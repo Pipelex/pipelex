@@ -731,8 +731,8 @@ def _bundle_run_source(run_request: RunRequest) -> Generator[_BundleRunSource, N
     every file of theirs is written into a temp directory of its own, as `<tmp>/<name>/…`,
     which the engine searches first for an address-based reference and never writes, so a
     shipped package wins over an installed copy and ends with the request. The other `.mthds`
-    paths are refused with a `422` naming the entry (`partition_bundle_entries`), and so is a
-    bundle whose only `.mthds` files are shipped ones.
+    paths are refused with a `422` naming the entry (`partition_bundle_entries`), and so are two
+    shipped packages declaring the same address and a bundle whose only `.mthds` files are shipped ones.
 
     No bundle → yields the request's own `mthds_contents` and no directory (the classic path,
     unchanged). Each temp dir is created only when it has files, and cleaned up on exit.

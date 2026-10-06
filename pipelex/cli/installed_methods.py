@@ -63,11 +63,11 @@ def _read_provenance(*, method_dir: Path) -> MethodProvenance | None:
     provenance_path = method_dir / PROVENANCE_FILENAME
     if not provenance_path.is_file():
         return None
-    content = provenance_path.read_text(encoding="utf-8")
     try:
-        return MethodProvenance.model_validate_json(content)
+        # Validated from the bytes, so pydantic reports a sidecar that is not UTF-8 as invalid JSON too.
+        return MethodProvenance.model_validate_json(provenance_path.read_bytes())
     except ValidationError:
-        # A hand-edited or stale sidecar must not break discovery — the method is still usable,
+        # A hand-edited, stale or corrupt sidecar must not break discovery — the method is still usable,
         # it just has no recorded provenance.
         return None
 

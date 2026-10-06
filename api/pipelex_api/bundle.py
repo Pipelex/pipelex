@@ -19,7 +19,8 @@ A bundle may also ship the method packages it calls by address, each under
 `.mthds/methods/<name>/` at its root with its `METHODS.toml` there, the layout the
 standard names the local method cache. `partition_bundle_entries` sorts the entries
 into the bundle's own `.mthds` files, its other files, and those packages, refusing
-every other `.mthds` path with a `422 InvalidBundle` naming the entry, and
+every other `.mthds` path with a `422 InvalidBundle` naming the entry, and two
+packages declaring the same address with one naming both directories, and
 `materialized_methods_dir` writes the packages into a temp directory of their own,
 `<tmp>/<name>/…`, which the runner hands the engine as `methods_dirs`. In a sandbox-hosted
 deployment the load path reads every `.py` as source text, never importing it:
@@ -163,16 +164,29 @@ def _entries_from_zip(bundle_b64: str) -> list[tuple[PurePosixPath, bytes]]:
 
 
 def _entries_from_files(files: dict[str, str]) -> list[tuple[PurePosixPath, bytes]]:
-    """Validate a {relpath: text} map and return its (safe relpath, bytes) entries."""
+    r"""Validate a {relpath: text} map and return its (safe relpath, bytes) entries.
+
+    JSON can carry a lone surrogate as an escape (`"\ud800"`), which has no UTF-8 form, so an entry whose name or
+    content holds one is refused with a `422` naming it rather than failing later, when it is encoded or written.
+    """
     _guard_count(len(files))
     entries: list[tuple[PurePosixPath, bytes]] = []
     total_bytes = 0
     for name, content in files.items():
+        try:
+            name.encode("utf-8")
+        except UnicodeEncodeError:
+            msg = f"Bundle entry {name!r} has a name holding a lone surrogate, which is not valid Unicode text"
+            raise_validation_error(message=msg, error_type=ErrorType.INVALID_BUNDLE)
         relpath = _safe_relpath(name)
         if not relpath.parts:
             msg = f"Bundle entry {name!r} has no filename"
             raise_validation_error(message=msg, error_type=ErrorType.INVALID_BUNDLE)
-        data = content.encode("utf-8")
+        try:
+            data = content.encode("utf-8")
+        except UnicodeEncodeError:
+            msg = f"Bundle entry {name!r} holds a lone surrogate, which is not valid Unicode text"
+            raise_validation_error(message=msg, error_type=ErrorType.INVALID_BUNDLE)
         total_bytes += len(data)
         _guard_running_total(total_bytes)
         entries.append((relpath, data))
@@ -275,6 +289,27 @@ def _vendored_package(*, owner: str, name: str, entries: list[tuple[PurePosixPat
     return VendoredMethodPackage(name=name, full_address=f"{manifest.address}/{package_name}", entries=tuple(entries))
 
 
+def _refuse_shared_identities(*, owner: str, packages: tuple[VendoredMethodPackage, ...]) -> None:
+    """Refuse shipped packages a reference could not tell apart, rather than let the directory order pick one.
+
+    A reference is matched against a package's full address without regard to case, as the engine's lookup compares it,
+    so two packages whose full addresses differ only in case are one identity too.
+    """
+    by_identity: dict[str, list[VendoredMethodPackage]] = {}
+    for package in packages:
+        by_identity.setdefault(package.full_address.casefold(), []).append(package)
+    for sharing in by_identity.values():
+        if len(sharing) < 2:
+            continue
+        directories = ", ".join(f"'.mthds/methods/{package.name}/'" for package in sharing)
+        msg = (
+            f"{owner} ships several method packages declaring the address '{sharing[0].full_address}': {directories}. "
+            "A reference matches a package by its address without regard to case, so it could not tell them apart: "
+            "ship one package per address."
+        )
+        raise_validation_error(message=msg, error_type=ErrorType.INVALID_BUNDLE)
+
+
 def partition_bundle_entries(entries: tuple[tuple[PurePosixPath, bytes], ...], *, owner: str = "Bundle") -> BundlePartition:
     """Sort a bundle's entries into its own `.mthds` files, its other files, and the method packages it ships.
 
@@ -284,8 +319,10 @@ def partition_bundle_entries(entries: tuple[tuple[PurePosixPath, bytes], ...], *
     elsewhere under `.mthds/`, a `.mthds/methods/` store below the root, a file directly under `.mthds/methods/`, and a
     `.mthds/` inside a shipped package, whose own dependencies are not loaded. A shipped package must be a directory
     whose name does not start with a dot and whose `METHODS.toml` parses, and the address that manifest declares is read
-    here, to name the package in a refusal. Counting the bundle's own `.mthds` files is the caller's: a bundle whose only
-    `.mthds` files are shipped ones has no content of its own.
+    here, to name the package in a refusal. Two shipped packages declaring the same full address, compared without regard
+    to case as a reference is matched, are refused too, naming the address and both directories, since nothing but their
+    directory order would decide which one answers. Counting the bundle's own `.mthds` files is the caller's: a bundle
+    whose only `.mthds` files are shipped ones has no content of its own.
 
     Args:
         entries: The bundle's `(safe relpath, bytes)` entries.
@@ -319,6 +356,7 @@ def partition_bundle_entries(entries: tuple[tuple[PurePosixPath, bytes], ...], *
     vendored_packages = tuple(
         _vendored_package(owner=owner, name=name, entries=package_entries) for name, package_entries in vendored_entries.items()
     )
+    _refuse_shared_identities(owner=owner, packages=vendored_packages)
     return BundlePartition(mthds_entries=tuple(mthds_entries), library_entries=tuple(library_entries), vendored_packages=vendored_packages)
 
 

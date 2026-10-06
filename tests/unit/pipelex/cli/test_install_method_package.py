@@ -83,6 +83,28 @@ class TestInstallMethodPackage:
         assert installed.provenance is None
         assert not (installed.path / PROVENANCE_FILENAME).exists()
 
+    @pytest.mark.parametrize(
+        "sidecar",
+        [
+            pytest.param(b"\xff\xfe garbage", id="not-utf8"),
+            pytest.param(b"{not json", id="not-json"),
+            pytest.param(b'{"address": "x"}', id="not-provenance"),
+        ],
+    )
+    def test_discovery_reads_an_unreadable_sidecar_as_no_provenance(self, tmp_path: Path, sidecar: bytes) -> None:
+        """A sidecar discovery cannot read, whatever the reason, leaves the method usable with no recorded provenance."""
+        package_dir = _make_package_dir(tmp_path)
+        methods_dir = tmp_path / "methods"
+        installed = install_method_package(package_dir=package_dir, name="scoring", provenance=PROVENANCE, methods_dir=methods_dir)
+        (installed.path / PROVENANCE_FILENAME).write_bytes(sidecar)
+
+        methods = discover_installed_methods(include_global=False, include_project=False, extra_search_dirs=[methods_dir])
+        found = find_method_by_full_address(FULL_ADDRESS, methods=methods)
+
+        assert found is not None
+        assert found.path == installed.path
+        assert found.provenance is None
+
     def test_install_refuses_a_target_occupied_by_a_non_package(self, tmp_path: Path) -> None:
         """An existing target directory that is not a method package is never overwritten."""
         package_dir = _make_package_dir(tmp_path)

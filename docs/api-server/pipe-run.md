@@ -232,7 +232,7 @@ The server materializes the bundle into a temporary library directory for the ru
 
 - A hard **file-count** ceiling (`MAX_BUNDLE_FILES`) and a **total decompressed-size** ceiling (`MAX_BUNDLE_TOTAL_KIB`) → `413 PayloadTooLarge`. The zip path bounds actual decompression, so a zip bomb cannot expand past the ceiling, and an oversized `bundle_b64` is refused on its encoded length *before* it is decoded into memory.
 - **Path safety:** entry names that are absolute, use `..` traversal, use backslashes, or carry a Windows drive/`:` form → `422 InvalidBundle`.
-- Supplying **both** `bundle_b64` and `files`, an empty bundle, or a corrupt zip → `422 InvalidBundle`; invalid base64 → `400 InvalidBase64`.
+- Supplying **both** `bundle_b64` and `files`, an empty bundle, a corrupt zip, or a `files` entry whose name or text holds a lone surrogate (which JSON can escape but UTF-8 cannot encode) → `422 InvalidBundle`; invalid base64 → `400 InvalidBase64`.
 
 **Sandbox-hosted only for custom Python.** A bundle that ships any `.py` is honored **only on a sandbox-hosted deployment**, where the load path reads the source without importing it and execution happens in an isolated sandbox. On a non-hosted deployment such a bundle is refused with `403 CustomCodeRequiresSandbox` — running caller-supplied code in-process is never done implicitly. A bundle that carries only `.mthds` (no `.py`) is accepted on any deployment.
 
@@ -254,13 +254,14 @@ bundle.mthds
 - **Its Python never runs in the server's process.** A `.py` file in a shipped package counts for the sandbox gate like any other, so a deployment that is not sandbox-hosted refuses the bundle with `403 CustomCodeRequiresSandbox`. On a sandbox-hosted deployment, a shipped package whose Python declares a structure class is refused with `403 MethodStructuresRefusedError` naming the package's address, as a package fetched by address is.
 - **A shipped bundle that does not parse refuses the run** with the `422` verdict, whose items name the file as `<address>/<path inside the package>`, never by a path on the server.
 
-Any other `.mthds` path in the bundle is refused with `422 InvalidBundle`, naming the entry and the expected layout, rather than dropped:
+Any other `.mthds` path in the bundle is refused with `422 InvalidBundle`, naming the entry and the expected layout, rather than dropped, and so are shipped packages a reference could not tell apart:
 
 - a file under `.mthds/` outside `.mthds/methods/<name>/`, such as `.mthds/foo` or a file directly under `.mthds/methods/`;
 - a `.mthds/methods/` directory below the bundle's root, such as `sub/.mthds/methods/…`;
 - a `.mthds/` directory inside a shipped package, since a package's own dependencies are not loaded;
 - a package directory whose name starts with a dot;
-- a package directory without a `METHODS.toml`, or whose `METHODS.toml` is not a valid manifest.
+- a package directory without a `METHODS.toml`, or whose `METHODS.toml` is not a valid manifest;
+- two package directories whose manifests declare the same address and name, compared without regard to case as a reference is matched, the name being the directory's when the manifest has none. The refusal names the address and each directory, since nothing but their order would decide which one answers.
 
 Shipping packages is a feature of the run routes. `POST /v1/validate` takes `mthds_contents` or `method_ref`, and a package reference in the validated content resolves there through the server's installed copies and fetch-on-miss only.
 

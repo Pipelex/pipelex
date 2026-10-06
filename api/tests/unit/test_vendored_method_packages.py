@@ -6,9 +6,12 @@ package is the only one that can answer, or, where a test installs a competing c
 invented package's entry composes a text naming its copy, which a dry run renders too, so the output tells which ran.
 """
 
+import base64
+import io
 import json
 import tempfile
-from collections.abc import Callable, Generator
+import zipfile
+from collections.abc import Callable, Generator, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -132,6 +135,15 @@ def _execute_vendored(client: TestClient, *, files: dict[str, str]) -> Any:
     return client.post("/v1/execute", json={"files": files, "inputs": {"text": "hello"}})
 
 
+def _zip_b64(files: Mapping[str, str | bytes]) -> str:
+    """A `bundle_b64` of the files, which, unlike a `files` map, can carry bytes that are not text."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, content in files.items():
+            archive.writestr(name, content)
+    return base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
 class TestVendoredMethodPackages:
     def test_a_shipped_package_answers_the_call_with_fetching_off(self, mocker: MockerFixture, tmp_path: Path):
         client = _build_client(mocker, tmp_path=tmp_path)
@@ -155,6 +167,16 @@ class TestVendoredMethodPackages:
         run_output = _run_output(response.json())
         assert f"{VENDORED_PROBE_MARKER}: hello" in run_output
         assert _INSTALLED_MARKER not in run_output
+
+    def test_a_shipped_provenance_sidecar_that_is_not_utf8_is_ignored(self, mocker: MockerFixture, tmp_path: Path):
+        """A sidecar the server cannot read records no provenance, as an unparsable one does, and the shipped copy runs."""
+        client = _build_client(mocker, tmp_path=tmp_path)
+        bundle_b64 = _zip_b64({**VENDORED_PROBE_FILES, ".mthds/methods/probe/.provenance.json": b"\xff\xfe garbage"})
+
+        response = client.post("/v1/execute", json={"bundle_b64": bundle_b64, "inputs": {"text": "hello"}})
+
+        assert response.status_code == 200, response.text
+        assert f"{VENDORED_PROBE_MARKER}: hello" in _run_output(response.json())
 
     def test_start_hands_the_job_a_library_holding_the_shipped_package(self, mocker: MockerFixture, tmp_path: Path):
         orchestrator = _RecordingOrchestrator()
@@ -213,6 +235,27 @@ class TestVendoredMethodPackages:
 
         assert response.status_code == 200, response.text
         assert f"{VENDORED_PROBE_MARKER}: hello" in _run_output(response.json())
+
+    def test_a_method_ref_package_shipping_one_identity_twice_is_refused(
+        self, mocker: MockerFixture, tmp_path: Path, install_method_package: Callable[..., Path]
+    ):
+        shipped_twice = {
+            f".mthds/methods/{directory}/{relpath.removeprefix('.mthds/methods/probe/')}": content
+            for directory in ("a", "b")
+            for relpath, content in _package_vendoring_files().items()
+        }
+        install_method_package(files={"smoke.mthds": UNRESOLVED_PACKAGE_MTHDS, **shipped_twice})
+        client = _build_client(mocker, tmp_path=tmp_path)
+
+        response = client.post("/v1/execute", json={"method_ref": _METHOD_REF, "inputs": {"text": "hello"}})
+
+        assert response.status_code == 422, response.text
+        body = response.json()
+        assert body["error_type"] == "InvalidBundle"
+        assert f"Method package '{STUB_METHOD_ADDRESS}'" in body["detail"]
+        assert VENDORED_PROBE_ADDRESS in body["detail"]
+        assert "'.mthds/methods/a/'" in body["detail"]
+        assert "'.mthds/methods/b/'" in body["detail"]
 
     def test_a_method_ref_package_keeps_its_shipped_files_apart(self, install_method_package: Callable[..., Path]):
         install_method_package(files={"smoke.mthds": UNRESOLVED_PACKAGE_MTHDS, **_package_vendoring_files()})
