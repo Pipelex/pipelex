@@ -6,9 +6,16 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.doc_gen.doc_gen_format import parse_doc_gen_choice_key
-from pipelex.cogt.exceptions import ModelManagerError, PluginModelDeclarationError
+from pipelex.cogt.exceptions import (
+    InferenceBackendCredentialsError,
+    InferenceBackendCredentialsErrorType,
+    ModelManagerError,
+    PluginModelDeclarationError,
+)
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.cogt.model_backends.backend import InferenceBackend, PipelexBackend
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
+from pipelex.cogt.model_backends.credential_resolution import CredentialResolution
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.model_routing.routing_models import BackendMatchingMethod
@@ -78,7 +85,9 @@ class ModelManager(ModelManagerAbstract):
             secrets_provider=secrets_provider,
             backends_library_paths=backends_library_paths or config_manager.backends_file_paths(),
             backends_dir_path=resolved_backends_dir_path,
-            lenient=not needs_inference,
+            # A keyless boot knows every enabled backend's models and resolves no credential; the boot
+            # that needs inference resolves every one and refuses to start without it.
+            credentials=CredentialResolution.REQUIRE if needs_inference else CredentialResolution.SKIP,
         )
         # The loader parks its stale-configuration warning rather than logging it, so that the
         # doctor's per-backend probe — which loads the whole library once per backend — does not
@@ -96,7 +105,6 @@ class ModelManager(ModelManagerAbstract):
         self._routing_profile = load_active_routing_profile(
             routing_profile_library_paths=routing_profile_library_paths or config_manager.routing_profiles_file_paths(),
             enabled_backends=enabled_backends,
-            lenient=not needs_inference,
         )
         model_deck_paths = ModelManager.get_model_deck_paths(deck_dir_path=deck_dir_path or str(config_manager.model_decks_dir_path))
         deck_blueprint = load_model_deck_blueprint(
@@ -248,8 +256,41 @@ class ModelManager(ModelManagerAbstract):
 
     @override
     def get_required_inference_backend(self, backend_name: str) -> InferenceBackend:
+        """The backend a worker calls, refused when this process left its credentials unresolved.
+
+        Every reader of a backend's credentials reaches it here, so this one check keeps a keyless
+        boot's unset key and endpoint away from every provider client. A keyless boot forces its own
+        runs to DRY, so only a keyless process executing live work for another one, as a Temporal
+        worker can, gets this far; it is told why rather than sending a provider no key.
+
+        Raises:
+            ModelManagerError: No such backend is loaded.
+            InferenceBackendCredentialsError: The backend's credentials were not resolved, because the
+                process booted without inference.
+        """
         backend = self.inference_backend_library.get_inference_backend(backend_name)
         if backend is None:
             msg = f"Inference backend '{backend_name}' not found"
             raise ModelManagerError(msg)
+        if backend.unresolved_credentials:
+            unresolved_description = ", ".join(
+                f"{field_name} ({', '.join(var_names)})" if var_names else field_name
+                for field_name, var_names in backend.unresolved_credentials.items()
+            )
+            unresolved_var_names = backend.unresolved_credential_vars
+            msg = (
+                f"Inference backend '{backend_name}' cannot be called by this process: it booted without inference "
+                f"(needs_inference=False), which loads every backend's models but resolves none of their credentials. "
+                f"Left unresolved: {unresolved_description}."
+            )
+            raise InferenceBackendCredentialsError(
+                credentials_error_type=InferenceBackendCredentialsErrorType.NOT_RESOLVED_ON_KEYLESS_BOOT,
+                backend_name=backend_name,
+                message=msg,
+                key_name=unresolved_var_names[0] if unresolved_var_names else next(iter(backend.unresolved_credentials)),
+                user_action=UserAction(
+                    kind=UserActionKind.CHECK_CREDENTIALS,
+                    detail="Boot the process that calls this backend with needs_inference=True, with its credentials set",
+                ),
+            )
         return backend

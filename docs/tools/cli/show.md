@@ -102,6 +102,8 @@ pipelex show backends [OPTIONS]
 
 Displays all configured inference backends and the active routing profile with its routing rules.
 
+The command does not resolve credentials, so it works on a machine that holds no key: every enabled backend is listed, with the variables it reads its credentials from. An endpoint read from a variable is shown as not resolved, by the name of its variable.
+
 **Options:**
 
 - `--all`, `-a` - Show all backends including disabled ones (by default, only enabled backends are shown)
@@ -118,7 +120,7 @@ pipelex show backends --all
 
 **What it displays:**
 
-- Table of configured backends with status, endpoint, and model count
+- Table of configured backends with status, endpoint, credential variables, and model count
 - Active routing profile name and description
 - Default backend for the profile
 - Routing rules mapping model patterns to backends

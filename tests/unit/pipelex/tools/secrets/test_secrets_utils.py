@@ -110,6 +110,13 @@ class TestSubstituteVars:
         with pytest.raises(VarNotFoundError, match="Could not get variable 'MISSING_SECRET': Secret not found"):
             substitute_vars("Value: ${MISSING_SECRET}", secrets_provider=mock_secrets_provider)
 
+    def test_an_unknown_prefix_after_a_candidate_that_resolves_is_refused(self, mocker: MockerFixture, mock_secrets_provider: Any) -> None:
+        """The verdict on the syntax does not wait on which candidate resolves first."""
+        mocker.patch.dict(os.environ, {"FIRST_CANDIDATE": "resolved"})
+
+        with pytest.raises(UnknownVarPrefixError, match="Unknown variable prefix: 'secrte'"):
+            substitute_vars("${env:FIRST_CANDIDATE|secrte:SECOND_CANDIDATE}", secrets_provider=mock_secrets_provider)
+
     def test_fallback_both_missing_raises_error(self, mock_secrets_provider: Any) -> None:
         mock_secrets_provider.get_secret.side_effect = SecretNotFoundError("Secret not found")
 

@@ -18,6 +18,7 @@ from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import ErrorContext
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
+from pipelex.cogt.model_backends.credential_resolution import CredentialResolution
 from pipelex.cogt.model_backends.model_lists import ModelLister
 from pipelex.interpreter_hub import get_library_manager, get_pipe_library, get_required_entry_pipe, resolve_library_dirs, set_current_library
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
@@ -75,7 +76,7 @@ def do_show_backends(*, show_all: bool = False) -> None:
                 backends_library_paths=config_manager.backends_file_paths(),
                 backends_dir_path=str(config_manager.backends_dir_path),
                 include_disabled=True,
-                lenient=True,
+                credentials=CredentialResolution.SKIP,
             )
         else:
             backend_library = models_manager.inference_backend_library
@@ -108,17 +109,29 @@ def do_show_backends(*, show_all: bool = False) -> None:
     if show_all:
         backends_table.add_column("Status", style="yellow")
     backends_table.add_column("Endpoint", style="blue")
+    backends_table.add_column("Credential variables", style="magenta")
     backends_table.add_column("Models", style="cyan", justify="right")
 
     for backend in sorted(backends_to_display, key=lambda b: b.name):
-        endpoint = backend.endpoint or "[dim]N/A[/dim]"
+        # This command boots without inference, which keeps every backend and resolves no credential:
+        # an endpoint read from a variable is shown by its variable, never by a value it never looked up.
+        if backend.endpoint:
+            endpoint = escape(backend.endpoint)
+        elif endpoint_var_names := backend.unresolved_credentials.get("endpoint"):
+            endpoint = f"[dim]not resolved ({escape(', '.join(endpoint_var_names))})[/dim]"
+        elif "endpoint" in backend.unresolved_credentials:
+            endpoint = "[dim]not resolved[/dim]"
+        else:
+            endpoint = "[dim]N/A[/dim]"
+        # A variable name is the user's text, and the placeholder syntax allows brackets in it.
+        credential_variables = escape(", ".join(backend.unresolved_credential_vars)) or "[dim]none[/dim]"
         model_count = str(len(backend.model_specs))
 
         if show_all:
             status = "[green]Enabled[/green]" if backend.enabled else "[red]Disabled[/red]"
-            backends_table.add_row(backend.name, status, endpoint, model_count)
+            backends_table.add_row(backend.name, status, endpoint, credential_variables, model_count)
         else:
-            backends_table.add_row(backend.name, endpoint, model_count)
+            backends_table.add_row(backend.name, endpoint, credential_variables, model_count)
 
     console.print("\n")
     console.print(backends_table)
@@ -168,6 +181,7 @@ def do_show_backends(*, show_all: bool = False) -> None:
             console.print(f"[dim]💡 Showing {enabled_count} enabled backend(s). {disabled_count} disabled backend(s) hidden.[/dim]")
             console.print("[dim]   To see all backends: [bold]pipelex show backends --all[/bold][/dim]\n")
 
+    console.print("[dim]💡 This command does not resolve credentials: it lists the variables each backend reads them from.[/dim]")
     console.print("[dim]💡 To enable more backends, edit: [bold].pipelex/inference/backends.toml[/bold][/dim]")
     console.print("[dim]💡 To list available models for a backend: [bold]pipelex show models <backend_name>[/bold][/dim]\n")
     get_telemetry_manager().track_event(EventName.BACKENDS_SHOW, properties={EventProperty.NB_BACKENDS: len(all_backends)})
