@@ -46,6 +46,13 @@ class TestMistralStructuredRequest:
         assert is_unset(request, "reasoning_effort")
         assert request["temperature"] == 0.5
 
+    async def test_a_model_refusing_temperature_omits_it(self, mocker: MockerFixture) -> None:
+        worker, complete_async = make_worker(mocker, thinking_mode=ThinkingMode.MANUAL, response=tool_call_response(), accepts_temperature=False)
+
+        await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
+        assert is_unset(sent_request(complete_async), "temperature")
+
     async def test_a_model_without_reasoning_refuses_it_as_its_text_path_does(self, mocker: MockerFixture) -> None:
         worker, complete_async = make_worker(mocker, thinking_mode=ThinkingMode.NONE, response=tool_call_response())
         llm_job = make_llm_job(mocker)
