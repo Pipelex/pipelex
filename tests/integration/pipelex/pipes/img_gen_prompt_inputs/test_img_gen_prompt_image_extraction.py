@@ -39,7 +39,7 @@ class TestImgGenPromptImageExtraction:
 
         blueprint = PipeImgGenBlueprint(
             description="Test dotted path image in img_gen prompt",
-            inputs={"page.page_view": "Image", "page": "Page"},
+            inputs={"page": "Page"},
             output="Image",
             prompt="Edit this image: {{ page.page_view }}",
         )
@@ -95,7 +95,7 @@ class TestImgGenPromptImageExtraction:
 
         blueprint = PipeImgGenBlueprint(
             description="Test dollar dotted path image in img_gen prompt",
-            inputs={"page.page_view": "Image", "page": "Page"},
+            inputs={"page": "Page"},
             output="Image",
             prompt="Edit this image: $page.page_view",
         )
@@ -150,7 +150,7 @@ class TestImgGenPromptImageExtraction:
 
         blueprint = PipeImgGenBlueprint(
             description="Test at dotted path image in img_gen prompt",
-            inputs={"page.page_view": "Image", "page": "Page"},
+            inputs={"page": "Page"},
             output="Image",
             prompt="Edit this image:\n@page.page_view",
         )

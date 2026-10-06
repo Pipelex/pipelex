@@ -79,7 +79,7 @@ Provide a comprehensive assessment.
 [pipe.evaluate_all_ideas]
 type = "PipeLLM"
 description = "Evaluate and rank all analyzed ideas"
-inputs = { detailed_analyses = "IdeaAnalysis" }
+inputs = { detailed_analyses = "IdeaAnalysis[]" }
 output = "IdeaEvaluation"
 model = "$testing-text"
 prompt = """

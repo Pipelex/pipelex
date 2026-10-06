@@ -26,8 +26,8 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.graph.graph_tracer_manager import GraphTracerManager, IOSpec, NodeKind
 from pipelex.graph.stuff_io_spec import make_stuff_io_spec
 from pipelex.libraries.library_crate import LibraryCrate
+from pipelex.pipe_machinery.memory_writes import MemoryWrite
 from pipelex.pipe_machinery.pipe_blueprint import PipeCategory, PipeType, valid_pipe_type_tags
-from pipelex.pipe_machinery.validation import is_variable_satisfied_by_inputs
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError
 from pipelex.pipeline.pipeline_factory import PipelineFactory
@@ -47,7 +47,7 @@ from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_identity import make_run_identity_span_attributes
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.package_utils import get_package_version
-from pipelex.tools.misc.string_utils import is_snake_case
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path, is_snake_case
 from pipelex.validation_error_types import PipeValidationErrorType
 
 if TYPE_CHECKING:
@@ -71,7 +71,8 @@ class CompanionSlot(NamedTuple):
     """
 
     slot_name: str
-    concept: Concept
+    # The concept of the empty list a plural slot resolves to; `None` for a slot whose spec is unknown, which is never plural.
+    concept: Concept | None
     is_plural: bool
     producing_pipe_code: str
 
@@ -329,12 +330,19 @@ class PipeAbstract(ABC, BaseModel):
             for var_name, declared_stuff_spec in self.inputs.root.items()
         }
 
+    def refuse_undeclared_needed_input(self, *, variable_name: str) -> None:
+        """Raise a pipe's own refusal of a needed input it does not declare, before the generic one; nothing by default.
+
+        A controller whose need is better named than "required variable" overrides it: a PipeSequence asks, for a
+        binding step's root, for the concept whose structure holds the path the binding walks.
+        """
+
     @final
     def generic_validate_inputs_with_library(self):
-        # First validate required variables are in the inputs (using prefix-based matching)
+        # First validate required variables are in the inputs: a variable path reads the input its root names
         input_names = set(self.inputs.variables)
         for required_variable_path in self.required_variables():
-            if not is_variable_satisfied_by_inputs(required_variable_path, input_names=input_names):
+            if get_root_from_dotted_path(required_variable_path) not in input_names:
                 msg = (
                     f"Required variable '{required_variable_path}' is not in the inputs of pipe '{self.code}'. "
                     f"Current inputs: {self.inputs.format_for_display()}"
@@ -355,6 +363,7 @@ class PipeAbstract(ABC, BaseModel):
             var_name = named_stuff_spec.variable_name
 
             if var_name not in self.inputs.variables:
+                self.refuse_undeclared_needed_input(variable_name=var_name)
                 msg = f"Required variable '{var_name}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs.format_for_display()}"
                 raise PipeValidationError(
                     message=msg,
@@ -371,7 +380,7 @@ class PipeAbstract(ABC, BaseModel):
                 # Compare the essential parts of StuffSpec (concept code + multiplicity)
                 # Skip validation if the needed stuff_spec is Dynamic or Anything (flexible output types)
                 declared_stuff_spec = self.inputs.root[var_name]
-                needed_stuff_spec = the_needed_inputs.root[named_stuff_spec.requirement_expression or var_name]
+                needed_stuff_spec = the_needed_inputs.root[var_name]
 
                 # Allow mismatch if the needed stuff_spec is a flexible type (Dynamic or Anything).
                 # Presence markers are deliberately NOT compared: a controller's boundary marker may
@@ -614,6 +623,19 @@ class PipeAbstract(ABC, BaseModel):
 
         """
 
+    def memory_writes(self, *, visited_pipes: set[str] | None = None) -> dict[str, MemoryWrite]:  # ruff: ignore[unused-method-argument] (the overrides recurse)
+        """What the pipe stores in the working memory it runs on, besides its own result, which its caller names.
+
+        Each name maps to what it holds once the pipe returns: its spec, why it may hold an absence, and whether every run
+        stores it (`MemoryWrite`). An operator stores only its result, so it stores nothing more. A controller that runs its
+        steps or its outcome on its caller's memory, rather than on copies, overrides this, and its calling sequence's
+        typed flow, needed inputs and absence-taint walk all read what it stores from here.
+
+        Args:
+            visited_pipes: The `visit_key` of each pipe currently being processed, to prevent infinite recursion.
+        """
+        return {}
+
     def _format_pipe_run_info(self, pipe_run_params: PipeRunParams) -> str:
         indent_level = len(pipe_run_params.pipe_stack) - 1
         indent = "   " * indent_level
@@ -855,9 +877,26 @@ class PipeAbstract(ABC, BaseModel):
 
     def lifted_companion_slots(self) -> list[CompanionSlot]:
         """Extra slots this pipe would have written besides its main output, to resolve when it
-        is lifted. Default: none; an `add_each_output` PipeParallel reports its branch slots.
+        is lifted: every name its `memory_writes` always stores, so a name its caller's analyses
+        count as stored is never left holding neither a value nor an absence. A name only some
+        runs store is left as the caller had it, which those analyses already allow for. An
+        operator stores nothing more; an `add_each_output` PipeParallel reports its branch slots
+        with the branch pipe that produces each.
         """
-        return []
+        companion_slots: list[CompanionSlot] = []
+        for slot_name, memory_write in self.memory_writes().items():
+            if not memory_write.is_always_written:
+                continue
+            stuff_spec = memory_write.stuff_spec
+            companion_slots.append(
+                CompanionSlot(
+                    slot_name=slot_name,
+                    concept=stuff_spec.concept if stuff_spec is not None else None,
+                    is_plural=stuff_spec is not None and stuff_spec.is_multiple(),
+                    producing_pipe_code=self.code,
+                )
+            )
+        return companion_slots
 
     @classmethod
     def _make_skip_reason(cls, *, liftable: list[AbsentInput]) -> str:
@@ -920,7 +959,7 @@ class PipeAbstract(ABC, BaseModel):
                 producing_pipe=companion_slot.producing_pipe_code,
                 upstream=lifted_input.absence_record,
             )
-            if companion_slot.is_plural:
+            if companion_slot.is_plural and companion_slot.concept is not None:
                 empty_companion_stuff = Stuff(
                     concept=companion_slot.concept,
                     content=ListContent[StuffContent](items=[]),

@@ -545,6 +545,9 @@ class InferenceBackendCredentialsErrorType(StrEnum):
     VAR_NOT_FOUND = "var_not_found"
     UNKNOWN_VAR_PREFIX = "unknown_var_prefix"
     VAR_FALLBACK_PATTERN = "var_fallback_pattern"
+    # The process booted without inference, which loads every backend but resolves no credential,
+    # and was then asked for a backend to call.
+    NOT_RESOLVED_ON_KEYLESS_BOOT = "not_resolved_on_keyless_boot"
 
 
 class InferenceBackendCredentialsError(CogtError):
@@ -560,10 +563,22 @@ class InferenceBackendCredentialsError(CogtError):
         backend_name: str,
         message: str,
         key_name: str,
+        user_action: UserAction | None = None,
     ):
+        """A credential a backend needs that this process does not hold.
+
+        Args:
+            credentials_error_type: Why the credential is missing.
+            backend_name: The backend whose credential it is.
+            message: The error's message.
+            key_name: The variable the credential is read from, or the field when no variable names it.
+            user_action: This error's own next step, when the class's ("set the variable") is not it.
+        """
         self.credentials_error_type = credentials_error_type
         self.backend_name = backend_name
         self.key_name = key_name
+        if user_action is not None:
+            self.user_action = user_action
         super().__init__(message)
 
 

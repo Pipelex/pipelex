@@ -65,6 +65,27 @@ class PipelexBundleBlueprintValidationErrorData(BaseModel):
     # rename, ``None`` for a ``main_pipe`` value strip (which is a root ``set_key``, not a rename).
     stripped_pipe_code: str | None = None
 
+    # A dotted input name whose root the same `inputs` table also declares (``delete-redundant-dotted-input``
+    # enrichment), set on an ``invalid_input_name`` error only when it holds: the declared root already
+    # supplies every field a template reads through it, so the planner can delete the key. A lone dotted
+    # name or a malformed one leaves it unset, because its repair is the author's to choose.
+    redundant_input_name: str | None = None
+
+    # Set beside ``redundant_input_name`` only when deleting that key would change its root's contract: the marker
+    # the key declares, as MTHDS writes it after the concept (``!``, ``[]``, or the empty string for a plain single
+    # value). As the last declaration under its root, the key set the root's presence and multiplicity, so the
+    # planner offers the deletion as unsafe. Unset, the deletion is safe.
+    dropped_input_marker: str | None = None
+
+    # Set together with ``dropped_input_marker``: the marker the root declares, written the same way. The planner's
+    # warning compares the two markers' multiplicity and presence apart, and names only the part that differs.
+    root_input_marker: str | None = None
+
+    # Set beside ``redundant_input_name`` only when the root's declared concept does not hold the field the dotted key named,
+    # as the binding walk over the bundle's own concepts finds: the walk's refusal. Deleting the key would then leave the
+    # root typed by a concept that lacks the field, so the planner offers the deletion as unsafe, whatever the markers say.
+    redundant_input_unwalkable_reason: str | None = None
+
 
 class PipesAndConceptValidationErrorData(BaseModel):
     """Structured validation error data for Pipe/Concept validation errors.

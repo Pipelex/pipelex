@@ -1,0 +1,12 @@
+name = "invalid_binding_path_unresolved_through_a_dict"
+description = "An order reference bound through a dict of references, whose keys no structure declares"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.binding_path_unresolved",
+]
+
+expected_error = "binding_path_unresolved"

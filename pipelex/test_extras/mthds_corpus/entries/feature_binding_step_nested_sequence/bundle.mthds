@@ -1,0 +1,36 @@
+domain      = "bakery_orders"
+description = "Confirming a bakery order through a confirmation sub-flow"
+main_pipe   = "confirm_order"
+
+[concept.BakeryOrder]
+description = "An order placed at a bakery for a given day"
+
+[concept.BakeryOrder.structure]
+customer = { type = "text", description = "Who placed the order", required = true }
+loaves   = { type = "integer", description = "How many loaves were ordered", required = true }
+
+[pipe.confirm_order]
+type = "PipeSequence"
+description = "Calls the confirmation sub-flow for an order"
+inputs = { order = "BakeryOrder" }
+output = "Text"
+steps = [
+  { pipe = "write_confirmation_flow", result = "confirmation" },
+]
+
+[pipe.write_confirmation_flow]
+type = "PipeSequence"
+description = "Binds the loaf count of an order, then writes the confirmation"
+inputs = { order = "BakeryOrder" }
+output = "Text"
+steps = [
+  { from = "order.loaves", result = "loaf_count" },
+  { pipe = "write_confirmation", result = "confirmation" },
+]
+
+[pipe.write_confirmation]
+type        = "PipeCompose"
+description = "Writes the confirmation of a loaf count"
+inputs      = { loaf_count = "Number" }
+output      = "Text"
+template    = "Confirmed: $loaf_count loaves"

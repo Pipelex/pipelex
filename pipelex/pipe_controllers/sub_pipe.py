@@ -1,23 +1,22 @@
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from pipelex import log
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError, PipeRunInputsError
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
+from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
+from pipelex.core.pipes.variable_multiplicity import PresenceMarker, VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
-from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.interpreter_hub import get_pipe_router, get_required_pipe
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
-from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
-from pipelex.pipe_machinery.pipe_factory import PipeFactory
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
-from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
+from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams, output_multiplicity_to_apply
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
@@ -30,6 +29,44 @@ class SubPipe(BaseModel):
     output_name: str | None = None
     output_multiplicity: VariableMultiplicity | None = None
     batch_params: BatchParams | None = None
+
+    @field_validator("batch_params", mode="after")
+    @classmethod
+    def refuse_dotted_input_list(cls, batch_params: BatchParams | None) -> BatchParams | None:
+        """Refuse a batch over a dotted path: the sequence holding the step rewrites a dotted `batch_over` into a binding step
+        followed by a batch over the bound name, so a step only ever batches over a name in working memory.
+        """
+        if batch_params is not None and "." in batch_params.input_list_stuff_name:
+            msg = (
+                f"A step batches over the dotted path '{batch_params.input_list_stuff_name}': a step batches over a name in working memory, "
+                "and the PipeSequence holding it binds a dotted `batch_over` to a name of its own first."
+            )
+            raise ValueError(msg)
+        return batch_params
+
+    def result_spec(self, *, step_pipe: PipeAbstract) -> StuffSpec:
+        """The spec of what the step stores under its result, `step_pipe` being the pipe it runs, resolved as the run path resolves it.
+
+        A batched step stores the list of its branches' results, a `PipeBatch` wrapping the pipe: `X[]` whatever the pipe
+        outputs and whatever count the step asks for, since an absent branch result is dropped from the list, which is never
+        absent. Any other step stores the pipe's output, its multiplicity overridden by the step's `nb_output` or
+        `multiple_output`, and a single result keeps the pipe's presence.
+        """
+        if self.batch_params is not None:
+            return StuffSpec(concept=step_pipe.output.concept, multiplicity=True)
+        multiplicity_resolution = output_multiplicity_to_apply(
+            base_multiplicity=step_pipe.output.multiplicity,
+            override_multiplicity=self.output_multiplicity,
+        )
+        multiplicity: VariableMultiplicity | None
+        if not multiplicity_resolution.is_multiple_outputs_enabled:
+            multiplicity = None
+        elif multiplicity_resolution.specific_output_count is not None:
+            multiplicity = multiplicity_resolution.specific_output_count
+        else:
+            multiplicity = True
+        presence = step_pipe.output.presence if multiplicity is None else PresenceMarker.PLAIN
+        return StuffSpec(concept=step_pipe.output.concept, multiplicity=multiplicity, presence=presence)
 
     async def run_pipe(
         self,
@@ -52,86 +89,6 @@ class SubPipe(BaseModel):
         # Case 1: Batch processing
         if batch_params := self.batch_params:
             sub_pipe_run_params.batch_params = batch_params
-
-            # Pre-resolve dotted paths (e.g. "search_result.sources") before PipeBatch
-            synthetic_flat_name: str | None = None
-            input_list_stuff_name = batch_params.input_list_stuff_name
-            if "." in input_list_stuff_name:
-                try:
-                    # wanted_type=None: the nested attribute may be a plain list (not ListContent), so skip type checking here
-                    resolved = working_memory.get_typed_object_or_attribute(name=input_list_stuff_name, wanted_type=None)
-                except WorkingMemoryStuffNotFoundError as exc:
-                    msg = (
-                        f"Input list stuff named '{input_list_stuff_name}' required by sub_pipe '{self.pipe_code}' "
-                        f"of pipe '{calling_pipe_code}' not found in working memory: {exc}"
-                    )
-                    raise PipeRunInputsError(
-                        message=msg,
-                        run_mode=sub_pipe_run_params.run_mode,
-                        pipe_code=self.pipe_code,
-                        variable_name=input_list_stuff_name,
-                        concept_code=None,
-                    ) from exc
-
-                list_content: ListContent[StuffContent]
-                if isinstance(resolved, ListContent):
-                    list_content = cast("ListContent[StuffContent]", resolved)
-                elif isinstance(resolved, list):
-                    list_content = ListContent[StuffContent](items=cast("list[StuffContent]", resolved))
-                else:
-                    msg = (
-                        f"Dotted path '{input_list_stuff_name}' resolved to {type(resolved).__name__}, "
-                        f"expected ListContent or list for batch_over in sub_pipe '{self.pipe_code}' "
-                        f"of pipe '{calling_pipe_code}'"
-                    )
-                    raise PipeRunInputsError(
-                        message=msg,
-                        run_mode=sub_pipe_run_params.run_mode,
-                        pipe_code=self.pipe_code,
-                        variable_name=input_list_stuff_name,
-                        concept_code=None,
-                    )
-
-                # Inject resolved list under a synthetic flat name and update batch_params
-                synthetic_flat_name = input_list_stuff_name.replace(".", "__")
-                if working_memory.is_stuff_exists(name=synthetic_flat_name):
-                    msg = (
-                        f"Cannot use synthetic name '{synthetic_flat_name}' for dotted-path batch resolution "
-                        f"in sub_pipe '{self.pipe_code}' of pipe '{calling_pipe_code}': "
-                        f"a stuff with that name already exists in working memory"
-                    )
-                    raise PipeRunInputsError(
-                        message=msg,
-                        run_mode=sub_pipe_run_params.run_mode,
-                        pipe_code=self.pipe_code,
-                        variable_name=synthetic_flat_name,
-                        concept_code=None,
-                    )
-                try:
-                    item_stuff_spec = sub_pipe.inputs.get_required_stuff_spec(variable_name=batch_params.input_item_stuff_name)
-                except InputStuffSpecNotFoundError as exc:
-                    msg = (
-                        f"Batch input item named '{batch_params.input_item_stuff_name}' from '{calling_pipe_code}' is not "
-                        f"in SubPipe '{self.pipe_code}' input stuff specs: {sub_pipe.inputs}"
-                    )
-                    raise PipeRunInputsError(
-                        message=msg,
-                        run_mode=sub_pipe_run_params.run_mode,
-                        pipe_code=self.pipe_code,
-                        variable_name=batch_params.input_item_stuff_name,
-                        concept_code=None,
-                    ) from exc
-                synthetic_stuff = StuffFactory.make_stuff(
-                    concept=item_stuff_spec.concept,
-                    content=list_content,
-                    name=synthetic_flat_name,
-                )
-                working_memory.add_new_stuff(name=synthetic_flat_name, stuff=synthetic_stuff)
-                batch_params = BatchParams(
-                    input_list_stuff_name=synthetic_flat_name,
-                    input_item_stuff_name=batch_params.input_item_stuff_name,
-                )
-                sub_pipe_run_params.batch_params = batch_params
 
             try:
                 working_memory.get_typed_object_or_attribute(name=batch_params.input_list_stuff_name, wanted_type=ListContent)
@@ -162,45 +119,30 @@ class SubPipe(BaseModel):
                     variable_name=batch_params.input_item_stuff_name,
                     concept_code=None,
                 ) from exc
-            pipe_batch_blueprint = PipeBatchBlueprint(
-                description=f"Batch processing for {self.pipe_code}",
-                branch_pipe_code=self.pipe_code,
-                # The full concept_ref, not the bare code: the factory resolves a bare code in
-                # `domain_code` below (the sub-pipe's own domain), so a sub-pipe whose output concept
-                # lives in another domain would resolve to the wrong concept — or to nothing.
-                output=sub_pipe.output.concept.concept_ref,
-                input_list_name=batch_params.input_list_stuff_name,
-                input_item_name=batch_params.input_item_stuff_name,
-                inputs={
-                    batch_params.input_list_stuff_name: item_stuff_spec.concept.concept_ref,
-                },
-            )
-
-            # Derived from the resolved pipe's LOCAL code, not from `self.pipe_code` — that is a
-            # qualified ref (`domain.foo`), and suffixing it would name `domain.foo_batch` while
-            # `domain_code` below adds the domain a second time.
-            pipe_batch_adhoc_pipe_code = f"{sub_pipe.code}_batch"
-            pipe_batch = PipeFactory[PipeBatch].make_from_blueprint(
+            # The batch is built as the runtime pipe, not from a blueprint: its list is a name of the calling sequence's memory,
+            # a private one for a dotted `batch_over` the sequence rewrote, or any name a step stores under, never an input
+            # name an author declares, so the input-name grammar a blueprint enforces does not apply to it.
+            pipe_batch = PipeBatch(
                 domain_code=sub_pipe.domain_code,
-                pipe_code=pipe_batch_adhoc_pipe_code,
-                blueprint=pipe_batch_blueprint,
-                concept_codes_from_the_same_domain=[concept.code for concept in sub_pipe.concept_dependencies],
+                # Derived from the resolved pipe's LOCAL code, not from `self.pipe_code` — that is a qualified ref
+                # (`domain.foo`), and suffixing it would name `domain.foo_batch` while the domain is added a second time.
+                code=f"{sub_pipe.code}_batch",
+                description=f"Batch processing for {self.pipe_code}",
+                inputs=InputStuffSpecs(root={batch_params.input_list_stuff_name: StuffSpec(concept=item_stuff_spec.concept)}),
+                output=StuffSpec(concept=sub_pipe.output.concept),
+                branch_pipe_code=self.pipe_code,
+                batch_params=batch_params,
             )
-            try:
-                pipe_output = await get_pipe_router().run(
-                    pipe_job=PipeJobFactory.make_pipe_job(
-                        pipe=pipe_batch,
-                        job_metadata=job_metadata,
-                        working_memory=working_memory,
-                        pipe_run_params=sub_pipe_run_params,
-                        output_name=self.output_name,
-                        library_crate=library_crate,
-                    ),
-                )
-            finally:
-                # Clean up synthetic stuff injected for dotted-path resolution
-                if synthetic_flat_name:
-                    working_memory.remove_stuff(name=synthetic_flat_name)
+            pipe_output = await get_pipe_router().run(
+                pipe_job=PipeJobFactory.make_pipe_job(
+                    pipe=pipe_batch,
+                    job_metadata=job_metadata,
+                    working_memory=working_memory,
+                    pipe_run_params=sub_pipe_run_params,
+                    output_name=self.output_name,
+                    library_crate=library_crate,
+                ),
+            )
         # Case 2: Condition processing
         elif isinstance(sub_pipe, PipeCondition):
             pipe_output = await get_pipe_router().run(

@@ -9,14 +9,24 @@ class AbsenceKind(StrEnum):
     """How a slot came to hold no value.
 
     - DECLARED_ABSENT: a producer with an optional (`?`) output declared it produced nothing
-      (e.g. a PipeCondition `continue` outcome, or — phase 2 — an LLM maybe-wrapper).
-    - SKIPPED: the producing pipe was lifted (skipped) because one of its plain inputs was absent.
+      (e.g. a PipeCondition `continue` outcome, or — phase 2 — an LLM maybe-wrapper), or a binding
+      step's path reached a field holding nothing.
+    - SKIPPED: the producing pipe was lifted (skipped) because one of its plain inputs was absent,
+      or a binding step was, because its root was.
     - NOT_PROVIDED: the caller omitted an optional method input from the pipeline inputs.
     """
 
     DECLARED_ABSENT = "declared_absent"
     SKIPPED = "skipped"
     NOT_PROVIDED = "not_provided"
+
+    @property
+    def is_skipped(self) -> bool:
+        match self:
+            case AbsenceKind.SKIPPED:
+                return True
+            case AbsenceKind.DECLARED_ABSENT | AbsenceKind.NOT_PROVIDED:
+                return False
 
 
 class AbsenceRecord(BaseModel):

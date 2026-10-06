@@ -1,0 +1,11 @@
+name = "feature_binding_step_batch_views"
+description = "The views of a catalog's pages bound into a list, then captioned one by one by a batch over the bound name"
+
+validity = "valid"
+tier = "offline"
+granularity = "focused"
+
+covers = [
+  "feature.binding_step",
+  "controller.batch",
+]

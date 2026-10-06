@@ -63,7 +63,7 @@ class TestCrateQualification:
     def test_sequence_step_refs(self):
         sequence = qualify_crate(CrateQualificationTestData.crate()).pipes["alpha.seq"]
         assert isinstance(sequence, PipeSequenceBlueprint)
-        assert [step.pipe for step in sequence.steps] == ["alpha.leaf"]
+        assert [step.pipe for step in sequence.pipe_steps] == ["alpha.leaf"]
 
     def test_parallel_branch_refs(self):
         parallel = qualify_crate(CrateQualificationTestData.crate()).pipes["alpha.par"]
@@ -105,7 +105,7 @@ class TestCrateQualification:
 
         sequence = qualify_crate(crate).pipes["alpha.calls_sibling"]
         assert isinstance(sequence, PipeSequenceBlueprint)
-        assert sequence.steps[0].pipe == "alpha.only_here"
+        assert sequence.pipe_steps[0].pipe == "alpha.only_here"
 
     def test_a_second_domain_declaring_the_code_is_not_an_ambiguity(self):
         """Ambiguity was a consequence of searching. Nothing is searched for, so nothing is ambiguous —
@@ -117,7 +117,7 @@ class TestCrateQualification:
 
         sequence = qualify_crate(crate).pipes["alpha.seq"]
         assert isinstance(sequence, PipeSequenceBlueprint)
-        assert sequence.steps[0].pipe == "alpha.leaf"
+        assert sequence.pipe_steps[0].pipe == "alpha.leaf"
 
     def test_cross_package_refs_pass_through_untouched(self):
         """`alias->…` refs are the packaging project's to canonicalize; this pass must not touch them."""
@@ -130,7 +130,7 @@ class TestCrateQualification:
 
         sequence = qualify_crate(crate).pipes["alpha.calls_dependency"]
         assert isinstance(sequence, PipeSequenceBlueprint)
-        assert sequence.steps[0].pipe == "dep->helper"
+        assert sequence.pipe_steps[0].pipe == "dep->helper"
 
     def test_a_step_naming_a_pipe_called_continue_is_still_qualified(self):
         """`continue` is a legal snake_case pipe code, so it is only special in a condition outcome.
@@ -148,7 +148,7 @@ class TestCrateQualification:
 
         sequence = qualify_crate(crate).pipes["alpha.calls_continue"]
         assert isinstance(sequence, PipeSequenceBlueprint)
-        assert sequence.steps[0].pipe == "alpha.continue"
+        assert sequence.pipe_steps[0].pipe == "alpha.continue"
 
     def test_special_outcomes_pass_through_untouched(self):
         """`fail` / `continue` are outcomes, not pipe refs — in a condition, and only there."""
@@ -176,7 +176,7 @@ class TestCrateQualification:
 
         sequence = crate.pipes["alpha.seq"]
         assert isinstance(sequence, PipeSequenceBlueprint)
-        assert sequence.steps[0].pipe == "leaf"
+        assert sequence.pipe_steps[0].pipe == "leaf"
         assert crate.pipes["alpha.leaf"].output == "Report"
         detailed = crate.concepts["alpha.Detailed"]
         assert isinstance(detailed, ConceptBlueprint)
@@ -194,7 +194,7 @@ class TestCrateQualification:
         # qualified one rather than whatever went in.
         second_pass_sequence = twice.pipes["alpha.seq"]
         assert isinstance(second_pass_sequence, PipeSequenceBlueprint)
-        assert second_pass_sequence.steps[0].pipe == "alpha.leaf"
+        assert second_pass_sequence.pipe_steps[0].pipe == "alpha.leaf"
 
     # --- rejections, raised by the pass itself rather than through the normalizer ---
 

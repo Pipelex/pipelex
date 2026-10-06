@@ -1,0 +1,12 @@
+name = "invalid_binding_step_pipe_and_from"
+description = "An invoice acknowledged by a step that both runs a pipe and binds a value"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.binding_step_invalid",
+]
+
+expected_error = "binding_step_invalid"

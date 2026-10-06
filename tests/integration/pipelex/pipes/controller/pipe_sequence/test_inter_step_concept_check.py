@@ -1,0 +1,934 @@
+from collections.abc import Callable
+
+import pytest
+from pytest_mock import MockerFixture
+
+from pipelex.core.pipes.exceptions import PipeValidationError
+from pipelex.interpreter_hub import get_library_manager, get_required_pipe
+from pipelex.mthds_parsing.parser import MthdsParser
+from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
+from pipelex.validation_error_types import PipeValidationErrorType
+from tests.integration.pipelex.pipes.controller.pipe_sequence.unresolved_pipes import hide_pipe_from_sequence_analyses
+
+# The pipes every case's sequence reads from: each case appends one sequence, `flow`, whose steps hand values between them.
+_DEPOT_PIPES = """domain = "depot_steps"
+description = "The steps of a depot's sequences, each reading what an earlier step stored"
+
+[concept.Parcel]
+description = "A parcel received at the depot"
+
+[concept.Parcel.structure]
+weight = { type = "number", description = "The weight, in kilograms", required = true }
+
+[concept.FragileParcel]
+description = "A parcel the depot handles with care"
+refines = "Parcel"
+
+[concept.Invoice]
+description = "An invoice received at the depot"
+
+[concept.Invoice.structure]
+total = { type = "number", description = "The amount due, in euros", required = true }
+
+[pipe.weigh_parcel]
+type = "PipeCompose"
+description = "Writes out a parcel of a given weight"
+inputs = { amount = "Number" }
+output = "Parcel"
+
+[pipe.weigh_parcel.construct]
+weight = { from = "amount.number" }
+
+[pipe.pack_fragile_parcel]
+type = "PipeCompose"
+description = "Writes out a fragile parcel of a given weight"
+inputs = { amount = "Number" }
+output = "FragileParcel"
+
+[pipe.pack_fragile_parcel.construct]
+weight = { from = "amount.number" }
+
+[pipe.make_invoice]
+type = "PipeCompose"
+description = "Writes out an invoice for an amount"
+inputs = { amount = "Number" }
+output = "Invoice"
+
+[pipe.make_invoice.construct]
+total = { from = "amount.number" }
+
+[pipe.label_parcel]
+type = "PipeCompose"
+description = "Writes the label of a parcel"
+inputs = { parcel = "Parcel" }
+output = "Text"
+template = "Parcel of $parcel.weight kilograms"
+
+[pipe.render_note]
+type = "PipeCompose"
+description = "Renders a note written in Markdown"
+inputs = { note = "Markdown" }
+output = "Text"
+template = "Rendered: $note"
+
+[pipe.archive_note]
+type = "PipeCompose"
+description = "Archives a note"
+inputs = { note = "Text" }
+output = "Text"
+template = "Archived: $note"
+
+[pipe.list_three_parcels]
+type = "PipeCompose"
+description = "Writes the manifest of a crate of three parcels"
+inputs = { parcels = "Parcel[3]" }
+output = "Text"
+template = "Crate: $parcels"
+
+[pipe.label_record]
+type = "PipeCompose"
+description = "Writes the label of the parcel on record"
+inputs = { record = "Parcel" }
+output = "Text"
+template = "Parcel of $record.weight kilograms"
+
+[pipe.list_parcels]
+type = "PipeCompose"
+description = "Writes the manifest of several parcels"
+inputs = { parcels = "Parcel[]" }
+output = "Text"
+template = "Manifest: $parcels"
+
+[pipe.settle_invoice]
+type = "PipeCompose"
+description = "Writes the settlement of the invoice on record"
+inputs = { record = "Invoice" }
+output = "Text"
+template = "Settled: $record.total euros"
+
+[pipe.describe_amount]
+type = "PipeCompose"
+description = "Writes out an amount given in words"
+inputs = { amount = "Text" }
+output = "Text"
+template = "Amount: $amount"
+
+[pipe.note_anything]
+type = "PipeCompose"
+description = "Writes a note about whatever is on record"
+inputs = { record = "Anything" }
+output = "Text"
+template = "On record: $record"
+
+[pipe.swap_for_parcel]
+type = "PipeSequence"
+description = "Stores a parcel under the record's name"
+inputs = { amount = "Number" }
+output = "Parcel"
+steps = [
+  { pipe = "weigh_parcel", result = "record" },
+]
+
+[pipe.swap_for_invoice]
+type = "PipeSequence"
+description = "Stores an invoice under the record's name"
+inputs = { amount = "Number" }
+output = "Invoice"
+steps = [
+  { pipe = "make_invoice", result = "record" },
+]
+
+[pipe.swap_record]
+type = "PipeCondition"
+description = "Stores a parcel or an invoice under the record's name, as the mode says"
+inputs = { amount = "Number", mode = "Text" }
+output = "Anything"
+expression = "mode"
+default_outcome = "fail"
+
+[pipe.swap_record.outcomes]
+parcel = "swap_for_parcel"
+invoice = "swap_for_invoice"
+
+[pipe.label_swapped]
+type = "PipeCompose"
+description = "Writes the label of the parcel a swap stored"
+inputs = { swapped = "Parcel" }
+output = "Text"
+template = "Parcel of $swapped.weight kilograms"
+
+[pipe.weigh_anything]
+type = "PipeSequence"
+description = "Weighs a parcel, declaring its output as whatever it is"
+inputs = { amount = "Number" }
+output = "Anything"
+steps = [
+  { pipe = "weigh_parcel", result = "weighed" },
+]
+
+[pipe.render_then_archive]
+type = "PipeSequence"
+description = "Renders a note written in Markdown, then archives it as a text"
+inputs = { note = "Markdown" }
+output = "Text"
+steps = [
+  { pipe = "render_note", result = "rendered" },
+  { pipe = "archive_note", result = "archived" },
+]
+
+[pipe.crate_then_list]
+type = "PipeSequence"
+description = "Writes the manifest of a crate of three parcels, then lists them"
+inputs = { parcels = "Parcel[3]" }
+output = "Text"
+steps = [
+  { pipe = "list_three_parcels", result = "crate" },
+  { pipe = "list_parcels", result = "manifest" },
+]
+
+[pipe.label_given_parcel]
+type = "PipeSequence"
+description = "Writes the label of a parcel it is given"
+inputs = { parcel = "Parcel" }
+output = "Text"
+steps = [
+  { pipe = "label_parcel", result = "given_label" },
+]
+
+[pipe.weigh_record_then_note]
+type = "PipeSequence"
+description = "Weighs a parcel as heavy as the parcel on record, then notes the record, whatever it is"
+inputs = { record = "Parcel" }
+output = "Text"
+steps = [
+  { from = "record.weight", result = "amount" },
+  { pipe = "weigh_parcel", result = "weighed" },
+  { pipe = "note_anything", result = "noted" },
+]
+
+[pipe.archive_record]
+type = "PipeCompose"
+description = "Archives the record, read as a text"
+inputs = { record = "Text" }
+output = "Text"
+template = "Archived: $record"
+
+[pipe.store_note_as_record]
+type = "PipeSequence"
+description = "Stores the archived note under the record's name"
+inputs = { note = "Text" }
+output = "Text"
+steps = [
+  { pipe = "archive_note", result = "record" },
+]
+
+[pipe.maybe_store_note]
+type = "PipeCondition"
+description = "Stores the archived note under the record's name, or leaves the record as it is, as the mode says"
+inputs = { mode = "Text", note = "Text" }
+output = "Text?"
+expression = "mode"
+default_outcome = "fail"
+
+[pipe.maybe_store_note.outcomes]
+store = "store_note_as_record"
+keep = "continue"
+
+[pipe.summarize_records]
+type = "PipeCompose"
+description = "Writes a summary of the records, read as texts"
+inputs = { records = "Text[]" }
+output = "Text"
+template = "Records: $records"
+
+[pipe.store_notes_as_records]
+type = "PipeSequence"
+description = "Stores the archived notes under the records' name, then summarizes them"
+inputs = { notes = "Text[]" }
+output = "Text"
+steps = [
+  { pipe = "archive_note", batch_over = "notes", batch_as = "note", result = "records" },
+  { pipe = "summarize_records", result = "summary" },
+]
+
+[pipe.maybe_store_notes]
+type = "PipeCondition"
+description = "Stores the archived notes under the records' name, or leaves the records as they are, as the mode says"
+inputs = { mode = "Text", notes = "Text[]" }
+output = "Text?"
+expression = "mode"
+default_outcome = "fail"
+
+[pipe.maybe_store_notes.outcomes]
+store = "store_notes_as_records"
+keep = "continue"
+
+[pipe.weigh_anything_as_record]
+type = "PipeSequence"
+description = "Stores a parcel, declared as whatever it is, under the record's name"
+inputs = { amount = "Number" }
+output = "Anything"
+steps = [
+  { pipe = "weigh_anything", result = "record" },
+]
+
+[pipe.store_anything_or_note]
+type = "PipeCondition"
+description = "Stores a parcel declared as whatever it is, or the archived note, under the record's name, as the mode says"
+inputs = { amount = "Number", note = "Text", mode = "Text" }
+output = "Anything"
+expression = "mode"
+default_outcome = "fail"
+
+[pipe.store_anything_or_note.outcomes]
+weigh = "weigh_anything_as_record"
+note = "store_note_as_record"
+
+[pipe.maybe_store_anything_or_note]
+type = "PipeCondition"
+description = "Stores a parcel declared as whatever it is, or the archived note, under the record's name, or leaves the record as it is"
+inputs = { amount = "Number", note = "Text", mode = "Text" }
+output = "Anything?"
+expression = "mode"
+default_outcome = "fail"
+
+[pipe.maybe_store_anything_or_note.outcomes]
+weigh = "weigh_anything_as_record"
+note = "store_note_as_record"
+keep = "continue"
+
+[pipe.store_invoice_or_either]
+type = "PipeCondition"
+description = "Stores an invoice under the record's name, or a parcel declared as whatever it is, or the archived note"
+inputs = { amount = "Number", note = "Text", mode = "Text" }
+output = "Anything"
+expression = "mode"
+default_outcome = "fail"
+
+[pipe.store_invoice_or_either.outcomes]
+invoice = "swap_for_invoice"
+either = "store_anything_or_note"
+"""
+
+
+def _flow(*, inputs: str, output: str, steps: list[str]) -> str:
+    """The sequence `flow`, declaring `inputs` (a TOML inline table's content) and running `steps` in order."""
+    step_lines = "".join(f"  {step},\n" for step in steps)
+    return (
+        "\n[pipe.flow]\n"
+        'type = "PipeSequence"\n'
+        'description = "Hands values from step to step"\n'
+        f"inputs = {{ {inputs} }}\n"
+        f'output = "{output}"\n'
+        f"steps = [\n{step_lines}]\n"
+    )
+
+
+def _load_flow(*, flow: str, library_id: str) -> PipeSequence:
+    """Load the depot's pipes and `flow` into the library, which validates every pipe, and return `flow`."""
+    blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=_DEPOT_PIPES + flow, mthds_source="depot.mthds")
+    pipes = get_library_manager().load_from_blueprints(library_id=library_id, blueprints=[blueprint])
+    sequences = [pipe for pipe in pipes if isinstance(pipe, PipeSequence) and pipe.code == "flow"]
+    assert len(sequences) == 1
+    return sequences[0]
+
+
+class TestInterStepConceptCheck:
+    @pytest.mark.parametrize(
+        ("flow", "message"),
+        [
+            pytest.param(
+                _flow(
+                    inputs='amount = "Number"',
+                    output="Text",
+                    steps=['{ pipe = "weigh_parcel", result = "record" }', '{ pipe = "settle_invoice", result = "note" }'],
+                ),
+                (
+                    "In pipe 'flow', step 2 (pipe 'settle_invoice') reads 'record' as 'Invoice', but step 1 (pipe 'weigh_parcel') stores it "
+                    "as 'Parcel'. Declare the input as 'Parcel' in pipe 'settle_invoice', or make step 1 (pipe 'weigh_parcel') store a "
+                    "'Invoice' under 'record'."
+                ),
+                id="a-concept-another-step-stores",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='amount = "Number"',
+                    output="Text",
+                    steps=['{ pipe = "weigh_parcel", result = "parcels" }', '{ pipe = "list_parcels", result = "manifest" }'],
+                ),
+                "In pipe 'flow', step 2 (pipe 'list_parcels') reads 'parcels' as 'Parcel[]', but step 1 (pipe 'weigh_parcel') stores it as 'Parcel'.",
+                id="a-list-read-where-a-single-value-is-stored",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='amounts = "Number[]"',
+                    output="Text",
+                    steps=[
+                        '{ pipe = "weigh_parcel", batch_over = "amounts", batch_as = "amount", result = "parcel" }',
+                        '{ pipe = "label_parcel", result = "label" }',
+                    ],
+                ),
+                "In pipe 'flow', step 2 (pipe 'label_parcel') reads 'parcel' as 'Parcel', but step 1 (pipe 'weigh_parcel') stores it as 'Parcel[]'.",
+                id="a-single-value-read-where-a-batch-stores-a-list",
+            ),
+            pytest.param(
+                # The last step reading `amount` sets what the sequence's inputs are checked against, so only the check of each
+                # step against the flow sees the first one.
+                _flow(
+                    inputs='amount = "Number"',
+                    output="Text",
+                    steps=[
+                        '{ pipe = "describe_amount", result = "note" }',
+                        '{ pipe = "weigh_parcel", result = "parcel" }',
+                        '{ pipe = "label_parcel", result = "label" }',
+                    ],
+                ),
+                (
+                    "In pipe 'flow', step 1 (pipe 'describe_amount') reads 'amount' as 'Text', but the sequence declares it as 'Number'. "
+                    "Declare the input as 'Number' in pipe 'describe_amount', or declare 'amount' as 'Text' in the inputs of pipe 'flow'."
+                ),
+                id="a-declared-input-read-as-another-concept",
+            ),
+            pytest.param(
+                # A declared input the last step reading it accepts, but an earlier one reads as a concept refining it.
+                _flow(
+                    inputs='note = "Text"',
+                    output="Text",
+                    steps=['{ pipe = "render_note", result = "rendered" }', '{ pipe = "archive_note", result = "archived" }'],
+                ),
+                (
+                    "In pipe 'flow', step 1 (pipe 'render_note') reads 'note' as 'Markdown', but the sequence declares it as 'Text'. "
+                    "Declare the input as 'Text' in pipe 'render_note', or declare 'note' as 'Markdown' in the inputs of pipe 'flow'."
+                ),
+                id="a-declared-input-an-earlier-step-reads-as-a-refinement",
+            ),
+            pytest.param(
+                # A declared list the last step reading it accepts, but an earlier one reads as a fixed count.
+                _flow(
+                    inputs='parcels = "Parcel[]"',
+                    output="Text",
+                    steps=['{ pipe = "list_three_parcels", result = "crate" }', '{ pipe = "list_parcels", result = "manifest" }'],
+                ),
+                (
+                    "In pipe 'flow', step 1 (pipe 'list_three_parcels') reads 'parcels' as 'Parcel[3]', but the sequence declares it as "
+                    "'Parcel[]'. Declare the input as 'Parcel[]' in pipe 'list_three_parcels', or declare 'parcels' as 'Parcel[3]' in the "
+                    "inputs of pipe 'flow'."
+                ),
+                id="a-declared-list-an-earlier-step-reads-as-a-fixed-count",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='amount = "Number"',
+                    output="Text[]",
+                    steps=[
+                        '{ pipe = "weigh_parcel", result = "parcels" }',
+                        '{ pipe = "label_parcel", batch_over = "parcels", batch_as = "parcel", result = "labels" }',
+                    ],
+                ),
+                (
+                    "In pipe 'flow', step 2 (pipe 'label_parcel') batches over 'parcels', which step 1 (pipe 'weigh_parcel') stores as a "
+                    "single 'Parcel', not a list: a batch runs its pipe once per item of a list. Batch over a name holding a list, or run "
+                    "the step on the value itself, without `batch_over`."
+                ),
+                id="a-batch-over-a-single-value",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='amounts = "Number[]"',
+                    output="Text[]",
+                    steps=[
+                        '{ pipe = "weigh_parcel", batch_over = "amounts", batch_as = "amount", result = "parcels" }',
+                        '{ pipe = "settle_invoice", batch_over = "parcels", batch_as = "record", result = "settlements" }',
+                    ],
+                ),
+                (
+                    "In pipe 'flow', step 2 (pipe 'settle_invoice') batches over 'parcels', which step 1 (pipe 'weigh_parcel') stores "
+                    "as 'Parcel[]', but its pipe reads each item, 'record', as 'Invoice'. Declare 'record' as 'Parcel' in pipe "
+                    "'settle_invoice', or batch over a list of 'Invoice'."
+                ),
+                id="a-batch-whose-items-are-read-as-another-concept",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='amount = "Number", mode = "Text"',
+                    output="Text",
+                    steps=['{ pipe = "swap_record", result = "swapped" }', '{ pipe = "label_record", result = "label" }'],
+                ),
+                (
+                    "In pipe 'flow', step 2 (pipe 'label_record') reads 'record' as 'Parcel', but the values 'record' may hold have different "
+                    "specs: outcome 'swap_for_invoice' of pipe 'swap_record' as 'Invoice'; outcome 'swap_for_parcel' of pipe 'swap_record' "
+                    "as 'Parcel'."
+                ),
+                id="a-name-the-outcomes-of-a-condition-store-under-different-concepts",
+            ),
+            pytest.param(
+                # The nested sequence's first step reads `note` as `Markdown`, its last as `Text`: its declaration, not its
+                # last reader, is what the calling step is checked against.
+                _flow(
+                    inputs='note = "Text"',
+                    output="Text",
+                    steps=['{ pipe = "render_then_archive", result = "done" }', '{ pipe = "archive_note", result = "archived_again" }'],
+                ),
+                (
+                    "In pipe 'flow', step 1 (pipe 'render_then_archive') reads 'note' as 'Markdown', but the sequence declares it as 'Text'. "
+                    "Declare the input as 'Text' in pipe 'render_then_archive', or declare 'note' as 'Markdown' in the inputs of pipe 'flow'."
+                ),
+                id="a-nested-sequence-declaring-a-refinement-its-last-step-reads-as-the-parent",
+            ),
+            pytest.param(
+                # The sequence's only reader of `note` is the nested sequence, so its inputs check names the nested declaration.
+                _flow(
+                    inputs='note = "Text"',
+                    output="Text",
+                    steps=['{ pipe = "render_then_archive", result = "done" }'],
+                ),
+                "In pipe 'flow', input 'note' is declared as 'Text' but its step needs 'Markdown'. Update the input to 'Markdown'.",
+                id="a-nested-sequence-called-with-the-parent-of-what-it-declares",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='parcels = "Parcel[]"',
+                    output="Text",
+                    steps=['{ pipe = "crate_then_list", result = "done" }'],
+                ),
+                "In pipe 'flow', input 'parcels' is declared as 'Parcel[]' but its step needs 'Parcel[3]'. Update the input to 'Parcel[3]'.",
+                id="a-nested-sequence-declaring-a-fixed-count-its-last-step-reads-as-a-variable-list",
+            ),
+            pytest.param(
+                # The nested sequence binds `record.weight` from the `Parcel` it declares, then reads `record` as `Anything`.
+                _flow(
+                    inputs='amount = "Number"',
+                    output="Text",
+                    steps=['{ pipe = "make_invoice", result = "record" }', '{ pipe = "weigh_record_then_note", result = "done" }'],
+                ),
+                (
+                    "In pipe 'flow', step 2 (pipe 'weigh_record_then_note') reads 'record' as 'Parcel', but step 1 (pipe 'make_invoice') "
+                    "stores it as 'Invoice'."
+                ),
+                id="a-nested-sequence-binding-over-what-it-declares-given-another-concept",
+            ),
+            pytest.param(
+                # A value stored as `Anything` is not known before the run, but its multiplicity is.
+                _flow(
+                    inputs='amount = "Number"',
+                    output="Text",
+                    steps=['{ pipe = "weigh_anything", result = "parcels" }', '{ pipe = "list_parcels", result = "manifest" }'],
+                ),
+                (
+                    "In pipe 'flow', step 2 (pipe 'list_parcels') reads 'parcels' as 'Parcel[]', but step 1 (pipe 'weigh_anything') stores "
+                    "it as 'Anything'."
+                ),
+                id="a-single-anything-read-as-a-list",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='amount = "Number"',
+                    output="Text[]",
+                    steps=[
+                        '{ pipe = "weigh_anything", result = "parcels" }',
+                        '{ pipe = "label_parcel", batch_over = "parcels", batch_as = "parcel", result = "labels" }',
+                    ],
+                ),
+                (
+                    "In pipe 'flow', step 2 (pipe 'label_parcel') batches over 'parcels', which step 1 (pipe 'weigh_anything') stores as a "
+                    "single 'Anything', not a list"
+                ),
+                id="a-batch-over-a-single-anything",
+            ),
+            pytest.param(
+                # The sequence's own declaration is known: declaring `Anything` where a step reads a `Parcel` is refused.
+                _flow(
+                    inputs='record = "Anything"',
+                    output="Text",
+                    steps=['{ pipe = "label_record", result = "label" }'],
+                ),
+                "In pipe 'flow', input 'record' is declared as 'Anything' but its step needs 'Parcel'. Update the input to 'Parcel'.",
+                id="a-declared-anything-read-as-a-concept",
+            ),
+            pytest.param(
+                # Regression: the condition may leave the caller's `Anything` in place, which is a declaration, not a pipe
+                # step's store, so it is checked even among the values the name may hold.
+                _flow(
+                    inputs='record = "Anything", mode = "Text", note = "Text"',
+                    output="Text",
+                    steps=['{ pipe = "maybe_store_note", result = "stored" }', '{ pipe = "archive_record", result = "archived" }'],
+                ),
+                (
+                    "In pipe 'flow', step 2 (pipe 'archive_record') reads 'record' as 'Text', but the values 'record' may hold have different "
+                    "specs: the value it held before step 1 (pipe 'maybe_store_note'), which the step leaves when it stores nothing, as "
+                    "'Anything'; step 1 (pipe 'maybe_store_note'), when it stores a value, as 'Text'."
+                ),
+                id="a-declared-anything-a-condition-may-leave-read-as-a-concept",
+            ),
+            pytest.param(
+                # Regression: as above, for a list batched over.
+                _flow(
+                    inputs='records = "Anything[]", mode = "Text", notes = "Text[]"',
+                    output="Text[]",
+                    steps=[
+                        '{ pipe = "maybe_store_notes", result = "stored" }',
+                        '{ pipe = "archive_record", batch_over = "records", batch_as = "record", result = "archived" }',
+                    ],
+                ),
+                (
+                    "In pipe 'flow', step 2 (pipe 'archive_record') batches over 'records', which may hold 'Anything[]', but its pipe reads "
+                    "each item, 'record', as 'Text'."
+                ),
+                id="a-declared-anything-list-a-condition-may-leave-batched-over-as-a-concept",
+            ),
+            pytest.param(
+                # A binding's value is no pipe step's store either: binding a declared `Anything` binds an `Anything`.
+                _flow(
+                    inputs='given = "Anything", mode = "Text", note = "Text"',
+                    output="Text",
+                    steps=[
+                        '{ from = "given", result = "record" }',
+                        '{ pipe = "maybe_store_note", result = "stored" }',
+                        '{ pipe = "archive_record", result = "archived" }',
+                    ],
+                ),
+                (
+                    "In pipe 'flow', step 3 (pipe 'archive_record') reads 'record' as 'Text', but the values 'record' may hold have different "
+                    "specs: the value it held before step 2 (pipe 'maybe_store_note'), which the step leaves when it stores nothing, as "
+                    "'Anything'; step 2 (pipe 'maybe_store_note'), when it stores a value, as 'Text'."
+                ),
+                id="a-bound-anything-a-condition-may-leave-read-as-a-concept",
+            ),
+            pytest.param(
+                # Regression: the outcomes that store `record` disagree among themselves, and the caller's `Anything`, which the
+                # `continue` outcome leaves, is listed beside them rather than dropped.
+                _flow(
+                    inputs='record = "Anything", amount = "Number", mode = "Text", note = "Text"',
+                    output="Text",
+                    steps=['{ pipe = "maybe_store_anything_or_note", result = "stored" }', '{ pipe = "archive_record", result = "archived" }'],
+                ),
+                (
+                    "In pipe 'flow', step 2 (pipe 'archive_record') reads 'record' as 'Text', but the values 'record' may hold have different "
+                    "specs: the value it held before step 1 (pipe 'maybe_store_anything_or_note'), which the step leaves when it stores "
+                    "nothing, as 'Anything'; outcome 'store_note_as_record' of pipe 'maybe_store_anything_or_note' as 'Text'; outcome "
+                    "'weigh_anything_as_record' of pipe 'maybe_store_anything_or_note' as 'Anything'."
+                ),
+                id="a-declared-anything-a-condition-may-leave-beside-outcomes-that-disagree",
+            ),
+            pytest.param(
+                # Regression: one outcome stores an `Invoice`, the other a value whose own outcomes disagree, and the `Invoice` is
+                # listed beside their values rather than dropped.
+                _flow(
+                    inputs='amount = "Number", note = "Text", mode = "Text"',
+                    output="Text",
+                    steps=['{ pipe = "store_invoice_or_either", result = "stored" }', '{ pipe = "archive_record", result = "archived" }'],
+                ),
+                (
+                    "In pipe 'flow', step 2 (pipe 'archive_record') reads 'record' as 'Text', but the values 'record' may hold have different "
+                    "specs: outcome 'store_note_as_record' of pipe 'store_anything_or_note' as 'Text'; outcome 'weigh_anything_as_record' of "
+                    "pipe 'store_anything_or_note' as 'Anything'; outcome 'swap_for_invoice' of pipe 'store_invoice_or_either' as 'Invoice'."
+                ),
+                id="an-outcome-storing-another-concept-beside-one-whose-values-disagree",
+            ),
+        ],
+    )
+    def test_a_step_reading_what_the_flow_does_not_carry_is_refused(self, load_empty_library: Callable[[], str], flow: str, message: str) -> None:
+        """A step whose pipe reads a name as a concept or a multiplicity the flow does not carry there is refused at validation."""
+        with pytest.raises(PipeValidationError) as exc_info:
+            _load_flow(flow=flow, library_id=load_empty_library())
+
+        assert exc_info.value.error_type == PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
+        assert exc_info.value.pipe_code == "flow"
+        assert message in str(exc_info.value)
+
+    @pytest.mark.parametrize(
+        "flow",
+        [
+            pytest.param(
+                _flow(
+                    inputs='amount = "Number"',
+                    output="Text",
+                    steps=['{ pipe = "pack_fragile_parcel", result = "parcel" }', '{ pipe = "label_parcel", result = "label" }'],
+                ),
+                id="a-refinement-read-as-its-parent",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='amounts = "Number[]"',
+                    output="Text",
+                    steps=[
+                        '{ pipe = "weigh_parcel", batch_over = "amounts", batch_as = "amount", result = "parcels" }',
+                        '{ pipe = "list_parcels", result = "manifest" }',
+                    ],
+                ),
+                id="a-batched-result-read-as-a-list",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='amounts = "Number[]"',
+                    output="Text",
+                    steps=[
+                        '{ pipe = "weigh_parcel", batch_over = "amounts", batch_as = "amount", result = "parcels", nb_output = 1 }',
+                        '{ pipe = "list_parcels", result = "manifest" }',
+                    ],
+                ),
+                id="a-batched-result-asking-for-one-output-read-as-a-list",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='amounts = "Number[]"',
+                    output="Text",
+                    steps=[
+                        '{ pipe = "weigh_parcel", batch_over = "amounts", batch_as = "amount", result = "parcels" }',
+                        '{ pipe = "pack_fragile_parcel", batch_over = "amounts", batch_as = "amount", result = "fragile_parcels" }',
+                        '{ pipe = "label_parcel", batch_over = "fragile_parcels", batch_as = "parcel", result = "labels" }',
+                        '{ pipe = "list_parcels", result = "manifest" }',
+                    ],
+                ),
+                id="a-batch-over-a-list-of-refinements",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='amount = "Number"',
+                    output="Text",
+                    steps=['{ pipe = "weigh_parcel", result = "record" }', '{ pipe = "note_anything", result = "note" }'],
+                ),
+                id="a-name-read-as-anything",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='record = "Invoice", amount = "Number"',
+                    output="Text",
+                    steps=[
+                        '{ pipe = "settle_invoice", result = "settlement" }',
+                        '{ pipe = "weigh_parcel", result = "record" }',
+                        '{ pipe = "label_record", result = "label" }',
+                    ],
+                ),
+                id="a-declared-input-replaced-by-what-a-step-stores",
+            ),
+            pytest.param(
+                # The last step reading `note` reads a `Text`, so only the check of each step against the flow accepts a
+                # declaration other than the last reader's need.
+                _flow(
+                    inputs='note = "Markdown"',
+                    output="Text",
+                    steps=['{ pipe = "render_note", result = "rendered" }', '{ pipe = "archive_note", result = "archived" }'],
+                ),
+                id="a-declared-input-read-as-a-refinement-then-as-its-parent",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='parcels = "Parcel[3]"',
+                    output="Text",
+                    steps=['{ pipe = "list_three_parcels", result = "crate" }', '{ pipe = "list_parcels", result = "manifest" }'],
+                ),
+                id="a-declared-fixed-count-read-as-it-then-as-a-variable-list",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='note = "Markdown"',
+                    output="Text",
+                    steps=['{ pipe = "render_then_archive", result = "done" }'],
+                ),
+                id="a-nested-sequence-called-with-what-it-declares",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='parcels = "Parcel[3]"',
+                    output="Text",
+                    steps=['{ pipe = "crate_then_list", result = "done" }'],
+                ),
+                id="a-nested-sequence-called-with-the-fixed-count-it-declares",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='parcel = "FragileParcel"',
+                    output="Text",
+                    steps=['{ pipe = "label_given_parcel", result = "done" }'],
+                ),
+                id="a-nested-sequence-declaring-a-parent-given-a-declared-refinement",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='amount = "Number"',
+                    output="Text",
+                    steps=['{ pipe = "pack_fragile_parcel", result = "parcel" }', '{ pipe = "label_given_parcel", result = "done" }'],
+                ),
+                id="a-nested-sequence-declaring-a-parent-given-a-stored-refinement",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='amount = "Number"',
+                    output="Text",
+                    steps=['{ pipe = "weigh_parcel", result = "record" }', '{ pipe = "weigh_record_then_note", result = "done" }'],
+                ),
+                id="a-nested-sequence-binding-over-what-it-declares-given-it",
+            ),
+            pytest.param(
+                # A condition whose outcomes produce different concepts declares `Anything`: what it stores is not known
+                # before the run, so a step reading it as a concept is assumed to get it, as from a pipe that does not resolve.
+                _flow(
+                    inputs='amount = "Number", mode = "Text"',
+                    output="Text",
+                    steps=['{ pipe = "swap_record", result = "swapped" }', '{ pipe = "label_swapped", result = "label" }'],
+                ),
+                id="a-condition-result-declared-anything-read-as-a-concept",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='amount = "Number"',
+                    output="Text",
+                    steps=['{ pipe = "weigh_anything", result = "parcel" }', '{ pipe = "label_parcel", result = "label" }'],
+                ),
+                id="a-nested-sequence-result-declared-anything-read-as-a-concept",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='amounts = "Number[]"',
+                    output="Text[]",
+                    steps=[
+                        '{ pipe = "weigh_anything", batch_over = "amounts", batch_as = "amount", result = "parcels" }',
+                        '{ pipe = "label_parcel", batch_over = "parcels", batch_as = "parcel", result = "labels" }',
+                    ],
+                ),
+                id="a-batch-over-a-list-of-anything-whose-items-are-read-as-a-concept",
+            ),
+            pytest.param(
+                # The outcomes store `record` as `Anything` and as `Text`: both are pipe stores, so a step reading it as `Text`
+                # is assumed to get one.
+                _flow(
+                    inputs='amount = "Number", note = "Text", mode = "Text"',
+                    output="Text",
+                    steps=['{ pipe = "store_anything_or_note", result = "stored" }', '{ pipe = "archive_record", result = "archived" }'],
+                ),
+                id="outcomes-storing-anything-and-a-concept-read-as-the-concept",
+            ),
+            pytest.param(
+                # The condition may leave the `Anything` an earlier pipe step stored, which is a pipe step's store too.
+                _flow(
+                    inputs='amount = "Number", mode = "Text", note = "Text"',
+                    output="Text",
+                    steps=[
+                        '{ pipe = "weigh_anything", result = "record" }',
+                        '{ pipe = "maybe_store_note", result = "stored" }',
+                        '{ pipe = "archive_record", result = "archived" }',
+                    ],
+                ),
+                id="a-stored-anything-a-condition-may-leave-read-as-a-concept",
+            ),
+        ],
+    )
+    def test_a_step_reading_what_the_flow_carries_validates(self, load_empty_library: Callable[[], str], flow: str) -> None:
+        """A refined concept satisfies a step reading its parent, a batched step always stores a list, a step calling a nested
+        sequence is checked against what the nested sequence declares, and a value a step stores as `Anything` satisfies any concept.
+        """
+        sequence = _load_flow(flow=flow, library_id=load_empty_library())
+
+        assert sequence.code == "flow"
+
+    @pytest.mark.parametrize(
+        ("flow", "error_type", "message", "expected_inputs"),
+        [
+            pytest.param(
+                _flow(
+                    inputs='note = "Markdown", remark = "Text"',
+                    output="Text",
+                    steps=['{ pipe = "render_note", result = "rendered" }', '{ pipe = "archive_note", result = "archived" }'],
+                ),
+                PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
+                "Extraneous input 'remark' found in the inputs of pipe flow",
+                {"note": "Markdown"},
+                id="a-declared-input-no-step-reads",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='note = "Markdown"',
+                    output="Text",
+                    steps=[
+                        '{ pipe = "render_note", result = "rendered" }',
+                        '{ pipe = "archive_note", result = "archived" }',
+                        '{ pipe = "label_record", result = "record_label" }',
+                    ],
+                ),
+                PipeValidationErrorType.MISSING_INPUT_VARIABLE,
+                "Required variable 'record' is not in the inputs of pipe 'flow'.",
+                {"note": "Markdown", "record": "Parcel"},
+                id="a-needed-input-not-declared",
+            ),
+        ],
+    )
+    def test_the_declared_names_are_checked_beside_a_declaration_every_step_accepts(
+        self,
+        load_empty_library: Callable[[], str],
+        flow: str,
+        error_type: PipeValidationErrorType,
+        message: str,
+        expected_inputs: dict[str, str],
+    ) -> None:
+        """A declaration every step reading it accepts leaves the sequence's inputs checked for missing and extraneous names, and
+        the inputs a fix would write keep that declaration rather than the need of the last step reading it.
+        """
+        with pytest.raises(PipeValidationError) as exc_info:
+            _load_flow(flow=flow, library_id=load_empty_library())
+
+        assert exc_info.value.error_type == error_type
+        assert exc_info.value.pipe_code == "flow"
+        assert message in str(exc_info.value)
+        assert exc_info.value.expected_inputs == expected_inputs
+
+    def test_a_name_an_unresolved_pipe_stores_is_assumed_to_deliver(self, load_empty_library: Callable[[], str], mocker: MockerFixture) -> None:
+        """A pipe that does not resolve at validation, as a dependency not loaded yet, gives the flow nothing to check a reader
+        against, so the step reading what it stores is assumed to get what it reads, as every other check of the sequence assumes.
+        """
+        hide_pipe_from_sequence_analyses(mocker=mocker, pipe_code="weigh_parcel")
+        flow = _flow(
+            inputs='amount = "Number"',
+            output="Text",
+            steps=['{ pipe = "weigh_parcel", result = "record" }', '{ pipe = "settle_invoice", result = "note" }'],
+        )
+
+        sequence = _load_flow(flow=flow, library_id=load_empty_library())
+
+        record_slot = sequence.build_typed_flow().slots_by_pipe_step[1]["record"]
+        assert record_slot.stuff_spec is None
+        assert record_slot.disagreement is None
+        assert record_slot.producer_step_index == 0
+
+    def test_a_binding_over_a_value_stored_as_anything_is_refused(self, load_empty_library: Callable[[], str]) -> None:
+        """A value stored as `Anything` satisfies a step reading it as a concept, but a binding cannot walk a path through it."""
+        flow = _flow(
+            inputs='amount = "Number", mode = "Text"',
+            output="Number",
+            steps=['{ pipe = "swap_record", result = "swapped" }', '{ from = "swapped.weight", result = "weight" }'],
+        )
+
+        with pytest.raises(PipeValidationError) as exc_info:
+            _load_flow(flow=flow, library_id=load_empty_library())
+
+        assert exc_info.value.error_type == PipeValidationErrorType.BINDING_PATH_UNRESOLVED
+        assert exc_info.value.pipe_code == "flow"
+        assert (
+            "In pipe 'flow', the binding step { from = \"swapped.weight\", result = \"weight\" } cannot be derived. Cannot bind 'swapped.weight'"
+            in str(exc_info.value)
+        )
+        assert "which is structureless by definition, so the segment 'weight' has no structure to walk" in str(exc_info.value)
+
+    @pytest.mark.parametrize(
+        ("pipe_code", "variable_name", "expected_spec"),
+        [
+            pytest.param("render_then_archive", "note", "Markdown", id="a-refinement-its-last-step-reads-as-the-parent"),
+            pytest.param("crate_then_list", "parcels", "Parcel[3]", id="a-fixed-count-its-last-step-reads-as-a-variable-list"),
+            pytest.param("weigh_record_then_note", "record", "Parcel", id="a-binding-root-its-last-step-reads-as-anything"),
+        ],
+    )
+    def test_a_sequence_needs_what_it_declares_when_every_step_accepts_it(
+        self, load_empty_library: Callable[[], str], pipe_code: str, variable_name: str, expected_spec: str
+    ) -> None:
+        """What a sequence needs from its caller under a declared input every step accepts is its declaration, not the need of the
+        last step reading it, so every caller, a sequence, a condition or a parallel above it, is held to the declaration.
+        """
+        _load_flow(
+            flow=_flow(inputs='amount = "Number"', output="Parcel", steps=['{ pipe = "weigh_parcel", result = "parcel" }']),
+            library_id=load_empty_library(),
+        )
+        nested_sequence = get_required_pipe(pipe_code=f"depot_steps.{pipe_code}")
+
+        needed_spec = nested_sequence.needed_inputs().root[variable_name]
+
+        assert needed_spec.to_bundle_representation(relative_to_domain="depot_steps") == expected_spec

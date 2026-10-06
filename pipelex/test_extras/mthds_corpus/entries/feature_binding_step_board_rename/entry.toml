@@ -1,0 +1,10 @@
+name = "feature_binding_step_board_rename"
+description = "A departure board bound under the name the next step reads, a renamed copy of the whole value"
+
+validity = "valid"
+tier = "offline"
+granularity = "focused"
+
+covers = [
+  "feature.binding_step",
+]

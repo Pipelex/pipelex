@@ -59,25 +59,29 @@ Analyze this wedding photo and describe the key moments captured: $wedding_photo
 
 ### Images as Sub-attributes of Structured Content
 
-When working with structured content that contains image fields (like `PageContent` which has a `page_view` field), you need to specify the full path to the image attribute in the `inputs` section:
+When working with structured content that contains image fields (like `Page`, which has a `page_view` field), declare the structured value with its whole concept in `inputs`, and read the image field through it in the prompt:
 
 ```toml
 [pipe.analyze_page_view]
 type = "PipeLLM"
 description = "Analyze the visual layout of a page"
-inputs = { "page_content.page_view" = "Image" }
+inputs = { page = "Page" }
 output = "LayoutAnalysis"
 prompt = """
-Analyze the visual layout and design elements of this page: $page_content.page_view
+Analyze the visual layout and design elements of this page:
+@page.page_view
+
 Focus on typography, spacing, and overall composition.
 """
 ```
 
 In this example:
 
-- `page_content` is the input variable containing a `PageContent` object
-- `page_view` is the `ImageContent` field within the `PageContent` structure
-- The dot notation `page_content.page_view` tells Pipelex to extract the image from that specific field
+- `page` is the input variable, declared with its whole concept, `Page`
+- `page_view` is the `Image` field within the `Page` structure
+- The path `page.page_view` reads that field through `page`, and because the concept the path reaches is `Image`, Pipelex attaches it to the model call as an image
+
+An input name is always a plain name: a key such as `"page.page_view" = "Image"` is refused as `invalid_input_name`. When a pipe should receive only the field, under a name of its own, the calling sequence binds the field with a binding step, `{ from = "page.page_view", result = "page_view" }`, and the pipe declares `page_view = "Image"`.
 
 ### Multiple Images
 
@@ -229,7 +233,7 @@ The same rule governs `PipeImgGen` prompts (positive and negative), which use th
 | --------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
 | `type`                      | string              | The type of the pipe: `PipeLLM`                                                                          | Yes      |
 | `description`               | string              | A description of the LLM operation.                                                                           | Yes      |
-| `inputs`                    | dictionary          | The input concept(s) for the LLM operation, as a dictionary mapping input names to concept codes. For images within structured content, use dot notation (e.g., `"page.image_argurment"`)
+| `inputs`                    | dictionary          | The input concept(s) for the LLM operation, as a dictionary mapping input names to concept codes. An input name is a plain `snake_case` name; for an image within structured content, declare the structured value (e.g., `page = "Page"`) and read the field through it in the prompt (`@page.page_view`). | No       |
 | `output`                    | string              | The output concept produced by the LLM operation with multiplicity notation using brackets (e.g., `"Text"`, `"Text[]"`, `"Text[3]"`).                                                | Yes      |
 | `model`                       | string or table     | Specifies the LLM choice by name, setting, or preset to use.              | No       |
 | `model_to_structure`                       | string or table     | LLM choice used whenever this `PipeLLM` produces a structured output. Applies both to direct structured generation and to the structuring step when `structuring_method = "preliminary_text"` is set. | No       |

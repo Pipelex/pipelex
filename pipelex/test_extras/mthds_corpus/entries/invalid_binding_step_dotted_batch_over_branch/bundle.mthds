@@ -1,0 +1,42 @@
+domain      = "catalog_printing"
+description = "Preparing a catalog for the printer"
+main_pipe   = "prepare_catalog"
+
+[concept.CatalogPage]
+description = "A page of a printed catalog"
+
+[concept.CatalogPage.structure]
+title = { type = "text", description = "The title printed at the top of the page", required = true }
+
+[concept.Catalog]
+description = "A printed catalog"
+
+[concept.Catalog.structure]
+season = { type = "text", description = "The season the catalog covers", required = true }
+pages  = { type = "list", item_type = "concept", item_concept_ref = "CatalogPage", description = "The pages of the catalog", required = true }
+
+[pipe.write_index_line]
+type        = "PipeCompose"
+description = "Writes the index line for one page"
+inputs      = { page = "CatalogPage" }
+output      = "Text"
+template    = "Page: {{ page.title }}"
+
+[pipe.write_cover_note]
+type        = "PipeCompose"
+description = "Writes the note printed on the cover"
+inputs      = { catalog = "Catalog" }
+output      = "Text"
+template    = "Catalog for {{ catalog.season }}"
+
+[pipe.prepare_catalog]
+type            = "PipeParallel"
+description     = "Writes the index lines and the cover note at the same time"
+inputs          = { catalog = "Catalog" }
+output          = "Composite"
+add_each_output = true
+# Wrong on purpose: a dotted batch_over binds, and a branch never binds; bind the pages in a sequence before the parallel.
+branches = [
+  { pipe = "write_index_line", batch_over = "catalog.pages", batch_as = "page", result = "index_lines" },
+  { pipe = "write_cover_note", result = "cover_note" },
+]

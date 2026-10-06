@@ -62,6 +62,4 @@ class PipeSearchBlueprint(PipeBlueprint):
         )
         # Names starting with an underscore are internal and never count as read inputs
         variable_paths = {path for path in full_paths if not get_root_from_dotted_path(path).startswith("_")}
-        check_inputs_match_variables(
-            declared_inputs=declared_inputs, variable_paths=variable_paths, reader="prompt", dotted_input_supplies_its_path=False
-        )
+        check_inputs_match_variables(declared_inputs=declared_inputs, variable_paths=variable_paths, reader="prompt")

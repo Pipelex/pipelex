@@ -1,0 +1,10 @@
+name = "feature_binding_step_nested_sequence"
+description = "A binding inside a sequence that another sequence calls, binding as it does at the top level"
+
+validity = "valid"
+tier = "offline"
+granularity = "focused"
+
+covers = [
+  "feature.binding_step",
+]

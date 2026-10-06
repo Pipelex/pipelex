@@ -1,0 +1,12 @@
+name = "invalid_binding_path_unresolved_past_a_leaf"
+description = "An invoice total walked into as if the number had fields of its own"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.binding_path_unresolved",
+]
+
+expected_error = "binding_path_unresolved"

@@ -9,7 +9,13 @@ resolving sub-pipes through the hub:
   that step. A step overwrites its result's name, and also whatever a nested sequence or condition
   outcome writes, since those run on the caller's memory; after a step that may write a name the
   walk cannot know, nothing more is followed. A step's batch parameters map the list slot to its
-  item slot.
+  item slot. A binding step makes its result stand for where the value it binds comes from: a single
+  value, or the list one field of a single root holds, for the entry path it reads, a renamed copy
+  for its root's own path, and a list gathered across items whose last field is itself a list for
+  every item of that field, `cases[].transcripts` for `cases.transcripts` over a list root. A list
+  gathered from a field that is not a list, `cases.attachment`, has no path a frame can say, so its
+  result stops being followed. A dotted `batch_over` is such a binding followed by a batch over its
+  result.
 - **Parallel.** Every branch is visited.
 - **Batch.** The list slot maps to the item slot, and the branch pipe is visited.
 - **Condition.** Every outcome is visited, and whatever is found below it is conditional.
@@ -42,6 +48,7 @@ from pipelex.kernel.extract_ops import resolve_extract_setting
 from pipelex.kernel.judgment_ops import judgment_setting_of_choice
 from pipelex.kernel.llm_ops import resolve_llm_setting_for_object, resolve_llm_setting_for_text
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
+from pipelex.pipe_controllers.binding.binding_step import BindingStep
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
@@ -323,8 +330,27 @@ def _visit_sequence(
     *, sequence: PipeSequence, frame: _Frame, is_conditional: bool, visiting: frozenset[str], consumers: list[FileInputConsumer]
 ) -> None:
     liftable_refs = {liftable_step.pipe_ref for liftable_step in sequence.analyze_taint().liftable_steps}
+    typed_flow = sequence.build_typed_flow() if any(isinstance(step, BindingStep) for step in sequence.sequential_sub_pipes) else None
     step_frame = dict(frame)
-    for sub_pipe in sequence.sequential_sub_pipes:
+    for step_index, sub_pipe in enumerate(sequence.sequential_sub_pipes):
+        if isinstance(sub_pipe, BindingStep):
+            # A binding stores a copy of the value at its path, and its result stands for where that value comes from, built
+            # on the path its root stands for: a single value, a renamed copy or one list field of a single root is at the
+            # entry path it reads, and a list whose last field is itself a list, gathered across the items of a list root or
+            # of a list crossed before it, holds the items of that field, `("cases", "[]", "transcripts")` for
+            # `cases.transcripts` over a list root. A batch over the result, a dotted `batch_over` included, then maps its
+            # item to that path followed by the item segment, which covers a file at `cases[1].transcripts[0]`. A list
+            # gathered from a field that is not a list, `cases.attachment`, holds values sitting at `cases[].attachment`
+            # rather than at the items of one path, which a frame cannot say, since it maps a slot to the value at one path
+            # and a batch's item to that path's items, so its result stops being followed.
+            derivation = typed_flow.binding_derivations.get(step_index) if typed_flow is not None else None
+            root_path = step_frame.get(sub_pipe.root_name)
+            provenance_path = derivation.provenance_path(item_segment=LIST_ITEM_SEGMENT) if derivation is not None else None
+            if root_path is None or provenance_path is None:
+                step_frame.pop(sub_pipe.output_name, None)
+            else:
+                step_frame[sub_pipe.output_name] = (*root_path, *provenance_path)
+            continue
         step_pipe = _visit_sub_pipe(
             sub_pipe=sub_pipe, frame=step_frame, is_conditional=is_conditional, liftable_refs=liftable_refs, visiting=visiting, consumers=consumers
         )
@@ -377,7 +403,9 @@ def _pipe_writes(*, pipe: PipeAbstract, visiting: frozenset[str]) -> _Writes:
     if isinstance(pipe, PipeSequence):
         return _merge_writes(
             writes=[
-                _sub_pipe_writes(sub_pipe=sub_pipe, step_pipe=get_optional_pipe(pipe_code=sub_pipe.pipe_code), visiting=visiting)
+                _Writes(names=frozenset({sub_pipe.output_name}), may_write_any=False)
+                if isinstance(sub_pipe, BindingStep)
+                else _sub_pipe_writes(sub_pipe=sub_pipe, step_pipe=get_optional_pipe(pipe_code=sub_pipe.pipe_code), visiting=visiting)
                 for sub_pipe in pipe.sequential_sub_pipes
             ]
         )

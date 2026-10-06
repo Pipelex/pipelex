@@ -40,6 +40,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
+from pipelex.cogt.model_backends.credential_resolution import CredentialResolution
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.runtime_boot import BACKEND_LIBRARY_REFUSED, BootComponent, RuntimeBoot
 from pipelex.system.configuration.config_loader import BACKENDS_DIR_NAME, INFERENCE_DIR_NAME
@@ -122,7 +123,7 @@ class TestAStaleBackendFileTheLedgerCannotFullyExplain:
                 secrets_provider=EnvSecretsProvider(),
                 backends_library_paths=[machine / INFERENCE_DIR_NAME / "backends.toml"],
                 backends_dir_path=str(machine / INFERENCE_DIR_NAME / BACKENDS_DIR_NAME),
-                lenient=False,
+                credentials=CredentialResolution.REQUIRE,
             )
         return refused.value
 

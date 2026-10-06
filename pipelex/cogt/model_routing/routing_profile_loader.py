@@ -16,7 +16,6 @@ def load_active_routing_profile(
     *,
     routing_profile_library_paths: Sequence[Path],
     enabled_backends: list[str],
-    lenient: bool = False,
 ) -> RoutingProfile:
     """Load the active routing profile from the routing profile library.
 
@@ -30,13 +29,12 @@ def load_active_routing_profile(
     blueprint refuses or an ``active`` naming no profile is ``RoutingProfileLibraryError``, and a profile whose default or
     routes name a backend that is not enabled is ``RoutingProfileDisabledBackendError``. That last
     one is the half-written override — ``active`` flipped, the backend still off — and the boot
-    turns it into a setup error that says so.
+    turns it into a setup error that says so, whether or not it needs inference: a keyless boot keeps
+    every enabled backend, so a profile it cannot route is a configuration error there too.
 
     Args:
         routing_profile_library_paths: The base file first, then the override files in merge order.
         enabled_backends: List of currently enabled backend names.
-        lenient: When True, warn instead of raising when the profile references
-            backends that are not enabled (e.g. because credentials are missing).
     """
     library_description = describe_toml_base_and_overrides(paths=routing_profile_library_paths)
     try:
@@ -75,25 +73,17 @@ def load_active_routing_profile(
         blueprint=active_profile_blueprint,
     )
     if active_profile.default and active_profile.default not in enabled_backends:
-        if lenient:
-            log.verbose(f"Default backend '{active_profile.default}' for routing profile '{active_profile_name}' is not enabled (lenient mode)")
-        else:
-            msg = (
-                f"Default backend '{active_profile.default}' set for routing profile '{active_profile_name}' is not enabled. "
-                f"You must either enable backend '{active_profile.default}' or set a different default backend for profile '{active_profile_name}', "
-                "or select a different routing profile."
-            )
-            raise RoutingProfileDisabledBackendError(msg)
+        msg = (
+            f"Default backend '{active_profile.default}' set for routing profile '{active_profile_name}' is not enabled. "
+            f"You must either enable backend '{active_profile.default}' or set a different default backend for profile '{active_profile_name}', "
+            "or select a different routing profile."
+        )
+        raise RoutingProfileDisabledBackendError(msg)
 
     # Check routes that use disabled backends
-    seen_disabled_backends: set[str] = set()
     for backend_name in active_profile.routes.values():
-        if backend_name not in enabled_backends and backend_name not in seen_disabled_backends:
-            if lenient:
-                log.verbose(f"Backend '{backend_name}' for profile '{active_profile_name}' is not enabled (lenient mode)")
-            else:
-                msg = f"Backend '{backend_name}', required for profile '{active_profile_name}' is not enabled"
-                raise RoutingProfileDisabledBackendError(msg)
-            seen_disabled_backends.add(backend_name)
+        if backend_name not in enabled_backends:
+            msg = f"Backend '{backend_name}', required for profile '{active_profile_name}' is not enabled"
+            raise RoutingProfileDisabledBackendError(msg)
 
     return active_profile

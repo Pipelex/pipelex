@@ -1972,6 +1972,10 @@ rationale = "Factory from source: builds the result from the name; single operan
 param = "backend_name"
 rationale = "Loads model specs for the named backend; single operand."
 
+["pipelex/cogt/model_backends/backend_library.py::InferenceBackendLibrary._record_placeholder_var_names"]
+param = "content"
+rationale = "A string transform: apply_to_strings_recursive calls transform_func with the string positionally, as it calls substitute_vars on a load that resolves credentials."
+
 ["pipelex/cogt/model_backends/backend_library.py::InferenceBackendLibrary.get_inference_backend"]
 param = "backend_name"
 rationale = "Keyed accessor by the backend_name; single operand."
@@ -3152,7 +3156,7 @@ rationale = "Query accessor keyed by the node it inspects; single operand."
 param = "digest"
 rationale = "Query accessor keyed by the stuff digest it inspects; single operand."
 
-["pipelex/graph/graph_analysis.py::GraphAnalysis.get_producer"]
+["pipelex/graph/graph_analysis.py::GraphAnalysis.get_producers"]
 param = "digest"
 rationale = "Query accessor keyed by the stuff digest it inspects; single operand."
 
@@ -3548,6 +3552,14 @@ rationale = "Factory from source: builds the table from the template mapping; si
 param = "schema"
 rationale = "Schema-pipeline stage transforming the schema dict; single operand."
 
+["pipelex/language/mthds_schema_generator.py::_constrain_batch_over"]
+param = "schema"
+rationale = "One post-processing pass of the schema pipeline, called as a verb on the schema it rewrites, like its sibling passes."
+
+["pipelex/language/mthds_schema_generator.py::_constrain_input_names"]
+param = "schema"
+rationale = "Schema-pipeline stage transforming the schema dict; single operand."
+
 ["pipelex/language/mthds_schema_generator.py::_convert_to_draft4"]
 param = "schema"
 rationale = "Schema-pipeline stage transforming the schema dict; single operand."
@@ -3575,6 +3587,10 @@ rationale = "Verb-object: mutates the schema object's required list; field_names
 ["pipelex/language/mthds_schema_generator.py::_remove_internal_fields"]
 param = "schema"
 rationale = "Schema-pipeline stage transforming the schema dict; single operand."
+
+["pipelex/language/mthds_schema_generator.py::_reserve_private_binding_names"]
+param = "schema"
+rationale = "One post-processing pass of the schema pipeline, called as a verb on the schema it rewrites, like its sibling passes."
 
 ["pipelex/language/mthds_schema_generator.py::_walk_schema"]
 param = "node"
@@ -4004,10 +4020,6 @@ rationale = "Predicate on the pipe's step result; modifiers stay keyword."
 param = "pipe"
 rationale = "Verb-object: scans the pipe for taint triggers; slot_taints is context."
 
-["pipelex/pipe_controllers/batch/pipe_batch.py::PipeBatch._live_run_controller_pipe._run_branch"]
-param = "item_input_stuff"
-rationale = "Verb-object: runs the branch for the item stuff; invoked positionally via functools.partial."
-
 ["pipelex/pipe_controllers/condition/special_outcome.py::SpecialOutcome.is_continue"]
 param = "outcome"
 rationale = "Predicate on the outcome string; single operand."
@@ -4123,14 +4135,6 @@ rationale = "Predicate on the pipe code; single operand."
 ["pipelex/pipe_machinery/validation.py::is_valid_input_name"]
 param = "input_name"
 rationale = "Predicate on the input name; single operand."
-
-["pipelex/pipe_machinery/validation.py::is_variable_satisfied_by_inputs"]
-param = "variable_path"
-rationale = "Predicate on the variable path; the inputs stay keyword."
-
-["pipelex/pipe_machinery/validation.py::validate_input_name"]
-param = "input_name"
-rationale = "Verb-object: validates the input name; single operand."
 
 ["pipelex/pipe_operators/compose/construct_blueprint.py::ConstructBlueprint.make_from_raw"]
 param = "raw"
@@ -6995,6 +6999,10 @@ rationale = "Dispatch handler: handles the event; single operand."
 ["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_batch_item"]
 param = "event"
 rationale = "Dispatch handler: handles the event; single operand."
+
+["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_condition_output_merge"]
+param = "event"
+rationale = "An event handler of the assembler's pass one, called with the one event it folds in, like its sibling handlers."
 
 ["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_controller_output"]
 param = "event"

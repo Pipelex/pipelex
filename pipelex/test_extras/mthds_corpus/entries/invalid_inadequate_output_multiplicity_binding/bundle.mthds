@@ -1,0 +1,13 @@
+domain      = "catalog_pages"
+description = "Picking the photograph of a printed catalog"
+main_pipe   = "pick_page_view"
+
+[pipe.pick_page_view]
+type        = "PipeSequence"
+description = "Binds the views of every page and returns them"
+inputs      = { pages = "Page[]" }
+# Wrong on purpose: binding through a list of pages gives a list of images, and the output promises one.
+output = "Image"
+steps = [
+  { from = "pages.page_view", result = "page_views" },
+]

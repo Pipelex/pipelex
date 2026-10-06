@@ -1,0 +1,12 @@
+name = "invalid_binding_step_malformed_path"
+description = "The first line of an invoice bound through a subscript, which a binding path cannot hold"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.binding_step_invalid",
+]
+
+expected_error = "binding_step_invalid"

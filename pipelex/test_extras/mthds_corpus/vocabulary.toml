@@ -136,6 +136,10 @@ fails_at = "runtime"
 code = "invalid_pipe_code_syntax"
 fails_at = "runtime"
 
+[error.invalid_input_name]
+code = "invalid_input_name"
+fails_at = "schema"
+
 [error.unknown_pipe_type]
 code = "unknown_pipe_type"
 fails_at = "schema"
@@ -146,6 +150,14 @@ fails_at = "schema"
 
 [error.batch_item_name_collision]
 code = "batch_item_name_collision"
+fails_at = "runtime"
+
+[error.binding_step_invalid]
+code = "binding_step_invalid"
+fails_at = "schema"
+
+[error.binding_path_unresolved]
+code = "binding_path_unresolved"
 fails_at = "runtime"
 
 [error.optional_marker_invalid]
@@ -227,6 +239,9 @@ excluded = "Advisory-only: the intent-hints lint rides the validation report's `
 [error.hint_inapplicable_intent]
 code = "hint_inapplicable_intent"
 excluded = "Advisory-only: the intent-hints lint rides the validation report's `warnings` array and never makes a verdict invalid (hints are non-normative; well-formed unknown content is preserved). Same shape problem as `optional_force_redundant`: an entry contract keyed on `expected_error` has nowhere to put a warning on a valid entry. Revisit if the manifest ever grows a warnings axis."
+
+[feature.binding_step]
+description = "A PipeSequence step `{ from = \"invoice.total\", result = \"total_amount\" }` that binds the value at a path in working memory to a new name: its concept is derived from the declared structures the path walks, its value is a deep copy taken when the step runs, a path crossing a list binds a flat list, and a path reaching nothing records an absence."
 
 [feature.intent_hints]
 description = "An `intent` hint authored in a `hints` table — on a concept, a structure field, or an expanded input slot — carrying non-normative presentation intent (`prose`, `label`, `rating`, `quantity`) that renderers may honor and every other consumer safely ignores."

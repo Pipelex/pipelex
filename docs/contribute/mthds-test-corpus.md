@@ -56,7 +56,9 @@ An entry directory holds either exactly one `.mthds` file, or several with a `bu
     .venv/bin/pipelex validate bundle pipelex/test_extras/mthds_corpus/entries/native_time_departure/
     ```
 
-6. **Run the gates**: `.venv/bin/pytest tests/unit/pipelex/test_extras tests/integration/pipelex/test_extras`.
+6. **Give an `offline` entry its expectations.** An `offline` entry ships an `inputs.json` and runs for real in the offline runner, which checks what the run leaves in working memory against the expectations in `tests/integration/pipelex/test_extras/test_data.py`, keyed by the entry's name: a value's concept and the fields its content must hold, or a recorded absence and its kind.
+
+7. **Run the gates**: `.venv/bin/pytest tests/unit/pipelex/test_extras tests/integration/pipelex/test_extras`.
 
 An **invalid** entry additionally declares the exact wire `error_type` it must produce. Read that string off the runtime rather than inferring it from the source:
 
@@ -129,6 +131,7 @@ The tier governs execution, never validation: the entry-validation gate below pa
 | Manifest | `tests/unit/pipelex/test_extras/test_mthds_corpus_manifest.py` | The strict `entry.toml` model rejected something. |
 | Layout and filters | `tests/unit/pipelex/test_extras/test_mthds_corpus_loader.py` | An entry's name does not match its directory, its bundle does not resolve, or the loader's filter semantics changed. |
 | Entry validation | `tests/integration/pipelex/test_extras/test_mthds_corpus_entries.py` | A valid entry stopped validating, or an invalid one stopped failing with exactly its declared error. Runs over every entry regardless of tier, so an `inference`-tier entry that broke is caught without spending a token. |
+| Offline runs | `tests/integration/pipelex/test_extras/test_mthds_corpus_offline_runs.py` | An `offline`-tier entry stopped running live with its `inputs.json`, or left values in working memory other than the ones its expectations name. An entry holds no expected outputs, so each offline entry's expectations live in that suite's `test_data.py`, keyed by entry name, and a new offline entry with none there is red too. |
 | Packaging | `tests/integration/pipelex/test_extras/test_mthds_corpus_packaging.py` | A corpus file stopped shipping in the wheel, or the generator started shipping. It builds a real wheel and derives what it expects from the corpus tree, so a new entry is covered with no wiring. |
 
 ## Consuming the corpus from a test

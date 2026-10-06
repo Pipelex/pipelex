@@ -1,0 +1,10 @@
+name = "feature_binding_step_page_views"
+description = "The views of a catalog's pages bound as the last step, a page without a view dropped, beside the cover's view"
+
+validity = "valid"
+tier = "offline"
+granularity = "focused"
+
+covers = [
+  "feature.binding_step",
+]

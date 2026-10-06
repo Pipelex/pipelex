@@ -21,7 +21,7 @@ $image
 [pipe.describe_page]
 type = "PipeLLM"
 description = "Describe a page"
-inputs = { "page.page_view" = "Image", page = "Page" }
+inputs = { page = "Page" }
 output = "Article"
 system_prompt = """
 You are an expert at describing page contents.

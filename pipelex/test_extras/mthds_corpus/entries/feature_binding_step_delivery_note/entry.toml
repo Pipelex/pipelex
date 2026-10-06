@@ -1,0 +1,11 @@
+name = "feature_binding_step_delivery_note"
+description = "A delivery note bound from two rounds, one carrying a note and one not, read by a guarded step and by a plain one that lifts"
+
+validity = "valid"
+tier = "offline"
+granularity = "focused"
+
+covers = [
+  "feature.binding_step",
+  "feature.optionals",
+]

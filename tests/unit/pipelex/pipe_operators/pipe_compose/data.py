@@ -185,19 +185,31 @@ class PipeComposeInputCheckTestCases:
         ["place"],
     )
 
-    # A dotted input name alone does not supply the stuff its path is read from: the root must be declared
+    # An input name is a plain name: a dotted one is refused by the shared input-name check, before the template is read
     REFUSED_TEMPLATE_LONE_DOTTED_INPUT: ClassVar[tuple[str, dict[str, Any], PipeValidationErrorType, list[str]]] = (
         "template_lone_dotted_input",
         {"description": "d", "inputs": {"deal.amount": "Number"}, "output": "Text", "template": "Worth $deal.amount"},
-        PipeValidationErrorType.MISSING_INPUT_VARIABLE,
-        ["deal"],
+        PipeValidationErrorType.INVALID_INPUT_NAME,
+        ["deal.amount"],
     )
 
     REFUSED_CONSTRUCT_LONE_DOTTED_INPUT: ClassVar[tuple[str, dict[str, Any], PipeValidationErrorType, list[str]]] = (
         "construct_lone_dotted_input",
         {"description": "d", "inputs": {"page.page_view": "Image"}, "output": "Summary", "construct": {"view": {"from": "page.page_view"}}},
-        PipeValidationErrorType.MISSING_INPUT_VARIABLE,
-        ["page"],
+        PipeValidationErrorType.INVALID_INPUT_NAME,
+        ["page.page_view"],
+    )
+
+    REFUSED_CONSTRUCT_DOTTED_INPUT_BESIDE_ITS_ROOT: ClassVar[tuple[str, dict[str, Any], PipeValidationErrorType, list[str]]] = (
+        "construct_dotted_input_beside_its_root",
+        {
+            "description": "d",
+            "inputs": {"page": "Page", "page.page_view": "Image"},
+            "output": "Summary",
+            "construct": {"view": {"from": "page.page_view"}, "text": {"from": "page.text_and_images"}},
+        },
+        PipeValidationErrorType.INVALID_INPUT_NAME,
+        ["page.page_view"],
     )
 
     REFUSED_CASES: ClassVar[list[tuple[str, dict[str, Any], PipeValidationErrorType, list[str]]]] = [
@@ -211,6 +223,7 @@ class PipeComposeInputCheckTestCases:
         REFUSED_CONSTRUCT_UNDECLARED_NESTED_TEMPLATE,
         REFUSED_TEMPLATE_LONE_DOTTED_INPUT,
         REFUSED_CONSTRUCT_LONE_DOTTED_INPUT,
+        REFUSED_CONSTRUCT_DOTTED_INPUT_BESIDE_ITS_ROOT,
     ]
 
     ACCEPTED_CASES: ClassVar[list[tuple[str, dict[str, Any]]]] = [
@@ -241,10 +254,10 @@ class PipeComposeInputCheckTestCases:
             },
         ),
         (
-            "construct_dotted_input_name",
+            "construct_from_paths_through_the_root",
             {
                 "description": "d",
-                "inputs": {"page": "Page", "page.page_view": "Image"},
+                "inputs": {"page": "Page"},
                 "output": "Summary",
                 "construct": {"view": {"from": "page.page_view"}, "text": {"from": "page.text_and_images"}},
             },

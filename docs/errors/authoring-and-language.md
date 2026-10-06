@@ -95,6 +95,8 @@ own page. Classes are grouped by subsystem.
 
 ## Pipe controllers
 
+- [`BindingPathUnresolvedError`](binding-path-unresolved-error.md) — Binding path unresolved
+- [`BindingStepRunError`](binding-step-run-error.md) — Binding step run
 - [`PipeBatchFactoryError`](pipe-batch-factory-error.md) — Pipe batch factory
 - [`PipeConditionFactoryError`](pipe-condition-factory-error.md) — Pipe condition factory
 - [`PipeControllerError`](pipe-controller-error.md) — Pipe controller

@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Any, Literal
 
+from pydantic import BaseModel, ConfigDict
 from typing_extensions import override
 
 from pipelex import log
@@ -12,13 +13,17 @@ from pipelex.core.pipes.exceptions import PipeRunError, PipeValidationError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.stuffs.stuff import Stuff
+from pipelex.graph.condition_output_merge import ConditionOutputMerge, ConditionOutputTyping
+from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import get_optional_pipe, get_pipe_router, get_required_pipe
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import describe_expression_parse_failure
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.pipe_controller import PipeController
+from pipelex.pipe_machinery.memory_writes import AlternativeWrites, MemoryWrite, merge_alternative_writes
 from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
-from pipelex.pipe_run.pipe_run_params import PipeRunParams
+from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
@@ -30,6 +35,32 @@ if TYPE_CHECKING:
     from pipelex.libraries.library_crate import LibraryCrate
 
 ConditionOutcomeMap = dict[str, str | SpecialOutcome]
+
+
+class DryRunOutcomeSlot(BaseModel):
+    """What one outcome of a dry-run condition left in the condition's slot, beside what it declares.
+
+    Attributes:
+        declared_concept: The concept code the outcome pipe declares as its output.
+        declared_list: Whether the outcome pipe declares a list output.
+        stuff: The stuff the outcome wrote into the slot, or None where it resolved the slot absent.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    declared_concept: str
+    declared_list: bool
+    stuff: Stuff | None
+
+    @property
+    def declared_typing(self) -> tuple[str, bool]:
+        return (self.declared_concept, self.declared_list)
+
+    @property
+    def written_typing(self) -> tuple[str, bool] | None:
+        if self.stuff is None:
+            return None
+        return (self.stuff.concept.code, self.stuff.is_list)
 
 
 class PipeCondition(PipeController):
@@ -63,6 +94,37 @@ class PipeCondition(PipeController):
 
         # Exclude internal variables starting with `_`
         return {var for var in required_variables if not var.startswith("_")}
+
+    @override
+    def memory_writes(self, *, visited_pipes: set[str] | None = None) -> dict[str, MemoryWrite]:
+        """What the outcome it runs stores besides its result: the chosen outcome runs on the caller's memory.
+
+        The outcomes are merged as alternatives (`merge_alternative_writes`): a name is always written only if every outcome
+        that can run stores it, may hold an absence if any outcome may leave one, and keeps a spec only if every outcome
+        storing it stores the same one, recording otherwise which outcome stores which spec, so that a binding reading the name
+        is refused before the run. A `continue` outcome stores nothing, a `fail` outcome stops the run, and an outcome
+        pipe that does not resolve is left out, as a sequence assumes an unresolved pipe delivers. The alias the condition
+        may add is left out too: the working memory refuses an alias over a name it already holds, so it never replaces a
+        value the flow types.
+        """
+        if visited_pipes is None:
+            visited_pipes = set()
+        if self.visit_key in visited_pipes:
+            return {}
+        visited_pipes_with_current = visited_pipes | {self.visit_key}
+        outcome_writes: list[AlternativeWrites] = []
+        for outcome_pipe_code in sorted(self.pipe_dependencies()):
+            outcome_pipe = get_optional_pipe(pipe_code=outcome_pipe_code)
+            if outcome_pipe is not None:
+                outcome_writes.append(
+                    AlternativeWrites(
+                        label=f"outcome '{outcome_pipe.code}' of pipe '{self.code}'",
+                        writes=outcome_pipe.memory_writes(visited_pipes=visited_pipes_with_current),
+                    )
+                )
+        if self._continue_reachable:
+            outcome_writes.append(AlternativeWrites(label=f"the `continue` outcome of pipe '{self.code}'", writes={}))
+        return merge_alternative_writes(alternatives=outcome_writes)
 
     @override
     def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
@@ -436,22 +498,40 @@ class PipeCondition(PipeController):
                 )
             )
 
-        # Here, it should launch the dry run of all the pipes in the outcomes map.
-        # pipe_dependencies() is a set, and every branch dry-runs into the SAME
-        # working memory under the SAME output_name — so the branch iterated last
-        # is the one whose stuff the caller sees as this condition's output. Left
-        # unsorted, that is string-hash order, which varies per process: the same
-        # bundle dry-run twice yields two different graphs. Sort so the last writer
-        # is a property of the method, not of PYTHONHASHSEED.
-        for pipe_code in sorted(self.pipe_dependencies()):
-            pipe = get_required_pipe(pipe_code=pipe_code)
-            await pipe.run_pipe(
+        # A dry run cannot know which outcome a live run takes, so every pipe outcome runs. Each
+        # outcome but the last runs on a copy of the memory and run params this condition received,
+        # as PipeParallel runs its branches: no outcome sees what a sibling wrote, and the memory
+        # this condition leaves is the one a live run choosing the last outcome would leave. The
+        # last outcome is the default outcome's pipe, so the steps after the condition read the
+        # value a live run falls back to when nothing matches, and the order is a property of the
+        # method rather than of set iteration order. The graph then shows the condition's result
+        # as one stuff that every outcome produces, which the merge registered below records.
+        received_stuff_codes = {stuff.stuff_code for stuff in working_memory.root.values()}
+        outcome_slots: list[DryRunOutcomeSlot] = []
+        outcome_pipe_codes = self._dry_run_outcome_order()
+        for outcome_index, pipe_code in enumerate(outcome_pipe_codes):
+            is_last_outcome = outcome_index == len(outcome_pipe_codes) - 1
+            outcome_pipe = get_required_pipe(pipe_code=pipe_code)
+            outcome_output = await outcome_pipe.run_pipe(
                 job_metadata=job_metadata,
-                working_memory=working_memory,
-                pipe_run_params=pipe_run_params,
+                working_memory=working_memory if is_last_outcome else working_memory.make_deep_copy(),
+                pipe_run_params=pipe_run_params if is_last_outcome else pipe_run_params.make_deep_copy(),
                 output_name=output_name,
                 library_crate=library_crate,
             )
+            outcome_slots.append(
+                DryRunOutcomeSlot(
+                    declared_concept=outcome_pipe.output.concept.code,
+                    declared_list=bool(outcome_pipe.output.multiplicity),
+                    stuff=outcome_output.working_memory.get_optional_main_stuff(),
+                )
+            )
+        self._register_dry_run_output_merge(
+            job_metadata=job_metadata,
+            pipe_run_params=pipe_run_params,
+            received_stuff_codes=received_stuff_codes,
+            outcome_slots=outcome_slots,
+        )
         execution_data_dict: dict[str, Any] = {
             "evaluated_expression": "dry_run",
             "selected_outcome": "all_outcomes",
@@ -482,6 +562,85 @@ class PipeCondition(PipeController):
                 reason=f"dry run of PipeCondition '{self.code}': all outcomes are special, the declared output resolves absent",
             )
         return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.run_metadata.pipeline_run_id)
+
+    def _dry_run_outcome_order(self) -> list[str]:
+        """The pipe outcomes in the order a dry run runs them: sorted, with the default outcome's pipe last."""
+        pipe_codes = sorted(self.pipe_dependencies())
+        if self.default_outcome in pipe_codes:
+            pipe_codes.remove(self.default_outcome)
+            pipe_codes.append(self.default_outcome)
+        return pipe_codes
+
+    def _register_dry_run_output_merge(
+        self,
+        *,
+        job_metadata: JobMetadata,
+        pipe_run_params: PipeRunParams,
+        received_stuff_codes: set[str],
+        outcome_slots: list[DryRunOutcomeSlot],
+    ) -> None:
+        """Record that every outcome's output is this condition's one output stuff, for the graph.
+
+        The shared stuff is the last outcome's, which the steps after the condition already read.
+        Only a stuff minted inside the condition is merged: an outcome handing back a stuff it was
+        given would otherwise drag that stuff's own producer into the condition's result. When the
+        merged outcomes write or declare different concepts or multiplicities, the shared stuff is
+        typed by this condition's declared output, the one typing that covers them all. The
+        declarations count because an outcome's stuff can stand for several: a nested condition
+        hands back only its last outcome's stuff, while its declaration covers all of them. A
+        record carrying a typing and no merged digest is still left when the outcomes already
+        share the stuff code, as under a batch that gives its branch its own stuff code.
+
+        Args:
+            job_metadata: The condition's job metadata, whose trace context names its graph node.
+            pipe_run_params: The condition's run params, carrying the invocation's output multiplicity.
+            received_stuff_codes: The stuff codes in the memory the condition received.
+            outcome_slots: What each outcome left in the slot and what it declares, in run order.
+        """
+        trace_context = job_metadata.trace_context
+        if trace_context is None or not trace_context.emit_graph_events or trace_context.parent_node_id is None:
+            return
+        tracer_manager = GraphTracerManager.get_instance()
+        if tracer_manager is None or not outcome_slots:
+            return
+        shared_slot = outcome_slots[-1]
+        shared_stuff = shared_slot.stuff
+        if shared_stuff is None or shared_stuff.stuff_code in received_stuff_codes:
+            return
+        # The outcomes that wrote a stuff minted inside the condition. Their stuffs can already carry
+        # the shared digest: a condition run as a batch's branch is given the branch's stuff code,
+        # which every outcome mints under, so only the typing is left to record.
+        merging_slots = [slot for slot in outcome_slots[:-1] if slot.stuff is not None and slot.stuff.stuff_code not in received_stuff_codes]
+        if not merging_slots:
+            return
+        merging_slots.append(shared_slot)
+        merged_digests = sorted(
+            {slot.stuff.stuff_code for slot in merging_slots if slot.stuff is not None and slot.stuff.stuff_code != shared_stuff.stuff_code}
+        )
+
+        shared_typing: ConditionOutputTyping | None = None
+        if len({slot.written_typing for slot in merging_slots}) > 1 or len({slot.declared_typing for slot in merging_slots}) > 1:
+            multiplicity_resolution = output_multiplicity_to_apply(
+                base_multiplicity=self.output.multiplicity,
+                override_multiplicity=pipe_run_params.output_multiplicity,
+            )
+            shared_typing = ConditionOutputTyping(
+                concept=self.output.concept.code,
+                multiplicity=True if multiplicity_resolution.is_multiple_outputs_enabled else None,
+            )
+
+        if not merged_digests and shared_typing is None:
+            return
+
+        tracer_manager.register_condition_output_merge(
+            lookup_key=trace_context.lookup_key,
+            merge=ConditionOutputMerge(
+                condition_node_id=trace_context.parent_node_id,
+                shared_digest=shared_stuff.stuff_code,
+                merged_digests=merged_digests,
+                shared_typing=shared_typing,
+            ),
+        )
 
     def _record_declared_absent_output(self, *, working_memory: WorkingMemory, output_name: str | None, reason: str) -> None:
         """Resolve this pipe's declared output as a declared-absent record (the `continue` arm)."""

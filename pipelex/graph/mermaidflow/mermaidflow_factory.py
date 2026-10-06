@@ -140,6 +140,15 @@ class MermaidflowFactory:
                     for output_spec in controller_node.node_io.outputs:
                         if output_spec.digest and output_spec.digest in digest_map:
                             digest_map[output_spec.digest] = (output_spec.name, output_spec.concept_label)
+            # A stuff with several writers (a dry-run condition's one output stuff, which every outcome
+            # writes) is rendered once, inside the deepest controller containing all its writers, and
+            # never inside a parallel outcome that combines into it.
+            for digest_map in controller_output_stuffs.values():
+                for digest in analysis.shared_stuff_controllers:
+                    digest_map.pop(digest, None)
+            for digest, controller_id in analysis.shared_stuff_controllers.items():
+                if digest in stuff_registry:
+                    controller_output_stuffs.setdefault(controller_id, {})[digest] = stuff_registry[digest]
 
             # Render pipe nodes and their produced stuff within controller subgraphs
             lines.append("")
@@ -152,6 +161,7 @@ class MermaidflowFactory:
                     children_map=analysis.containment_tree,
                     stuff_registry=stuff_registry,
                     stuff_producers=analysis.stuff_producers,
+                    shared_stuff_digests=set(analysis.shared_stuff_controllers),
                     stuff_consumers=analysis.stuff_consumers,
                     stuff_id_mapping=stuff_id_mapping,
                     subgraph_depths=subgraph_depths,
@@ -187,7 +197,7 @@ class MermaidflowFactory:
             lines.append("    %% Pipe nodes (flat view)")
 
             # Only render pipes that participate in data flow
-            participating_pipes: set[str] = set(analysis.stuff_producers.values())
+            participating_pipes: set[str] = {producer_id for producer_ids in analysis.stuff_producers.values() for producer_id in producer_ids}
             for consumers in analysis.stuff_consumers.values():
                 participating_pipes.update(consumers)
 
@@ -229,11 +239,14 @@ class MermaidflowFactory:
         lines.append("")
         lines.append("    %% Data flow edges: producer -> stuff -> consumer")
 
-        for digest, producer_node_id in sorted(analysis.stuff_producers.items(), key=operator.itemgetter(0)):
-            producer_mermaid_id = id_mapping.get(producer_node_id)
+        for digest, producer_node_ids in sorted(analysis.stuff_producers.items(), key=operator.itemgetter(0)):
             prod_stuff_mermaid_id = stuff_id_mapping.get(digest)
-            if producer_mermaid_id and prod_stuff_mermaid_id:
-                lines.append(f"    {producer_mermaid_id} --> {prod_stuff_mermaid_id}")
+            if not prod_stuff_mermaid_id:
+                continue
+            for producer_node_id in producer_node_ids:
+                producer_mermaid_id = id_mapping.get(producer_node_id)
+                if producer_mermaid_id:
+                    lines.append(f"    {producer_mermaid_id} --> {prod_stuff_mermaid_id}")
 
         # Render edges: stuff -> consumer
         for digest, consumer_node_ids in sorted(analysis.stuff_consumers.items(), key=operator.itemgetter(0)):
@@ -365,6 +378,9 @@ class MermaidflowFactory:
             case NodeKind.ERROR:
                 # Rectangle with failed class
                 node_str = f'{mermaid_id}["{label}"]:::failed'
+            case NodeKind.BINDING:
+                # Parallelogram for a binding step, which reshapes a value rather than running a pipe
+                node_str = f'{mermaid_id}[/"{label}"/]'
             case NodeKind.CONTROLLER | NodeKind.PIPE_CALL | NodeKind.OPERATOR:
                 # Rectangle for operators/pipes
                 if node.status == NodeStatus.FAILED:
@@ -481,7 +497,8 @@ class MermaidflowFactory:
         id_mapping: dict[str, str],
         children_map: dict[str, list[str]],
         stuff_registry: dict[str, tuple[str, str | None]],
-        stuff_producers: dict[str, str],
+        stuff_producers: dict[str, list[str]],
+        shared_stuff_digests: set[str],
         stuff_consumers: dict[str, list[str]],
         stuff_id_mapping: dict[str, str],
         subgraph_depths: dict[str, int],
@@ -505,7 +522,8 @@ class MermaidflowFactory:
             id_mapping: Map of node_id to sanitized Mermaid ID.
             children_map: Map of parent node_id to list of child node_ids.
             stuff_registry: Map of digest to (name, concept) for all stuffs.
-            stuff_producers: Map of digest to producer node_id.
+            stuff_producers: Map of digest to its producer node_ids.
+            shared_stuff_digests: Digests of the stuffs with several producers that a common controller renders.
             stuff_consumers: Map of digest to list of consumer node_ids.
             stuff_id_mapping: Map to store stuff mermaid IDs (mutated).
             subgraph_depths: Map to track subgraph IDs and their depths (mutated).
@@ -555,6 +573,7 @@ class MermaidflowFactory:
                     children_map=children_map,
                     stuff_registry=stuff_registry,
                     stuff_producers=stuff_producers,
+                    shared_stuff_digests=shared_stuff_digests,
                     stuff_consumers=stuff_consumers,
                     stuff_id_mapping=stuff_id_mapping,
                     subgraph_depths=subgraph_depths,
@@ -608,9 +627,10 @@ class MermaidflowFactory:
                         lines.append(stuff_line)
                         rendered_orphan_stuffs.add(digest)
 
-            # Also render any stuff nodes produced by this pipe
-            for digest, producer_node_id in stuff_producers.items():
-                if producer_node_id == node_id and digest in stuff_registry:
+            # Also render any stuff nodes produced by this pipe. A stuff with several producers is
+            # rendered once: by their common controller, or by its first producer when they have none.
+            for digest, producer_node_ids in stuff_producers.items():
+                if producer_node_ids[0] == node_id and digest not in shared_stuff_digests and digest in stuff_registry:
                     name, concept = stuff_registry[digest]
                     stuff_line = cls._render_stuff_node(
                         digest=digest,

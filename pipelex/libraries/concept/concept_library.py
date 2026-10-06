@@ -14,6 +14,7 @@ from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.libraries.concept.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
+from pipelex.libraries.library_state import next_library_state_token
 from pipelex.runtime_hub import get_class_registry
 from pipelex.tools.typing.class_utils import are_structure_classes_compatible
 
@@ -26,6 +27,16 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
     @override
     def model_post_init(self, _context: Any) -> None:
         self._concept_resolver: Callable[[str], Concept | None] | None = None
+        # Replaced on every change to what the library holds, so a value derived from the concepts it resolves knows it is stale.
+        self._state_token: int = next_library_state_token()
+
+    @property
+    @override
+    def state_token(self) -> int:
+        return self._state_token
+
+    def _mark_changed(self) -> None:
+        self._state_token = next_library_state_token()
 
     def set_concept_resolver(self, resolver: Callable[[str], Concept | None]) -> None:
         """Set a resolver callback for cross-package concept lookups.
@@ -34,6 +45,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
             resolver: A callable that takes a concept ref and returns the Concept or None
         """
         self._concept_resolver = resolver
+        self._mark_changed()
 
     @model_validator(mode="after")
     def validation_static(self):
@@ -50,6 +62,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
     @override
     def teardown(self):
         self.root = {}
+        self._mark_changed()
 
     @override
     def reset(self):
@@ -86,6 +99,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
             msg = f"Concept '{concept.concept_ref}' already exists in the library"
             raise ConceptLibraryError(msg)
         self.root[concept.concept_ref] = concept
+        self._mark_changed()
 
     @override
     def add_concepts(self, concepts: list[Concept]):
@@ -97,6 +111,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         for concept_ref in concept_refs:
             if concept_ref in self.root:
                 del self.root[concept_ref]
+        self._mark_changed()
 
     @override
     def is_compatible(self, *, tested_concept: Concept, wanted_concept: Concept, strict: bool = False) -> bool:
@@ -344,6 +359,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
             msg = f"Dependency concept '{key}' already exists in the library"
             raise ConceptLibraryError(msg)
         self.root[key] = concept
+        self._mark_changed()
 
     def is_concept_exists(self, concept_ref: str) -> bool:
         return concept_ref in self.root

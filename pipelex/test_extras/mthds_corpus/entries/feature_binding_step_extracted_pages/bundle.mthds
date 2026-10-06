@@ -1,0 +1,19 @@
+domain      = "scan_archive"
+description = "Keeping the page photographs of a scanned delivery note"
+main_pipe   = "keep_page_views"
+
+[pipe.keep_page_views]
+type = "PipeSequence"
+description = "Reads the pages out of a scan, then binds their views"
+inputs = { delivery_scan = "Document" }
+output = "Image[]"
+steps = [
+  { pipe = "read_pages", result = "pages" },
+  { from = "pages.page_view", result = "page_views" },
+]
+
+[pipe.read_pages]
+type        = "PipeExtract"
+description = "Reads each page out of the scan"
+inputs      = { delivery_scan = "Document" }
+output      = "Page[]"

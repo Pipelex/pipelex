@@ -49,9 +49,3 @@ class TestInputStuffSpecsPresence:
         specs = InputStuffSpecs(root={})
         specs.add_stuff_spec(variable_name="maybe_var", concept=_text_concept(), presence=PresenceMarker.OPTIONAL)
         assert specs.root["maybe_var"].presence == PresenceMarker.OPTIONAL
-
-    def test_root_validator_preserves_presence(self):
-        """The wrap validator rebuilds StuffSpecs (dotted-path rooting) and must not drop presence."""
-        concept = _text_concept()
-        specs = InputStuffSpecs(root={"doc.summary": StuffSpec(concept=concept, presence=PresenceMarker.OPTIONAL)})
-        assert specs.root["doc"].presence == PresenceMarker.OPTIONAL

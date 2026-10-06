@@ -418,6 +418,70 @@ steps = [
 """
 
 
+_REDUNDANT_DOTTED_INPUT_MTHDS = """domain = "dottedfix_redundant"
+main_pipe = "describe_page"
+
+# Wrong on purpose: a dotted input key beside its declared root, the form the bundles of the
+# methods repository, the cookbook and the hub used to carry. The root already supplies the field.
+[pipe.describe_page]
+type = "PipeLLM"
+description = "Describe the view of a catalog page."
+inputs = { "page.page_view" = "Image", page = "Page" }
+output = "Text"
+prompt = \"\"\"
+Describe this catalog page:
+@page.page_view
+\"\"\"
+"""
+
+_MARKER_DROPPING_DOTTED_INPUT_MTHDS = """domain = "dottedfix_marker"
+main_pipe = "summarize_draft"
+
+# Wrong on purpose: a dotted input key beside its declared root, declared after it with another presence
+# marker. The key forces the root the author declared optional, so deleting it would change the contract.
+[pipe.summarize_draft]
+type = "PipeLLM"
+description = "Summarize the text of a draft."
+inputs = { draft = "Text?", "draft.text" = "Text!" }
+output = "Text"
+prompt = \"\"\"
+Summarize this draft:
+$draft.text
+\"\"\"
+"""
+
+_UNREADABLE_DOTTED_INPUT_MTHDS = """domain = "dottedfix_unreadable"
+main_pipe = "summarize_draft"
+
+# Wrong on purpose: a dotted input key beside a root declared with a concept that lacks the field. The key
+# typed the root `Text` under the fold, so the template read worked; deleting it leaves `data` a Number.
+[pipe.summarize_draft]
+type = "PipeLLM"
+description = "Summarize the text of a draft."
+inputs = { data = "Number", "data.text" = "Text" }
+output = "Text"
+prompt = \"\"\"
+Summarize this draft:
+$data.text
+\"\"\"
+"""
+
+_LONE_DOTTED_INPUT_MTHDS = """domain = "dottedfix_lone"
+main_pipe = "describe_page"
+
+# Wrong on purpose: a lone dotted input key. Nothing says what concept `page` is, so no fix can write it.
+[pipe.describe_page]
+type = "PipeLLM"
+description = "Describe the view of a catalog page."
+inputs = { "page.page_view" = "Image" }
+output = "Text"
+prompt = \"\"\"
+Describe this catalog page:
+@page.page_view
+\"\"\"
+"""
+
+
 @pytest.mark.asyncio(loop_scope="class")
 class TestFixConvergenceLoop:
     async def test_single_iteration_fixes_and_revalidates(
@@ -913,3 +977,92 @@ class TestFixConvergenceLoop:
         assert result.iterations == 0
         assert result.fixes_applied == []
         assert bundle_path.read_text(encoding="utf-8") == valid_text
+
+    async def test_redundant_dotted_input_is_deleted_in_one_iteration(
+        self,
+        tmp_path: Path,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """A dotted input whose root is declared beside it is deleted, and the bundle then validates."""
+        load_empty_library()
+        bundle_path = tmp_path / "redundant_dotted.mthds"
+        bundle_path.write_text(_REDUNDANT_DOTTED_INPUT_MTHDS, encoding="utf-8")
+
+        result = await fix_bundle_file(bundle_path)
+
+        assert result.is_valid is True
+        assert result.iterations == 1
+        assert [fix.fix_code for fix in result.fixes_applied] == ["delete-redundant-dotted-input"]
+        assert result.remaining_errors == []
+        describe_page = _pipes(bundle_path)["describe_page"]
+        assert describe_page["inputs"] == {"page": "Page"}
+        assert "@page.page_view" in describe_page["prompt"]
+
+    async def test_lone_dotted_input_is_left_to_the_author_with_the_remedies(
+        self,
+        tmp_path: Path,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """A lone dotted input has no safe fix, so the file is untouched and the error names both remedies."""
+        load_empty_library()
+        bundle_path = tmp_path / "lone_dotted.mthds"
+        bundle_path.write_text(_LONE_DOTTED_INPUT_MTHDS, encoding="utf-8")
+
+        result = await fix_bundle_file(bundle_path)
+
+        assert result.is_valid is False
+        assert result.fixes_applied == []
+        assert bundle_path.read_text(encoding="utf-8") == _LONE_DOTTED_INPUT_MTHDS
+        assert [item.error_type for item in result.remaining_errors] == ["invalid_input_name"]
+        remaining = result.remaining_errors[0]
+        assert remaining.suggested_fix is None
+        assert remaining.message is not None
+        assert "declare 'page' with its whole concept" in remaining.message
+        assert '{ from = "page.page_view", result = "page_view" }' in remaining.message
+
+    async def test_marker_dropping_dotted_input_is_offered_but_never_applied(
+        self,
+        tmp_path: Path,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """A dotted input whose deletion would drop its marker from the root gets an UNSAFE fix, which the loop leaves to the author."""
+        load_empty_library()
+        bundle_path = tmp_path / "marker_dropping_dotted.mthds"
+        bundle_path.write_text(_MARKER_DROPPING_DOTTED_INPUT_MTHDS, encoding="utf-8")
+
+        result = await fix_bundle_file(bundle_path)
+
+        assert result.is_valid is False
+        assert result.iterations == 0
+        assert result.fixes_applied == []
+        assert bundle_path.read_text(encoding="utf-8") == _MARKER_DROPPING_DOTTED_INPUT_MTHDS
+        assert [item.error_type for item in result.remaining_errors] == ["invalid_input_name"]
+        remaining = result.remaining_errors[0]
+        assert remaining.suggested_fix is not None
+        assert remaining.suggested_fix.fix_code == "delete-redundant-dotted-input"
+        assert not remaining.suggested_fix.safety.is_safe
+        assert "replace `?` with `!` on 'draft' if the root must be forced" in remaining.suggested_fix.description
+        assert remaining.message is not None
+        assert "Deleting 'draft.text' drops its forced presence (`!`), where 'draft' is optional (`?`)" in remaining.message
+
+    async def test_unreadable_dotted_input_is_offered_but_never_applied(
+        self,
+        tmp_path: Path,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """A dotted input whose path the root's declared concept cannot hold gets an UNSAFE fix naming the walk's refusal, never applied."""
+        load_empty_library()
+        bundle_path = tmp_path / "unreadable_dotted.mthds"
+        bundle_path.write_text(_UNREADABLE_DOTTED_INPUT_MTHDS, encoding="utf-8")
+
+        result = await fix_bundle_file(bundle_path)
+
+        assert result.is_valid is False
+        assert result.fixes_applied == []
+        assert bundle_path.read_text(encoding="utf-8") == _UNREADABLE_DOTTED_INPUT_MTHDS
+        assert [item.error_type for item in result.remaining_errors] == ["invalid_input_name"]
+        remaining = result.remaining_errors[0]
+        assert remaining.suggested_fix is not None
+        assert remaining.suggested_fix.fix_code == "delete-redundant-dotted-input"
+        assert not remaining.suggested_fix.safety.is_safe
+        assert "'data' holds a 'native.Number', which has no field 'text'" in remaining.suggested_fix.description

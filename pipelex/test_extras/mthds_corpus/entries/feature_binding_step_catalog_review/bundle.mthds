@@ -1,0 +1,67 @@
+domain      = "catalog_review"
+description = "Reviewing a supplier's catalog before it goes to print"
+main_pipe   = "review_catalog"
+
+[concept.Catalog]
+description = "A supplier's catalog waiting for review"
+
+[concept.Catalog.structure]
+title          = { type = "text", description = "The title on the cover", required = true }
+pages          = { type = "list", item_type = "concept", item_concept_ref = "Page", description = "The pages of the catalog", required = true }
+cheapest_price = { type = "number", description = "The lowest price printed in the catalog, in euros", required = true }
+editor_note    = { type = "text", description = "A note the editor left on the proof, when there is one" }
+
+[concept.CatalogReview]
+description = "The review sent back to the supplier"
+
+[concept.CatalogReview.structure]
+title        = { type = "text", description = "The catalog reviewed", required = true }
+captions     = { type = "list", item_type = "text", description = "One caption per photograph", required = true }
+price_is_low = { type = "boolean", description = "Whether the cheapest price looks too low to be true", required = true }
+
+[pipe.review_catalog]
+type = "PipeSequence"
+description = "Binds the parts of a catalog, captions its photographs, judges its cheapest price and writes the review"
+inputs = { catalog = "Catalog" }
+output = "Text"
+steps = [
+  { from = "catalog.title", result = "title" },
+  { from = "catalog.pages.page_view", result = "page_views" },
+  { from = "catalog.cheapest_price", result = "cheapest_price" },
+  { from = "catalog.editor_note", result = "editor_note" },
+  { pipe = "caption_view", batch_over = "page_views", batch_as = "page_view", result = "captions" },
+  { pipe = "judge_price_is_low", result = "price_is_low" },
+  { pipe = "write_review", result = "review" },
+]
+
+[pipe.caption_view]
+type = "PipeLLM"
+description = "Writes a one-line caption for a catalog photograph"
+inputs = { page_view = "Image" }
+output = "Text"
+prompt = """
+Write a one-line caption for this catalog photograph:
+@page_view
+"""
+
+[pipe.judge_price_is_low]
+type        = "PipeJudge"
+description = "Judges whether a price looks too low to be true"
+inputs      = { cheapest_price = "Number" }
+output      = "YesNo"
+model       = "@default-judgment"
+question    = "Does this price, in euros, look too low to be true for furniture?"
+criteria    = { yes = "The price is below five euros", no = "The price is five euros or more" }
+threshold   = 0.7
+
+[pipe.write_review]
+type = "PipeCompose"
+description = "Writes the review sent back to the supplier"
+inputs = { title = "Text", captions = "Text[]", price_is_low = "YesNo", editor_note = "Text?" }
+output = "Text"
+template = """
+Review of $title
+{% for caption in captions %}- {{ caption.text }}
+{% endfor %}Cheapest price suspicious: {{ price_is_low.yes_no }}
+{% if editor_note is defined %}Editor's note: {{ editor_note.text }}{% endif %}
+"""

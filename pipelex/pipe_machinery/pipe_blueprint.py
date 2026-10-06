@@ -19,7 +19,7 @@ from pipelex.core.pipes.variable_multiplicity import (
     presence_from_symbol,
     presence_symbol,
 )
-from pipelex.pipe_machinery.validation import validate_input_name
+from pipelex.pipe_machinery.validation import validate_input_names
 from pipelex.validation_error_types import PipeValidationErrorType
 
 # A signature is NOT an executable pipe kind: it is deliberately absent from `PipeType` and
@@ -356,8 +356,6 @@ class PipeBlueprint(ABC, BaseModel):
     def generic_validate_inputs(self):
         if self.inputs:
             for input_name, slot_value in self.inputs.items():
-                validate_input_name(input_name)
-
                 # One grammar, two spellings: the expanded slot form's `concept` value is validated
                 # with the same ref+multiplicity+presence grammar as the plain string form.
                 concept_spec = slot_concept_spec(slot_value)
@@ -405,6 +403,12 @@ class PipeBlueprint(ABC, BaseModel):
                 except ConceptStringError as exc:
                     msg = f"Invalid concept string or code '{concept_ref_or_code}' when trying to validate the input of a pipe blueprint: {exc}"
                     raise ValueError(msg) from exc
+
+            # One check for every pipe, operator, controller or signature alike: an input name is a plain
+            # snake_case name, never a dotted path into a field (`invalid_input_name`). It runs once every spec
+            # is known to be valid, because whether deleting a redundant dotted key is safe depends on the
+            # markers the specs carry.
+            validate_input_names(input_specs={input_name: slot_concept_spec(slot_value) for input_name, slot_value in self.inputs.items()})
 
         self.validate_inputs()
 

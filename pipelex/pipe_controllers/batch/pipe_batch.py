@@ -23,7 +23,6 @@ from pipelex.urls import URLs
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-    from pipelex.core.stuffs.stuff import Stuff
     from pipelex.core.stuffs.stuff_content import StuffContent
     from pipelex.libraries.library_crate import LibraryCrate
 
@@ -141,8 +140,20 @@ class PipeBatch(PipeController):
                 f"rate-limited, resumable runs: {URLs.durable_execution}"
             )
 
-        async def _run_branch(item_input_stuff: "Stuff", *, branch_output_item_code: str) -> PipeOutput:
+        item_concept = self.inputs.get_required_stuff_spec(input_list_stuff_name).concept
+
+        async def _run_branch(*, branch_index: int, branch_input_item_code: str, branch_output_item_code: str) -> PipeOutput:
             branch_memory = working_memory.make_deep_copy()
+            # The item is taken from the branch's own copy of the list, never from the parent's: a branch gets
+            # its own copy of its item as it does of the rest of working memory, so a branch that rewrites its
+            # item in place (a PipeFunc can) leaves the batched list and every sibling branch as they were.
+            branch_list_content = cast("ListContent[StuffContent]", branch_memory.get_stuff(input_list_stuff_name).content)
+            item_input_stuff = StuffFactory.make_stuff(
+                code=branch_input_item_code,
+                concept=item_concept,
+                content=branch_list_content.items[branch_index],
+                name=input_item_stuff_name,
+            )
             branch_memory.set_new_main_stuff(stuff=item_input_stuff, name=input_item_stuff_name)
 
             # We create a deep copy of the run params to avoid modifying the original run params,
@@ -174,15 +185,9 @@ class PipeBatch(PipeController):
         # Build one factory per branch. Each factory defers its working-memory deep copy until it
         # actually runs, so gather_bounded materializes at most `max_concurrency` of them at once.
         branch_factories: list[Callable[[], Awaitable[PipeOutput]]] = []
-        for branch_index, item in enumerate(input_content.items):
+        for branch_index in range(item_count):
             branch_output_item_code = f"{batch_output_stuff_code}-branch-{branch_index}"
             branch_input_item_code = f"{input_stuff.stuff_code}-branch-{branch_index}"
-            item_input_stuff = StuffFactory.make_stuff(
-                code=branch_input_item_code,
-                concept=self.inputs.get_required_stuff_spec(input_list_stuff_name).concept,
-                content=item,
-                name=input_item_stuff_name,
-            )
 
             # Register batch item extraction with graph tracer
             if job_metadata.trace_context is not None:
@@ -198,7 +203,14 @@ class PipeBatch(PipeController):
                         batch_controller_node_id=batch_controller_node_id,
                     )
 
-            branch_factories.append(functools.partial(_run_branch, item_input_stuff, branch_output_item_code=branch_output_item_code))
+            branch_factories.append(
+                functools.partial(
+                    _run_branch,
+                    branch_index=branch_index,
+                    branch_input_item_code=branch_input_item_code,
+                    branch_output_item_code=branch_output_item_code,
+                )
+            )
 
         pipe_outputs = await gather_bounded(branch_factories, max_concurrency=max_concurrency)
 

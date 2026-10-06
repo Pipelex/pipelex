@@ -32,16 +32,15 @@ from pipelex.pipe_controllers.absence_taint import (
     ForceConsumptionInfo,
     LiftableStepInfo,
     ParallelTaintAnalysis,
-    SlotTaint,
     is_plural_step_result,
     scan_taint_triggers,
 )
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
+from pipelex.pipe_machinery.memory_writes import MemoryWrite, SlotTaint
 from pipelex.pipe_machinery.pipe_abstract import CompanionSlot
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.system.job_metadata import JobMetadata
-from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.validation_error_types import PipeValidationErrorType
 
 if TYPE_CHECKING:
@@ -79,6 +78,30 @@ class PipeParallel(PipeController):
         return set()
 
     @override
+    def memory_writes(self, *, visited_pipes: set[str] | None = None) -> dict[str, MemoryWrite]:
+        """Each branch's result, when the parallel adds each output: its branches run on copies of the memory, and only
+        the results it adds come back to it, every one of them on every run, as a value or as the absence its branch
+        resolved (`analyze_branch_taint`).
+        """
+        if not self.add_each_output:
+            return {}
+        if visited_pipes is None:
+            visited_pipes = set()
+        if self.visit_key in visited_pipes:
+            return {}
+        branch_taints = self.analyze_branch_taint(visited_pipes=visited_pipes | {self.visit_key}).branch_taints
+        branch_writes: dict[str, MemoryWrite] = {}
+        for branch in self.parallel_sub_pipes:
+            if not branch.output_name:
+                continue
+            branch_pipe = get_optional_pipe(pipe_code=branch.pipe_code)
+            branch_writes[branch.output_name] = MemoryWrite(
+                stuff_spec=branch.result_spec(step_pipe=branch_pipe) if branch_pipe is not None else None,
+                absence=branch_taints.get(branch.output_name),
+            )
+        return branch_writes
+
+    @override
     def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         if visited_pipes is None:
             visited_pipes = set()
@@ -105,9 +128,9 @@ class PipeParallel(PipeController):
                         f"in this Parallel Pipe '{self.code}' input requirements: {pipe_needed_inputs}"
                     )
                     raise PipeValidationError(message=msg) from exc
-                input_list_root = get_root_from_dotted_path(sub_pipe.batch_params.input_list_stuff_name)
+                # A branch batches over a plain name only: a dotted `batch_over` is refused on a branch, since it binds.
                 needed_inputs.add_stuff_spec(
-                    variable_name=input_list_root,
+                    variable_name=sub_pipe.batch_params.input_list_stuff_name,
                     concept=stuff_spec.concept,
                     multiplicity=True,
                 )
@@ -256,7 +279,7 @@ class PipeParallel(PipeController):
                     variable_names=[result_name],
                 )
 
-    def analyze_branch_taint(self) -> ParallelTaintAnalysis:
+    def analyze_branch_taint(self, *, visited_pipes: set[str] | None = None) -> ParallelTaintAnalysis:
         """Static taint over the branches (D6): which branch results are maybe-absent.
 
         Within the parallel's frame, the maybe-absent slots are exactly its own `?`-declared
@@ -265,6 +288,10 @@ class PipeParallel(PipeController):
         maybe-absent when it is liftable (a plain input fed by an optional input of the
         parallel) or when its pipe declares an optional output; a plural branch result is
         never maybe-absent (D4: compaction / empty list).
+
+        Args:
+            visited_pipes: The recursion guard of the walk this one runs inside, `memory_writes`'s, handed to each branch's
+                needed inputs; `None` for a walk of its own.
         """
         optional_input_taints: dict[str, SlotTaint] = {}
         for input_name, stuff_spec in self.inputs.root.items():
@@ -281,7 +308,7 @@ class PipeParallel(PipeController):
             branch_pipe = get_optional_pipe(pipe_code=sub_pipe.pipe_code)
             if branch_pipe is None:
                 continue
-            trigger_scan = scan_taint_triggers(branch_pipe, slot_taints=optional_input_taints)
+            trigger_scan = scan_taint_triggers(branch_pipe, slot_taints=optional_input_taints, visited_pipes=visited_pipes)
             for asserting_name in trigger_scan.asserting_force_names:
                 force_consumptions.append(
                     ForceConsumptionInfo(

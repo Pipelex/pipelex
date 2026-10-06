@@ -32,6 +32,14 @@ class PipeLibraryAbstract(ABC):
     def get_required_pipe(self, pipe_code: str) -> PipeAbstract:
         """Resolve an in-body pipe reference, raising when it is not known."""
 
+    @property
+    @abstractmethod
+    def state_token(self) -> int:
+        """The token of what the library holds now, which every change to it replaces (`library_state`).
+
+        A value derived from the pipes the library resolves records it, and is stale once it differs.
+        """
+
     @abstractmethod
     def setup(self) -> None:
         pass

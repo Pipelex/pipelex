@@ -30,7 +30,7 @@ from pipelex.kernel.llm_ops import (
 )
 from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
-from pipelex.pipe_machinery.validation import is_input_used_by_variables, is_variable_satisfied_by_inputs
+from pipelex.pipe_machinery.validation import is_input_used_by_variables
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import (
@@ -40,6 +40,7 @@ from pipelex.pipe_run.pipe_run_params import (
 from pipelex.runtime_hub import get_class_registry
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_param_key import PipeRunParamKey
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.validation_error_types import PipeValidationErrorType
@@ -89,9 +90,9 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     explanation=f"Input '{input_name}' is declared in inputs but not referenced in prompt/system_prompt.",
                 )
 
-        # Check for missing inputs: variable paths in prompt/system_prompt not satisfied by any input
+        # Check for missing inputs: variable paths in prompt/system_prompt whose root names no input
         for variable_path in required_variable_paths:
-            if not is_variable_satisfied_by_inputs(variable_path, input_names=input_names):
+            if get_root_from_dotted_path(variable_path) not in input_names:
                 msg = f"PipeLLM '{self.code}' uses variable '{variable_path}' in prompt/system_prompt but it is not declared in inputs."
                 raise PipeValidationError(
                     message=msg,

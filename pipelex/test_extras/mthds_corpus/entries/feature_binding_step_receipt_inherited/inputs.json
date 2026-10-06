@@ -1,0 +1,9 @@
+{
+  "receipt": {
+    "concept": "shop_till.Receipt",
+    "content": {
+      "shop": "Épicerie du Port",
+      "total": 42.8
+    }
+  }
+}

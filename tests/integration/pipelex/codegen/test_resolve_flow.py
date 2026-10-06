@@ -101,7 +101,7 @@ class TestResolveFlow:
             # Cross-file pipe ref inside the sequence controller qualified against the owner domain.
             run_pipeline = normalized.pipes["pipeline.run_pipeline"]
             assert isinstance(run_pipeline, PipeSequenceBlueprint)
-            assert run_pipeline.steps[0].pipe == "pipeline.compute_score"
+            assert run_pipeline.pipe_steps[0].pipe == "pipeline.compute_score"
 
             # Both encodings agree on the fingerprint.
             json_doc = json.loads(encode_crate_json(normalized))

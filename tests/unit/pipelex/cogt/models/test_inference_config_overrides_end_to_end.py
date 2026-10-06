@@ -3,7 +3,7 @@
 A developer writes `~/.pipelex/inference/backends_override.toml` and `routing_profiles_override.toml`
 once, and every project on the machine follows — the model manager's default paths carry both, and
 deleting the two files restores the shipped default. Built on the kit's own inference tree so the shipped defaults are the
-fixture, and lenient (`needs_inference=False`) so no credential on this machine is a precondition.
+fixture, and keyless (`needs_inference=False`) so no credential on this machine is a precondition.
 """
 
 from __future__ import annotations

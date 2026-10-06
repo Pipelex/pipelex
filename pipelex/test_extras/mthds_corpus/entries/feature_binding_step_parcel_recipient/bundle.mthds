@@ -1,0 +1,50 @@
+domain      = "parcel_counter"
+description = "Writing the label for a parcel handed in at the counter"
+main_pipe   = "label_parcel"
+
+[concept.Recipient]
+description = "The person a parcel is addressed to"
+
+[concept.Recipient.structure]
+name   = { type = "text", description = "The recipient's full name", required = true }
+street = { type = "text", description = "The street and number", required = true }
+town   = { type = "text", description = "The town", required = true }
+
+[concept.Parcel]
+description = "A parcel handed in at the counter"
+
+[concept.Parcel.structure]
+is_fragile = { type = "boolean", description = "Whether the parcel must be handled with care", required = true }
+recipient  = { type = "concept", concept_ref = "Recipient", description = "Who the parcel is for", required = true }
+
+[concept.ParcelLabel]
+description = "The label stuck on a parcel before it leaves the counter"
+
+[concept.ParcelLabel.structure]
+addressee = { type = "text", description = "Who the parcel is for", required = true }
+street    = { type = "text", description = "The street and number", required = true }
+town      = { type = "text", description = "The town", required = true }
+handling  = { type = "text", description = "How the parcel must be handled", required = true }
+
+[pipe.label_parcel]
+type = "PipeSequence"
+description = "Binds the recipient and the fragile flag of a parcel, then writes its label"
+inputs = { parcel = "Parcel" }
+output = "ParcelLabel"
+steps = [
+  { from = "parcel.is_fragile", result = "fragile" },
+  { from = "parcel.recipient", result = "recipient" },
+  { pipe = "write_label", result = "label" },
+]
+
+[pipe.write_label]
+type        = "PipeCompose"
+description = "Writes the label from the recipient and whether the parcel is fragile"
+inputs      = { recipient = "Recipient", fragile = "YesNo" }
+output      = "ParcelLabel"
+
+[pipe.write_label.construct]
+addressee = { from = "recipient.name" }
+street    = { from = "recipient.street" }
+town      = { from = "recipient.town" }
+handling  = { template = "{% if fragile.yes_no %}Fragile, handle with care{% else %}Standard handling{% endif %}" }

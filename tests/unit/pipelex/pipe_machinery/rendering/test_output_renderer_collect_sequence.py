@@ -5,10 +5,13 @@ from pytest_mock import MockerFixture
 
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.concepts.exceptions import ConceptError
+from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.libraries.concept.concept_library import ConceptLibrary
+from pipelex.pipe_controllers.binding.binding_step import BindingStep
 from pipelex.pipe_machinery.rendering.output_renderer import (
     _collect_possible_outputs,  # pyright: ignore[reportPrivateUsage]
 )
+from pipelex.validation_error_types import PipeValidationErrorType
 
 GET_REQUIRED_PIPE_TARGET = "pipelex.pipe_machinery.rendering.output_renderer.get_required_pipe"
 
@@ -119,3 +122,18 @@ class TestCollectPossibleOutputsSequence:
         leaf_pipe.output.render_stuff_spec.assert_called_once_with(
             concept_provider=renderer_concept_library, output_format=ConceptRepresentationFormat.JSON
         )
+
+    def test_a_last_binding_the_flow_cannot_derive_yields_no_outputs(self, mocker: MockerFixture) -> None:
+        """A binding ending the sequence whose path does not resolve is rendered as no outputs, as a render failure is."""
+        sequence_pipe = _make_sequence_pipe(mocker, ["first_step"])
+        sequence_pipe.sequential_sub_pipes.append(BindingStep(from_path="invoice.totl", output_name="total_amount"))
+        sequence_pipe.build_typed_flow.side_effect = PipeValidationError(
+            message="the binding step cannot be derived", error_type=PipeValidationErrorType.BINDING_PATH_UNRESOLVED
+        )
+        get_pipe_mock = mocker.patch(GET_REQUIRED_PIPE_TARGET)
+
+        result = _collect_possible_outputs(sequence_pipe)
+
+        assert result == []
+        sequence_pipe.build_typed_flow.assert_called_once_with()
+        get_pipe_mock.assert_not_called()
