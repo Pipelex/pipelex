@@ -1,0 +1,12 @@
+name = "invalid_binding_step_dotted_batch_over_branch"
+description = "The pages of a catalog batched over by a parallel branch through a dotted batch_over, which only a sequence step may carry"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.binding_step_invalid",
+]
+
+expected_error = "binding_step_invalid"

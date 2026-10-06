@@ -52,6 +52,8 @@ exclude = [
   # entry-validation gate runs the real validation engine over every entry in CI and is red both when
   # an invalid entry fails differently and when it accidentally validates.
   "**/mthds_corpus/entries/invalid_binding_step_batch_fields/*.mthds",
+  "**/mthds_corpus/entries/invalid_binding_step_dotted_batch_over_branch/*.mthds",
+  "**/mthds_corpus/entries/invalid_binding_step_dotted_batch_over_malformed/*.mthds",
   "**/mthds_corpus/entries/invalid_binding_step_malformed_path/*.mthds",
   "**/mthds_corpus/entries/invalid_binding_step_parallel_branch/*.mthds",
   "**/mthds_corpus/entries/invalid_binding_step_pipe_and_from/*.mthds",

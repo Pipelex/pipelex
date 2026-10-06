@@ -3,6 +3,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
+from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_controllers.binding.binding_step_blueprint import BindingStepBlueprint
@@ -166,6 +167,139 @@ branches = [
         assert [error.error_type for error in errors] == [PipeValidationErrorType.BINDING_STEP_INVALID]
         assert errors[0].pipe_code == "acknowledge_in_parallel"
         assert "bind the value in a step of the calling PipeSequence, before the PipeParallel step" in errors[0].message
+
+    def test_a_dotted_batch_over_parses_on_a_pipe_step(self) -> None:
+        """The blueprint keeps the path as written: the sequence rewrites it into a binding and a batch when it loads."""
+        sequence = _parse_sequence(
+            steps_toml='    { pipe = "write_receipt", batch_over = "invoice.lines", batch_as = "total_amount", result = "receipts" },',
+        )
+
+        assert sequence.steps == [SubPipeBlueprint(pipe="write_receipt", batch_over="invoice.lines", batch_as="total_amount", result="receipts")]
+
+    @pytest.mark.parametrize(
+        "batch_over",
+        [
+            pytest.param("invoice..lines", id="an-empty-segment"),
+            pytest.param("invoice.lines[0]", id="a-subscript"),
+            pytest.param("invoice._lines", id="an-underscore-led-segment"),
+            pytest.param("invoice.lines ", id="whitespace"),
+        ],
+    )
+    def test_a_dotted_batch_over_outside_the_path_grammar_is_refused_as_binding_step_invalid(self, batch_over: str) -> None:
+        step_toml = f'    {{ pipe = "write_receipt", batch_over = "{batch_over}", batch_as = "total_amount", result = "receipts" }},'
+        with pytest.raises(MthdsParserError) as exc_info:
+            MthdsParser.make_pipelex_bundle_blueprint(mthds_content=_sequence_bundle(steps_toml=step_toml), mthds_source="main.mthds")
+
+        errors = exc_info.value.validation_errors
+        assert [error.error_type for error in errors] == [PipeValidationErrorType.BINDING_STEP_INVALID]
+        assert errors[0].pipe_code == "acknowledge_invoice"
+        assert f"the dotted `batch_over` '{batch_over}' is not a path" in errors[0].message
+
+    @pytest.mark.parametrize(
+        "batch_over",
+        [
+            pytest.param("invoice.lines", id="a-path"),
+            pytest.param("invoice..lines", id="a-malformed-path"),
+        ],
+    )
+    def test_a_dotted_batch_over_in_a_parallel_branch_is_refused(self, batch_over: str) -> None:
+        """A dotted `batch_over` binds, and a branch never binds: the calling sequence binds the list before the parallel."""
+        mthds_content = f"""{_BUNDLE_HEADER}steps = [{{ pipe = "acknowledge_in_parallel", result = "receipt" }}]
+
+[pipe.acknowledge_in_parallel]
+type = "PipeParallel"
+description = "Writes receipts in parallel"
+inputs = {{ invoice = "Invoice" }}
+output = "Text"
+add_each_output = true
+branches = [
+    {{ pipe = "write_receipt", batch_over = "{batch_over}", batch_as = "total_amount", result = "receipts" }},
+]
+"""
+        with pytest.raises(MthdsParserError) as exc_info:
+            MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content, mthds_source="main.mthds")
+
+        errors = exc_info.value.validation_errors
+        assert [error.error_type for error in errors] == [PipeValidationErrorType.BINDING_STEP_INVALID]
+        assert errors[0].pipe_code == "acknowledge_in_parallel"
+        assert f"Branch 1 of the parallel batches over the dotted path '{batch_over}'" in errors[0].message
+        assert f'`{{ from = "{batch_over}", result = "<name>" }}`' in errors[0].message
+
+    def test_a_parallel_branch_built_with_a_dotted_batch_over_is_refused(self) -> None:
+        """A branch built in Python, not parsed from a table, is refused the same way."""
+        with pytest.raises(ValidationError) as exc_info:
+            PipeParallelBlueprint(
+                description="Writes receipts in parallel",
+                output="Composite",
+                branches=[SubPipeBlueprint(pipe="write_receipt", batch_over="invoice.lines", batch_as="line", result="receipts")],
+            )
+
+        refusal = exc_info.value.errors()[0].get("ctx", {}).get("error")
+        assert isinstance(refusal, PipeValidationError)
+        assert refusal.error_type == PipeValidationErrorType.BINDING_STEP_INVALID
+
+    @pytest.mark.parametrize(
+        ("step_toml", "field_name", "reserved_name"),
+        [
+            pytest.param('{ pipe = "write_receipt", result = "_bound_invoice_lines" }', "result", "_bound_invoice_lines", id="result"),
+            pytest.param(
+                '{ pipe = "write_receipt", batch_over = "lines", batch_as = "_bound_line", result = "receipts" }',
+                "batch_as",
+                "_bound_line",
+                id="batch-as",
+            ),
+            pytest.param(
+                '{ pipe = "write_receipt", batch_over = "_bound_invoice_lines", batch_as = "total_amount", result = "receipts" }',
+                "batch_over",
+                "_bound_invoice_lines",
+                id="plain-batch-over",
+            ),
+        ],
+    )
+    @pytest.mark.parametrize("controller", ["sequence", "parallel"])
+    def test_a_name_taking_the_reserved_prefix_is_refused_on_a_step_and_a_branch(
+        self, controller: str, step_toml: str, field_name: str, reserved_name: str
+    ) -> None:
+        """A nested sequence binds a dotted `batch_over` in its caller's working memory, under a `_bound_` name no author may write."""
+        pipe_code: str
+        mthds_content: str
+        if controller == "sequence":
+            pipe_code = "acknowledge_invoice"
+            mthds_content = _sequence_bundle(steps_toml=f"    {step_toml},")
+        else:
+            pipe_code = "acknowledge_in_parallel"
+            mthds_content = f"""{_BUNDLE_HEADER}steps = [{{ pipe = "acknowledge_in_parallel", result = "receipt" }}]
+
+[pipe.acknowledge_in_parallel]
+type = "PipeParallel"
+description = "Writes receipts in parallel"
+inputs = {{ invoice = "Invoice" }}
+output = "Text"
+add_each_output = true
+branches = [
+    {step_toml},
+]
+"""
+        with pytest.raises(MthdsParserError) as exc_info:
+            MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content, mthds_source="main.mthds")
+
+        errors = exc_info.value.validation_errors
+        assert [error.error_type for error in errors] == [PipeValidationErrorType.INVALID_INPUT_NAME]
+        assert errors[0].pipe_code == pipe_code
+        assert errors[0].variable_names == [reserved_name]
+        assert f"The `{field_name}` of the step running pipe 'write_receipt', '{reserved_name}', takes the `_bound_` prefix" in errors[0].message
+        assert "which is reserved for the bound list of a dotted `batch_over`" in errors[0].message
+
+    def test_a_plain_batch_over_in_a_parallel_branch_parses(self) -> None:
+        blueprint = PipeParallelBlueprint.model_validate(
+            {
+                "description": "Writes receipts in parallel",
+                "output": "Composite",
+                "branches": [{"pipe": "write_receipt", "batch_over": "lines", "batch_as": "line", "result": "receipts"}],
+            }
+        )
+
+        assert blueprint.branches == [SubPipeBlueprint(pipe="write_receipt", batch_over="lines", batch_as="line", result="receipts")]
 
     def test_a_parallel_branch_keeps_the_pipe_step_shape(self) -> None:
         assert PipeParallelBlueprint.model_fields["branches"].annotation == list[SubPipeBlueprint]

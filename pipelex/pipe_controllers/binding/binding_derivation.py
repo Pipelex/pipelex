@@ -188,6 +188,8 @@ class BindingDerivation(BaseModel):
     # How the runtime stores the value it reaches: a concept's content is copied whole, a plain value wrapped.
     leaf_kind: BindingValueKind
     segments: tuple[BindingSegment, ...] = ()
+    # The multiplicity of the root the path starts from, as the sequence knows it at the binding step.
+    root_multiplicity: VariableMultiplicity | None = None
 
     @property
     def root_name(self) -> str:
@@ -200,6 +202,40 @@ class BindingDerivation(BaseModel):
     @property
     def is_plural(self) -> bool:
         return is_multiple_multiplicity(multiplicity=self.multiplicity)
+
+    def provenance_path(self, *, item_segment: str) -> tuple[str, ...] | None:
+        """Where, below its root, the value the binding binds comes from, `item_segment` standing for any item of a list crossed.
+
+        A list sits at its own path and its items at that path followed by the item segment, so what the binding binds has
+        such a path when it is the value at one path of its root, or the items of a list field reached across items:
+
+        - a single value, or one list field of a single root, is at its fields' path: `invoice.lines` is `("lines",)`;
+        - a bare name is its root's own value, a list included: `()`;
+        - a list gathered across items whose last field is itself a list holds the items of that field, wherever they sit:
+          the item segment follows a list root, and every field before the last that crosses a list, so `cases.transcripts`
+          over a list root is `("[]", "transcripts")` and `case.folders.transcripts` is `("folders", "[]", "transcripts")`.
+
+        A list gathered from a field that is not itself a list, `cases.attachment` over a list root, holds values that are
+        items of no list at one path, so it has no such path: `None`.
+
+        Args:
+            item_segment: The segment the caller's paths use for any item of a list.
+
+        Returns:
+            The segments below the root, or `None` for a list gathered from a field that is not a list.
+        """
+        if self.is_bare_name:
+            return ()
+        *leading_segments, last_segment = self.segments
+        if self.is_plural and not last_segment.crosses_list:
+            return None
+        provenance: list[str] = [item_segment] if is_multiple_multiplicity(multiplicity=self.root_multiplicity) else []
+        for segment in leading_segments:
+            provenance.append(segment.name)
+            if segment.crosses_list:
+                provenance.append(item_segment)
+        provenance.append(last_segment.name)
+        return tuple(provenance)
 
 
 def _quoted(*, names: list[str]) -> str:
@@ -236,6 +272,7 @@ def derive_binding(*, path: str, root: BindingRoot, resolver: ConceptWalkResolve
             multiplicity=root.multiplicity,
             may_find_nothing=False,
             leaf_kind=BindingValueKind.CONCEPT,
+            root_multiplicity=root.multiplicity,
         )
 
     crosses_any_list = is_multiple_multiplicity(multiplicity=root.multiplicity)
@@ -349,4 +386,5 @@ def derive_binding(*, path: str, root: BindingRoot, resolver: ConceptWalkResolve
         first_optional_path=first_optional_path if not crosses_any_list else None,
         leaf_kind=leaf_kind,
         segments=tuple(segments),
+        root_multiplicity=root.multiplicity,
     )

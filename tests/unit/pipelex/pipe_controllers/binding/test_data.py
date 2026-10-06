@@ -64,6 +64,10 @@ CONCEPTS: dict[str, ConceptBlueprint | str] = {
         structure={"parcels": make_field(field_type=FieldType.LIST, item_type="concept", item_concept_ref="Parcel", required=True)},
     ),
     "billing.Parcel": ConceptBlueprint(description="A parcel", structure={"weight": make_field(field_type=FieldType.NUMBER, required=True)}),
+    "billing.Manifest": ConceptBlueprint(
+        description="A manifest of shipments",
+        structure={"shipments": make_field(field_type=FieldType.LIST, item_type="concept", item_concept_ref="Shipment", required=True)},
+    ),
     "billing.Crate": ConceptBlueprint(
         description="A crate holding anything",
         structure={

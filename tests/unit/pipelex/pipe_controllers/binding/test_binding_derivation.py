@@ -4,6 +4,9 @@ from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.pipe_controllers.binding.binding_derivation import BindingRoot, BindingValueKind, derive_binding
 from tests.unit.pipelex.pipe_controllers.binding.test_data import INVOICE, RESOLVER, make_root
 
+# The segment a caller of `provenance_path` chooses to stand for any item of a list.
+_ITEM = "[]"
+
 
 class TestBindingDerivationTable:
     @pytest.mark.parametrize(
@@ -90,6 +93,34 @@ class TestBindingDerivationTable:
 
         assert derivation.may_find_nothing is may_find_nothing
         assert derivation.first_optional_path == first_optional_path
+
+    @pytest.mark.parametrize(
+        ("path", "root", "provenance_path"),
+        [
+            # A single value sits at its path's fields
+            ("invoice.total", INVOICE, ("total",)),
+            ("invoice.supplier.address.city", INVOICE, ("supplier", "address", "city")),
+            # A bare name is its root's own value, a list root's included
+            ("invoice", INVOICE, ()),
+            ("pages", make_root("native.Page", multiplicity=True), ()),
+            # One list field of a single root is the list at that field's path
+            ("invoice.lines", INVOICE, ("lines",)),
+            # A list gathered across items whose last field is a list: the item segment follows a list root and every list crossed before
+            ("shipments.parcels", make_root("billing.Shipment", multiplicity=True), (_ITEM, "parcels")),
+            ("manifest.shipments.parcels", make_root("billing.Manifest"), ("shipments", _ITEM, "parcels")),
+            ("manifests.shipments.parcels", make_root("billing.Manifest", multiplicity=3), (_ITEM, "shipments", _ITEM, "parcels")),
+            # A list gathered from a field that is not itself a list holds values that are items of no list at one path
+            ("pages.page_view", make_root("native.Page", multiplicity=True), None),
+            ("invoice.lines.amount", INVOICE, None),
+            ("invoice.pages.page_view", INVOICE, None),
+        ],
+    )
+    def test_provenance_path_places_the_item_segment_after_every_list_crossed(
+        self, path: str, root: BindingRoot, provenance_path: tuple[str, ...] | None
+    ):
+        derivation = derive_binding(path=path, root=root, resolver=RESOLVER)
+
+        assert derivation.provenance_path(item_segment=_ITEM) == provenance_path
 
     def test_segments_record_the_lists_they_cross(self):
         derivation = derive_binding(path="invoice.lines.amount", root=INVOICE, resolver=RESOLVER)

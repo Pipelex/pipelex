@@ -42,8 +42,8 @@ A pipe step is a table with the following keys:
 | `result` | string | The name to give to this step's output in the working memory. When omitted, the output is stored only in the unnamed `main_stuff` slot (the default output), so later steps can pick it up as their implicit input but cannot reference it by a dedicated name. | No       |
 | `nb_output` | integer | Request a fixed number of outputs from this step's pipe. Cannot be combined with `multiple_output`. | No       |
 | `multiple_output` | boolean | Request a variable number of outputs from this step's pipe (the model decides how many). Cannot be combined with `nb_output`. | No       |
-| `batch_over` | string | The name of a list in the working memory to batch this step over, running the pipe once per item. Must be provided together with `batch_as`. See [Understanding Multiplicity](../understanding-multiplicity.md). | No       |
-| `batch_as` | string | The name each item takes in the working memory during a `batch_over` run. Must differ from `batch_over` (e.g. `batch_over = "items"`, `batch_as = "item"`). | No       |
+| `batch_over` | string | The list in the working memory to batch this step over, running the pipe once per item: a name, or a dotted path to a list held in a field, such as `catalog.pages`, which is a binding followed by a batch (see [Batching over a field](#batching-over-a-field)). Must be provided together with `batch_as`. See [Understanding Multiplicity](../understanding-multiplicity.md). | No       |
+| `batch_as` | string | The name each item takes in the working memory during a `batch_over` run. Must differ from `batch_over` (e.g. `batch_over = "items"`, `batch_as = "item"`). Like `result` and `batch_over`, it never starts with `_bound_`, a prefix reserved for the bound list of a dotted `batch_over`. | No       |
 
 #### Binding steps
 
@@ -136,9 +136,44 @@ The bound value is a deep copy taken when the step runs: changing the root after
 -   A sequence ending with a binding step is checked as one ending with a pipe: its output concept with `inadequate_output_concept`, its multiplicity with `inadequate_output_multiplicity`, and a maybe-absent result with `optional_not_handled`.
 -   A step asking a sequence that ends with a binding step for a count of outputs, with `nb_output` or `multiple_output`, is refused with `inadequate_output_multiplicity` when the binding does not bind that count: a binding binds what its path derives, whatever count its caller asks for. A batched step asks its branches for nothing, so it is not checked.
 -   A root that is neither an input of the sequence nor stored by an earlier step on every run is refused with `missing_input_variable`.
--   A malformed step is refused with `binding_step_invalid`: `pipe` beside `from`, a binding without `result`, a binding carrying `nb_output`, `multiple_output`, `batch_over` or `batch_as`, a `from` or a `result` outside its grammar. The schema refuses each of these too.
+-   A malformed step is refused with `binding_step_invalid`: `pipe` beside `from`, a binding without `result`, a binding carrying `nb_output`, `multiple_output`, `batch_over` or `batch_as`, a `from` or a `result` outside its grammar, and a dotted `batch_over` outside the path grammar or on a `PipeParallel` branch. The schema refuses each of these too.
 
 A binding step lives in a `PipeSequence`'s `steps` only. A [`PipeParallel`](PipeParallel.md) branch is always a pipe step, since its branches run at once and a binding orders a value before the steps that read it: bind in the sequence before the parallel.
+
+### Batching over a field
+
+A pipe step's `batch_over` may be a dotted path to a list held in a field. The step is then a binding followed by a batch: the path is bound under a private name, by every rule of a binding step's `from`, and the step batches over the bound list.
+
+```toml
+[pipe.index_catalog]
+type = "PipeSequence"
+description = "Writes one index line per page of a catalog"
+inputs = { catalog = "Catalog" }
+output = "Text[]"
+steps = [
+    { pipe = "write_index_line", batch_over = "catalog.pages", batch_as = "page", result = "index_lines" },
+]
+```
+
+This step runs exactly as the two steps below, apart from the name the list is bound under:
+
+```toml
+steps = [
+    { from = "catalog.pages", result = "pages" },
+    { pipe = "write_index_line", batch_over = "pages", batch_as = "page", result = "index_lines" },
+]
+```
+
+So a dotted `batch_over` shares everything a binding does:
+
+-   The root is typed by the latest step that stored it, or by the sequence's `inputs`, and the sequence needs it as its own concept: `catalog` as a `Catalog`, never as the item's `CatalogPage`.
+-   Lists map and flatten, so `batch_over = "catalogs.pages"` over `Catalog[]` runs one branch per page of every catalog, and an absent root binds an empty list, which runs no branch.
+-   The path must reach a list, through a list root, a list field along the way, or a list field it ends on. A path deriving a single value, such as `catalog.season`, is refused before the run with `input_stuff_spec_mismatch`, as a batch over a value that is not a list is, and so is a list whose items the pipe reads as another concept.
+-   A path the structures cannot walk is refused with `binding_path_unresolved`, and a root that is neither an input of the sequence nor stored by an earlier step with `missing_input_variable`, each message naming the `batch_over` as written.
+-   A path outside the path grammar, such as `catalog..pages`, is refused with `binding_step_invalid`, which the schema catches too.
+-   In the execution graph, the binding is a node of kind `binding`, fed by the root's producer, and it feeds the batch.
+
+The private name starts with an underscore, `_bound_catalog_pages` for `catalog.pages`, so no template or input can read it: it shows only in the working memory the run leaves and in the graph. The `_bound_` prefix is reserved for these names. A nested `PipeSequence` binds in the working memory of the sequence calling it, so a name of the caller taking the prefix could be overwritten by the list a sequence it calls binds: a pipe step's `result`, `batch_as` or plain `batch_over`, on a sequence step or a `PipeParallel` branch, and a [`PipeBatch`](PipeBatch.md)'s `input_item_name` that starts with `_bound_` are refused with `invalid_input_name`, which the schema catches too, and the message asks for another name. Only a sequence's steps bind, so a [`PipeParallel`](PipeParallel.md) branch carries a plain `batch_over` only, and a dotted one there is refused with `binding_step_invalid`: bind the list in a step before the `PipeParallel`, and batch the branch over the bound name.
 
 ### Example
 

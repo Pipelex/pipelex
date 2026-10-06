@@ -118,6 +118,7 @@ class TestInputNameRefusal:
         assert error.variable_names == ["catalog.pages"]
         assert error.redundant_input_name is None
         assert '{ from = "catalog.pages", result = "pages" }' in error.message
+        assert '`{ pipe = "total_page", batch_over = "catalog.pages", batch_as = "page" }`' in error.message
 
     def test_a_dotted_batch_list_declared_as_an_input_is_refused(self) -> None:
         """The other spelling of a dotted batch list: the list declared under its dotted name is refused by the shared input-name check."""

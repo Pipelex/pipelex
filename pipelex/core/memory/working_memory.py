@@ -35,11 +35,22 @@ from pipelex.tools.misc.string_utils import find_private_path_segment
 
 MAIN_STUFF_NAME = "main_stuff"
 BATCH_ITEM_STUFF_NAME = "BATCH_ITEM"
+# The prefix of the private name a PipeSequence binds a dotted `batch_over`'s list under: underscore-led, so no template or
+# input reads it, and never a param's, so working memory holds it like any stuff. The prefix is the runtime's alone: a nested
+# sequence binds in its caller's working memory, so validation refuses any name an author writes taking it
+# (`check_name_is_not_reserved`), and a caller's value is never overwritten by a list a sequence it calls binds. This one
+# constant spells the prefix for the name `make_private_binding_name` generates, the params exemption below, and that refusal.
+PRIVATE_BINDING_NAME_PREFIX = "_bound_"
 PRETTY_PRINT_MAX_LENGTH = 1000
 TEST_DUMMY_NAME = "dummy_result"
 
 StuffDict = dict[str, Stuff]
 StuffArtefactDict = dict[str, StuffArtefact]
+
+
+def _is_reserved_for_params(*, name: str) -> bool:
+    """Whether a stuff name takes the underscore that marks params, which a private binding name carries by design."""
+    return name.startswith("_") and name != BATCH_ITEM_STUFF_NAME and not name.startswith(PRIVATE_BINDING_NAME_PREFIX)
 
 
 class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
@@ -54,14 +65,14 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
     @model_validator(mode="after")
     def validate_stuff_names(self) -> Self:
         for key, stuff in self.root.items():
-            if key.startswith("_") and key != BATCH_ITEM_STUFF_NAME:
+            if _is_reserved_for_params(name=key):
                 log.warning(f"Stuff key '{key}' starts with '_', which is reserved for params")
 
             if not stuff.stuff_name:
                 self.root[key].stuff_name = key
             elif key not in {MAIN_STUFF_NAME, stuff.stuff_name}:
                 log.warning(f"Stuff name '{stuff.stuff_name}' does not match the key '{key}'")
-            elif stuff.stuff_name.startswith("_") and stuff.stuff_name != BATCH_ITEM_STUFF_NAME:
+            elif _is_reserved_for_params(name=stuff.stuff_name):
                 log.warning(f"Stuff name '{stuff.stuff_name}' starts with '_', which is reserved for params")
 
         return self

@@ -20,7 +20,7 @@ from pydantic import BaseModel, ConfigDict
 from pipelex import log
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
-from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.memory.working_memory import PRIVATE_BINDING_NAME_PREFIX, WorkingMemory
 from pipelex.core.pipes.inputs.exceptions import PipeRunInputsError
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff import Stuff
@@ -52,6 +52,24 @@ class BindingOutcome(BaseModel):
         return self.absence is not None and self.absence.kind.is_skipped
 
 
+def make_private_binding_name(*, path: str, taken_names: set[str]) -> str:
+    """The private name a sequence binds a dotted `batch_over`'s list under: underscore-led, so no template or input reads it.
+
+    It spells the path, `_bound_catalog_pages` for `catalog.pages`, and takes a numbered suffix when a name of the sequence
+    already holds that spelling, as when two of its steps batch over the same dotted path. It is generated once the bundle is
+    validated, and never checked against the plain-name grammar of a binding step's `result`, which governs the steps an author
+    writes. No name an author writes takes the prefix, which validation refuses, so a private name never takes the name of a
+    value the sequence's caller holds in the working memory they share.
+    """
+    base_name = f"{PRIVATE_BINDING_NAME_PREFIX}{path.replace('.', '_')}"
+    private_name = base_name
+    suffix = 2
+    while private_name in taken_names:
+        private_name = f"{base_name}_{suffix}"
+        suffix += 1
+    return private_name
+
+
 class BindingStep(BaseModel):
     """A PipeSequence step binding the value at `from_path` to `output_name`, as the runtime holds it."""
 
@@ -59,6 +77,9 @@ class BindingStep(BaseModel):
 
     from_path: str
     output_name: str
+    # Whether the sequence wrote this step itself, rewriting a pipe step's dotted `batch_over` into a binding of its path under
+    # a private name, followed by the same step batching over that name. Messages then name the `batch_over` the author wrote.
+    is_dotted_batch_over: bool = False
 
     @property
     def root_name(self) -> str:
@@ -68,6 +89,13 @@ class BindingStep(BaseModel):
     def as_written(self) -> str:
         """The step as MTHDS writes it, for messages."""
         return f'{{ from = "{self.from_path}", result = "{self.output_name}" }}'
+
+    @property
+    def label(self) -> str:
+        """How a message names the step, after "the": the binding step as written, or the dotted `batch_over` the sequence rewrote."""
+        if self.is_dotted_batch_over:
+            return f'dotted `batch_over = "{self.from_path}"`'
+        return f"binding step {self.as_written}"
 
     def bind(
         self,
@@ -107,10 +135,7 @@ class BindingStep(BaseModel):
             record = AbsenceRecord(
                 variable_name=self.output_name,
                 kind=AbsenceKind.DECLARED_ABSENT,
-                reason=(
-                    f"the binding step {self.as_written} of pipe '{calling_pipe_code}' bound nothing, "
-                    f"because '{bound_content.empty_path}' holds nothing"
-                ),
+                reason=(f"the {self.label} of pipe '{calling_pipe_code}' bound nothing, because '{bound_content.empty_path}' holds nothing"),
             )
             working_memory.record_new_main_absence(record)
             log.verbose(f"Binding '{self.from_path}' found nothing at '{bound_content.empty_path}': '{self.output_name}' is recorded absent")
@@ -147,7 +172,7 @@ class BindingStep(BaseModel):
         root_absence = working_memory.get_optional_absence(self.root_name)
         if root_absence is None:
             msg = (
-                f"The binding step {self.as_written} of pipe '{calling_pipe_code}' reads '{self.root_name}', which is not in working "
+                f"The {self.label} of pipe '{calling_pipe_code}' reads '{self.root_name}', which is not in working "
                 f"memory and has no recorded absence. Valid keys are: {working_memory.list_keys()}"
             )
             raise PipeRunInputsError(

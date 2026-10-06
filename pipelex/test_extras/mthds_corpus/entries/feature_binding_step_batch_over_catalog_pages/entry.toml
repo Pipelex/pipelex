@@ -1,0 +1,11 @@
+name = "feature_binding_step_batch_over_catalog_pages"
+description = "One index line written for each page of a catalog, batching over the pages its field holds with a dotted batch_over"
+
+validity = "valid"
+tier = "offline"
+granularity = "focused"
+
+covers = [
+  "feature.binding_step",
+  "controller.batch",
+]

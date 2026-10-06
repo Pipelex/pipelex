@@ -993,7 +993,6 @@
     "tests/integration/pipelex/pipes/controller/pipe_batch/test_pipe_batch_compaction.py::TestPipeBatchCompaction::test_absent_branch_results_are_dropped": 3.534,
     "tests/integration/pipelex/pipes/controller/pipe_batch/test_pipe_batch_compaction.py::TestPipeBatchCompaction::test_all_branches_absent_yields_empty_list": 1.656,
     "tests/integration/pipelex/pipes/controller/pipe_batch/test_pipe_batch_simple.py::TestPipeBatchSimple::test_simple_batch_processing": 4.431,
-    "tests/integration/pipelex/pipes/controller/pipe_batch_dotted_path/test_dotted_batch.py::TestDottedBatchOver::test_dotted_batch_resolves_nested_list": 4.7059,
     "tests/integration/pipelex/pipes/controller/pipe_condition/test_pipe_condition_complex.py::TestPipeConditionComplex::test_business_finance_routing": 6.7838,
     "tests/integration/pipelex/pipes/controller/pipe_condition/test_pipe_condition_complex.py::TestPipeConditionComplex::test_complex_pipeline_dry_run_missing_inputs": 0.5977,
     "tests/integration/pipelex/pipes/controller/pipe_condition/test_pipe_condition_complex.py::TestPipeConditionComplex::test_complex_pipeline_dry_run_success": 6.3922,

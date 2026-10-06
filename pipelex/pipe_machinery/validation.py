@@ -3,6 +3,7 @@ from collections.abc import Mapping
 from typing import NamedTuple
 
 from pipelex.base_exceptions import PipelexUnexpectedError
+from pipelex.core.memory.working_memory import PRIVATE_BINDING_NAME_PREFIX
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeVariableMultiplicityError
 from pipelex.core.pipes.variable_multiplicity import (
     PresenceMarker,
@@ -17,6 +18,7 @@ from pipelex.core.pipes.variable_multiplicity import (
 )
 from pipelex.tools.misc.string_utils import (
     FIELD_PATH_PATTERN,
+    FIELD_PATH_SEGMENT_REGEX,
     SNAKE_CASE_IDENTIFIER_REGEX,
     SNAKE_CASE_PATTERN,
     get_root_from_dotted_path,
@@ -39,6 +41,22 @@ BINDING_RESULT_PATTERN = INPUT_NAME_PATTERN
 # single dots, each segment a letter followed by letters, digits and underscores. Subscripts, expressions,
 # whitespace and underscore-led segments are outside it.
 BINDING_PATH_PATTERN = FIELD_PATH_PATTERN
+
+# The grammar of a PipeSequence pipe step's `batch_over`: a name with no dot, which names the list as a step or the
+# sequence's inputs store it, or a dotted path following the binding path grammar, which the sequence binds before
+# batching over the bound list. A dotted `batch_over` outside the path grammar is `binding_step_invalid`.
+SEQUENCE_STEP_BATCH_OVER_PATTERN = rf"^(?:[^.]*|{FIELD_PATH_SEGMENT_REGEX}(?:\.{FIELD_PATH_SEGMENT_REGEX})+)$"
+
+# The grammar of a PipeParallel branch's `batch_over`: a name with no dot. A dotted `batch_over` binds, and only a
+# sequence's steps bind, so a branch carrying one is `binding_step_invalid`.
+PARALLEL_BRANCH_BATCH_OVER_PATTERN = r"^[^.]*$"
+
+# The names the runtime reserves: those taking the prefix a PipeSequence binds a dotted `batch_over`'s list under. A nested
+# sequence binds in its caller's working memory, so a caller's name taking the prefix could be overwritten by that list.
+# `check_name_is_not_reserved` refuses it on every name an author writes into working memory or batches over by name, the
+# ones no other grammar already keeps underscore-free, and the MTHDS JSON Schema generator writes this pattern under `not`
+# on the same fields, so a structural check refuses exactly what the runtime refuses.
+RESERVED_NAME_PATTERN = f"^{re.escape(PRIVATE_BINDING_NAME_PREFIX)}"
 
 # The marker of an input declaration as `_input_marker` writes it after the concept: an optional multiplicity
 # suffix (`[]` or `[N]`), then an optional presence symbol (`?` or `!`). Group 1 is the bracket content, group 2
@@ -426,11 +444,13 @@ def validate_input_names(*, input_specs: Mapping[str, str]) -> None:
     raise PipeValidationError(message=msg, error_type=PipeValidationErrorType.INVALID_INPUT_NAME, variable_names=[first_invalid_name])
 
 
-def check_input_list_name(*, input_list_name: str) -> None:
+def check_input_list_name(*, input_list_name: str, branch_pipe_code: str, input_item_name: str) -> None:
     """Refuse a PipeBatch's `input_list_name` that is not a plain input name.
 
     It names one of the batch's own inputs, so it follows the input-name grammar: a list held in a field
-    of a larger value is declared by the batch under a plain name, and handed to it by the calling sequence.
+    of a larger value is declared by the batch under a plain name, and handed to it by the calling sequence,
+    which binds the field to that name, or runs the branch pipe in a step whose dotted `batch_over` binds the
+    list and batches over it, in place of the PipeBatch.
 
     Raises:
         PipeValidationError: ``INVALID_INPUT_NAME`` naming the list.
@@ -443,11 +463,40 @@ def check_input_list_name(*, input_list_name: str) -> None:
             f"`input_list_name` '{input_list_name}' is not a plain input name: a PipeBatch maps over a list it declares as an input "
             f'of its own, under a plain name. Declare the list itself (`{plain_name} = "<Concept>[]"`, with '
             f'`input_list_name = "{plain_name}"`), and have the calling sequence bind the field to that name with a binding step '
-            f"({_binding_step(dotted_path=input_list_name)})."
+            f"({_binding_step(dotted_path=input_list_name)}), or have the calling sequence run '{branch_pipe_code}' in a step that "
+            f'batches over the field itself, which binds the list and batches over it, in place of the PipeBatch (`{{ pipe = "{branch_pipe_code}", '
+            f'batch_over = "{input_list_name}", batch_as = "{input_item_name}" }}`).'
         )
     else:
         msg = f"`input_list_name` '{input_list_name}' is not a valid input name: {_PLAIN_NAME_RULE}."
     raise PipeValidationError(message=msg, error_type=PipeValidationErrorType.INVALID_INPUT_NAME, variable_names=[input_list_name])
+
+
+def check_name_is_not_reserved(*, name: str, field_label: str) -> None:
+    """Refuse a name an author writes that takes the prefix the runtime reserves for the bound list of a dotted `batch_over`.
+
+    A PipeSequence binds a dotted `batch_over`'s list under a private name taking the prefix, `_bound_catalog_pages` for
+    `catalog.pages`, and a nested sequence binds in the working memory of the sequence calling it. A caller's name taking
+    the prefix could then be overwritten by the list a sequence it calls binds, so the prefix is the runtime's alone: a
+    name an author stores a value under, hands an item to a pipe under, or batches over by name never takes it.
+
+    Args:
+        name: The name as written.
+        field_label: The field holding it, for the message, such as "The `result` of the step running pipe 'describe_page'".
+
+    Raises:
+        PipeValidationError: ``INVALID_INPUT_NAME`` naming the name.
+    """
+    if not name.startswith(PRIVATE_BINDING_NAME_PREFIX):
+        return
+    unreserved_name = name.removeprefix(PRIVATE_BINDING_NAME_PREFIX)
+    suggestion = f", such as '{unreserved_name}'" if is_snake_case(unreserved_name) else ""
+    msg = (
+        f"{field_label}, '{name}', takes the `{PRIVATE_BINDING_NAME_PREFIX}` prefix, which is reserved for the bound list of a dotted "
+        f"`batch_over`: a PipeSequence binds that list under a `{PRIVATE_BINDING_NAME_PREFIX}` name in the working memory it shares "
+        f"with the sequence calling it, so only the runtime writes or reads such a name. Choose another name{suggestion}."
+    )
+    raise PipeValidationError(message=msg, error_type=PipeValidationErrorType.INVALID_INPUT_NAME, variable_names=[name])
 
 
 def is_pipe_code_valid(pipe_code: str) -> bool:

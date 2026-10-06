@@ -205,6 +205,8 @@ The run is then refused, with an input error naming the input, when:
 - an `Image` input holds a file that is not an image, whatever reads it;
 - a document input is certain to reach a step whose model does not read its format: for example, Word transcripts batched into a `PipeExtract` whose extract model reads only PDF. The error names each input, its format, the step, the model and the formats that model reads.
 
+The check follows each input through the steps of the method: the items of a batch, the fields of a structured input, and what a binding step or a dotted `batch_over` binds, so a Word transcript at `cases[1].transcripts[0]`, batched through `batch_over = "cases.transcripts"` over a list of cases, is refused before the run. A list a binding gathers from a field that is not itself a list, such as `cases.attachment` over a list of cases, is not followed, and a step that reads its items refuses a file when it gets to it.
+
 A step reached only through a `PipeCondition`, or a step that may be skipped because an optional input is absent, may never run, so the run is not refused on its account. If it does run, it refuses the file itself, with the same kind of input error. The same holds for files a run produces along the way.
 
 ### NumberContent

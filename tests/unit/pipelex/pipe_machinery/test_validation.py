@@ -218,12 +218,14 @@ class TestInputNameValidation:
         assert "`[a-z][a-z0-9_]*`" in str(error)
 
     def test_a_plain_list_name_passes(self):
-        check_input_list_name(input_list_name="pages")
+        check_input_list_name(input_list_name="pages", branch_pipe_code="describe_page", input_item_name="page")
 
     def test_a_dotted_list_name_is_refused(self):
-        """A PipeBatch's list is one of its own inputs, so a dotted list name is refused, naming the binding step."""
+        """A PipeBatch's list is one of its own inputs, so a dotted list name is refused, naming both ways the calling sequence
+        hands the field over: a binding step to the declared list, or a step whose dotted `batch_over` binds it and batches over it.
+        """
         with pytest.raises(PipeValidationError) as exc_info:
-            check_input_list_name(input_list_name="catalog.pages")
+            check_input_list_name(input_list_name="catalog.pages", branch_pipe_code="describe_page", input_item_name="page")
 
         error = exc_info.value
         assert error.error_type == PipeValidationErrorType.INVALID_INPUT_NAME
@@ -232,10 +234,11 @@ class TestInputNameValidation:
         assert "`input_list_name` 'catalog.pages' is not a plain input name" in message
         assert '`input_list_name = "pages"`' in message
         assert '{ from = "catalog.pages", result = "pages" }' in message
+        assert '`{ pipe = "describe_page", batch_over = "catalog.pages", batch_as = "page" }`' in message
 
     def test_a_malformed_list_name_is_refused(self):
         with pytest.raises(PipeValidationError) as exc_info:
-            check_input_list_name(input_list_name="CatalogPages")
+            check_input_list_name(input_list_name="CatalogPages", branch_pipe_code="describe_page", input_item_name="page")
 
         assert exc_info.value.error_type == PipeValidationErrorType.INVALID_INPUT_NAME
         assert "is not a valid input name" in str(exc_info.value)
