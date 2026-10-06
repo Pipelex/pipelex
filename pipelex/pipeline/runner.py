@@ -192,10 +192,15 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         # them is the caller's invalid bundle; a host's own otherwise, loaded untranslated. See
         # `acquire_library`.
         library_dirs_are_callers: bool = False,
+        # Directories laid out like `.mthds/methods/` holding the method packages a caller ships with the contents it
+        # runs, searched first for an address-based reference and never written. A run reads them; `validate` does
+        # not, and resolves such a reference through the installed stores and fetch-on-miss only.
+        methods_dirs: list[Path] | None = None,
     ):
         self.library_id = library_id
         self.library_dirs = library_dirs
         self.library_dirs_are_callers = library_dirs_are_callers
+        self.methods_dirs = methods_dirs
         self.bundle_uris = bundle_uris
         self.pipe_run_mode = pipe_run_mode
         self.is_mock_usage = is_mock_usage
@@ -331,6 +336,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 extras=self.extras,
                 inputs_base_dir=self.inputs_base_dir,
                 library_dirs_are_callers=self.library_dirs_are_callers,
+                methods_dirs=self.methods_dirs,
                 request_id=request_id,
             )
             effective_pipe_run = self._pipe_run or get_pipe_run()

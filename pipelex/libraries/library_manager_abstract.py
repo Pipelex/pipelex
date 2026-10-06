@@ -133,8 +133,17 @@ class LibraryManagerAbstract(ABC):
         """
 
     @abstractmethod
-    def load_from_blueprints(self, *, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
-        pass
+    def load_from_blueprints(
+        self, *, library_id: str, blueprints: list[PipelexBundleBlueprint], methods_dirs: list[Path] | None = None
+    ) -> list[PipeAbstract]:
+        """Load the blueprints into the library, resolving their address-based dependencies.
+
+        Args:
+            library_id: The library to load into
+            blueprints: The parsed bundles to load
+            methods_dirs: Directories laid out like ``.mthds/methods/`` holding packages for this load alone, searched
+                for an address-based dependency before the installed stores and fetch-on-miss, and never written
+        """
 
     @abstractmethod
     def _remove_from_blueprint(self, *, library_id: str, blueprint: PipelexBundleBlueprint) -> None:

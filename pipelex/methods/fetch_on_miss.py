@@ -7,14 +7,19 @@ fetch), installs it into the installed-methods store (``~/.mthds/methods/``) wit
 provenance recorded, and hands it back so library loading can proceed. A miss that cannot be
 bridged — fetch disabled, an unfetchable address, a failed fetch — raises a diagnostic that
 names the address and the remedy; it is never a silent pass.
+
+A load can also be handed methods directories of its own, holding the packages a request ships
+with its bundle under `.mthds/methods/<name>/`. They are looked up first, by the same manifest
+identity, and only searched, never written (:func:`find_vendored_method`).
 """
 
 import shutil
 import tempfile
 from pathlib import Path
+from typing import NamedTuple
 
 from pipelex import log
-from pipelex.cli.installed_methods import InstalledMethod, find_method_by_full_address, install_method_package
+from pipelex.cli.installed_methods import InstalledMethod, discover_installed_methods, find_method_by_full_address, install_method_package
 from pipelex.config import METHODS_FETCH_ON_MISS_ENV_VAR, is_method_fetch_on_miss_enabled, is_pipe_func_sandbox_hosted
 from pipelex.methods.exceptions import (
     MethodDependencyFetchError,
@@ -34,6 +39,54 @@ from pipelex.methods.structures_check import (
 
 # The remedy every refusal ends with. It names no directory: on a host, the runtime's own store is not the caller's to write.
 MANUAL_INSTALL_HINT = "install the package where this runtime runs (for example with `mthds install <address>`)"
+
+
+class _LookupAddress(NamedTuple):
+    """The address a reference is looked up by, with the parsed reference or the reason it did not parse."""
+
+    address: str
+    ref: MethodRef | None
+    parse_error: MethodRefParseError | None
+
+
+def _lookup_address(*, full_address: str) -> _LookupAddress:
+    """Strip any ``@<tag>`` from a reference for the lookup: an installed or vendored copy is keyed by its address alone."""
+    if not looks_like_method_ref(full_address):
+        return _LookupAddress(address=full_address, ref=None, parse_error=None)
+    try:
+        ref = parse_method_ref(full_address)
+    except MethodRefParseError as exc:
+        return _LookupAddress(address=full_address, ref=None, parse_error=exc)
+    return _LookupAddress(address=ref.address, ref=ref, parse_error=None)
+
+
+def find_vendored_method(*, full_address: str, methods_dirs: list[Path]) -> InstalledMethod | None:
+    """Look an address-based reference up among the packages a load was handed, and nowhere else.
+
+    ``methods_dirs`` are laid out like ``.mthds/methods/`` (one directory per package, its ``METHODS.toml`` at its
+    root) and hold the packages a request ships with its bundle. A package matches by the manifest identity the
+    installed stores are matched by, any ``@<tag>`` stripped, so a vendored copy answers an address this runtime could
+    not fetch too. The installed stores are not read, and nothing is fetched or installed. A ``@<tag>`` pin answered by
+    a vendored copy uses the copy, as an installed copy is used, with a warning unless the copy's version is that tag.
+
+    Args:
+        full_address: The address-based alias as written in the bundle, with any ``@<tag>``.
+        methods_dirs: The load's own methods directories.
+
+    Returns:
+        The vendored package the reference names, or ``None`` when none of the directories holds it.
+    """
+    lookup = _lookup_address(full_address=full_address)
+    vendored_methods = discover_installed_methods(include_global=False, include_project=False, extra_search_dirs=methods_dirs)
+    vendored = find_method_by_full_address(lookup.address, methods=vendored_methods)
+    if vendored is not None and lookup.ref is not None and lookup.ref.tag is not None:
+        version = vendored.manifest.version
+        if lookup.ref.tag not in {version, f"v{version}"}:
+            log.warning(
+                f"Method '{lookup.ref.address}' is shipped with the request at version {version} while the reference pins "
+                f"'@{lookup.ref.tag}'; using the shipped copy."
+            )
+    return vendored
 
 
 def _warn_on_tag_mismatch(*, installed: InstalledMethod, ref: MethodRef | None) -> None:
@@ -86,17 +139,11 @@ def resolve_address_based_method(
             the install target being occupied by a different package that shares the bare
             directory name (never silently loaded, never silently overwritten).
     """
-    ref: MethodRef | None = None
-    parse_error: MethodRefParseError | None = None
-    lookup_address = full_address
-    if looks_like_method_ref(full_address):
-        try:
-            ref = parse_method_ref(full_address)
-            lookup_address = ref.address
-        except MethodRefParseError as exc:
-            parse_error = exc
+    lookup = _lookup_address(full_address=full_address)
+    ref = lookup.ref
+    parse_error = lookup.parse_error
 
-    installed = find_method_by_full_address(lookup_address, extra_search_dirs=extra_search_dirs)
+    installed = find_method_by_full_address(lookup.address, extra_search_dirs=extra_search_dirs)
     if installed is not None:
         _warn_on_tag_mismatch(installed=installed, ref=ref)
         return installed
