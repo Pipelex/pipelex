@@ -45,59 +45,69 @@ def _mock_config(mocker: MockerFixture) -> None:
 
 
 class TestMistralReasoning:
-    """Tests for _resolve_prompt_mode on MistralLLMWorker."""
+    """Tests for _resolve_reasoning_effort on MistralLLMWorker."""
 
     def test_reasoning_budget_with_thinking_mode_none_raises(self, mocker: MockerFixture):
         """reasoning_budget with thinking_mode=none gives an accurate 'does not support reasoning' error."""
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.NONE)
         job_params = LLMJobParams(temperature=0.5, reasoning_budget=4096)
         with pytest.raises(LLMCapabilityError, match="does not support reasoning"):
-            worker._resolve_prompt_mode(job_params=job_params)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+            worker._resolve_reasoning_effort(job_params=job_params)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     def test_reasoning_budget_with_thinking_mode_manual_raises(self, mocker: MockerFixture):
-        """reasoning_budget with thinking_mode=manual raises with 'prompt_mode' guidance."""
+        """reasoning_budget with thinking_mode=manual raises with 'reasoning_effort' guidance."""
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL)
         job_params = LLMJobParams(temperature=0.5, reasoning_budget=4096)
-        with pytest.raises(LLMCapabilityError, match="reasoning_budget"):
-            worker._resolve_prompt_mode(job_params=job_params)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+        with pytest.raises(LLMCapabilityError, match="does not support reasoning_budget; Mistral uses reasoning_effort instead"):
+            worker._resolve_reasoning_effort(job_params=job_params)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     @pytest.mark.parametrize(
-        ("effort", "expected_prompt_mode"),
+        ("effort", "expected_mistral_effort"),
         [
-            (ReasoningEffort.MINIMAL, "reasoning"),
-            (ReasoningEffort.LOW, "reasoning"),
-            (ReasoningEffort.MEDIUM, "reasoning"),
-            (ReasoningEffort.HIGH, "reasoning"),
-            (ReasoningEffort.XHIGH, "reasoning"),
-            (ReasoningEffort.MAX, "reasoning"),
+            (ReasoningEffort.MINIMAL, "high"),
+            (ReasoningEffort.LOW, "high"),
+            (ReasoningEffort.MEDIUM, "high"),
+            (ReasoningEffort.HIGH, "high"),
+            (ReasoningEffort.XHIGH, "high"),
+            (ReasoningEffort.MAX, "high"),
         ],
     )
     def test_reasoning_effort_maps_correctly(
         self,
         mocker: MockerFixture,
         effort: ReasoningEffort,
-        expected_prompt_mode: str,
+        expected_mistral_effort: str,
     ):
-        """Each non-NONE ReasoningEffort maps to prompt_mode='reasoning'."""
+        """Each non-NONE ReasoningEffort maps to the `reasoning` level, which Mistral turns on as reasoning_effort `high`."""
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL)
         _mock_config(mocker)
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=effort)
-        result = worker._resolve_prompt_mode(job_params=job_params)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
-        assert result == expected_prompt_mode
+        result = worker._resolve_reasoning_effort(job_params=job_params)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+        assert result == expected_mistral_effort
 
     def test_thinking_mode_none_raises_capability_error(self, mocker: MockerFixture):
         """Models with thinking_mode=none should raise LLMCapabilityError."""
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.NONE)
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.HIGH)
         with pytest.raises(LLMCapabilityError, match="does not support reasoning"):
-            worker._resolve_prompt_mode(job_params=job_params)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+            worker._resolve_reasoning_effort(job_params=job_params)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     def test_thinking_mode_adaptive_raises_capability_error(self, mocker: MockerFixture):
         """Adaptive thinking mode is not applicable to Mistral models."""
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.ADAPTIVE)
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.HIGH)
         with pytest.raises(LLMCapabilityError, match="adaptive"):
-            worker._resolve_prompt_mode(job_params=job_params)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+            worker._resolve_reasoning_effort(job_params=job_params)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
+    def test_none_effort_omits_the_parameter(self, mocker: MockerFixture):
+        """NONE maps to disabled, so the parameter is left out and the model does not reason."""
+        from mistralai.client.types import UNSET  # ruff: ignore[import-outside-top-level]
+
+        worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL)
+        _mock_config(mocker)
+        job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.NONE)
+        result = worker._resolve_reasoning_effort(job_params=job_params)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+        assert result is UNSET
 
     def test_no_reasoning_params_returns_unset(self, mocker: MockerFixture):
         """When neither reasoning_effort nor reasoning_budget is set, returns UNSET."""
@@ -105,5 +115,5 @@ class TestMistralReasoning:
 
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL)
         job_params = LLMJobParams(temperature=0.5)
-        result = worker._resolve_prompt_mode(job_params=job_params)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+        result = worker._resolve_reasoning_effort(job_params=job_params)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert result is UNSET

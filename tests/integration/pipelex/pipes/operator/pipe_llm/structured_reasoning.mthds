@@ -1,0 +1,19 @@
+domain      = "test_structured_reasoning"
+description = "A structured output from a pipe whose model setting carries a reasoning effort"
+
+# The shape of a deck reasoning preset on a structured pipe: the object is generated with the text
+# model setting, reasoning effort included, since no model_to_structure is named.
+[concept.ComparisonVerdict]
+description = "A verdict on which of two numbers is larger"
+
+[concept.ComparisonVerdict.structure]
+larger_number = { type = "text", description = "The larger of the two numbers, as written in the question", required = true }
+reasons       = { type = "list", item_type = "text", description = "The reasons for the verdict, one per item", required = true }
+
+[pipe.compare_numbers]
+type        = "PipeLLM"
+description = "Compare two numbers, reasoning at low effort, into a structured verdict"
+inputs      = { question = "Text" }
+output      = "ComparisonVerdict"
+model       = { model = "gpt-5.6-luna", temperature = 1, reasoning_effort = "low" }
+prompt      = "Answer this question: $question"

@@ -253,8 +253,28 @@ class SearchTestCases:
     ]
 
 
+class AnswerConfidence(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class WorkingStep(BaseModel):
+    description: str = Field(description="One step of the working, in a short sentence")
+
+
+class ReasonedAnswer(BaseModel):
+    """A structured answer with an enum and a nested list, the shapes a structured output breaks on first."""
+
+    answer: str = Field(description="The final answer, as short as possible")
+    confidence: AnswerConfidence
+    steps: list[WorkingStep] = Field(description="The steps of the working, in order")
+
+
 class LLMReasoningTestCases:
     """Test cases for LLM reasoning/thinking integration tests."""
+
+    STRUCTURED_PROMPT = "What is 317 * 723? Give the answer, your confidence in it, and the steps of your working."
 
     PROMPTS: ClassVar[list[tuple[str, str]]] = [  # topic, prompt_text
         ("Comparison", "Which is larger: 0.9 or 0.11?"),

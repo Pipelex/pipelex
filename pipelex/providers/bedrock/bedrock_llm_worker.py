@@ -68,7 +68,7 @@ class BedrockLLMWorker(LLMWorkerAbstract):
                 messages=message.to_dict_list(),
                 system_text=llm_job.llm_prompt.system_text,
                 model=self.inference_model.model_id,
-                temperature=job_params.temperature,
+                temperature=job_params.temperature if self.inference_model.accepts_temperature else None,
                 max_tokens=job_params.max_tokens or self.default_max_tokens,
             )
         except ClientError as exc:

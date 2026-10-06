@@ -3,7 +3,8 @@ from typing import TYPE_CHECKING, Any
 import httpx
 from mistralai.client import Mistral
 from mistralai.client.errors import MistralError
-from mistralai.client.models import MistralPromptMode, TextChunk, ThinkChunk
+from mistralai.client.models import ReasoningEffort as MistralReasoningEffort
+from mistralai.client.models import TextChunk, ThinkChunk
 from mistralai.client.types import UNSET
 from typing_extensions import override
 
@@ -66,14 +67,16 @@ class MistralLLMWorker(LLMWorkerAbstract):
         else:
             self.instructor_for_objects = from_mistral(client=sdk_instance, use_async=True)
 
-    def _resolve_prompt_mode(self, job_params: LLMJobParams) -> "OptionalNullable[MistralPromptMode]":
-        """Resolve reasoning parameters to a Mistral prompt_mode value.
+    def _resolve_reasoning_effort(self, job_params: LLMJobParams) -> "OptionalNullable[MistralReasoningEffort]":
+        """Resolve reasoning parameters to a Mistral reasoning_effort value.
+
+        Mistral's reasoning models take `reasoning_effort` and refuse the older `prompt_mode="reasoning"`.
 
         Args:
             job_params: The LLM job parameters containing reasoning_effort/reasoning_budget.
 
         Returns:
-            The Mistral prompt_mode value, or UNSET if reasoning is not requested.
+            The Mistral reasoning_effort value, or UNSET if reasoning is not requested.
 
         """
         thinking_mode = self.inference_model.thinking_mode
@@ -81,7 +84,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
         if job_params.reasoning_budget is not None:
             match thinking_mode:
                 case ThinkingMode.MANUAL:
-                    msg = f"Model '{self.inference_model.desc}' does not support reasoning_budget; Mistral uses prompt_mode instead"
+                    msg = f"Model '{self.inference_model.desc}' does not support reasoning_budget; Mistral uses reasoning_effort instead"
                     raise LLMCapabilityError(msg)
                 case ThinkingMode.ADAPTIVE:
                     msg = f"Model '{self.inference_model.desc}' has thinking_mode=adaptive which is not supported for Mistral models"
@@ -94,12 +97,12 @@ class MistralLLMWorker(LLMWorkerAbstract):
             effort = job_params.reasoning_effort
             match thinking_mode:
                 case ThinkingMode.MANUAL:
-                    prompt_mode = get_config().inference.llm.mistral.get_reasoning_level(effort=effort)
-                    if prompt_mode is None:
-                        log.verbose("Mistral prompt_mode omitted (reasoning disabled)")
+                    mistral_effort = get_config().inference.llm.mistral.get_reasoning_level(effort=effort)
+                    if mistral_effort is None:
+                        log.verbose("Mistral reasoning_effort omitted (reasoning disabled)")
                         return UNSET
-                    log.verbose(f"Mistral prompt_mode={prompt_mode}")
-                    return prompt_mode
+                    log.verbose(f"Mistral reasoning_effort={mistral_effort}")
+                    return mistral_effort
                 case ThinkingMode.ADAPTIVE:
                     msg = f"Model '{self.inference_model.desc}' has thinking_mode=adaptive which is not supported for Mistral models"
                     raise LLMCapabilityError(msg)
@@ -116,14 +119,14 @@ class MistralLLMWorker(LLMWorkerAbstract):
     ) -> str:
         job_params = llm_job.applied_job_params or llm_job.job_params
         messages = await self.mistral_factory.make_simple_messages(llm_job=llm_job)
-        prompt_mode = self._resolve_prompt_mode(job_params=job_params)
+        reasoning_effort = self._resolve_reasoning_effort(job_params=job_params)
         try:
             response: ChatCompletionResponse | None = await self.mistral_client_for_text.chat.complete_async(
                 messages=messages,
                 model=self.inference_model.model_id,
-                temperature=job_params.temperature,
+                temperature=job_params.temperature if self.inference_model.accepts_temperature else UNSET,
                 max_tokens=job_params.max_tokens or self.default_max_tokens,
-                prompt_mode=prompt_mode,
+                reasoning_effort=reasoning_effort,
             )
         except (MistralError, httpx.TransportError) as sdk_exc:
             metadata = extract_mistral_metadata(sdk_exc)
@@ -223,18 +226,29 @@ class MistralLLMWorker(LLMWorkerAbstract):
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
-        self._validate_no_reasoning_for_structured_gen(job_params=job_params)
-        messages = await self.mistral_factory.make_simple_messages_openai_typed(llm_job=llm_job)
-        # Deferred import: avoid pulling heavy SDK at module-load time
+        reasoning_effort = self._resolve_reasoning_effort(job_params=job_params)
+        # Deferred imports: avoid pulling heavy SDK at module-load time
+        from instructor import Mode as InstructorMode  # ruff: ignore[import-outside-top-level]
         from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]
+
+        if reasoning_effort is not UNSET and self.instructor_for_objects.mode != InstructorMode.TOOLS:
+            # A reasoning reply carries its answer beside a thinking chunk in a list of content chunks, which instructor's
+            # JSON parsers read as one string and refuse on every attempt; its tool mode reads the tool call and validates
+            msg = (
+                f"Model '{self.inference_model.desc}' cannot reason on a structured output with structure method "
+                f"'{self.inference_model.structure_method}': use 'instructor/mistral_tools', or remove the reasoning setting"
+            )
+            raise LLMCapabilityError(msg)
+        messages = await self.mistral_factory.make_simple_messages_openai_typed(llm_job=llm_job)
 
         try:
             result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                 response_model=schema,
                 messages=messages,
                 model=self.inference_model.model_id,
-                temperature=job_params.temperature,
+                temperature=job_params.temperature if self.inference_model.accepts_temperature else UNSET,
                 max_tokens=job_params.max_tokens or self.default_max_tokens,
+                reasoning_effort=reasoning_effort,
                 # instructor's retry is confined to schema re-ask: this validation-only AsyncRetrying
                 # re-asks on a malformed/invalid output but never retries a transport error, which ends the
                 # loop and comes out wrapped, for the except clause below to unwrap — transport retry is the

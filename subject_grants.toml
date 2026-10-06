@@ -1932,10 +1932,6 @@ rationale = "Worker verb–object: processes the llm_job; single operand."
 param = "llm_job"
 rationale = "Operates on the llm_job; single operand (attached data keyword-only)."
 
-["pipelex/cogt/llm/llm_worker_abstract.py::LLMWorkerAbstract._validate_no_reasoning_for_structured_gen"]
-param = "job_params"
-rationale = "Validator: the job params are the single operand checked."
-
 ["pipelex/cogt/llm/llm_worker_abstract.py::LLMWorkerAbstract.gen_object"]
 param = "llm_job"
 rationale = "Worker verb–object: processes the llm_job; single operand."
@@ -5020,9 +5016,9 @@ rationale = "Verb–object: renders the model list; single operand."
 param = "models"
 rationale = "Verb–object: renders the model list; single operand."
 
-["pipelex/providers/mistral/mistral_llm_worker.py::MistralLLMWorker._resolve_prompt_mode"]
+["pipelex/providers/mistral/mistral_llm_worker.py::MistralLLMWorker._resolve_reasoning_effort"]
 param = "job_params"
-rationale = "Resolves the prompt mode from the job params; single operand."
+rationale = "Resolves the reasoning effort from the job params; single operand."
 
 ["pipelex/providers/mistral/mistral_plugin.py::MistralPlugin.register"]
 param = "registrar"

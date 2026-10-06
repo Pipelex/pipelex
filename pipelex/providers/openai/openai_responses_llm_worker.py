@@ -147,7 +147,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
             response = await self.openai_client_for_responses.responses.create(
                 model=self.inference_model.model_id,
                 instructions=llm_job.llm_prompt.system_text,
-                temperature=omit if openai_reasoning is not None else job_params.temperature,
+                temperature=omit if (openai_reasoning is not None or not self.inference_model.accepts_temperature) else job_params.temperature,
                 max_output_tokens=job_params.max_tokens or omit,
                 input=input_items,
                 reasoning=openai_reasoning if openai_reasoning is not None else omit,
@@ -189,7 +189,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
-        self._validate_no_reasoning_for_structured_gen(job_params=job_params)
+        openai_reasoning = self._resolve_reasoning(job_params=job_params)
         from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]
 
         if not hasattr(self.instructor_for_objects, "responses"):
@@ -225,8 +225,9 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
                 max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.schema_reask_max_attempts),
                 model=self.inference_model.model_id,
                 instructions=llm_job.llm_prompt.system_text,
-                temperature=job_params.temperature,
+                temperature=omit if (openai_reasoning is not None or not self.inference_model.accepts_temperature) else job_params.temperature,
                 max_output_tokens=job_params.max_tokens or NOT_GIVEN,
+                reasoning=openai_reasoning if openai_reasoning is not None else omit,
                 extra_headers=extra_headers,
                 extra_body=extra_body,
             )
