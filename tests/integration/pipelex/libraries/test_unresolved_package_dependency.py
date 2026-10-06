@@ -9,9 +9,11 @@ The packages are invented; every test isolates the installed store, and none rea
 """
 
 import json
+import logging
 from pathlib import Path
 
 import pytest
+from mthds.package.exceptions import VCSFetchError
 from mthds.package.manifest.parser import parse_methods_toml
 from pytest_mock import MockerFixture
 
@@ -144,6 +146,26 @@ class TestUnresolvedPackageDependency:
         assert "does not appear to be a git repository" in strict_dump
         assert "Cloning into" not in strict_dump
         assert "mthds_fetch_on_miss_" not in strict_dump
+
+    async def test_the_host_log_keeps_what_caused_the_item(self, tmp_path: Path, mocker: MockerFixture, caplog: pytest.LogCaptureFixture) -> None:
+        """The item carries the caller-facing text; the host's own log keeps the whole cause chain, git's raw output included."""
+        isolate_installed_methods(mocker=mocker, root=tmp_path)
+        _enable_fetch_on_miss(mocker=mocker)
+        mocker.patch(
+            "pipelex.methods.fetching.clone_default_branch",
+            side_effect=VCSFetchError("Failed to clone 'https://github.com/invented/probe-lib.git': Cloning into '/host/clones/x'...\nfatal: boom"),
+        )
+
+        with caplog.at_level(logging.WARNING):
+            await _verdict_for(mthds_content=ProbePackageTestData.CONSUMER_BUNDLE)
+
+        warnings = [
+            record.message for record in caplog.records if record.levelno == logging.WARNING and ProbePackageTestData.DEP_ALIAS in record.message
+        ]
+        assert len(warnings) == 1, warnings
+        assert "MethodDependencyFetchError" in warnings[0]
+        assert "VCSFetchError" in warnings[0]
+        assert "Cloning into '/host/clones/x'" in warnings[0]
 
     async def test_a_repository_without_the_package_is_one_item(self, tmp_path: Path, mocker: MockerFixture) -> None:
         isolate_installed_methods(mocker=mocker, root=tmp_path)

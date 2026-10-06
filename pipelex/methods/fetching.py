@@ -52,19 +52,25 @@ class FetchedMethodPackage(BaseModel):
         return MethodProvenance(address=self.full_address, tag=self.ref.tag, commit_sha=self.commit_sha)
 
 
-def _without_host_directory(*, text: str, directory: Path) -> str:
-    """Remove from git's output everything that names `directory`, a clone directory on this host.
+CLONE_DIRECTORY_PLACEHOLDER = "<clone directory>"
 
-    Git's own explanation (`remote: Repository not found.`, `fatal: … not found`) is what the caller can use; its
-    progress line `Cloning into '<directory>'...` names a temporary directory of the host, gone once the fetch ends.
-    That fragment is cut where a prefix shares its line, and any other line naming the directory is dropped. Both
-    spellings of the directory are matched, since macOS reaches its temporary directory through a symlink.
+
+def _without_host_directory(*, text: str, directory: Path) -> str:
+    """Remove from git's output every mention of `directory`, a clone directory on this host.
+
+    Git's own explanation (`remote: Repository not found.`, `fatal: … not found`) is what the caller can use; the
+    directory it names is a temporary directory of the host, gone once the fetch ends. Git's progress fragment
+    `Cloning into '<directory>'...` is cut, and any other mention of the directory is replaced by a placeholder, so a
+    line whose reason names it (`fatal: could not create work tree dir '<directory>': Permission denied`) keeps the
+    reason. Both spellings of the directory are matched, the longer first since macOS reaches its temporary
+    directory through a symlink and the resolved spelling contains the other.
     """
-    spellings = {str(directory), str(directory.resolve())}
+    spellings = sorted({str(directory), str(directory.resolve())}, key=len, reverse=True)
     for spelling in spellings:
         text = text.replace(f"Cloning into '{spelling}'...", "")
-    kept_lines = [line.rstrip() for line in text.splitlines() if not any(spelling in line for spelling in spellings)]
-    return "\n".join(kept_lines).strip()
+    for spelling in spellings:
+        text = text.replace(spelling, CLONE_DIRECTORY_PLACEHOLDER)
+    return "\n".join(line.rstrip() for line in text.splitlines()).strip()
 
 
 def resolve_head_commit_sha(*, clone_dir: Path) -> str:

@@ -15,7 +15,7 @@ from pydantic import BaseModel, PydanticUserError, ValidationError
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.base_exceptions import PipelexError, SecurityError, error_domain_is_input
+from pipelex.base_exceptions import PipelexError, SecurityError, error_domain_is_input, iter_cause_chain
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.config import is_pipe_func_sandbox_hosted
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
@@ -1463,6 +1463,10 @@ class LibraryManager(LibraryManagerAbstract):
                     extra_search_dirs=extra_search_dirs,
                 )
             except (MethodFetchDisabledError, MethodDependencyFetchError) as exc:
+                # The item carries the caller-facing text; the host's log keeps the whole cause chain, git's raw output
+                # included, since a cause on the host (git missing, an unwritable clone directory) becomes an item too.
+                causes = " <- ".join(f"{type(cause).__name__}: {cause}" for cause in iter_cause_chain(exc))
+                log.warning(f"Method package '{full_address}' could not be resolved: {causes}")
                 unresolved_items.append(
                     PipesAndConceptValidationErrorData(
                         error_type=PipeValidationErrorType.UNRESOLVED_PACKAGE_DEPENDENCY,
