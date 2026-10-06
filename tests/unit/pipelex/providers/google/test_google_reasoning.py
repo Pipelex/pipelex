@@ -5,6 +5,7 @@ from pytest_mock import MockerFixture
 from pipelex.cogt.exceptions import LLMCapabilityError
 from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
+from pipelex.cogt.model_backends.constraints import ListedConstraint
 from pipelex.providers.google.google_config import GoogleConfig
 from pipelex.providers.google.google_llm_worker import GoogleLLMWorker
 
@@ -25,12 +26,14 @@ def _make_worker(
     *,
     min_thinking_budget: int | None = None,
     max_thinking_budget: int | None = None,
+    listed_constraints: list[ListedConstraint] | None = None,
 ) -> GoogleLLMWorker:
-    """Create a minimal GoogleLLMWorker with a mocked inference_model, declaring no thinking budget bounds by default."""
+    """Create a minimal GoogleLLMWorker with a mocked inference_model, declaring no thinking budget bounds or constraints by default."""
     worker = object.__new__(GoogleLLMWorker)
     mock_model = mocker.MagicMock()
     mock_model.thinking_mode = thinking_mode
     mock_model.desc = "test-model"
+    mock_model.listed_constraints = listed_constraints or []
     mock_model.min_thinking_budget = min_thinking_budget
     mock_model.max_thinking_budget = max_thinking_budget
     worker.inference_model = mock_model
@@ -145,6 +148,23 @@ class TestGoogleReasoning:
         result = worker._build_thinking_config(job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert result is not None
         assert result.thinking_budget == 0
+
+    @pytest.mark.parametrize("thinking_mode", [ThinkingMode.MANUAL, ThinkingMode.ADAPTIVE])
+    def test_effort_none_is_refused_on_a_model_that_cannot_turn_thinking_off(self, mocker: MockerFixture, thinking_mode: ThinkingMode):
+        """Gemini 2.5 Pro and 3.1 Pro answer a budget of 0 with a 400, so the worker refuses before sending it."""
+        worker = _make_worker(mocker, thinking_mode=thinking_mode, listed_constraints=[ListedConstraint.THINKING_CANNOT_BE_DISABLED])
+        _mock_config_for_adaptive(mocker)
+        job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.NONE)
+        with pytest.raises(LLMCapabilityError, match="cannot turn thinking off"):
+            worker._build_thinking_config(job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
+    def test_another_effort_still_thinks_on_a_model_that_cannot_turn_thinking_off(self, mocker: MockerFixture):
+        worker = _make_worker(mocker, thinking_mode=ThinkingMode.ADAPTIVE, listed_constraints=[ListedConstraint.THINKING_CANNOT_BE_DISABLED])
+        _mock_config_for_adaptive(mocker)
+        job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.LOW)
+        result = worker._build_thinking_config(job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+        assert result is not None
+        assert result.thinking_level == genai_types.ThinkingLevel.LOW
 
     @pytest.mark.parametrize(
         "thinking_mode",

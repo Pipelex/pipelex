@@ -37,8 +37,17 @@ class TestFitThinkingBudget:
         assert "300" in message
 
     def test_without_a_floor_a_small_max_tokens_cuts_the_budget_without_refusing(self):
-        """Gemini takes any budget, so its path has no floor and never refuses."""
+        """A model that declares no minimum, such as Gemini 2.5 Flash, has its budget cut rather than refused."""
         assert fit_thinking_budget(budget=1024, max_tokens=100, min_budget=None, max_budget=None, model_desc="test-model") == 75
+
+    def test_a_tiny_max_tokens_still_keeps_a_token_for_the_answer(self):
+        """A quarter of max_tokens rounds down to nothing below 4, so the reserve is never less than one token."""
+        assert fit_thinking_budget(budget=5000, max_tokens=3, min_budget=None, max_budget=None, model_desc="test-model") == 2
+
+    def test_a_max_tokens_with_no_room_to_think_is_refused_without_a_floor(self):
+        with pytest.raises(LLMCapabilityError) as exc_info:
+            fit_thinking_budget(budget=5000, max_tokens=1, min_budget=None, max_budget=None, model_desc="test-model")
+        assert "max_tokens=1" in str(exc_info.value)
 
     def test_a_budget_over_the_model_maximum_is_cut_to_it(self):
         assert fit_thinking_budget(budget=65536, max_tokens=100000, min_budget=128, max_budget=32768, model_desc="test-model") == 32768

@@ -250,6 +250,15 @@ valued_constraints = { min_thinking_budget = 512, max_thinking_budget = 24576 }
 
 A budget resolved from a reasoning effort, or set explicitly, is held within that range, and a `max_tokens` too small to hold the minimum beside the quarter kept for the answer is refused before the call is sent. The kit's Anthropic models declare Anthropic's minimum of 1,024 tokens, and its Gemini 2.5 models declare their ranges; a model that declares neither gets its budget fitted inside `max_tokens` alone.
 
+On the `google` SDK, a reasoning effort of `none` is sent as a thinking budget of 0, which turns thinking off. A Gemini model that always thinks refuses that budget, so it lists the `thinking_cannot_be_disabled` constraint, and `none` on it is refused before the call is sent. The kit declares it on Gemini 2.5 Pro, Gemini 3.1 Pro and the `-latest` aliases that currently resolve to a model that always thinks:
+
+```toml
+# google.toml
+["gemini-3.1-pro"]
+model_id = "gemini-3.1-pro-preview"
+listed_constraints = ["thinking_cannot_be_disabled"]
+```
+
 #### Sending extra request headers per model
 
 A model table may carry keys beyond the model-spec fields. A key shaped like a request header — it contains a hyphen and its value is a string — is sent to the provider **as an HTTP request header** on each call to that model; this is how, for example, the Portkey backend routes each model to its upstream provider:

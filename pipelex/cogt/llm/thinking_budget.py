@@ -24,22 +24,24 @@ def fit_thinking_budget(*, budget: int, max_tokens: int | None, min_budget: int 
         model_desc: The model's description, for the error message.
 
     Returns:
-        The budget, cut to max_budget and to leave a quarter of max_tokens for the answer, and raised to min_budget.
+        The budget, cut to max_budget and to leave a quarter of max_tokens (at least one token) for the answer, and raised to min_budget.
 
     Raises:
-        LLMCapabilityError: When max_tokens cannot hold min_budget beside the answer reserve.
+        LLMCapabilityError: When max_tokens cannot hold min_budget, or a single thinking token when the model declares no minimum,
+            beside the answer reserve.
 
     """
     fitted_budget = budget
     if max_budget is not None:
         fitted_budget = min(fitted_budget, max_budget)
     if max_tokens is not None:
-        answer_reserve = max_tokens // THINKING_ANSWER_RESERVE_DIVISOR
+        answer_reserve = max(1, max_tokens // THINKING_ANSWER_RESERVE_DIVISOR)
         ceiling = max_tokens - answer_reserve
-        if min_budget is not None and ceiling < min_budget:
+        smallest_budget = min_budget if min_budget is not None else 1
+        if ceiling < smallest_budget:
             msg = (
                 f"Model '{model_desc}' cannot think within max_tokens={max_tokens}: after reserving {answer_reserve} tokens for the answer, "
-                f"{ceiling} remain for thinking, below the model's minimum thinking budget of {min_budget}. "
+                f"{ceiling} remain for thinking, below the smallest thinking budget of {smallest_budget}. "
                 f"Raise max_tokens or remove the reasoning setting."
             )
             raise LLMCapabilityError(msg)

@@ -24,6 +24,7 @@ from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_fr
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.thinking_budget import fit_thinking_budget
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
+from pipelex.cogt.model_backends.constraints import ListedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
@@ -149,7 +150,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 google_level = get_config().inference.llm.google.get_reasoning_level(effort=effort)
                 if google_level is None:
                     log.verbose("Google manual thinking disabled (effort mapped to disabled)")
-                    return genai_types.ThinkingConfig(thinking_budget=0)
+                    return self._thinking_off_config()
                 budget = get_config().inference.llm.get_reasoning_budget(
                     family=self.reasoning_budget_family,
                     effort=effort,
@@ -167,12 +168,22 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 thinking_level = get_config().inference.llm.google.get_reasoning_level(effort=effort)
                 if thinking_level is None:
                     log.verbose("Google adaptive thinking disabled (effort=NONE)")
-                    return genai_types.ThinkingConfig(thinking_budget=0)
+                    return self._thinking_off_config()
                 log.verbose(f"Google adaptive thinking with thinking_level={thinking_level}")
                 return genai_types.ThinkingConfig(thinking_level=thinking_level)
             case ThinkingMode.NONE:
                 msg = f"Model '{self.inference_model.desc}' does not support reasoning (thinking_mode=none)"
                 raise LLMCapabilityError(msg)
+
+    def _thinking_off_config(self) -> genai_types.ThinkingConfig:
+        """Build the thinking config that turns thinking off, which a model that always thinks refuses with a 400."""
+        if ListedConstraint.THINKING_CANNOT_BE_DISABLED in self.inference_model.listed_constraints:
+            msg = (
+                f"Model '{self.inference_model.desc}' cannot turn thinking off, so it cannot take reasoning_effort 'none': "
+                f"set another reasoning effort, or remove the reasoning setting"
+            )
+            raise LLMCapabilityError(msg)
+        return genai_types.ThinkingConfig(thinking_budget=0)
 
     def _build_thinking_config_for_budget(
         self,

@@ -38,6 +38,8 @@ outputs = ["text", "structured"]
 max_prompt_images = 3000
 costs = { input = 1.25, output = 10.0 }
 valued_constraints = { min_thinking_budget = 128, max_thinking_budget = 32768 }
+# Gemini refuses a thinking budget of 0 for this model
+listed_constraints = ["thinking_cannot_be_disabled"]
 
 ["gemini-2.5-flash"]
 model_id = "gemini-2.5-flash"
@@ -79,6 +81,8 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 3000
 costs = { input = 2, output = 12.0 }
+# Gemini refuses a thinking budget of 0 for this model
+listed_constraints = ["thinking_cannot_be_disabled"]
 thinking_mode = "adaptive"
 
 # --- Gemini 3.5 Series ----------------------------------------
@@ -96,6 +100,8 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 3000
 costs = { input = 1.25, output = 10.0 }
+# Gemini refuses a thinking budget of 0 for this model
+listed_constraints = ["thinking_cannot_be_disabled"]
 thinking_mode = "adaptive"
 
 ["gemini-flash-latest"]
@@ -110,6 +116,8 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 3000
 costs = { input = 0.10, output = 0.40 }
+# Gemini refuses a thinking budget of 0 for this model
+listed_constraints = ["thinking_cannot_be_disabled"]
 thinking_mode = "adaptive"
 
 ################################################################################

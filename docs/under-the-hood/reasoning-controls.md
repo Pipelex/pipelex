@@ -252,7 +252,7 @@ xhigh = "high"
 max = "high"
 ```
 
-If the level map returns `"disabled"` (e.g., for `NONE` effort), thinking is disabled with `thinking_budget=0` regardless of mode.
+If the level map returns `"disabled"` (e.g., for `NONE` effort), thinking is disabled with `thinking_budget=0` regardless of mode. Some Gemini models always think and refuse a budget of 0 with a 400 error, among them Gemini 2.5 Pro and 3.1 Pro: such a model lists the `thinking_cannot_be_disabled` constraint in its backend file, and `NONE` on it is refused with an `LLMCapabilityError` before the call is sent.
 
 !!! note
     `MAX` maps to `"high"` because Google's `ThinkingLevel` enum tops out at `HIGH` — there is no higher level.
@@ -374,8 +374,8 @@ The budget is resolved at runtime via `LLMConfig.get_reasoning_budget()` (`pipel
 Anthropic and Gemini count the thinking budget against `max_tokens`, so a budget that fills it leaves the answer, a tool call on a structured output, nothing to be written in. Every manual budget, resolved from an effort or set explicitly, is therefore fitted by `fit_thinking_budget()` (`pipelex/cogt/llm/thinking_budget.py`) before it is sent:
 
 - The budget is held within the range the provider accepts for the model, which the model's spec declares as two valued constraints, `min_thinking_budget` and `max_thinking_budget`, both inclusive and both optional. The kit's Anthropic models declare Anthropic's minimum of 1,024, and its Gemini 2.5 models declare their ranges. A server reached through the `anthropic` SDK that is not Anthropic, such as MiniMax, declares no minimum and gets none.
-- When the request sets `max_tokens`, a quarter of it is reserved for the answer, so the budget is cut to at most `max_tokens` minus that reserve.
-- When `max_tokens` cannot hold the model's minimum beside the reserve, the call is refused with an `LLMCapabilityError` naming `max_tokens`, the reserve and the minimum, rather than sent to fail at the provider.
+- When the request sets `max_tokens`, a quarter of it, and never less than one token, is reserved for the answer, so the budget is cut to at most `max_tokens` minus that reserve.
+- When `max_tokens` cannot hold the model's minimum beside the reserve, or a single thinking token for a model that declares no minimum, the call is refused with an `LLMCapabilityError` naming `max_tokens`, the reserve and the minimum, rather than sent to fail at the provider.
 
 On the Anthropic structured path, `max_tokens` is first capped by the structured-output timeout (`inference.llm.anthropic.structured_output_timeout_seconds`, 42,666 tokens at the default 1,200 seconds), so a `MAX` effort's 65,536-token budget becomes 32,000 there.
 
@@ -450,6 +450,7 @@ All reasoning-related errors use `LLMCapabilityError` (`pipelex/cogt/exceptions.
 | `thinking_mode = "adaptive"` on OpenAI or Mistral | "adaptive ... not supported" |
 | Any reasoning param on Bedrock (aiobotocore) models | "does not support reasoning parameters" |
 | A manual budget that `max_tokens` cannot hold beside the answer reserve, under the model's `min_thinking_budget` | "cannot think within max_tokens" |
+| `NONE` effort on a Gemini model that lists `thinking_cannot_be_disabled` | "cannot turn thinking off" |
 | A reasoning setting on a Mistral structured output whose structure method is not `instructor/mistral_tools` | "cannot reason on a structured output" |
 | Both `reasoning_effort` and `reasoning_budget` set | `ValueError` / `LLMSettingValueError` (mutual exclusivity) |
 
