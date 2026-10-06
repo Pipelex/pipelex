@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Claude Opus 5.5 and Claude Sonnet 5.5 on the `anthropic` backend**: `claude-5.5-opus` (model id `claude-opus-5-5`, $4 / $20 per million tokens) and `claude-5.5-sonnet` (model id `claude-sonnet-5-5`, $2 / $10) take text, images and PDF, produce text and structured output, and reason with adaptive thinking, with up to 128K output tokens each. Both refuse `temperature` and a forced `tool_choice`, so structured output uses `instructor/anthropic_reasoning_tools`, as `claude-5.1-fable` does.
+
 ## [v0.76.0] - 2026-10-06
 
 ### Added
