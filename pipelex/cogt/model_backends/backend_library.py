@@ -1,4 +1,4 @@
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, Self, cast
@@ -68,6 +68,14 @@ UNRESOLVED_MODEL_SPECS_KEY = "model_specs"
 # What the loader runs over every string of a backend's files: substitution on a load that resolves
 # credentials, a recorder that keeps the text on one that does not.
 StringTransform = Callable[[str], str]
+
+# The declared fields a `${…}` placeholder may stand in: the values a call sends. Every other declared
+# field describes the model (its type, its constraints, the SDK that serves it), which a keyless load
+# must know without resolving anything, so both loads refuse a placeholder there. A key the blueprint
+# does not declare is extra config on a backend and a request header on a model, both sent with a
+# call, so both stay templatable.
+TEMPLATABLE_BACKEND_FIELDS = frozenset({"endpoint", "api_key", "extra_config"})
+TEMPLATABLE_MODEL_SPEC_FIELDS = frozenset({"model_id", "endpoint_path"})
 
 
 class RecoveredModelSpecs(NamedTuple):
@@ -156,7 +164,8 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 templated model-spec string keeps its text, and the backend records the variables in
                 `unresolved_credentials`, which refuses a call to it. Vertex AI mints no token.
                 A malformed configuration (an unknown or invalid key, a model spec that is not a
-                table, a missing per-backend TOML) is fatal in both modes: a config typo must never
+                table, a missing per-backend TOML, a placeholder in a field that describes the model
+                rather than a value a call sends) is fatal in both modes: a config typo must never
                 silently delete a backend, because the commands that boot keyless would then report
                 the far more confusing "model not found" for every handle that backend served. A
                 *stale* key — one the ledger explains — is not a typo: it is carried forward in both
@@ -212,6 +221,13 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     f"or disable the backend."
                 )
                 raise InferenceBackendLibraryValidationError(msg, backend_name=backend_name)
+            self._refuse_placeholders_in_literal_fields(
+                table=backend_table,
+                declared_fields=backend_blueprint_standard_fields,
+                templatable_fields=TEMPLATABLE_BACKEND_FIELDS,
+                where=f"inference backend '{backend_name}' in {library_paths_description}",
+                backend_name=backend_name,
+            )
             unresolved_credentials: dict[str, list[str]] = {}
             model_spec_var_names: list[str] = []
             match credentials:
@@ -371,6 +387,40 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         return kept_fields
 
     @classmethod
+    def _refuse_placeholders_in_literal_fields(
+        cls,
+        *,
+        table: dict[str, Any],
+        declared_fields: Iterable[str],
+        templatable_fields: frozenset[str],
+        where: str,
+        backend_name: str,
+    ) -> None:
+        """Refuse a `${…}` placeholder in a declared field that describes the model, on every load.
+
+        Checked on the raw text, before any substitution, so a load that resolves credentials and one
+        that does not refuse the same files: a keyless load cannot resolve such a field, and a verdict
+        that held only where the variable is set is what the keyless boot exists to rule out.
+
+        Raises:
+            InferenceBackendLibraryValidationError: Naming the field and the variables it references.
+        """
+        literal_fields = set(declared_fields) - templatable_fields
+        for field_name, value in table.items():
+            if field_name not in literal_fields:
+                continue
+            var_names: list[str] = []
+            apply_to_strings_recursive({field_name: value}, transform_func=partial(cls._record_placeholder_var_names, var_names=var_names))
+            if var_names:
+                msg = (
+                    f"Invalid {where}: '{field_name}' references {', '.join(var_names)}, but a placeholder may only "
+                    f"stand in a value a call sends (an API key, an endpoint, a model id, a request header or an extra "
+                    f"config key). '{field_name}' describes the model, which a boot without inference must know "
+                    f"without resolving anything: write it literally."
+                )
+                raise InferenceBackendLibraryValidationError(msg, backend_name=backend_name)
+
+    @classmethod
     def _record_placeholder_var_names(cls, content: str, *, var_names: list[str]) -> str:
         """Add the variables `content` references to `var_names`, and return `content` as it is."""
         for var_name in placeholder_var_names(content=content):
@@ -503,6 +553,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
 
         Raises:
             InferenceBackendLibraryError: If the file is missing.
+            InferenceBackendLibraryValidationError: If a field describing a model references a variable.
             InferenceBackendCredentialsError: If variable substitution fails.
         """
         path_to_model_specs_toml = backend_toml_path(backends_dir_path=backends_dir_path, backend_name=backend_name)
@@ -513,6 +564,15 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             raise InferenceBackendLibraryError(msg, backend_name=backend_name) from file_not_found_exc
 
         backend_config_source = f"file '{path_to_model_specs_toml}'"
+        for model_spec_name, model_spec_table in model_specs_dict_raw.items():
+            if isinstance(model_spec_table, dict):
+                self._refuse_placeholders_in_literal_fields(
+                    table=cast("dict[str, Any]", model_spec_table),
+                    declared_fields=InferenceModelSpecBlueprint.model_fields.keys(),
+                    templatable_fields=TEMPLATABLE_MODEL_SPEC_FIELDS,
+                    where=f"model '{model_spec_name}' for backend '{backend_name}' in {backend_config_source}",
+                    backend_name=backend_name,
+                )
         model_specs_dict = self._substitute_model_spec_vars(
             model_specs_dict=model_specs_dict_raw,
             backend_name=backend_name,
