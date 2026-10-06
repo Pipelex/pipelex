@@ -193,6 +193,27 @@ def _entries_from_files(files: dict[str, str]) -> list[tuple[PurePosixPath, byte
     return entries
 
 
+def _refuse_colliding_paths(entries: list[tuple[PurePosixPath, bytes]]) -> None:
+    """Refuse two entries of one path, and an entry that is also the directory of another.
+
+    Entry names are normalized (`a/./b` and `a//b` are `a/b`) and a zip may hold one member name twice, so two entries
+    can name one file: a check reading the first copy, as the shipped packages' manifest check does, would pass content
+    that differs from the last copy, which is the one written to disk and read by the engine. A file that another entry
+    is placed under could not be written at all.
+    """
+    paths: set[PurePosixPath] = set()
+    for relpath, _ in entries:
+        if relpath in paths:
+            msg = f"Bundle has more than one entry for the path '{relpath.as_posix()}'; each file may appear only once"
+            raise_validation_error(message=msg, error_type=ErrorType.INVALID_BUNDLE)
+        paths.add(relpath)
+    for relpath, _ in entries:
+        for parent in relpath.parents:
+            if parent in paths:
+                msg = f"Bundle entry '{parent.as_posix()}' is a file, and also the directory of the entry '{relpath.as_posix()}'"
+                raise_validation_error(message=msg, error_type=ErrorType.INVALID_BUNDLE)
+
+
 class ParsedBundle(NamedTuple):
     """A decoded-and-validated bundle held in memory, NOT yet written to disk.
 
@@ -214,8 +235,9 @@ def parse_bundle(*, bundle_b64: str | None, files: dict[str, str] | None) -> Par
 
     Exactly one of `bundle_b64` / `files` must be supplied; supplying both is a
     caller mistake (they are the same content in two forms) and is refused. All
-    ingest guards (base64, size, count, path-safety, zip-bomb) run here, so the
-    caller can inspect `has_python_sources` and reject BEFORE materializing to disk.
+    ingest guards (base64, size, count, path-safety, zip-bomb, colliding paths) run
+    here, so the caller can inspect `has_python_sources` and reject BEFORE
+    materializing to disk.
     """
     if bundle_b64 is not None and files is not None:
         msg = "Provide either bundle_b64 or files, not both"
@@ -227,6 +249,7 @@ def parse_bundle(*, bundle_b64: str | None, files: dict[str, str] | None) -> Par
     else:
         msg = "No bundle supplied (bundle_b64 and files are both absent)"
         raise_validation_error(message=msg, error_type=ErrorType.INVALID_BUNDLE)
+    _refuse_colliding_paths(entries)
     return ParsedBundle(entries=tuple(entries))
 
 

@@ -16,6 +16,7 @@
 
 - **A provenance sidecar that is not UTF-8 no longer breaks method discovery**: an installed or shipped method package whose `.provenance.json` is not valid UTF-8 is discovered with no recorded provenance, as one that does not parse already was, where discovery raised `UnicodeDecodeError` and a run calling the package answered a `500`.
 - **A `files` entry holding a lone surrogate is refused as an invalid bundle**: a name or a text in a run request's `files` map holding an escaped lone surrogate such as `"\ud800"`, which JSON carries but UTF-8 cannot encode, is refused with a `422 InvalidBundle` naming the entry, where the server answered a `500`.
+- **A bundle naming one path twice is refused**: a run request whose bundle holds two entries for one file, spelled differently in a `files` map (`a/./b` beside `a/b`) or twice in a zip, or a file that is also the directory of another entry, is refused with a `422 InvalidBundle` naming the path. The shipped packages' manifest check read the first copy while the engine read the last, so two packages of one address could get past it, and the second shape answered a `500`.
 
 ## [v0.75.0] - 2026-10-06
 

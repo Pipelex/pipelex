@@ -232,6 +232,7 @@ The server materializes the bundle into a temporary library directory for the ru
 
 - A hard **file-count** ceiling (`MAX_BUNDLE_FILES`) and a **total decompressed-size** ceiling (`MAX_BUNDLE_TOTAL_KIB`) → `413 PayloadTooLarge`. The zip path bounds actual decompression, so a zip bomb cannot expand past the ceiling, and an oversized `bundle_b64` is refused on its encoded length *before* it is decoded into memory.
 - **Path safety:** entry names that are absolute, use `..` traversal, use backslashes, or carry a Windows drive/`:` form → `422 InvalidBundle`.
+- **One entry per path:** two entries naming one file once their names are normalized (`a/./b` and `a//b` are `a/b`), which a zip can also hold as one member name twice, and a file that is also the directory of another entry → `422 InvalidBundle` naming the path.
 - Supplying **both** `bundle_b64` and `files`, an empty bundle, a corrupt zip, or a `files` entry whose name or text holds a lone surrogate (which JSON can escape but UTF-8 cannot encode) → `422 InvalidBundle`; invalid base64 → `400 InvalidBase64`.
 
 **Sandbox-hosted only for custom Python.** A bundle that ships any `.py` is honored **only on a sandbox-hosted deployment**, where the load path reads the source without importing it and execution happens in an isolated sandbox. On a non-hosted deployment such a bundle is refused with `403 CustomCodeRequiresSandbox` — running caller-supplied code in-process is never done implicitly. A bundle that carries only `.mthds` (no `.py`) is accepted on any deployment.

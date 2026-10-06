@@ -109,14 +109,37 @@ _DUPLICATE_IDENTITY_BUNDLES: dict[str, tuple[dict[str, str], tuple[str, ...]]] =
 }
 
 
+# Entries naming one file twice once their names are normalized, or a file that is another entry's directory, each with
+# the path the refusal must name. Each name is spelled differently, so the entries fit a `files` map as well as a zip.
+_COLLIDING_ENTRIES: dict[str, tuple[list[tuple[str, str]], str]] = {
+    "a file named twice": ([("main.mthds", VALID_MTHDS), ("notes.txt", "a"), ("./notes.txt", "b")], "'notes.txt'"),
+    "a shipped manifest named twice": (
+        [
+            *VENDORED_PROBE_FILES.items(),
+            (".mthds/methods/probe//METHODS.toml", _probe_manifest(address="github.com/invented/decoy", name="probe")),
+        ],
+        "'.mthds/methods/probe/METHODS.toml'",
+    ),
+    "a file that is another entry's directory": (
+        [("main.mthds", VALID_MTHDS), ("helper.txt", "x"), ("helper.txt/inner.txt", "y")],
+        "'helper.txt'",
+    ),
+}
+
+
 def _files_under(directory: Path) -> list[str]:
     return sorted(path.relative_to(directory).as_posix() for path in directory.rglob("*") if path.is_file())
 
 
 def _zip_b64(files: dict[str, str]) -> str:
+    return _zip_b64_of_entries(list(files.items()))
+
+
+def _zip_b64_of_entries(entries: list[tuple[str, str]]) -> str:
+    """A zip of the entries in order, which, unlike a `files` map, may hold one member name twice."""
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
-        for name, content in files.items():
+        for name, content in entries:
             archive.writestr(name, content)
     return base64.b64encode(buffer.getvalue()).decode("ascii")
 
@@ -343,6 +366,36 @@ class TestPipelineBundle:
         assert VENDORED_PROBE_ADDRESS.casefold() in problem["detail"].casefold()
         for directory in directories:
             assert f"'.mthds/methods/{directory}/'" in problem["detail"]
+        assert snapshot == {}, "the runner was reached"
+
+    @pytest.mark.parametrize("transport", ["files", "bundle_b64"])
+    @pytest.mark.parametrize("case", list(_COLLIDING_ENTRIES))
+    def test_entries_colliding_on_one_path_are_refused(self, mocker: MockerFixture, transport: str, case: str):
+        """Two entries of one file would let a check read one copy while the last one written lands on disk: refused."""
+        entries, named = _COLLIDING_ENTRIES[case]
+        client, snapshot = _build_client(mocker)
+        body: dict[str, Any] = {"files": dict(entries)} if transport == "files" else {"bundle_b64": _zip_b64_of_entries(entries)}
+
+        response = client.post("/v1/execute", json={**body, "inputs": {"text": "hi"}})
+
+        assert response.status_code == 422, response.text
+        problem = response.json()
+        assert problem["error_type"] == "InvalidBundle"
+        assert named in problem["detail"]
+        assert snapshot == {}, "the runner was reached"
+
+    def test_a_zip_member_named_twice_is_refused(self, mocker: MockerFixture):
+        """A zip may hold one member name twice, spelled the same."""
+        client, snapshot = _build_client(mocker)
+        with pytest.warns(UserWarning, match="Duplicate name"):
+            bundle_b64 = _zip_b64_of_entries([("main.mthds", VALID_MTHDS), ("notes.txt", "a"), ("notes.txt", "b")])
+
+        response = client.post("/v1/execute", json={"bundle_b64": bundle_b64, "inputs": {"text": "hi"}})
+
+        assert response.status_code == 422, response.text
+        problem = response.json()
+        assert problem["error_type"] == "InvalidBundle"
+        assert "'notes.txt'" in problem["detail"]
         assert snapshot == {}, "the runner was reached"
 
     def test_two_shipped_packages_of_one_repository_are_both_shipped(self, mocker: MockerFixture):
