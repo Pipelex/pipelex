@@ -42,7 +42,7 @@ from pipelex.pipe_controllers.sequence.sequence_typed_flow import (
     step_memory_writes,
 )
 from pipelex.pipe_controllers.sub_pipe import SubPipe
-from pipelex.pipe_machinery.memory_writes import MemoryWrite, SlotTaint, taint_after_write
+from pipelex.pipe_machinery.memory_writes import MemoryWrite, SlotTaint, is_same_value_spec, taint_after_write
 from pipelex.pipe_machinery.validation import is_valid_input_name
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams, output_multiplicity_to_apply
 from pipelex.system.job_metadata import JobMetadata
@@ -319,42 +319,51 @@ class PipeSequence(PipeController):
             if refusal is not None:
                 raise refusal
 
-    @override
-    def accepts_declared_input_spec(self, *, variable_name: str) -> bool:
-        """Whether every pipe step reading the value the caller passes under a declared input accepts its declared spec, as the
-        check of each step against the typed flow (`validate_inputs_with_library`) judges it.
+    def _accepted_declared_names(self, *, visited_pipes: set[str]) -> frozenset[str]:
+        """The declared inputs whose declared spec every pipe step reading the caller's value under them accepts, as the check
+        of each step against the typed flow (`validate_inputs_with_library`) judges it, once per state of the current libraries.
 
-        That check is the authority on whether a declared input fits the steps reading it. The generic check of the inputs
-        compares a declaration with the need of the last step reading it only, so it takes an accepted declaration as fitting:
-        a first step reading `note` as `Markdown` and a second reading it as `Text` are both satisfied by a `Markdown`, which is
-        not the last step's need. A declaration some step refuses is reported by the generic check, against the last step's
-        need and with the fix it offers, or, when it equals that need, by the check of each step.
+        That check is the authority on whether a declared input fits the steps reading it, so a declaration it accepts is what
+        the sequence needs (`needed_inputs`): a first step reading `note` as `Markdown` and a second reading it as `Text` are
+        both satisfied by a `Markdown`, which is not the last step's need.
 
         Raises:
             PipeValidationError: ``BINDING_PATH_UNRESOLVED`` when a binding's path cannot be walked, as validating the sequence
                 itself reports.
         """
-        if variable_name not in self.inputs.root:
-            return False
-        typed_flow = self.build_typed_flow()
+        memo = self._current_flow_memo()
+        is_kept = self._is_independent_of_walk(memo=memo, visited_pipes=visited_pipes)
+        if is_kept and memo.accepted_declared_names is not None:
+            return memo.accepted_declared_names
+        typed_flow = self._build_typed_flow(visited_pipes=visited_pipes)
+        refused_names: set[str] = set()
         for step_index, step in enumerate(self.sequential_sub_pipes):
             if not isinstance(step, SubPipe):
                 continue
-            slot = typed_flow.slots_by_pipe_step.get(step_index, {}).get(variable_name)
-            if slot is None or slot.producer_step_index is not None:
-                # The step sees nothing under the name, or a value an earlier step stored there rather than the caller's.
-                continue
-            if self._step_input_refusal(step_index=step_index, step=step, slots={variable_name: slot}) is not None:
-                return False
-        return True
+            for variable_name, slot in typed_flow.slots_by_pipe_step.get(step_index, {}).items():
+                if variable_name in refused_names or variable_name not in self.inputs.root or slot.producer_step_index is not None:
+                    # Already refused, not a declared input, or a value an earlier step stored there rather than the caller's.
+                    continue
+                if self._step_input_refusal(step_index=step_index, step=step, slots={variable_name: slot}) is not None:
+                    refused_names.add(variable_name)
+        accepted_names = frozenset(name for name in self.inputs.root if name not in refused_names)
+        if is_kept:
+            memo.accepted_declared_names = accepted_names
+        return accepted_names
 
     def _step_input_refusal(self, *, step_index: int, step: SubPipe, slots: dict[str, FlowSlot]) -> PipeValidationError | None:
-        """The refusal of a pipe step whose pipe reads a name, among the slots given, as a spec the slot does not hold, `None`
-        when it reads every one of them as the slot holds it.
+        """The refusal of a pipe step whose pipe declares an input, among the slots given, as a spec the slot does not hold,
+        `None` when every one of them holds what the pipe declares.
+
+        A step is checked against the inputs its pipe declares, its contract. An operator needs exactly what it declares. A
+        controller's declaration is what its own validation holds its steps, outcomes or branches to, while what it needs
+        (`needed_inputs`) keeps one need per name, which for a nested sequence is its declaration only where every step reading
+        the name accepts it. Reading the declaration never walks the pipe's own steps, so the sequence's `needed_inputs` can ask
+        this check which of its declarations it accepts.
 
         A slot the flow cannot type, a value a pipe that does not resolve stored, is assumed to deliver. A slot whose possible
         values have different specs is checked against each of them. The refusal is returned rather than raised, so that the
-        same check answers whether a declared input is accepted (`accepts_declared_input_spec`).
+        same check answers which declared inputs are accepted (`_accepted_declared_names`).
 
         Returns:
             ``INPUT_STUFF_SPEC_MISMATCH`` naming the step, the name and what stored it, or `None`.
@@ -362,7 +371,7 @@ class PipeSequence(PipeController):
         step_pipe = get_optional_pipe(pipe_code=step.pipe_code)
         if step_pipe is None:
             return None
-        step_needs = step_pipe.needed_inputs()
+        step_contract = step_pipe.inputs
         batch_item_name: str | None = None
         if step.batch_params is not None:
             batch_item_name = step.batch_params.input_item_stuff_name
@@ -373,11 +382,11 @@ class PipeSequence(PipeController):
                     step_pipe_code=step_pipe.code,
                     batch_params=step.batch_params,
                     slot=list_slot,
-                    item_need=step_needs.root.get(batch_item_name),
+                    item_need=step_contract.root.get(batch_item_name),
                 )
                 if list_refusal is not None:
                     return list_refusal
-        for input_name, needed_spec in step_needs.items:
+        for input_name, needed_spec in step_contract.items:
             if input_name == batch_item_name:
                 continue
             slot = slots.get(input_name)
@@ -937,6 +946,16 @@ class PipeSequence(PipeController):
 
     @override
     def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+        """What the sequence needs from its caller: every name a step reads before an earlier step always stores it.
+
+        The walk of the steps keeps one need per name, the last step's reading it. Where the sequence declares the name and
+        every step reading the caller's value under it accepts the declaration (`_accepted_declared_names`), the declaration is
+        the need, its concept and multiplicity, so whatever calls the sequence, another sequence, a condition or a parallel, is
+        held to what every step accepts rather than to what the last one reads: a sequence declaring `note = "Markdown"` whose
+        last step reads a `Text` needs a `Markdown`. A declaration some step refuses leaves the last step's need, which the
+        generic check of the inputs then reports with the fix it offers. The presence stays the steps', as every reader of it
+        takes the declared marker first.
+        """
         if visited_pipes is None:
             visited_pipes = set()
 
@@ -944,8 +963,26 @@ class PipeSequence(PipeController):
         if self.visit_key in visited_pipes:
             return InputStuffSpecsFactory.make_empty()
 
-        needed_inputs, _ = self._walk_needed_inputs(visited_pipes=visited_pipes)
-        return needed_inputs
+        walked_needs, _ = self._walk_needed_inputs(visited_pipes=visited_pipes)
+        differing_names = [
+            input_name
+            for input_name, walked_spec in walked_needs.items
+            if input_name in self.inputs.root and not is_same_value_spec(first_spec=self.inputs.root[input_name], second_spec=walked_spec)
+        ]
+        if not differing_names:
+            return walked_needs
+        accepted_names = self._accepted_declared_names(visited_pipes=visited_pipes)
+        for input_name in differing_names:
+            if input_name not in accepted_names:
+                continue
+            declared_spec = self.inputs.root[input_name]
+            walked_needs.add_stuff_spec(
+                variable_name=input_name,
+                concept=declared_spec.concept,
+                multiplicity=declared_spec.multiplicity,
+                presence=walked_needs.root[input_name].presence,
+            )
+        return walked_needs
 
     @override
     def pipe_dependencies(self) -> set[str]:

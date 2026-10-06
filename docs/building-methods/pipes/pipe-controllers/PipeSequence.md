@@ -66,7 +66,7 @@ Validation follows the values through the sequence, one step after the other, an
 -   what a nested `PipeSequence` or a `PipeCondition`'s outcome stores in the caller's memory, and the branch results of a `PipeParallel` with `add_each_output`;
 -   what a binding step binds (see [What a binding binds](#what-a-binding-binds)).
 
-A pipe step whose pipe reads a name as a concept or a multiplicity the name does not hold is refused with `input_stuff_spec_mismatch`, and the message names the step, the name and what stored it:
+A pipe step is checked against the `inputs` its pipe declares. For a nested `PipeSequence`, `PipeCondition`, `PipeParallel` or `PipeBatch`, that declaration is its contract, which its own validation holds its steps, outcomes or branches to, whatever the last of them reads. A pipe step whose pipe reads a name as a concept or a multiplicity the name does not hold is refused with `input_stuff_spec_mismatch`, and the message names the step, the name and what stored it:
 
 ```text
 In pipe 'process_cv', step 2 (pipe 'analyze_one_cv') reads 'cv_pages' as 'Page', but step 1 (pipe 'extract_one_cv') stores it as 'Page[]'. Declare the input as 'Page[]' in pipe 'analyze_one_cv', or make step 1 (pipe 'extract_one_cv') store a 'Page' under 'cv_pages'.
@@ -78,7 +78,7 @@ In pipe 'process_cv', step 2 (pipe 'analyze_one_cv') reads 'cv_pages' as 'Page',
 -   A name whose values may have different concepts, as when the outcomes of a `PipeCondition` store it under different concepts, must satisfy the read with each of them.
 -   A name a pipe that does not resolve at validation stored, such as a pipe of a dependency not loaded yet, is assumed to hold what the step reads.
 
-Every step reading a declared input is checked this way, not only the last one, so a declared input must satisfy each step that reads it, and one that does is valid even when the last step reads it as something else. When a first step reads `note` as `Markdown` and a later one reads it as `Text`, the sequence declares `note = "Markdown"`, which both accept, and declaring `note = "Text"` is refused at the first step; when a first step reads `pages` as `Page[3]` and a later one as `Page[]`, it declares `pages = "Page[3]"`. A declared input no step reads is still refused with `extraneous_input_variable`, and a name a step reads from the caller that the sequence does not declare with `missing_input_variable`.
+Every step reading a declared input is checked this way, not only the last one, so a declared input must satisfy each step that reads it, and one that does is valid even when the last step reads it as something else. When a first step reads `note` as `Markdown` and a later one reads it as `Text`, the sequence declares `note = "Markdown"`, which both accept, and declaring `note = "Text"` is refused at the first step; when a first step reads `pages` as `Page[3]` and a later one as `Page[]`, it declares `pages = "Page[3]"`. That declaration is then what the sequence needs from whatever calls it: a step calling it with a `Text` under `note`, or a `Page[]` under `pages`, is refused. A declared input no step reads is still refused with `extraneous_input_variable`, and a name a step reads from the caller that the sequence does not declare with `missing_input_variable`.
 
 ## Binding steps
 

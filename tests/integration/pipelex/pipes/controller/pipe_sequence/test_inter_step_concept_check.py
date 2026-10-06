@@ -4,7 +4,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.core.pipes.exceptions import PipeValidationError
-from pipelex.interpreter_hub import get_library_manager
+from pipelex.interpreter_hub import get_library_manager, get_required_pipe
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.validation_error_types import PipeValidationErrorType
@@ -149,6 +149,46 @@ default_outcome = "fail"
 [pipe.swap_record.outcomes]
 parcel = "swap_for_parcel"
 invoice = "swap_for_invoice"
+
+[pipe.render_then_archive]
+type = "PipeSequence"
+description = "Renders a note written in Markdown, then archives it as a text"
+inputs = { note = "Markdown" }
+output = "Text"
+steps = [
+  { pipe = "render_note", result = "rendered" },
+  { pipe = "archive_note", result = "archived" },
+]
+
+[pipe.crate_then_list]
+type = "PipeSequence"
+description = "Writes the manifest of a crate of three parcels, then lists them"
+inputs = { parcels = "Parcel[3]" }
+output = "Text"
+steps = [
+  { pipe = "list_three_parcels", result = "crate" },
+  { pipe = "list_parcels", result = "manifest" },
+]
+
+[pipe.label_given_parcel]
+type = "PipeSequence"
+description = "Writes the label of a parcel it is given"
+inputs = { parcel = "Parcel" }
+output = "Text"
+steps = [
+  { pipe = "label_parcel", result = "given_label" },
+]
+
+[pipe.weigh_record_then_note]
+type = "PipeSequence"
+description = "Weighs a parcel as heavy as the parcel on record, then notes the record, whatever it is"
+inputs = { record = "Parcel" }
+output = "Text"
+steps = [
+  { from = "record.weight", result = "amount" },
+  { pipe = "weigh_parcel", result = "weighed" },
+  { pipe = "note_anything", result = "noted" },
+]
 """
 
 
@@ -302,6 +342,52 @@ class TestInterStepConceptCheck:
                 ),
                 id="a-name-the-outcomes-of-a-condition-store-under-different-concepts",
             ),
+            pytest.param(
+                # The nested sequence's first step reads `note` as `Markdown`, its last as `Text`: its declaration, not its
+                # last reader, is what the calling step is checked against.
+                _flow(
+                    inputs='note = "Text"',
+                    output="Text",
+                    steps=['{ pipe = "render_then_archive", result = "done" }', '{ pipe = "archive_note", result = "archived_again" }'],
+                ),
+                (
+                    "In pipe 'flow', step 1 (pipe 'render_then_archive') reads 'note' as 'Markdown', but the sequence declares it as 'Text'. "
+                    "Declare the input as 'Text' in pipe 'render_then_archive', or declare 'note' as 'Markdown' in the inputs of pipe 'flow'."
+                ),
+                id="a-nested-sequence-declaring-a-refinement-its-last-step-reads-as-the-parent",
+            ),
+            pytest.param(
+                # The sequence's only reader of `note` is the nested sequence, so its inputs check names the nested declaration.
+                _flow(
+                    inputs='note = "Text"',
+                    output="Text",
+                    steps=['{ pipe = "render_then_archive", result = "done" }'],
+                ),
+                "In pipe 'flow', input 'note' is declared as 'Text' but its step needs 'Markdown'. Update the input to 'Markdown'.",
+                id="a-nested-sequence-called-with-the-parent-of-what-it-declares",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='parcels = "Parcel[]"',
+                    output="Text",
+                    steps=['{ pipe = "crate_then_list", result = "done" }'],
+                ),
+                "In pipe 'flow', input 'parcels' is declared as 'Parcel[]' but its step needs 'Parcel[3]'. Update the input to 'Parcel[3]'.",
+                id="a-nested-sequence-declaring-a-fixed-count-its-last-step-reads-as-a-variable-list",
+            ),
+            pytest.param(
+                # The nested sequence binds `record.weight` from the `Parcel` it declares, then reads `record` as `Anything`.
+                _flow(
+                    inputs='amount = "Number"',
+                    output="Text",
+                    steps=['{ pipe = "make_invoice", result = "record" }', '{ pipe = "weigh_record_then_note", result = "done" }'],
+                ),
+                (
+                    "In pipe 'flow', step 2 (pipe 'weigh_record_then_note') reads 'record' as 'Parcel', but step 1 (pipe 'make_invoice') "
+                    "stores it as 'Invoice'."
+                ),
+                id="a-nested-sequence-binding-over-what-it-declares-given-another-concept",
+            ),
         ],
     )
     def test_a_step_reading_what_the_flow_does_not_carry_is_refused(self, load_empty_library: Callable[[], str], flow: str, message: str) -> None:
@@ -397,10 +483,52 @@ class TestInterStepConceptCheck:
                 ),
                 id="a-declared-fixed-count-read-as-it-then-as-a-variable-list",
             ),
+            pytest.param(
+                _flow(
+                    inputs='note = "Markdown"',
+                    output="Text",
+                    steps=['{ pipe = "render_then_archive", result = "done" }'],
+                ),
+                id="a-nested-sequence-called-with-what-it-declares",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='parcels = "Parcel[3]"',
+                    output="Text",
+                    steps=['{ pipe = "crate_then_list", result = "done" }'],
+                ),
+                id="a-nested-sequence-called-with-the-fixed-count-it-declares",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='parcel = "FragileParcel"',
+                    output="Text",
+                    steps=['{ pipe = "label_given_parcel", result = "done" }'],
+                ),
+                id="a-nested-sequence-declaring-a-parent-given-a-declared-refinement",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='amount = "Number"',
+                    output="Text",
+                    steps=['{ pipe = "pack_fragile_parcel", result = "parcel" }', '{ pipe = "label_given_parcel", result = "done" }'],
+                ),
+                id="a-nested-sequence-declaring-a-parent-given-a-stored-refinement",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='amount = "Number"',
+                    output="Text",
+                    steps=['{ pipe = "weigh_parcel", result = "record" }', '{ pipe = "weigh_record_then_note", result = "done" }'],
+                ),
+                id="a-nested-sequence-binding-over-what-it-declares-given-it",
+            ),
         ],
     )
     def test_a_step_reading_what_the_flow_carries_validates(self, load_empty_library: Callable[[], str], flow: str) -> None:
-        """A refined concept satisfies a step reading its parent, and a batched step always stores a list."""
+        """A refined concept satisfies a step reading its parent, a batched step always stores a list, and a step calling a nested
+        sequence is checked against what the nested sequence declares.
+        """
         sequence = _load_flow(flow=flow, library_id=load_empty_library())
 
         assert sequence.code == "flow"
@@ -472,3 +600,27 @@ class TestInterStepConceptCheck:
         assert record_slot.stuff_spec is None
         assert record_slot.disagreement is None
         assert record_slot.producer_step_index == 0
+
+    @pytest.mark.parametrize(
+        ("pipe_code", "variable_name", "expected_spec"),
+        [
+            pytest.param("render_then_archive", "note", "Markdown", id="a-refinement-its-last-step-reads-as-the-parent"),
+            pytest.param("crate_then_list", "parcels", "Parcel[3]", id="a-fixed-count-its-last-step-reads-as-a-variable-list"),
+            pytest.param("weigh_record_then_note", "record", "Parcel", id="a-binding-root-its-last-step-reads-as-anything"),
+        ],
+    )
+    def test_a_sequence_needs_what_it_declares_when_every_step_accepts_it(
+        self, load_empty_library: Callable[[], str], pipe_code: str, variable_name: str, expected_spec: str
+    ) -> None:
+        """What a sequence needs from its caller under a declared input every step accepts is its declaration, not the need of the
+        last step reading it, so every caller, a sequence, a condition or a parallel above it, is held to the declaration.
+        """
+        _load_flow(
+            flow=_flow(inputs='amount = "Number"', output="Parcel", steps=['{ pipe = "weigh_parcel", result = "parcel" }']),
+            library_id=load_empty_library(),
+        )
+        nested_sequence = get_required_pipe(pipe_code=f"depot_steps.{pipe_code}")
+
+        needed_spec = nested_sequence.needed_inputs().root[variable_name]
+
+        assert needed_spec.to_bundle_representation(relative_to_domain="depot_steps") == expected_spec

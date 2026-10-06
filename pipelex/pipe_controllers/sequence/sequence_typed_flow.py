@@ -19,7 +19,7 @@ run derives it from the value it holds, checking it there against what reads it.
 inputs and its absence-taint walk read them from it too, so the three analyses agree on every name.
 
 The flow serves three checks: a binding types its root from it, every pipe step is checked against the spec
-the flow carries for each name its pipe reads, whichever declared input, pipe step or binding put it there,
+the flow carries for each name its pipe declares, whichever declared input, pipe step or binding put it there,
 and a binding ending the sequence is checked against the sequence's output.
 """
 
@@ -119,6 +119,8 @@ class SequenceFlowMemo(BaseModel):
     reachable_visit_keys: frozenset[str] | None = None
     typed_flow: SequenceTypedFlow | None = None
     memory_writes: dict[str, MemoryWrite] | None = None
+    # The declared inputs the check of each step accepts for every pipe step reading the caller's value under them.
+    accepted_declared_names: frozenset[str] | None = None
 
     def is_valid_for(self, *, owner: object, library_state: tuple[int, int]) -> bool:
         return self.owner is owner and self.library_state == library_state
