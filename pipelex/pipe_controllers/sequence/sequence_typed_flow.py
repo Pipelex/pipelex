@@ -18,14 +18,15 @@ run derives it from the value it holds, checking it there against what reads it.
 `step_memory_writes` is the one place a step's stores beside its result are computed: the sequence's needed
 inputs and its absence-taint walk read them from it too, so the three analyses agree on every name.
 
-It is used in three places, and only these: a binding types its root from the flow, a step reading a
-binding's result is checked against the spec the binding derives, and a binding ending the sequence is
-checked against the sequence's output. Extending the check to every step's inputs is a separate change.
+The flow serves three checks: a binding types its root from it, every pipe step is checked against the spec
+the flow carries for each name its pipe reads, whichever declared input, pipe step or binding put it there,
+and a binding ending the sequence is checked against the sequence's output.
 """
 
-from typing import NamedTuple
+from typing import Any, NamedTuple, Self
 
 from pydantic import BaseModel, ConfigDict
+from typing_extensions import override
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.pipes.exceptions import PipeValidationError
@@ -48,7 +49,7 @@ SequenceStep = SubPipe | BindingStep
 
 
 class FlowSlot(BaseModel):
-    """What a name holds at a point of the flow, and which binding step stored it, if one did."""
+    """What a name holds at a point of the flow, which step stored it, and which binding step, if one did."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -58,6 +59,9 @@ class FlowSlot(BaseModel):
     binding_step_index: int | None = None
     # Set only when `stuff_spec` is `None` because the values the name may hold have different specs, seen before the run.
     disagreement: SpecDisagreement | None = None
+    # The index of the step that stored the value, as its result or as a name its pipe stores besides, `None` for a value
+    # the sequence's caller passed in, one of its declared inputs.
+    producer_step_index: int | None = None
 
 
 class SequenceTypedFlow(BaseModel):
@@ -69,8 +73,8 @@ class SequenceTypedFlow(BaseModel):
     binding_derivations: dict[int, BindingDerivation]
     # By step index, the derived spec of each binding step whose root the flow types.
     binding_specs: dict[int, StuffSpec]
-    # By pipe-step index, the slots a binding step stored that are still visible when the step runs.
-    binding_slots_by_pipe_step: dict[int, dict[str, FlowSlot]]
+    # By pipe-step index, every slot visible when the step runs: the declared inputs and what earlier steps stored.
+    slots_by_pipe_step: dict[int, dict[str, FlowSlot]]
     # The flow after the last step.
     final_slots: dict[str, FlowSlot]
     # The slots the steps stored, as they stand after the last step: what the sequence leaves in the memory it runs on.
@@ -79,6 +83,44 @@ class SequenceTypedFlow(BaseModel):
     always_written_names: frozenset[str]
     # By pipe-step index, what the step stores besides its result (`step_memory_writes`), for the walks that follow the flow.
     memory_writes_by_pipe_step: dict[int, dict[str, MemoryWrite]]
+
+
+class SequenceFlowMemo(BaseModel):
+    """What one PipeSequence derived from one state of the libraries its steps resolve in, kept so it is built once.
+
+    The typed flow and what the sequence stores in its caller's memory depend only on the sequence's own steps and on the
+    pipes and concepts they resolve to in the current library, so the memo records the state tokens of the current pipe
+    and concept libraries (`library_state`) and is discarded once either differs: a library that loads or removes a pipe or
+    a concept, or another library where a pipe code resolves differently, never reads a flow built before.
+
+    A walk that cut a cycle short, having already visited a pipe the sequence reaches, builds a flow that depends on what it
+    visited, so only the flows built by a walk that visited none of `reachable_visit_keys` are kept: those are the same
+    whatever else the walk visited.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    # The sequence that built the memo. A shallow copy of the sequence shares the memo object, and must not read it.
+    owner: Any
+    # The state tokens of the pipe library and of the concept library the memo was built in.
+    library_state: tuple[int, int]
+    # The `visit_key` of every pipe the sequence reaches through its steps, at any depth, itself excepted.
+    reachable_visit_keys: frozenset[str] | None = None
+    typed_flow: SequenceTypedFlow | None = None
+    memory_writes: dict[str, MemoryWrite] | None = None
+
+    def is_valid_for(self, *, owner: object, library_state: tuple[int, int]) -> bool:
+        return self.owner is owner and self.library_state == library_state
+
+    @override
+    def __copy__(self) -> Self:
+        """A copy keeps nothing: what it derived belongs to the sequence that built it."""
+        return self.__class__(owner=None, library_state=(0, 0))
+
+    @override
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
+        """A copy keeps nothing, and never copies the sequence that owns the memo, which would copy the memo again."""
+        return self.__class__(owner=None, library_state=(0, 0))
 
 
 class DerivedBinding(NamedTuple):
@@ -169,16 +211,16 @@ def step_memory_writes(*, step: SubPipe, step_pipe: PipeAbstract, visited_pipes:
     return step_pipe.memory_writes(visited_pipes=visited_pipes)
 
 
-def slot_after_write(*, prior_slot: FlowSlot | None, memory_write: MemoryWrite, step_label: str) -> FlowSlot:
+def slot_after_write(*, prior_slot: FlowSlot | None, memory_write: MemoryWrite, step_index: int, step_label: str) -> FlowSlot:
     """What a name holds once a step stored it: the stored spec, or, when the step may leave the name as it was, the spec
     the stored value and the value already there agree on, untyped when they do not.
 
     A name left untyped records why when the two specs are known and differ, or when either side carries a disagreement
     already; a side nothing could type, a pipe that does not resolve having stored it, leaves it untyped with no disagreement.
-    `step_label` names the step for that record, e.g. "step 2 (pipe 'swap_record')".
+    `step_index` is the storing step's, and `step_label` names it for that record, e.g. "step 2 (pipe 'swap_record')".
     """
     if memory_write.is_always_written or prior_slot is None:
-        return FlowSlot(stuff_spec=memory_write.stuff_spec, disagreement=memory_write.disagreement)
+        return FlowSlot(stuff_spec=memory_write.stuff_spec, disagreement=memory_write.disagreement, producer_step_index=step_index)
     if is_same_value_spec(first_spec=prior_slot.stuff_spec, second_spec=memory_write.stuff_spec):
         return prior_slot
     disagreement: SpecDisagreement | None
@@ -194,7 +236,7 @@ def slot_after_write(*, prior_slot: FlowSlot | None, memory_write: MemoryWrite, 
         )
     else:
         disagreement = prior_slot.disagreement or memory_write.disagreement
-    return FlowSlot(stuff_spec=None, disagreement=disagreement)
+    return FlowSlot(stuff_spec=None, disagreement=disagreement, producer_step_index=step_index)
 
 
 def untyped_root_error(*, sequence_code: str, domain_code: str, binding_step: BindingStep, disagreement: SpecDisagreement) -> PipeValidationError:
@@ -236,7 +278,7 @@ def build_sequence_typed_flow(
     always_written_names: set[str] = set()
     binding_derivations: dict[int, BindingDerivation] = {}
     binding_specs: dict[int, StuffSpec] = {}
-    binding_slots_by_pipe_step: dict[int, dict[str, FlowSlot]] = {}
+    slots_by_pipe_step: dict[int, dict[str, FlowSlot]] = {}
     memory_writes_by_pipe_step: dict[int, dict[str, MemoryWrite]] = {}
 
     for step_index, step in enumerate(steps):
@@ -250,23 +292,23 @@ def build_sequence_typed_flow(
                 # A root nothing types: an undeclared one, refused as a missing input of the sequence; or a value a pipe that
                 # does not resolve stored, assumed to deliver as the rest of the sequence's checks assume, which the run
                 # derives from the value it holds and checks against what reads it.
-                slots[step.output_name] = FlowSlot(stuff_spec=None, binding_step_index=step_index)
+                slots[step.output_name] = FlowSlot(stuff_spec=None, binding_step_index=step_index, producer_step_index=step_index)
                 continue
             derived_binding = derive_binding_spec(
                 binding_step=step, root_spec=root_slot.stuff_spec, sequence_code=sequence_code, domain_code=domain_code
             )
             binding_derivations[step_index] = derived_binding.derivation
             binding_specs[step_index] = derived_binding.stuff_spec
-            slots[step.output_name] = FlowSlot(stuff_spec=derived_binding.stuff_spec, binding_step_index=step_index)
+            slots[step.output_name] = FlowSlot(stuff_spec=derived_binding.stuff_spec, binding_step_index=step_index, producer_step_index=step_index)
             continue
 
-        binding_slots_by_pipe_step[step_index] = {name: slot for name, slot in slots.items() if slot.binding_step_index is not None}
+        slots_by_pipe_step[step_index] = dict(slots)
         step_pipe = get_optional_pipe(pipe_code=step.pipe_code)
         if step_pipe is None:
             if step.output_name:
                 written_names.add(step.output_name)
                 always_written_names.add(step.output_name)
-                slots[step.output_name] = FlowSlot(stuff_spec=None)
+                slots[step.output_name] = FlowSlot(stuff_spec=None, producer_step_index=step_index)
             continue
         step_writes = step_memory_writes(step=step, step_pipe=step_pipe, visited_pipes=visited_pipes)
         memory_writes_by_pipe_step[step_index] = step_writes
@@ -275,16 +317,18 @@ def build_sequence_typed_flow(
             written_names.add(written_name)
             if memory_write.is_always_written:
                 always_written_names.add(written_name)
-            slots[written_name] = slot_after_write(prior_slot=slots.get(written_name), memory_write=memory_write, step_label=step_label)
+            slots[written_name] = slot_after_write(
+                prior_slot=slots.get(written_name), memory_write=memory_write, step_index=step_index, step_label=step_label
+            )
         if step.output_name:
             written_names.add(step.output_name)
             always_written_names.add(step.output_name)
-            slots[step.output_name] = FlowSlot(stuff_spec=step.result_spec(step_pipe=step_pipe))
+            slots[step.output_name] = FlowSlot(stuff_spec=step.result_spec(step_pipe=step_pipe), producer_step_index=step_index)
 
     return SequenceTypedFlow(
         binding_derivations=binding_derivations,
         binding_specs=binding_specs,
-        binding_slots_by_pipe_step=binding_slots_by_pipe_step,
+        slots_by_pipe_step=slots_by_pipe_step,
         final_slots=slots,
         written_slots={name: slot for name, slot in slots.items() if name in written_names},
         always_written_names=frozenset(always_written_names),
