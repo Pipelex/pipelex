@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING, Any, Final
 
-from pydantic import Field
+from pydantic import Field, model_validator
+from typing_extensions import Self
 
 from pipelex.cogt.img_gen.img_gen_model_rules import ImgGenModelRules
 from pipelex.cogt.llm.structured_output import StructureMethod
@@ -41,6 +42,34 @@ class InferenceModelSpec(ConfigModel):
     extra_headers: dict[str, str] | None = None
     rules: ImgGenModelRules | None = None
     endpoint_path: str | None = None
+
+    @model_validator(mode="after")
+    def validate_thinking_budget_bounds(self) -> Self:
+        bounds: dict[ValuedConstraint, int] = {}
+        for constraint in (ValuedConstraint.MIN_THINKING_BUDGET, ValuedConstraint.MAX_THINKING_BUDGET):
+            value = self.valued_constraints.get(constraint)
+            if value is None:
+                continue
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                msg = f"Model '{self.name}' declares {constraint}={value!r}, which must be a non-negative integer"
+                raise ValueError(msg)
+            bounds[constraint] = value
+        min_budget = bounds.get(ValuedConstraint.MIN_THINKING_BUDGET)
+        max_budget = bounds.get(ValuedConstraint.MAX_THINKING_BUDGET)
+        if min_budget is not None and max_budget is not None and min_budget > max_budget:
+            msg = f"Model '{self.name}' declares min_thinking_budget={min_budget} above max_thinking_budget={max_budget}"
+            raise ValueError(msg)
+        return self
+
+    @property
+    def min_thinking_budget(self) -> int | None:
+        """The smallest manual thinking budget the provider accepts for this model, when it declares one."""
+        return self.valued_constraints.get(ValuedConstraint.MIN_THINKING_BUDGET)
+
+    @property
+    def max_thinking_budget(self) -> int | None:
+        """The largest manual thinking budget the provider accepts for this model, when it declares one."""
+        return self.valued_constraints.get(ValuedConstraint.MAX_THINKING_BUDGET)
 
     @property
     def tag(self) -> str:
