@@ -1,0 +1,12 @@
+name = "invalid_binding_step_batch_fields"
+description = "The lines of an invoice bound by a step that also tries to batch over them"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.binding_step_invalid",
+]
+
+expected_error = "binding_step_invalid"

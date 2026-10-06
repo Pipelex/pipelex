@@ -8,11 +8,11 @@ The `PipeSequence` controller is used to execute a series of pipes one after ano
 
 ## How it works
 
-A `PipeSequence` defines a list of `steps`. Each step calls another pipe and gives a name to its output. The working memory is passed from one step to the next, accumulating results along the way.
+A `PipeSequence` defines a list of `steps`. A step is either a **pipe step**, which calls another pipe and gives a name to its output, or a **binding step**, which binds the value at a path in working memory to a new name (see [Binding steps](#binding-steps)). The working memory is passed from one step to the next, accumulating results along the way.
 
 -   The `input` of the `PipeSequence` is passed to the first pipe in the sequence.
 -   The `output` of each intermediate step is named via the `result` key and becomes available in the working memory for all subsequent steps.
--   The final `output` of the `PipeSequence` is the output produced by the very last step in the sequence.
+-   The final `output` of the `PipeSequence` is the output produced by the very last step in the sequence, a pipe step's output or the value a binding step binds.
 
 ## Configuration
 
@@ -26,11 +26,15 @@ A `PipeSequence` defines a list of `steps`. Each step calls another pipe and giv
 | `description` | string          | A description of the sequence operation.                                                                          | Yes      |
 | `inputs`    | dictionary  | The input concept(s) for the *first* pipe in the sequence, as a dictionary mapping input names to concept codes.                                                     | No       |
 | `output`   | string          | The output concept produced by the *last* pipe in the sequence.                                                | Yes      |
-| `steps`    | array of tables | An ordered list of the pipes to execute. Each table in the array defines a single step.                          | Yes      |
+| `steps`    | array of tables | An ordered list of the steps to run. Each table in the array defines a single step, a pipe step or a binding step. | Yes      |
 
 ### Step Configuration
 
-Each entry in the `steps` array is a table with the following keys:
+A step carrying `pipe` is a pipe step, and a step carrying `from` is a binding step. A step carries one or the other, never both, and each kind is a closed table: a key the kind does not define is refused.
+
+#### Pipe steps
+
+A pipe step is a table with the following keys:
 
 | Key      | Type   | Description                                                        | Required |
 | -------- | ------ | ------------------------------------------------------------------ | -------- |
@@ -41,8 +45,100 @@ Each entry in the `steps` array is a table with the following keys:
 | `batch_over` | string | The name of a list in the working memory to batch this step over, running the pipe once per item. Must be provided together with `batch_as`. See [Understanding Multiplicity](../understanding-multiplicity.md). | No       |
 | `batch_as` | string | The name each item takes in the working memory during a `batch_over` run. Must differ from `batch_over` (e.g. `batch_over = "items"`, `batch_as = "item"`). | No       |
 
+#### Binding steps
+
+A binding step is a table with exactly these two keys:
+
+| Key      | Type   | Description                                                        | Required |
+| -------- | ------ | ------------------------------------------------------------------ | -------- |
+| `from`   | string | The path to bind: a name in working memory followed by zero or more field names, separated by single dots, each a letter followed by letters, digits and underscores. No subscript, expression or whitespace. | Yes      |
+| `result` | string | The name the bound value is stored under, a plain snake_case input name. | Yes      |
+
 !!! important "Output Concept Matching"
-    The output concept of the `PipeSequence` has to match the output of the last pipe in the sequence.
+    The output concept of the `PipeSequence` has to match the output of its last step: the output of the last pipe, or the concept a binding step derives when the sequence ends with one.
+
+## Binding steps
+
+A binding step hands one part of a bigger value to the steps after it, under a name of its own. An input name is always a plain name, so a pipe never declares `"invoice.total" = "Number"`: the calling sequence binds the field, and the pipe reads the bound name.
+
+```toml
+[pipe.acknowledge_invoice]
+type = "PipeSequence"
+description = "Acknowledges an invoice by its total"
+inputs = { invoice = "Invoice" }
+output = "Text"
+steps = [
+    { from = "invoice.total", result = "total_amount" },
+    { pipe = "write_receipt", result = "receipt" },
+]
+
+[pipe.write_receipt]
+type = "PipeCompose"
+description = "Writes the receipt for an amount"
+inputs = { total_amount = "Number" }
+output = "Text"
+template = "Received: $total_amount euros"
+```
+
+### What a binding binds
+
+The concept of the result is derived before the method runs, from the declared structures the path walks. The first segment names a value in working memory, the root, and each later segment names a field of the concept reached so far.
+
+| The path ends on | The result is |
+| --- | --- |
+| The root itself, `from = "departure_board"` | A renamed copy of the whole value, with its concept and multiplicity |
+| A field of concept `X`, or a field whose concept is `X` | `X` |
+| A `text` field, or a field declared by its `choices` | `Text` |
+| A `number` or `integer` field | `Number` |
+| A `boolean` field | `YesNo` |
+| A `date` or `datetime` field | `Date` (a `datetime` keeps its time) |
+| A `time` field | `Time` |
+| A `dict` field | `JSON` |
+| A `list` field of `X`, or of a plain type | `X[]`, or the native the plain type derives, as a list |
+| A field holding `Anything` | `Anything`, its value stored as an `Anything` input is: a string as a `Text`, a number as a `Number`, an object as a `JSON`, and so on. A list, or a value of no such type, is refused when the step runs |
+
+The root is typed by the latest step that stored a value under its name, or by the sequence's `inputs` when no step did. A step stores its `result`, and a batched step stores the list of its branches' results, `X[]`, whatever `nb_output` it carries. A nested `PipeSequence` runs its steps on the caller's working memory and a `PipeCondition` runs its chosen outcome there, so a name either of them stores counts as stored by the step that calls it, as do the branch results of a `PipeParallel` with `add_each_output`: a later step, a pipe step or a binding, reads it with no input of that name, and the name keeps its concept and whether it may be absent. A name only some outcomes of a condition store, when another outcome stores nothing under it or is `continue`, may still hold the value it held before, so the sequence needs it as an input, and it keeps its concept only when both values have the same one. When the values a name may hold have different concepts, its concept is not known before the run, so a binding reading it is refused with `binding_path_unresolved`, the message naming each outcome and the concept it stores. That happens when the outcomes of a condition store the name under different concepts, or when one outcome stores a value of another concept than the one an outcome storing nothing, such as `continue`, leaves. Store the name under one concept in every outcome, or bind inside each outcome, where its concept is known.
+
+A root stored by a pipe that does not resolve at validation, such as a pipe of a dependency not loaded yet, is assumed to deliver, as the rest of the sequence's checks assume. Its binding is derived when it runs, from the value the root holds, and checked then against what reads it: the sequence's declared output when the binding ends the sequence, its concept, its multiplicity and whether it may be absent, and the input of a later step reading the result. A mismatch is a run error, never a value of another concept. A root that may be absent still makes the result maybe-absent.
+
+A concept that refines another is walked through the structure it inherits, and a native concept through its pinned definition, so `page.page_view` binds an `Image`, every field of it kept, its `caption` included. A root holding a dependency package's concept, the output of one of the package's pipes, is walked through the package's own definitions, never through a concept of the method spelled the same.
+
+A path is refused with `binding_path_unresolved` when the walk cannot follow it, and the message names the segment and the fields the concept does have:
+
+-   a segment naming no field of the concept reached;
+-   a segment after a plain field (`invoice.total.amount`), after a `dict` field, or after a list with no declared item type;
+-   a segment into a concept with no structure to walk: a concept declared with neither a `structure` nor `refines`, whether as a string (`Notice = "A notice"`) or as a table with a description alone, unless its code names a registered Python class, whose fields are walked; `Dynamic`, `Anything`, `Composite`; a native holding its value in a single field (`Text`, `Number`, `Time`, `JSON`, `Markdown`); or a concept refining one of these. Bind the value itself instead, `from = "note"`.
+
+A path ending on a list with no declared item type is refused too, since nothing says what its items are.
+
+### Lists map and flatten
+
+When the path crosses a list, whether the root holds a list or a field does, the rest of the path is applied to every item, and every list crossed is flattened into one. The result is always one flat list, `X[]`: binding `pages.page_view` over `Page[]` gives `Image[]`, one image per page, and binding `shipments.parcels` over `Shipment[]` gives every parcel of every shipment. Items holding nothing are dropped, and an empty list is a valid result, so a list result is never absent.
+
+A single result never chooses one item of a list. When the run finds a list under a root typed as a single value, as when a count asked of the whole run reaches the steps of the sequence, the binding step fails with a run error naming the path and both shapes, rather than keep the first item. A bare name typed as a list that finds a single value fails the same way.
+
+### Absence
+
+A binding that finds nothing records an absence, under the optionality model (see [Understanding Optionality](../understanding-optionality.md#binding-steps-under-absence)):
+
+-   when the path reaches a field holding nothing, the result is recorded as `DECLARED_ABSENT`, and the reason names the segment that held nothing;
+-   when the root itself is absent, the binding is skipped as a pipe with an absent plain input is, and the result is recorded as `SKIPPED`, chained to the root's own record.
+
+A single result can be absent when its path walks a field that is not `required` and has no default, or, on a concept whose structure is a Python class, a field whose annotation admits `None`, required or not, so the static checks treat it as a maybe-absent value: a step reading it as a plain input may be lifted, and a sequence ending with it declares its output optional (`Text?`), or the validation refuses it with `optional_not_handled`.
+
+### A copy, with an identity of its own
+
+The bound value is a deep copy taken when the step runs: changing the root afterwards, or storing another value under the root's name, leaves the bound value as it was, and the reverse. The result is a new stuff with its own stuff code, and in the execution graph the binding is a node of its own, of kind `binding`, fed by the root's producer and producing the stuff it binds.
+
+### What validation checks
+
+-   A step that reads a bound name is checked against the derived concept and multiplicity: reading `total_amount` as `Text` when the binding derives a `Number` is refused with `input_stuff_spec_mismatch`, and `batch_over` a bound name requires a list.
+-   A sequence ending with a binding step is checked as one ending with a pipe: its output concept with `inadequate_output_concept`, its multiplicity with `inadequate_output_multiplicity`, and a maybe-absent result with `optional_not_handled`.
+-   A step asking a sequence that ends with a binding step for a count of outputs, with `nb_output` or `multiple_output`, is refused with `inadequate_output_multiplicity` when the binding does not bind that count: a binding binds what its path derives, whatever count its caller asks for. A batched step asks its branches for nothing, so it is not checked.
+-   A root that is neither an input of the sequence nor stored by an earlier step on every run is refused with `missing_input_variable`.
+-   A malformed step is refused with `binding_step_invalid`: `pipe` beside `from`, a binding without `result`, a binding carrying `nb_output`, `multiple_output`, `batch_over` or `batch_as`, a `from` or a `result` outside its grammar. The schema refuses each of these too.
+
+A binding step lives in a `PipeSequence`'s `steps` only. A [`PipeParallel`](PipeParallel.md) branch is always a pipe step, since its branches run at once and a binding orders a value before the steps that read it: bind in the sequence before the parallel.
 
 ### Example
 

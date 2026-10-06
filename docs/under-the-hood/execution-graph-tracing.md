@@ -194,6 +194,7 @@ class GraphSpec(BaseModel):
 | `OUTPUT` | Pipeline output node |
 | `ARTIFACT` | Generated artifact |
 | `ERROR` | Error node |
+| `BINDING` | A PipeSequence binding step, `{ from = "invoice.total", result = "total_amount" }`: its `pipe_code` is the `from` path and its `pipe_type` is `BindingStep`; its input is the root's stuff and its output the stuff it binds, so DATA edges run from the root's producer to the binding and from the binding to every step reading the result |
 
 ### Edge Types
 

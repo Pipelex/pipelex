@@ -91,6 +91,12 @@ _PIPE_TYPE_PREFIX = "Pipe"
 # coverage the corpus does not have is worse than a short vocabulary. Rendered in alphabetical order,
 # there being no registry order to follow.
 _FEATURE_TAGS: dict[str, str] = {
+    "binding_step": (
+        'A PipeSequence step `{ from = "invoice.total", result = "total_amount" }` that binds the value at a '
+        "path in working memory to a new name: its concept is derived from the declared structures the path walks, "
+        "its value is a deep copy taken when the step runs, a path crossing a list binds a flat list, and a path "
+        "reaching nothing records an absence."
+    ),
     "optionals": (
         "An input declared optional with the `?` suffix, so a run that has no value for it proceeds "
         "instead of failing and the absence is recorded in the working memory. How a method copes with "
@@ -224,6 +230,11 @@ _ERROR_TYPE_SCHEMA_FAULTS: frozenset[ValidationErrorType] = frozenset(
         # both of its entries: plxt reports `error[schema]` on the lone dotted key and on the one beside
         # its declared root.
         PipeValidationErrorType.INVALID_INPUT_NAME,
+        # A malformed binding step: `pipe` beside `from`, a binding without `result` or carrying a pipe step's
+        # batch fields, a `from` outside the path grammar or a `result` outside the plain-name grammar, and a
+        # binding written as a parallel branch. The schema's closed step shapes and their patterns reject each.
+        # Measured on all of its entries: plxt reports `error[schema]` on every one of them.
+        PipeValidationErrorType.BINDING_STEP_INVALID,
     }
 )
 

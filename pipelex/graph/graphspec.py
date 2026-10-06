@@ -48,6 +48,8 @@ class NodeKind(StrEnum):
     OUTPUT = "output"
     ARTIFACT = "artifact"
     ERROR = "error"
+    # A PipeSequence binding step: it runs no pipe, and produces the stuff it binds from a path in working memory.
+    BINDING = "binding"
 
 
 class NodeStatus(StrEnum):

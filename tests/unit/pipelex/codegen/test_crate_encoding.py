@@ -8,6 +8,10 @@ from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBl
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.libraries.library_crate import LibraryCrate
+from pipelex.pipe_controllers.binding.binding_step_blueprint import BindingStepBlueprint
+from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
+from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
+from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 
 MTHDS_TEST_VERSION = "0.1.0-test"
@@ -30,6 +34,39 @@ def _normalized_crate() -> LibraryCrate:
         },
         domains={"scoring": DomainBlueprint(code="scoring", description="Scoring domain")},
         source_map={"scoring.Score": "/fake/scoring.mthds"},
+    )
+    return normalize_crate(crate, mthds_version=MTHDS_TEST_VERSION)
+
+
+def _binding_crate() -> LibraryCrate:
+    """A normalized crate whose sequence binds a field of its input before a pipe step reads it."""
+    crate = LibraryCrate(
+        concepts={
+            "billing.Invoice": ConceptBlueprint(
+                description="An invoice sent by a supplier",
+                structure={
+                    "total": ConceptStructureBlueprint(description="The amount due", type=ConceptStructureBlueprintFieldType.NUMBER, required=True),
+                },
+            ),
+        },
+        pipes={
+            "billing.write_receipt": PipeComposeBlueprint(
+                description="Writes a receipt for an amount",
+                inputs={"total_amount": "Number"},
+                output="Text",
+                template="Received $total_amount",
+            ),
+            "billing.acknowledge_invoice": PipeSequenceBlueprint(
+                description="Acknowledges an invoice by its total",
+                inputs={"invoice": "Invoice"},
+                output="Text",
+                steps=[
+                    BindingStepBlueprint.model_validate({"from": "invoice.total", "result": "total_amount"}),
+                    SubPipeBlueprint(pipe="write_receipt", result="receipt"),
+                ],
+            ),
+        },
+        domains={"billing": DomainBlueprint(code="billing", description="Billing domain")},
     )
     return normalize_crate(crate, mthds_version=MTHDS_TEST_VERSION)
 
@@ -83,3 +120,18 @@ class TestCrateEncoding:
         crate = _normalized_crate()
         assert encode_crate(crate, encoding=CrateEncoding.JSON) == encode_crate_json(crate)
         assert encode_crate(crate, encoding=CrateEncoding.TOML) == encode_crate_toml(crate)
+
+    def test_a_binding_step_is_emitted_under_from_and_round_trips(self):
+        """A binding step is written as MTHDS spells it, `from`, so a crate holding one validates again with the same fingerprint."""
+        crate = _binding_crate()
+        json_doc = json.loads(encode_crate_json(crate))
+        toml_doc = tomli.loads(encode_crate_toml(crate))
+        for doc in (json_doc, toml_doc):
+            assert doc["pipes"]["billing.acknowledge_invoice"]["steps"][0] == {"from": "invoice.total", "result": "total_amount"}
+
+        from_json = LibraryCrate.model_validate(json_doc)
+        from_toml = LibraryCrate.model_validate(toml_doc)
+        assert from_json.pipes == crate.pipes
+        assert from_toml.pipes == crate.pipes
+        assert from_json.compute_normalized() == crate.fingerprint
+        assert from_toml.compute_normalized() == crate.fingerprint

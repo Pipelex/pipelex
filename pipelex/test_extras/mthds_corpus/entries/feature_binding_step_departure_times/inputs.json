@@ -1,0 +1,10 @@
+{
+  "departure": {
+    "concept": "ferry_timetable.Departure",
+    "content": {
+      "day": "2026-04-02",
+      "scheduled_at": "2026-04-02T08:15:00+02:00",
+      "boarding": "07:45:00"
+    }
+  }
+}

@@ -94,8 +94,8 @@ class TestPreliminaryTextInlineE2E:
         user_facing_pipe = get_required_entry_pipe(pipe_code=pipe_code)
         assert isinstance(user_facing_pipe, PipeSequence)
         assert len(user_facing_pipe.sequential_sub_pipes) == 2
-        assert user_facing_pipe.sequential_sub_pipes[0].pipe_code == f"test_preliminary_text_inline_e2e.{pipe_code}__draft_text"
-        assert user_facing_pipe.sequential_sub_pipes[1].pipe_code == f"test_preliminary_text_inline_e2e.{pipe_code}__structure"
+        assert user_facing_pipe.pipe_steps[0].pipe_code == f"test_preliminary_text_inline_e2e.{pipe_code}__draft_text"
+        assert user_facing_pipe.pipe_steps[1].pipe_code == f"test_preliminary_text_inline_e2e.{pipe_code}__structure"
 
         structure_step = get_required_entry_pipe(pipe_code=f"{pipe_code}__structure")
         assert isinstance(structure_step, PipeStructure)

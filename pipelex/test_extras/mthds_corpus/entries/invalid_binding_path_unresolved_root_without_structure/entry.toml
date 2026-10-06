@@ -1,0 +1,12 @@
+name = "invalid_binding_path_unresolved_root_without_structure"
+description = "The text of a delivery note bound through a field of Text, which holds its value whole"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.binding_path_unresolved",
+]
+
+expected_error = "binding_path_unresolved"

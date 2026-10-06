@@ -74,7 +74,13 @@ _REDUNDANT_INPUT_BUNDLE_HEADER = """domain = "dotted_safety"
 description = "Inputs declared once by their root and again by a dotted path into it"
 
 [concept]
-Item = "An item of an order"
+Remark = "A remark, declared without a structure"
+
+[concept.Item]
+description = "An item of an order"
+
+[concept.Item.structure]
+x = "The item's label"
 
 [pipe.read_input]
 type = "PipeLLM"
@@ -342,6 +348,43 @@ class TestBlueprintFixPlanner:
                 "page.page_view",
                 None,
                 id="differing-concept-root-last",
+            ),
+            pytest.param(
+                [("data", "Number"), ("data.text", "Text")],
+                FixSafety.UNSAFE,
+                "data.text",
+                "'data.text' cannot be read through the concept declared for 'data', so a template reading it may fail once the key is deleted. "
+                "Cannot bind 'data.text': 'data' holds a 'native.Number', which has no field 'text'.",
+                id="root-concept-without-the-field",
+            ),
+            pytest.param(
+                [("items", "Item"), ("items.label", "Text")],
+                FixSafety.UNSAFE,
+                "items.label",
+                "Cannot bind 'items.label': 'items' holds a 'dotted_safety.Item', which has no field 'label'. Its fields are: 'x'.",
+                id="declared-structure-without-the-field",
+            ),
+            pytest.param(
+                [("remark", "Remark"), ("remark.text", "Text")],
+                FixSafety.UNSAFE,
+                "remark.text",
+                "'remark' holds a 'dotted_safety.Remark', which is declared with neither a structure nor refines",
+                id="root-concept-without-a-structure",
+            ),
+            pytest.param(
+                [("data", "Number?"), ("data.text", "Text")],
+                FixSafety.UNSAFE,
+                "data.text",
+                "remove `?` from 'data' if the root must not be optional. "
+                "Warning: 'data.text' cannot be read through the concept declared for 'data'",
+                id="dropped-marker-and-unreadable-path",
+            ),
+            pytest.param(
+                [("data", "Text"), ("data.text", "Text")],
+                FixSafety.SAFE,
+                "data.text",
+                None,
+                id="single-field-native-read-through-its-field",
             ),
             pytest.param(
                 [("data", "Text"), ("data.text", "Text[1]")],

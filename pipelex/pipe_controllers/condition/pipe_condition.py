@@ -20,6 +20,7 @@ from pipelex.interpreter_hub import get_optional_pipe, get_pipe_router, get_requ
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import describe_expression_parse_failure
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.pipe_controller import PipeController
+from pipelex.pipe_machinery.memory_writes import AlternativeWrites, MemoryWrite, merge_alternative_writes
 from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
@@ -93,6 +94,37 @@ class PipeCondition(PipeController):
 
         # Exclude internal variables starting with `_`
         return {var for var in required_variables if not var.startswith("_")}
+
+    @override
+    def memory_writes(self, *, visited_pipes: set[str] | None = None) -> dict[str, MemoryWrite]:
+        """What the outcome it runs stores besides its result: the chosen outcome runs on the caller's memory.
+
+        The outcomes are merged as alternatives (`merge_alternative_writes`): a name is always written only if every outcome
+        that can run stores it, may hold an absence if any outcome may leave one, and keeps a spec only if every outcome
+        storing it stores the same one, recording otherwise which outcome stores which spec, so that a binding reading the name
+        is refused before the run. A `continue` outcome stores nothing, a `fail` outcome stops the run, and an outcome
+        pipe that does not resolve is left out, as a sequence assumes an unresolved pipe delivers. The alias the condition
+        may add is left out too: the working memory refuses an alias over a name it already holds, so it never replaces a
+        value the flow types.
+        """
+        if visited_pipes is None:
+            visited_pipes = set()
+        if self.visit_key in visited_pipes:
+            return {}
+        visited_pipes_with_current = visited_pipes | {self.visit_key}
+        outcome_writes: list[AlternativeWrites] = []
+        for outcome_pipe_code in sorted(self.pipe_dependencies()):
+            outcome_pipe = get_optional_pipe(pipe_code=outcome_pipe_code)
+            if outcome_pipe is not None:
+                outcome_writes.append(
+                    AlternativeWrites(
+                        label=f"outcome '{outcome_pipe.code}' of pipe '{self.code}'",
+                        writes=outcome_pipe.memory_writes(visited_pipes=visited_pipes_with_current),
+                    )
+                )
+        if self._continue_reachable:
+            outcome_writes.append(AlternativeWrites(label=f"the `continue` outcome of pipe '{self.code}'", writes={}))
+        return merge_alternative_writes(alternatives=outcome_writes)
 
     @override
     def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:

@@ -1,0 +1,10 @@
+name = "feature_binding_step_invoice_fields"
+description = "An invoice acknowledged from the plain fields it carries, each bound to a name of its own"
+
+validity = "valid"
+tier = "offline"
+granularity = "focused"
+
+covers = [
+  "feature.binding_step",
+]

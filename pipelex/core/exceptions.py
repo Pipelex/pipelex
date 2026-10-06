@@ -81,6 +81,11 @@ class PipelexBundleBlueprintValidationErrorData(BaseModel):
     # warning compares the two markers' multiplicity and presence apart, and names only the part that differs.
     root_input_marker: str | None = None
 
+    # Set beside ``redundant_input_name`` only when the root's declared concept does not hold the field the dotted key named,
+    # as the binding walk over the bundle's own concepts finds: the walk's refusal. Deleting the key would then leave the
+    # root typed by a concept that lacks the field, so the planner offers the deletion as unsafe, whatever the markers say.
+    redundant_input_unwalkable_reason: str | None = None
+
 
 class PipesAndConceptValidationErrorData(BaseModel):
     """Structured validation error data for Pipe/Concept validation errors.

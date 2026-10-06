@@ -1,0 +1,12 @@
+name = "invalid_optional_not_handled_binding"
+description = "A delivery note that may be missing, bound and returned by a sequence that promises one"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.optional_not_handled",
+]
+
+expected_error = "optional_not_handled"

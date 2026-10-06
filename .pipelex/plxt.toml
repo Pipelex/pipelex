@@ -51,6 +51,12 @@ exclude = [
   # narrows which rule applies. What guards these entries instead is strictly stronger: the corpus's
   # entry-validation gate runs the real validation engine over every entry in CI and is red both when
   # an invalid entry fails differently and when it accidentally validates.
+  "**/mthds_corpus/entries/invalid_binding_step_batch_fields/*.mthds",
+  "**/mthds_corpus/entries/invalid_binding_step_malformed_path/*.mthds",
+  "**/mthds_corpus/entries/invalid_binding_step_parallel_branch/*.mthds",
+  "**/mthds_corpus/entries/invalid_binding_step_pipe_and_from/*.mthds",
+  "**/mthds_corpus/entries/invalid_binding_step_result_not_plain/*.mthds",
+  "**/mthds_corpus/entries/invalid_binding_step_without_result/*.mthds",
   "**/mthds_corpus/entries/invalid_input_name_lone_dotted/*.mthds",
   "**/mthds_corpus/entries/invalid_input_name_redundant_dotted/*.mthds",
   "**/mthds_corpus/entries/invalid_missing_pipe_type/*.mthds",

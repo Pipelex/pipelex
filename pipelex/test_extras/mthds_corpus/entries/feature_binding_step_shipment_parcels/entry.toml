@@ -1,0 +1,10 @@
+name = "feature_binding_step_shipment_parcels"
+description = "The parcels of several shipments bound into one flat list, a shipment without parcels adding none"
+
+validity = "valid"
+tier = "offline"
+granularity = "focused"
+
+covers = [
+  "feature.binding_step",
+]

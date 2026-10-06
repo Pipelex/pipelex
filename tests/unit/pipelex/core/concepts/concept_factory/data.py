@@ -10,6 +10,18 @@ from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBl
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 
+# A concept's declared fields, which its runtime concept keeps as `declared_structure` for the binding walk.
+PERSON_STRUCTURE: dict[str, ConceptStructureBlueprint] = {
+    "name": ConceptStructureBlueprint(description="The person's name", type=ConceptStructureBlueprintFieldType.TEXT, required=True),
+    "age": ConceptStructureBlueprint(description="The person's age", type=ConceptStructureBlueprintFieldType.NUMBER, required=True),
+    "active": ConceptStructureBlueprint(
+        description="Whether the person is active",
+        type=ConceptStructureBlueprintFieldType.BOOLEAN,
+        required=False,
+        default_value=True,
+    ),
+}
+
 
 class TestCases:
     # Test cases for make_refines method
@@ -104,6 +116,7 @@ class TestCases:
                 description="A concept from same domain",
                 structure_class_name="my_domain__DomainConcept",
                 refines="native.Text",
+                is_described_only=True,
             ),
         ),
         # Test case 9: Blueprint with dict structure (same domain)
@@ -113,16 +126,7 @@ class TestCases:
             "PersonConcept",
             ConceptBlueprint(
                 description="A person with structured data",
-                structure={
-                    "name": ConceptStructureBlueprint(description="The person's name", type=ConceptStructureBlueprintFieldType.TEXT, required=True),
-                    "age": ConceptStructureBlueprint(description="The person's age", type=ConceptStructureBlueprintFieldType.NUMBER, required=True),
-                    "active": ConceptStructureBlueprint(
-                        description="Whether the person is active",
-                        type=ConceptStructureBlueprintFieldType.BOOLEAN,
-                        required=False,
-                        default_value=True,
-                    ),
-                },
+                structure={**PERSON_STRUCTURE},
             ),
             Concept(
                 domain_code="my_domain",
@@ -130,6 +134,7 @@ class TestCases:
                 description="A person with structured data",
                 structure_class_name="my_domain__PersonConcept",
                 refines=None,
+                declared_structure=PERSON_STRUCTURE,
             ),
         ),
         # Test case 11: Blueprint with refines (same domain)

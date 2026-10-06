@@ -1,0 +1,12 @@
+name = "invalid_missing_input_variable_binding_root"
+description = "An invoice total bound from an invoice the sequence neither declares nor produces"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.missing_input_variable",
+]
+
+expected_error = "missing_input_variable"

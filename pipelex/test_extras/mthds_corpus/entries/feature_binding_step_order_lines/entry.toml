@@ -1,0 +1,10 @@
+name = "feature_binding_step_order_lines"
+description = "The lines of an order bound as a list, and their amounts bound across the list, an order without lines giving an empty list"
+
+validity = "valid"
+tier = "offline"
+granularity = "focused"
+
+covers = [
+  "feature.binding_step",
+]

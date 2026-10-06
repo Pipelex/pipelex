@@ -57,6 +57,7 @@ from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeCond
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
+from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 
 if TYPE_CHECKING:
     from pipelex.pipe_machinery.pipe_blueprint import InputSlotBlueprint
@@ -184,7 +185,11 @@ def _qualify_pipe_blueprint(blueprint: PipeBlueprintUnion, *, owner_domain: str,
 
     match blueprint:
         case PipeSequenceBlueprint():
-            updates["steps"] = [step.model_copy(update={"pipe": qualify(pipe_ref=step.pipe)}) for step in blueprint.steps]
+            # A binding step names no pipe, only a path in working memory, so it is kept as written.
+            updates["steps"] = [
+                step.model_copy(update={"pipe": qualify(pipe_ref=step.pipe)}) if isinstance(step, SubPipeBlueprint) else step
+                for step in blueprint.steps
+            ]
         case PipeParallelBlueprint():
             updates["branches"] = [branch.model_copy(update={"pipe": qualify(pipe_ref=branch.pipe)}) for branch in blueprint.branches]
         case PipeConditionBlueprint():

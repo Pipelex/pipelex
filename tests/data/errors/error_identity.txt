@@ -20,6 +20,8 @@ AzureCredentialsError | Azure credentials | https://docs.pipelex.com/latest/erro
 BatchParamsError | Batch params | https://docs.pipelex.com/latest/errors/batch-params-error/
 BedrockFactoryError | Bedrock factory | https://docs.pipelex.com/latest/errors/bedrock-factory-error/
 BedrockWorkerConfigurationError | Bedrock worker configuration | https://docs.pipelex.com/latest/errors/bedrock-worker-configuration-error/
+BindingPathUnresolvedError | Binding path unresolved | https://docs.pipelex.com/latest/errors/binding-path-unresolved-error/
+BindingStepRunError | Binding step run | https://docs.pipelex.com/latest/errors/binding-step-run-error/
 BrokenPluginError | Broken plugin | https://docs.pipelex.com/latest/errors/broken-plugin-error/
 BundleElaboratorError | Bundle elaborator | https://docs.pipelex.com/latest/errors/bundle-elaborator-error/
 CodegenError | Codegen error | https://docs.pipelex.com/latest/errors/codegen-error/

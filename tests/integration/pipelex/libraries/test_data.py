@@ -361,3 +361,144 @@ inputs      = { data = "Text" }
 output      = "Text"
 prompt      = "private x: $data"
 """
+
+
+class LedgerPackageTestData:
+    """An installed method package whose sequence binds fields of its own `Invoice`, and consumers binding the same; nothing here is real.
+
+    A package's concept reaches a consumer's sequence as the output of one of the package's pipes, or as a field the consumer types
+    with the package's alias. Its concepts are held in the consumer's library only under that alias, so a binding walking them must
+    read them there, and never a consumer concept spelled the same.
+    """
+
+    METHOD_NAME: ClassVar[str] = "ledger"
+    DEP_ALIAS: ClassVar[str] = "github.com/invented/ledger-lib/ledger"
+
+    DEP_MANIFEST: ClassVar[str] = """[package]
+name        = "ledger"
+address     = "github.com/invented/ledger-lib"
+version     = "1.0.0"
+description = "An invented ledger package"
+
+[exports.invented_ledger]
+pipes = ["make_invoice", "read_invoice", "write_line"]
+"""
+
+    DEP_BUNDLE: ClassVar[str] = """domain      = "invented_ledger"
+description = "An invented ledger package"
+
+[concept.Supplier]
+description = "Who sent an invoice"
+
+[concept.Supplier.structure]
+name = { type = "text", description = "The supplier's name", required = true }
+
+[concept.Invoice]
+description = "An invoice kept in the ledger"
+
+[concept.Invoice.structure]
+total    = { type = "number", description = "The amount due, in euros", required = true }
+supplier = { type = "concept", concept_ref = "Supplier", description = "Who sent it", required = true }
+
+[pipe.make_invoice]
+type        = "PipeCompose"
+description = "Writes out an invoice for an amount and a supplier"
+inputs      = { amount = "Number", sender = "Text" }
+output      = "Invoice"
+
+[pipe.make_invoice.construct]
+total    = { from = "amount.number" }
+supplier = { name = { from = "sender.text" } }
+
+[pipe.write_line]
+type        = "PipeCompose"
+description = "Writes the ledger line of a supplier and an amount"
+inputs      = { supplier_name = "Text", total_amount = "Number" }
+output      = "Text"
+template    = "$supplier_name: $total_amount euros"
+
+[pipe.read_invoice]
+type        = "PipeSequence"
+description = "Binds the supplier's name and the total of an invoice, then writes its ledger line"
+inputs      = { invoice = "Invoice" }
+output      = "Text"
+steps       = [
+  { from = "invoice.supplier.name", result = "supplier_name" },
+  { from = "invoice.total", result = "total_amount" },
+  { pipe = "write_line", result = "line" },
+]
+"""
+
+    #: The consumer binds the fields of an invoice the package makes, and has the package read one with its own bindings.
+    CONSUMER_BUNDLE: ClassVar[str] = """domain      = "invented_books"
+description = "A consumer of the invented ledger package"
+
+[pipe.check_invoice]
+type        = "PipeSequence"
+description = "Has the package make an invoice, binds its fields, then writes the package's ledger line"
+inputs      = { amount = "Number", sender = "Text" }
+output      = "Text"
+steps       = [
+  { pipe = "github.com/invented/ledger-lib/ledger->invented_ledger.make_invoice", result = "invoice" },
+  { from = "invoice.supplier.name", result = "supplier_name" },
+  { from = "invoice.total", result = "total_amount" },
+  { pipe = "github.com/invented/ledger-lib/ledger->invented_ledger.write_line", result = "line" },
+]
+
+[pipe.relay_invoice]
+type        = "PipeSequence"
+description = "Has the package make an invoice and read it with its own bindings"
+inputs      = { amount = "Number", sender = "Text" }
+output      = "Text"
+steps       = [
+  { pipe = "github.com/invented/ledger-lib/ledger->invented_ledger.make_invoice", result = "invoice" },
+  { pipe = "github.com/invented/ledger-lib/ledger->invented_ledger.read_invoice", result = "line" },
+]
+"""
+
+    #: A consumer bundle declaring `invented_ledger.Invoice` and `invented_ledger.Supplier` of its own, with other fields, and a
+    #: concept of its own whose field the consumer types with the package's `Invoice`.
+    CONSUMER_NAMESAKE_BUNDLE: ClassVar[str] = """domain      = "invented_ledger"
+description = "The consumer's own concepts, in a domain named like the package's"
+
+[concept.Supplier]
+description = "The consumer's own idea of a supplier"
+
+[concept.Supplier.structure]
+city = { type = "text", description = "Where the supplier is", required = true }
+
+[concept.Invoice]
+description = "The consumer's own idea of an invoice"
+
+[concept.Invoice.structure]
+amount   = { type = "number", description = "The amount, in the consumer's words", required = true }
+supplier = { type = "concept", concept_ref = "Supplier", description = "Who sent it", required = true }
+
+[concept.Filing]
+description = "The consumer's filing of an invoice the package keeps"
+
+[concept.Filing.structure.invoice]
+type        = "concept"
+concept_ref = "github.com/invented/ledger-lib/ledger->invented_ledger.Invoice"
+description = "The invoice filed"
+required    = true
+
+[pipe.read_own_invoice]
+type        = "PipeSequence"
+description = "Binds the fields of the consumer's own invoice"
+inputs      = { invoice = "Invoice" }
+output      = "Text"
+steps       = [
+  { from = "invoice.amount", result = "amount" },
+  { from = "invoice.supplier.city", result = "city" },
+]
+
+[pipe.read_filing]
+type        = "PipeSequence"
+description = "Binds the supplier's name off the package's invoice a filing holds"
+inputs      = { filing = "Filing" }
+output      = "Text"
+steps       = [
+  { from = "filing.invoice.supplier.name", result = "supplier_name" },
+]
+"""

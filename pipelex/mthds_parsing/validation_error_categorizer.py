@@ -1,24 +1,33 @@
 import re
 from typing import Any, cast, get_args
 
+from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 from pydantic_core.core_schema import CoreSchemaType
 
 from pipelex import log
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
+from pipelex.core.pipes.exceptions import PipeVariableMultiplicityError
+from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.mthds_parsing.exceptions import (
     InvalidPipeCodeSyntaxError,
     NativeConceptRedeclarationError,
 )
 from pipelex.mthds_parsing.handle_pipe_errors import extract_wrapped_pipe_validation_error
 from pipelex.mthds_parsing.helpers import ValidationErrorScope, get_error_scope
+from pipelex.pipe_controllers.binding.binding_concept_resolvers import BlueprintConceptWalkResolver, qualify_concept_ref
+from pipelex.pipe_controllers.binding.binding_derivation import BindingRoot, derive_binding
+from pipelex.pipe_controllers.binding.exceptions import BindingPathUnresolvedError
 from pipelex.pipe_machinery.pipe_blueprint import PIPE_SIGNATURE_TYPE_TAG, PipeType
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.validation_error_types import PipeValidationErrorType
 
 PIPELEX_BUNDLE_BLUEPRINT_DOMAIN_FIELD = "domain"
 PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD = "source"
 PIPELEX_BUNDLE_BLUEPRINT_MAIN_PIPE_FIELD = "main_pipe"
 PIPELEX_BUNDLE_BLUEPRINT_PIPE_FIELD = "pipe"
+PIPELEX_BUNDLE_BLUEPRINT_CONCEPT_FIELD = "concept"
 
 # Distinctive fragments of the two type-tag errors raised by the bundle blueprint's `pipe`
 # before-validator (via `normalize_typeless_signature_section` in `pipe_blueprint.py`). Kept in sync
@@ -106,6 +115,60 @@ def _main_pipe_strip_is_safe(*, offending_code: str, stripped_code: str, bluepri
         return False
     pipe_keys = {key for key in cast("dict[Any, Any]", raw_pipe) if isinstance(key, str)}
     return (offending_code in pipe_keys) != (stripped_code in pipe_keys)
+
+
+def _redundant_input_unwalkable_reason(
+    *,
+    dotted_input_name: str,
+    pipe_code: str | None,
+    domain: str | None,
+    blueprint_dict: dict[str, Any],
+) -> str | None:
+    """Why a redundant dotted input's path cannot be read through its root's declared concept, or ``None`` when it can.
+
+    Deleting the dotted key leaves the root typed by its own declaration, which the deletion is safe for only when
+    that concept holds the field the key named. The raise site sees the `inputs` table alone, so the check is made
+    here, on the raw bundle dict, by the binding walk over the bundle's own concepts and the natives: a concept the
+    bundle does not declare cannot be walked, and the deletion is then not proven safe. A template reads a
+    single-field native's pinned field (`$data.text` on a `Text`), which a binding refuses as a leaf, so the walk is
+    told to read those natives through their field.
+    """
+    if pipe_code is None or domain is None:
+        return "the pipe or its domain is unknown"
+    raw_pipes = blueprint_dict.get(PIPELEX_BUNDLE_BLUEPRINT_PIPE_FIELD)
+    raw_pipe = cast("dict[str, Any]", raw_pipes).get(pipe_code) if isinstance(raw_pipes, dict) else None
+    raw_inputs = cast("dict[str, Any]", raw_pipe).get("inputs") if isinstance(raw_pipe, dict) else None
+    root_name = get_root_from_dotted_path(dotted_input_name)
+    raw_root_spec = cast("dict[str, Any]", raw_inputs).get(root_name) if isinstance(raw_inputs, dict) else None
+    if not isinstance(raw_root_spec, str):
+        return f"the root '{root_name}' is not declared with a concept"
+    try:
+        parsed_root_spec = parse_concept_with_multiplicity(raw_root_spec)
+    except PipeVariableMultiplicityError:
+        return f"the root '{root_name}' is declared as '{raw_root_spec}', which is not a concept"
+    concept_blueprints: dict[str, ConceptBlueprint | str] = {}
+    raw_concepts = blueprint_dict.get(PIPELEX_BUNDLE_BLUEPRINT_CONCEPT_FIELD)
+    if isinstance(raw_concepts, dict):
+        for concept_code, raw_concept in cast("dict[Any, Any]", raw_concepts).items():
+            if not isinstance(concept_code, str):
+                continue
+            if isinstance(raw_concept, str):
+                concept_blueprints[f"{domain}.{concept_code}"] = raw_concept
+                continue
+            try:
+                concept_blueprints[f"{domain}.{concept_code}"] = ConceptBlueprint.model_validate(raw_concept)
+            except ValidationError:
+                continue
+    root_concept_ref = qualify_concept_ref(concept_ref=parsed_root_spec.concept_ref_or_code, domain_code=domain)
+    try:
+        derive_binding(
+            path=dotted_input_name,
+            root=BindingRoot(concept_ref=root_concept_ref, multiplicity=parsed_root_spec.multiplicity),
+            resolver=BlueprintConceptWalkResolver(concept_blueprints=concept_blueprints, walks_single_field_natives=True),
+        )
+    except BindingPathUnresolvedError as exc:
+        return str(exc)
+    return None
 
 
 def _categorize_typeless_pipe_error(
@@ -349,6 +412,16 @@ def categorize_blueprint_validation_error(
     # bundle dict, preferring any the error does carry.
     wrapped_pipe_error = extract_wrapped_pipe_validation_error(error)
     if wrapped_pipe_error is not None:
+        # A redundant dotted input is safe to delete only when the root's declared concept holds the field the key named,
+        # which only this document-level view, holding the bundle's concepts, can check.
+        redundant_input_unwalkable_reason: str | None = None
+        if wrapped_pipe_error.redundant_input_name is not None:
+            redundant_input_unwalkable_reason = _redundant_input_unwalkable_reason(
+                dotted_input_name=wrapped_pipe_error.redundant_input_name,
+                pipe_code=wrapped_pipe_error.pipe_code or pipe_code,
+                domain=domain,
+                blueprint_dict=blueprint_dict,
+            )
         return PipelexBundleBlueprintValidationErrorData(
             error_type=wrapped_pipe_error.error_type,
             domain_code=wrapped_pipe_error.domain_code or domain,
@@ -359,6 +432,7 @@ def categorize_blueprint_validation_error(
             redundant_input_name=wrapped_pipe_error.redundant_input_name,
             dropped_input_marker=wrapped_pipe_error.dropped_input_marker,
             root_input_marker=wrapped_pipe_error.root_input_marker,
+            redundant_input_unwalkable_reason=redundant_input_unwalkable_reason,
         )
 
     # A native-concept redeclaration: ``validate_concept_keys`` raised a typed ``ValueError``

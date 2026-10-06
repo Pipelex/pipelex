@@ -42,7 +42,7 @@ class TestCrateQualificationUnderAPackageAlias:
 
         sequence = pipes["alpha.seq"]
         assert isinstance(sequence, PipeSequenceBlueprint)
-        assert sequence.steps[0].pipe == aliased_leaf
+        assert sequence.pipe_steps[0].pipe == aliased_leaf
         parallel = pipes["alpha.par"]
         assert isinstance(parallel, PipeParallelBlueprint)
         assert parallel.branches[0].pipe == aliased_leaf
@@ -67,7 +67,7 @@ class TestCrateQualificationUnderAPackageAlias:
         assert condition.outcomes == {"stop": SpecialOutcome.FAIL, "hit": f"{self.ALIAS}->alpha.leaf"}
         other = pipes["alpha.calls_other_package"]
         assert isinstance(other, PipeSequenceBlueprint)
-        assert other.steps[0].pipe == "other->beta.helper"
+        assert other.pipe_steps[0].pipe == "other->beta.helper"
 
     def test_is_idempotent(self):
         once = qualify_crate(CrateQualificationTestData.crate(), package_alias=self.ALIAS)
@@ -77,4 +77,4 @@ class TestCrateQualificationUnderAPackageAlias:
         assert twice.pipes == once.pipes
         sequence = twice.pipes["alpha.seq"]
         assert isinstance(sequence, PipeSequenceBlueprint)
-        assert sequence.steps[0].pipe == f"{self.ALIAS}->alpha.leaf"
+        assert sequence.pipe_steps[0].pipe == f"{self.ALIAS}->alpha.leaf"

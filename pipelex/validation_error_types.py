@@ -60,6 +60,16 @@ class PipeValidationErrorType(StrEnum):
     MISSING_PIPE_TYPE = "missing_pipe_type"
     BATCH_ITEM_NAME_COLLISION = "batch_item_name_collision"
 
+    # A PipeSequence step whose shape breaks the binding-step rules: a step carrying both `pipe` and `from`,
+    # a binding step without `result` or carrying a pipe step's `nb_output`, `multiple_output`, `batch_over`
+    # or `batch_as`, a binding `result` that is not a plain input name, a `from` outside the path grammar, or
+    # a binding step in a PipeParallel's `branches`. Detected at blueprint parse time, as the schema does.
+    BINDING_STEP_INVALID = "binding_step_invalid"
+    # A binding step's `from` path that the declared structures cannot walk: a segment naming no field, a
+    # segment after a leaf, a dict or a list with no `item_type`, a concept with no walkable structure, or a
+    # path ending on a list with no `item_type`. Detected when the sequence is validated against the library.
+    BINDING_PATH_UNRESOLVED = "binding_path_unresolved"
+
     # Presence-marker grammar misuse, detected at blueprint parse time: a presence marker
     # (`?` or `!`) combined with a multiplicity suffix, or `!` on an output (D1, D4 of the
     # optionals design).
@@ -129,6 +139,8 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
                 | PipeValidationErrorType.MISSING_PIPE_TYPE
                 | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.BINDING_STEP_INVALID
+                | PipeValidationErrorType.BINDING_PATH_UNRESOLVED
                 | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
                 | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
                 | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
@@ -162,6 +174,8 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
                 | PipeValidationErrorType.MISSING_PIPE_TYPE
                 | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.BINDING_STEP_INVALID
+                | PipeValidationErrorType.BINDING_PATH_UNRESOLVED
                 | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
                 | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
                 | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
@@ -202,6 +216,8 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
                 | PipeValidationErrorType.MISSING_PIPE_TYPE
                 | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.BINDING_STEP_INVALID
+                | PipeValidationErrorType.BINDING_PATH_UNRESOLVED
                 | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
                 | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
                 | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
@@ -237,6 +253,8 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
                 | PipeValidationErrorType.MISSING_PIPE_TYPE
                 | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.BINDING_STEP_INVALID
+                | PipeValidationErrorType.BINDING_PATH_UNRESOLVED
                 | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
                 | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
                 | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
@@ -275,6 +293,8 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
                 | PipeValidationErrorType.MISSING_PIPE_TYPE
                 | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.BINDING_STEP_INVALID
+                | PipeValidationErrorType.BINDING_PATH_UNRESOLVED
                 | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
                 | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
                 | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
@@ -314,6 +334,8 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
                 | PipeValidationErrorType.MISSING_PIPE_TYPE
                 | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.BINDING_STEP_INVALID
+                | PipeValidationErrorType.BINDING_PATH_UNRESOLVED
                 | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
                 | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
                 | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
@@ -349,6 +371,8 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
                 | PipeValidationErrorType.MISSING_PIPE_TYPE
                 | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.BINDING_STEP_INVALID
+                | PipeValidationErrorType.BINDING_PATH_UNRESOLVED
                 | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
                 | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
                 | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED

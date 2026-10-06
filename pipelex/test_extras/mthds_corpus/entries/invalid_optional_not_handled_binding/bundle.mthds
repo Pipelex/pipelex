@@ -1,0 +1,20 @@
+domain      = "delivery_rounds"
+description = "Passing on the note left for a delivery round"
+main_pipe   = "pass_on_note"
+
+[concept.DeliveryRound]
+description = "A delivery round driven by one van"
+
+[concept.DeliveryRound.structure]
+driver = { type = "text", description = "Who drives the round", required = true }
+note   = { type = "text", description = "A note left for the driver, when there is one" }
+
+[pipe.pass_on_note]
+type        = "PipeSequence"
+description = "Binds the note of a round and returns it"
+inputs      = { delivery_round = "DeliveryRound" }
+# Wrong on purpose: `note` is not required, so the binding may find nothing, and the output is not declared `Text?`.
+output = "Text"
+steps = [
+  { from = "delivery_round.note", result = "note" },
+]

@@ -360,6 +360,43 @@ class TestMthdsSchemaGeneration:
         table = {**_minimal_pipe_table("PipeBatch"), "input_list_name": input_list_name}
         assert validator.is_valid(table) is should_validate
 
+    @pytest.mark.parametrize(
+        ("step", "should_validate"),
+        [
+            pytest.param({"pipe": "sub_pipe"}, True, id="pipe-step"),
+            pytest.param({"from": "invoice.total", "result": "total_amount"}, True, id="binding-step"),
+            pytest.param({"from": "invoice", "result": "invoice_copy"}, True, id="binding-step-bare-name"),
+            pytest.param({"from": "page.page_view.caption", "result": "caption"}, True, id="binding-step-deep-path"),
+            pytest.param({"from": "invoice.Total2", "result": "total"}, True, id="binding-step-mixed-case-segment"),
+            pytest.param({"from": "invoice.total", "result": "TotalAmount"}, False, id="result-not-plain"),
+            pytest.param({"from": "invoice.total", "result": "invoice.total"}, False, id="result-dotted"),
+            pytest.param({"from": "pages[0].text", "result": "text"}, False, id="from-with-a-subscript"),
+            pytest.param({"from": "invoice._total", "result": "total"}, False, id="from-with-an-underscore-led-segment"),
+            pytest.param({"from": "invoice..total", "result": "total"}, False, id="from-with-an-empty-segment"),
+            pytest.param({"from": "invoice.total ", "result": "total"}, False, id="from-with-whitespace"),
+            pytest.param({"from": "invoice.total"}, False, id="binding-without-result"),
+            pytest.param({"pipe": "sub_pipe", "from": "invoice.total", "result": "total"}, False, id="pipe-and-from"),
+            pytest.param({"from": "invoice.lines", "result": "lines", "batch_over": "lines"}, False, id="binding-with-batch-over"),
+            pytest.param({"from": "invoice.total", "result": "total", "note": "x"}, False, id="binding-with-a-stray-field"),
+            pytest.param({"from_path": "invoice.total", "result": "total"}, False, id="binding-spelled-from-path"),
+            pytest.param({"from": "invoice.total", "from_path": "invoice.total", "result": "total"}, False, id="binding-with-from-path-beside-from"),
+            pytest.param({"result": "total"}, False, id="neither-pipe-nor-from"),
+        ],
+    )
+    def test_sequence_steps_are_pipe_steps_or_binding_steps(self, schema: dict[str, Any], step: dict[str, Any], should_validate: bool) -> None:
+        """A PipeSequence step is a closed pipe step or a closed binding step, `from` following the path grammar and `result` the plain name's."""
+        validator = _pipe_union_oneof_validator(schema)
+        table = {**_minimal_pipe_table("PipeSequence"), "steps": [step]}
+        assert validator.is_valid(table) is should_validate, f"step {step!r}"
+
+    def test_parallel_branches_keep_the_pipe_step_shape(self, schema: dict[str, Any]) -> None:
+        """A PipeParallel branch is a pipe step only: a binding step there matches no shape, since branches run concurrently."""
+        validator = _pipe_union_oneof_validator(schema)
+        table = {**_minimal_pipe_table("PipeParallel"), "branches": [{"from": "invoice.total", "result": "total"}]}
+        assert validator.is_valid(table) is False
+        branch_items = schema["definitions"]["PipeParallelBlueprint"]["properties"]["branches"]["items"]
+        assert branch_items == {"$ref": "#/definitions/SubPipeBlueprint"}
+
     def test_minimal_table_coverage_matches_schema_pipe_kinds(self, schema: dict[str, Any]) -> None:
         """Guard: the test's per-kind table map covers exactly the *concrete* pipe kinds in the schema.
 

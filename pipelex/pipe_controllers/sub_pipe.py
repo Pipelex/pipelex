@@ -7,7 +7,8 @@ from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError, PipeRunInputsError
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
+from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
+from pipelex.core.pipes.variable_multiplicity import PresenceMarker, VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
@@ -15,9 +16,10 @@ from pipelex.interpreter_hub import get_pipe_router, get_required_pipe
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
-from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
+from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams, output_multiplicity_to_apply
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
@@ -30,6 +32,30 @@ class SubPipe(BaseModel):
     output_name: str | None = None
     output_multiplicity: VariableMultiplicity | None = None
     batch_params: BatchParams | None = None
+
+    def result_spec(self, *, step_pipe: PipeAbstract) -> StuffSpec:
+        """The spec of what the step stores under its result, `step_pipe` being the pipe it runs, resolved as the run path resolves it.
+
+        A batched step stores the list of its branches' results, a `PipeBatch` wrapping the pipe: `X[]` whatever the pipe
+        outputs and whatever count the step asks for, since an absent branch result is dropped from the list, which is never
+        absent. Any other step stores the pipe's output, its multiplicity overridden by the step's `nb_output` or
+        `multiple_output`, and a single result keeps the pipe's presence.
+        """
+        if self.batch_params is not None:
+            return StuffSpec(concept=step_pipe.output.concept, multiplicity=True)
+        multiplicity_resolution = output_multiplicity_to_apply(
+            base_multiplicity=step_pipe.output.multiplicity,
+            override_multiplicity=self.output_multiplicity,
+        )
+        multiplicity: VariableMultiplicity | None
+        if not multiplicity_resolution.is_multiple_outputs_enabled:
+            multiplicity = None
+        elif multiplicity_resolution.specific_output_count is not None:
+            multiplicity = multiplicity_resolution.specific_output_count
+        else:
+            multiplicity = True
+        presence = step_pipe.output.presence if multiplicity is None else PresenceMarker.PLAIN
+        return StuffSpec(concept=step_pipe.output.concept, multiplicity=multiplicity, presence=presence)
 
     async def run_pipe(
         self,

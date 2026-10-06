@@ -9,7 +9,8 @@ resolving sub-pipes through the hub:
   that step. A step overwrites its result's name, and also whatever a nested sequence or condition
   outcome writes, since those run on the caller's memory; after a step that may write a name the
   walk cannot know, nothing more is followed. A step's batch parameters map the list slot to its
-  item slot.
+  item slot. A binding step that binds a single value makes its result stand for the entry path it
+  reads, a renamed copy for its root's own path; one gathering a list stops its result being followed.
 - **Parallel.** Every branch is visited.
 - **Batch.** The list slot maps to the item slot, and the branch pipe is visited.
 - **Condition.** Every outcome is visited, and whatever is found below it is conditional.
@@ -42,6 +43,7 @@ from pipelex.kernel.extract_ops import resolve_extract_setting
 from pipelex.kernel.judgment_ops import judgment_setting_of_choice
 from pipelex.kernel.llm_ops import resolve_llm_setting_for_object, resolve_llm_setting_for_text
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
+from pipelex.pipe_controllers.binding.binding_step import BindingStep
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
@@ -323,8 +325,19 @@ def _visit_sequence(
     *, sequence: PipeSequence, frame: _Frame, is_conditional: bool, visiting: frozenset[str], consumers: list[FileInputConsumer]
 ) -> None:
     liftable_refs = {liftable_step.pipe_ref for liftable_step in sequence.analyze_taint().liftable_steps}
+    typed_flow = sequence.build_typed_flow() if any(isinstance(step, BindingStep) for step in sequence.sequential_sub_pipes) else None
     step_frame = dict(frame)
-    for sub_pipe in sequence.sequential_sub_pipes:
+    for step_index, sub_pipe in enumerate(sequence.sequential_sub_pipes):
+        if isinstance(sub_pipe, BindingStep):
+            # A binding stores a copy of the value at its path: a single value stands for the entry path it reads,
+            # while a list gathered across items has no one entry path, so it stops being followed, as an unknown would.
+            derivation = typed_flow.binding_derivations.get(step_index) if typed_flow is not None else None
+            bound_path = _tracked_path(frame=step_frame, variable_path=sub_pipe.from_path) if derivation and not derivation.is_plural else None
+            if bound_path is None:
+                step_frame.pop(sub_pipe.output_name, None)
+            else:
+                step_frame[sub_pipe.output_name] = bound_path
+            continue
         step_pipe = _visit_sub_pipe(
             sub_pipe=sub_pipe, frame=step_frame, is_conditional=is_conditional, liftable_refs=liftable_refs, visiting=visiting, consumers=consumers
         )
@@ -377,7 +390,9 @@ def _pipe_writes(*, pipe: PipeAbstract, visiting: frozenset[str]) -> _Writes:
     if isinstance(pipe, PipeSequence):
         return _merge_writes(
             writes=[
-                _sub_pipe_writes(sub_pipe=sub_pipe, step_pipe=get_optional_pipe(pipe_code=sub_pipe.pipe_code), visiting=visiting)
+                _Writes(names=frozenset({sub_pipe.output_name}), may_write_any=False)
+                if isinstance(sub_pipe, BindingStep)
+                else _sub_pipe_writes(sub_pipe=sub_pipe, step_pipe=get_optional_pipe(pipe_code=sub_pipe.pipe_code), visiting=visiting)
                 for sub_pipe in pipe.sequential_sub_pipes
             ]
         )

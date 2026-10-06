@@ -1,0 +1,27 @@
+{
+  "shipments": {
+    "concept": "depot_loading.Shipment",
+    "content": [
+      {
+        "parcels": [
+          {
+            "tracking_number": "QP-1001"
+          },
+          {
+            "tracking_number": "QP-1002"
+          }
+        ]
+      },
+      {
+        "parcels": []
+      },
+      {
+        "parcels": [
+          {
+            "tracking_number": "BR-2001"
+          }
+        ]
+      }
+    ]
+  }
+}

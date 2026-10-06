@@ -241,7 +241,7 @@ class TestCrateNormalization:
         result = normalize_crate(_authored_crate(), mthds_version=MTHDS_TEST_VERSION)
         pipeline = result.pipes["scoring.pipeline"]
         assert isinstance(pipeline, PipeSequenceBlueprint)
-        assert pipeline.steps[0].pipe == "scoring.compute_score"
+        assert pipeline.pipe_steps[0].pipe == "scoring.compute_score"
 
     @pytest.mark.parametrize("crate_factory", [_authored_crate, _closed_all_kinds_crate])
     def test_normalized_crate_is_closed_over_its_pipe_refs(self, crate_factory: Callable[[], LibraryCrate]):
@@ -276,7 +276,7 @@ class TestCrateNormalization:
         result = normalize_crate(_cross_domain_crate(), mthds_version=MTHDS_TEST_VERSION)
         sequence = result.pipes["orchestrator.run_all"]
         assert isinstance(sequence, PipeSequenceBlueprint)
-        assert sequence.steps[0].pipe == "orchestrator.present_as_markdown"
+        assert sequence.pipe_steps[0].pipe == "orchestrator.present_as_markdown"
 
         parallel = result.pipes["orchestrator.fan_out"]
         assert isinstance(parallel, PipeParallelBlueprint)
@@ -301,7 +301,7 @@ class TestCrateNormalization:
         result = normalize_crate(_authored_crate(), mthds_version=MTHDS_TEST_VERSION)
         pipeline = result.pipes["scoring.pipeline"]
         assert isinstance(pipeline, PipeSequenceBlueprint)
-        assert pipeline.steps[0].pipe == "scoring.compute_score"
+        assert pipeline.pipe_steps[0].pipe == "scoring.compute_score"
         assert "scoring.compute_score" in result.pipes
 
     def test_special_outcomes_are_left_alone(self):
@@ -340,7 +340,7 @@ class TestCrateNormalization:
         # steps is a row that only half-holds.
         sequence = result.pipes["orchestrator.run_all"]
         assert isinstance(sequence, PipeSequenceBlueprint)
-        assert sequence.steps[0].pipe == "orchestrator.present_as_markdown"
+        assert sequence.pipe_steps[0].pipe == "orchestrator.present_as_markdown"
 
         parallel = result.pipes["orchestrator.fan_out"]
         assert isinstance(parallel, PipeParallelBlueprint)
@@ -378,7 +378,7 @@ class TestCrateNormalization:
         result = normalize_crate(crate, mthds_version=MTHDS_TEST_VERSION)
         sequence = result.pipes["orchestrator.run_all"]
         assert isinstance(sequence, PipeSequenceBlueprint)
-        assert sequence.steps[0].pipe == "orchestrator.nowhere_to_be_found"
+        assert sequence.pipe_steps[0].pipe == "orchestrator.nowhere_to_be_found"
 
     def test_refinement_with_structured_base_is_flattened(self):
         """Refining a concept with a structure adopts that (qualified) structure and drops `refines`."""
