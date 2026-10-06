@@ -150,6 +150,22 @@ default_outcome = "fail"
 parcel = "swap_for_parcel"
 invoice = "swap_for_invoice"
 
+[pipe.label_swapped]
+type = "PipeCompose"
+description = "Writes the label of the parcel a swap stored"
+inputs = { swapped = "Parcel" }
+output = "Text"
+template = "Parcel of $swapped.weight kilograms"
+
+[pipe.weigh_anything]
+type = "PipeSequence"
+description = "Weighs a parcel, declaring its output as whatever it is"
+inputs = { amount = "Number" }
+output = "Anything"
+steps = [
+  { pipe = "weigh_parcel", result = "weighed" },
+]
+
 [pipe.render_then_archive]
 type = "PipeSequence"
 description = "Renders a note written in Markdown, then archives it as a text"
@@ -388,6 +404,44 @@ class TestInterStepConceptCheck:
                 ),
                 id="a-nested-sequence-binding-over-what-it-declares-given-another-concept",
             ),
+            pytest.param(
+                # A value stored as `Anything` is not known before the run, but its multiplicity is.
+                _flow(
+                    inputs='amount = "Number"',
+                    output="Text",
+                    steps=['{ pipe = "weigh_anything", result = "parcels" }', '{ pipe = "list_parcels", result = "manifest" }'],
+                ),
+                (
+                    "In pipe 'flow', step 2 (pipe 'list_parcels') reads 'parcels' as 'Parcel[]', but step 1 (pipe 'weigh_anything') stores "
+                    "it as 'Anything'."
+                ),
+                id="a-single-anything-read-as-a-list",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='amount = "Number"',
+                    output="Text[]",
+                    steps=[
+                        '{ pipe = "weigh_anything", result = "parcels" }',
+                        '{ pipe = "label_parcel", batch_over = "parcels", batch_as = "parcel", result = "labels" }',
+                    ],
+                ),
+                (
+                    "In pipe 'flow', step 2 (pipe 'label_parcel') batches over 'parcels', which step 1 (pipe 'weigh_anything') stores as a "
+                    "single 'Anything', not a list"
+                ),
+                id="a-batch-over-a-single-anything",
+            ),
+            pytest.param(
+                # The sequence's own declaration is known: declaring `Anything` where a step reads a `Parcel` is refused.
+                _flow(
+                    inputs='record = "Anything"',
+                    output="Text",
+                    steps=['{ pipe = "label_record", result = "label" }'],
+                ),
+                "In pipe 'flow', input 'record' is declared as 'Anything' but its step needs 'Parcel'. Update the input to 'Parcel'.",
+                id="a-declared-anything-read-as-a-concept",
+            ),
         ],
     )
     def test_a_step_reading_what_the_flow_does_not_carry_is_refused(self, load_empty_library: Callable[[], str], flow: str, message: str) -> None:
@@ -523,11 +577,40 @@ class TestInterStepConceptCheck:
                 ),
                 id="a-nested-sequence-binding-over-what-it-declares-given-it",
             ),
+            pytest.param(
+                # A condition whose outcomes produce different concepts declares `Anything`: what it stores is not known
+                # before the run, so a step reading it as a concept is assumed to get it, as from a pipe that does not resolve.
+                _flow(
+                    inputs='amount = "Number", mode = "Text"',
+                    output="Text",
+                    steps=['{ pipe = "swap_record", result = "swapped" }', '{ pipe = "label_swapped", result = "label" }'],
+                ),
+                id="a-condition-result-declared-anything-read-as-a-concept",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='amount = "Number"',
+                    output="Text",
+                    steps=['{ pipe = "weigh_anything", result = "parcel" }', '{ pipe = "label_parcel", result = "label" }'],
+                ),
+                id="a-nested-sequence-result-declared-anything-read-as-a-concept",
+            ),
+            pytest.param(
+                _flow(
+                    inputs='amounts = "Number[]"',
+                    output="Text[]",
+                    steps=[
+                        '{ pipe = "weigh_anything", batch_over = "amounts", batch_as = "amount", result = "parcels" }',
+                        '{ pipe = "label_parcel", batch_over = "parcels", batch_as = "parcel", result = "labels" }',
+                    ],
+                ),
+                id="a-batch-over-a-list-of-anything-whose-items-are-read-as-a-concept",
+            ),
         ],
     )
     def test_a_step_reading_what_the_flow_carries_validates(self, load_empty_library: Callable[[], str], flow: str) -> None:
-        """A refined concept satisfies a step reading its parent, a batched step always stores a list, and a step calling a nested
-        sequence is checked against what the nested sequence declares.
+        """A refined concept satisfies a step reading its parent, a batched step always stores a list, a step calling a nested
+        sequence is checked against what the nested sequence declares, and a value a step stores as `Anything` satisfies any concept.
         """
         sequence = _load_flow(flow=flow, library_id=load_empty_library())
 
@@ -600,6 +683,25 @@ class TestInterStepConceptCheck:
         assert record_slot.stuff_spec is None
         assert record_slot.disagreement is None
         assert record_slot.producer_step_index == 0
+
+    def test_a_binding_over_a_value_stored_as_anything_is_refused(self, load_empty_library: Callable[[], str]) -> None:
+        """A value stored as `Anything` satisfies a step reading it as a concept, but a binding cannot walk a path through it."""
+        flow = _flow(
+            inputs='amount = "Number", mode = "Text"',
+            output="Number",
+            steps=['{ pipe = "swap_record", result = "swapped" }', '{ from = "swapped.weight", result = "weight" }'],
+        )
+
+        with pytest.raises(PipeValidationError) as exc_info:
+            _load_flow(flow=flow, library_id=load_empty_library())
+
+        assert exc_info.value.error_type == PipeValidationErrorType.BINDING_PATH_UNRESOLVED
+        assert exc_info.value.pipe_code == "flow"
+        assert (
+            "In pipe 'flow', the binding step { from = \"swapped.weight\", result = \"weight\" } cannot be derived. Cannot bind 'swapped.weight'"
+            in str(exc_info.value)
+        )
+        assert "which is structureless by definition, so the segment 'weight' has no structure to walk" in str(exc_info.value)
 
     @pytest.mark.parametrize(
         ("pipe_code", "variable_name", "expected_spec"),

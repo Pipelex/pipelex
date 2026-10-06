@@ -21,6 +21,10 @@ inputs and its absence-taint walk read them from it too, so the three analyses a
 The flow serves three checks: a binding types its root from it, every pipe step is checked against the spec
 the flow carries for each name its pipe declares, whichever declared input, pipe step or binding put it there,
 and a binding ending the sequence is checked against the sequence's output.
+
+A pipe step's result is typed by the output its pipe declares. A pipe declaring `Anything` or `Dynamic`, as a
+condition whose outcomes produce different concepts must, stores a value whose concept is known only when it
+runs, so a step reading it is assumed to get the concept it reads, as from a pipe that does not resolve.
 """
 
 from typing import Any, NamedTuple, Self

@@ -361,9 +361,10 @@ class PipeSequence(PipeController):
         the name accepts it. Reading the declaration never walks the pipe's own steps, so the sequence's `needed_inputs` can ask
         this check which of its declarations it accepts.
 
-        A slot the flow cannot type, a value a pipe that does not resolve stored, is assumed to deliver. A slot whose possible
-        values have different specs is checked against each of them. The refusal is returned rather than raised, so that the
-        same check answers which declared inputs are accepted (`_accepted_declared_names`).
+        A slot the flow cannot type, a value a pipe that does not resolve stored, is assumed to deliver, and so is the concept of
+        a value a pipe step stored as `Anything` or `Dynamic`. A slot whose possible values have different specs is checked
+        against each of them. The refusal is returned rather than raised, so that the same check answers which declared inputs
+        are accepted (`_accepted_declared_names`).
 
         Returns:
             ``INPUT_STUFF_SPEC_MISMATCH`` naming the step, the name and what stored it, or `None`.
@@ -483,8 +484,9 @@ class PipeSequence(PipeController):
         `None` when the value satisfies the read.
 
         A refined concept satisfies its parent, and a fixed count a variable list; a flexible need (`Dynamic`, `Anything`)
-        takes any value. The message names what stored the value: a binding step, an earlier pipe step, or the sequence's
-        own declared input.
+        takes any value, and a value a pipe step stored as `Anything` or `Dynamic` has a concept known only when it runs, so
+        its concept is assumed to satisfy the read while its multiplicity is still checked. The message names what stored the
+        value: a binding step, an earlier pipe step, or the sequence's own declared input.
 
         Returns:
             ``INPUT_STUFF_SPEC_MISMATCH`` naming the step, the name and what stored it, or `None`.
@@ -498,10 +500,11 @@ class PipeSequence(PipeController):
             if slot.disagreement is None:
                 # A value a pipe that does not resolve at validation stored: nothing types it, so it is assumed to deliver.
                 return None
+            # Every value a disagreement lists is one a step's run may leave, so each is read as a pipe step's store.
             unreadable_specs = [
                 stored_spec.stuff_spec
                 for stored_spec in slot.disagreement.stored_specs
-                if not self._is_readable_as(provided_spec=stored_spec.stuff_spec, needed_spec=needed_spec)
+                if not self._is_readable_as(provided_spec=stored_spec.stuff_spec, needed_spec=needed_spec, is_stored_by_pipe_step=True)
             ]
             if not unreadable_specs:
                 return None
@@ -519,7 +522,7 @@ class PipeSequence(PipeController):
                 provided_concept_code=unreadable_specs[0].concept.concept_ref,
                 required_concept_codes=[needed_spec.concept.concept_ref],
             )
-        if self._is_readable_as(provided_spec=provided_spec, needed_spec=needed_spec):
+        if self._is_readable_as(provided_spec=provided_spec, needed_spec=needed_spec, is_stored_by_pipe_step=self._is_stored_by_pipe_step(slot=slot)):
             return None
         provided_ref = self._render_spec(stuff_spec=provided_spec)
         declare_remedy = f"Declare the input as '{provided_ref}' in pipe '{step_pipe_code}'"
@@ -544,12 +547,34 @@ class PipeSequence(PipeController):
             required_concept_codes=[needed_spec.concept.concept_ref],
         )
 
-    @staticmethod
-    def _is_readable_as(*, provided_spec: StuffSpec, needed_spec: StuffSpec) -> bool:
-        """Whether a value of `provided_spec` satisfies a read as `needed_spec`: a compatible concept and multiplicity."""
+    @classmethod
+    def _is_readable_as(cls, *, provided_spec: StuffSpec, needed_spec: StuffSpec, is_stored_by_pipe_step: bool) -> bool:
+        """Whether a value of `provided_spec` satisfies a read as `needed_spec`: a compatible concept and multiplicity, the
+        concept of a value a pipe step stored being assumed to satisfy any read when it is known only when it runs.
+        """
         if not is_multiplicity_compatible(source_multiplicity=provided_spec.multiplicity, target_multiplicity=needed_spec.multiplicity):
             return False
+        if is_stored_by_pipe_step and cls._is_concept_known_only_at_run(stuff_spec=provided_spec):
+            return True
         return get_concept_library().is_compatible(tested_concept=provided_spec.concept, wanted_concept=needed_spec.concept)
+
+    @staticmethod
+    def _is_concept_known_only_at_run(*, stuff_spec: StuffSpec) -> bool:
+        """Whether a pipe's output spec leaves the concept of the value it stores to the run: `Anything` or `Dynamic`, which a pipe
+        declares when what it produces varies, as a condition whose outcomes produce different concepts must declare `Anything`.
+
+        Only a pipe step's store is read this way. The run stores the concept the pipe actually produced, which nothing knows
+        before it, so the step reading it is assumed to get what it reads, as from a pipe that does not resolve at validation.
+        The sequence's own declared input is a contract its caller is held to, and a binding over a field holding `Anything`
+        binds a value whose concept is `Anything`, so both are checked as any other value. The multiplicity, which the pipe's
+        declaration and the step's batch or count set, is checked whatever the concept.
+        """
+        return stuff_spec.concept.code in {NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING}
+
+    @staticmethod
+    def _is_stored_by_pipe_step(*, slot: FlowSlot) -> bool:
+        """Whether an earlier pipe step stored the slot's value, as its result or as a name its pipe stores besides."""
+        return slot.producer_step_index is not None and slot.binding_step_index is None
 
     def _batched_list_refusal(
         self, *, step_index: int, step_pipe_code: str, batch_params: BatchParams, slot: FlowSlot, item_need: StuffSpec | None
@@ -559,7 +584,8 @@ class PipeSequence(PipeController):
 
         A dotted `batch_over` is named by the path its author wrote, never by the private name the sequence bound it under.
         A value the flow cannot type is assumed to deliver; one whose possible values have different specs is checked
-        against each of them.
+        against each of them. A list a pipe step stored as `Anything[]` or `Dynamic[]` holds items whose concept is known
+        only when it runs, so they are assumed to be what the pipe reads, while a single value is still no list.
 
         Returns:
             ``INPUT_STUFF_SPEC_MISMATCH``, as a batch over a value that is not a list is refused, naming the step and what
@@ -573,6 +599,8 @@ class PipeSequence(PipeController):
         stored_specs: list[StuffSpec]
         batched_phrase: str
         list_label = list_name
+        # Every value a disagreement lists is one a step's run may leave, so each is read as a pipe step's store.
+        is_stored_by_pipe_step = slot.stuff_spec is None or self._is_stored_by_pipe_step(slot=slot)
         if slot.stuff_spec is not None:
             stored_specs = [slot.stuff_spec]
             if isinstance(binding_step, BindingStep):
@@ -608,6 +636,8 @@ class PipeSequence(PipeController):
                     provided_concept_code=stored_spec.concept.concept_ref,
                 )
             if item_need is None or item_need.concept.code in {NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING}:
+                continue
+            if is_stored_by_pipe_step and self._is_concept_known_only_at_run(stuff_spec=stored_spec):
                 continue
             if get_concept_library().is_compatible(tested_concept=stored_spec.concept, wanted_concept=item_need.concept):
                 continue
