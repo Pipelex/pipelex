@@ -46,16 +46,31 @@ class PipeValidationErrorType(StrEnum):
     INADEQUATE_OUTPUT_CONCEPT = "inadequate_output_concept"
     INADEQUATE_OUTPUT_MULTIPLICITY = "inadequate_output_multiplicity"
 
-    CIRCULAR_DEPENDENCY_ERROR = "circular_dependency_error"
-
     LLM_OUTPUT_CANNOT_BE_IMAGE = "llm_output_cannot_be_image"
     INVALID_PIPE_CODE_SYNTAX = "invalid_pipe_code_syntax"
+    # An input name that is not a plain snake_case identifier, a dotted name (`invoice.total`) included,
+    # on any pipe's `inputs` or as a PipeBatch's `input_list_name`; or a name taking the `_bound_` prefix
+    # the runtime reserves for the bound list of a dotted `batch_over`, as a pipe step's or a parallel
+    # branch's `result`, `batch_as` or plain `batch_over`, or a PipeBatch's `input_item_name`. Detected at
+    # blueprint parse time; a dotted name whose root the same `inputs` table declares carries the
+    # enrichment the fix planner turns into deleting the key.
+    INVALID_INPUT_NAME = "invalid_input_name"
     UNKNOWN_PIPE_TYPE = "unknown_pipe_type"
     # A `[pipe.x]` section declared no `type` yet carries fields beyond the signature contract
     # (`description`, `inputs`, `output`). The author is describing an implementation without naming
     # its type — the counterpart to UNKNOWN_PIPE_TYPE (a declared-but-invalid type).
     MISSING_PIPE_TYPE = "missing_pipe_type"
     BATCH_ITEM_NAME_COLLISION = "batch_item_name_collision"
+
+    # A PipeSequence step whose shape breaks the binding-step rules: a step carrying both `pipe` and `from`,
+    # a binding step without `result` or carrying a pipe step's `nb_output`, `multiple_output`, `batch_over`
+    # or `batch_as`, a binding `result` that is not a plain input name, a `from` outside the path grammar, or
+    # a binding step in a PipeParallel's `branches`. Detected at blueprint parse time, as the schema does.
+    BINDING_STEP_INVALID = "binding_step_invalid"
+    # A binding step's `from` path that the declared structures cannot walk: a segment naming no field, a
+    # segment after a leaf, a dict or a list with no `item_type`, a concept with no walkable structure, or a
+    # path ending on a list with no `item_type`. Detected when the sequence is validated against the library.
+    BINDING_PATH_UNRESOLVED = "binding_path_unresolved"
 
     # Presence-marker grammar misuse, detected at blueprint parse time: a presence marker
     # (`?` or `!`) combined with a multiplicity suffix, or `!` on an output (D1, D4 of the
@@ -70,6 +85,11 @@ class PipeValidationErrorType(StrEnum):
     OPTIONAL_OUTPUT_REQUIRED = "optional_output_required"
     OPTIONAL_INPUT_UNGUARDED = "optional_input_unguarded"
     OPTIONAL_BRANCH_REQUIRED_FIELD = "optional_branch_required_field"
+
+    # A template reads a name starting with an underscore that is not one of an input's declared
+    # metadata fields (`_stuff_name`, `_content_class`, `_concept_code`, `_stuff_code`). The template
+    # sandbox refuses such a read at render time; the load-time lint names the pipe and the template.
+    TEMPLATE_PRIVATE_NAME = "template_private_name"
 
     # Advisory-only (rides the validation report's `warnings` array, never raised as an error):
     # a `!` (force) input whose slot is guaranteed present in every analyzed flow — the
@@ -90,6 +110,14 @@ class PipeValidationErrorType(StrEnum):
     # merged library (a referenced concept or dependency pipe does not resolve).
     UNRESOLVED_CONCEPT = "unresolved_concept"
     UNRESOLVED_PIPE_DEPENDENCY = "unresolved_pipe_dependency"
+    # A reference from outside a dependency package to a pipe the package loads but does not export: the pipe
+    # exists, so the remedy is to export it in the package or to call one of its public pipes.
+    UNEXPORTED_PIPE_DEPENDENCY = "unexported_pipe_dependency"
+
+    # A pipe's model field names a handle, alias, preset or waterfall its model deck does not define,
+    # refused when the pipe is built. The item carries the field's path, the reference as written, the
+    # model type and the deck's close matches, so the author can pick one.
+    UNKNOWN_MODEL = "unknown_model"
 
     # Generic fallback for unexpected validation errors
     UNKNOWN_VALIDATION_ERROR = "unknown_validation_error"
@@ -107,22 +135,27 @@ class PipeValidationErrorType(StrEnum):
             case (
                 PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
-                | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
                 | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
+                | PipeValidationErrorType.INVALID_INPUT_NAME
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
                 | PipeValidationErrorType.MISSING_PIPE_TYPE
                 | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.BINDING_STEP_INVALID
+                | PipeValidationErrorType.BINDING_PATH_UNRESOLVED
                 | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
                 | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
                 | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
                 | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+                | PipeValidationErrorType.TEMPLATE_PRIVATE_NAME
                 | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
                 | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
                 | PipeValidationErrorType.INPUT_PRESENCE_VACUOUS
                 | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
                 | PipeValidationErrorType.UNRESOLVED_CONCEPT
                 | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNKNOWN_MODEL
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
                 return False
@@ -137,22 +170,27 @@ class PipeValidationErrorType(StrEnum):
                 PipeValidationErrorType.MISSING_INPUT_VARIABLE
                 | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE
                 | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
-                | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
                 | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
+                | PipeValidationErrorType.INVALID_INPUT_NAME
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
                 | PipeValidationErrorType.MISSING_PIPE_TYPE
                 | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.BINDING_STEP_INVALID
+                | PipeValidationErrorType.BINDING_PATH_UNRESOLVED
                 | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
                 | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
                 | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
                 | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+                | PipeValidationErrorType.TEMPLATE_PRIVATE_NAME
                 | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
                 | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
                 | PipeValidationErrorType.INPUT_PRESENCE_VACUOUS
                 | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
                 | PipeValidationErrorType.UNRESOLVED_CONCEPT
                 | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNKNOWN_MODEL
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
                 return False
@@ -174,22 +212,27 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE
                 | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
-                | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
                 | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
+                | PipeValidationErrorType.INVALID_INPUT_NAME
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
                 | PipeValidationErrorType.MISSING_PIPE_TYPE
                 | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.BINDING_STEP_INVALID
+                | PipeValidationErrorType.BINDING_PATH_UNRESOLVED
                 | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
                 | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
                 | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
                 | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+                | PipeValidationErrorType.TEMPLATE_PRIVATE_NAME
                 | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
                 | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
                 | PipeValidationErrorType.INPUT_PRESENCE_VACUOUS
                 | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
                 | PipeValidationErrorType.UNRESOLVED_CONCEPT
                 | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNKNOWN_MODEL
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
                 return False
@@ -206,21 +249,26 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
-                | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
                 | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
+                | PipeValidationErrorType.INVALID_INPUT_NAME
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
                 | PipeValidationErrorType.MISSING_PIPE_TYPE
                 | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.BINDING_STEP_INVALID
+                | PipeValidationErrorType.BINDING_PATH_UNRESOLVED
                 | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
                 | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
                 | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
                 | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+                | PipeValidationErrorType.TEMPLATE_PRIVATE_NAME
                 | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
                 | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
                 | PipeValidationErrorType.INPUT_PRESENCE_VACUOUS
                 | PipeValidationErrorType.UNRESOLVED_CONCEPT
                 | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNKNOWN_MODEL
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
                 return False
@@ -242,21 +290,103 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
                 | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
-                | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
+                | PipeValidationErrorType.INVALID_INPUT_NAME
                 | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
                 | PipeValidationErrorType.MISSING_PIPE_TYPE
                 | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.BINDING_STEP_INVALID
+                | PipeValidationErrorType.BINDING_PATH_UNRESOLVED
                 | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
                 | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
                 | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
                 | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+                | PipeValidationErrorType.TEMPLATE_PRIVATE_NAME
                 | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
                 | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
                 | PipeValidationErrorType.INPUT_PRESENCE_VACUOUS
                 | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
                 | PipeValidationErrorType.UNRESOLVED_CONCEPT
                 | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNKNOWN_MODEL
+                | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
+            ):
+                return False
+
+    @property
+    def is_invalid_input_name(self) -> bool:
+        """True for the invalid-input-name refusal, which the fix planner acts on when it is enriched.
+
+        Gates entry to ``delete-redundant-dotted-input``; the planner still requires the
+        ``redundant_input_name`` enrichment, so a lone dotted name or a malformed one, whose repair is the
+        author's to choose, falls through as ``None`` even though it shares this ``error_type``.
+        """
+        match self:
+            case PipeValidationErrorType.INVALID_INPUT_NAME:
+                return True
+            case (
+                PipeValidationErrorType.MISSING_INPUT_VARIABLE
+                | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE
+                | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
+                | PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
+                | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
+                | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
+                | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
+                | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
+                | PipeValidationErrorType.MISSING_PIPE_TYPE
+                | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.BINDING_STEP_INVALID
+                | PipeValidationErrorType.BINDING_PATH_UNRESOLVED
+                | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
+                | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
+                | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
+                | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+                | PipeValidationErrorType.TEMPLATE_PRIVATE_NAME
+                | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
+                | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
+                | PipeValidationErrorType.INPUT_PRESENCE_VACUOUS
+                | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
+                | PipeValidationErrorType.UNRESOLVED_CONCEPT
+                | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNKNOWN_MODEL
+                | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
+            ):
+                return False
+
+    @property
+    def is_unknown_model(self) -> bool:
+        """True for the unknown-model refusal, which the fix planner renames when the deck offers one close match."""
+        match self:
+            case PipeValidationErrorType.UNKNOWN_MODEL:
+                return True
+            case (
+                PipeValidationErrorType.MISSING_INPUT_VARIABLE
+                | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE
+                | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
+                | PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
+                | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
+                | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
+                | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
+                | PipeValidationErrorType.INVALID_INPUT_NAME
+                | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
+                | PipeValidationErrorType.MISSING_PIPE_TYPE
+                | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.BINDING_STEP_INVALID
+                | PipeValidationErrorType.BINDING_PATH_UNRESOLVED
+                | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
+                | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
+                | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
+                | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+                | PipeValidationErrorType.TEMPLATE_PRIVATE_NAME
+                | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
+                | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
+                | PipeValidationErrorType.INPUT_PRESENCE_VACUOUS
+                | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
+                | PipeValidationErrorType.UNRESOLVED_CONCEPT
+                | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
                 return False
@@ -275,18 +405,18 @@ class PipeFactoryErrorType(StrEnum):
 
 
 class ValidationResidualErrorType(StrEnum):
-    """The ``error_type`` of a validation residual — a failure with no stage-level error data.
+    """The ``error_type`` of a failure no validation stage classifies into a code.
 
-    A residual is what the wire projection emits when a bundle failed but no categorized
-    validation stage produced structured data to report. There is exactly one residual that names
-    itself: a dry-run failure surfaces a single message from a raised ``DryRunError`` / ``PipeRunError``,
-    so the item is tagged with that exception's own class name.
+    There is exactly one that names itself: a dry-run failure is raised as an error object, a
+    ``DryRunError`` carrying one located failure per pipe whose dry run failed, so each of its items is
+    tagged with that exception's own class name.
 
-    The other residual — the parse-level one, for a bundle that could not be turned into a
-    blueprint at all (a TOML-syntax error, an empty blueprint, an elaborator failure) — carries no
-    ``error_type`` and therefore no member here. That is not an omission: it fires for several
-    distinct underlying errors, and inventing one code for all of them would tell a consumer it
-    knows which fault occurred when it does not. Its message is the authoritative diagnostic.
+    The items no code identifies — the parse-level residual, for a bundle that could not be turned
+    into a blueprint at all (a TOML-syntax error, an empty blueprint, an elaborator failure), and a
+    pydantic error no categorizer knows — carry no ``error_type`` and therefore no member here. That
+    is not an omission: they stand for many distinct underlying errors, and inventing one code for all
+    of them would tell a consumer it knows which fault occurred when it does not. Their message is the
+    authoritative diagnostic.
     """
 
     DRY_RUN_ERROR = "DryRunError"

@@ -3,7 +3,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
-from pipelex.tools.uri.uri_resolver import make_base64_url_from_any_uri
+from pipelex.tools.uri.uri_base64 import make_base64_url_from_any_uri
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -13,7 +13,7 @@ class TestUriResolverErrorHandling:
     async def test_http_404_error_propagates(self, mocker: MockerFixture) -> None:
         """Test that HTTP 404 errors are propagated through make_base64_url_from_any_uri."""
         mocker.patch(
-            "pipelex.tools.misc.base64_utils.fetch_file_from_url_httpx",
+            "pipelex.tools.uri.uri_base64.fetch_file_from_url_httpx",
             side_effect=httpx.HTTPStatusError(
                 message="404 Not Found",
                 request=httpx.Request("GET", "https://example.com/not-found.png"),
@@ -29,7 +29,7 @@ class TestUriResolverErrorHandling:
     async def test_http_500_error_propagates(self, mocker: MockerFixture) -> None:
         """Test that HTTP 500 errors are propagated through make_base64_url_from_any_uri."""
         mocker.patch(
-            "pipelex.tools.misc.base64_utils.fetch_file_from_url_httpx",
+            "pipelex.tools.uri.uri_base64.fetch_file_from_url_httpx",
             side_effect=httpx.HTTPStatusError(
                 message="500 Internal Server Error",
                 request=httpx.Request("GET", "https://example.com/error"),
@@ -45,7 +45,7 @@ class TestUriResolverErrorHandling:
     async def test_http_403_forbidden_error_propagates(self, mocker: MockerFixture) -> None:
         """Test that HTTP 403 Forbidden errors are propagated."""
         mocker.patch(
-            "pipelex.tools.misc.base64_utils.fetch_file_from_url_httpx",
+            "pipelex.tools.uri.uri_base64.fetch_file_from_url_httpx",
             side_effect=httpx.HTTPStatusError(
                 message="403 Forbidden",
                 request=httpx.Request("GET", "https://example.com/forbidden.png"),
@@ -61,7 +61,7 @@ class TestUriResolverErrorHandling:
     async def test_connection_error_propagates(self, mocker: MockerFixture) -> None:
         """Test that connection errors are propagated."""
         mocker.patch(
-            "pipelex.tools.misc.base64_utils.fetch_file_from_url_httpx",
+            "pipelex.tools.uri.uri_base64.fetch_file_from_url_httpx",
             side_effect=httpx.ConnectError("Connection refused"),
         )
 
@@ -71,7 +71,7 @@ class TestUriResolverErrorHandling:
     async def test_timeout_error_propagates(self, mocker: MockerFixture) -> None:
         """Test that timeout errors are propagated."""
         mocker.patch(
-            "pipelex.tools.misc.base64_utils.fetch_file_from_url_httpx",
+            "pipelex.tools.uri.uri_base64.fetch_file_from_url_httpx",
             side_effect=httpx.TimeoutException("Request timed out"),
         )
 
@@ -81,7 +81,7 @@ class TestUriResolverErrorHandling:
     async def test_dns_error_propagates(self, mocker: MockerFixture) -> None:
         """Test that DNS resolution errors are propagated."""
         mocker.patch(
-            "pipelex.tools.misc.base64_utils.fetch_file_from_url_httpx",
+            "pipelex.tools.uri.uri_base64.fetch_file_from_url_httpx",
             side_effect=httpx.ConnectError("DNS resolution failed"),
         )
 
@@ -120,7 +120,7 @@ class TestUriResolverErrorHandling:
     async def test_ssl_certificate_error_propagates(self, mocker: MockerFixture) -> None:
         """Test that SSL certificate errors are propagated."""
         mocker.patch(
-            "pipelex.tools.misc.base64_utils.fetch_file_from_url_httpx",
+            "pipelex.tools.uri.uri_base64.fetch_file_from_url_httpx",
             side_effect=httpx.ConnectError("SSL certificate verification failed"),
         )
 
@@ -150,7 +150,7 @@ class TestUriResolverErrorHandling:
     ) -> None:
         """Test that various HTTP status codes are properly propagated."""
         mocker.patch(
-            "pipelex.tools.misc.base64_utils.fetch_file_from_url_httpx",
+            "pipelex.tools.uri.uri_base64.fetch_file_from_url_httpx",
             side_effect=httpx.HTTPStatusError(
                 message=f"{status_code} {topic}",
                 request=httpx.Request("GET", f"https://example.com/{topic}"),

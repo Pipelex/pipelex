@@ -5,13 +5,8 @@ import filecmp
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from rich.console import Group
-from rich.syntax import Syntax
-from rich.table import Table
-from rich.text import Text
-
 from pipelex.tools.misc.file_utils import is_excluded_by_name
-from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
+from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode, require_rich_for_rendering
 
 if TYPE_CHECKING:
     from collections.abc import Set as AbstractSet
@@ -32,7 +27,7 @@ def has_diff_dirs(
     Args:
         dir1: First directory path.
         dir2: Second directory path.
-        exclude_files: Set of file names to exclude from comparison (e.g., {"pipelex_service.toml"}).
+        exclude_files: Set of file names to exclude from comparison (e.g., {"pipelex_override.toml"}).
         exclude_dirs: Set of directory names to exclude from comparison (e.g., {"storage"}).
         exclude_patterns: Set of glob patterns whose matching file names are excluded from
             comparison (e.g., {"*.bak.*"}). For artifacts whose names carry a timestamp or another
@@ -227,7 +222,7 @@ def make_diff_dirs_pretty(
     Args:
         dir1: First directory path.
         dir2: Second directory path.
-        exclude_files: Set of file names to exclude from comparison (e.g., {"pipelex_service.toml"}).
+        exclude_files: Set of file names to exclude from comparison (e.g., {"pipelex_override.toml"}).
         exclude_dirs: Set of directory names to exclude from comparison (e.g., {"storage"}).
         exclude_patterns: Set of glob patterns whose matching file names are excluded from
             comparison (e.g., {"*.bak.*"}). Keep it equal to what the matching `has_diff_dirs` call
@@ -238,6 +233,12 @@ def make_diff_dirs_pretty(
         and different files with full diff content. For different files, indicates
         which version is newer based on modification time.
     """
+    require_rich_for_rendering()
+    from rich.console import Group
+    from rich.syntax import Syntax
+    from rich.table import Table
+    from rich.text import Text
+
     dir1 = Path(dir1)
     dir2 = Path(dir2)
     exclude_dirs = exclude_dirs or set()

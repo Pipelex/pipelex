@@ -1,7 +1,7 @@
 """Read-side helpers shared by every configuration surface.
 
 A **configuration surface** is one family of user-owned TOML files with one schema and one
-migration ledger — `pipelex.toml` and its tiers, `telemetry.toml`, `pipelex_service.toml`, and the
+migration ledger — `pipelex.toml` and its tiers, `telemetry.toml`, and the
 inference backend definitions under `inference/backends/`. Two things are the same for all of them on
 the read path, and this module is the one place that knows about either.
 
@@ -109,7 +109,6 @@ def version_declared_below_the_floor(*, ledger: MigrationLedger, config_dict: di
 # loader and the registry from drifting apart on a string literal.
 PIPELEX_CONFIG_SURFACE_ID = "pipelex-config"
 TELEMETRY_CONFIG_SURFACE_ID = "telemetry-config"
-PIPELEX_SERVICE_CONFIG_SURFACE_ID = "pipelex-service-config"
 INFERENCE_BACKEND_CONFIG_SURFACE_ID = "inference-backend"
 
 
@@ -153,11 +152,11 @@ def replay_surface_files_in_memory(*, surface_id: str, paths: Sequence[Path]) ->
     are where it is loud; on a machine in the field the user has a configuration error in front of
     them, and replacing it with ours would cost them the only message that names what to fix.
     """
-    # Imported here rather than at module level, and the reason is architectural: the engine's
-    # applier lives under `pipelex.pipeline`, an interpreter package, while this module sits in
-    # `runtime_hub`'s import closure — the kernel layer, which loads zero interpreter modules.
-    # Deferring it also makes the contract's "the healthy path is untouched" literal: a boot whose
-    # configuration validates never even imports the migration engine.
+    # Imported here rather than at module level so that the contract's "the healthy path is
+    # untouched" is literal: a boot whose configuration validates never even imports the migration
+    # engine. The engine is kernel-layer, like this module, so the deferral is not what keeps the
+    # boot clean of interpreter modules — `test_runtime_boot_closure.py` boots over a stale file to
+    # prove that.
     from pipelex.migration.engine import replay_ledger_over_text  # ruff: ignore[import-outside-top-level]
 
     try:

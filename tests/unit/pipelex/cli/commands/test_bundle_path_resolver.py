@@ -12,8 +12,8 @@ from typing import TYPE_CHECKING
 import pytest
 import typer
 
-from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME
 from pipelex.cli.commands.bundle_path_resolver import resolve_bundle_target
+from pipelex.pipeline.default_file_names import DEFAULT_BUNDLE_FILE_NAME
 
 if TYPE_CHECKING:
     from pathlib import Path

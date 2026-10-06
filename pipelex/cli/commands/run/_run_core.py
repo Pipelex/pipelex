@@ -7,16 +7,20 @@ from typing import TYPE_CHECKING, cast
 
 import typer
 from posthog import tag
+from rich.markup import escape
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.commands.run._inputs_file_loader import load_inputs_dict_from_path
 from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths
+from pipelex.cli.commands.run._main_stuff_file import save_main_stuff_file
 from pipelex.cli.error_handlers import (
     ErrorContext,
+    handle_dedicated_failure_panel,
     handle_model_availability_error,
     handle_model_choice_error,
+    handle_validate_bundle_error,
     print_traceback_if_requested,
 )
 from pipelex.config import get_config
@@ -28,13 +32,13 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.interpreter_hub import clear_current_library, get_concept_library, get_library_manager
-from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.exceptions import PipelineExecutionError
+from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
 from pipelex.pipeline.execution_seams import acquire_library
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 from pipelex.reporting.cost_report_renderer import render_cost_report_for_output
 from pipelex.runtime_hub import get_console, get_telemetry_manager
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -52,6 +56,7 @@ if TYPE_CHECKING:
     from pipelex.core.stuffs.stuff_content import StuffContent
 
 COMMAND = "run"
+_WORKING_MEMORY_FILENAME = "working_memory.json"
 
 
 def validate_run_flag_combination(*, dry_run: bool, mock_usage: bool, mock_inputs: bool) -> None:
@@ -143,6 +148,11 @@ async def _execute_run(
             typer.secho(f"Failed to --save-csv: {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
 
+    # An invalid bundle is refused with the grouped panel `validate` prints, whichever step refuses it:
+    # the parse below, or the load at the start of the run.
+    bundle_file_path = Path(bundle_path) if bundle_path else None
+    library_dir_paths = [Path(one_library_dir) for one_library_dir in library_dir] if library_dir else None
+
     mthds_content: str | None = None
     if bundle_path:
         try:
@@ -150,7 +160,8 @@ async def _execute_run(
             # Use lightweight parsing to extract main_pipe without full validation
             # Full validation happens later during execute
             if not pipe_code:
-                bundle_blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
+                with translate_to_validate_bundle_error():
+                    bundle_blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content, mthds_source=bundle_path)
                 main_pipe_code = bundle_blueprint.main_pipe
                 if not main_pipe_code:
                     msg = (
@@ -164,10 +175,8 @@ async def _execute_run(
             print_traceback_if_requested(console=get_console())
             typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
-        except MthdsParserError as exc:
-            print_traceback_if_requested(console=get_console())
-            typer.secho(f"Failed to parse bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
-            raise typer.Exit(1) from exc
+        except ValidateBundleError as exc:
+            handle_validate_bundle_error(exc, bundle_path=bundle_file_path, library_dirs=library_dir_paths)
     elif not pipe_code:
         typer.secho("Failed to run: no pipe code specified", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
@@ -233,6 +242,8 @@ async def _execute_run(
             execution_config=execution_config,
             library_dirs=library_dir,
             inputs_base_dir=inputs_base_dir,
+            # The directories a CLI loads are the caller's own: a refusal there is their invalid bundle.
+            library_dirs_are_callers=True,
         )
         response = await runner.execute(
             pipe_code=pipe_code,
@@ -241,9 +252,17 @@ async def _execute_run(
             dynamic_output_concept_ref=dynamic_output_concept_ref,
         )
         pipe_output = response.pipe_output
+    except ValidateBundleError as exc:
+        # The run refused the bundle while loading it, before any pipe ran.
+        handle_validate_bundle_error(exc, bundle_path=bundle_file_path, library_dirs=library_dir_paths)
     except PipelineExecutionError as exc:
+        # A failure whose cause has a dedicated panel (a model that is not available, a model choice
+        # that cannot be read) renders it: the panel names the pipe that failed, the model and the stack.
+        handle_dedicated_failure_panel(error=exc, context=ErrorContext.PIPE_RUN)
         print_traceback_if_requested(console=get_console())
-        typer.secho(f"Failed to execute pipeline '{exc.pipe_code}': {exc}", fg=typer.colors.RED, err=True)
+        # The message names the pipe that failed and its path; the pipeline named first is the entry pipe.
+        entry_pipe_code = exc.pipe_stack[0] if exc.pipe_stack else exc.pipe_code
+        typer.secho(f"Failed to execute pipeline '{entry_pipe_code}': {exc.message}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1) from exc
     except PipelexError as exc:
         print_traceback_if_requested(console=get_console())
@@ -295,6 +314,7 @@ async def _execute_run(
     # Save main_stuff files if enabled. An absent main output saves the explicit absence
     # artifact (json + md, no interactive viewer — nothing to view), never value renders.
     saved_main_stuff_formats: list[str] = []
+    saved_main_stuff_file: Path | None = None
     if save_main_stuff and output_path:
         if isinstance(main_resolved, AbsenceRecord):
             absence_json_path = output_path / "main_stuff.json"
@@ -332,13 +352,23 @@ async def _execute_run(
             log.verbose(f"Main stuff HTML viewer saved to: {main_stuff_viewer_path}")
             saved_main_stuff_formats.append("html_viewer")
 
+            # A Document or Image main output also lands as the file itself, under its own name. A dry run
+            # produced a placeholder, not a file, so there is nothing to copy.
+            if not dry_run:
+                try:
+                    saved_main_stuff_file = await save_main_stuff_file(
+                        content=main_stuff.content, output_dir=output_path, reserved_names=frozenset({_WORKING_MEMORY_FILENAME})
+                    )
+                except (PipelexError, OSError, ValueError) as file_exc:
+                    typer.secho(f"Could not copy the main output's file into {output_path}: {file_exc}", fg=typer.colors.YELLOW, err=True)
+
     # Save working memory to JSON if enabled
     working_memory_output_path: str | None = None
     if save_working_memory and output_path:
         if working_memory_path:
             working_memory_output_path = working_memory_path
         else:
-            working_memory_output_path = str(output_path / "working_memory.json")
+            working_memory_output_path = str(output_path / _WORKING_MEMORY_FILENAME)
         working_memory_dict = pipe_output.working_memory.smart_dump()
         save_as_json_to_path(object_to_save=working_memory_dict, path=Path(working_memory_output_path))
         log.verbose(f"Working memory saved to: {working_memory_output_path}")
@@ -419,20 +449,23 @@ async def _execute_run(
         console.print("\n[yellow]✓[/yellow] [bold]Dry run completed successfully[/bold]")
     else:
         console.print("\n[green]✓[/green] [bold]Pipeline execution completed successfully[/bold]")
+    # Paths are escaped: a file name or an --output-dir can hold brackets, which Rich would read as markup.
     if output_path:
-        console.print(f"  Output saved to [bold magenta]{output_path}[/bold magenta]:")
+        console.print(f"  Output saved to [bold magenta]{escape(str(output_path))}[/bold magenta]:")
         if saved_graphs:
             console.print(f"    [green]✓[/green] graphs: {', '.join(saved_graphs)}")
         if saved_main_stuff_formats:
             console.print(f"    [green]✓[/green] main_stuff: {', '.join(saved_main_stuff_formats)}")
+        if saved_main_stuff_file:
+            console.print(f"    [green]✓[/green] file: [bold magenta]{escape(str(saved_main_stuff_file))}[/bold magenta]")
         if working_memory_output_path:
             if Path(working_memory_output_path).is_relative_to(output_path):
-                console.print("    [green]✓[/green] working_memory.json")
+                console.print(f"    [green]✓[/green] {_WORKING_MEMORY_FILENAME}")
             else:
-                console.print(f"    [green]✓[/green] working_memory: {working_memory_output_path}")
+                console.print(f"    [green]✓[/green] working_memory: {escape(working_memory_output_path)}")
     # CSV output is written to a literal cwd-relative path (CQ1), independent of --output-dir.
     if save_csv is not None:
-        console.print(f"  [green]✓[/green] CSV saved to [bold magenta]{save_csv}[/bold magenta]")
+        console.print(f"  [green]✓[/green] CSV saved to [bold magenta]{escape(save_csv)}[/bold magenta]")
 
 
 def execute_run(
@@ -462,18 +495,15 @@ def execute_run(
     Shared between the ``method`` and ``pipe`` subcommands.
     """
     # A dry run makes no inference call, so it must not demand credentials: `needs_inference=False`
-    # forces every run to DRY and skips a backend whose key is missing instead of failing the boot.
-    # `needs_model_specs=True` keeps the real gateway model specs (not the dummy ones), so wherever
-    # credentials ARE present a dry run resolves model handles exactly as a live run would. It does not
-    # help on a machine with no key at all: a skipped backend contributes no models, so a pipe pinning a
-    # bare handle served only by that backend reports it as not found (see docs/features/validation-dry-run.md).
-    # This is the same boot `pipelex-agent run --dry-run` uses, so the two CLIs agree either way.
+    # forces every run to DRY and resolves no backend's credentials, yet keeps every enabled backend
+    # with its models, so a dry run resolves model handles exactly as a live run would, whichever keys
+    # the machine holds (see docs/features/validation-dry-run.md). This is the same boot
+    # `pipelex-agent run --dry-run` uses, so the two CLIs agree.
     make_pipelex_for_cli(
         context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN,
         library_dirs=library_dir,
         needs_inference=not dry_run,
         boot_orchestrator=orchestrator,
-        needs_model_specs=True,
     )
 
     try:

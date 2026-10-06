@@ -4,16 +4,16 @@ from typing import Annotated
 
 import typer
 
-from pipelex.builder.operations.models_ops import ModelCategory, format_models_markdown, list_models
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success, set_agent_cli_error_format
+from pipelex.cogt.models.model_listing import ModelCategory, format_models_markdown, list_models
 from pipelex.pipelex import Pipelex
 
 
 def agent_models_cmd(
     model_type: Annotated[
         list[ModelCategory] | None,
-        typer.Option("--type", "-t", help="Filter by model category (repeatable): llm, extract, img_gen, search"),
+        typer.Option("--type", "-t", help="Filter by model category (repeatable): llm, extract, img_gen, search, judgment"),
     ] = None,
     backend: Annotated[
         str | None,
@@ -35,7 +35,7 @@ def agent_models_cmd(
     """
     set_agent_cli_error_format(error_format or output_format)
     try:
-        make_pipelex_for_agent_cli(needs_inference=False, needs_model_specs=backend is not None)
+        make_pipelex_for_agent_cli(needs_inference=False)
 
         result = list_models(categories=model_type, backend=backend)
 

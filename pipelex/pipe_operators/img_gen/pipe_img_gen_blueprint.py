@@ -9,6 +9,7 @@ from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
 from pipelex.cogt.templating.exceptions import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
+from pipelex.pipe_machinery.validation import check_inputs_match_variables
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateSyntaxError
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
@@ -46,13 +47,29 @@ class PipeImgGenBlueprint(PipeBlueprint):
 
     @override
     def validate_inputs(self):
-        # Get all required variables from prompt
-        template_category = TemplateCategory.IMG_GEN_PROMPT
+        # An input counts as read when the prompt or the negative prompt reads it
         declared_inputs: set[str] = set(self.inputs.keys()) if self.inputs else set()
+        variable_paths: set[str] = set()
+        for template_source, template_label in [(self.prompt, "prompt"), (self.negative_prompt, "negative_prompt")]:
+            if template_source is None:
+                continue
+            variable_paths.update(
+                self._read_variable_paths(template_source=template_source, template_label=template_label, declared_inputs=declared_inputs)
+            )
+        check_inputs_match_variables(
+            declared_inputs=declared_inputs,
+            variable_paths=variable_paths,
+            reader="prompt or negative_prompt",
+        )
+
+    @classmethod
+    def _read_variable_paths(cls, *, template_source: str, template_label: str, declared_inputs: set[str]) -> set[str]:
+        """The dotted variable paths one template reads, internal names (starting with an underscore) excluded."""
+        template_category = TemplateCategory.IMG_GEN_PROMPT
         try:
-            preprocessed_template = preprocess_template(self.prompt, declared_inputs=declared_inputs)
+            preprocessed_template = preprocess_template(template_source, declared_inputs=declared_inputs)
         except TemplateSigilSyntaxError as exc:
-            msg = f"Template sigil error in PipeImgGen prompt: {exc}"
+            msg = f"Template sigil error in PipeImgGen {template_label}: {exc}"
             raise ValueError(msg) from exc
         try:
             check_jinja2_parsing(
@@ -60,29 +77,13 @@ class PipeImgGenBlueprint(PipeBlueprint):
                 template_category=template_category,
             )
         except Jinja2TemplateSyntaxError as exc:
-            msg = f"Could not parse template for PipeImgGen: {exc}"
+            msg = f"Could not parse {template_label} template for PipeImgGen: {exc}"
             raise ValueError(msg) from exc
-        # Filter out internal variables that start with underscore
         full_paths = detect_jinja2_required_variables(
             template_category=template_category,
             template_source=preprocessed_template,
         )
-        required_variables: set[str] = set()
-        for path in full_paths:
-            root = get_root_from_dotted_path(path)
-            if not root.startswith("_"):
-                required_variables.add(root)
-
-        # Check that all required variables are in inputs
-        missing_variables: set[str] = required_variables - declared_inputs
-
-        if missing_variables:
-            missing_vars_str = ", ".join(sorted(missing_variables))
-            msg = (
-                f"Missing input variable(s) in prompt template: {missing_vars_str}. "
-                "These variables are used in the prompt but not declared in inputs."
-            )
-            raise ValueError(msg)
+        return {path for path in full_paths if not get_root_from_dotted_path(path).startswith("_")}
 
     @override
     def validate_output(self):

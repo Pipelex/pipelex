@@ -1,7 +1,7 @@
 """Pin the ``build_validated_pipes`` projection contract (the C-8 fix).
 
 ``build_validated_pipes`` turns a dry-run result map into the ``validated_pipes`` JSON list that the
-agent CLI + builder ops publish. Two guarantees must hold, and a regression in either would silently
+agent CLI and the protocol validation report publish. Two guarantees must hold, and a regression in either would silently
 corrupt the published contract while the rest of the suite stays green:
 
 1. **Truthful status.** A FAILURE (e.g. an ``allowed_to_fail`` pipe) and a SKIPPED (cross-package)

@@ -79,9 +79,9 @@ class TestRunnerValidatePlumbing:
         )
 
     async def test_library_dirs_converted_to_paths_and_allow_signatures_passthrough(self, mocker: MockerFixture) -> None:
-        """Constructor library_dirs strings reach validate_bundle as Path objects; allow_signatures forwarded verbatim."""
+        """Constructor library_dirs strings reach validate_bundle as Path objects; allow_signatures and their ownership forwarded verbatim."""
         env = self._patch_env(mocker, library_ids=[None, "val-lib"])
-        runner = PipelexMTHDSProtocol(library_dirs=["dir_alpha", "nested/dir_beta"])
+        runner = PipelexMTHDSProtocol(library_dirs=["dir_alpha", "nested/dir_beta"], library_dirs_are_callers=True)
 
         await runner.validate(mthds_contents=["bundle-content"], allow_signatures=True)
 
@@ -90,10 +90,11 @@ class TestRunnerValidatePlumbing:
             mthds_sources=None,
             library_dirs=[Path("dir_alpha"), Path("nested/dir_beta")],
             allow_signatures=True,
+            library_dirs_are_callers=True,
         )
 
     async def test_no_library_dirs_passes_none_and_strict_default(self, mocker: MockerFixture) -> None:
-        """Without constructor library_dirs, validate_bundle receives None and the strict default."""
+        """Without constructor library_dirs, validate_bundle receives None, the strict default and a host's directories."""
         env = self._patch_env(mocker, library_ids=[None, "val-lib"])
         runner = PipelexMTHDSProtocol()
 
@@ -104,6 +105,7 @@ class TestRunnerValidatePlumbing:
             mthds_sources=None,
             library_dirs=None,
             allow_signatures=False,
+            library_dirs_are_callers=False,
         )
 
     async def test_validation_runs_with_the_protocols_caller_in_scope(self, mocker: MockerFixture) -> None:

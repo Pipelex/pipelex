@@ -8,10 +8,11 @@ how each parameter should be formatted for the specific provider's API.
 """
 
 import base64
-from typing import Any, TypeAlias
+from enum import StrEnum
+from typing import Any, TypeAlias, TypeVar
 
 from pipelex import log
-from pipelex.cogt.exceptions import ImgGenParameterError
+from pipelex.cogt.exceptions import ImgGenParameterError, InferenceErrorCategory
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
@@ -42,6 +43,8 @@ from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttp
 ImageFileTuple: TypeAlias = tuple[str, bytes, str]
 """httpx-style multipart file part: (filename, content_bytes, mime_type)."""
 
+TaxonomyType = TypeVar("TaxonomyType", bound=StrEnum)
+
 
 class ImgGenArgsFactory:
     """Factory that builds provider-specific API arguments from model rules and job parameters.
@@ -49,6 +52,27 @@ class ImgGenArgsFactory:
     This factory iterates over the model's rules (topic -> taxonomy mappings) and uses
     the appropriate taxonomy handler to generate the correct API arguments for each topic.
     """
+
+    @classmethod
+    def rule_taxonomy(
+        cls,
+        *,
+        taxonomy_class: type[TaxonomyType],
+        topic: ImgGenArgTopic,
+        taxonomy_value: str,
+        model_name: str,
+    ) -> TaxonomyType:
+        """The rule's value read as its topic's taxonomy.
+
+        Raises:
+            ImgGenParameterError: If this release does not know the value, in the `CONFIGURATION`
+                category since the rules are the model configuration's, not the caller's.
+        """
+        try:
+            return taxonomy_class(taxonomy_value)
+        except ValueError as exc:
+            msg = f"Image model '{model_name}' has an unknown {topic} taxonomy '{taxonomy_value}'"
+            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from exc
 
     @classmethod
     async def make_args_for_model(
@@ -82,7 +106,9 @@ class ImgGenArgsFactory:
         for topic, taxonomy_value in model_rules.items():
             match topic:
                 case ImgGenArgTopic.PROMPT:
-                    prompt_taxonomy = PromptTaxonomy(taxonomy_value)
+                    prompt_taxonomy = cls.rule_taxonomy(
+                        taxonomy_class=PromptTaxonomy, topic=topic, taxonomy_value=taxonomy_value, model_name=model_name
+                    )
                     args_dict.update(
                         cls.make_args_from_prompt(
                             prompt_taxonomy=prompt_taxonomy,
@@ -91,7 +117,9 @@ class ImgGenArgsFactory:
                         )
                     )
                 case ImgGenArgTopic.NUM_IMAGES:
-                    num_images_taxonomy = NumImagesTaxonomy(taxonomy_value)
+                    num_images_taxonomy = cls.rule_taxonomy(
+                        taxonomy_class=NumImagesTaxonomy, topic=topic, taxonomy_value=taxonomy_value, model_name=model_name
+                    )
                     args_dict.update(
                         cls.make_args_from_num_images(
                             num_images_taxonomy=num_images_taxonomy,
@@ -99,7 +127,9 @@ class ImgGenArgsFactory:
                         )
                     )
                 case ImgGenArgTopic.ASPECT_RATIO:
-                    aspect_ratio_taxonomy = AspectRatioTaxonomy(taxonomy_value)
+                    aspect_ratio_taxonomy = cls.rule_taxonomy(
+                        taxonomy_class=AspectRatioTaxonomy, topic=topic, taxonomy_value=taxonomy_value, model_name=model_name
+                    )
                     args_dict.update(
                         cls.make_args_from_aspect_ratio(
                             aspect_ratio_taxonomy=aspect_ratio_taxonomy,
@@ -109,7 +139,9 @@ class ImgGenArgsFactory:
                         )
                     )
                 case ImgGenArgTopic.BACKGROUND:
-                    background_taxonomy = BackgroundTaxonomy(taxonomy_value)
+                    background_taxonomy = cls.rule_taxonomy(
+                        taxonomy_class=BackgroundTaxonomy, topic=topic, taxonomy_value=taxonomy_value, model_name=model_name
+                    )
                     args_dict.update(
                         cls.make_args_from_background(
                             background_taxonomy=background_taxonomy,
@@ -118,7 +150,9 @@ class ImgGenArgsFactory:
                         )
                     )
                 case ImgGenArgTopic.INFERENCE:
-                    inference_taxonomy = InferenceTaxonomy(taxonomy_value)
+                    inference_taxonomy = cls.rule_taxonomy(
+                        taxonomy_class=InferenceTaxonomy, topic=topic, taxonomy_value=taxonomy_value, model_name=model_name
+                    )
                     args_dict.update(
                         cls.make_args_from_inference(
                             inference_taxonomy=inference_taxonomy,
@@ -129,7 +163,9 @@ class ImgGenArgsFactory:
                         )
                     )
                 case ImgGenArgTopic.SAFETY_CHECKER:
-                    safety_checker_taxonomy = SafetyCheckerTaxonomy(taxonomy_value)
+                    safety_checker_taxonomy = cls.rule_taxonomy(
+                        taxonomy_class=SafetyCheckerTaxonomy, topic=topic, taxonomy_value=taxonomy_value, model_name=model_name
+                    )
                     args_dict.update(
                         cls.make_args_from_safety_checker(
                             safety_checker_taxonomy=safety_checker_taxonomy,
@@ -138,7 +174,9 @@ class ImgGenArgsFactory:
                         )
                     )
                 case ImgGenArgTopic.OUTPUT_FORMAT:
-                    output_format_taxonomy = OutputFormatTaxonomy(taxonomy_value)
+                    output_format_taxonomy = cls.rule_taxonomy(
+                        taxonomy_class=OutputFormatTaxonomy, topic=topic, taxonomy_value=taxonomy_value, model_name=model_name
+                    )
                     args_dict.update(
                         cls.make_args_from_output_format(
                             output_format_taxonomy=output_format_taxonomy,
@@ -146,21 +184,27 @@ class ImgGenArgsFactory:
                         )
                     )
                 case ImgGenArgTopic.OUTPUT_COMPRESSION:
-                    output_compression_taxonomy = OutputCompressionTaxonomy(taxonomy_value)
+                    output_compression_taxonomy = cls.rule_taxonomy(
+                        taxonomy_class=OutputCompressionTaxonomy, topic=topic, taxonomy_value=taxonomy_value, model_name=model_name
+                    )
                     args_dict.update(
                         cls.make_args_from_output_compression(
                             output_compression_taxonomy=output_compression_taxonomy,
                         )
                     )
                 case ImgGenArgTopic.SPECIFIC:
-                    specific_taxonomy = SpecificTaxonomy(taxonomy_value)
+                    specific_taxonomy = cls.rule_taxonomy(
+                        taxonomy_class=SpecificTaxonomy, topic=topic, taxonomy_value=taxonomy_value, model_name=model_name
+                    )
                     args_dict.update(
                         cls.make_args_from_specific(
                             specific_taxonomy=specific_taxonomy,
                         )
                     )
                 case ImgGenArgTopic.MODEL_CHOICE:
-                    model_name_taxonomy = ModelChoiceTaxonomy(taxonomy_value)
+                    model_name_taxonomy = cls.rule_taxonomy(
+                        taxonomy_class=ModelChoiceTaxonomy, topic=topic, taxonomy_value=taxonomy_value, model_name=model_name
+                    )
                     args_dict.update(
                         cls.make_args_from_model_name(
                             model_name_taxonomy=model_name_taxonomy,
@@ -169,14 +213,18 @@ class ImgGenArgsFactory:
                         )
                     )
                 case ImgGenArgTopic.INPUT_IMAGES:
-                    input_images_taxonomy = InputImagesTaxonomy(taxonomy_value)
+                    input_images_taxonomy = cls.rule_taxonomy(
+                        taxonomy_class=InputImagesTaxonomy, topic=topic, taxonomy_value=taxonomy_value, model_name=model_name
+                    )
                     input_images_args = await cls.make_args_from_input_images(
                         input_images_taxonomy=input_images_taxonomy,
                         input_images=img_gen_job.img_gen_prompt.input_images,
                     )
                     args_dict.update(input_images_args)
                 case ImgGenArgTopic.INPUT_FIDELITY:
-                    input_fidelity_taxonomy = InputFidelityTaxonomy(taxonomy_value)
+                    input_fidelity_taxonomy = cls.rule_taxonomy(
+                        taxonomy_class=InputFidelityTaxonomy, topic=topic, taxonomy_value=taxonomy_value, model_name=model_name
+                    )
                     args_dict.update(
                         cls.make_args_from_input_fidelity(
                             input_fidelity_taxonomy=input_fidelity_taxonomy,

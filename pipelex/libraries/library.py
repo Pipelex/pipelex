@@ -81,6 +81,32 @@ def _describe_unresolved_pipe_dependency(
     return " ".join(lines)
 
 
+def _describe_unexported_pipe_dependency(*, referring_pipe_key: str, private_ref: str, package_alias: str) -> str:
+    return (
+        f"Pipe '{referring_pipe_key}' references '{private_ref}', which the package loaded as '{package_alias}' does not export. "
+        "A package's private pipes are called by its own pipes only: call one of its exported pipes, or export this one in the package."
+    )
+
+
+def _pipe_dependency_refusal(*, pipe: PipeController, missing_ref: str, error_type: PipeValidationErrorType, message: str) -> LibraryLoadingError:
+    """The refusal of a controller's sub-pipe reference, carrying a structured item.
+
+    The item makes the refusal a categorized `pipe_validation` item: `pipe_code` is the referring controller and
+    `missing_pipe_code` the reference that does not resolve, or is not visible, so a machine consumer reads both
+    without parsing the message. LibraryLoadingError rides the existing `except LibraryError` forwarding in
+    translate_to_validate_bundle_error.
+    """
+    dependency_error_data = PipesAndConceptValidationErrorData(
+        error_type=error_type,
+        domain_code=pipe.domain_code,
+        pipe_code=pipe.code,
+        missing_pipe_code=missing_ref,
+        message=message,
+        field_path=f"pipe.{pipe.code}",
+    )
+    return LibraryLoadingError(message=message, pipe_concept_validation_errors=[dependency_error_data])
+
+
 class Library(BaseModel):
     """A Library bundles together domain, concept, and pipe libraries for a specific context.
 
@@ -201,14 +227,9 @@ class Library(BaseModel):
             # Validate pipe dependencies exist for pipe controllers
             if isinstance(pipe, PipeController):
                 for sub_pipe_code in pipe.pipe_dependencies():
-                    # Cross-package refs that aren't loaded are validated at package level, not library level
-                    if QualifiedRef.has_cross_package_prefix(sub_pipe_code) and self.pipe_library.get_optional_pipe(sub_pipe_code) is None:
+                    if QualifiedRef.has_cross_package_prefix(sub_pipe_code):
+                        self._validate_cross_package_pipe_dependency(pipe=pipe, pipe_key=pipe_key, dep_alias=dep_alias, sub_pipe_code=sub_pipe_code)
                         continue
-                    # For dependency pipes, look up bare sub-pipe codes in the child library
-                    if dep_alias is not None and not QualifiedRef.has_cross_package_prefix(sub_pipe_code):
-                        child_library = self.dependency_libraries.get(dep_alias)
-                        if child_library is not None and child_library.pipe_library.get_optional_pipe(sub_pipe_code) is not None:
-                            continue
                     try:
                         self.pipe_library.get_required_pipe(pipe_code=sub_pipe_code)
                     except PipeLibraryError as pipe_error:
@@ -220,26 +241,74 @@ class Library(BaseModel):
                             candidates=bare_code_candidates,
                             cause=pipe_error,
                         )
-                        # Carry a structured item so an unresolved dependency surfaces as a categorized
-                        # `pipe_validation` item: `pipe_code` is the referencing controller and
-                        # `missing_pipe_code` is the dependency that does not resolve, so a machine
-                        # consumer can read both without parsing the message. LibraryLoadingError rides
-                        # the existing `except LibraryError` forwarding in translate_to_validate_bundle_error.
-                        dependency_error_data = PipesAndConceptValidationErrorData(
-                            error_type=PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY,
-                            domain_code=pipe.domain_code,
-                            pipe_code=pipe.code,
-                            missing_pipe_code=sub_pipe_code,
-                            message=msg,
-                            field_path=f"pipe.{pipe.code}",
-                        )
-                        raise LibraryLoadingError(message=msg, pipe_concept_validation_errors=[dependency_error_data]) from pipe_error
+                        raise _pipe_dependency_refusal(
+                            pipe=pipe, missing_ref=sub_pipe_code, error_type=PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY, message=msg
+                        ) from pipe_error
 
         for pipe in self.pipe_library.root.values():
             # Skip full validation for pipe controllers with unresolved cross-package dependencies
             if isinstance(pipe, PipeController) and self._has_unresolved_cross_package_deps(pipe):
                 continue
             pipe.validate_with_libraries()
+
+    def _validate_cross_package_pipe_dependency(self, *, pipe: PipeController, pipe_key: str, dep_alias: str | None, sub_pipe_code: str) -> None:
+        """Refuse a reference into a dependency package that names a pipe the package does not have or does not export.
+
+        A dependency's own references carry its alias (`crate_qualification.qualify_crate`), so this covers a
+        package's calls to its own pipes as well as a consumer's calls into it. A reference whose alias names no
+        loaded package is tolerated: that is a crate loaded without its packages, as a worker loads one, and the
+        package is validated where it is loaded. So is a dependency's reference to another package: a dependency's own
+        dependencies are never loaded, and its alias for one may name a different package the consumer loaded.
+
+        A reference naming a pipe the package declares but could not build is refused naming that failure before
+        anything is looked up, so a bare `alias->code` never falls through to another pipe of the same code.
+
+        Raises:
+            LibraryLoadingError: The package is loaded and has no such pipe, withholds it, or holds it as private
+                while the referring pipe is not the package's own.
+        """
+        ref_alias, remainder = QualifiedRef.split_cross_package_ref(sub_pipe_code)
+        if ref_alias not in self.dependency_libraries or (dep_alias is not None and ref_alias != dep_alias):
+            return
+        unbuilt_reason = self.pipe_library.unbuilt_dependency_pipe_reason(pipe_code=sub_pipe_code)
+        if unbuilt_reason is not None:
+            msg = (
+                f"Pipe '{pipe_key}' references '{sub_pipe_code}', which the package loaded as '{ref_alias}' declares "
+                f"but could not build: {unbuilt_reason}"
+            )
+            raise _pipe_dependency_refusal(
+                pipe=pipe, missing_ref=sub_pipe_code, error_type=PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY, message=msg
+            )
+        try:
+            sub_pipe = self.pipe_library.get_optional_pipe(pipe_code=sub_pipe_code)
+        except PipeLibraryError as pipe_error:
+            msg = _describe_unresolved_pipe_dependency(referring_pipe_ref=pipe.pipe_ref, missing_ref=sub_pipe_code, candidates={}, cause=pipe_error)
+            raise _pipe_dependency_refusal(
+                pipe=pipe, missing_ref=sub_pipe_code, error_type=PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY, message=msg
+            ) from pipe_error
+        if sub_pipe is None:
+            if self.pipe_library.is_withheld_dependency_pipe(pipe_code=sub_pipe_code):
+                raise _pipe_dependency_refusal(
+                    pipe=pipe,
+                    missing_ref=sub_pipe_code,
+                    error_type=PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY,
+                    message=_describe_unexported_pipe_dependency(referring_pipe_key=pipe_key, private_ref=sub_pipe_code, package_alias=ref_alias),
+                )
+            msg = (
+                f"Pipe '{pipe_key}' references '{sub_pipe_code}', which does not exist. "
+                f"The package loaded as '{ref_alias}' has no pipe '{remainder}'."
+            )
+            raise _pipe_dependency_refusal(
+                pipe=pipe, missing_ref=sub_pipe_code, error_type=PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY, message=msg
+            )
+        # A package's private pipe is visible to that package's own pipes, and to nothing else.
+        if ref_alias != dep_alias and self.pipe_library.is_private_dependency_pipe(pipe_key=f"{ref_alias}->{sub_pipe.pipe_ref}"):
+            raise _pipe_dependency_refusal(
+                pipe=pipe,
+                missing_ref=sub_pipe_code,
+                error_type=PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY,
+                message=_describe_unexported_pipe_dependency(referring_pipe_key=pipe_key, private_ref=sub_pipe_code, package_alias=ref_alias),
+            )
 
     def _index_pipe_refs_by_bare_code(self) -> dict[str, list[str]]:
         """Group every pipe ref in this library by its bare code, for failure-path diagnostics only.

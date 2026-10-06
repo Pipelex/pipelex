@@ -1,5 +1,5 @@
 """Tests that synthetic helpers from build-time elaboration are loaded alongside their parent
-when a dependency manifest restricts exports.
+when a dependency manifest restricts exports: the exported closure follows the parent's steps.
 
 Without this behavior, exporting a `preliminary_text` PipeLLM would let the parent pipe load
 into the consumer library while its `__draft_text` and `__structure` helpers are filtered out,
@@ -9,7 +9,7 @@ producing a runtime resolution failure inside the wrapping PipeSequence.
 from pathlib import Path
 
 from mthds.package.dependency_resolver import ResolvedDependency
-from mthds.package.manifest.schema import MethodsManifest
+from mthds.package.manifest.schema import DomainExports, MethodsManifest
 from pytest_mock import MockerFixture
 
 from pipelex.interpreter_hub import get_library_manager
@@ -40,10 +40,12 @@ class TestDependencyPreliminaryTextExport:
         mthds_file = tmp_path / "review_dep.mthds"
         mthds_file.write_text(DEP_MTHDS, encoding="utf-8")
 
+        # The public set is read by domain from the manifest's `[exports]`, so the manifest declares what `exported` names.
         manifest = MethodsManifest(
             address="github.com/org/review-dep",
             version="1.0.0",
             description="A dep package",
+            exports={"review_dep": DomainExports(pipes=sorted(exported))} if exported else {},
         )
         return ResolvedDependency(
             alias="review_dep",
@@ -61,8 +63,8 @@ class TestDependencyPreliminaryTextExport:
     ) -> None:
         """When the manifest exports `make_review`, both synthetic helpers must also load.
 
-        The parent is a PipeSequence post-elaboration; it references the helpers by bare code,
-        so they must be present in the child library or the consumer crashes at run time.
+        The parent is a PipeSequence post-elaboration that calls the helpers, so the exported closure
+        carries them, or the consumer would crash at run time.
         """
         # Hub interaction is required for PipeFactory to resolve concepts during the dep load.
         # We use the live hub but a fresh empty library to keep the test isolated.
@@ -75,6 +77,7 @@ class TestDependencyPreliminaryTextExport:
         manager = LibraryManager()
         manager._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             library=library,
+            package_address="github.com/org/review-dep",
             resolved_dep=self._build_resolved_dep(tmp_path=tmp_path, exported={"make_review"}),
         )
 
@@ -101,6 +104,7 @@ class TestDependencyPreliminaryTextExport:
         manager = LibraryManager()
         manager._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             library=library,
+            package_address="github.com/org/review-dep",
             resolved_dep=self._build_resolved_dep(tmp_path=tmp_path, exported=set()),
         )
 

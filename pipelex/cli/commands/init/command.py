@@ -4,187 +4,25 @@ import shutil
 from pathlib import Path
 
 import typer
-from pydantic import BaseModel, ConfigDict, ValidationError
 from rich.console import Console
 from rich.markup import escape
 from rich.prompt import Confirm
 
 from pipelex.cli.commands.init.backends import (
     customize_backends_config,
-    disable_managed_gateway_backends,
     get_selected_backend_keys,
-    warn_if_managed_gateway_pinned_by_override,
 )
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.credentials import prompt_credentials
 from pipelex.cli.commands.init.routing import customize_routing_profile
 from pipelex.cli.commands.init.telemetry import setup_telemetry
-from pipelex.cli.commands.init.ui.gateway_ui import (
-    build_gateway_terms_panel,
-    display_gateway_accepted_message,
-    display_gateway_declined_message,
-    prompt_gateway_acceptance,
-)
 from pipelex.cli.commands.init.ui.general_ui import build_initialization_panel
 from pipelex.cli.commands.init.ui.types import InitFocus
-from pipelex.cogt.models.deck_manifest import compute_kit_manifest, write_manifest
+from pipelex.cogt.models.deck_manifest import stamp_kit_manifests
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.runtime_hub import get_console
 from pipelex.system.configuration.config_loader import config_manager
-from pipelex.system.pipelex_service.exceptions import RemoteConfigUnavailableError
-from pipelex.system.pipelex_service.pipelex_service_agreement import update_service_terms_acceptance
-from pipelex.system.pipelex_service.pipelex_service_config import (
-    enabled_managed_gateway_sections,
-    load_pipelex_service_config_if_exists,
-)
-from pipelex.system.pipelex_service.remote_config_cache import RemoteConfigCache
-from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
-
-
-class CachePrimingResult(BaseModel):
-    """Outcome of an attempt to prime the on-disk remote-config cache.
-
-    ``primed`` is ``True`` only when a fresh fetch succeeded *and* a usable cache exists on disk
-    afterwards. ``error_message`` is populated when the fetch was attempted but failed (offline at
-    init time) *or* when the fetch succeeded but the cache could not be persisted, read back, or
-    validated as a usable ``RemoteConfig`` (e.g. a read-only or full cache directory). ``None``
-    means priming was skipped (no managed gateway backend enabled, or terms not accepted) or that
-    it succeeded.
-    """
-
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    primed: bool
-    error_message: str | None = None
-
-
-def attempt_prime_remote_config_cache(*, target_config_dir: Path | None = None) -> CachePrimingResult:
-    """Prime the on-disk remote-config cache so later offline runs can fall back to it.
-
-    Pure-logic variant: no I/O on the way out, so both the interactive (`pipelex init`) and
-    machine (`pipelex-agent init`) surfaces can decide how to surface failure (Rich warning vs
-    structured JSON field).
-
-    Skipped (``primed=False, error_message=None``) when:
-    - no managed gateway backend is enabled in ``backends.toml`` (BYOK has nothing to cache), or
-    - the service terms have not been accepted (we cannot fetch without consent).
-
-    The question is the boot's — *any* managed gateway backend — rather than the Portkey-cloud
-    one's, because what gets cached is the single published configuration carrying every managed
-    backend's section: a manifold-only installation has exactly as much to cache as a gateway one.
-
-    Always passes ``require_fresh=True`` to the fetcher: priming's only job is to write a fresh
-    cache, so silently accepting an existing cached fallback would be a misleading success. When
-    the network is unreachable and only a stale cache exists, the fetcher raises
-    ``RemoteConfigUnavailableError`` and we surface that as ``error_message`` — the stale cache
-    on disk is left intact so subsequent offline dry-runs can still fall back to it.
-
-    ``RemoteConfigValidationError`` is intentionally NOT caught: a server-side schema break is a
-    real bug (we control the back-office) and should surface loudly rather than be hidden by the
-    priming step.
-
-    Args:
-        target_config_dir: When set, read the backends document *at that directory* (its
-            ``backends.toml`` and its own ``backends_override.toml``) to decide whether a managed
-            gateway backend is enabled. ``pipelex init`` and ``pipelex init --local`` target
-            different ``.pipelex/`` directories — using the layered/project-preferred config here
-            would let priming branch on the wrong file. ``None`` (default) falls back to the layered
-            document. The terms-acceptance check always reads the *global* ``pipelex_service.toml``
-            by design.
-    """
-    if not enabled_managed_gateway_sections(config_dir=target_config_dir):
-        return CachePrimingResult(primed=False)
-
-    service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
-    if service_config is None or not service_config.agreement.terms_accepted:
-        return CachePrimingResult(primed=False)
-
-    try:
-        RemoteConfigFetcher.fetch_remote_config(require_fresh=True)
-    except RemoteConfigUnavailableError as exc:
-        return CachePrimingResult(primed=False, error_message=str(exc))
-
-    # A successful fetch does NOT guarantee a usable cache. ``RemoteConfigFetcher`` treats the
-    # cache write as opportunistic and swallows OSErrors (read-only / full cache dir) with only a
-    # stderr warning. And even when a file is written, ``RemoteConfigCache.load()`` validates only
-    # the cache *wrapper* — a malformed inner ``raw_config`` would still pass it but break later
-    # offline runs (see the matching check in ``RemoteConfigFetcher.fetch_remote_config``). Verify
-    # both: the wrapper loads AND its payload re-validates as a ``RemoteConfig``. Otherwise priming
-    # would misreport success and later offline runs would hit ``RemoteConfigUnavailableError``.
-    cached = RemoteConfigCache.load()
-    if cached is not None:
-        try:
-            cached.to_remote_config()
-        except ValidationError:
-            cached = None
-    if cached is None:
-        msg = (
-            f"Remote config was fetched but the cache at {RemoteConfigCache.cache_path()} "
-            "could not be written, read back, or validated; offline dry-runs will not have a "
-            "fallback. Check that the directory is writable."
-        )
-        return CachePrimingResult(primed=False, error_message=msg)
-    return CachePrimingResult(primed=True)
-
-
-def prime_remote_config_cache(*, console: Console, target_config_dir: Path | None = None) -> None:
-    """Interactive-surface wrapper around :func:`attempt_prime_remote_config_cache`.
-
-    Prints a yellow warning to the console when a fetch was attempted and failed; otherwise
-    silent. Used by ``pipelex init`` so the user knows priming didn't happen and how to retry.
-
-    ``target_config_dir`` is forwarded so the managed-gateway check inspects the directory
-    being initialized rather than the layered config (see ``attempt_prime_remote_config_cache``).
-    """
-    result = attempt_prime_remote_config_cache(target_config_dir=target_config_dir)
-    if result.error_message is not None:
-        console.print(f"[yellow]⚠ Could not prime remote config cache: {escape(result.error_message)}[/yellow]")
-        console.print("[dim]Re-run 'pipelex init' while online to prime the cache for offline dry-runs.[/dim]")
-
-
-def _check_gateway_terms_if_needed(*, console: Console, backends_toml_path: Path) -> None:
-    """Check if gateway is enabled and terms not yet accepted, then prompt for acceptance.
-
-    This is called after init_config() to ensure users who have gateway enabled
-    in their existing backends.toml are prompted to accept terms when pipelex_service.toml
-    is first created.
-
-    Args:
-        console: Rich Console instance for user interaction.
-        backends_toml_path: Path to backends.toml file.
-    """
-    # Check if backends.toml exists and gateway is enabled. Enabled means enabled in the merged
-    # document pinned to this directory — a gateway switched on only by that directory's
-    # `backends_override.toml` needs the terms as much as one switched on in the base.
-    if not backends_toml_path.exists():
-        return
-
-    # Any managed gateway backend puts this installation behind the service terms — the same
-    # question the boot asks. Asking only about the Portkey-cloud one leaves a manifold-only
-    # install unable to record acceptance through any supported step.
-    if not enabled_managed_gateway_sections(config_dir=backends_toml_path.parent.parent):
-        return
-
-    # Gateway is enabled - check if terms are already accepted (always global)
-    pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
-    if pipelex_service_config is not None and pipelex_service_config.agreement.terms_accepted:
-        return
-
-    # Gateway is enabled but terms not accepted - prompt user
-    gateway_accepted = prompt_gateway_acceptance(console=console)
-
-    config_manager.global_config_dir.mkdir(parents=True, exist_ok=True)
-    if gateway_accepted:
-        display_gateway_accepted_message(console=console)
-        update_service_terms_acceptance(accepted=True, config_dir=config_manager.global_config_dir)
-    else:
-        display_gateway_declined_message(console=console)
-        update_service_terms_acceptance(accepted=False, config_dir=config_manager.global_config_dir)
-        # Actually disable the managed gateway backends in backends.toml — and say so if an
-        # override still pins one on
-        disable_managed_gateway_backends(backends_toml_path)
-        warn_if_managed_gateway_pinned_by_override(console=console, backends_toml_path=backends_toml_path)
 
 
 def determine_needs(
@@ -269,8 +107,6 @@ def confirm_initialization(
         console.print("\n[yellow]Initialization cancelled.[/yellow]")
         if needs_config or needs_inference or needs_routing or needs_telemetry:
             match focus:
-                case InitFocus.AGREEMENT:
-                    init_cmd_str = "pipelex init agreement"
                 case InitFocus.ALL:
                     init_cmd_str = "pipelex init"
                 case InitFocus.CONFIG | InitFocus.CREDENTIALS | InitFocus.INFERENCE | InitFocus.ROUTING | InitFocus.TELEMETRY:
@@ -316,7 +152,7 @@ def execute_initialization(
         is_first_time_backends_setup: Whether backends.toml didn't exist before this run.
         target_config_dir: Explicit target .pipelex directory. If None, uses config_manager.pipelex_config_dir.
         for_project: True when initializing a project's .pipelex/; False when initializing
-            the global ~/.pipelex/. Selects which telemetry template gets copied.
+            the home configuration directory. Selects which telemetry template gets copied.
 
     """
     # Step 1: Initialize config if needed
@@ -333,11 +169,6 @@ def execute_initialization(
 
         if not backends_existed_before or (check_inference and backends_exists_now):
             needs_inference = True
-
-        # If we're NOT going to run customize_backends_config (which handles gateway terms),
-        # we need to check if gateway is enabled and terms not accepted
-        if not needs_inference and backends_existed_before:
-            _check_gateway_terms_if_needed(console=console, backends_toml_path=backends_toml_path)
 
     # Determine if this is truly a first-time setup
     first_time_setup = is_first_time_backends_setup
@@ -375,9 +206,9 @@ def execute_initialization(
                     dst_path = target_deck_dir / deck_file.name
                     shutil.copy2(deck_file, dst_path)
 
-            # Stamp the deck manifest so future updates can detect drift and
-            # `pipelex update` knows the exact kit version this install came from.
-            write_manifest(compute_kit_manifest(), deck_dir=target_deck_dir)
+            # Stamp the kit manifests of the deck and of backends/internal.toml so future updates can
+            # detect drift and `pipelex update` knows the exact kit version this install came from.
+            stamp_kit_manifests(inference_dir=target_inference_dir)
 
             # Reset routing_profiles.toml
             template_routing_path = template_inference_dir / "routing_profiles.toml"
@@ -423,66 +254,6 @@ def execute_initialization(
     if needs_telemetry:
         setup_telemetry(console=console, telemetry_config_path=telemetry_config_path, for_project=for_project)
 
-    # Step 5: Prime the remote-config cache so dry-runs and validate can fall back offline.
-    # No-op when gateway is disabled or terms have not been accepted. We forward
-    # ``target_config_dir`` so the gateway-enabled check inspects the directory we just
-    # initialized (matters for ``--local`` vs default init).
-    prime_remote_config_cache(console=console, target_config_dir=target_config_dir)
-
-    console.print()
-
-
-def _init_agreement(*, console: Console) -> None:
-    """Handle the agreement-only initialization flow.
-
-    This prompts the user to accept the Pipelex service terms without resetting any configuration,
-    and it is the human CLI's only way to record acceptance after the fact. It therefore asks the
-    same question the boot asks — is ANY managed gateway backend enabled — rather than the narrower
-    gateway-only one, which would report that nothing is needed on an installation the boot refuses
-    to start for want of exactly this.
-
-    Args:
-        console: Rich Console instance for user interaction.
-    """
-    if not enabled_managed_gateway_sections():
-        console.print()
-        console.print("[green]✓ No Pipelex-managed gateway backend is enabled.[/green]")
-        console.print("[dim]No terms acceptance is required.[/dim]")
-        console.print()
-        return
-
-    # Check current terms acceptance status (always global)
-    pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
-
-    if pipelex_service_config is not None and pipelex_service_config.agreement.terms_accepted:
-        console.print()
-        console.print("[green]✓ Pipelex Gateway terms have already been accepted.[/green]")
-        console.print()
-        return
-
-    # Show the terms panel and prompt for acceptance
-    console.print()
-    console.print(build_gateway_terms_panel())
-    console.print()
-
-    accepted = Confirm.ask(
-        "[bold]Do you accept the Pipelex Gateway terms of service?[/bold]",
-        console=console,
-        default=True,
-    )
-
-    if accepted:
-        display_gateway_accepted_message(console=console)
-        update_service_terms_acceptance(accepted=True, config_dir=config_manager.global_config_dir)
-    else:
-        display_gateway_declined_message(console=console)
-        update_service_terms_acceptance(accepted=False, config_dir=config_manager.global_config_dir)
-        # Disable the gateway since terms were declined
-        backends_toml_path = config_manager.pipelex_config_dir / "inference" / "backends.toml"
-        if backends_toml_path.exists():
-            disable_managed_gateway_backends(backends_toml_path)
-            warn_if_managed_gateway_pinned_by_override(console=console, backends_toml_path=backends_toml_path)
-
     console.print()
 
 
@@ -498,16 +269,12 @@ def init_cmd(
     of the configuration, overwriting any existing files.
 
     Args:
-        focus: What to initialize - 'all', 'agreement', 'config', 'credentials', 'inference', 'routing', or 'telemetry'
+        focus: What to initialize - 'all', 'config', 'credentials', 'inference', 'routing', or 'telemetry'
         skip_confirmation: If True, skip the confirmation prompt (used when called from doctor --fix)
-        local: If True, create project-level .pipelex/ at the detected project root. Otherwise, create global ~/.pipelex/.
+        local: If True, create project-level .pipelex/ at the detected project root.
+            Otherwise, create the home configuration directory (~/.pipelex/, or PIPELEX_HOME).
     """
     console = get_console()
-
-    # Handle agreement-only flow separately (no reset needed)
-    if focus == InitFocus.AGREEMENT:
-        _init_agreement(console=console)
-        return
 
     # Handle credentials-only flow separately (no reset needed)
     if focus == InitFocus.CREDENTIALS:
@@ -533,9 +300,9 @@ def init_cmd(
         else:
             target_config_dir = Path.cwd() / ".pipelex"
     else:
-        # Default: create global config at ~/.pipelex/
+        # Default: create the global config in the home configuration directory
         target_config_dir = config_manager.global_config_dir
-    console.print(f"[dim]Target directory: {target_config_dir}[/dim]")
+    console.print(f"[dim]Target directory: {escape(str(target_config_dir))}[/dim]")
 
     pipelex_config_dir = target_config_dir
     telemetry_config_path = pipelex_config_dir / TELEMETRY_CONFIG_FILE_NAME

@@ -17,6 +17,8 @@ The variables you declare in `inputs` are **injected into that template** at run
 
 The pipe can be configured to generate a single image or a list of images. Its only concept constraints are that declared image inputs must be `Image`-compatible and the `output` must be `Image`-compatible.
 
+Every input the pipe declares must be read by the `prompt` or the `negative_prompt`, and every variable they read must be declared in `inputs`. Validation refuses an input neither template reads as `extraneous_input_variable`, naming the input: an image declared in `inputs` but never referenced in the prompt is never passed to the generator, so reference it in the prompt, or remove it from `inputs`. An undeclared variable is refused as `missing_input_variable`.
+
 ## Configuration
 
 `PipeImgGen` is configured in your pipeline's `.mthds` file.
@@ -198,7 +200,7 @@ prompt = "Combine the styles of these reference images into a single coherent sc
 model = "$gen-image"
 ```
 
-Image references also work through a dotted path to a nested image field (e.g. `$page.page_view` when `page` is a `Page`), and through any of the `$var`, `@var`, or `{{ var }}` syntaxes.
+Image references also work through a dotted path to a nested image field (e.g. `$page.page_view` when the pipe declares `page = "Page"`), and through any of the `$var`, `@var`, or `{{ var }}` syntaxes. The image is detected from the concept the path reaches, so only the root is declared: an input name is a plain name, and a key such as `"page.page_view" = "Image"` is refused as `invalid_input_name`.
 
 ### Inputs and outputs
 

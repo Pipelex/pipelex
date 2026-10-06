@@ -10,13 +10,14 @@ from rich.traceback import Traceback
 from typer.core import TyperGroup
 from typing_extensions import override
 
+from pipelex.cli.dev_cli.commands.check_actions_allowlist_cmd import check_actions_allowlist_cmd
 from pipelex.cli.dev_cli.commands.check_config_sync_cmd import LeadingConfig, check_config_sync_cmd
-from pipelex.cli.dev_cli.commands.check_gateway_models_cmd import check_gateway_models_cmd
 from pipelex.cli.dev_cli.commands.check_hub_layering_cmd import check_hub_layering_cmd
 from pipelex.cli.dev_cli.commands.check_keyword_only_cmd import check_keyword_only_cmd
 from pipelex.cli.dev_cli.commands.check_ledger_cmd import check_ledger_cmd
 from pipelex.cli.dev_cli.commands.check_migration_schemas_cmd import check_migration_schemas_cmd
 from pipelex.cli.dev_cli.commands.check_mthds_schema_cmd import check_mthds_schema_cmd
+from pipelex.cli.dev_cli.commands.check_rich_imports_cmd import check_rich_imports_cmd
 from pipelex.cli.dev_cli.commands.check_rules_sync_cmd import check_rules_sync_cmd
 from pipelex.cli.dev_cli.commands.check_urls_cmd import DEFAULT_TIMEOUT, check_urls_cmd
 from pipelex.cli.dev_cli.commands.drift.drift_cmd import drift_app
@@ -33,7 +34,6 @@ from pipelex.cli.dev_cli.commands.subject_grant_cmd import subject_grant_cmd
 from pipelex.cli.dev_cli.commands.sync_kit_configs_cmd import sync_kit_configs_cmd
 from pipelex.cli.dev_cli.commands.sync_main_config_cmd import SyncTarget, sync_main_config_cmd
 from pipelex.cli.dev_cli.commands.trace_input_semantics_cmd import trace_input_semantics_cmd
-from pipelex.cli.dev_cli.commands.update_gateway_models_cmd import update_gateway_models_cmd
 from pipelex.cli.dev_cli.commands.update_migration_schemas_cmd import update_migration_schemas_cmd
 from pipelex.runtime_hub import get_console
 from pipelex.tools.misc.package_utils import get_package_version
@@ -46,13 +46,14 @@ class PipelexDevCLI(TyperGroup):
     def list_commands(self, ctx: Context) -> list[str]:
         """List commands in proper order."""
         return [
+            "check-actions-allowlist",
             "check-config-sync",
-            "check-gateway-models",
             "check-hub-layering",
             "check-keyword-only",
             "check-ledger",
             "check-migration-schemas",
             "check-mthds-schema",
+            "check-rich-imports",
             "check-rules",
             "check-urls",
             "drift",
@@ -69,7 +70,6 @@ class PipelexDevCLI(TyperGroup):
             "sync-kit-configs",
             "sync-main-config",
             "trace-input-semantics",
-            "update-gateway-models",
             "update-migration-schemas",
         ]
 
@@ -271,27 +271,6 @@ def generate_mthds_schema_command(
         sys.exit(1)
 
 
-@app.command(name="check-gateway-models", help="Verify that gateway models reference is up-to-date")
-def check_gateway_models_command(
-    show_diff: Annotated[bool, typer.Option("--show-diff/--no-diff", help="Show differences if found")] = True,
-    quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only a single validation line")] = False,
-) -> None:
-    """Verify that the Pipelex Gateway models reference file is up-to-date."""
-    try:
-        check_gateway_models_cmd(show_diff=show_diff, quiet=quiet)
-    except (typer.Exit, typer.Abort):
-        # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
-        raise
-    except Exception:  # ruff: ignore[blind-except]
-        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
-        console = get_console()
-        console.print()
-        console.print("[bold red]Unexpected error occurred[/bold red]")
-        console.print()
-        console.print(Traceback())
-        sys.exit(1)
-
-
 @app.command(name="check-mthds-schema", help="Verify that MTHDS JSON Schema is up-to-date")
 def check_mthds_schema_command(
     show_diff: Annotated[bool, typer.Option("--show-diff/--no-diff", help="Show differences if found")] = True,
@@ -387,6 +366,50 @@ def check_hub_layering_command(
     """Enforce the runtime_hub / interpreter_hub layering boundary."""
     try:
         check_hub_layering_cmd(quiet=quiet)
+    except (typer.Exit, typer.Abort):
+        # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
+        raise
+    except Exception:  # ruff: ignore[blind-except]
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
+        console = get_console()
+        console.print()
+        console.print("[bold red]Unexpected error occurred[/bold red]")
+        console.print()
+        console.print(Traceback())
+        sys.exit(1)
+
+
+@app.command(name="check-actions-allowlist", help="Refuse a workflow action the organization's Actions policy would refuse")
+def check_actions_allowlist_command(
+    quiet: Annotated[
+        bool, typer.Option("--quiet", "-q", help="Light output on success (single line); the full violation list still prints on failure")
+    ] = False,
+) -> None:
+    """Refuse a workflow action outside the Actions allowlist mirrored in .github/actions-allowlist.toml."""
+    try:
+        check_actions_allowlist_cmd(quiet=quiet)
+    except (typer.Exit, typer.Abort):
+        # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
+        raise
+    except Exception:  # ruff: ignore[blind-except]
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
+        console = get_console()
+        console.print()
+        console.print("[bold red]Unexpected error occurred[/bold red]")
+        console.print()
+        console.print(Traceback())
+        sys.exit(1)
+
+
+@app.command(name="check-rich-imports", help="Refuse a module-level Rich import or reach outside pipelex/cli/ (Rich is the cli extra)")
+def check_rich_imports_command(
+    quiet: Annotated[
+        bool, typer.Option("--quiet", "-q", help="Light output on success (single line); the full violation list still prints on failure")
+    ] = False,
+) -> None:
+    """Refuse a module-level Rich import outside pipelex/cli/, direct or through a CLI module."""
+    try:
+        check_rich_imports_cmd(quiet=quiet)
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
@@ -572,26 +595,6 @@ def refresh_graph_ui_sri_command(
             elkjs_version=elkjs_version,
             quiet=quiet,
         )
-    except (typer.Exit, typer.Abort):
-        # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
-        raise
-    except Exception:  # ruff: ignore[blind-except]
-        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
-        console = get_console()
-        console.print()
-        console.print("[bold red]Unexpected error occurred[/bold red]")
-        console.print()
-        console.print(Traceback())
-        sys.exit(1)
-
-
-@app.command(name="update-gateway-models", help="Update the gateway models reference file")
-def update_gateway_models_command(
-    quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only a single validation line")] = False,
-) -> None:
-    """Update the Pipelex Gateway models reference file from remote config."""
-    try:
-        update_gateway_models_cmd(quiet=quiet)
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise

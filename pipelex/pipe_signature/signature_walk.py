@@ -16,13 +16,14 @@ def collect_signature_refs(pipe: PipeAbstract, *, visited: set[str] | None = Non
 
     Walks `pipe.pipe_dependencies()`, resolving each dependency via `get_optional_pipe`.
     Unresolved dependencies are skipped silently. Cycles are broken via the `visited`
-    set keyed by qualified pipe_ref.
+    set keyed by each pipe's `visit_key`, so a consumer pipe and a dependency's pipe of the
+    same `domain.code` are both walked.
     """
     if visited is None:
         visited = set()
-    if pipe.pipe_ref in visited:
+    if pipe.visit_key in visited:
         return set()
-    visited.add(pipe.pipe_ref)
+    visited.add(pipe.visit_key)
 
     found: set[str] = set()
     if pipe.is_signature:
@@ -41,23 +42,27 @@ def collect_signature_paths(
     pipe: PipeAbstract,
     *,
     current_path: list[str] | None = None,
+    visiting: frozenset[str] | None = None,
     paths: dict[str, list[str]] | None = None,
 ) -> dict[str, list[str]]:
     """Return mapping from signature pipe_ref to the longest dep chain that reaches it.
 
     Each value is the ordered list of controller pipe_refs traversed (entry-point first).
-    Keys and path entries are qualified pipe_refs. Companion of `collect_signature_refs`
+    Keys and path entries are qualified pipe_refs; `visiting` holds the `visit_key` of each pipe on
+    the active path, which breaks cycles without taking one pipe for another of the same `domain.code`. Companion of `collect_signature_refs`
     used to render the dep chain that reaches each unimplemented signature. When a signature
     is reachable by several paths (a diamond), the longest — most informative — chain is kept.
     """
     if current_path is None:
         current_path = []
+    if visiting is None:
+        visiting = frozenset()
     if paths is None:
         paths = {}
     # Cycle break: a pipe already on the active dependency path is a back edge — stop.
     # Unlike a global visited set, this still explores diamonds (distinct paths that
     # re-converge on the same signature), so we can keep the longest, most informative chain.
-    if pipe.pipe_ref in current_path:
+    if pipe.visit_key in visiting:
         return paths
     if pipe.is_signature:
         existing = paths.get(pipe.pipe_ref)
@@ -69,5 +74,5 @@ def collect_signature_paths(
         dep_pipe = get_optional_pipe(pipe_code=dep_code)
         if dep_pipe is None:
             continue
-        collect_signature_paths(pipe=dep_pipe, current_path=next_path, paths=paths)
+        collect_signature_paths(pipe=dep_pipe, current_path=next_path, visiting=visiting | {pipe.visit_key}, paths=paths)
     return paths

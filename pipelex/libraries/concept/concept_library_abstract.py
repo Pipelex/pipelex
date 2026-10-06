@@ -12,6 +12,14 @@ class ConceptLibraryAbstract(ConceptProviderAbstract):
     interpreter layer.
     """
 
+    @property
+    @abstractmethod
+    def state_token(self) -> int:
+        """The token of what the library holds now, which every change to it replaces (`library_state`).
+
+        A value derived from the concepts the library resolves records it, and is stale once it differs.
+        """
+
     @abstractmethod
     def add_new_concept(self, concept: Concept) -> None:
         pass

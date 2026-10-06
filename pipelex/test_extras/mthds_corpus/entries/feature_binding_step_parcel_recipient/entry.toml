@@ -1,0 +1,10 @@
+name = "feature_binding_step_parcel_recipient"
+description = "A parcel label written from the recipient bound whole and the fragile flag bound as a yes or no"
+
+validity = "valid"
+tier = "offline"
+granularity = "focused"
+
+covers = [
+  "feature.binding_step",
+]

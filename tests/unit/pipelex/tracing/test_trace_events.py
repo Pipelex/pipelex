@@ -9,12 +9,14 @@ from pydantic import TypeAdapter
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
+from pipelex.graph.condition_output_merge import ConditionOutputMerge, ConditionOutputTyping
 from pipelex.graph.graphspec import EdgeKind, ErrorSpec, IOSpec, NodeKind
 from pipelex.system.job_metadata import JobCategory, JobMetadata, RunMetadata, UnitJobId
 from pipelex.tracing.trace_events import (
     AnyTraceEvent,
     BatchAggregateEvent,
     BatchItemEvent,
+    ConditionOutputMergeEvent,
     ControllerOutputEvent,
     EdgeEvent,
     ExecutionDataEvent,
@@ -69,7 +71,7 @@ class _Shared:
     @staticmethod
     def make_job_metadata() -> JobMetadata:
         return JobMetadata(
-            run_metadata=RunMetadata(storage_scope="test/scope", user_id="user_test", pipeline_run_id=_Shared.PIPELINE_RUN_ID),
+            run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="user_test", pipeline_run_id=_Shared.PIPELINE_RUN_ID),
             pipe_code="test_pipe",
             unit_job_id=UnitJobId.LLM_GEN_TEXT,
             job_category=JobCategory.LLM_JOB,
@@ -186,6 +188,18 @@ class TestTraceEvents:
             },
         ),
         (
+            "condition_output_merge",
+            TraceEventKind.CONDITION_OUTPUT_MERGE,
+            {
+                "merge": ConditionOutputMerge(
+                    condition_node_id=_Shared.PARENT_NODE_ID,
+                    shared_digest="shared_001",
+                    merged_digests=["outcome_a"],
+                    shared_typing=ConditionOutputTyping(concept="Anything", multiplicity=True),
+                ),
+            },
+        ),
+        (
             "execution_data",
             TraceEventKind.EXECUTION_DATA,
             {
@@ -213,6 +227,7 @@ class TestTraceEvents:
         TraceEventKind.BATCH_ITEM: BatchItemEvent,
         TraceEventKind.BATCH_AGGREGATE: BatchAggregateEvent,
         TraceEventKind.PARALLEL_COMBINE: ParallelCombineEvent,
+        TraceEventKind.CONDITION_OUTPUT_MERGE: ConditionOutputMergeEvent,
         TraceEventKind.EXECUTION_DATA: ExecutionDataEvent,
         TraceEventKind.USAGE_REPORT: UsageReportEvent,
     }
@@ -280,7 +295,7 @@ class TestTraceEvents:
         assert restored.metrics == {}
 
     def test_io_spec_survives_round_trip_within_event(self) -> None:
-        """IOSpec fields (digest, preview, concept) are preserved through event serialization."""
+        """IOSpec fields (digest, preview, concept, multiplicity) are preserved through event serialization."""
         io_spec = IOSpec(
             name="complex_stuff",
             concept="StructuredData",
@@ -288,6 +303,7 @@ class TestTraceEvents:
             preview='{"key": "value"}',
             size=16,
             digest="sha256_abc",
+            multiplicity=True,
             extra={"custom_field": "custom_value"},
         )
         event = PipeStartEvent(
@@ -306,6 +322,7 @@ class TestTraceEvents:
         assert restored_io.name == "complex_stuff"
         assert restored_io.concept == "StructuredData"
         assert restored_io.digest == "sha256_abc"
+        assert restored_io.multiplicity is True
         assert restored_io.extra == {"custom_field": "custom_value"}
 
     def test_error_spec_survives_round_trip_within_event(self) -> None:

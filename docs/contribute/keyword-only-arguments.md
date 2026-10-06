@@ -49,7 +49,7 @@ The command validates the def (it must exist, be inspected by the guard, and hav
 
 A subject grant is warranted when EITHER:
 
-- **Verb–object test:** the function name is a verb (phrase) and the param is its direct object — the call reads as a sentence (`render(node)`, `validate_bundle(bundle)`, `parse_concept_spec(spec_data)`) — AND it is the **single candidate** (if you hesitate between two params, neither is the subject) — AND typical call sites pass a **self-labelling expression**, never a bare literal (literal-typed subjects are banned outright anyway);
+- **Verb–object test:** the function name is a verb (phrase) and the param is its direct object — the call reads as a sentence (`render(node)`, `validate_bundle(bundle)`) — AND it is the **single candidate** (if you hesitate between two params, neither is the subject) — AND typical call sites pass a **self-labelling expression**, never a bare literal (literal-typed subjects are banned outright anyway);
 - OR the def must satisfy a **positional `Callable` protocol** (it is passed as a value to something that calls it positionally) and a grant keeps it compliant without reaching for the heavier `# kw-only: ignore`.
 
 When in doubt → keyword-only. The grant is the exception tier; all-keyword is always compliant and often more readable. Rationales must be def-specific but may be terse for obvious keeps ("verb–object; single operand") — the value is that someone actually looked; copy-paste boilerplate across dozens of entries defeats the point.
@@ -116,7 +116,7 @@ A def is skipped when it is registered with a framework whose calling convention
 - pytest fixtures — `fixture`, matched on the bare decorator name so both `@pytest.fixture` and bare `@fixture` (`from pytest import fixture`) are covered (the only src-side fixtures live in the shipped `pipelex/test_extras/shared_pytest_plugins.py` plugin module).
 - Jinja2 filters/tests/globals — `pass_context`, `pass_environment`, `pass_eval_context`, matched on the bare decorator name (covers both `@pass_context` from `from jinja2 import pass_context` and the attributed `@jinja2.pass_context`). The Jinja2 engine invokes a filter POSITIONALLY from template syntax — `{{ value | tag("name") }}` calls `tag(context, value, "name")` — so the wrapped callable's arguments cannot be made keyword-only. This is the same framework-entrypoint category as Typer/pytest. A multi-argument filter without one of these decorators (rare) is covered by the `# kw-only: ignore` escape hatch; single-argument filters (`escape_script_tag(value)`) have an ordinary lone subject and take a grant like any other def.
 
-FastAPI is intentionally absent: there are no route handlers in `pipelex/` source — the FastAPI server lives in the separate `pipelex-api/` repo.
+FastAPI is intentionally absent: there are no route handlers in `pipelex/` source — the FastAPI server lives in the `api/` workspace member, outside `pipelex/` and outside this convention's scope (see [The API Server](api-server.md)).
 
 Known coverage gap (documented, not silently ignored): some Typer commands are registered by call-style `app.command(name=...)(some_fn)` against functions defined in separate modules that carry NO decorator, so a decorator-keyed guard cannot see them via the framework carve-out. These target functions consistently type their parameters as `Annotated[T, typer.Argument(...)]` / `Annotated[T, typer.Option(...)]`. The guard treats a def as a framework entrypoint when any of its parameters carry `Argument`/`Option` metadata in their `Annotated[...]` annotation — matched on the trailing callee name, so both the qualified `typer.Option(...)` form and the bare `Option(...)` form (`from typer import Option`) are recognized — which closes the gap without resorting to a broad path-based exclusion of CLI modules.
 
@@ -139,8 +139,8 @@ A `# kw-only: ignore` comment on the `def` line (or the `async def` line) suppre
 A subject plus options — the canonical shape, legal only with a grant:
 
 ```python
-# subject_grants.toml carries: ["pipelex/builder/build.py::build_pipe"] param = "spec" rationale = "…"
-def build_pipe(spec, *, dry_run, retries, validate): ...  # build_pipe(my_spec, dry_run=True, retries=3, validate=False)
+# subject_grants.toml carries: ["pipelex/pipeline/publish.py::publish_bundle"] param = "bundle" rationale = "…"
+def publish_bundle(bundle, *, dry_run, retries, validate): ...  # publish_bundle(my_bundle, dry_run=True, retries=3, validate=False)
 ```
 
 A single subject and nothing else — needs a grant too (strict-all scope; lone-subject defs are not implicitly exempt):

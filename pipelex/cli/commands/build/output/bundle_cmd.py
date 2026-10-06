@@ -5,10 +5,10 @@ from typing import Annotated
 
 import typer
 
-from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME
 from pipelex.cli.commands.build.output._output_core import execute_generate_output
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
+from pipelex.pipeline.default_file_names import DEFAULT_BUNDLE_FILE_NAME
 
 
 def build_output_bundle_cmd(

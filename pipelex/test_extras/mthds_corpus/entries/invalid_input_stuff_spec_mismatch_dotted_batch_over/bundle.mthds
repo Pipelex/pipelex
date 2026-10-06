@@ -1,0 +1,27 @@
+domain      = "supplier_labels"
+description = "Writing the shelf labels for a supplier's invoice"
+main_pipe   = "label_invoice"
+
+[concept.Invoice]
+description = "An invoice received from a supplier"
+
+[concept.Invoice.structure]
+supplier_name = { type = "text", description = "The name of the supplier", required = true }
+total         = { type = "number", description = "The amount due, in euros", required = true }
+
+[pipe.write_label]
+type        = "PipeCompose"
+description = "Writes a shelf label for a supplier"
+inputs      = { supplier = "Text" }
+output      = "Text"
+template    = "Supplied by $supplier"
+
+[pipe.label_invoice]
+type        = "PipeSequence"
+description = "Writes a shelf label for the supplier of an invoice"
+inputs      = { invoice = "Invoice" }
+output      = "Text[]"
+# Wrong on purpose: a dotted batch_over must reach a list, and the supplier's name is a single text.
+steps = [
+  { pipe = "write_label", batch_over = "invoice.supplier_name", batch_as = "supplier", result = "labels" },
+]

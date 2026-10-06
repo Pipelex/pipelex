@@ -14,6 +14,7 @@ from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.libraries.concept.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
+from pipelex.libraries.library_state import next_library_state_token
 from pipelex.runtime_hub import get_class_registry
 from pipelex.tools.typing.class_utils import are_structure_classes_compatible
 
@@ -26,6 +27,16 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
     @override
     def model_post_init(self, _context: Any) -> None:
         self._concept_resolver: Callable[[str], Concept | None] | None = None
+        # Replaced on every change to what the library holds, so a value derived from the concepts it resolves knows it is stale.
+        self._state_token: int = next_library_state_token()
+
+    @property
+    @override
+    def state_token(self) -> int:
+        return self._state_token
+
+    def _mark_changed(self) -> None:
+        self._state_token = next_library_state_token()
 
     def set_concept_resolver(self, resolver: Callable[[str], Concept | None]) -> None:
         """Set a resolver callback for cross-package concept lookups.
@@ -34,6 +45,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
             resolver: A callable that takes a concept ref and returns the Concept or None
         """
         self._concept_resolver = resolver
+        self._mark_changed()
 
     @model_validator(mode="after")
     def validation_static(self):
@@ -50,6 +62,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
     @override
     def teardown(self):
         self.root = {}
+        self._mark_changed()
 
     @override
     def reset(self):
@@ -86,6 +99,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
             msg = f"Concept '{concept.concept_ref}' already exists in the library"
             raise ConceptLibraryError(msg)
         self.root[concept.concept_ref] = concept
+        self._mark_changed()
 
     @override
     def add_concepts(self, concepts: list[Concept]):
@@ -97,6 +111,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         for concept_ref in concept_refs:
             if concept_ref in self.root:
                 del self.root[concept_ref]
+        self._mark_changed()
 
     @override
     def is_compatible(self, *, tested_concept: Concept, wanted_concept: Concept, strict: bool = False) -> bool:
@@ -120,11 +135,20 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
             # make: the declaration tier's silence is the whole answer.
             return False
 
-        return are_structure_classes_compatible(
-            class_1=self.get_structure_class(concept=tested_concept),
-            class_2=self.get_structure_class(concept=wanted_concept),
-            strict=strict,
-        )
+        tested_class = self.get_structure_class(concept=tested_concept)
+        wanted_class = self.get_structure_class(concept=wanted_concept)
+        if self._is_native_refining_a_native(concept=wanted_concept):
+            # `native.Markdown` refines `native.Text` and its class has Text's shape by construction, so
+            # shape says nothing about being one: only its lineage does. A plain Text, or any text concept,
+            # is refused where a Markdown is wanted; a concept refining Markdown, at any depth, is accepted.
+            return issubclass(tested_class, wanted_class)
+        return are_structure_classes_compatible(class_1=tested_class, class_2=wanted_class, strict=strict)
+
+    @staticmethod
+    def _is_native_refining_a_native(*, concept: Concept) -> bool:
+        if not Concept.is_native_concept(concept=concept):
+            return False
+        return NativeConceptCode(concept.code).refined_native is not None
 
     @override
     def get_structure_class(self, *, concept: Concept) -> type[StuffContent]:
@@ -201,8 +225,9 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         """Resolve a concept string a **human** supplied — an input payload's `concept` field, a CLI argument.
 
         Entry-shaped lookup, the concept twin of `PipeLibrary.get_optional_entry_pipe` — kept a
-        deliberate near-copy rather than a shared helper (see
-        wip/pipe-refs/entry-affordance-share-vs-duplicate.md). Natives resolve first, per the
+        deliberate near-copy rather than a shared helper: the concept side has steps the pipe side
+        cannot have (natives first, then the scope preference), so a shared helper would carry dead
+        branches. Natives resolve first, per the
         standard's own step 1. A fully-specified ref (`domain.Concept`, `alias->domain.Concept`)
         is a direct hit or a miss. A bare code prefers `search_scope` — the entry pipe's own
         domain, carried as `alias->domain` when the entry pipe came from a dependency package —
@@ -334,6 +359,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
             msg = f"Dependency concept '{key}' already exists in the library"
             raise ConceptLibraryError(msg)
         self.root[key] = concept
+        self._mark_changed()
 
     def is_concept_exists(self, concept_ref: str) -> bool:
         return concept_ref in self.root

@@ -4,6 +4,7 @@ from pipelex.core.concepts.native.exceptions import NativeConceptDefinitionError
 from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.core.stuffs.choice_content import ChoiceContent
 from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.document_content import DocumentContent
@@ -11,8 +12,10 @@ from pipelex.core.stuffs.dynamic_content import DynamicContent
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.json_content import JSONContent
+from pipelex.core.stuffs.markdown_content import MarkdownContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.page_content import PageContent
+from pipelex.core.stuffs.rating_content import RatingContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
@@ -23,12 +26,15 @@ from pipelex.core.stuffs.yes_no_content import YesNoContent
 class NativeConceptCode(StrEnum):
     DYNAMIC = "Dynamic"
     TEXT = "Text"
+    MARKDOWN = "Markdown"
     IMAGE = "Image"
     DOCUMENT = "Document"
     HTML = "Html"
     TEXT_AND_IMAGES = "TextAndImages"
     NUMBER = "Number"
     YES_NO = "YesNo"
+    CHOICE = "Choice"
+    RATING = "Rating"
     DATE = "Date"
     TIME = "Time"
     PAGE = "Page"
@@ -50,12 +56,15 @@ class NativeConceptCode(StrEnum):
             case (
                 NativeConceptCode.DYNAMIC
                 | NativeConceptCode.TEXT
+                | NativeConceptCode.MARKDOWN
                 | NativeConceptCode.IMAGE
                 | NativeConceptCode.DOCUMENT
                 | NativeConceptCode.HTML
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
                 | NativeConceptCode.YES_NO
+                | NativeConceptCode.CHOICE
+                | NativeConceptCode.RATING
                 | NativeConceptCode.DATE
                 | NativeConceptCode.TIME
                 | NativeConceptCode.PAGE
@@ -64,6 +73,72 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.ANYTHING
             ):
                 return False
+
+    @property
+    def refined_native(self) -> "NativeConceptCode | None":
+        """The native concept this one refines, or None when it refines none.
+
+        `Markdown` refines `Text`: a Markdown value is a text, so it is accepted wherever a `Text` is,
+        while a plain `Text` is not a Markdown. Its content class subclasses the refined one's, which
+        gives it the same shape, so compatibility with such a native is decided by lineage and never
+        by shape (`ConceptLibrary.is_compatible`).
+        """
+        match self:
+            case NativeConceptCode.MARKDOWN:
+                return NativeConceptCode.TEXT
+            case (
+                NativeConceptCode.DYNAMIC
+                | NativeConceptCode.TEXT
+                | NativeConceptCode.IMAGE
+                | NativeConceptCode.DOCUMENT
+                | NativeConceptCode.HTML
+                | NativeConceptCode.TEXT_AND_IMAGES
+                | NativeConceptCode.NUMBER
+                | NativeConceptCode.YES_NO
+                | NativeConceptCode.CHOICE
+                | NativeConceptCode.RATING
+                | NativeConceptCode.DATE
+                | NativeConceptCode.TIME
+                | NativeConceptCode.PAGE
+                | NativeConceptCode.JSON
+                | NativeConceptCode.SEARCH_RESULT
+                | NativeConceptCode.ANYTHING
+                | NativeConceptCode.COMPOSITE
+            ):
+                return None
+
+    @property
+    def is_pinned_by_the_standard(self) -> bool:
+        """Whether the MTHDS standard's page pins this native's definition, which `pinned_blueprints.py` copies.
+
+        `Markdown` is the one native Pipelex defines ahead of the standard: its blueprint in
+        `pinned_blueprints.py` is Pipelex's own until the standard's page defines it, and the day it
+        does, this returns True for it and `PINNED_NATIVES_MTHDS_VERSION` moves to the version that
+        re-pinned the set. The conformance test against the page reads only the natives this is True for.
+        """
+        match self:
+            case NativeConceptCode.MARKDOWN:
+                return False
+            case (
+                NativeConceptCode.DYNAMIC
+                | NativeConceptCode.TEXT
+                | NativeConceptCode.IMAGE
+                | NativeConceptCode.DOCUMENT
+                | NativeConceptCode.HTML
+                | NativeConceptCode.TEXT_AND_IMAGES
+                | NativeConceptCode.NUMBER
+                | NativeConceptCode.YES_NO
+                | NativeConceptCode.CHOICE
+                | NativeConceptCode.RATING
+                | NativeConceptCode.DATE
+                | NativeConceptCode.TIME
+                | NativeConceptCode.PAGE
+                | NativeConceptCode.JSON
+                | NativeConceptCode.SEARCH_RESULT
+                | NativeConceptCode.ANYTHING
+                | NativeConceptCode.COMPOSITE
+            ):
+                return True
 
     @property
     def concept_ref(self) -> str:
@@ -85,6 +160,8 @@ class NativeConceptCode(StrEnum):
                 return DynamicContent
             case NativeConceptCode.TEXT:
                 return TextContent
+            case NativeConceptCode.MARKDOWN:
+                return MarkdownContent
             case NativeConceptCode.IMAGE:
                 return ImageContent
             case NativeConceptCode.DOCUMENT:
@@ -97,6 +174,10 @@ class NativeConceptCode(StrEnum):
                 return NumberContent
             case NativeConceptCode.YES_NO:
                 return YesNoContent
+            case NativeConceptCode.CHOICE:
+                return ChoiceContent
+            case NativeConceptCode.RATING:
+                return RatingContent
             case NativeConceptCode.DATE:
                 return DateContent
             case NativeConceptCode.TIME:
@@ -151,7 +232,7 @@ class NativeConceptCode(StrEnum):
             return False
 
         match enum_value:
-            case NativeConceptCode.TEXT:
+            case NativeConceptCode.TEXT | NativeConceptCode.MARKDOWN:
                 return True
             case (
                 NativeConceptCode.DYNAMIC
@@ -161,6 +242,8 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
                 | NativeConceptCode.YES_NO
+                | NativeConceptCode.CHOICE
+                | NativeConceptCode.RATING
                 | NativeConceptCode.DATE
                 | NativeConceptCode.TIME
                 | NativeConceptCode.PAGE
@@ -191,12 +274,15 @@ class NativeConceptCode(StrEnum):
             case (
                 NativeConceptCode.DYNAMIC
                 | NativeConceptCode.TEXT
+                | NativeConceptCode.MARKDOWN
                 | NativeConceptCode.IMAGE
                 | NativeConceptCode.DOCUMENT
                 | NativeConceptCode.HTML
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
                 | NativeConceptCode.YES_NO
+                | NativeConceptCode.CHOICE
+                | NativeConceptCode.RATING
                 | NativeConceptCode.DATE
                 | NativeConceptCode.TIME
                 | NativeConceptCode.PAGE
@@ -216,12 +302,15 @@ class NativeConceptCode(StrEnum):
         match enum_value:
             case (
                 NativeConceptCode.TEXT
+                | NativeConceptCode.MARKDOWN
                 | NativeConceptCode.IMAGE
                 | NativeConceptCode.DOCUMENT
                 | NativeConceptCode.HTML
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
                 | NativeConceptCode.YES_NO
+                | NativeConceptCode.CHOICE
+                | NativeConceptCode.RATING
                 | NativeConceptCode.DATE
                 | NativeConceptCode.TIME
                 | NativeConceptCode.PAGE

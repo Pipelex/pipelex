@@ -2,6 +2,7 @@ from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import ImgGenAssignment
 from pipelex.cogt.content_generation.dry_mock import dry_img_gen_image_contents
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
+from pipelex.cogt.content_generation.read_authorization import authorize_assignment_reads
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job_factory import ImgGenJobFactory
 from pipelex.core.stuffs.image_content import ImageContent
@@ -9,6 +10,7 @@ from pipelex.runtime_hub import get_img_gen_worker
 
 
 async def img_gen_single_image(img_gen_assignment: ImgGenAssignment) -> GeneratedImageRawDetails:
+    authorize_assignment_reads(job_metadata=img_gen_assignment.job_metadata, uri_references=img_gen_assignment.referenced_uris())
     img_gen_worker = get_img_gen_worker(img_gen_handle=img_gen_assignment.img_gen_handle)
     img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt(
         img_gen_prompt=img_gen_assignment.img_gen_prompt,
@@ -22,6 +24,7 @@ async def img_gen_single_image(img_gen_assignment: ImgGenAssignment) -> Generate
 
 
 async def img_gen_image_list(img_gen_assignment: ImgGenAssignment) -> list[GeneratedImageRawDetails]:
+    authorize_assignment_reads(job_metadata=img_gen_assignment.job_metadata, uri_references=img_gen_assignment.referenced_uris())
     img_gen_worker = get_img_gen_worker(img_gen_handle=img_gen_assignment.img_gen_handle)
     img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt(
         img_gen_prompt=img_gen_assignment.img_gen_prompt,
@@ -46,8 +49,10 @@ async def img_gen_single_image_and_store(
 
     The DRY branch sits at the ``*_and_store`` layer, above the raw provider leaf, so a dry run
     performs no storage IO — see the ``dry_mock`` module docstring (eng review D10). Do not
-    "unify" it downward into the raw leaf.
+    "unify" it downward into the raw leaf. The read scope is authorized above that branch, so a dry
+    run refuses what a live one would; the raw leaf authorizes again, for a caller that reaches it directly.
     """
+    authorize_assignment_reads(job_metadata=img_gen_assignment.job_metadata, uri_references=img_gen_assignment.referenced_uris())
     if img_gen_assignment.cogt_run_params.run_mode.is_dry:
         # Exactly one mock, matching the live single path's one-provider-call semantics
         # regardless of the assignment's nb_images.
@@ -69,8 +74,10 @@ async def img_gen_image_list_and_store(
 ) -> list[ImageContent]:
     """Generate multiple images and store them, returning ImageContent list with URLs (no raw binary data).
 
-    DRY branch at the ``*_and_store`` layer — see ``img_gen_single_image_and_store`` (D10).
+    DRY branch at the ``*_and_store`` layer — see ``img_gen_single_image_and_store`` (D10), and the
+    read scope authorized above it.
     """
+    authorize_assignment_reads(job_metadata=img_gen_assignment.job_metadata, uri_references=img_gen_assignment.referenced_uris())
     if img_gen_assignment.cogt_run_params.run_mode.is_dry:
         return dry_img_gen_image_contents(img_gen_assignment)
     generated_image_list = await img_gen_image_list(img_gen_assignment)

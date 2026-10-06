@@ -28,12 +28,6 @@ from pipelex.pipeline.exceptions import (
 from pipelex.plugins.exceptions import UnknownSecretsMethodError, UnknownStorageMethodError
 from pipelex.system.exceptions import EnvVarNotFoundError
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.pipelex_service.exceptions import (
-    GatewayTermsNotAcceptedError,
-    PipelexServiceConfigValidationError,
-    PipelexServiceError,
-    RemoteConfigFetchError,
-)
 from pipelex.tools.tabular.exceptions import CsvError
 
 _PIPELINE_EXEC_ERROR = PipelineExecutionError(
@@ -62,10 +56,6 @@ class TestClassLevelMetadata:
             ("interpreter", MthdsParserError("boom"), ErrorDomain.INPUT),
             ("setup", PipelexSetupError("boom"), ErrorDomain.CONFIG),
             ("config", PipelexConfigError("boom"), ErrorDomain.CONFIG),
-            ("service_base", PipelexServiceError("boom"), ErrorDomain.CONFIG),
-            ("service_config_validation", PipelexServiceConfigValidationError("boom"), ErrorDomain.CONFIG),
-            ("remote_config_fetch", RemoteConfigFetchError("boom"), ErrorDomain.CONFIG),
-            ("gateway_terms", GatewayTermsNotAcceptedError(), ErrorDomain.CONFIG),
             ("env_var_not_found", EnvVarNotFoundError("boom"), ErrorDomain.CONFIG),
         ],
     )
@@ -77,8 +67,12 @@ class TestClassLevelMetadata:
     @pytest.mark.parametrize(
         ("_topic", "exc", "expected_detail"),
         [
-            ("pipeline_execution", _PIPELINE_EXEC_ERROR, "Check pipe_stack to identify which pipe failed"),
-            ("validate_bundle", ValidateBundleError("boom"), "Check the validation_errors array for specific issues"),
+            ("pipeline_execution", _PIPELINE_EXEC_ERROR, "The run of 'some_pipe' failed: the message gives the cause."),
+            (
+                "validate_bundle",
+                ValidateBundleError("boom"),
+                "Edit the bundle as each validation error says: apply its suggested fix where it has one, after confirming an unsafe one",
+            ),
             (
                 "entry_pipe_not_found",
                 EntryPipeNotFoundError("boom"),

@@ -1,0 +1,30 @@
+domain      = "invoice_approval"
+description = "Deciding whether an invoice total needs a second signature"
+main_pipe   = "check_total"
+
+[concept.Invoice]
+description = "An invoice waiting for approval"
+
+[concept.Invoice.structure]
+supplier = { type = "text", description = "Who sent the invoice", required = true }
+total    = { type = "number", description = "The amount due, in euros", required = true }
+
+[pipe.check_total]
+type = "PipeSequence"
+description = "Binds the total of an invoice, then judges whether it needs a second signature"
+inputs = { invoice = "Invoice" }
+output = "YesNo"
+steps = [
+  { from = "invoice.total", result = "total_amount" },
+  { pipe = "judge_needs_second_signature", result = "needs_second_signature" },
+]
+
+[pipe.judge_needs_second_signature]
+type        = "PipeJudge"
+description = "Judges whether an amount is high enough to need a second signature"
+inputs      = { total_amount = "Number" }
+output      = "YesNo"
+model       = "@default-judgment"
+question    = "Is this amount high enough to need a second signature?"
+criteria    = { yes = "The amount is above five thousand euros", no = "The amount is five thousand euros or less" }
+threshold   = 0.7

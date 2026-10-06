@@ -23,8 +23,6 @@ from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
 from pipelex.plugins.model_handle import ModelHandle
 from pipelex.plugins.registrar import PluginRegistrar
 from pipelex.plugins.sdk_client_registry import SdkClientRegistry
-from pipelex.providers.gateway.gateway_completions_factory import GatewayCompletionsFactory
-from pipelex.providers.gateway.gateway_responses_factory import GatewayResponsesFactory
 from pipelex.providers.mistral.mistral_factory import MistralFactory
 from pipelex.providers.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.providers.openai.openai_responses_factory import OpenAIResponsesFactory
@@ -55,10 +53,6 @@ def build_builtin_inference_backend_registry() -> InferenceBackendRegistry:
 
 FACTORY_MODULE = "pipelex.cogt.llm.llm_worker_factory"
 
-GATEWAY_COMPLETIONS_CLIENT = (
-    "pipelex.providers.gateway.gateway_completions_factory.GatewayCompletionsFactory.make_portkey_openai_client_for_completions"
-)
-GATEWAY_RESPONSES_CLIENT = "pipelex.providers.gateway.gateway_responses_factory.GatewayResponsesFactory.make_portkey_openai_client_for_responses"
 PORTKEY_COMPLETIONS_CLIENT = (
     "pipelex.providers.portkey.portkey_completions_factory.PortkeyCompletionsFactory.make_portkey_openai_client_for_completions"
 )
@@ -121,28 +115,6 @@ class TestLLMWorkerFactory:
     @pytest.mark.parametrize(
         ("sdk", "client_target", "worker_target", "factory_field", "factory_cls", "http_flag", "passes_model_handle", "expects_extra_config"),
         [
-            pytest.param(
-                "gateway_completions",
-                GATEWAY_COMPLETIONS_CLIENT,
-                COMPLETIONS_WORKER,
-                "openai_completions_factory",
-                GatewayCompletionsFactory,
-                False,
-                True,
-                False,
-                id="gateway_completions",
-            ),
-            pytest.param(
-                "gateway_responses",
-                GATEWAY_RESPONSES_CLIENT,
-                RESPONSES_WORKER,
-                "openai_responses_factory",
-                GatewayResponsesFactory,
-                False,
-                True,
-                False,
-                id="gateway_responses",
-            ),
             pytest.param(
                 "portkey_completions",
                 PORTKEY_COMPLETIONS_CLIENT,
@@ -213,7 +185,7 @@ class TestLLMWorkerFactory:
             pytest.param("bedrock_anthropic", ANTHROPIC_CLIENT, ANTHROPIC_WORKER, None, None, None, True, True, id="bedrock_anthropic"),
             pytest.param("mistral", MISTRAL_CLIENT, MISTRAL_WORKER, "mistral_factory", MistralFactory, None, False, False, id="mistral"),
             pytest.param("bedrock_boto3", BEDROCK_CLIENT, BEDROCK_WORKER, None, None, None, True, False, id="bedrock_boto3"),
-            pytest.param("bedrock_aioboto3", BEDROCK_CLIENT, BEDROCK_WORKER, None, None, None, True, False, id="bedrock_aioboto3"),
+            pytest.param("bedrock_aioboto", BEDROCK_CLIENT, BEDROCK_WORKER, None, None, None, True, False, id="bedrock_aioboto"),
             pytest.param("google", GOOGLE_CLIENT, GOOGLE_WORKER, None, None, None, False, False, id="google"),
         ],
     )
@@ -307,7 +279,7 @@ class TestLLMWorkerFactory:
             pytest.param("bedrock_anthropic", "anthropic", id="bedrock_anthropic"),
             pytest.param("mistral", "mistral", id="mistral"),
             pytest.param("bedrock_boto3", "bedrock", id="bedrock_boto3"),
-            pytest.param("bedrock_aioboto3", "bedrock", id="bedrock_aioboto3"),
+            pytest.param("bedrock_aioboto", "bedrock", id="bedrock_aioboto"),
             pytest.param("google", "google", id="google"),
         ],
     )
@@ -336,3 +308,4 @@ class TestLLMWorkerFactory:
         assert exc_info.value.sdk == "definitely_not_an_sdk"
         assert "definitely_not_an_sdk" in str(exc_info.value)
         assert "Is its plugin installed and enabled?" in str(exc_info.value)
+        assert "`pipelex migrate` reports each backend file that still sets a retired handle" in str(exc_info.value)

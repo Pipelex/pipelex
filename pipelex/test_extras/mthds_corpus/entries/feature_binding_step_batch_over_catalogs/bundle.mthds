@@ -1,0 +1,32 @@
+domain      = "furniture_catalogs"
+description = "Writing one index line for every page of a furniture maker's catalogs"
+main_pipe   = "index_catalogs"
+
+[concept.CatalogPage]
+description = "A page of a printed catalog"
+
+[concept.CatalogPage.structure]
+title = { type = "text", description = "The title printed at the top of the page", required = true }
+
+[concept.Catalog]
+description = "A printed catalog of a furniture maker"
+
+[concept.Catalog.structure]
+season = { type = "text", description = "The season the catalog covers", required = true }
+pages  = { type = "list", item_type = "concept", item_concept_ref = "CatalogPage", description = "The pages of the catalog", required = true }
+
+[pipe.index_catalogs]
+type = "PipeSequence"
+description = "Writes one index line per page of every catalog, batching over the pages of all of them"
+inputs = { catalogs = "Catalog[]" }
+output = "Text[]"
+steps = [
+  { pipe = "write_index_line", batch_over = "catalogs.pages", batch_as = "page", result = "index_lines" },
+]
+
+[pipe.write_index_line]
+type        = "PipeCompose"
+description = "Writes the index line for one page"
+inputs      = { page = "CatalogPage" }
+output      = "Text"
+template    = "Page: {{ page.title }}"

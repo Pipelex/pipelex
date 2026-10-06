@@ -8,12 +8,10 @@ from mthds.runners.types import RunnerType
 from typer.core import TyperGroup
 from typing_extensions import override
 
-from pipelex.cli.agent_cli.commands.accept_gateway_terms_cmd import agent_accept_gateway_terms_cmd
 from pipelex.cli.agent_cli.commands.agent_cli_factory import silence_logging_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, set_agent_cli_error_format
 from pipelex.cli.agent_cli.commands.check_model_cmd import agent_check_model_cmd
 from pipelex.cli.agent_cli.commands.codegen.app import codegen_app
-from pipelex.cli.agent_cli.commands.concept_cmd import concept_cmd
 from pipelex.cli.agent_cli.commands.doctor_cmd import agent_doctor_cmd
 from pipelex.cli.agent_cli.commands.fix.app import fix_app
 from pipelex.cli.agent_cli.commands.fmt_cmd import fmt_cmd
@@ -22,7 +20,6 @@ from pipelex.cli.agent_cli.commands.inputs.app import inputs_app
 from pipelex.cli.agent_cli.commands.lint_cmd import lint_cmd
 from pipelex.cli.agent_cli.commands.migrate_cmd import agent_migrate_cmd
 from pipelex.cli.agent_cli.commands.models_cmd import agent_models_cmd
-from pipelex.cli.agent_cli.commands.pipe_cmd import pipe_cmd
 from pipelex.cli.agent_cli.commands.run.app import run_app
 from pipelex.cli.agent_cli.commands.validate.app import validate_app
 from pipelex.cli.version_report import version_report_lines
@@ -43,11 +40,8 @@ class PipelexAgentCLI(TyperGroup):
             "lint",
             "inputs",
             "codegen",
-            "concept",
-            "pipe",
             "models",
             "check-model",
-            "accept-gateway-terms",
             "migrate",
             "doctor",
         ]
@@ -109,7 +103,7 @@ def app_callback(
     Free-floating logs would corrupt those channels, so Python's logging system is
     cut off process-wide via ``silence_logging_for_agent_cli`` as the very first
     action in this callback — covering every subcommand invocation (including ones
-    like ``init`` and ``accept-gateway-terms`` that bypass
+    like ``init`` that bypass
     ``make_pipelex_for_agent_cli``). The ``--version`` eager option short-circuits
     before this body runs, but its callback only does ``typer.echo`` + ``Exit`` and
     touches no log path. For verbose debugging, use the human ``pipelex`` CLI instead.
@@ -144,10 +138,7 @@ app.command(name="fmt", help="Format a .mthds, .toml, or .plx file in-place")(fm
 app.command(name="lint", help="Lint a .mthds, .toml, or .plx file")(lint_cmd)
 app.add_typer(inputs_app, name="inputs", help="Generate example input JSON for a pipe")
 app.add_typer(codegen_app, name="codegen", help="Project the crate into typed artifacts (types) and check drift offline (check)")
-app.command(name="concept", help="Structure a concept from JSON spec and output TOML")(concept_cmd)
-app.command(name="pipe", help="Structure a pipe from JSON spec and output TOML")(pipe_cmd)
 app.command(name="models", help="List available model presets, aliases, and waterfalls")(agent_models_cmd)
 app.command(name="check-model", help="Check if a model reference is valid and suggest alternatives")(agent_check_model_cmd)
-app.command(name="accept-gateway-terms", help="Accept Pipelex Gateway terms and mark inference setup complete")(agent_accept_gateway_terms_cmd)
 app.command(name="migrate", help="Migrate this machine's Pipelex configuration files to the current schema")(agent_migrate_cmd)
 app.command(name="doctor", help="Check Pipelex configuration health and auto-fix issues")(agent_doctor_cmd)

@@ -1,30 +1,32 @@
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelManagerError
-from pipelex.cogt.extract.extract_setting import ExtractSetting
-from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
-from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.cogt.doc_gen.doc_gen_format import parse_doc_gen_choice_key
+from pipelex.cogt.exceptions import (
+    InferenceBackendCredentialsError,
+    InferenceBackendCredentialsErrorType,
+    ModelManagerError,
+    PluginModelDeclarationError,
+)
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.cogt.model_backends.backend import InferenceBackend, PipelexBackend
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
-from pipelex.cogt.model_backends.gateway_config import GatewayConfig
+from pipelex.cogt.model_backends.credential_resolution import CredentialResolution
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.model_routing.routing_models import BackendMatchingMethod
 from pipelex.cogt.model_routing.routing_profile import RoutingProfile
 from pipelex.cogt.model_routing.routing_profile_loader import load_active_routing_profile
-from pipelex.cogt.models.exceptions import ModelReferenceParseError
 from pipelex.cogt.models.model_deck import ModelDeck, ModelDeckBlueprint
 from pipelex.cogt.models.model_deck_loader import load_model_deck_blueprint
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
-from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind
-from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.config import get_config
+from pipelex.plugins.plugin_model_declarations import PluginModelDeclarations
 from pipelex.system.configuration.config_loader import config_manager
-from pipelex.system.pipelex_service.types import RemoteConfigSource
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
@@ -67,8 +69,7 @@ class ModelManager(ModelManagerAbstract):
         self,
         *,
         secrets_provider: SecretsProviderAbstract,
-        managed_gateway_configs: dict[str, GatewayConfig] | None,
-        gateway_config_source: RemoteConfigSource | None,
+        plugin_model_declarations: PluginModelDeclarations,
         needs_inference: bool = True,
         backends_library_paths: Sequence[Path] | None = None,
         backends_dir_path: str | None = None,
@@ -79,12 +80,14 @@ class ModelManager(ModelManagerAbstract):
         # back to layered config_manager paths for all other callers. The two documents are
         # sequences — the base file, then the personal override files — see
         # `ConfigLoader.backends_file_paths`.
+        resolved_backends_dir_path = backends_dir_path or str(config_manager.backends_dir_path)
         self.inference_backend_library.load(
             secrets_provider=secrets_provider,
             backends_library_paths=backends_library_paths or config_manager.backends_file_paths(),
-            backends_dir_path=backends_dir_path or str(config_manager.backends_dir_path),
-            managed_gateway_configs=managed_gateway_configs,
-            lenient=not needs_inference,
+            backends_dir_path=resolved_backends_dir_path,
+            # A keyless boot knows every enabled backend's models and resolves no credential; the boot
+            # that needs inference resolves every one and refuses to start without it.
+            credentials=CredentialResolution.REQUIRE if needs_inference else CredentialResolution.SKIP,
         )
         # The loader parks its stale-configuration warning rather than logging it, so that the
         # doctor's per-backend probe — which loads the whole library once per backend — does not
@@ -92,249 +95,47 @@ class ModelManager(ModelManagerAbstract):
         # single copy, and by here logging is configured.
         if (stale_warning := self.inference_backend_library.take_stale_configuration_warning()) is not None:
             log.warning(stale_warning)
+        # The plugins' internal models join the internal backend before anything reads the library, so routing
+        # and the deck see them exactly as they see a model `internal.toml` declares.
+        has_internal_backend = self.inference_backend_library.merge_plugin_internal_models(
+            plugin_model_declarations=plugin_model_declarations,
+            backends_dir_path=resolved_backends_dir_path,
+        )
         enabled_backends = self.inference_backend_library.all_enabled_backends()
         self._routing_profile = load_active_routing_profile(
             routing_profile_library_paths=routing_profile_library_paths or config_manager.routing_profiles_file_paths(),
             enabled_backends=enabled_backends,
-            lenient=not needs_inference,
         )
         model_deck_paths = ModelManager.get_model_deck_paths(deck_dir_path=deck_dir_path or str(config_manager.model_decks_dir_path))
-        deck_blueprint = load_model_deck_blueprint(model_deck_paths=model_deck_paths)
+        deck_blueprint = load_model_deck_blueprint(
+            model_deck_paths=model_deck_paths,
+            base_deck_dict=self._make_plugin_deck_base(
+                plugin_model_declarations=plugin_model_declarations, has_internal_backend=has_internal_backend
+            ),
+        )
         self.model_deck = self.build_deck(enabled_backends=enabled_backends, model_deck_blueprint=deck_blueprint)
 
-        self._enforce_gateway_model_membership(
-            managed_gateway_configs=managed_gateway_configs,
-            gateway_config_source=gateway_config_source,
-            enabled_backends=enabled_backends,
-        )
-
-    def _enforce_gateway_model_membership(
-        self,
-        managed_gateway_configs: dict[str, GatewayConfig] | None,
-        *,
-        gateway_config_source: RemoteConfigSource | None,
-        enabled_backends: list[str],
-    ) -> None:
-        """Fail loudly when a handle routed to a managed gateway is absent from that gateway's specs.
-
-        Runs even when ``missing_presets_reaction = "log"`` (the default), because a missing
-        gateway model is a distinct failure mode from a generic preset mismatch: it means the
-        active gateway specs (fresh or cached) are out of sync with what the deck author
-        declared. Surfacing this as ``GatewayUnknownModelError`` lets the agent CLI hint at
-        cache-refresh remediation when the config was sourced from the on-disk fallback.
-
-        We only fire the check when both the configs and ``gateway_config_source`` are set — that
-        is, when a managed gateway is actually live in this setup pass.
-
-        **One check per live managed service, run separately — not a union across them.** With two
-        services the old shape breaks in two directions at once. It was a union membership test
-        ("is this handle in the deck *or* in the one gateway's specs?"), which with two sections
-        would pass a handle that neither service can actually serve as long as the *other* one can.
-        And ``_collect_deck_referenced_handles`` walks the whole deck, so running the old check
-        separately against both would demand every deck handle appear in *both* sections — which
-        the mixed profile cannot satisfy and the parked families contradict.
-
-        **The resolution is the routing profile.** Each per-service check validates only the deck
-        handles the active profile actually routes to that service. A handle legitimately absent
-        from one section is then not an error, the mixed profile stays expressible, and the case
-        that matters — the profile routes a handle to a service whose section does not carry it —
-        still fails loudly at boot.
-
-        Waterfall semantics: a waterfall reference is "known" if AT LEAST ONE of its
-        fallbacks resolves to a known handle. At runtime the deck walks the list and uses
-        the first available model (when ``is_model_fallback_enabled`` is true, the default),
-        so a deck like ``["future-model", "current-model"]`` is perfectly valid as long as
-        ``current-model`` is in the gateway specs.
-        """
-        if not managed_gateway_configs or gateway_config_source is None:
-            return
-        deck = self.get_model_deck()
-        referenced_handles = self._collect_deck_referenced_handles(deck)
-
-        for backend_name, gateway_config in managed_gateway_configs.items():
-            gateway_spec_names = {name for name in gateway_config.model_specs if name != "defaults"}
-            for handle, model_type in referenced_handles:
-                try:
-                    ref = ModelReference.parse(handle)
-                except ModelReferenceParseError:
-                    continue
-                candidates = self._resolve_terminal_candidates(deck=deck, ref=ref, model_type=model_type)
-                # Only the candidates this service is responsible for. A candidate the profile sends
-                # to a BYOK backend, to the internal one, or to the *other* managed service is not
-                # this check's business; the generic missing-handle path covers those.
-                routed_here = [
-                    candidate
-                    for candidate in candidates
-                    if self._routes_to_backend(candidate=candidate, backend_name=backend_name, enabled_backends=enabled_backends)
-                ]
-                if not routed_here:
-                    continue
-                # ``deck.inference_models`` is consulted over the WHOLE candidate list, not just the
-                # part routed here, and the difference is load-bearing. That map is built by routing
-                # every handle through the active profile and keeping the ones whose matched backend
-                # has a spec, so membership in it already means "resolvable under this profile",
-                # whichever backend serves it — which is exactly what ``_resolve_waterfall`` walks at
-                # runtime. Narrowing this half to ``routed_here`` would refuse a waterfall whose
-                # working fallback lives on another backend, and the runtime would have served it.
-                if any(candidate in deck.inference_models for candidate in candidates):
-                    continue
-                # The section lookup, by contrast, is only about what THIS service carries.
-                if any(candidate in gateway_spec_names for candidate in routed_here):
-                    continue
-                # No candidate resolves to a known handle. Report the first one — it's the
-                # primary the user is asking for; subsequent entries are fallbacks.
-                raise GatewayUnknownModelError(model_name=routed_here[0], backend_name=backend_name, source=gateway_config_source)
-
-    def _routes_to_backend(self, *, candidate: str, backend_name: str, enabled_backends: list[str]) -> bool:
-        """Whether the active routing profile sends this handle to this backend."""
-        backend_match = self.routing_profile.get_backend_match_for_model(
-            enabled_backends=enabled_backends,
-            model_name=candidate,
-        )
-        return backend_match is not None and backend_match.backend_name == backend_name
-
     @classmethod
-    def _collect_deck_referenced_handles(cls, deck: ModelDeck) -> list[tuple[str, ModelType]]:
-        """Gather the (handle, model_type) pairs that the deck advertises as usable.
+    def _make_plugin_deck_base(cls, *, plugin_model_declarations: PluginModelDeclarations, has_internal_backend: bool) -> dict[str, Any]:
+        """The model deck document the plugins' defaults make, for the deck files to be merged over.
 
-        Covers presets and choice defaults across every model type. Aliases and waterfalls
-        are intentionally NOT enumerated directly — they are reachable via preset/choice
-        references, and the resolver walks through them. Including them here would force the
-        check on dangling helpers the user has not actively wired into a preset.
+        Left out entirely without an internal backend, as the plugins' models are: a default pointing at a model this
+        boot does not serve would fail the deck's validation, and a plugin must not make a
+        boot fail that would succeed without it. The kit's own internal models set the precedent: with the backend
+        disabled their files' models are not loaded, and nothing a plugin adds changes that.
+
+        Raises:
+            PluginModelDeclarationError: a plugin declares a default for a format and source no step composes.
         """
-        references: list[tuple[str, ModelType]] = []
-        for llm_setting in deck.llm_presets.values():
-            references.append((llm_setting.model, ModelType.LLM))
-        llm_text_handle = cls._extract_choice_handle(deck.llm_choice_defaults.for_text)
-        if llm_text_handle is not None:
-            references.append((llm_text_handle, ModelType.LLM))
-        llm_object_handle = cls._extract_choice_handle(deck.llm_choice_defaults.for_object)
-        if llm_object_handle is not None:
-            references.append((llm_object_handle, ModelType.LLM))
-        for extract_setting in deck.extract_presets.values():
-            references.append((extract_setting.model, ModelType.TEXT_EXTRACTOR))
-        extract_default_handle = cls._extract_choice_handle(deck.extract_choice_default)
-        if extract_default_handle is not None:
-            references.append((extract_default_handle, ModelType.TEXT_EXTRACTOR))
-        for img_gen_setting in deck.img_gen_presets.values():
-            references.append((img_gen_setting.model, ModelType.IMG_GEN))
-        img_gen_default_handle = cls._extract_choice_handle(deck.img_gen_choice_default)
-        if img_gen_default_handle is not None:
-            references.append((img_gen_default_handle, ModelType.IMG_GEN))
-        for search_setting in deck.search_presets.values():
-            references.append((search_setting.model, ModelType.SEARCH))
-        search_default_handle = cls._extract_choice_handle(deck.search_choice_default)
-        if search_default_handle is not None:
-            references.append((search_default_handle, ModelType.SEARCH))
-        return references
-
-    @classmethod
-    def _extract_choice_handle(cls, choice: LLMSetting | ExtractSetting | ImgGenSetting | SearchSetting | ModelReference | str | None) -> str | None:
-        """Normalise a ``*ModelChoice`` union (LLMModelChoice etc.) to a raw handle string.
-
-        Choice defaults can be a typed setting object, a parsed ``ModelReference``, or a raw
-        string — all three paths point at a handle we need to validate.
-        """
-        if choice is None:
-            return None
-        if isinstance(choice, str):
-            return choice
-        if isinstance(choice, ModelReference):
-            return choice.raw
-        return choice.model
-
-    @classmethod
-    def _resolve_terminal_candidates(cls, *, deck: ModelDeck, ref: ModelReference, model_type: ModelType) -> list[str]:
-        """Return every terminal handle reachable from ``ref`` via aliases/waterfalls.
-
-        For ``HANDLE`` references: returns ``[name]`` (bare strings are HANDLEs by design —
-        see ``ModelReference.parse`` for the BREAKING CHANGE note).
-
-        For ``ALIAS`` references: follows the alias target. Cycles return ``[]``.
-
-        For ``WATERFALL`` references: follows EVERY fallback in order (or only the first
-        when ``model_deck_config.is_model_fallback_enabled`` is false, matching runtime
-        behaviour at ``model_deck._get_optional_inference_model_with_fallback``). Cycles
-        across either alias or waterfall keys return ``[]`` for the cycling branch but do
-        not poison the rest of the candidate list.
-
-        For ``PRESET`` references: returns ``[]`` (presets are not handles).
-        """
-        aliases, waterfalls = deck.get_aliases_and_waterfalls_for_type(model_type)
-        is_fallback_enabled = deck.model_deck_config.is_model_fallback_enabled
-        return cls._collect_candidates(
-            ref=ref,
-            aliases=aliases,
-            waterfalls=waterfalls,
-            is_fallback_enabled=is_fallback_enabled,
-            visited=set(),
-        )
-
-    @classmethod
-    def _collect_candidates(
-        cls,
-        ref: ModelReference,
-        *,
-        aliases: dict[str, str],
-        waterfalls: dict[str, list[str]],
-        is_fallback_enabled: bool,
-        visited: set[tuple[ModelReferenceKind, str]],
-    ) -> list[str]:
-        # Cycle key is (kind, name): an alias and a waterfall can share a name yet be distinct nodes.
-        visit_key: tuple[ModelReferenceKind, str]
-        match ref.kind:
-            case ModelReferenceKind.HANDLE:
-                return [ref.name]
-            case ModelReferenceKind.ALIAS:
-                visit_key = (ref.kind, ref.name)
-                if visit_key in visited:
-                    return []
-                visited.add(visit_key)
-                target = aliases.get(ref.name)
-                if target is None:
-                    return [ref.name]
-                try:
-                    next_ref = ModelReference.parse(target)
-                except ModelReferenceParseError:
-                    return []
-                return cls._collect_candidates(
-                    ref=next_ref,
-                    aliases=aliases,
-                    waterfalls=waterfalls,
-                    is_fallback_enabled=is_fallback_enabled,
-                    visited=visited,
-                )
-            case ModelReferenceKind.WATERFALL:
-                visit_key = (ref.kind, ref.name)
-                if visit_key in visited:
-                    return []
-                visited.add(visit_key)
-                fallback_list = waterfalls.get(ref.name)
-                if not fallback_list:
-                    return [ref.name]
-                # Runtime only tries the first fallback when fallback is disabled; mirror
-                # that here so the membership check stays consistent with what actually runs.
-                entries = fallback_list if is_fallback_enabled else fallback_list[:1]
-                candidates: list[str] = []
-                for entry in entries:
-                    try:
-                        next_ref = ModelReference.parse(entry)
-                    except ModelReferenceParseError:
-                        continue
-                    # Fresh visited set per branch so two waterfall entries that legitimately
-                    # share an alias don't kill the second one.
-                    candidates.extend(
-                        cls._collect_candidates(
-                            ref=next_ref,
-                            aliases=aliases,
-                            waterfalls=waterfalls,
-                            is_fallback_enabled=is_fallback_enabled,
-                            visited=set(visited),
-                        )
-                    )
-                return candidates
-            case ModelReferenceKind.PRESET:
-                return []
+        if not has_internal_backend:
+            return {}
+        for doc_gen_default in plugin_model_declarations.doc_gen_defaults:
+            try:
+                parse_doc_gen_choice_key(doc_gen_default.choice_key)
+            except ValueError as exc:
+                msg = f"Plugin '{doc_gen_default.plugin}' declares a default document engine that no step can use: {exc}"
+                raise PluginModelDeclarationError(msg, plugin=doc_gen_default.plugin) from exc
+        return plugin_model_declarations.make_deck_base()
 
     @override
     def validate_model_deck(self):
@@ -433,6 +234,16 @@ class ModelManager(ModelManagerAbstract):
             search_waterfalls=model_deck_blueprint.search.waterfalls,
             search_presets=model_deck_blueprint.search.presets,
             search_choice_default=model_deck_blueprint.search.choice_default,
+            # DocGen
+            doc_gen_aliases=model_deck_blueprint.doc_gen.aliases,
+            doc_gen_waterfalls=model_deck_blueprint.doc_gen.waterfalls,
+            doc_gen_presets=model_deck_blueprint.doc_gen.presets,
+            doc_gen_choice_defaults=model_deck_blueprint.doc_gen.choice_defaults,
+            # Judgment
+            judgment_aliases=model_deck_blueprint.judgment.aliases,
+            judgment_waterfalls=model_deck_blueprint.judgment.waterfalls,
+            judgment_presets=model_deck_blueprint.judgment.presets,
+            judgment_choice_default=model_deck_blueprint.judgment.choice_default,
             model_deck_config=get_config().inference.model_deck,
         )
 
@@ -445,8 +256,41 @@ class ModelManager(ModelManagerAbstract):
 
     @override
     def get_required_inference_backend(self, backend_name: str) -> InferenceBackend:
+        """The backend a worker calls, refused when this process left its credentials unresolved.
+
+        Every reader of a backend's credentials reaches it here, so this one check keeps a keyless
+        boot's unset key and endpoint away from every provider client. A keyless boot forces its own
+        runs to DRY, so only a keyless process executing live work for another one, as a Temporal
+        worker can, gets this far; it is told why rather than sending a provider no key.
+
+        Raises:
+            ModelManagerError: No such backend is loaded.
+            InferenceBackendCredentialsError: The backend's credentials were not resolved, because the
+                process booted without inference.
+        """
         backend = self.inference_backend_library.get_inference_backend(backend_name)
         if backend is None:
             msg = f"Inference backend '{backend_name}' not found"
             raise ModelManagerError(msg)
+        if backend.unresolved_credentials:
+            unresolved_description = ", ".join(
+                f"{field_name} ({', '.join(var_names)})" if var_names else field_name
+                for field_name, var_names in backend.unresolved_credentials.items()
+            )
+            unresolved_var_names = backend.unresolved_credential_vars
+            msg = (
+                f"Inference backend '{backend_name}' cannot be called by this process: it booted without inference "
+                f"(needs_inference=False), which loads every backend's models but resolves none of their credentials. "
+                f"Left unresolved: {unresolved_description}."
+            )
+            raise InferenceBackendCredentialsError(
+                credentials_error_type=InferenceBackendCredentialsErrorType.NOT_RESOLVED_ON_KEYLESS_BOOT,
+                backend_name=backend_name,
+                message=msg,
+                key_name=unresolved_var_names[0] if unresolved_var_names else next(iter(backend.unresolved_credentials)),
+                user_action=UserAction(
+                    kind=UserActionKind.CHECK_CREDENTIALS,
+                    detail="Boot the process that calls this backend with needs_inference=True, with its credentials set",
+                ),
+            )
         return backend

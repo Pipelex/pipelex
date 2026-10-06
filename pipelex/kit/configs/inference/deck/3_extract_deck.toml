@@ -31,12 +31,24 @@ choice_default = "@default-extract-document"
 ####################################################################################################
 
 [extract.aliases]
-default-premium = "azure-document-intelligence"
-default-extract-document = "azure-document-intelligence"
-default-extract-image = "azure-document-intelligence"
+default-premium = "~ocr-extractor"
+default-extract-document = "~document-extractor"
+default-extract-image = "~ocr-extractor"
 default-text-from-pdf = "pypdfium2-extract-pdf"
 default-no-inference = "pypdfium2-extract-pdf"
 default-extract-web-page = "linkup-fetch"
+
+####################################################################################################
+# Waterfalls
+####################################################################################################
+#
+# Each default resolves to the first entry an enabled backend serves: Mistral OCR with your own
+# Mistral key. Documents fall back to reading a PDF's text layer locally, which needs no key but
+# recovers no text from a scanned page.
+
+[extract.waterfalls]
+document-extractor = ["mistral-ocr", "pypdfium2-extract-pdf"]
+ocr-extractor = ["mistral-ocr"]
 
 ####################################################################################################
 # Extract Presets

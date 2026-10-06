@@ -28,7 +28,7 @@ from pipelex.system.telemetry.otel_constants import OTelConstants
 
 
 def _metadata(storage_scope: str) -> JobMetadata:
-    return JobMetadata(run_metadata=RunMetadata(user_id="u1", pipeline_run_id="run_1", storage_scope=storage_scope))
+    return JobMetadata(run_metadata=RunMetadata(user_id="u1", pipeline_run_id="run_1", storage_scope=storage_scope, read_scope=None))
 
 
 class TestAcceptedScopes:
@@ -122,7 +122,7 @@ class TestScopeIsRequired:
             # Both type checkers reject this call, which is the point being
             # tested: the omission is caught statically AND at runtime. The
             # ignores are what let the runtime half be asserted at all.
-            JobMetadata(run_metadata=RunMetadata(user_id="u1", pipeline_run_id="run_1"))  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]
+            JobMetadata(run_metadata=RunMetadata(user_id="u1", pipeline_run_id="run_1", read_scope=None))  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]
 
 
 class TestTheTelemetryPlaceholderStaysOutOfIdentity:

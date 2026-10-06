@@ -29,7 +29,6 @@ from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.providers.linkup.linkup_exceptions import LinkupSearchEmptyResultError, LinkupSearchResponseError
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.runtime_hub import get_secrets_provider
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
@@ -37,10 +36,10 @@ class LinkupSearchWorker(SearchWorkerAbstract):
     def __init__(
         self,
         inference_model: InferenceModelSpec,
+        api_key: str,
         reporting_delegate: ReportingProtocol | None = None,
     ) -> None:
         SearchWorkerAbstract.__init__(self, inference_model=inference_model, reporting_delegate=reporting_delegate)
-        api_key = get_secrets_provider().get_secret(secret_id="LINKUP_API_KEY")
         self._linkup_client = LinkupClient(api_key=api_key)
 
     def _parse_date(self, date_str: str | None) -> date | None:

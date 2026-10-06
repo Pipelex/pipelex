@@ -2,9 +2,9 @@ import base64
 
 import pytest
 
-from pipelex.tools.misc.base64_utils import make_base64_url_from_http_url
 from pipelex.tools.uri.resolved_uri import ResolvedHttpUrl, ResolvedLocalPath, UriKind
-from pipelex.tools.uri.uri_resolver import make_base64_url_from_any_uri, resolve_uri
+from pipelex.tools.uri.uri_base64 import make_base64_url_from_any_uri, make_base64_url_from_http_url
+from pipelex.tools.uri.uri_resolver import resolve_uri
 from tests.cases import ImageTestCases, TestURLs
 
 

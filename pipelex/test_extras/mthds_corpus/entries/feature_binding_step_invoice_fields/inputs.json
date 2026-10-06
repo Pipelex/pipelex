@@ -1,0 +1,21 @@
+{
+  "invoice": {
+    "concept": "supplier_invoices.Invoice",
+    "content": {
+      "supplier_name": "Atelier Morvan",
+      "total": 1250.5,
+      "line_count": 3,
+      "priority": "urgent",
+      "order_details": {
+        "order_ref": "PO-118",
+        "delivery_slot": "morning"
+      },
+      "supplier": {
+        "name": "Atelier Morvan SARL",
+        "address": {
+          "city": "Quimper"
+        }
+      }
+    }
+  }
+}

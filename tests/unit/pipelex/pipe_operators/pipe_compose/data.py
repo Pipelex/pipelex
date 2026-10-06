@@ -1,8 +1,9 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.validation_error_types import PipeValidationErrorType
 
 
 class PipeComposeInputTestCases:
@@ -93,4 +94,197 @@ class PipeComposeInputTestCases:
         VALID_WITH_JINJA2_CONTROL,
         VALID_WITH_HTML_TEMPLATE,
         VALID_COMPLEX_JINJA2,
+    ]
+
+
+class PipeComposeInputCheckTestCases:
+    """Cases for the blueprint input check: every declared input is read, and every variable read is declared.
+
+    A refused case is (test_id, blueprint kwargs, expected error_type, expected variable_names); an accepted
+    case is (test_id, blueprint kwargs). Kwargs rather than built blueprints, since a refused one cannot be built.
+    """
+
+    REFUSED_TEMPLATE_ONE_UNREAD: ClassVar[tuple[str, dict[str, Any], PipeValidationErrorType, list[str]]] = (
+        "template_one_unread",
+        {"description": "d", "inputs": {"topic": "Text", "unused": "Text"}, "output": "Text", "template": "About $topic"},
+        PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
+        ["unused"],
+    )
+
+    REFUSED_TEMPLATE_TWO_UNREAD: ClassVar[tuple[str, dict[str, Any], PipeValidationErrorType, list[str]]] = (
+        "template_two_unread",
+        {"description": "d", "inputs": {"topic": "Text", "bbb": "Text", "aaa": "Text"}, "output": "Text", "template": "About $topic"},
+        PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
+        ["aaa", "bbb"],
+    )
+
+    REFUSED_TEMPLATE_BLUEPRINT_UNREAD: ClassVar[tuple[str, dict[str, Any], PipeValidationErrorType, list[str]]] = (
+        "template_blueprint_unread",
+        {
+            "description": "d",
+            "inputs": {"content": "Text", "unused": "Text"},
+            "output": "Text",
+            "template": {"template": "# Title\n\n{{ content }}", "category": "markdown"},
+        },
+        PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
+        ["unused"],
+    )
+
+    REFUSED_TEMPLATE_UNDECLARED: ClassVar[tuple[str, dict[str, Any], PipeValidationErrorType, list[str]]] = (
+        "template_undeclared",
+        {"description": "d", "inputs": {"topic": "Text"}, "output": "Text", "template": "About $topic and $other"},
+        PipeValidationErrorType.MISSING_INPUT_VARIABLE,
+        ["other"],
+    )
+
+    REFUSED_CONSTRUCT_ONE_UNREAD: ClassVar[tuple[str, dict[str, Any], PipeValidationErrorType, list[str]]] = (
+        "construct_one_unread",
+        {
+            "description": "d",
+            "inputs": {"deal": "Deal", "unused": "Text"},
+            "output": "Summary",
+            "construct": {"customer_name": {"from": "deal.customer_name"}, "label": {"template": "Deal $deal.amount"}},
+        },
+        PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
+        ["unused"],
+    )
+
+    REFUSED_CONSTRUCT_TWO_UNREAD: ClassVar[tuple[str, dict[str, Any], PipeValidationErrorType, list[str]]] = (
+        "construct_two_unread",
+        {
+            "description": "d",
+            "inputs": {"deal": "Deal", "bbb": "Text", "aaa": "Text"},
+            "output": "Summary",
+            "construct": {"customer_name": {"from": "deal.customer_name"}},
+        },
+        PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
+        ["aaa", "bbb"],
+    )
+
+    REFUSED_CONSTRUCT_UNDECLARED_FROM: ClassVar[tuple[str, dict[str, Any], PipeValidationErrorType, list[str]]] = (
+        "construct_undeclared_from",
+        {
+            "description": "d",
+            "inputs": {"deal": "Deal"},
+            "output": "Summary",
+            "construct": {"customer_name": {"from": "deal.customer_name"}, "owner": {"from": "other.name"}},
+        },
+        PipeValidationErrorType.MISSING_INPUT_VARIABLE,
+        ["other"],
+    )
+
+    REFUSED_CONSTRUCT_UNDECLARED_NESTED_TEMPLATE: ClassVar[tuple[str, dict[str, Any], PipeValidationErrorType, list[str]]] = (
+        "construct_undeclared_nested_template",
+        {
+            "description": "d",
+            "inputs": {"deal": "Deal"},
+            "output": "Summary",
+            "construct": {"customer_name": {"from": "deal.customer_name"}, "address": {"line": {"template": "$place.city"}}},
+        },
+        PipeValidationErrorType.MISSING_INPUT_VARIABLE,
+        ["place"],
+    )
+
+    # An input name is a plain name: a dotted one is refused by the shared input-name check, before the template is read
+    REFUSED_TEMPLATE_LONE_DOTTED_INPUT: ClassVar[tuple[str, dict[str, Any], PipeValidationErrorType, list[str]]] = (
+        "template_lone_dotted_input",
+        {"description": "d", "inputs": {"deal.amount": "Number"}, "output": "Text", "template": "Worth $deal.amount"},
+        PipeValidationErrorType.INVALID_INPUT_NAME,
+        ["deal.amount"],
+    )
+
+    REFUSED_CONSTRUCT_LONE_DOTTED_INPUT: ClassVar[tuple[str, dict[str, Any], PipeValidationErrorType, list[str]]] = (
+        "construct_lone_dotted_input",
+        {"description": "d", "inputs": {"page.page_view": "Image"}, "output": "Summary", "construct": {"view": {"from": "page.page_view"}}},
+        PipeValidationErrorType.INVALID_INPUT_NAME,
+        ["page.page_view"],
+    )
+
+    REFUSED_CONSTRUCT_DOTTED_INPUT_BESIDE_ITS_ROOT: ClassVar[tuple[str, dict[str, Any], PipeValidationErrorType, list[str]]] = (
+        "construct_dotted_input_beside_its_root",
+        {
+            "description": "d",
+            "inputs": {"page": "Page", "page.page_view": "Image"},
+            "output": "Summary",
+            "construct": {"view": {"from": "page.page_view"}, "text": {"from": "page.text_and_images"}},
+        },
+        PipeValidationErrorType.INVALID_INPUT_NAME,
+        ["page.page_view"],
+    )
+
+    REFUSED_CASES: ClassVar[list[tuple[str, dict[str, Any], PipeValidationErrorType, list[str]]]] = [
+        REFUSED_TEMPLATE_ONE_UNREAD,
+        REFUSED_TEMPLATE_TWO_UNREAD,
+        REFUSED_TEMPLATE_BLUEPRINT_UNREAD,
+        REFUSED_TEMPLATE_UNDECLARED,
+        REFUSED_CONSTRUCT_ONE_UNREAD,
+        REFUSED_CONSTRUCT_TWO_UNREAD,
+        REFUSED_CONSTRUCT_UNDECLARED_FROM,
+        REFUSED_CONSTRUCT_UNDECLARED_NESTED_TEMPLATE,
+        REFUSED_TEMPLATE_LONE_DOTTED_INPUT,
+        REFUSED_CONSTRUCT_LONE_DOTTED_INPUT,
+        REFUSED_CONSTRUCT_DOTTED_INPUT_BESIDE_ITS_ROOT,
+    ]
+
+    ACCEPTED_CASES: ClassVar[list[tuple[str, dict[str, Any]]]] = [
+        ("dollar_sigil", {"description": "d", "inputs": {"name": "Text"}, "output": "Text", "template": "Hello $name!"}),
+        ("at_block", {"description": "d", "inputs": {"name": "Text"}, "output": "Text", "template": "Hello:\n@name\n"}),
+        ("guarded_at_block_on_optional", {"description": "d", "inputs": {"note": "Text?"}, "output": "Text", "template": "Notes:\n@?note\n"}),
+        (
+            "jinja2_if",
+            {"description": "d", "inputs": {"note": "Text?"}, "output": "Text", "template": "{% if note %}{{ note }}{% else %}none{% endif %}"},
+        ),
+        ("jinja2_if_only", {"description": "d", "inputs": {"flag": "Text?"}, "output": "Text", "template": "{% if flag %}flagged{% endif %}"}),
+        ("dotted_path", {"description": "d", "inputs": {"deal": "Deal"}, "output": "Text", "template": "Worth $deal.amount"}),
+        (
+            "for_loop",
+            {"description": "d", "inputs": {"items": "Text[]"}, "output": "Text", "template": "{% for item in items %}{{ item }}{% endfor %}"},
+        ),
+        (
+            "construct_from_path",
+            {"description": "d", "inputs": {"deal": "Deal"}, "output": "Summary", "construct": {"name": {"from": "deal.customer_name"}}},
+        ),
+        (
+            "construct_nested_template",
+            {
+                "description": "d",
+                "inputs": {"hq": "Office"},
+                "output": "Summary",
+                "construct": {"headquarters": {"country": "France", "phone": {"template": "+$hq.country_code $hq.phone"}}},
+            },
+        ),
+        (
+            "construct_from_paths_through_the_root",
+            {
+                "description": "d",
+                "inputs": {"page": "Page"},
+                "output": "Summary",
+                "construct": {"view": {"from": "page.page_view"}, "text": {"from": "page.text_and_images"}},
+            },
+        ),
+        (
+            "attribute_after_subscript",
+            {"description": "d", "inputs": {"items": "Text[]"}, "output": "Text", "template": "First: {{ items[0].text }}"},
+        ),
+        (
+            "self_referential_set",
+            {"description": "d", "inputs": {"topic": "Text"}, "output": "Text", "template": "{% set topic = topic|trim %}About {{ topic }}"},
+        ),
+        (
+            "set_in_every_branch_of_an_if",
+            {
+                "description": "d",
+                "inputs": {"flag": "Text"},
+                "output": "Text",
+                "template": "{% if flag %}{% set label = 'on' %}{% else %}{% set label = 'off' %}{% endif %}Status: {{ label }}",
+            },
+        ),
+        (
+            "input_named_like_a_jinja_global",
+            {"description": "d", "inputs": {"namespace": "Text"}, "output": "Text", "template": "List the pods in $namespace"},
+        ),
+        (
+            "construct_attribute_after_subscript",
+            {"description": "d", "inputs": {"items": "Text[]"}, "output": "Summary", "construct": {"first": {"template": "{{ items[0].text }}"}}},
+        ),
     ]

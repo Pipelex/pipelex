@@ -129,3 +129,20 @@ class TestFormatPydanticValidationError:
         assert "bad_tone" in formatted
         assert "'length'" in formatted
         assert "bad_length" in formatted
+
+    def test_every_error_is_rendered_beside_the_listed_kinds(self) -> None:
+        """An error kind without a heading of its own is rendered even when a listed kind is present."""
+
+        class Mixed(BaseModel):
+            a: int
+            b: str
+            c: int
+
+        with pytest.raises(ValidationError) as exc:
+            Mixed.model_validate({"a": "notanint", "b": 3})
+
+        formatted = format_pydantic_validation_error(exc.value)
+        assert "Missing required fields: 'c'" in formatted
+        assert "Other validation errors:" in formatted
+        assert "a: int_parsing: Input should be a valid integer" in formatted
+        assert "b: string_type: Input should be a valid string" in formatted

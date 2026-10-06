@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:ba531715aa9e9f29262c7ea2fd18c4a63e31b9878c5b5f1507b135f511aa7b38"
-reviewed_by = "Claude (Opus 5)"
-reviewed_at = "2026-09-16T08:54:20Z"
-rationale = "Round-2 review fix in runtime_hub is docstring-only: reset_boot_state no longer claims the agent CLI pins silent before booting (it pins after), and now says a mode assigned after boot is released too. No import, accessor or layer placement changed. Read docs/contribute/hub-layering.md: it specifies the boundary, the forbidden import list and the accessor table, and describes neither reset_boot_state nor the pretty-print mode. Nothing stale."
+digest = "sha256:0d04191133ff7766daf3182784f868d2da5a724f655b9d23428a3634ec97e8d3"
+reviewed_by = "Claude (Opus 5.5)"
+reviewed_at = "2026-10-04T20:43:02Z"
+rationale = "real-catch: the guard now declares pipelex.fix_ops and pipelex.migration; hub-layering.md's declared-package list, the paragraph that called declaring migration an overreach, and a new known inversion now say so. Re-deriving the 'every top-level package accounted for' claim from ls pipelex/ found pipelex.methods unaccounted for; measured it (structures_check imports pipelex.codegen, loading interpreter modules without reaching the hub) and added it to both the doc and the guard's note."
 
 [trigger_files]
-"pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:2dbadcbab7d44364a7b5f1d16268b23b26700a00"
+"pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:fe10deb00e0d30f300352a0696258ab108668e3c"
 "pipelex/interpreter_hub.py" = "blob:327e75d0fbb5bdf46f6cbf06024f83840f0106d0"
-"pipelex/runtime_hub.py" = "blob:4682e96a187338d7c0c6728319f0b81e270b0c21"
+"pipelex/runtime_hub.py" = "blob:05f84b9604b9f904e7df96d222b8856123ce9e91"

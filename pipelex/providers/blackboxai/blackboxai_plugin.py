@@ -19,6 +19,7 @@ def _make_blackboxai_img_gen_worker(
     from pipelex.providers.blackboxai.blackboxai_completions_factory import BlackboxaiCompletionsFactory  # ruff: ignore[import-outside-top-level]
     from pipelex.providers.openai.openai_client_factory import OpenAIClientFactory  # ruff: ignore[import-outside-top-level]
     from pipelex.providers.openai.openai_completions_img_gen_worker import OpenAICompletionsImgGenWorker  # ruff: ignore[import-outside-top-level]
+    from pipelex.tools.misc.image_utils import ImageFormat  # ruff: ignore[import-outside-top-level]
 
     model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
     sdk_instance = sdk_clients.get_or_create(
@@ -30,6 +31,7 @@ def _make_blackboxai_img_gen_worker(
         sdk_instance=sdk_instance,
         inference_model=inference_model,
         reporting_delegate=reporting_delegate,
+        fixed_output_format=ImageFormat.JPEG,
     )
 
 

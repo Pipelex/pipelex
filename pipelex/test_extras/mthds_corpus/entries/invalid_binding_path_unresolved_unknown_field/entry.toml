@@ -1,0 +1,12 @@
+name = "invalid_binding_path_unresolved_unknown_field"
+description = "An invoice total bound through a misspelt field the invoice does not have"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.binding_path_unresolved",
+]
+
+expected_error = "binding_path_unresolved"

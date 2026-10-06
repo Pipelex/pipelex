@@ -29,9 +29,9 @@ structuring_method = "preliminary_text"
         wrapping = bundle.pipe["make_foo"]
         assert isinstance(wrapping, PipeSequenceBlueprint)
         assert len(wrapping.steps) == 2
-        assert wrapping.steps[0].pipe == "make_foo__draft_text"
+        assert wrapping.pipe_steps[0].pipe == "make_foo__draft_text"
         assert wrapping.steps[0].result == "draft_text"
-        assert wrapping.steps[1].pipe == "make_foo__structure"
+        assert wrapping.pipe_steps[1].pipe == "make_foo__structure"
 
         draft = bundle.pipe["make_foo__draft_text"]
         assert isinstance(draft, PipeLLMBlueprint)

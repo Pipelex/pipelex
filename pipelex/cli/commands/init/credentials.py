@@ -10,13 +10,12 @@ from rich.markup import escape
 from rich.prompt import Prompt
 
 from pipelex.system.configuration.config_loader import config_manager
-from pipelex.system.pipelex_service.pipelex_details import PipelexDetails
 from pipelex.tools.misc.dict_utils import extract_vars_from_strings_recursive
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 
 def get_global_env_path() -> Path:
-    """Return the path to the global credentials file (~/.pipelex/.env)."""
+    """Return the path to the credentials file in the home configuration directory (`~/.pipelex/.env`, or under `PIPELEX_HOME`)."""
     return config_manager.global_config_dir / ".env"
 
 
@@ -102,7 +101,7 @@ def get_required_vars_for_enabled_backends(backends_toml_path: Path) -> dict[str
 
 
 def prompt_credentials(*, console: Console, backends_toml_path: Path) -> None:
-    """Prompt the user for missing credentials and persist them to ~/.pipelex/.env.
+    """Prompt the user for missing credentials and persist them to the `.env` in the home configuration directory.
 
     Reads the backends.toml to find which env vars are needed by enabled backends,
     checks which are already set, and prompts only for missing ones.
@@ -135,8 +134,6 @@ def prompt_credentials(*, console: Console, backends_toml_path: Path) -> None:
     collected_count = 0
     for var_name, backend_names in sorted(missing_vars.items()):
         backends_str = ", ".join(backend_names)
-        if var_name == PipelexDetails.PIPELEX_GATEWAY_API_KEY_VAR:
-            console.print("  [dim]Get a free API key at[/dim] [cyan]https://app.pipelex.com[/cyan]")
         value = Prompt.ask(
             f"  [bold]{escape(var_name)}[/bold] [dim](required by {escape(backends_str)})[/dim]", default="", console=console, password=True
         )
@@ -148,7 +145,7 @@ def prompt_credentials(*, console: Console, backends_toml_path: Path) -> None:
     if collected_count > 0:
         write_env_file(global_env_path, entries=entries)
         console.print()
-        console.print(f"[green]Saved {collected_count} credential(s) to {global_env_path}[/green]")
+        console.print(f"[green]Saved {collected_count} credential(s) to {escape(str(global_env_path))}[/green]")
     else:
         console.print()
         console.print("[dim]No credentials entered. You can set them later by running:[/dim] [cyan]pipelex init credentials[/cyan]")

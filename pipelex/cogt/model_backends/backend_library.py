@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Iterable, Sequence
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, Self, cast
@@ -13,28 +13,30 @@ from pipelex.cogt.exceptions import (
     InferenceBackendLibraryNotFoundError,
     InferenceBackendLibraryValidationError,
     InferenceModelSpecError,
+    PluginModelDeclarationError,
 )
-from pipelex.cogt.model_backends.backend import InferenceBackend, resolve_model_specs_section
+from pipelex.cogt.model_backends.backend import InferenceBackend, PipelexBackend
 from pipelex.cogt.model_backends.backend_factory import (
     InferenceBackendBlueprint,
     InferenceBackendFactory,
 )
-from pipelex.cogt.model_backends.gateway_config import GatewayConfig, drop_unknown_gateway_defaults
+from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
+from pipelex.cogt.model_backends.credential_resolution import CredentialResolution
 from pipelex.cogt.model_backends.model_spec_document import MODEL_SPEC_DEFAULTS_TABLE
 from pipelex.cogt.model_backends.model_spec_factory import (
     BackendModelSpecs,
     InferenceModelSpecBlueprint,
     InferenceModelSpecFactory,
 )
-from pipelex.cogt.model_backends.model_spec_keys import ModelSpecSource, describe_rejected_keys, split_model_spec_keys
+from pipelex.cogt.model_backends.model_spec_keys import describe_rejected_keys, split_model_spec_keys
 from pipelex.migration.plan import MigrationPlan
+from pipelex.plugins.plugin_model_declarations import PluginModelDeclarations
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_surface import (
     INFERENCE_BACKEND_CONFIG_SURFACE_ID,
     replay_surface_files_in_memory,
     stale_configuration_warning,
 )
-from pipelex.system.pipelex_service.gateway_config_merger import GatewayConfigMerger
 from pipelex.system.runtime import runtime_manager
 from pipelex.tools.misc.dict_utils import (
     apply_to_strings_recursive,
@@ -44,18 +46,36 @@ from pipelex.tools.misc.toml_utils import (
     describe_toml_base_and_overrides,
     load_toml_from_base_and_overrides,
     load_toml_from_path,
-    load_toml_from_path_if_exists,
     present_toml_override_paths,
 )
 from pipelex.tools.secrets.exceptions import UnknownVarPrefixError, VarFallbackPatternError, VarNotFoundError
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
-from pipelex.tools.secrets.secrets_utils import substitute_vars
+from pipelex.tools.secrets.secrets_utils import placeholder_var_names, substitute_vars
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 if TYPE_CHECKING:
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 
 InferenceBackendLibraryRoot = dict[str, InferenceBackend]
+
+# A `backends.toml` key that named the remote-config section holding a backend's model specs.
+RETIRED_MODEL_SPECS_SECTION_KEY = "model_specs_section"
+
+# Where a keyless load records the variables a backend's own file references, beside the fields of
+# its `backends.toml` table (see `InferenceBackend.unresolved_credentials`).
+UNRESOLVED_MODEL_SPECS_KEY = "model_specs"
+
+# What the loader runs over every string of a backend's files: substitution on a load that resolves
+# credentials, a recorder that keeps the text on one that does not.
+StringTransform = Callable[[str], str]
+
+# The declared fields a `${…}` placeholder may stand in: the values a call sends. Every other declared
+# field describes the model (its type, its constraints, the SDK that serves it), which a keyless load
+# must know without resolving anything, so both loads refuse a placeholder there. A key the blueprint
+# does not declare is extra config on a backend and a request header on a model, both sent with a
+# call, so both stay templatable.
+TEMPLATABLE_BACKEND_FIELDS = frozenset({"endpoint", "api_key", "extra_config"})
+TEMPLATABLE_MODEL_SPEC_FIELDS = frozenset({"model_id", "endpoint_path"})
 
 
 class RecoveredModelSpecs(NamedTuple):
@@ -110,13 +130,9 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         backends_library_paths: Sequence[Path],
         backends_dir_path: str,
         include_disabled: bool = False,
-        managed_gateway_configs: dict[str, GatewayConfig] | None = None,
-        lenient: bool = False,
+        credentials: CredentialResolution = CredentialResolution.REQUIRE,
     ):
         """Load backend configurations from TOML files.
-
-        For a managed gateway backend, uses that backend's slice of the fetched remote config and
-        merges with local overrides from a file named after the backend.
 
         **A file left behind by a schema change is carried forward rather than fatal.** When a local
         per-backend TOML is refused, the `inference-backend` ledger is replayed over that one file
@@ -140,18 +156,20 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             backends_library_paths: The base `backends.toml` first, then the override files in merge order.
             backends_dir_path: Path to directory containing per-backend TOML files.
             include_disabled: Whether to include disabled backends.
-            managed_gateway_configs: One gateway configuration per managed backend, keyed by backend
-                name. A managed backend absent from this mapping has no live specs — see the
-                per-backend branch below for what that means in each mode.
-            lenient: When True, skip a backend whose *credentials* cannot be resolved, or a managed
-                gateway backend when no `managed_gateway_configs` were handed in, instead of
-                raising — that is the whole of the tolerance. A malformed configuration (an unknown
-                or invalid key, a model spec that is not a table, a missing per-backend TOML) stays
-                fatal in both modes: a config typo must never silently delete a backend, because the
-                commands that boot leniently (validate, show, dry runs) would then report the far
-                more confusing "model not found" for every handle that backend served. A *stale* key
-                — one the ledger explains — is not a typo and is not covered by this flag at all: it
-                is carried forward in both modes, or fatal in both, according to the ledger alone.
+            credentials: `REQUIRE` substitutes every `${…}` placeholder and raises
+                `InferenceBackendCredentialsError` naming the variable it cannot resolve. `SKIP`, the
+                keyless boot's mode (validate, show, dry runs), substitutes nothing and asks the
+                secrets provider nothing: every enabled backend is kept with its models and
+                constraints, a field of its table that references a variable is left unset, a
+                templated model-spec string keeps its text, and the backend records the variables in
+                `unresolved_credentials`, which refuses a call to it. Vertex AI mints no token.
+                A malformed configuration (an unknown or invalid key, a model spec that is not a
+                table, a missing per-backend TOML, a placeholder in a field that describes the model
+                rather than a value a call sends) is fatal in both modes: a config typo must never
+                silently delete a backend, because the commands that boot keyless would then report
+                the far more confusing "model not found" for every handle that backend served. A
+                *stale* key — one the ledger explains — is not a typo: it is carried forward in both
+                modes, or fatal in both, according to the ledger alone.
         """
         stale_plans: list[MigrationPlan] = []
         library_paths_description = describe_toml_base_and_overrides(paths=backends_library_paths)
@@ -179,7 +197,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 # The likeliest half-written override: `acme = false` where `[acme] enabled = false`
                 # was meant. `deep_update` replaces a table by a scalar whole, so this is the first
                 # place that can name the file rather than crash on `.copy()`. Fatal in both modes:
-                # leniency is for what this machine cannot load, not for a document that is wrong.
+                # a keyless boot skips credentials, not a document that is wrong.
                 msg = (
                     f"Invalid inference backend '{backend_name}' in {library_paths_description}: "
                     f"expected a table, got {type(backend_dict).__name__} ({backend_dict!r})"
@@ -191,186 +209,118 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             enabled = inference_backend_blueprint_dict_raw.get("enabled", True)
             if not enabled and not include_disabled:
                 continue
-            if runtime_manager.is_ci_testing and backend_name == "vertexai":
-                continue
-            # Read before substitution, deliberately: the section is a plain literal with no `${…}`
-            # in it, and whether this backend is *managed* decides how the substitution below is
-            # allowed to fail. Reading it off the validated blueprint would be too late.
-            declared_model_specs_section = self._declared_model_specs_section(backend_dict=inference_backend_blueprint_dict_raw)
-            model_specs_section = resolve_model_specs_section(
-                backend_name=backend_name,
-                declared_section=declared_model_specs_section,
-            )
-            # **The tolerance below keys on the DECLARATION, not on the resolved section**, and the
-            # two come apart on exactly one name. `pipelex_gateway` is handed a section by
-            # compatibility default so a `backends.toml` written before the field keeps working, so
-            # it is managed without declaring anything — and keying on managed-ness would hand it a
-            # tolerance it never had: an unset `PIPELEX_GATEWAY_API_KEY` would stop being a boot
-            # failure with a remediation message and become a silently missing backend, which is the
-            # behaviour delta on the Portkey-cloud path this work must not make. A declaration is
-            # something only the kit writes, and only for a backend it also ships disabled.
-            tolerates_missing_variables = declared_model_specs_section is not None
-            try:
-                inference_backend_blueprint_dict = apply_to_strings_recursive(
-                    inference_backend_blueprint_dict_raw, transform_func=substitute_vars_with_provider
-                )
-            except VarFallbackPatternError as var_fallback_pattern_exc:
-                if lenient:
-                    log.verbose(f"Skipping backend '{backend_name}': variable fallback pattern error")
-                    continue
-                msg = f"Variable substitution failed due to a pattern error in {library_paths_description}:\n{var_fallback_pattern_exc}"
-                key_name = "unknown"
-                raise InferenceBackendCredentialsError(
-                    credentials_error_type=InferenceBackendCredentialsErrorType.VAR_FALLBACK_PATTERN,
-                    backend_name=backend_name,
-                    message=msg,
-                    key_name=key_name,
-                ) from var_fallback_pattern_exc
-            except VarNotFoundError as var_not_found_exc:
-                if lenient:
-                    log.verbose(f"Skipping backend '{backend_name}': missing credential variable '{var_not_found_exc.var_name}'")
-                    continue
-                if tolerates_missing_variables:
-                    # **Scoped to backends that DECLARE a model specs section, and the scoping is
-                    # the whole point.** Such a backend is one the kit can ship *declared* —
-                    # `pipelex_manifold` ships declared and disabled, and joining the beta is
-                    # enabling it and setting two variables — so an installation that has enabled
-                    # one and not yet filled in its variables must not fail to boot over them.
-                    # Disabled with a named warning is exactly the posture the gateway itself takes
-                    # toward an integration missing its variables. (An installation that has not
-                    # joined never reaches here at all: a disabled backend is skipped above, and the
-                    # one loader that asks for disabled backends asks leniently.)
-                    #
-                    # Every other backend keeps today's fatal boot — `pipelex_gateway` included,
-                    # since it declares no section — because widening this would mean a user who
-                    # typos ANTHROPIC_API_KEY or PIPELEX_GATEWAY_API_KEY stops getting a boot
-                    # failure and starts getting a silently missing backend that resurfaces much
-                    # later as a model-resolution error, a behaviour delta on paths this work must
-                    # not touch.
-                    log.warning(
-                        f"Backend '{backend_name}' is disabled: it is a Pipelex-managed gateway backend and the variable "
-                        f"'{var_not_found_exc.var_name}' it needs is not set. Set it to enable this backend, or set "
-                        f"`enabled = false` on it in {library_paths_description} to silence this warning."
-                    )
-                    continue
+            if enabled and RETIRED_MODEL_SPECS_SECTION_KEY in backend_table:
+                # The key once pointed at specs the remote config served. Read as an extra key, it would
+                # boot the backend with whatever its own file lists — for a backend whose file was a
+                # comment-only template, nothing — and every model routed to it would go missing with no
+                # word on why. Fatal in both modes, like any document that is wrong.
                 msg = (
-                    f"Variable substitution failed due to a 'variable not found' error in {library_paths_description}:\n"
-                    f"Backend name: '{backend_name}', Variable name: '{var_not_found_exc.var_name}'\n"
-                    f"{var_not_found_exc}\nRun mode: '{runtime_manager.run_mode}'"
+                    f"Invalid inference backend '{backend_name}' in {library_paths_description}: "
+                    f"'{RETIRED_MODEL_SPECS_SECTION_KEY}' is no longer supported, because model specs are no longer "
+                    f"downloaded. List the backend's models in 'backends/{backend_name}.toml' and remove the key, "
+                    f"or disable the backend."
                 )
-                raise InferenceBackendCredentialsError(
-                    credentials_error_type=InferenceBackendCredentialsErrorType.VAR_NOT_FOUND,
+                raise InferenceBackendLibraryValidationError(msg, backend_name=backend_name)
+            try:
+                self._refuse_placeholders_in_literal_fields(
+                    table=backend_table,
+                    declared_fields=backend_blueprint_standard_fields,
+                    templatable_fields=TEMPLATABLE_BACKEND_FIELDS,
+                    where=f"inference backend '{backend_name}' in {library_paths_description}",
                     backend_name=backend_name,
-                    message=msg,
-                    key_name=var_not_found_exc.var_name,
-                ) from var_not_found_exc
+                )
             except UnknownVarPrefixError as unknown_var_prefix_exc:
-                if lenient:
-                    log.verbose(f"Skipping backend '{backend_name}': unknown variable prefix for '{unknown_var_prefix_exc.var_name}'")
-                    continue
-                raise InferenceBackendCredentialsError(
-                    credentials_error_type=InferenceBackendCredentialsErrorType.UNKNOWN_VAR_PREFIX,
-                    backend_name=backend_name,
-                    message=(
-                        f"Variable substitution failed due to an unknown variable prefix error "
-                        f"in {library_paths_description}:\n{unknown_var_prefix_exc}"
-                    ),
-                    key_name=unknown_var_prefix_exc.var_name,
+                raise self._unknown_var_prefix_credentials_error(
+                    unknown_var_prefix_exc=unknown_var_prefix_exc, backend_name=backend_name, source=library_paths_description
                 ) from unknown_var_prefix_exc
+            unresolved_credentials: dict[str, list[str]] = {}
+            model_spec_var_names: list[str] = []
+            match credentials:
+                case CredentialResolution.REQUIRE:
+                    if runtime_manager.is_ci_testing and backend_name == "vertexai":
+                        # Its token is minted over the network at load, which a CI sandbox cannot do.
+                        continue
+                    inference_backend_blueprint_dict = self._substitute_backend_table_vars(
+                        backend_table=inference_backend_blueprint_dict_raw,
+                        backend_name=backend_name,
+                        library_paths_description=library_paths_description,
+                        substitute_vars_with_provider=substitute_vars_with_provider,
+                    )
+                    model_specs_transform: StringTransform = substitute_vars_with_provider
+                case CredentialResolution.SKIP:
+                    # The shape is checked before a templated field is stripped: substitution turns text into
+                    # text, so the raw table is refused wherever the resolved one would be, a key written as a
+                    # list included, and stripping cannot hide a field of the wrong type.
+                    self._validated_backend_blueprint(
+                        table=inference_backend_blueprint_dict_raw, backend_name=backend_name, library_paths_description=library_paths_description
+                    )
+                    try:
+                        inference_backend_blueprint_dict = self._backend_table_without_templated_fields(
+                            backend_table=inference_backend_blueprint_dict_raw,
+                            unresolved_credentials=unresolved_credentials,
+                        )
+                    except UnknownVarPrefixError as unknown_var_prefix_exc:
+                        # The prefix is refused as the load that resolves credentials refuses it.
+                        raise self._unknown_var_prefix_credentials_error(
+                            unknown_var_prefix_exc=unknown_var_prefix_exc, backend_name=backend_name, source=library_paths_description
+                        ) from unknown_var_prefix_exc
+                    model_specs_transform = partial(self._record_placeholder_var_names, var_names=model_spec_var_names)
+
+            for backend_blueprint_key in list(inference_backend_blueprint_dict):
+                if backend_blueprint_key not in backend_blueprint_standard_fields:
+                    extra_config[backend_blueprint_key] = inference_backend_blueprint_dict.pop(backend_blueprint_key)
+            backend_blueprint = self._validated_backend_blueprint(
+                table=inference_backend_blueprint_dict, backend_name=backend_name, library_paths_description=library_paths_description
+            )
+
+            model_specs_dict, backend_config_source = self._load_local_model_specs(
+                backend_name=backend_name,
+                backends_dir_path=backends_dir_path,
+                substitute_vars_with_provider=model_specs_transform,
+            )
 
             try:
-                for backend_blueprint_key in backend_table:
-                    if backend_blueprint_key not in backend_blueprint_standard_fields:
-                        extra_config[backend_blueprint_key] = inference_backend_blueprint_dict.pop(backend_blueprint_key)
-                try:
-                    backend_blueprint = InferenceBackendBlueprint.model_validate(inference_backend_blueprint_dict)
-                except ValidationError as validation_error:
-                    # The index file's own refusal, said with the backend and the file in front of the
-                    # analysis: pydantic's error alone names a field, and every table of this file has
-                    # that field.
-                    validation_error_msg = format_pydantic_validation_error(validation_error)
-                    msg = f"Invalid inference backend '{backend_name}' in {library_paths_description}: {validation_error_msg}"
-                    raise InferenceBackendLibraryValidationError(msg, backend_name=backend_name) from validation_error
-
-                # A managed gateway backend takes its specs from the fetched artifact; everything
-                # else reads its own local file.
-                backend_config_source: str
-                model_spec_source: ModelSpecSource
-                if model_specs_section is not None:
-                    if managed_gateway_configs is None:
-                        if lenient:
-                            log.verbose(f"Skipping backend '{backend_name}': gateway model specs not available")
-                            continue
-                        # A caller's omission rather than a user's, and the two are told apart by
-                        # *which* input is missing. `None` means the caller supplied no managed
-                        # configs at all while this document declares one enabled — reachable only by
-                        # loading the library directly without them.
-                        msg = (
-                            f"Backend '{backend_name}' is enabled in {library_paths_description} and declares model specs section "
-                            f"'{model_specs_section}', but no model specs were given to the loader for it: pass it in "
-                            "`managed_gateway_configs`, or disable the backend"
-                        )
-                        raise InferenceBackendLibraryError(msg, backend_name=backend_name)
-                    gateway_config = managed_gateway_configs.get(backend_name)
-                    if gateway_config is None:
-                        # A mapping that was supplied and simply has no entry for this backend is the
-                        # user's situation, not the caller's: the config builder walked this same file
-                        # and found the published artifact carried no such section, warning by name as
-                        # it skipped. Disabled here, quietly, because that warning was already said.
-                        log.verbose(f"Skipping backend '{backend_name}': the Pipelex configuration carries no '{model_specs_section}' section")
-                        continue
-                    # Only when the artifact actually carried one. The manifold service is built
-                    # without a region on purpose: nothing on its path reads it back, because its
-                    # Bedrock credentials live gateway-side.
-                    if gateway_config.aws_region is not None:
-                        extra_config["aws_region"] = gateway_config.aws_region
-                    model_spec_source = ModelSpecSource.REMOTE_GATEWAY
-                    model_specs_dict, backend_config_source = self._load_gateway_model_specs(
-                        gateway_config=gateway_config,
-                        backend_name=backend_name,
-                        backends_dir_path=backends_dir_path,
-                        substitute_vars_with_provider=substitute_vars_with_provider,
-                    )
-                else:
-                    model_spec_source = ModelSpecSource.LOCAL_FILE
-                    model_specs_dict, backend_config_source = self._load_local_model_specs(
-                        backend_name=backend_name,
-                        backends_dir_path=backends_dir_path,
-                        substitute_vars_with_provider=substitute_vars_with_provider,
-                    )
-
-                try:
-                    backend_model_specs = self._build_backend_model_specs(
-                        model_specs_dict=model_specs_dict,
-                        backend_name=backend_name,
-                        backend_config_source=backend_config_source,
-                        model_spec_source=model_spec_source,
-                        backend_blueprint=backend_blueprint,
-                    )
-                except InferenceBackendLibraryError:
-                    recovered = self._local_model_specs_the_ledger_can_explain(
-                        backend_name=backend_name,
-                        backends_dir_path=backends_dir_path,
-                        model_spec_source=model_spec_source,
-                        backend_blueprint=backend_blueprint,
-                        substitute_vars_with_provider=substitute_vars_with_provider,
-                    )
-                    if recovered is None:
-                        raise
-                    backend_model_specs = recovered.model_specs
-                    stale_plans.extend(recovered.plans)
-                backend = InferenceBackendFactory.make_inference_backend(
-                    name=backend_name,
-                    blueprint=backend_blueprint,
-                    extra_config=extra_config,
-                    model_specs=backend_model_specs,
+                backend_model_specs = self._build_backend_model_specs(
+                    model_specs_dict=model_specs_dict,
+                    backend_name=backend_name,
+                    backend_config_source=backend_config_source,
+                    backend_listed_constraints=backend_blueprint.listed_constraints,
+                    backend_valued_constraints=backend_blueprint.valued_constraints,
                 )
-                self.root[backend_name] = backend
-            except InferenceBackendCredentialsError as credentials_exc:
-                if lenient:
-                    log.verbose(f"Skipping backend '{backend_name}': {credentials_exc}")
-                    continue
-                raise
+            except InferenceBackendLibraryError:
+                recovered = self._local_model_specs_the_ledger_can_explain(
+                    backend_name=backend_name,
+                    backends_dir_path=backends_dir_path,
+                    backend_blueprint=backend_blueprint,
+                    substitute_vars_with_provider=model_specs_transform,
+                )
+                if recovered is None:
+                    raise
+                backend_model_specs = recovered.model_specs
+                stale_plans.extend(recovered.plans)
+            if enabled and not backend_model_specs and backend_name != PipelexBackend.INTERNAL:
+                # An enabled backend serving nothing is never what a user meant: it is a table an
+                # earlier release left enabled over a comment-only file, the Pipelex Gateway's above all.
+                # Booting it would only drop every model routed to it from the deck, which says
+                # "handle not found" and nothing about why. The internal backend is exempt: plugins
+                # add its models after this load.
+                msg = (
+                    f"Inference backend '{backend_name}' is enabled in {library_paths_description} but "
+                    f"{backend_config_source} declares no model. Disable it, or list the models it serves; "
+                    f"if a routing profile sends models to it, point that profile at a backend that serves them."
+                )
+                raise InferenceBackendLibraryValidationError(msg, backend_name=backend_name)
+            if model_spec_var_names:
+                unresolved_credentials[UNRESOLVED_MODEL_SPECS_KEY] = model_spec_var_names
+            backend = InferenceBackendFactory.make_inference_backend(
+                name=backend_name,
+                blueprint=backend_blueprint,
+                extra_config=extra_config,
+                model_specs=backend_model_specs,
+                credentials=credentials,
+                unresolved_credentials=unresolved_credentials,
+            )
+            self.root[backend_name] = backend
 
         # One warning for the whole load rather than one per backend: a schema change lands on every
         # file of the directory at once, and a user reading a dozen warnings would learn nothing the
@@ -378,16 +328,152 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         self._stale_warning = stale_configuration_warning(plans=stale_plans, walked_dirs=config_manager.existing_config_dirs) if stale_plans else None
 
     @classmethod
-    def _declared_model_specs_section(cls, *, backend_dict: dict[str, Any]) -> str | None:
-        """The `model_specs_section` this declaration states, read straight off the raw table.
+    def _substitute_backend_table_vars(
+        cls,
+        *,
+        backend_table: dict[str, Any],
+        backend_name: str,
+        library_paths_description: str,
+        substitute_vars_with_provider: StringTransform,
+    ) -> dict[str, Any]:
+        """Resolve every placeholder of a backend's `backends.toml` table, as a *credentials* failure when one cannot be.
 
-        Non-string values return `None` rather than raising: the blueprint validation a few lines
-        later is what reports a malformed declaration, and it says so with the backend and the file
-        in front of the analysis. Answering "not managed" here just means that report happens on the
-        normal path instead of from inside a pre-check.
+        Raises:
+            InferenceBackendCredentialsError: If a variable cannot be resolved.
         """
-        declared = backend_dict.get("model_specs_section")
-        return declared if isinstance(declared, str) else None
+        try:
+            return apply_to_strings_recursive(backend_table, transform_func=substitute_vars_with_provider)
+        except VarFallbackPatternError as var_fallback_pattern_exc:
+            msg = f"Variable substitution failed due to a pattern error in {library_paths_description}:\n{var_fallback_pattern_exc}"
+            raise InferenceBackendCredentialsError(
+                credentials_error_type=InferenceBackendCredentialsErrorType.VAR_FALLBACK_PATTERN,
+                backend_name=backend_name,
+                message=msg,
+                # The pattern names several candidates, so no single one of them is the missing key.
+                key_name="unknown",
+            ) from var_fallback_pattern_exc
+        except VarNotFoundError as var_not_found_exc:
+            msg = (
+                f"Variable substitution failed due to a 'variable not found' error in {library_paths_description}:\n"
+                f"Backend name: '{backend_name}', Variable name: '{var_not_found_exc.var_name}'\n"
+                f"{var_not_found_exc}\nRun mode: '{runtime_manager.run_mode}'"
+            )
+            raise InferenceBackendCredentialsError(
+                credentials_error_type=InferenceBackendCredentialsErrorType.VAR_NOT_FOUND,
+                backend_name=backend_name,
+                message=msg,
+                key_name=var_not_found_exc.var_name,
+            ) from var_not_found_exc
+        except UnknownVarPrefixError as unknown_var_prefix_exc:
+            raise cls._unknown_var_prefix_credentials_error(
+                unknown_var_prefix_exc=unknown_var_prefix_exc, backend_name=backend_name, source=library_paths_description
+            ) from unknown_var_prefix_exc
+
+    @classmethod
+    def _validated_backend_blueprint(
+        cls,
+        *,
+        table: dict[str, Any],
+        backend_name: str,
+        library_paths_description: str,
+    ) -> InferenceBackendBlueprint:
+        """The blueprint of a backend's `backends.toml` table, built from its declared fields alone.
+
+        Raises:
+            InferenceBackendLibraryValidationError: The index file's own refusal, said with the backend
+                and the file in front of the analysis: pydantic's error alone names a field, and every
+                table of this file has that field.
+        """
+        declared_fields = InferenceBackendBlueprint.model_fields.keys()
+        try:
+            return InferenceBackendBlueprint.model_validate(
+                {field_name: value for field_name, value in table.items() if field_name in declared_fields}
+            )
+        except ValidationError as validation_error:
+            validation_error_msg = format_pydantic_validation_error(validation_error)
+            msg = f"Invalid inference backend '{backend_name}' in {library_paths_description}: {validation_error_msg}"
+            raise InferenceBackendLibraryValidationError(msg, backend_name=backend_name) from validation_error
+
+    @classmethod
+    def _unknown_var_prefix_credentials_error(
+        cls,
+        *,
+        unknown_var_prefix_exc: UnknownVarPrefixError,
+        backend_name: str,
+        source: str,
+    ) -> InferenceBackendCredentialsError:
+        """A placeholder's unknown prefix, said the same way whether the load resolves credentials or not."""
+        return InferenceBackendCredentialsError(
+            credentials_error_type=InferenceBackendCredentialsErrorType.UNKNOWN_VAR_PREFIX,
+            backend_name=backend_name,
+            message=f"Variable substitution failed due to an unknown variable prefix error in {source}:\n{unknown_var_prefix_exc}",
+            key_name=unknown_var_prefix_exc.var_name,
+        )
+
+    @classmethod
+    def _backend_table_without_templated_fields(
+        cls,
+        *,
+        backend_table: dict[str, Any],
+        unresolved_credentials: dict[str, list[str]],
+    ) -> dict[str, Any]:
+        """A backend's `backends.toml` table less every field that references a variable, which it records instead.
+
+        A keyless load leaves such a field unset rather than keep its `${…}` text, so that nothing
+        can mistake the text for an endpoint or a key: `endpoint` and `api_key` fall back to `None`,
+        an extra-config key is absent. A literal field, such as a fixed endpoint, is kept as written.
+        """
+        kept_fields: dict[str, Any] = {}
+        for field_name, value in backend_table.items():
+            field_var_names: list[str] = []
+            apply_to_strings_recursive({field_name: value}, transform_func=partial(cls._record_placeholder_var_names, var_names=field_var_names))
+            if field_var_names:
+                unresolved_credentials[field_name] = field_var_names
+            else:
+                kept_fields[field_name] = value
+        return kept_fields
+
+    @classmethod
+    def _refuse_placeholders_in_literal_fields(
+        cls,
+        *,
+        table: dict[str, Any],
+        declared_fields: Iterable[str],
+        templatable_fields: frozenset[str],
+        where: str,
+        backend_name: str,
+    ) -> None:
+        """Refuse a `${…}` placeholder in a declared field that describes the model, on every load.
+
+        Checked on the raw text, before any substitution, so a load that resolves credentials and one
+        that does not refuse the same files: a keyless load cannot resolve such a field, and a verdict
+        that held only where the variable is set is what the keyless boot exists to rule out.
+
+        Raises:
+            InferenceBackendLibraryValidationError: Naming the field and the variables it references.
+        """
+        literal_fields = set(declared_fields) - templatable_fields
+        for field_name, value in table.items():
+            if field_name not in literal_fields:
+                continue
+            var_names: list[str] = []
+            apply_to_strings_recursive({field_name: value}, transform_func=partial(cls._record_placeholder_var_names, var_names=var_names))
+            if var_names:
+                msg = (
+                    f"Invalid {where}: '{field_name}' references {', '.join(var_names)}, but a placeholder may only "
+                    f"stand in a value a call sends (an API key, an endpoint, a model id, a request header or an extra "
+                    f"config key). '{field_name}' describes the model, which a boot without inference must know "
+                    f"without resolving anything: write it literally."
+                )
+                raise InferenceBackendLibraryValidationError(msg, backend_name=backend_name)
+
+    @classmethod
+    def _record_placeholder_var_names(cls, content: str, *, var_names: list[str]) -> str:
+        """Add the variables `content` references to `var_names`, and return `content` as it is."""
+        for var_name in placeholder_var_names(content=content):
+            if var_name not in var_names:
+                var_names.append(var_name)
+        return content
 
     @classmethod
     def _build_backend_model_specs(
@@ -396,14 +482,15 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         model_specs_dict: BackendModelSpecs,
         backend_name: str,
         backend_config_source: str,
-        model_spec_source: ModelSpecSource,
-        backend_blueprint: InferenceBackendBlueprint,
+        backend_listed_constraints: list[ListedConstraint],
+        backend_valued_constraints: dict[ValuedConstraint, Any],
     ) -> "dict[str, InferenceModelSpec]":
         """Turn one backend's raw tables into model specs: pop `[defaults]`, split, merge, validate.
 
         Its own method so the boot-tolerance retry can run it a second time over a migrated document
-        without duplicating a line of it. The read is non-destructive — `[defaults]` is popped from a
-        copy — because the caller may still need the original tables when this raises.
+        without duplicating a line of it, and so a plugin's internal models are built by the very path
+        a backend file's are. The read is non-destructive — `[defaults]` is popped from a copy —
+        because the caller may still need the original tables when this raises.
         """
         remaining_tables = dict(model_specs_dict)
         defaults_dict: dict[str, Any] = remaining_tables.pop(MODEL_SPEC_DEFAULTS_TABLE, {})
@@ -415,25 +502,17 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             model_spec_dict: dict[str, Any] = cast("dict[str, Any]", value)
             try:
                 # A per-model key the blueprint does not know is a request header only if it is shaped
-                # like one; anything else is a typo or a dead field, and what happens to it depends on
-                # where the table came from.
+                # like one; anything else is a typo or a dead field, and is refused.
                 key_split = split_model_spec_keys(model_spec_dict=model_spec_dict)
                 if key_split.rejected:
-                    match model_spec_source:
-                        case ModelSpecSource.LOCAL_FILE:
-                            # Fatal in lenient mode too: leniency covers credentials only (see the docstring),
-                            # and this is not a credentials error, so the lenient `except` in `load` lets it
-                            # through. What may still catch it is the ledger, one level up.
-                            plural = "s" if len(key_split.rejected) > 1 else ""
-                            msg = (
-                                f"Unknown key{plural} on model '{model_spec_name}' for backend '{backend_name}' "
-                                f"from {backend_config_source}: {describe_rejected_keys(rejected=key_split.rejected)}"
-                            )
-                            raise InferenceBackendLibraryError(msg, backend_name=backend_name)
-                        case ModelSpecSource.REMOTE_GATEWAY:
-                            # Version skew, the same judgement `drop_unknown_gateway_defaults` makes for the
-                            # `defaults` block: pruned, and silently — this can run before the log hub is set.
-                            pass
+                    # Fatal on a keyless load too: that load skips credentials, and this is a document
+                    # that is wrong. What may still catch it is the ledger, one level up.
+                    plural = "s" if len(key_split.rejected) > 1 else ""
+                    msg = (
+                        f"Unknown key{plural} on model '{model_spec_name}' for backend '{backend_name}' "
+                        f"from {backend_config_source}: {describe_rejected_keys(rejected=key_split.rejected)}"
+                    )
+                    raise InferenceBackendLibraryError(msg, backend_name=backend_name)
                 # Start from the defaults, then override with the model's own fields
                 model_spec_blueprint_dict = defaults_dict.copy()
                 model_spec_blueprint_dict.update(key_split.fields)
@@ -442,8 +521,8 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     backend_name=backend_name,
                     name=model_spec_name,
                     blueprint=model_spec_blueprint,
-                    backend_listed_constraints=backend_blueprint.listed_constraints,
-                    backend_valued_constraints=backend_blueprint.valued_constraints,
+                    backend_listed_constraints=backend_listed_constraints,
+                    backend_valued_constraints=backend_valued_constraints,
                     extra_headers=key_split.headers,
                 )
                 backend_model_specs[model_spec_name] = model_spec
@@ -464,9 +543,8 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         *,
         backend_name: str,
         backends_dir_path: str,
-        model_spec_source: ModelSpecSource,
         backend_blueprint: InferenceBackendBlueprint,
-        substitute_vars_with_provider: Any,
+        substitute_vars_with_provider: StringTransform,
     ) -> RecoveredModelSpecs | None:
         """This backend's specs rebuilt from its file as the ledger would leave it, or `None`.
 
@@ -475,20 +553,10 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         re-raises the error the file actually produced, which names the key the user can act on,
         where "migration did not help" would name nothing.
 
-        **One file, and only a local one.** The helper deep-merges the paths it is given, which is
+        **One file at a time.** The helper deep-merges the paths it is given, which is
         right for a tier stack and wrong here — backend files are independent documents that share no
-        keys, so they are replayed one at a time. And the gateway backend is left out on purpose:
-        `GatewayConfigMerger` ignores a local `[defaults]` outright and keeps only `sdk` and
-        `structure_method` from a per-model override, so a stale key in `pipelex_gateway.toml` is
-        filtered out before any spec is built and can never be what refused the load. `pipelex
-        migrate` still repairs that file on disk — the surface claims every `*.toml` in the directory
-        — but at boot there is nothing there to carry forward.
+        keys, so they are replayed one at a time.
         """
-        match model_spec_source:
-            case ModelSpecSource.REMOTE_GATEWAY:
-                return None
-            case ModelSpecSource.LOCAL_FILE:
-                pass
         path_to_model_specs_toml = backend_toml_path(backends_dir_path=backends_dir_path, backend_name=backend_name)
         replayed = replay_surface_files_in_memory(surface_id=INFERENCE_BACKEND_CONFIG_SURFACE_ID, paths=[path_to_model_specs_toml])
         if replayed is None:
@@ -505,80 +573,34 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 model_specs_dict=migrated_specs_dict,
                 backend_name=backend_name,
                 backend_config_source=backend_config_source,
-                model_spec_source=model_spec_source,
-                backend_blueprint=backend_blueprint,
+                backend_listed_constraints=backend_blueprint.listed_constraints,
+                backend_valued_constraints=backend_blueprint.valued_constraints,
             )
         except (InferenceBackendLibraryError, InferenceModelSpecError, InferenceBackendCredentialsError):
             return None
         return RecoveredModelSpecs(model_specs=model_specs, plans=replayed.plans)
-
-    def _load_gateway_model_specs(
-        self,
-        gateway_config: GatewayConfig,
-        *,
-        backend_name: str,
-        backends_dir_path: str,
-        substitute_vars_with_provider: Any,
-    ) -> tuple[BackendModelSpecs, str]:
-        """Load model specs for pipelex_gateway from remote config.
-
-        Args:
-            gateway_config: Gateway configuration for Pipelex Gateway backend.
-            backend_name: Name the backend library gives this gateway backend.
-            backends_dir_path: Path to directory containing local override file.
-            substitute_vars_with_provider: Function to substitute variables.
-
-        Returns:
-            Model specs dictionary merged from remote and local overrides.
-
-        Raises:
-            InferenceBackendCredentialsError: If variable substitution fails.
-        """
-        # Load local overrides if they exist. The path follows the *backend's own name*, so
-        # `backends/pipelex_manifold.toml` overrides the manifold backend exactly as
-        # `backends/pipelex_gateway.toml` overrides the legacy one — and neither can reach the
-        # other's models. Built through the shared helper for the reason its docstring gives: a
-        # backend name is an unvalidated top-level TOML key, and a quoted absolute-path key would
-        # otherwise escape the backends directory.
-        path_to_local_overrides = str(backend_toml_path(backends_dir_path=backends_dir_path, backend_name=backend_name))
-        local_overrides = load_toml_from_path_if_exists(path=path_to_local_overrides) or {}
-
-        # Merge remote config with local overrides
-        model_specs_dict = GatewayConfigMerger.merge(
-            gateway_model_specs=drop_unknown_gateway_defaults(gateway_model_specs=gateway_config.model_specs),
-            local_overrides=local_overrides,
-        )
-
-        backend_config_source = f"remote config with local overrides from '{path_to_local_overrides}'"
-        # Apply variable substitution (in case remote config has any variables)
-        model_specs_dict = self._substitute_model_spec_vars(
-            model_specs_dict=model_specs_dict,
-            backend_name=backend_name,
-            source=backend_config_source,
-            substitute_vars_with_provider=substitute_vars_with_provider,
-        )
-
-        return model_specs_dict, backend_config_source
 
     def _load_local_model_specs(
         self,
         backend_name: str,
         *,
         backends_dir_path: str,
-        substitute_vars_with_provider: Any,
+        substitute_vars_with_provider: StringTransform,
     ) -> tuple[BackendModelSpecs, str]:
         """Load model specs from local TOML file.
 
         Args:
             backend_name: Name of the backend.
             backends_dir_path: Path to directory containing TOML files.
-            substitute_vars_with_provider: Function to substitute variables.
+            substitute_vars_with_provider: What runs over every string of the file: substitution, or on a
+                keyless load a recorder that keeps the text.
 
         Returns:
             Model specs dictionary from local TOML.
 
         Raises:
             InferenceBackendLibraryError: If the file is missing.
+            InferenceBackendLibraryValidationError: If a field describing a model references a variable.
             InferenceBackendCredentialsError: If variable substitution fails.
         """
         path_to_model_specs_toml = backend_toml_path(backends_dir_path=backends_dir_path, backend_name=backend_name)
@@ -589,6 +611,20 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             raise InferenceBackendLibraryError(msg, backend_name=backend_name) from file_not_found_exc
 
         backend_config_source = f"file '{path_to_model_specs_toml}'"
+        for model_spec_name, model_spec_table in model_specs_dict_raw.items():
+            if isinstance(model_spec_table, dict):
+                try:
+                    self._refuse_placeholders_in_literal_fields(
+                        table=cast("dict[str, Any]", model_spec_table),
+                        declared_fields=InferenceModelSpecBlueprint.model_fields.keys(),
+                        templatable_fields=TEMPLATABLE_MODEL_SPEC_FIELDS,
+                        where=f"model '{model_spec_name}' for backend '{backend_name}' in {backend_config_source}",
+                        backend_name=backend_name,
+                    )
+                except UnknownVarPrefixError as unknown_var_prefix_exc:
+                    raise self._unknown_var_prefix_credentials_error(
+                        unknown_var_prefix_exc=unknown_var_prefix_exc, backend_name=backend_name, source=backend_config_source
+                    ) from unknown_var_prefix_exc
         model_specs_dict = self._substitute_model_spec_vars(
             model_specs_dict=model_specs_dict_raw,
             backend_name=backend_name,
@@ -604,13 +640,12 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         model_specs_dict: BackendModelSpecs,
         backend_name: str,
         source: str,
-        substitute_vars_with_provider: Any,
+        substitute_vars_with_provider: StringTransform,
     ) -> BackendModelSpecs:
         """Resolve variable placeholders in model specs, as a *credentials* failure when one cannot be.
 
-        The error class carries the leniency decision: `load(lenient=True)` skips a backend whose
-        credentials are missing, and nothing else. Raising anything broader here would put a
-        malformed-config failure on the same silent path.
+        Only a load that resolves credentials can raise here: a keyless load's transform keeps the
+        text and records the variables, and never raises.
 
         Raises:
             InferenceBackendCredentialsError: If a variable cannot be resolved.
@@ -642,6 +677,62 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 message=msg,
                 key_name=unknown_var_prefix_exc.var_name,
             ) from unknown_var_prefix_exc
+
+    def merge_plugin_internal_models(self, *, plugin_model_declarations: PluginModelDeclarations, backends_dir_path: str) -> bool:
+        """Merge the internal models the plugins declared into the internal backend, or report there is none to merge into.
+
+        Each table is built by the path a backend file's tables take: a key the model spec
+        does not know is the plugin author's mistake and fatal, as it is in a local file. The table is complete on
+        its own, so the `[defaults]` of `internal.toml` is not applied to it.
+
+        **A name the installation's `internal.toml` already declares is refused rather than overridden**, naming
+        the plugin and the file: which of the two declarations a boot would run would otherwise depend on nothing
+        the user can see. Model names are not global across backends — the same name in several backend files is
+        the ordinary case, and the routing profile picks one — so a name another backend declares is left to the
+        routing, exactly as it is for a model the file declares.
+
+        Returns:
+            Whether this load has an internal backend. `False` when the installation disables it, or declares none:
+            the plugins' models are then not merged, as a disabled backend's own models are not loaded, and the
+            caller leaves the plugins' model deck defaults out for the same reason.
+
+        Raises:
+            PluginModelDeclarationError: a plugin declares a model `internal.toml` declares too, or one whose table
+                is not a valid model spec.
+        """
+        internal_backend = self.root.get(PipelexBackend.INTERNAL)
+        if internal_backend is None:
+            return False
+        internal_file_path = backend_toml_path(backends_dir_path=backends_dir_path, backend_name=PipelexBackend.INTERNAL)
+        merged_model_specs = dict(internal_backend.model_specs)
+        for model_name, plugin_model in plugin_model_declarations.internal_models.items():
+            if model_name == MODEL_SPEC_DEFAULTS_TABLE:
+                msg = (
+                    f"Plugin '{plugin_model.plugin}' declares an internal model named '{model_name}', which is the name of a backend "
+                    "file's table of defaults, so it cannot name a model."
+                )
+                raise PluginModelDeclarationError(msg, plugin=plugin_model.plugin)
+            if model_name in internal_backend.model_specs:
+                msg = (
+                    f"Plugin '{plugin_model.plugin}' declares the internal model '{model_name}', which '{internal_file_path}' declares too. "
+                    "Remove it from that file, or run `pipelex update` to refresh the file from the kit: the plugin's declaration is the one "
+                    "that ships with its engine."
+                )
+                raise PluginModelDeclarationError(msg, plugin=plugin_model.plugin)
+            try:
+                plugin_model_specs = self._build_backend_model_specs(
+                    model_specs_dict={model_name: plugin_model.spec},
+                    backend_name=PipelexBackend.INTERNAL,
+                    backend_config_source=f"plugin '{plugin_model.plugin}'",
+                    backend_listed_constraints=internal_backend.listed_constraints,
+                    backend_valued_constraints=internal_backend.valued_constraints,
+                )
+            except InferenceBackendLibraryError as exc:
+                msg = f"Plugin '{plugin_model.plugin}' declares the internal model '{model_name}' with a table that is not a valid model spec: {exc}"
+                raise PluginModelDeclarationError(msg, plugin=plugin_model.plugin) from exc
+            merged_model_specs.update(plugin_model_specs)
+        self.root[PipelexBackend.INTERNAL] = internal_backend.model_copy(update={"model_specs": merged_model_specs})
+        return True
 
     def list_backend_names(self) -> list[str]:
         return list(self.root.keys())

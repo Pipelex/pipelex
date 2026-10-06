@@ -9,7 +9,7 @@
    ```bash
    make agent-check
    # If the current system doesn't have the `make` command,
-   # lookup the "agent-check" target in the Makefile and run the commands one by one (targets fix-unused-imports fix-keyword-only format lint pyright mypy check-ledger check-keyword-only check-hub-layering drift-check)
+   # lookup the "agent-check" target in the Makefile and run the commands one by one (targets fix-unused-imports fix-keyword-only format lint pyright mypy check-ledger check-keyword-only check-hub-layering check-rich-imports check-actions-allowlist drift-check api-agent-check)
    ```
 
    This runs multiple code quality tools:
@@ -19,6 +19,7 @@
    - plxt: Format and lint TOML, MTHDS, and PLX files
    - Migration ledgers: every checked-in ledger must be legal and replay harmlessly over its reference documents (`make check-ledger`, alias `cl`)
    - Drift contracts: open code↔docs review obligations fail the gate (note the digest reads the git index, so stage your changes for the check to see them)
+   - The Pipelex API server's own gate (`make -C api agent-check`): the server lives in `api/` as a uv workspace member with its own environment, and its checks include the drift of its OpenAPI artifact and of its vendored inference tree
 
    Always fix any issues reported by these tools before proceeding.
 
@@ -176,6 +177,7 @@
 - Do not import libraries in functions or classes unless in very specific cases, to be discussed with the user, as they would required a `# noqa: ...` comment to pass linting
 - Do not bother with ordering the imports or removing unused imports, our Ruff linter will handle it for us.
 - `if TYPE_CHECKING:` blocks must always be the **last** block in the imports section, placed after all regular imports.
+- **Rich is the standing exception.** It is the `cli` extra, which a server does not install, so outside `pipelex/cli/` it is imported inside the function that renders, after `require_rich(...)` (`pipelex.tools.misc.rich_extra`) or `require_rich_for_rendering()` (`pipelex.tools.misc.pretty`), and a type-only import of it goes under `if TYPE_CHECKING:`. Such a deferred import needs no suppression comment, and `make check-rich-imports` refuses a module-level one, as well as a module-level import of a CLI module that imports Rich. See `docs/contribute/rich-imports.md`.
 
 #### Removing unused imports
 
@@ -346,12 +348,9 @@ Use one casing per acronym (`LLMError` vs `LlmError` collide when kebab-cased in
 
 ## Standards related to developing the Pipelex codebase
 
-### Spec vs Blueprint Architecture
+### Blueprints
 
-- **Blueprints** (`pipelex/pipe_operators/`, `pipelex/pipe_controllers/`, `pipelex/pipe_machinery/`, `pipelex/mthds_parsing/`, `pipelex/core/`) are the MTHDS language reference — what `.mthds` files parse into. The base `PipeBlueprint` lives in `pipe_machinery/`, the bundle blueprint the parser produces in `mthds_parsing/`, and the concept/domain blueprints in `core/`.
-- **Specs** (`pipelex/builder/pipe/`) are a convenience authoring format for AI agents. Each spec has `to_blueprint()` that transforms it into the corresponding blueprint. Spec-level fields may differ from blueprint-level fields.
-
-When adding validation or fields, decide which layer they belong to. Language rules go on blueprints; authoring convenience goes on specs. See `pipelex/builder/CLAUDE.md` for details.
+**Blueprints** (`pipelex/pipe_operators/`, `pipelex/pipe_controllers/`, `pipelex/pipe_machinery/`, `pipelex/mthds_parsing/`, `pipelex/core/`) are the MTHDS language reference — what `.mthds` files parse into. The base `PipeBlueprint` lives in `pipe_machinery/`, the bundle blueprint the parser produces in `mthds_parsing/`, and the concept/domain blueprints in `core/`. A language rule or field goes on the blueprint, since a method is written as MTHDS directly.
 
 ### Main config
 

@@ -6,12 +6,12 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 import pytest
-from mistralai import MistralError
+from mistralai.client.errors import MistralError
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-from pipelex.cogt.exceptions import ExtractJobFailureError, ExtractModelNotFoundError, InferenceErrorCategory
+from pipelex.cogt.exceptions import ExtractCapabilityError, ExtractJobFailureError, ExtractModelNotFoundError, InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.providers.mistral.mistral_extract_worker import MistralExtractWorker
 
@@ -34,6 +34,14 @@ def _make_worker(mocker: MockerFixture) -> MistralExtractWorker:
     mock_client.ocr.process_async = mocker.AsyncMock()
     worker.mistral_client = mock_client
     return worker
+
+
+def _make_job_params(mocker: MockerFixture, *, max_nb_images: int | None = None, image_min_size: int | None = None) -> Any:
+    extract_job_params = mocker.MagicMock()
+    extract_job_params.should_caption_images = False
+    extract_job_params.max_nb_images = max_nb_images
+    extract_job_params.image_min_size = image_min_size
+    return extract_job_params
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -76,7 +84,7 @@ class TestMistralExtractWorkerSemantic:
         )
 
         with pytest.raises(ExtractJobFailureError) as exc_info:
-            await worker._extract_page_from_image(image_uri="https://example.com/test.png")  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+            await worker._extract_page_from_image(image_uri="https://example.com/test.png", extract_job_params=_make_job_params(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category
         assert exc_info.value.user_action is not None
@@ -117,7 +125,7 @@ class TestMistralExtractWorkerSemantic:
         )
 
         with pytest.raises(ExtractJobFailureError) as exc_info:
-            await worker._extract_page_from_image(image_uri="https://example.com/test.png")  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+            await worker._extract_page_from_image(image_uri="https://example.com/test.png", extract_job_params=_make_job_params(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
         assert exc_info.value.user_action is not None
@@ -180,7 +188,7 @@ class TestMistralExtractWorkerSemantic:
         )
 
         with pytest.raises(ExtractModelNotFoundError) as exc_info:
-            await worker._extract_page_from_image(image_uri="https://example.com/test.png")  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+            await worker._extract_page_from_image(image_uri="https://example.com/test.png", extract_job_params=_make_job_params(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
         assert exc_info.value.user_action is not None
@@ -189,3 +197,51 @@ class TestMistralExtractWorkerSemantic:
         assert exc_info.value.provider_metadata.provider == "mistral"
         assert exc_info.value.provider_metadata.status_code == 404
         assert exc_info.value.__cause__ is sdk_exc
+
+    async def test_image_path_asks_for_the_figures_it_finds(self, mocker: MockerFixture) -> None:
+        """OCR finds figures inside an image too, and returns them without pixels unless asked, which the response conversion refuses."""
+        worker = _make_worker(mocker)
+        cast_client: Any = worker.mistral_client
+        mocker.patch(
+            "pipelex.providers.mistral.mistral_extract_worker.MistralFactory.make_extract_output_from_mistral_response",
+            return_value=mocker.sentinel.extract_output,
+        )
+
+        extract_output = await worker._extract_page_from_image(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+            image_uri="https://example.com/test.png",
+            extract_job_params=_make_job_params(mocker, max_nb_images=3, image_min_size=64),
+        )
+
+        assert extract_output is mocker.sentinel.extract_output
+        request_kwargs = cast_client.ocr.process_async.call_args.kwargs
+        assert request_kwargs["include_image_base64"] is True
+        assert request_kwargs["image_limit"] == 3
+        assert request_kwargs["image_min_size"] == 64
+
+    @pytest.mark.parametrize(
+        ("image_uri", "document_uri"),
+        [
+            ("https://example.com/test.png", None),
+            (None, "https://example.com/doc.pdf"),
+        ],
+    )
+    async def test_a_caption_request_is_refused_before_either_path_starts(
+        self, mocker: MockerFixture, image_uri: str | None, document_uri: str | None
+    ) -> None:
+        """Mistral OCR writes no captions, so asking for them fails on an image as on a document, before anything is uploaded."""
+        worker = _make_worker(mocker)
+        make_image_chunk = mocker.patch("pipelex.providers.mistral.mistral_extract_worker.MistralFactory.make_mistral_image_url_chunk_from_uri")
+        make_document_chunk = mocker.patch("pipelex.providers.mistral.mistral_extract_worker.MistralFactory.make_mistral_document_url_chunk_from_uri")
+        extract_job = mocker.MagicMock()
+        extract_job.extract_input.image_uri = image_uri
+        extract_job.extract_input.document_uri = document_uri
+        extract_job.job_params = _make_job_params(mocker)
+        extract_job.job_params.should_caption_images = True
+
+        with pytest.raises(ExtractCapabilityError, match="Captioning is not implemented for Mistral OCR"):
+            await worker._extract_pages(extract_job=extract_job)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
+        make_image_chunk.assert_not_called()
+        make_document_chunk.assert_not_called()
+        cast_client: Any = worker.mistral_client
+        cast_client.ocr.process_async.assert_not_called()

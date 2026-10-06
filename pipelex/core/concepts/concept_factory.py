@@ -42,6 +42,8 @@ def _is_valid_structure_class(*, structure_class_name: str) -> bool:
 class StructureNameAndRefine(NamedTuple):
     structure_class_name: str
     refine_string: str | None
+    # Whether the class is the text placeholder a description-only concept gets, rather than a Python class named after it.
+    is_text_placeholder: bool = False
 
 
 class ConceptDeclarationType(StrEnum):
@@ -121,6 +123,16 @@ class ConceptFactory:
                     domain_code=SpecialDomain.NATIVE,
                     description="A text",
                     structure_class_name=structure_class_name,
+                )
+            case NativeConceptCode.MARKDOWN:
+                # The one native refining another (`NativeConceptCode.refined_native`): the declaration is
+                # what lets a Markdown value stand in for a Text, established without resolving any class.
+                return Concept(
+                    code=native_concept_code,
+                    domain_code=SpecialDomain.NATIVE,
+                    description="A text written in Markdown",
+                    structure_class_name=structure_class_name,
+                    refines=NativeConceptCode.TEXT.concept_ref,
                 )
             case NativeConceptCode.IMAGE:
                 return Concept(
@@ -204,6 +216,20 @@ class ConceptFactory:
                     code=native_concept_code,
                     domain_code=SpecialDomain.NATIVE,
                     description="A search result with answer and sources",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptCode.CHOICE:
+                return Concept(
+                    code=native_concept_code,
+                    domain_code=SpecialDomain.NATIVE,
+                    description="One option picked out of a declared set",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptCode.RATING:
+                return Concept(
+                    code=native_concept_code,
+                    domain_code=SpecialDomain.NATIVE,
+                    description="A position on an ordered scale of described levels",
                     structure_class_name=structure_class_name,
                 )
             case NativeConceptCode.COMPOSITE:
@@ -389,7 +415,7 @@ class ConceptFactory:
         if _is_valid_structure_class(structure_class_name=concept_code):
             return StructureNameAndRefine(structure_class_name=concept_code, refine_string=None)
         if _is_valid_structure_class(structure_class_name=qualified_class_name):
-            return StructureNameAndRefine(structure_class_name=qualified_class_name, refine_string=None)
+            return StructureNameAndRefine(structure_class_name=qualified_class_name, refine_string=None, is_text_placeholder=True)
 
         # Because native concepts have structure class names diffrent than other (with "Content")
         if concept_code in NativeConceptCode.values_list():
@@ -411,7 +437,9 @@ class ConceptFactory:
         # Register the generated class
         get_class_registry().register_class(the_generated_class)
 
-        return StructureNameAndRefine(structure_class_name=qualified_class_name, refine_string=NativeConceptCode.TEXT.concept_ref)
+        return StructureNameAndRefine(
+            structure_class_name=qualified_class_name, refine_string=NativeConceptCode.TEXT.concept_ref, is_text_placeholder=True
+        )
 
     @classmethod
     def _handle_refines(
@@ -522,7 +550,7 @@ class ConceptFactory:
         match declaration_type:
             case ConceptDeclarationType.STRING:
                 assert isinstance(blueprint_or_string_description, str)
-                structure_class_name, _ = cls._handle_basic_blueprint(
+                basic_structure = cls._handle_basic_blueprint(
                     concept_code=concept_code,
                     domain_code=domain_code,
                     description=blueprint_or_string_description,
@@ -531,12 +559,13 @@ class ConceptFactory:
                     domain_code=domain_and_concept_code.domain_code,
                     code=domain_and_concept_code.concept_code,
                     description=blueprint_or_string_description,
-                    structure_class_name=structure_class_name,
+                    structure_class_name=basic_structure.structure_class_name,
+                    is_described_only=basic_structure.is_text_placeholder,
                 )
 
             case ConceptDeclarationType.BASIC_BLUEPRINT:
                 assert isinstance(blueprint_or_string_description, ConceptBlueprint)
-                structure_class_name, refines = cls._handle_basic_blueprint(
+                basic_structure = cls._handle_basic_blueprint(
                     concept_code=concept_code,
                     domain_code=domain_code,
                     description=blueprint_or_string_description.description,
@@ -545,8 +574,9 @@ class ConceptFactory:
                     domain_code=domain_and_concept_code.domain_code,
                     code=domain_and_concept_code.concept_code,
                     description=blueprint_or_string_description.description,
-                    structure_class_name=structure_class_name,
-                    refines=refines,
+                    structure_class_name=basic_structure.structure_class_name,
+                    refines=basic_structure.refine_string,
+                    is_described_only=basic_structure.is_text_placeholder,
                 )
 
             case ConceptDeclarationType.STRUCTURE_WITH_CLASSNAME:
@@ -565,6 +595,9 @@ class ConceptFactory:
 
             case ConceptDeclarationType.BLUEPRINT_WITH_STRUCTURE:
                 blueprint = cast("ConceptBlueprint", blueprint_or_string_description)
+                if not isinstance(blueprint.structure, dict):
+                    msg = f"Expected structure to be a dict, got {type(blueprint.structure)}"
+                    raise ConceptFactoryError(msg)
                 return Concept(
                     domain_code=domain_and_concept_code.domain_code,
                     code=domain_and_concept_code.concept_code,
@@ -575,11 +608,12 @@ class ConceptFactory:
                         domain_code=domain_code,
                     ),
                     refines=None,
+                    declared_structure=normalize_structure_blueprint(blueprint.structure),
                 )
 
             case ConceptDeclarationType.REFINES:
                 blueprint = cast("ConceptBlueprint", blueprint_or_string_description)
-                structure_class_name, current_refine = cls._handle_refines(
+                refined_structure = cls._handle_refines(
                     blueprint=blueprint,
                     concept_code=concept_code,
                     domain_code=domain_code,
@@ -588,6 +622,6 @@ class ConceptFactory:
                     domain_code=domain_and_concept_code.domain_code,
                     code=domain_and_concept_code.concept_code,
                     description=blueprint.description,
-                    structure_class_name=structure_class_name,
-                    refines=current_refine,
+                    structure_class_name=refined_structure.structure_class_name,
+                    refines=refined_structure.refine_string,
                 )

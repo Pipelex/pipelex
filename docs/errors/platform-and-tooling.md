@@ -29,12 +29,17 @@ own page. Classes are grouped by subsystem.
 - [`CsvFlatnessError`](csv-flatness-error.md) — CSV flatness error
 - [`CsvReadError`](csv-read-error.md) — CSV read error
 - [`FileTypeError`](file-type-error.md) — File type
+- [`GcpLogSinkCredentialsError`](gcp-log-sink-credentials-error.md) — Log sink credentials missing or refused
 - [`Jinja2ContextError`](jinja2-context-error.md) — Jinja 2 context
 - [`Jinja2DetectVariablesError`](jinja2-detect-variables-error.md) — Jinja 2 detect variables
 - [`Jinja2StuffError`](jinja2-stuff-error.md) — Jinja 2 stuff
+- [`Jinja2TemplateBudgetError`](jinja2-template-budget-error.md) — Template render budget exceeded
 - [`Jinja2TemplateRenderError`](jinja2-template-render-error.md) — Jinja 2 template render
+- [`Jinja2TemplateSecurityError`](jinja2-template-security-error.md) — Jinja 2 template security
 - [`Jinja2TemplateSyntaxError`](jinja2-template-syntax-error.md) — Jinja 2 template syntax
 - [`JsonTypeError`](json-type-error.md) — Json type
+- [`LogSinkHeaderValueError`](log-sink-header-value-error.md) — Log sink header value holds a line break
+- [`LogSinkVariableError`](log-sink-variable-error.md) — Log sink variable did not resolve
 - [`ModuleFileError`](module-file-error.md) — Module file
 - [`PyPdfium2RendererError`](py-pdfium2-renderer-error.md) — Py pdfium 2 renderer
 - [`RemoteFileFetchError`](remote-file-fetch-error.md) — Remote file could not be fetched
@@ -51,6 +56,7 @@ own page. Classes are grouped by subsystem.
 - [`StorageS3Error`](storage-s3-error.md) — S3 storage error
 - [`TomlError`](toml-error.md) — TOML parse error
 - [`UnknownVarPrefixError`](unknown-var-prefix-error.md) — Unknown var prefix
+- [`UriReadRefusedError`](uri-read-refused-error.md) — Read outside the run's scope refused
 - [`VarFallbackPatternError`](var-fallback-pattern-error.md) — Var fallback pattern
 - [`VarNotFoundError`](var-not-found-error.md) — Var not found
 
@@ -67,21 +73,10 @@ own page. Classes are grouped by subsystem.
 - [`EnvVarNotFoundError`](env-var-not-found-error.md) — Environment variable not set
 - [`FatalError`](fatal-error.md) — Fatal error
 - [`FuncRegistryError`](func-registry-error.md) — Func registry
-- [`GatewayApiKeyMissingError`](gateway-api-key-missing-error.md) — Gateway api key missing
-- [`GatewayConfigMergeError`](gateway-config-merge-error.md) — Gateway config merge
-- [`GatewayDoNotTrackConflictError`](gateway-do-not-track-conflict-error.md) — Gateway do not track conflict
-- [`GatewayTelemetryManagerInjectedError`](gateway-telemetry-manager-injected-error.md) — Gateway telemetry manager injected
-- [`GatewayTermsNotAcceptedError`](gateway-terms-not-accepted-error.md) — Gateway terms not accepted
-- [`InferenceSetupRequiredError`](inference-setup-required-error.md) — Inference setup required
 - [`JobMetadataError`](job-metadata-error.md) — Job metadata
 - [`LangfuseCredentialsError`](langfuse-credentials-error.md) — Langfuse credentials
 - [`MissingDependencyError`](missing-dependency-error.md) — Missing dependency
 - [`NestedKeyConflictError`](nested-key-conflict-error.md) — Nested key conflict
-- [`PipelexServiceConfigValidationError`](pipelex-service-config-validation-error.md) — Pipelex service config validation
-- [`PipelexServiceError`](pipelex-service-error.md) — Pipelex service
-- [`RemoteConfigFetchError`](remote-config-fetch-error.md) — Remote config fetch
-- [`RemoteConfigUnavailableError`](remote-config-unavailable-error.md) — Remote config unavailable
-- [`RemoteConfigValidationError`](remote-config-validation-error.md) — Remote config validation
 - [`TelemetryConfigError`](telemetry-config-error.md) — Telemetry config
 - [`TelemetryConfigValidationError`](telemetry-config-validation-error.md) — Telemetry config validation
 - [`ToolError`](tool-error.md) — Tool error
@@ -102,6 +97,11 @@ own page. Classes are grouped by subsystem.
 - [`CodegenError`](codegen-error.md) — Codegen error
 - [`CodegenLockError`](codegen-lock-error.md) — Codegen lock error
 - [`CodegenStampError`](codegen-stamp-error.md) — Codegen stamp error
+
+## Fix ops
+
+- [`FixTransactionError`](fix-transaction-error.md) — Fix transaction
+- [`FixWriteConflictError`](fix-write-conflict-error.md) — Fix write conflict
 
 ## Methods
 

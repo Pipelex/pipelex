@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from pipelex.builder.operations.models_ops import format_models_markdown
+from pipelex.cogt.models.model_listing import format_models_markdown
 
 
 class TestFormatModelsMarkdown:

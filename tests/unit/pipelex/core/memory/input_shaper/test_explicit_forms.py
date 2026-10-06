@@ -2,6 +2,7 @@ import datetime
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from pipelex import log, pretty_print
 from pipelex.core.memory.exceptions import (
@@ -11,7 +12,6 @@ from pipelex.core.memory.exceptions import (
 )
 from pipelex.core.memory.input_shaper import InputShaper
 from pipelex.core.stuffs.list_content import ListContent
-from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.time_content import TimeContent
 from pipelex.interpreter_hub import get_concept_library
 from tests.unit.pipelex.core.memory.input_shaper.data import OpeningTime, Question, ShaperInvoice, ShaperWeird, build_input_specs
@@ -23,7 +23,7 @@ class TestInputShaperExplicitForms:
         input_specs = build_input_specs([("invoice", "shaper_test.ShaperInvoice", None)])
         provided = {"concept": "shaper_test.ShaperInvoice", "content": {"invoice_number": "INV-001", "amount": 1250.0}}
 
-        working_memory = InputShaper.shape({"invoice": provided}, input_specs=input_specs, concept_provider=get_concept_library())
+        working_memory = InputShaper.shape({"invoice": provided}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         stuff = working_memory.root["invoice"]
         pretty_print(stuff, title="envelope structured")
@@ -35,13 +35,14 @@ class TestInputShaperExplicitForms:
         input_specs = build_input_specs([("answer", "native.Text", None)])
         provided = {"concept": "shaper_test.Question", "content": "What are the fees?"}
 
-        working_memory = InputShaper.shape({"answer": provided}, input_specs=input_specs, concept_provider=get_concept_library())
+        working_memory = InputShaper.shape({"answer": provided}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         stuff = working_memory.root["answer"]
         pretty_print(stuff, title="envelope refining wins")
-        # The declared lower bound is native.Text, but the caller volunteered the more specific Question.
+        # The declared lower bound is native.Text, but the caller volunteered the more specific Question,
+        # whose own class holds the text, as the Time envelope below keeps its refining class.
         assert stuff.concept.concept_ref == "shaper_test.Question"
-        assert stuff.content == TextContent(text="What are the fees?")
+        assert stuff.content == Question(text="What are the fees?")
 
     @pytest.mark.parametrize(
         ("concept_ref", "expected_type"),
@@ -52,7 +53,7 @@ class TestInputShaperExplicitForms:
         input_specs = build_input_specs([("opening", "native.Time", None)])
         provided = {"concept": concept_ref, "content": "15:40:00+02:00"}
 
-        working_memory = InputShaper.shape({"opening": provided}, input_specs=input_specs, concept_provider=get_concept_library())
+        working_memory = InputShaper.shape({"opening": provided}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         stuff = working_memory.root["opening"]
         assert stuff.concept.concept_ref == concept_ref
@@ -62,7 +63,7 @@ class TestInputShaperExplicitForms:
         input_specs = build_input_specs([("opening", "native.Time", None)])
         provided = {"concept": "native.Time", "content": datetime.time(15, 40)}
 
-        working_memory = InputShaper.shape({"opening": provided}, input_specs=input_specs, concept_provider=get_concept_library())
+        working_memory = InputShaper.shape({"opening": provided}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         assert working_memory.root["opening"].content == TimeContent(time=datetime.time(15, 40))
 
@@ -72,7 +73,7 @@ class TestInputShaperExplicitForms:
         provided = ShaperInvoice(invoice_number="INV-002", amount=99.0)
 
         working_memory = InputShaper.shape(
-            {"invoice": provided}, input_specs=input_specs, search_scope="shaper_test", concept_provider=get_concept_library()
+            {"invoice": provided}, input_specs=input_specs, search_scope="shaper_test", concept_provider=get_concept_library(), read_scope=None
         )
 
         stuff = working_memory.root["invoice"]
@@ -90,7 +91,7 @@ class TestInputShaperExplicitForms:
         provided = [Question(text="a"), Question(text="b")]
 
         working_memory = InputShaper.shape(
-            {"questions": provided}, input_specs=input_specs, search_scope="shaper_test", concept_provider=get_concept_library()
+            {"questions": provided}, input_specs=input_specs, search_scope="shaper_test", concept_provider=get_concept_library(), read_scope=None
         )
 
         stuff = working_memory.root["questions"]
@@ -104,7 +105,9 @@ class TestInputShaperExplicitForms:
         provided = [Question(text="a")]
 
         with pytest.raises(ExplicitConceptIncompatibleError, match="not compatible"):
-            InputShaper.shape({"priorities": provided}, input_specs=input_specs, search_scope="shaper_test", concept_provider=get_concept_library())
+            InputShaper.shape(
+                {"priorities": provided}, input_specs=input_specs, search_scope="shaper_test", concept_provider=get_concept_library(), read_scope=None
+            )
 
     def test_explicit_list_into_singular_raises(self) -> None:
         """D2: an explicit ListContent (or envelope-with-list) must not fill a singular-declared slot.
@@ -116,7 +119,9 @@ class TestInputShaperExplicitForms:
         provided: ListContent[Question] = ListContent(items=[Question(text="a"), Question(text="b")])
 
         with pytest.raises(ListWhereSingularError, match="declares a single"):
-            InputShaper.shape({"question": provided}, input_specs=input_specs, search_scope="shaper_test", concept_provider=get_concept_library())
+            InputShaper.shape(
+                {"question": provided}, input_specs=input_specs, search_scope="shaper_test", concept_provider=get_concept_library(), read_scope=None
+            )
 
     def test_explicit_list_wrong_fixed_count_raises(self) -> None:
         """D2: an explicit ListContent whose length differs from a declared [N] count is a D4 error."""
@@ -124,7 +129,25 @@ class TestInputShaperExplicitForms:
         provided: ListContent[Question] = ListContent(items=[Question(text="only-one")])
 
         with pytest.raises(MultiplicityCountMismatchError, match="exactly 2 items"):
-            InputShaper.shape({"questions": provided}, input_specs=input_specs, search_scope="shaper_test", concept_provider=get_concept_library())
+            InputShaper.shape(
+                {"questions": provided}, input_specs=input_specs, search_scope="shaper_test", concept_provider=get_concept_library(), read_scope=None
+            )
+
+    @pytest.mark.parametrize("declared_concept", ["native.Number", "native.Anything"])
+    def test_explicit_number_envelope_holding_nan_raises(self, declared_concept: str) -> None:
+        """An explicit envelope builds its content bottom-up, and `NumberContent` refuses a number JSON cannot hold."""
+        input_specs = build_input_specs([("payload", declared_concept, None)])
+        provided: dict[str, Any] = {"concept": "Number", "content": {"number": float("nan")}}
+
+        with pytest.raises(ValidationError, match="number must be finite"):
+            InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
+
+    def test_explicit_single_into_fixed_count_raises(self) -> None:
+        """A single value is one item, never the N a fixed count declares."""
+        input_specs = build_input_specs([("answers", "native.Text", 2)])
+        provided = {"concept": "native.Text", "content": "hello"}
+        with pytest.raises(MultiplicityCountMismatchError, match="but you provided 1"):
+            InputShaper.shape({"answers": provided}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
     def test_explicit_list_into_list_slot_ok(self) -> None:
         """D2/D6: an explicit ListContent whose length matches a declared list slot shapes cleanly."""
@@ -132,7 +155,7 @@ class TestInputShaperExplicitForms:
         provided: ListContent[Question] = ListContent(items=[Question(text="a"), Question(text="b")])
 
         working_memory = InputShaper.shape(
-            {"questions": provided}, input_specs=input_specs, search_scope="shaper_test", concept_provider=get_concept_library()
+            {"questions": provided}, input_specs=input_specs, search_scope="shaper_test", concept_provider=get_concept_library(), read_scope=None
         )
 
         stuff = working_memory.root["questions"]
@@ -146,7 +169,7 @@ class TestInputShaperExplicitForms:
         provided: ListContent[Question] = ListContent(items=[Question(text="a"), Question(text="b")])
 
         working_memory = InputShaper.shape(
-            {"payload": provided}, input_specs=input_specs, search_scope="shaper_test", concept_provider=get_concept_library()
+            {"payload": provided}, input_specs=input_specs, search_scope="shaper_test", concept_provider=get_concept_library(), read_scope=None
         )
 
         stuff = working_memory.root["payload"]
@@ -164,7 +187,7 @@ class TestInputShaperExplicitForms:
         input_specs = build_input_specs([("weird", "shaper_test.ShaperWeird", None)])
         provided = {"concept": "shaper_test.ShaperWeird", "content": {"concept": "x", "content": "y"}}
 
-        working_memory = InputShaper.shape({"weird": provided}, input_specs=input_specs, concept_provider=get_concept_library())
+        working_memory = InputShaper.shape({"weird": provided}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         stuff = working_memory.root["weird"]
         pretty_print(stuff, title="collision rule")
@@ -183,7 +206,7 @@ class TestInputShaperExplicitForms:
         input_specs = build_input_specs([("pics", "native.Image", True)])
         provided: dict[str, Any] = {"concept": "native.Image", "content": []}
 
-        working_memory = InputShaper.shape({"pics": provided}, input_specs=input_specs, concept_provider=get_concept_library())
+        working_memory = InputShaper.shape({"pics": provided}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         stuff = working_memory.root["pics"]
         pretty_print(stuff, title="envelope empty list")
@@ -195,8 +218,8 @@ class TestInputShaperExplicitForms:
         input_specs = build_input_specs([("pics", "native.Image", True)])
 
         envelope: dict[str, Any] = {"concept": "native.Image", "content": []}
-        via_envelope = InputShaper.shape({"pics": envelope}, input_specs=input_specs, concept_provider=get_concept_library())
-        via_bare = InputShaper.shape({"pics": []}, input_specs=input_specs, concept_provider=get_concept_library())
+        via_envelope = InputShaper.shape({"pics": envelope}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
+        via_bare = InputShaper.shape({"pics": []}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         assert via_envelope.root["pics"].content == via_bare.root["pics"].content
         assert via_envelope.root["pics"].concept.concept_ref == via_bare.root["pics"].concept.concept_ref
@@ -206,7 +229,7 @@ class TestInputShaperExplicitForms:
         input_specs = build_input_specs([("questions", "shaper_test.Question", True)])
         provided: dict[str, Any] = {"concept": "shaper_test.Question", "content": []}
 
-        working_memory = InputShaper.shape({"questions": provided}, input_specs=input_specs, concept_provider=get_concept_library())
+        working_memory = InputShaper.shape({"questions": provided}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         stuff = working_memory.root["questions"]
         assert stuff.concept.concept_ref == "shaper_test.Question"

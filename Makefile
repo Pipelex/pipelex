@@ -37,7 +37,7 @@ TS_TOOLCHAIN_ZOD_VERSION ?= 4.5.4
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
-USUAL_PYTEST_MARKERS := "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api"
+USUAL_PYTEST_MARKERS := "(dry_runnable or not (inference or llm or img_gen or extract or search or judgment)) and not pipelex_api"
 # The selection the sharded CI job runs. Shared by gha-tests and store-test-durations so the map
 # can never be balanced against a different set of tests than the one it is measured from.
 GHA_PYTEST_MARKERS := "(dry_runnable or not inference) and not (gha_disabled or pipelex_api)"
@@ -103,7 +103,7 @@ make plxt-lint                - Lint MTHDS/TOML/PLX files with plxt
 
 make rules                    - Install agent rules for contributing to Pipelex
 make rules-claude-standalone  - Install a standalone CLAUDE.md (full ruleset, for contributors without the Pipelex workspace)
-make up-kit-configs           - Update kit configs from .pipelex/
+make up-kit-configs           - Update kit configs from .pipelex/, then the api/ server's vendored inference tree from the kit
 make ukc                      - Shorthand -> up-kit-configs
 make check-config-sync        - Verify .pipelex and pipelex/kit/configs are in sync
 make ccs                      - Shorthand -> check-config-sync
@@ -127,15 +127,11 @@ make generate-error-pages     - Generate one docs page per PipelexError subclass
 make gep                      - Shorthand -> generate-error-pages
 make generate-error-identity  - Regenerate the committed PipelexError wire-identity snapshot
 make gei                      - Shorthand -> generate-error-identity
-make update-gateway-models    - Update gateway models reference
-make ugm                      - Shorthand -> update-gateway-models
-make check-gateway-models     - Check gateway models reference is up-to-date
-make cgm                      - Shorthand -> check-gateway-models
 make regenerate-test-models   - Regenerate test model fixtures from backend configs
 make rtm                      - Shorthand -> regenerate-test-models
 make insert-skeleton          - Insert skeleton from $(SKELETON_DIR)
 
-make up                       - Shorthand -> generate-mthds-schema update-gateway-models up-kit-configs rules
+make up                       - Shorthand -> generate-mthds-schema up-kit-configs rules
 make cleanenv                 - Remove virtual env
 make cleanderived             - Remove extraneous compiled files, caches, logs, etc.
 make cleanall                 - Remove all -> cleanenv + cleanderived
@@ -152,7 +148,9 @@ make codex-tests              - Run tests for Codex (exit on first failure) (no 
 make gha-tests		          - Run tests for github actions (exit on first failure) (no inference, no gha_disabled)
 make test                     - Run unit tests (no inference)
 make test-xdist               - Run unit tests with xdist (no inference)
-make agent-test               - Run unit tests, silent on success, output on failure (for AI agents)
+make agent-test               - Run unit tests, silent on success, output on failure (for AI agents), then the server's (api-agent-test)
+make api-agent-check          - The api/ server's own gate: its install, ruff, pyright, mypy, OpenAPI and vendored-kit drift checks
+make api-agent-test           - The api/ server's unit tests, in its own environment
 make agent-test-debug         - Debug variant: cleanup + outer timeout + live log; use when agent-test hangs or fails opaquely
 make atd                      - Shorthand -> agent-test-debug
 make ts-toolchain             - Install the pinned prettier + zod the TypeScript emission gates need
@@ -166,7 +164,6 @@ make tp                       - Shorthand -> test-with-prints
 make tb                       - Shorthand -> `make test-with-prints TEST=test_boot`
 make test-inference           - Run unit tests only for inference (with prints)
 make ti                       - Shorthand -> test-inference
-make ticc                     - Shorthand -> test config coverage (all Portkey configs)
 make tip                      - Shorthand -> test-inference-with-prints (parallelized inference tests)
 make test-llm			      - Run unit tests only for llm (with prints)
 make tl                       - Shorthand -> test-llm
@@ -184,6 +181,10 @@ make subject-grant            - Record a subject grant (FUNC="<path>::<qualname>
 make sgr                      - Shorthand -> subject-grant
 make check-hub-layering       - Enforce the runtime_hub / interpreter_hub layering boundary
 make chl                      - Shorthand -> check-hub-layering
+make check-rich-imports       - Refuse a module-level Rich import or reach outside pipelex/cli/ (Rich is the cli extra)
+make cri                      - Shorthand -> check-rich-imports
+make check-actions-allowlist  - Refuse a workflow action outside the committed Actions allowlist
+make caa                      - Shorthand -> check-actions-allowlist
 make check-TODOs              - Check for TODOs
 
 make docs                     - Serve documentation locally with mkdocs
@@ -223,14 +224,14 @@ export HELP
 .PHONY: \
 	all help env env-verbose check-uv check-uv-verbose lock install update build \
 	format lint ruff-format ruff-lint pyright mypy pylint plxt plxt-format plxt-lint \
-    rules rules-claude-standalone up-kit-configs ukc check-config-sync ccs check-keyword-only cko fix-keyword-only fko subject-grant sgr check-hub-layering chl check-rules check-urls cu insert-skeleton \
+    rules rules-claude-standalone up-kit-configs ukc check-config-sync ccs check-keyword-only cko fix-keyword-only fko subject-grant sgr check-hub-layering chl check-rich-imports cri check-actions-allowlist caa check-rules check-urls cu insert-skeleton \
 	drift-plan dp drift-check dc drift-ack da \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
 	test-llm tl test-img-gen tg test-extract te codex-tests gha-tests \
 	store-test-durations std store-test-durations-force stdf \
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
-	validate v check c cc agent-check agent-test agent-test-debug atd \
+	validate v check c cc agent-check agent-test agent-test-debug atd api-agent-check api-agent-test \
 	test-durations td test-durations-serial tds test-time tt test-time-serial tts \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright merge-check-plxt-format merge-check-plxt-lint \
 	li check-unused-imports fix-unused-imports check-TODOs check-uv \
@@ -240,7 +241,7 @@ export HELP
 	check-ledger cl check-migration-schemas cmig up-migration-schemas up-migration-schemas-force umig umigf \
 	generate-error-pages generate-error-pages-quiet gep \
 	generate-error-identity generate-error-identity-quiet gei \
-	update-gateway-models update-gateway-models-quiet ugm check-gateway-models cgm up \
+	up \
 	test-count check-test-badge \
 	ts-toolchain test-ts-gates ttg \
 	serve-graph serve-graph-bg stop-graph-server view-graph sg vg \
@@ -349,9 +350,15 @@ cu: env
 # Kit configs are mirrored from .pipelex/ by the pipelex-dev CLI, which derives its
 # exclude list from the single source of truth in pipelex/kit/paths.py — the same sets
 # `make check-config-sync` enforces, so a sync is always followed by a passing check.
+# The api/ server serves the models of its own vendored copy of the kit's inference tree,
+# so the same step carries a kit change there too, keeping the server's own choices (its
+# backend switches, its x_custom deck files); `make -C api kit-check`, part of the gate,
+# fails a change that skipped it. The script only imports pipelex, so the root venv runs it.
 up-kit-configs: env
 	$(call PRINT_TITLE,"Updating kit configs from .pipelex/")
 	$(VENV_PIPELEX_DEV) sync-kit-configs
+	$(call PRINT_TITLE,"Re-syncing the vendored inference tree of the api/ server from the kit")
+	$(VENV_PYTHON) api/scripts/sync_vendored_kit.py api/.pipelex
 
 ukc: up-kit-configs
 	@echo "> done: ukc = up-kit-configs"
@@ -396,6 +403,20 @@ check-hub-layering: env
 chl: check-hub-layering
 	@echo "> done: chl = check-hub-layering"
 
+check-rich-imports: env
+	$(call PRINT_TITLE,"Refusing module-level Rich imports and reaches outside pipelex/cli/")
+	$(VENV_PIPELEX_DEV) check-rich-imports --quiet
+
+cri: check-rich-imports
+	@echo "> done: cri = check-rich-imports"
+
+check-actions-allowlist: env
+	$(call PRINT_TITLE,"Refusing workflow actions the Actions allowlist does not name")
+	$(VENV_PIPELEX_DEV) check-actions-allowlist --quiet
+
+caa: check-actions-allowlist
+	@echo "> done: caa = check-actions-allowlist"
+
 drift-plan: env
 	$(VENV_PIPELEX_DEV) drift plan $(CONTRACT)
 
@@ -412,7 +433,7 @@ dc: drift-check
 drift-ack: env
 	$(call PRINT_TITLE,"Recording drift ack")
 	@if [ -z "$(CONTRACT)" ] || [ -z "$(RATIONALE)" ]; then \
-		echo 'Usage: make drift-ack CONTRACT=<contract-id> RATIONALE="…" [BY=<reviewer>]'; \
+		echo 'Usage: make drift-ack CONTRACT=<contract-id> RATIONALE="<real-catch|clean-pass|friction>: …" [BY=<reviewer>]'; \
 		exit 1; \
 	fi
 	$(VENV_PIPELEX_DEV) drift ack "$(CONTRACT)" --rationale "$(RATIONALE)" $(if $(BY),--by "$(BY)")
@@ -493,23 +514,6 @@ generate-error-identity-quiet: env
 
 gei: generate-error-identity
 	@echo "> done: gei = generate-error-identity"
-
-update-gateway-models: env
-	$(call PRINT_TITLE,"Updating gateway models reference")
-	$(VENV_PIPELEX_DEV) update-gateway-models
-
-update-gateway-models-quiet: env
-	$(VENV_PIPELEX_DEV) update-gateway-models --quiet
-
-ugm: update-gateway-models
-	@echo "> done: ugm = update-gateway-models"
-
-check-gateway-models: env
-	$(call PRINT_TITLE,"Checking gateway models reference is up-to-date")
-	$(VENV_PIPELEX_DEV) check-gateway-models --quiet
-
-cgm: check-gateway-models
-	@echo "> done: cgm = check-gateway-models"
 
 sync-main-config: env
 	$(call PRINT_TITLE,"Syncing main config to kit and project configs")
@@ -792,12 +796,6 @@ tip: test-inference-with-prints
 ti: test-inference-fast
 	@echo "> done: ti-fast = test-inference-fast"
 
-ticc: env
-	$(call PRINT_TITLE,"Config coverage inference testing")
-	@$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile all_configs_gw --quiet
-	$(VENV_PYTEST) -n auto --pipe-run-mode live -m "inference" -s -rfE -k "TestConfigCoverage" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,)))
-	@echo "> done: ticc = test-inference config coverage (all Portkey configs)"
-
 ti-dry: env
 	$(call PRINT_TITLE,"Unit testing")
 	@if [ -n "$(TEST)" ]; then \
@@ -890,6 +888,18 @@ agent-test: env
 	rm -f "$$tmpfile"; \
 	if [ $$exit_code -eq 0 ]; then echo "• All tests passed."; fi; \
 	exit $$exit_code
+	@$(MAKE) --no-print-directory api-agent-test
+
+# The Pipelex API server is the `api/` workspace member (see api/CLAUDE.md). It keeps its own
+# environment (`api/.venv`, provisioned by its own `install` on the first run) and its own gates, which
+# the root `agent-check` and `agent-test` run after pipelex's: the server runs the library of the same
+# commit, so a library change that breaks the server, moves its OpenAPI artifact or leaves its vendored
+# inference tree behind fails here, in the same change.
+api-agent-check:
+	@$(MAKE) --no-print-directory -C api agent-check
+
+api-agent-test:
+	@$(MAKE) --no-print-directory -C api agent-test
 
 # Debug variant of agent-test for when the suite hangs or fails opaquely.
 # Use this instead of agent-test when:
@@ -1263,20 +1273,20 @@ vg: view-graph
 c: check-keyword-only format lint pyright mypy
 	@echo "> done: c = check"
 
-cc: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet generate-corpus-vocabulary-quiet update-gateway-models-quiet c
-	@echo "> done: cc = cleanderived regenerate-test-models generate-mthds-schema generate-corpus-vocabulary update-gateway-models format lint pyright mypy"
+cc: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet generate-corpus-vocabulary-quiet c
+	@echo "> done: cc = cleanderived regenerate-test-models generate-mthds-schema generate-corpus-vocabulary format lint pyright mypy"
 
 # `up-migration-schemas` is deliberately NOT part of this aggregate. Every other regenerator here
 # rewrites a derived artifact from a live source; the migration head golden is a *proof obligation*
 # the coverage gate reads, so folding it into a habitual bulk regeneration would let a removal be
 # erased by muscle memory. Run `make umig` on purpose, and read its diff.
-up: generate-mthds-schema-quiet generate-corpus-vocabulary-quiet update-gateway-models-quiet up-kit-configs rules
-	@echo "> done: up = generate-mthds-schema generate-corpus-vocabulary update-gateway-models up-kit-configs rules"
+up: generate-mthds-schema-quiet generate-corpus-vocabulary-quiet up-kit-configs rules
+	@echo "> done: up = generate-mthds-schema generate-corpus-vocabulary up-kit-configs rules"
 
-check: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet check-unused-imports check-config-sync check-rules check-urls check-gateway-models check-mthds-schema check-ledger check-migration-schemas check-keyword-only check-hub-layering drift-check format lint pyright mypy pylint
+check: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet check-unused-imports check-config-sync check-rules check-urls check-mthds-schema check-ledger check-migration-schemas check-keyword-only check-hub-layering check-rich-imports check-actions-allowlist drift-check format lint pyright mypy pylint
 	@echo "> done: check"
 
-agent-check: fix-unused-imports fix-keyword-only format lint pyright mypy check-ledger check-keyword-only check-hub-layering drift-check
+agent-check: fix-unused-imports fix-keyword-only format lint pyright mypy check-ledger check-keyword-only check-hub-layering check-rich-imports check-actions-allowlist drift-check api-agent-check
 	@echo "> done: agent-check"
 
 v: validate

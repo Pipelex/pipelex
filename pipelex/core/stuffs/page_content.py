@@ -1,13 +1,15 @@
+from typing import TYPE_CHECKING
+
 from pydantic import Field
-from rich.console import Group
-from rich.markdown import Markdown
-from rich.text import Text
 from typing_extensions import override
 
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
-from pipelex.tools.misc.pretty import PrettyPrintable
+from pipelex.tools.misc.pretty import require_rich_for_rendering
+
+if TYPE_CHECKING:
+    from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class PageContent(StructuredContent):
@@ -17,7 +19,12 @@ class PageContent(StructuredContent):
     page_view: ImageContent | None = Field(default=None, description="The screenshot of the page")
 
     @override
-    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
+        require_rich_for_rendering()
+        from rich.console import Group
+        from rich.markdown import Markdown
+        from rich.text import Text
+
         # If there's no page_view, just return the text_and_images rendering
         if self.page_view is None:
             return self.text_and_images.rendered_pretty(depth=depth)

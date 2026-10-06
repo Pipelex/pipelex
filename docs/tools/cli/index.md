@@ -7,6 +7,16 @@ description: "Master the `pipelex` runtime CLI and understand where the `mthds` 
 
 The `pipelex` CLI is the runtime and project-configuration CLI for Pipelex. Use it to initialize config, validate methods, run pipes, inspect the runtime state, and generate supporting files.
 
+## Installation
+
+The CLI renders its tables, panels and log lines through Rich, which is the `cli` extra, so install the package with it:
+
+```bash
+uv tool install "pipelex[cli]"
+```
+
+The same extra serves the [`pipelex-agent`](agent-cli.md) CLI. A process that only embeds Pipelex, a server for instance, installs the package without it; see [Rich Imports](../../contribute/rich-imports.md) for what that process gives up and how the runtime keeps Rich out of it.
+
 ## Overview
 
 The Pipelex CLI is organized into several command groups:
@@ -14,14 +24,14 @@ The Pipelex CLI is organized into several command groups:
 | Command | Description |
 |---------|-------------|
 | [**init**](init.md) | Initialize Pipelex configuration |
-| [**update**](update.md) | Refresh the model deck to match the installed pipelex version |
+| [**update**](update.md) | Refresh the model deck and `backends/internal.toml` to match the installed pipelex version |
 | [**migrate**](migrate.md) | Bring your configuration files up to the schema the installed version expects |
 | [**validate**](validate.md) | Validate configuration and pipelines |
 | [**fix**](fix.md) | Apply deterministic safe fixes to a bundle and re-validate |
 | [**show**](show.md) | Inspect configuration, pipes, and AI models |
 | [**run**](run.md) | Execute pipelines |
 | [**run method by address**](run-by-address.md) | Fetch and run a method straight from a public GitHub repository |
-| [**build**](build/index.md) | Generate pipelines, runners, and structures |
+| [**build**](build/index.md) | Generate concept structures and example inputs and outputs for a pipe |
 
 ## Global flags
 

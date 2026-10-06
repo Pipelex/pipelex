@@ -1,17 +1,15 @@
-"""A dependency package's own in-body refs are qualified to the dependency's own domain.
+"""A dependency package's own in-body refs are qualified to its own domain, under the alias it is loaded as.
 
 The dependency loader builds its own crate and its own child library — it does not go through
 `load_from_crate` — so it is a second, independent crate-to-pipes path, and the qualification pass
-has to be wired into both. A miss on this one is invisible: every other test in this suite loads a
-single-domain library, where a bare ref and an owner-qualified ref name the same pipe, so nothing
-observes the difference. Removing the pass from the dependency path reddens *nothing* in the whole
-suite without this module — which is exactly why it exists.
+has to be wired into both. A miss on this one is invisible to every test that loads a single-domain
+library, where a bare ref and an owner-qualified ref name the same pipe — which is why this module
+exists.
 
-What this does NOT claim: that a dependency's bare sub-pipe ref *resolves* at run time. It does not,
-and that is a pre-existing defect deferred to the packaging project (execution consults the host
-library unconditionally, with no package scope). The claim here is narrower and is the part this
-change owns — the ref stored on the built pipe is the dependency's own qualified ref, which is what
-makes the eventual package-scoped lookup a direct key hit in the child library.
+The ref stored on the built pipe is `alias->domain.code`, the key the consumer's library holds the
+dependency's pipe under, so every reader of the ref reaches the package's own pipe and never a
+consumer pipe of the same `domain.code`. That the ref resolves end to end, at load and in a dry run,
+is pinned by `tests/integration/pipelex/libraries/test_dependency_pipe_scope.py`.
 """
 
 from pathlib import Path
@@ -74,6 +72,7 @@ class TestDependencyRefQualification:
         manager = LibraryManager()
         manager._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             library=library,
+            package_address="github.com/org/charts-dep",
             resolved_dep=ResolvedDependency(
                 alias="charts_dep",
                 address="github.com/org/charts-dep",
@@ -100,5 +99,6 @@ class TestDependencyRefQualification:
         render_chart = child_library.pipe_library.get_required_pipe("charts_dep.render_chart")
 
         # Its own domain's helper — not the sibling's, and not a bare code the strict lookup would
-        # never resolve.
-        assert render_chart.pipe_dependencies() == {"charts_dep.prepare_series"}
+        # never resolve — under the alias, the key the consumer's library holds it under.
+        assert render_chart.pipe_dependencies() == {"charts_dep->charts_dep.prepare_series"}
+        assert library.pipe_library.get_required_pipe(pipe_code="charts_dep->charts_dep.prepare_series").domain_code == "charts_dep"

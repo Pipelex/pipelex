@@ -1,0 +1,20 @@
+domain      = "catalog_index"
+description = "Listing the caption of every photograph in a catalog"
+main_pipe   = "index_views"
+
+[pipe.index_views]
+type = "PipeSequence"
+description = "Binds the views of every page, then writes one index line per view"
+inputs = { pages = "Page[]" }
+output = "Text[]"
+steps = [
+  { from = "pages.page_view", result = "page_views" },
+  { pipe = "write_index_line", batch_over = "page_views", batch_as = "page_view", result = "index_lines" },
+]
+
+[pipe.write_index_line]
+type        = "PipeCompose"
+description = "Writes the index line for one photograph"
+inputs      = { page_view = "Image" }
+output      = "Text"
+template    = "Photograph: {{ page_view.caption }}"

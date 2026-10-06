@@ -16,12 +16,15 @@ from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBluepri
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
+from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 from pipelex.pipe_machinery.pipe_blueprint import normalize_typeless_signature_section
 from pipelex.pipe_machinery.validation import is_pipe_code_valid
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
+from pipelex.pipe_operators.doc_gen.pipe_doc_gen_blueprint import PipeDocGenBlueprint
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
+from pipelex.pipe_operators.judge.pipe_judge_blueprint import PipeJudgeBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_operators.search.pipe_search_blueprint import PipeSearchBlueprint
 from pipelex.pipe_operators.structure.pipe_structure_blueprint import PipeStructureBlueprint
@@ -60,7 +63,9 @@ PipeBlueprintUnion = Annotated[
     | PipeLLMBlueprint
     | PipeExtractBlueprint
     | PipeSearchBlueprint
+    | PipeJudgeBlueprint
     | PipeStructureBlueprint
+    | PipeDocGenBlueprint
     | PipeBatchBlueprint
     | PipeConditionBlueprint
     | PipeParallelBlueprint
@@ -215,7 +220,9 @@ class PipelexBundleBlueprint(BaseModel):
         for pipe_code, pipe_blueprint in self.pipe.items():
             if isinstance(pipe_blueprint, PipeSequenceBlueprint):
                 for step_index, step in enumerate(pipe_blueprint.steps):
-                    pipe_refs.append((step.pipe, f"pipe.{pipe_code}.steps[{step_index}].pipe"))
+                    # A binding step names no pipe, only a path in working memory.
+                    if isinstance(step, SubPipeBlueprint):
+                        pipe_refs.append((step.pipe, f"pipe.{pipe_code}.steps[{step_index}].pipe"))
             elif isinstance(pipe_blueprint, PipeBatchBlueprint):
                 pipe_refs.append((pipe_blueprint.branch_pipe_code, f"pipe.{pipe_code}.branch_pipe_code"))
             elif isinstance(pipe_blueprint, PipeConditionBlueprint):

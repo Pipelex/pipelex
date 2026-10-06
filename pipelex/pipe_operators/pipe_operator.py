@@ -1,10 +1,13 @@
 from abc import abstractmethod
+from collections.abc import Generator
+from contextlib import contextmanager
 from typing import TYPE_CHECKING, Generic, Literal, TypeVar, final
 
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import ModelNotFoundError, ModelWaterfallError
+from pipelex.cogt.exceptions import ModelChoiceNotFoundError, ModelNotFoundError, ModelWaterfallError
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
@@ -25,6 +28,28 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
     @property
     def class_name(self) -> str:
         return self.__class__.__name__
+
+    @final
+    @contextmanager
+    def locating_model_choice(self, *, field_name: str) -> Generator[None, None, None]:
+        """Run a model deck check, raising its refusal located on this pipe and on the field that names the model.
+
+        Every operator that names a model checks it against the deck when it is built, through this one
+        wrapper, so an unknown model gives the same located ``PipeOperatorModelChoiceError`` whatever the
+        pipe type — which bundle validation turns into one ``unknown_model`` item. ``field_name`` is the
+        blueprint field the reference was written in (``model``, or ``model_to_structure`` on a
+        ``PipeLLM``), the key a fix rewrites.
+        """
+        try:
+            yield
+        except ModelChoiceNotFoundError as model_choice_error:
+            raise PipeOperatorModelChoiceError.make_from_model_choice_not_found(
+                model_choice_error=model_choice_error,
+                pipe_type=self.class_name,
+                pipe_code=self.code,
+                domain_code=self.domain_code,
+                field_name=field_name,
+            ) from model_choice_error
 
     @final
     @override

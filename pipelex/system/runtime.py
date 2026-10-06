@@ -19,46 +19,6 @@ class IntegrationMode(StrEnum):
     PYTEST = "pytest"
     PYTHON = "python"
 
-    @property
-    def requires_terms_acceptance(self) -> bool:
-        match self:
-            case IntegrationMode.CI:
-                return False
-            case IntegrationMode.CLI:
-                return True
-            case IntegrationMode.DOCKER:
-                return True
-            case IntegrationMode.FASTAPI:
-                return True
-            case IntegrationMode.MCP:
-                return True
-            case IntegrationMode.N8N:
-                return True
-            case IntegrationMode.PYTEST:
-                return True
-            case IntegrationMode.PYTHON:
-                return True
-
-    @property
-    def is_test_harness(self) -> bool:
-        """Whether this is a mode only test suites and conformance scripts boot in.
-
-        The boot keeps the Pipelex Gateway telemetry stream off in these modes, so a test run never
-        reports to the production analytics project.
-        """
-        match self:
-            case IntegrationMode.CI | IntegrationMode.PYTEST:
-                return True
-            case (
-                IntegrationMode.CLI
-                | IntegrationMode.DOCKER
-                | IntegrationMode.FASTAPI
-                | IntegrationMode.MCP
-                | IntegrationMode.N8N
-                | IntegrationMode.PYTHON
-            ):
-                return False
-
 
 class RunMode(StrEnum):
     NORMAL = "normal"

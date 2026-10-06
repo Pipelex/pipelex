@@ -19,6 +19,7 @@ from pipelex.methods.exceptions import MethodRefError
 from pipelex.methods.fetching import fetch_method_package
 from pipelex.methods.method_ref import looks_like_method_ref, parse_method_ref
 from pipelex.methods.structures_check import (
+    STRUCTURES_REFUSAL_REMEDY,
     STRUCTURES_REFUSAL_RULE,
     describe_structured_content_violations,
     scan_structured_content_classes,
@@ -149,7 +150,7 @@ def resolve_method_from_ref(ref_str: str) -> InstalledMethod:
         details = describe_structured_content_violations(violations=violations)
         typer.secho(
             f"Warning: this method declares Python structure classes ({details}). It runs locally, but {STRUCTURES_REFUSAL_RULE} — "
-            f"hosted execution would refuse it. Express the types as MTHDS concepts to keep the method hosted-runnable.",
+            f"hosted execution would refuse it. {STRUCTURES_REFUSAL_REMEDY}",
             fg=typer.colors.YELLOW,
             err=True,
         )

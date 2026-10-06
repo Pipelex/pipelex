@@ -7,7 +7,7 @@ and every consumer that has to *materialise* the input (a form, an API client, a
 inventing a meaning. That is what this lint names, on the report's advisory `warnings` array, so it
 never flips `is_valid`.
 
-Two scoping decisions define the rule, both stated in `wip/full-optional/design.md`:
+Two scoping decisions define the rule:
 
 - **Entry pipes only.** The smell exists at the boundary where a caller has to conjure the value —
   the bundle's declared `main_pipe`. On an inner pipe the slot is fed by dataflow, and an
@@ -21,7 +21,7 @@ Two scoping decisions define the rule, both stated in `wip/full-optional/design.
   restated here.
 
 Nested structures are judged **one level deep**: a required field that is itself an all-optional
-object does not warn in this version (design §7 — the transitive notion's boundary is arguable, and
+object does not warn in this version (the transitive notion's boundary is arguable, and
 a lint whose boundary is arguable is a lint that gets ignored).
 """
 

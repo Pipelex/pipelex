@@ -78,16 +78,26 @@ Write a brief about this topic: $topic
 - **A presence block** — `{% if enriched %} ... {% endif %}` (any reference inside the block is guarded, including `$enriched` and attribute access).
 - **An inline presence conditional** — `{{ enriched.text if enriched else "no enrichment" }}`.
 
-The guard-lint covers every pipe that renders authored templates over its inputs: PipeLLM (prompt and system prompt), PipeCompose (template mode), PipeCondition (expression), PipeSearch, and PipeImgGen.
+The guard-lint covers every pipe that renders authored templates over its inputs: PipeLLM (prompt and system prompt), PipeCompose (template mode), PipeCondition (expression), PipeSearch, PipeJudge (question), and PipeImgGen.
 
 ## Controllers Under Absence
 
 Each controller has a defined behavior when a value inside its flow resolves absent:
 
-- **PipeSequence** — steps consuming an absent value plainly are lifted (skipped), and the absence propagates step to step. The sequence's own declared output must account for it: if the last producing step can be lifted, the sequence output must be declared `?` (otherwise `optional_not_handled`).
+- **PipeSequence** — steps consuming an absent value plainly are lifted (skipped), and the absence propagates step to step. The sequence's own declared output must account for it: if the last producing step can be lifted, the sequence output must be declared `?` (otherwise `optional_not_handled`). A name a nested sequence, a condition's outcome or an `add_each_output` parallel stores in the sequence's memory carries its absence the same way, and a nested controller that is lifted records an absence for every name it always stores (an empty list for a list), so a later step reading one is lifted in turn.
 - **PipeCondition** — the `continue` outcome resolves the declared output as a **declared-absent** record (memory otherwise unchanged). A condition that can reach `continue` must declare its output `?` (`optional_output_required`). See [PipeCondition](pipe-controllers/PipeCondition.md).
 - **PipeParallel** — combining under absence: a `Composite` output omits the absent component (with a ledger note); a structured output absorbs an absent branch into a non-required field as that field's declared default; a **required** field fed by a maybe-absent branch is rejected statically (`optional_branch_required_field`). See [PipeParallel](pipe-controllers/PipeParallel.md).
 - **PipeBatch** — absent branch results are **compacted** out of the aggregated list (a list cannot hold a hole). See [PipeBatch](pipe-controllers/PipeBatch.md).
+
+### Binding steps under absence
+
+A [binding step](pipe-controllers/PipeSequence.md#binding-steps) of a PipeSequence, `{ from = "delivery.note", result = "note" }`, can find nothing, and records it the way a pipe records an absent output:
+
+- **The path reaches a field holding nothing.** When `delivery.note` holds nothing, or `invoice.scan.url` is read from an invoice with no `scan`, the result is recorded as **declared-absent**, and the reason names the binding step, the sequence and the segment that held nothing (`'invoice.scan'`). The step does not fail.
+- **The root is absent.** When `delivery` is itself absent, for instance an optional method input the caller did not provide, the binding is **skipped** like a pipe whose plain input is absent, and its record chains to the root's own record, so the provenance runs from the result back to where the absence entered the flow.
+- **A list result is never absent.** A binding that crosses a list drops the items holding nothing and may bind an empty list, and over an absent root it binds an empty list, keeping the skip as a note.
+
+Statically, a single result is **maybe-absent** when its path walks a field that is not `required` and has no default, or, on a concept whose structure is a Python class, a field whose annotation admits `None` (`str | None`), even a required one. It then flows like any maybe-absent value: a later step reading it as a plain input may be lifted, a step reading it as `X?` runs with its guard, and a sequence ending with it, or with a step it may lift, declares its output `?` or is refused with `optional_not_handled`, whose message names the binding step as the absence origin. A `required` field, or one with a default, binds a value that is never absent.
 
 ## The Static Safety Net
 
@@ -104,7 +114,7 @@ You never discover an unhandled absence at run time. Validation walks every cont
 Two more facts surface on the **valid** report (`pipelex validate`, the agent CLI, and the API) — the first about optionality, the second a mixed bag of advisories that the same report carries:
 
 - **`liftable_pipes`** — every pipe that may be silently skipped at run time, with the slots whose absence triggers the skip and where that absence can come from. Implicit lifting is acceptable *because* it is visible at build time.
-- **`warnings`** — advisory lints that never flip the verdict, spanning optionality and the intent-hint vocabulary alike. Every whole-bundle validate channel carries the same set — the protocol report, the agent CLI, the builder's per-bundle operations, and the bare CLI's `validate bundle` and `validate --all`. (`pipelex validate <PIPE_CODE>` makes no bundle-wide claim and prints none of them; neither does the builder's `validate_all`, which carries no `warnings` key at all.)
+- **`warnings`** — advisory lints that never flip the verdict, spanning optionality and the intent-hint vocabulary alike. Every whole-bundle validate channel carries the same set — the protocol report, the agent CLI, and the bare CLI's `validate bundle` and `validate --all`. (`pipelex validate <PIPE_CODE>` makes no bundle-wide claim and prints none of them.)
 
     - `optional_force_redundant` — a `!` whose slot is guaranteed present in every analyzed flow, so the assertion can never fire and the marker is dead weight.
     - `input_presence_vacuous` — a **method input** (an input of the bundle's declared `main_pipe`) that must be supplied, but whose concept declares no required field. The empty object satisfies it, so the declaration enforces nothing and a caller cannot tell what to fill in. Either mark the input `?`, or give the concept a required field. See [Inline Structures](../concepts/inline-structures.md#all-optional-structures-and-the-input_presence_vacuous-lint).

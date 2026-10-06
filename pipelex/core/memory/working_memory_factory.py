@@ -6,7 +6,6 @@ from polyfactory.exceptions import FactoryException
 from pydantic import BaseModel, ValidationError
 
 from pipelex import log
-from pipelex.cogt.content_generation.dry_mock import stamp_mock_main_coordination
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.core.memory.exceptions import WorkingMemoryFactoryError
@@ -21,12 +20,10 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.runtime_hub import get_class_registry
 
-# Field names that require snake_case format for pipelex bundle specs
-# Note: main_pipe is NOT included here because BundleHeaderSpec.main_pipe has
-# examples=["mock_main"] that should take precedence to coordinate with pipe_specs mocking
+# Field names whose mocked values must be snake_case codes, as MTHDS domain and pipe codes are
 SNAKE_CASE_FIELD_NAMES = {"domain", "domain_code", "pipe_code"}
 
-# Field names that require PascalCase format for pipelex concept specs
+# Field names whose mocked values must be PascalCase codes, as MTHDS concept codes are
 PASCAL_CASE_FIELD_NAMES = {"concept_code"}
 
 
@@ -77,6 +74,7 @@ class WorkingMemoryFactory(BaseModel):
         input_specs: InputStuffSpecs | None = None,
         search_scope: str | None = None,
         inputs_base_dir: Path | None = None,
+        read_scope: str | None,
     ) -> WorkingMemory:
         """Create a WorkingMemory from a pipeline inputs dictionary.
 
@@ -99,6 +97,8 @@ class WorkingMemoryFactory(BaseModel):
                 the inputs file's parent when inputs were file-loaded by a CLI. ``None`` for API/SDK
                 and in-process callers (they pass absolute urls / storage uris). Only consulted by
                 the shaper's file-ish / CSV arms.
+            read_scope: The run's read scope, which a table read while shaping must satisfy;
+                ``None`` for an unscoped run. See :mod:`pipelex.tools.uri.uri_read_scope`.
 
         Returns:
             WorkingMemory object reconstructed from the implicit format
@@ -111,6 +111,7 @@ class WorkingMemoryFactory(BaseModel):
                 input_specs=input_specs,
                 search_scope=search_scope,
                 inputs_base_dir=inputs_base_dir,
+                read_scope=read_scope,
             )
 
         working_memory = cls.make_empty()
@@ -121,6 +122,7 @@ class WorkingMemoryFactory(BaseModel):
                 stuff_content_or_data=stuff_content_or_data,
                 concept_provider=concept_provider,
                 search_scope=search_scope,
+                read_scope=read_scope,
             )
             working_memory.add_new_stuff(name=stuff_key, stuff=stuff)
         return working_memory
@@ -209,14 +211,8 @@ class WorkingMemoryFactory(BaseModel):
 
         Uses DryRunFactory to generate mock values with field-specific generators
         for known constrained fields (e.g., domain, pipe_code require snake_case).
-
-        For base classes that have concrete subclasses (like PipeSpec), picks a random
-        subclass for mocking to ensure discriminator fields are valid.
         """
         structure_class = typed_named_stuff_spec.structure_class
-
-        # Check if this is a base class with subclasses and pick a concrete one for mocking
-        structure_class = cls._get_mockable_class(structure_class)
 
         mock_factory = DryRunFactory.make_dry_run_factory(
             object_class=structure_class,
@@ -224,26 +220,6 @@ class WorkingMemoryFactory(BaseModel):
             pascal_case_field_names=PASCAL_CASE_FIELD_NAMES,
         )
         return mock_factory.build(factory_use_construct=True)  # type: ignore[no-any-return]
-
-    @classmethod
-    def _get_mockable_class(cls, structure_class: type[StuffContent]) -> type[StuffContent]:
-        """Get a concrete class to use for mocking.
-
-        If the class has subclasses defined in the same module (indicating it's a base class
-        for a discriminated union), picks a random subclass. Otherwise returns the class as-is.
-        """
-        # Import here to avoid circular imports
-        from pipelex.builder.pipe.pipe_spec import PipeSpec  # ruff: ignore[import-outside-top-level]
-
-        # Check for specific base classes that need special handling
-        if structure_class is PipeSpec:
-            # PipeSpec has many subclasses - pick one that has minimal extra required fields
-            # PipeBatchSpec is chosen as it's commonly used and has straightforward fields
-            from pipelex.builder.pipe.pipe_batch_spec import PipeBatchSpec  # ruff: ignore[import-outside-top-level]
-
-            return PipeBatchSpec
-
-        return structure_class
 
     @classmethod
     def make_mock_stuff(cls, typed_named_stuff_spec: TypedNamedStuffSpec) -> Stuff:
@@ -269,7 +245,6 @@ class WorkingMemoryFactory(BaseModel):
             nb_stuffs = typed_named_stuff_spec.multiplicity
 
         items: list[StuffContent] = [cls.make_mock_content(typed_named_stuff_spec) for _ in range(nb_stuffs)]
-        stamp_mock_main_coordination(items)
 
         mock_list_content = ListContent[StuffContent](items=items)
         return StuffFactory.make_stuff(

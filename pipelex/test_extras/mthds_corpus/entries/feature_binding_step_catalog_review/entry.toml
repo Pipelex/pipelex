@@ -1,0 +1,13 @@
+name = "feature_binding_step_catalog_review"
+description = "A catalog reviewed through several bindings, a batch over bound views, a judge on a bound price and an optional note"
+
+validity = "valid"
+tier = "dry"
+granularity = "composite"
+
+covers = [
+  "feature.binding_step",
+  "feature.optionals",
+  "controller.batch",
+  "operator.judge",
+]

@@ -21,7 +21,6 @@ from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_pipe_in_bundle_core,
 )
 from pipelex.cli.method_resolver import resolve_method_target
-from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.methods.exceptions import MethodRefError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
@@ -93,7 +92,7 @@ def validate_method_cmd(
     if library_dir:
         library_dirs_paths.extend(Path(lib_dir) for lib_dir in library_dir)
 
-    make_pipelex_for_agent_cli(library_dirs=library_dirs_paths, needs_inference=False, needs_model_specs=True)
+    make_pipelex_for_agent_cli(library_dirs=library_dirs_paths, needs_inference=False)
 
     try:
         if pipe:
@@ -128,17 +127,6 @@ def validate_method_cmd(
         # Invalid verdict (see bundle_cmd): format-aware failure surface. JSON keeps the exact
         # structured envelope; markdown renders the items as prose with a fix-aware footer.
         agent_error_validate_bundle(exc, bundle_path=bundle_path, library_dirs=library_dirs_paths, allow_signatures=allow_signatures)
-
-    except PipeOperatorModelChoiceError as exc:
-        agent_error(
-            exc.message,
-            error_type="PipeOperatorModelChoiceError",
-            cause=exc,
-            exit_code=2,
-            pipe_code=exc.pipe_code,
-            model_type=str(exc.model_type),
-            model_choice=str(exc.model_choice),
-        )
 
     except PipeOperatorModelAvailabilityError as exc:
         availability_extra: dict[str, Any] = {

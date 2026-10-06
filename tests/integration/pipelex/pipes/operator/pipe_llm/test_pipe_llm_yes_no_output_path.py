@@ -66,5 +66,17 @@ class TestPipeLLMYesNoOutputPath:
         schema = object_class.model_json_schema()
         assert schema["properties"]["yes_no"]["description"]
 
-        # And the produced verdict is a YesNo, not text.
+        # The model fills the native as pinned: its probability is offered, optional and described, so it
+        # may report its own estimate beside the verdict, within the range the schema states.
+        assert "probability" in schema["properties"]
+        assert "probability" not in schema.get("required", [])
+        assert schema["properties"]["probability"]["description"]
+        probability_arms = schema["properties"]["probability"]["anyOf"]
+        assert {"type": "number", "minimum": 0, "maximum": 1} in probability_arms
+
+        # And the produced verdict is a YesNo, not text, whose verdict is a real boolean.
         assert pipe_output.main_stuff.is_yes_no
+        verdict = pipe_output.main_stuff.content
+        assert isinstance(verdict, YesNoContent)
+        assert isinstance(verdict.yes_no, bool)
+        assert verdict.probability is None or 0 <= verdict.probability <= 1

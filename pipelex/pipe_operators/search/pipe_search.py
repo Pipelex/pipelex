@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, Any, Literal
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.models.model_deck_check import check_search_choice_with_deck
 from pipelex.cogt.search.search_setting import SearchModelChoice
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
@@ -13,7 +12,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.interpreter_hub import get_concept_library
 from pipelex.kernel.search_ops import resolve_search_setting, run_search
 from pipelex.kernel.templating_style_ops import resolve_templating_style
-from pipelex.pipe_machinery.template_guard_lint import lint_optional_input_guards
+from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.job_metadata import JobMetadata
@@ -51,14 +50,11 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
     @override
     def validate_inputs_static(self):
         if self.search_choice:
-            try:
+            with self.locating_model_choice(field_name="model"):
                 check_search_choice_with_deck(search_choice=self.search_choice)
-            except ModelChoiceNotFoundError as exc:
-                msg = f"Search choice '{self.search_choice}' was not found in the model deck"
-                raise ValueError(msg) from exc
 
-        # Guard-lint (D7): every reference to a declared-optional input must be guarded.
-        lint_optional_input_guards(
+        # Template lints: no private names, and every reference to a declared-optional input guarded (D7).
+        lint_authored_template(
             pipe_code=self.code,
             domain_code=self.domain_code,
             inputs=self.inputs,

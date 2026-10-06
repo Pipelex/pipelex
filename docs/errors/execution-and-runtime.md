@@ -25,13 +25,14 @@ own page. Classes are grouped by subsystem.
 
 ## Pipeline execution
 
-- [`FixTransactionError`](fix-transaction-error.md) — Fix transaction
-- [`FixWriteConflictError`](fix-write-conflict-error.md) — Fix write conflict
 - [`PipeExecutionError`](pipe-execution-error.md) — Pipe execution
 - [`PipeIOContractError`](pipe-io-contract-error.md) — Pipe IO contract
 - [`PipeStackOverflowError`](pipe-stack-overflow-error.md) — Pipe stack overflow
 - [`PipelineExecutionError`](pipeline-execution-error.md) — Pipeline execution
 - [`PipelineInputContentError`](pipeline-input-content-error.md) — Pipeline input content
+- [`PipelineInputFormatError`](pipeline-input-format-error.md) — Pipeline input format
+- [`PipelineInputFormatUnsupportedError`](pipeline-input-format-unsupported-error.md) — Pipeline input format unsupported
+- [`PipelineInputNotAnImageError`](pipeline-input-not-an-image-error.md) — Pipeline input not an image
 - [`PipelineInputUrlInvalidError`](pipeline-input-url-invalid-error.md) — Pipeline input url invalid
 - [`PipelineInputUrlMissingError`](pipeline-input-url-missing-error.md) — Pipeline input url missing
 - [`PipelineManagerAlreadyExistsError`](pipeline-manager-already-exists-error.md) — Pipeline manager already exists

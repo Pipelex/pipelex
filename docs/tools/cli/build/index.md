@@ -1,16 +1,15 @@
 ---
-description: "Generate runner code, Pydantic structures, and JSON templates from your pipeline definitions using the Pipelex build commands."
+description: "Generate Pydantic structures and example input and output templates from your method definitions using the Pipelex build commands."
 ---
 
 # Build Commands
 
-Generate pipelines, runner code, Python structures, and JSON templates from natural language descriptions.
+Generate the Python structures of your concepts and example input and output templates for a pipe, from your `.mthds` definitions.
 
 ## Available Commands
 
 | Command | Description |
 |---------|-------------|
-| [**build runner**](runner.md) | Generate Python code to run a pipe |
 | [**build structures**](structures.md) | Generate the structures (Pydantic models) of your concepts |
 | [**build inputs**](inputs.md) | Generate example input JSON for a pipe |
 | [**build output**](output.md) | Generate example output representation for a pipe (JSON, Python, or JSON Schema) |

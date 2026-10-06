@@ -1,0 +1,39 @@
+domain      = "round_notes"
+description = "Passing on the notes left for the morning and evening delivery rounds"
+main_pipe   = "pass_on_notes"
+
+[concept.DeliveryRound]
+description = "A delivery round driven by one van"
+
+[concept.DeliveryRound.structure]
+driver = { type = "text", description = "Who drives the round", required = true }
+note   = { type = "text", description = "A note left for the driver, when there is one" }
+
+[pipe.pass_on_notes]
+type = "PipeSequence"
+description = "Binds the note of each round, writes the board notice, then the evening reminder when there is a note"
+inputs = { morning_round = "DeliveryRound", evening_round = "DeliveryRound" }
+output = "Text?"
+steps = [
+  { from = "morning_round.note", result = "morning_note" },
+  { from = "evening_round.note", result = "evening_note" },
+  { pipe = "write_board_notice", result = "board_notice" },
+  { pipe = "write_evening_reminder", result = "evening_reminder" },
+]
+
+[pipe.write_board_notice]
+type = "PipeCompose"
+description = "Writes the notice pinned on the depot board, mentioning each note that was left"
+inputs = { morning_note = "Text?", evening_note = "Text?" }
+output = "Text"
+template = """
+{% if morning_note is defined %}Morning: {{ morning_note.text }}{% else %}Morning: no note{% endif %}
+{% if evening_note is defined %}Evening: {{ evening_note.text }}{% else %}Evening: no note{% endif %}
+"""
+
+[pipe.write_evening_reminder]
+type        = "PipeCompose"
+description = "Writes the reminder handed to the evening driver"
+inputs      = { evening_note = "Text" }
+output      = "Text"
+template    = "Reminder for tonight: $evening_note"

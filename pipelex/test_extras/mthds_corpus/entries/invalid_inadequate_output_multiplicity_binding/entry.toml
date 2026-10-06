@@ -1,0 +1,12 @@
+name = "invalid_inadequate_output_multiplicity_binding"
+description = "The views of a catalog's pages bound as a list and returned by a sequence that promises one image"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.inadequate_output_multiplicity",
+]
+
+expected_error = "inadequate_output_multiplicity"

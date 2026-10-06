@@ -60,13 +60,18 @@ def elide_authored_token(*, token: str) -> str:
 def _native_class_value_kind(*, class_name: str) -> HintSiteValueKind:
     """The value kind of a class-backed structure, by native-class identity.
 
-    Mirrors the deriver's `_class_backed_node` lookup: `TextContent` is the native Text payload
-    (text-valued), `NumberContent` the native Number payload (number-valued). Every other class —
-    the remaining natives and registered project classes alike — is not a hint-applicable site.
+    Mirrors the deriver's `_class_backed_node` lookup: `TextContent` is the native Text payload and
+    `MarkdownContent` the native Markdown one, which refines Text (both text-valued, both `prose` in the
+    descriptor), `NumberContent` the native Number payload (number-valued). Every other class — the
+    remaining natives and registered project classes alike — is not a hint-applicable site. The verdict
+    natives `YesNo`, `Choice` and `Rating` are structured sites where no intent word applies, `Rating`
+    included despite its number-valued level.
+    One divergence is open (L-260930-173b03): the deriver reflects a registered `RootModel` over a
+    scalar as its root value, which this lookup still classifies as OTHER.
     """
     native_code = next((code for code in NativeConceptCode if code.structure_class_name == class_name), None)
     match native_code:
-        case NativeConceptCode.TEXT:
+        case NativeConceptCode.TEXT | NativeConceptCode.MARKDOWN:
             return HintSiteValueKind.TEXT_VALUED
         case NativeConceptCode.NUMBER:
             return HintSiteValueKind.NUMBER_VALUED
@@ -77,6 +82,8 @@ def _native_class_value_kind(*, class_name: str) -> HintSiteValueKind:
             | NativeConceptCode.HTML
             | NativeConceptCode.TEXT_AND_IMAGES
             | NativeConceptCode.YES_NO
+            | NativeConceptCode.CHOICE
+            | NativeConceptCode.RATING
             | NativeConceptCode.DATE
             | NativeConceptCode.TIME
             | NativeConceptCode.PAGE
@@ -241,6 +248,11 @@ class _HintLinter:
             seen.add(current_ref)
             if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=current_ref):
                 native_ref = NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=current_ref)
+                refined_native = NativeConceptCode(QualifiedRef.parse(native_ref).local_code).refined_native
+                if refined_native is not None:
+                    # A native refining another (`Markdown` refines `Text`) classifies like the native it refines.
+                    current_ref = refined_native.concept_ref
+                    continue
                 if native_ref == _NATIVE_TEXT_REF:
                     return HintSiteValueKind.TEXT_VALUED
                 if native_ref == _NATIVE_NUMBER_REF:
@@ -261,9 +273,9 @@ class _HintLinter:
                 return HintSiteValueKind.TEXT_VALUED
             if isinstance(value.structure, str):
                 # Class-backed: a native class name maps by identity to its native's value kind,
-                # mirroring the input-form deriver's judgment for resolvable sites (the known
-                # divergences are recorded in wip/engine-hints/deferred.md). Any other registered
-                # class is an object payload, hence OTHER.
+                # mirroring the input-form deriver's judgment for resolvable sites. Any other
+                # registered class is classified OTHER, though the deriver reflects a `RootModel`
+                # over a scalar as its root value (L-260930-173b03).
                 return _native_class_value_kind(class_name=value.structure)
             return HintSiteValueKind.OTHER
 

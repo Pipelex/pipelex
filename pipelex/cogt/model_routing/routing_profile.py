@@ -1,16 +1,8 @@
-from enum import StrEnum
-
 from pydantic import Field
 
 from pipelex.cogt.model_routing.routing_models import BackendMatchForModel, BackendMatchingMethod
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.tools.misc.string_utils import matches_wildcard_pattern
-
-
-class PipelexRoutingProfile(StrEnum):
-    """Special Pipelex routing profiles."""
-
-    ALL_PIPELEX_GATEWAY = "all_pipelex_gateway"
 
 
 class RoutingProfile(ConfigModel):
@@ -34,7 +26,8 @@ class RoutingProfile(ConfigModel):
             Backend name to use for this model
 
         """
-        possible_routes = self.routes
+        # A copy: the enabled optional routes are merged for this match only, never into the declared `routes`.
+        possible_routes = dict(self.routes)
         for pattern, backend in self.optional_routes.items():
             if backend not in enabled_backends:
                 continue

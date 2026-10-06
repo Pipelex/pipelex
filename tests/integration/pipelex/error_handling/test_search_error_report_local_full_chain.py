@@ -7,8 +7,9 @@ mocked to fail, and asserts the resulting ``ErrorReport`` carries the full class
 This is the baseline the Temporal full-chain test
 (``tests/integration/pipelex/temporal/test_workflow_search_error_report_full_chain.py``) must match.
 Both arms assert the same ``SearchErrorReportParityTestData`` constants, so local / Temporal parity holds
-by construction. The search operator does not wrap the leaf error (unlike PipeLLM), so a raw
-``SearchJobFailureError`` (a ``CogtError``) propagates and the ``PipeRouter`` re-raises it as-is.
+by construction. The search operator does not wrap the leaf error (unlike PipeLLM), so the
+``PipeRouter`` locates the raw ``SearchJobFailureError`` (a ``CogtError``) itself, and the report
+carries its identity.
 """
 
 from collections.abc import Generator
@@ -19,6 +20,7 @@ from pytest_mock import MockerFixture
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.cogt.exceptions import SearchJobFailureError
 from pipelex.interpreter_hub import get_pipe_router
+from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.integration.pipelex.error_handling.test_data import SearchErrorReportParityTestData
@@ -43,18 +45,20 @@ class TestSearchErrorReportLocalFullChain:
         mocker: MockerFixture,
         failing_search_pipe_job_local: PipeJob,
     ) -> None:
-        """Local execution surfaces the worker failure as a classified ``SearchJobFailureError``."""
+        """Local execution surfaces the worker failure, located, with the ``SearchJobFailureError``'s classification."""
         mocker.patch.object(
             ContentGenerator,
             "make_search_sourced_answer",
             side_effect=SearchErrorReportParityTestData.make_failing_search_error(),
         )
 
-        with pytest.raises(SearchJobFailureError) as exc_info:
+        with pytest.raises(PipeRouterError) as exc_info:
             await get_pipe_router().run(pipe_job=failing_search_pipe_job_local)
+        assert isinstance(exc_info.value.__cause__, SearchJobFailureError)
 
         # The classification fields — the parity target.
         report = exc_info.value.to_error_report()
+        assert report.error_type == "SearchJobFailureError"
         assert report.error_category == SearchErrorReportParityTestData.FAILURE_CATEGORY
         assert report.retryable == SearchErrorReportParityTestData.EXPECTED_RETRYABLE
         assert report.model == SearchErrorReportParityTestData.FAILURE_MODEL

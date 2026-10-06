@@ -12,6 +12,7 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     agent_error,
     agent_error_validate_bundle,
     agent_success_formatted,
+    run_failure_fields,
     set_agent_cli_error_format,
 )
 from pipelex.cli.agent_cli.commands.bundle_path_resolver import resolve_bundle_target
@@ -19,7 +20,6 @@ from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_bundle_core,
     validate_pipe_in_bundle_core,
 )
-from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.graph.graph_rendering import GraphFormat
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.mthds_parsing.exceptions import MthdsParserError
@@ -98,7 +98,7 @@ def validate_bundle_cmd(
     # Convert library_dirs to list[str] for graph helper
     library_dir_strings = [str(lib_dir) for lib_dir in library_dirs] if library_dirs else None
 
-    make_pipelex_for_agent_cli(library_dirs=library_dirs, needs_inference=False, needs_model_specs=True)
+    make_pipelex_for_agent_cli(library_dirs=library_dirs, needs_inference=False)
 
     try:
         if pipe:
@@ -126,14 +126,13 @@ def validate_bundle_cmd(
                 )
                 result.update(graph_result)
             except PipelineExecutionError as exc:
-                graph_extra: dict[str, Any] = {
-                    "pipe_code": exc.pipe_code,
-                    "pipe_stack": exc.pipe_stack,
-                }
-                if exc.__cause__:
-                    graph_extra["cause_type"] = type(exc.__cause__).__name__
-                    graph_extra["cause_message"] = str(exc.__cause__)
-                agent_error(f"Graph generation failed: {exc.message}", error_type="PipelineExecutionError", cause=exc, exit_code=2, **graph_extra)
+                agent_error(
+                    f"Graph generation failed: {exc.message}",
+                    error_type="PipelineExecutionError",
+                    cause=exc,
+                    exit_code=2,
+                    **run_failure_fields(error=exc),
+                )
             except MthdsParserError as exc:
                 agent_error(f"Graph generation failed: {exc}", error_type=type(exc).__name__, cause=exc, exit_code=2)
             except typer.Exit:
@@ -155,14 +154,13 @@ def validate_bundle_cmd(
                 )
                 result.update(view_result)
             except PipelineExecutionError as exc:
-                view_extra: dict[str, Any] = {
-                    "pipe_code": exc.pipe_code,
-                    "pipe_stack": exc.pipe_stack,
-                }
-                if exc.__cause__:
-                    view_extra["cause_type"] = type(exc.__cause__).__name__
-                    view_extra["cause_message"] = str(exc.__cause__)
-                agent_error(f"View generation failed: {exc.message}", error_type="PipelineExecutionError", cause=exc, exit_code=2, **view_extra)
+                agent_error(
+                    f"View generation failed: {exc.message}",
+                    error_type="PipelineExecutionError",
+                    cause=exc,
+                    exit_code=2,
+                    **run_failure_fields(error=exc),
+                )
             except MthdsParserError as exc:
                 agent_error(f"View generation failed: {exc}", error_type=type(exc).__name__, cause=exc, exit_code=2)
             except typer.Exit:
@@ -199,17 +197,6 @@ def validate_bundle_cmd(
         # non-empty on every invalid verdict); markdown renders those items as prose with a fix-aware
         # footer. Signatures never reach here (they are a runnability fact, gated above).
         agent_error_validate_bundle(exc, bundle_path=Path(bundle_path), library_dirs=library_dirs, allow_signatures=allow_signatures)
-
-    except PipeOperatorModelChoiceError as exc:
-        agent_error(
-            exc.message,
-            error_type="PipeOperatorModelChoiceError",
-            cause=exc,
-            exit_code=2,
-            pipe_code=exc.pipe_code,
-            model_type=str(exc.model_type),
-            model_choice=str(exc.model_choice),
-        )
 
     except PipeOperatorModelAvailabilityError as exc:
         availability_extra: dict[str, Any] = {

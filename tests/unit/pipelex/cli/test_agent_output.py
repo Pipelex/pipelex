@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import datetime
 import json
-from typing import TYPE_CHECKING, Any
+import logging
+from typing import TYPE_CHECKING
 
 import pytest
 import typer
@@ -19,9 +20,8 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     _build_error_source,  # pyright: ignore[reportPrivateUsage]
     agent_error,
     agent_success,
-    consume_setup_warnings,
     extract_validation_errors,
-    record_setup_warning,
+    run_failure_fields,
     set_agent_cli_error_format,
 )
 from pipelex.cogt.exceptions import (
@@ -33,25 +33,29 @@ from pipelex.cogt.exceptions import (
 )
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipe_run.exceptions import PipeRouterError
+from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from pytest_mock import MockerFixture
 
 
 class TestAgentOutput:
     """Tests for agent_error, agent_success, and extract_validation_errors."""
 
     @pytest.fixture(autouse=True)
-    def _drain_warnings_buffer(self) -> Iterator[None]:
-        """Isolate the module-level ``_CAPTURED_WARNINGS`` global across tests.
+    def _restore_logging_cutoff(self) -> Iterator[None]:
+        """Restore the process-global ``logging.disable`` threshold after a test that runs the app.
 
-        The buffer is a process-wide global; without this drain a recorded warning
-        could leak into an unrelated test's envelope.
+        The app callback arms the agent CLI cutoff through ``silence_logging_for_agent_cli``;
+        left in place it silences every log call of every test that runs after this module.
         """
-        consume_setup_warnings()
+        original_disable = logging.root.manager.disable
         yield
-        consume_setup_warnings()
+        logging.disable(original_disable)
 
     def test_agent_error_outputs_json_to_stderr(self, capsys: pytest.CaptureFixture[str]) -> None:
         """agent_error should print valid JSON to stderr and exit with code 1."""
@@ -174,6 +178,25 @@ class TestAgentOutput:
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["error"] is True
         assert parsed["failed_at"] == "2026-02-09T14:00:00"
+
+    def test_run_failure_fields_name_the_location_and_the_root_fault(self) -> None:
+        """A failed run's fields carry the failing pipe, its path, and the root fault's identity and own message."""
+        root_fault = CogtError(message="rate limited", error_category=InferenceErrorCategory.TRANSIENT)
+        located = PipeRouterError.make_located(
+            failure=root_fault, run_mode=PipeRunMode.LIVE, pipe_code="summarize", output_name=None, pipe_stack=["two_steps", "summarize"]
+        )
+        located.__cause__ = root_fault
+        run_failure = PipelineExecutionError.make_for_run_failure(
+            failure=located, run_mode=PipeRunMode.LIVE, entry_pipe_code="two_steps", output_name=None
+        )
+        run_failure.__cause__ = located
+
+        assert run_failure_fields(error=run_failure) == {
+            "pipe_code": "summarize",
+            "pipe_stack": ["two_steps", "summarize"],
+            "cause_type": "CogtError",
+            "cause_message": "rate limited",
+        }
 
     def test_extract_validation_errors_message_only(self) -> None:
         """A message-only error yields one ``blueprint_validation`` residual — the structured-info invariant is total.
@@ -357,7 +380,7 @@ class TestAgentOutput:
         """
         # An error_type in AGENT_ERROR_DOMAINS that is NOT a CogtError subclass, so no derived
         # domain can pre-empt the lookup.
-        error_type = "PipeOperatorModelChoiceError"
+        error_type = "PipeOperatorModelAvailabilityError"
         assert error_type in AGENT_ERROR_DOMAINS, "precondition: error_type must be in AGENT_ERROR_DOMAINS"
 
         cause = CogtError("model not found", error_category=InferenceErrorCategory.UNKNOWN)
@@ -406,80 +429,19 @@ class TestAgentOutput:
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["error_domain"] == "input"
 
-    def test_app_callback_resets_error_format_to_json(self) -> None:
+    def test_app_callback_resets_error_format_to_json(self, mocker: MockerFixture) -> None:
         """The error-format ContextVar must be reset per invocation: a markdown command leaving
         it set must not leak markdown into a later JSON-only command in the same process.
         """
         # Simulate a prior markdown command having left the ContextVar set.
         set_agent_cli_error_format(CliOutputFormat.MARKDOWN)
+        mocker.patch("pipelex.cli.agent_cli.commands.plxt_passthrough.shutil.which", return_value=None)
 
-        # `concept` is a JSON-only command with no --format / --error-format option; invoked with no spec it
-        # errors via agent_error(). Its error must be JSON, proving the callback reset the format.
-        result = CliRunner().invoke(app, ["concept"])
+        # `fmt` is a JSON-only command with no --format / --error-format option; with no plxt binary on the
+        # path it errors via agent_error(). Its error must be JSON, proving the callback reset the format.
+        result = CliRunner().invoke(app, ["fmt", "bundle.mthds"])
 
         assert result.exit_code == 1
         parsed = json.loads(result.stderr)
         assert parsed["error"] is True
-        assert parsed["error_type"] == "ArgumentError"
-
-    # -------------------------------------------------------------------------
-    # Setup-warnings buffer tests (record_setup_warning / consume_setup_warnings
-    # / the warnings-merge branch of agent_success)
-    # -------------------------------------------------------------------------
-
-    def test_agent_success_attaches_recorded_warning(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """A warning recorded via record_setup_warning surfaces in the envelope's warnings array."""
-        record_setup_warning({"type": "RemoteConfigStale", "message": "cache is stale"})
-        agent_success({"success": True})
-
-        parsed = json.loads(capsys.readouterr().out)
-        assert parsed["warnings"] == [{"type": "RemoteConfigStale", "message": "cache is stale"}]
-
-    def test_agent_success_does_not_re_emit_drained_warnings(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """A second agent_success in the same process emits no stale warnings (drain+clear)."""
-        record_setup_warning({"type": "RemoteConfigStale", "message": "cache is stale"})
-        agent_success({"success": True})
-        capsys.readouterr()  # discard the first envelope
-
-        agent_success({"success": True})
-        parsed = json.loads(capsys.readouterr().out)
-        assert "warnings" not in parsed
-
-    def test_consume_setup_warnings_drains_and_clears(self) -> None:
-        """consume_setup_warnings returns the recorded list and empties the buffer."""
-        record_setup_warning({"type": "RemoteConfigStale", "message": "first"})
-        record_setup_warning({"type": "RemoteConfigStale", "message": "second"})
-
-        drained = consume_setup_warnings()
-        assert drained == [
-            {"type": "RemoteConfigStale", "message": "first"},
-            {"type": "RemoteConfigStale", "message": "second"},
-        ]
-        assert consume_setup_warnings() == []
-
-    def test_agent_success_appends_captured_after_caller_warnings(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Caller-supplied result['warnings'] are kept; captured ones are appended after them."""
-        record_setup_warning({"type": "RemoteConfigStale", "message": "captured"})
-        agent_success({"success": True, "warnings": [{"type": "CallerWarning", "message": "caller"}]})
-
-        parsed = json.loads(capsys.readouterr().out)
-        assert parsed["warnings"] == [
-            {"type": "CallerWarning", "message": "caller"},
-            {"type": "RemoteConfigStale", "message": "captured"},
-        ]
-
-    def test_agent_success_tolerates_non_list_caller_warnings(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """A non-list result['warnings'] is treated as empty rather than crashing (isinstance guard)."""
-        record_setup_warning({"type": "RemoteConfigStale", "message": "captured"})
-        agent_success({"success": True, "warnings": "not-a-list"})
-
-        parsed = json.loads(capsys.readouterr().out)
-        assert parsed["warnings"] == [{"type": "RemoteConfigStale", "message": "captured"}]
-
-    def test_agent_success_does_not_mutate_caller_result(self) -> None:
-        """agent_success copies result before merging captured warnings; the caller dict is untouched."""
-        record_setup_warning({"type": "RemoteConfigStale", "message": "captured"})
-        result: dict[str, Any] = {"success": True}
-        agent_success(result)
-
-        assert "warnings" not in result
+        assert parsed["error_type"] == "BinaryNotFoundError"

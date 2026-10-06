@@ -17,12 +17,15 @@ Pre-built universal concepts available in every Pipelex project:
 
 - **Dynamic** — Dynamic typing, resolved at runtime
 - **Text** — Plain text content
+- **Markdown** — A text written in Markdown, which refines Text and is formatted when shown
 - **Image** — Image data (base64, URL, or file path)
 - **Document** — A document container (PDF, image, or other file)
 - **Html** — HTML content
 - **TextAndImages** — Combined text and image content in a single structure
 - **Number** — Numeric value
-- **YesNo** — The answer to a yes/no question
+- **YesNo** — The answer to a yes/no question, with an optional probability
+- **Choice** — One option picked out of a declared set, with optional confidence and probabilities
+- **Rating** — A level on an ordered scale of described levels, with optional measures of uncertainty
 - **Date** — A calendar date, optionally with a time of day
 - **Time** — A time of day, optionally with a UTC offset
 - **Page** — A single page extracted from a document, with markdown text and optional images

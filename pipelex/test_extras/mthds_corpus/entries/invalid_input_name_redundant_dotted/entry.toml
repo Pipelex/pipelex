@@ -1,0 +1,12 @@
+name = "invalid_input_name_redundant_dotted"
+description = "A printed catalog page described by a step that declares the page, and the picture of the page a second time by its path in the page"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.invalid_input_name",
+]
+
+expected_error = "invalid_input_name"

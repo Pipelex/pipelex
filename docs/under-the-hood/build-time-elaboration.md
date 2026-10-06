@@ -55,7 +55,7 @@ Practical consequences:
 
 - Within a single process, after `BundleElaborator.elaborate(...)`, the metadata is available everywhere the bundle goes.
 - Across any serialization boundary — kajson dump, library cache, Temporal payload, MTHDS export — the metadata is gone. Downstream consumers that need it today have to re-elaborate.
-- The dependency loader handles one specific consequence: when a manifest restricts exports, synthetic helpers of exported parents are still loaded, even though they are never named in the manifest. This is implemented inline in `LibraryManager._load_single_dependency`.
+- The dependency loader does not need the metadata: when a manifest restricts exports, the synthetic helpers of an exported parent are still loaded, though the manifest never names them, because the parent's steps call them. `LibraryManager._load_single_dependency` loads every pipe a package's public pipes reach through its own references, as private pipes of the package.
 
 When a future consumer (graph viewer, persistent observability store) wants the metadata across boundaries, dropping `exclude=True` is the deliberate next step.
 

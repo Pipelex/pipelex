@@ -1,33 +1,46 @@
-from collections.abc import Callable
+import copy
+from collections.abc import Callable, Mapping
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar
 
 from pydantic import BaseModel, Field
 
 from pipelex.base_exceptions import ErrorReport
+from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource, doc_gen_choice_key
+from pipelex.cogt.inference.error_classification import RUNTIME_CLASSIFIED_ERROR_CODES
 from pipelex.plugins.bundle_validator_registry import BundleValidatorProtocol
 from pipelex.plugins.exceptions import (
     DuplicateBundleValidatorError,
+    DuplicateDocGenDefaultError,
     DuplicateHttpErrorMapperError,
     DuplicateInferenceBackendError,
+    DuplicateInternalModelError,
+    DuplicateLogSinkError,
     DuplicateModelListerError,
     DuplicateOrchestratorError,
     DuplicatePipeFuncExecutorError,
     DuplicateSecretsProviderError,
+    DuplicateServiceErrorCodeError,
     DuplicateStorageProviderError,
     HubSlotAlreadyClaimedError,
     PluginLayerViolationError,
+    ReservedServiceErrorCodeError,
 )
 from pipelex.plugins.inference_backend_registry import InferenceFamily, MakeWorkerFn
+from pipelex.plugins.log_sink_registry import LogSinkFactoryFn
 from pipelex.plugins.model_lister_registry import ListModelsFn
 from pipelex.plugins.orchestrator_registry import OrchestratorProtocol
 from pipelex.plugins.pipe_func_executor_registry import PipeFuncExecutorFactoryFn
 from pipelex.plugins.plugin_group import PluginGroup
+from pipelex.plugins.plugin_model_declarations import PluginDocGenDefault, PluginInternalModel, PluginModelDeclarations
 from pipelex.plugins.secrets_provider_registry import SecretsProviderFactoryFn
 from pipelex.plugins.storage_provider_registry import StorageProviderFactoryFn
 from pipelex.runtime_bridge.orchestration_mode import OrchestrationMode
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from pipelex.cogt.inference.service_error_vocabulary import ServiceErrorCode
     from pipelex.system.configuration.configs import PipelexConfig
 
 
@@ -158,7 +171,12 @@ class PluginRegistrar:
         self.bundle_validators: dict[OrchestrationMode, BundleValidatorProtocol] = {}
         self.storage_providers: dict[str, StorageProviderFactoryFn] = {}
         self.secrets_providers: dict[str, SecretsProviderFactoryFn] = {}
+        self.log_sinks: dict[str, LogSinkFactoryFn] = {}
         self.pipe_func_executors: dict[str, PipeFuncExecutorFactoryFn] = {}
+        # Plain data, read once by ``make_model_declarations`` for the model manager to merge at boot.
+        self.internal_models: dict[str, dict[str, Any]] = {}
+        self.doc_gen_defaults: dict[tuple[DocGenFormat, DocGenSource], str] = {}
+        self.service_error_codes: dict[str, ServiceErrorCode] = {}
         # Ordered list (not a type-keyed dict) because the exception types are
         # resolved lazily — only ``get_http_error_mappers`` invokes the providers,
         # so duplicate-by-type detection is deferred to resolution time too.
@@ -172,7 +190,11 @@ class PluginRegistrar:
         self._bundle_validator_sources: dict[OrchestrationMode, str] = {}
         self._storage_provider_sources: dict[str, str] = {}
         self._secrets_provider_sources: dict[str, str] = {}
+        self._log_sink_sources: dict[str, str] = {}
         self._pipe_func_executor_sources: dict[str, str] = {}
+        self._internal_model_sources: dict[str, str] = {}
+        self._doc_gen_default_sources: dict[tuple[DocGenFormat, DocGenSource], str] = {}
+        self._service_error_code_sources: dict[str, str] = {}
         self._slot_sources: dict[HubSlot, str] = {}
         # Reassigned per plugin by build_registrar; the floating default keeps the
         # menu methods safe to call outside a registration loop (e.g. a focused unit test).
@@ -284,6 +306,96 @@ class PluginRegistrar:
             ),
         )
 
+    def add_log_sink(self, *, method: str, factory: LogSinkFactoryFn) -> None:
+        """Contribute a factory for one log sink, keyed by an open ``method`` token.
+
+        The built-in ``LogSinkPlugin`` registers the ``json`` / ``console`` / ``otlp`` methods; an
+        external plugin registers its own token (e.g. ``"gcp"``). Boot reads ``runtime.log.sink`` and
+        calls the looked-up factory to produce the one sink whose handler goes on the root logger.
+        ``factory`` is invoked at that boot apply-point, never here, and the sink builds its handler
+        later still, at install — so a factory or a sink may import a heavy SDK (Rich, the OpenTelemetry
+        logs SDK) while ``register`` stays import-light. Fail-loud on a duplicate method, naming both plugins.
+        """
+        self._add(
+            store=self.log_sinks,
+            sources=self._log_sink_sources,
+            key=method,
+            value=factory,
+            contribution=f"log sink {method}",
+            on_duplicate=lambda first_plugin, second_plugin: DuplicateLogSinkError(
+                method=method, first_plugin=first_plugin, second_plugin=second_plugin
+            ),
+        )
+
+    def add_internal_model(self, *, name: str, spec: Mapping[str, Any]) -> None:
+        """Declare one model of the internal backend, the software-only backend that runs inside Pipelex.
+
+        ``spec`` is exactly the table a backend file would hold for the model (``model_type``, ``sdk``, ``model_id``,
+        ``inputs``, ``outputs``, ``costs``…), and it is complete on its own: no backend file's ``[defaults]`` table
+        is applied to it. A plugin that ships an engine declares its model here rather than leaving it to the kit's
+        ``internal.toml``, and registers the engine's worker with ``add_inference_backend`` for the same sdk.
+
+        Plain data, so it is stored and nothing else: the model manager validates the table when it merges it into
+        the internal backend at boot, and refuses one whose name the installation's ``internal.toml`` already
+        declares. Fail-loud on a name another plugin declared, naming both plugins.
+        """
+        self._add(
+            store=self.internal_models,
+            sources=self._internal_model_sources,
+            key=name,
+            value=copy.deepcopy(dict(spec)),
+            contribution=f"internal model {name}",
+            on_duplicate=lambda first_plugin, second_plugin: DuplicateInternalModelError(
+                name=name, first_plugin=first_plugin, second_plugin=second_plugin
+            ),
+        )
+
+    def add_doc_gen_default(self, *, doc_gen_format: DocGenFormat, source: DocGenSource, model: str) -> None:
+        """Declare the model deck's default document engine for one format and source, such as an ``xlsx`` from the auto-layout.
+
+        ``model`` names the engine a ``PipeDocGen`` step prints with when it names none: a model name, or any model
+        reference the deck resolves. The default sits beneath the deck files, so a deck file that sets the same
+        format and source, a user's ``x_custom_*.toml`` included, overrides it. Stored and nothing else: the model
+        manager checks that a step composes this format from this source when it merges the default at boot.
+        Fail-loud on a format and source another plugin declared, naming both plugins.
+        """
+        key = (doc_gen_format, source)
+        self._add(
+            store=self.doc_gen_defaults,
+            sources=self._doc_gen_default_sources,
+            key=key,
+            value=model,
+            contribution=f"doc_gen default {doc_gen_choice_key(doc_gen_format=doc_gen_format, source=source)} = {model}",
+            on_duplicate=lambda first_plugin, second_plugin: DuplicateDocGenDefaultError(
+                choice_key=doc_gen_choice_key(doc_gen_format=doc_gen_format, source=source),
+                first_plugin=first_plugin,
+                second_plugin=second_plugin,
+            ),
+        )
+
+    def add_service_error_codes(self, *, codes: "Iterable[ServiceErrorCode]") -> None:
+        """Contribute the error codes a service this plugin speaks to emits on its own, and what each one means.
+
+        For a plugin whose backend is a gateway or a hosted service that refuses some requests itself,
+        before any provider sees them, under codes of its own. Boot freezes every contribution into the
+        hub's `ServiceErrorVocabulary`, which `classify_inference_error` consults ahead of the status
+        ladder: a contributed code decides the error's category, its action and its advice, whatever the
+        status it arrived on. Plain data, stored and nothing else. Fail-loud on a code another plugin
+        contributed, naming both plugins, and on a code the runtime classifies itself.
+        """
+        contributed: list[str] = []
+        for service_error_code in codes:
+            code = service_error_code.code
+            if code in RUNTIME_CLASSIFIED_ERROR_CODES:
+                raise ReservedServiceErrorCodeError(code=code, plugin=self._active.name)
+            if code in self.service_error_codes:
+                raise DuplicateServiceErrorCodeError(code=code, first_plugin=self._service_error_code_sources[code], second_plugin=self._active.name)
+            self.service_error_codes[code] = service_error_code
+            self._service_error_code_sources[code] = self._active.name
+            contributed.append(code)
+        if contributed:
+            self._active.contributions.append(f"service error codes {', '.join(contributed)}")
+
     def add_pipe_func_executor(self, *, mode: str, factory: PipeFuncExecutorFactoryFn) -> None:
         """Contribute a factory for one PipeFunc execution mode, keyed by an open ``mode`` token.
 
@@ -365,6 +477,24 @@ class PluginRegistrar:
         slot, making them invalid boot-orchestrator targets.
         """
         return {discovery.name for discovery in self.discoveries if discovery.status.is_registered}
+
+    def make_model_declarations(self) -> PluginModelDeclarations:
+        """Freeze the internal models and model deck defaults the plugins declared, for ``ModelManagerAbstract.setup``.
+
+        A fresh value object with deep copies of the tables, so neither the model manager nor a plugin holding on to
+        the mapping it passed, or a list inside it, can change what the registrar recorded.
+        """
+        internal_models = {
+            name: PluginInternalModel(spec=copy.deepcopy(spec), plugin=self._internal_model_sources[name])
+            for name, spec in self.internal_models.items()
+        }
+        doc_gen_defaults = tuple(
+            PluginDocGenDefault(
+                doc_gen_format=doc_gen_format, source=source, model=model, plugin=self._doc_gen_default_sources[doc_gen_format, source]
+            )
+            for (doc_gen_format, source), model in self.doc_gen_defaults.items()
+        )
+        return PluginModelDeclarations(internal_models=internal_models, doc_gen_defaults=doc_gen_defaults)
 
     def get_http_error_mappers(self) -> dict[type[Exception], HttpErrorMapperFn]:
         """Resolve every contributed exc-type provider into a ``{exc_type: mapper}`` dict.

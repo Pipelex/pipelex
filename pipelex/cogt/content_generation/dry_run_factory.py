@@ -1,17 +1,41 @@
+import base64
 import random
 import string
 import types
 import typing
 from collections.abc import Callable
 from enum import StrEnum
-from typing import Any, Union, get_args, get_origin
+from typing import TYPE_CHECKING, Any, Union, get_args, get_origin
 
 from polyfactory.factories.pydantic_factory import ModelFactory
 from polyfactory.fields import Ignore, PostGenerated, Use
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 
+from pipelex.config import get_config
+from pipelex.core.stuffs.document_content import DocumentContent
+from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+
+if TYPE_CHECKING:
+    from polyfactory.factories.base import BaseFactory
+
+# A blank one-page PDF, the file behind every mocked document. Its xref offsets are exact, so a
+# reader opens it as it is; a test checks that one does.
+_BLANK_PDF_BYTES = (
+    b"%PDF-1.4\n"
+    b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+    b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
+    b"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>\nendobj\n"
+    b"xref\n0 4\n"
+    b"0000000000 65535 f \n"
+    b"0000000009 00000 n \n"
+    b"0000000058 00000 n \n"
+    b"0000000115 00000 n \n"
+    b"trailer\n<< /Size 4 /Root 1 0 R >>\n"
+    b"startxref\n186\n%%EOF\n"
+)
+MOCK_DOCUMENT_DATA_URL = f"data:application/pdf;base64,{base64.b64encode(_BLANK_PDF_BYTES).decode()}"
 
 
 class MockFormat(StrEnum):
@@ -92,6 +116,45 @@ class DryRunFactory:
         key = cls.generate_snake_case_code()
         value = random.choice(["Image", "Document"])
         return {key: value}
+
+    @classmethod
+    def generate_mock_image_url(cls) -> str:
+        """Pick one of the configured dry-run image URLs, the ones the dry image generation returns too."""
+        return random.choice(get_config().inference.dry_run.image_urls)
+
+    @classmethod
+    def generate_mock_document_url(cls) -> str:
+        """The data URL of a blank one-page PDF."""
+        return MOCK_DOCUMENT_DATA_URL
+
+    @classmethod
+    def _file_url_providers(cls, *, object_class: type[BaseModel]) -> dict[str, Any]:
+        """Give a mocked image or document a URL that is neither a local path nor a storage key.
+
+        Left to polyfactory, a file's ``url`` is a random string, which ``resolve_uri`` takes for a
+        local path. A run with a read scope refuses to read a local path, and it checks before the
+        dry-run branch, so a dry run on such a run would refuse its own mocks: a mocked input, or an
+        image inside a structure a dry model call returned. An https URL or a data URL is read by
+        nobody's leave, so it is what a mock carries.
+        """
+        if cls._is_file_class(object_class=object_class, file_class=ImageContent):
+            return {"url": Use(cls.generate_mock_image_url)}
+        if cls._is_file_class(object_class=object_class, file_class=DocumentContent):
+            return {"url": Use(cls.generate_mock_document_url)}
+        return {}
+
+    @classmethod
+    def _is_file_class(cls, *, object_class: type[BaseModel], file_class: type[BaseModel]) -> bool:
+        """Whether a class is the file class, a subclass of it, or a copy of it rebuilt from a JSON schema.
+
+        A worker that runs a dry model call out of process gets no class, only the output's JSON
+        schema, and rebuilds the classes from it: the nested file class it builds is no subclass of
+        the real one, but it keeps the real one's name, which the schema carries as the definition's
+        title, and its ``url`` field.
+        """
+        if issubclass(object_class, file_class):
+            return True
+        return object_class.__name__ == file_class.__name__ and "url" in object_class.model_fields
 
     @classmethod
     def _get_examples_from_field(cls, field_info: FieldInfo) -> list[Any] | None:
@@ -266,6 +329,7 @@ class DryRunFactory:
             "__use_examples__": True,
             "__allow_none_optionals__": False,
         }
+        class_attrs.update(cls._file_url_providers(object_class=nested_class))
 
         # Detect fields with examples and create providers
         fields_with_examples = cls._detect_examples_constraints(nested_class)  # type: ignore[arg-type]
@@ -373,6 +437,7 @@ class DryRunFactory:
             "__use_examples__": True,
             "__allow_none_optionals__": False,
         }
+        class_attrs.update(cls._file_url_providers(object_class=object_class))
 
         # Add snake_case providers
         for field_name in all_snake_case:
@@ -424,15 +489,20 @@ class DryRunFactory:
 
         # Find all nested BaseModel classes and create factories for them
         nested_classes = cls._find_nested_base_model_classes(object_class)  # type: ignore[arg-type]
-        nested_factories: dict[type[BaseModel], type[ModelFactory[Any]]] = {}
+        nested_factories: dict[Any, type[BaseFactory[Any]]] = {}
         for nested_class in nested_classes:
             nested_factory = cls._create_nested_factory(nested_class)
             nested_factories[nested_class] = nested_factory
 
         # Register nested factories using __base_factory_overrides__ attribute
-        # This tells polyfactory to use our custom factories for these model types
+        # This tells polyfactory to use our custom factories for these model types.
+        # Every nested factory gets the same map: polyfactory consults the overrides of the factory
+        # building the enclosing model and never passes them down, so without this a model nested
+        # two levels deep was built by a plain factory, with none of the providers above.
         if nested_factories:
             class_attrs["__base_factory_overrides__"] = nested_factories
+            for registered_factory in nested_factories.values():
+                registered_factory.__base_factory_overrides__ = nested_factories
 
         # Dynamically create the factory class using ModelFactory as the parent
         dry_run_factory: type[ModelFactory[BaseModelTypeVar]] = type(  # type: ignore[assignment]

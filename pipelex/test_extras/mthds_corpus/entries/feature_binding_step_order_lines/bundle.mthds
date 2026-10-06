@@ -1,0 +1,39 @@
+domain      = "order_desk"
+description = "Summing up an order and its backorder line by line"
+main_pipe   = "summarize_order"
+
+[concept.OrderLine]
+description = "One line of an order"
+
+[concept.OrderLine.structure]
+article = { type = "text", description = "The article ordered", required = true }
+amount  = { type = "number", description = "What the line costs, in euros" }
+
+[concept.Order]
+description = "An order placed by a shop"
+
+[concept.Order.structure]
+lines = { type = "list", item_type = "concept", item_concept_ref = "OrderLine", description = "The lines of the order", required = true }
+
+[pipe.summarize_order]
+type = "PipeSequence"
+description = "Binds the lines of an order and the amounts of an order and of its backorder, then sums them up"
+inputs = { order = "Order", backorder = "Order" }
+output = "Text"
+steps = [
+  { from = "order.lines", result = "lines" },
+  { from = "order.lines.amount", result = "amounts" },
+  { from = "backorder.lines.amount", result = "backorder_amounts" },
+  { pipe = "write_summary", result = "summary" },
+]
+
+[pipe.write_summary]
+type = "PipeCompose"
+description = "Writes one line per article, then the amounts of the order and of its backorder"
+inputs = { lines = "OrderLine[]", amounts = "Number[]", backorder_amounts = "Number[]" }
+output = "Text"
+template = """
+{% for line in lines %}- {{ line.article }}
+{% endfor %}Amounts: {% for amount in amounts %}{{ amount.number }} {% endfor %}
+Backordered amounts: {{ backorder_amounts | length }}
+"""

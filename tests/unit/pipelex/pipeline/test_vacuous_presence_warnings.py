@@ -1,6 +1,6 @@
 """The vacuous-presence lint's decision table, over hand-built input-form descriptors.
 
-One case per row of the design's rule table (`wip/full-optional/design.md` §3): a gating slot whose
+One case per row of the rule's decision table: a gating slot whose
 concept declares no required field warns; everything else is silent, and each silence is asserted
 here rather than assumed. The descriptors are built by hand — the lint is pure over them, so the
 table needs no library window and no crate.
@@ -146,7 +146,7 @@ class TestVacuousPresenceWarnings:
         assert _lint(slots=[slot]) == []
 
     def test_fixed_count_list_is_silent(self):
-        """`Concept[N]` gates, but the vacuity question is per item — deferred (design §7)."""
+        """`Concept[N]` gates, but the vacuity question is per item, so this version stays silent."""
         slot = ListField(
             name="opts",
             concept_ref=OPTIONS_CONCEPT_REF,

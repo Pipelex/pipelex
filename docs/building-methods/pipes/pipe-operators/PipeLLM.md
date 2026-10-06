@@ -18,6 +18,8 @@ For structured outputs, you have two options:
 
 If you already have text from elsewhere (a PDF extraction, a search result, an upstream pipe), call [`PipeStructure`](./PipeStructure.md) directly — there's no need to wrap a `PipeLLM` around it.
 
+Every input the pipe declares must be read by `prompt` or `system_prompt`, and every variable they read must be declared in `inputs`. Validation refuses an input neither prompt reads as `extraneous_input_variable`, naming the input, so you either reference it in a prompt or remove it from `inputs`; an undeclared variable is refused as `missing_input_variable`. A name a prompt sets with `{% set %}` is its own, not an input, from that statement on: after an `{% if %}` it stays set only when every branch sets it, the `{% else %}` included, so a name only some branches set is read from the input of that name on the other paths; and a loop, a macro or a block keeps what it sets to its own body.
+
 ## Working with Images (Vision Language Models)
 
 `PipeLLM` supports Vision Language Models (VLMs) that can process both text and images. To use images in your prompts:
@@ -57,25 +59,29 @@ Analyze this wedding photo and describe the key moments captured: $wedding_photo
 
 ### Images as Sub-attributes of Structured Content
 
-When working with structured content that contains image fields (like `PageContent` which has a `page_view` field), you need to specify the full path to the image attribute in the `inputs` section:
+When working with structured content that contains image fields (like `Page`, which has a `page_view` field), declare the structured value with its whole concept in `inputs`, and read the image field through it in the prompt:
 
 ```toml
 [pipe.analyze_page_view]
 type = "PipeLLM"
 description = "Analyze the visual layout of a page"
-inputs = { "page_content.page_view" = "Image" }
+inputs = { page = "Page" }
 output = "LayoutAnalysis"
 prompt = """
-Analyze the visual layout and design elements of this page: $page_content.page_view
+Analyze the visual layout and design elements of this page:
+@page.page_view
+
 Focus on typography, spacing, and overall composition.
 """
 ```
 
 In this example:
 
-- `page_content` is the input variable containing a `PageContent` object
-- `page_view` is the `ImageContent` field within the `PageContent` structure
-- The dot notation `page_content.page_view` tells Pipelex to extract the image from that specific field
+- `page` is the input variable, declared with its whole concept, `Page`
+- `page_view` is the `Image` field within the `Page` structure
+- The path `page.page_view` reads that field through `page`, and because the concept the path reaches is `Image`, Pipelex attaches it to the model call as an image
+
+An input name is always a plain name: a key such as `"page.page_view" = "Image"` is refused as `invalid_input_name`. When a pipe should receive only the field, under a name of its own, the calling sequence binds the field with a binding step, `{ from = "page.page_view", result = "page_view" }`, and the pipe declares `page_view = "Image"`.
 
 ### Multiple Images
 
@@ -227,7 +233,7 @@ The same rule governs `PipeImgGen` prompts (positive and negative), which use th
 | --------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
 | `type`                      | string              | The type of the pipe: `PipeLLM`                                                                          | Yes      |
 | `description`               | string              | A description of the LLM operation.                                                                           | Yes      |
-| `inputs`                    | dictionary          | The input concept(s) for the LLM operation, as a dictionary mapping input names to concept codes. For images within structured content, use dot notation (e.g., `"page.image_argurment"`)
+| `inputs`                    | dictionary          | The input concept(s) for the LLM operation, as a dictionary mapping input names to concept codes. An input name is a plain `snake_case` name; for an image within structured content, declare the structured value (e.g., `page = "Page"`) and read the field through it in the prompt (`@page.page_view`). | No       |
 | `output`                    | string              | The output concept produced by the LLM operation with multiplicity notation using brackets (e.g., `"Text"`, `"Text[]"`, `"Text[3]"`).                                                | Yes      |
 | `model`                       | string or table     | Specifies the LLM choice by name, setting, or preset to use.              | No       |
 | `model_to_structure`                       | string or table     | LLM choice used whenever this `PipeLLM` produces a structured output. Applies both to direct structured generation and to the structuring step when `structuring_method = "preliminary_text"` is set. | No       |
@@ -430,8 +436,8 @@ Analyze the following topic in depth, considering multiple perspectives:
 
 ## Related Documentation
 
-- [Hello World Example](../../../cookbook/hello-world.md) - Simple introductory example using PipeLLM
-- [Invoice Extraction Example](../../../cookbook/extract-invoice.md) - Complete invoice processing pipeline
-- [Write Tweet Example](../../../cookbook/write-tweet.md) - Multi-step tweet generation workflow
-- [Table Extraction Example](../../../cookbook/extract-table.md) - Extract and correct tables from images
-- [Gantt Extraction Example](../../../cookbook/extract-gantt.md) - Extract Gantt chart data from documents
+- [The MTHDS Language Tutorial](../../../get-started/mthds-language-tutorial.md#step-1-hello-world) - Starts from a single PipeLLM and builds a method step by step
+- [Invoice extraction](https://github.com/Pipelex/methods/tree/main/methods/invoice_extraction) - A method in the method library that extracts structured invoice data using both the OCR text and the page view
+- [Tweet optimizer](https://github.com/Pipelex/methods/tree/main/methods/tweet_optimizer) - A method in the method library that scores a draft tweet and rewrites it in your style
+- [Table extraction](https://github.com/Pipelex/methods/tree/main/methods/table_extraction) - A method in the method library that extracts a table from a screenshot into HTML, then reviews it against the image
+- [Gantt chart extraction](https://github.com/Pipelex/pipelex-cookbook/tree/main/methods/extract_gantt) - A cookbook method that returns every task and milestone of a Gantt chart image with their dates

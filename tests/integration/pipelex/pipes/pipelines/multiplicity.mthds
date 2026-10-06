@@ -50,14 +50,27 @@ Imagine a fantasy scene including the following products of nature:
 Keep it short and concise, just one sentence.
 """
 
+[pipe.imagine_fantasy_scene_including_several_products_of_nature]
+type = "PipeLLM"
+description = "Imagine a fantasy scene including several products of nature"
+inputs = { products_of_nature = "ProductOfNature[]" }
+output = "Text"
+prompt = """
+Imagine a fantasy scene including the following products of nature:
+
+@products_of_nature
+
+Keep it short and concise, just one sentence.
+"""
+
 [pipe.imagine_nature_scene_of_original_power_rangers_colors]
 type = "PipeSequence"
 description = "Imagine nature scenes of Power Rangers colors"
 output = "Text"
 steps = [
-  { pipe = "original_power_ranger_colors", result = "color" },
-  { pipe = "imagine_nature_product", result = "product_of_nature" },
-  { pipe = "imagine_fantasy_scene_including_products_of_nature" },
+  { pipe = "original_power_ranger_colors", result = "colors" },
+  { pipe = "imagine_nature_product", batch_over = "colors", batch_as = "color", result = "products_of_nature" },
+  { pipe = "imagine_fantasy_scene_including_several_products_of_nature" },
 ]
 
 [pipe.imagine_nature_scene_of_alltime_power_rangers_colors]

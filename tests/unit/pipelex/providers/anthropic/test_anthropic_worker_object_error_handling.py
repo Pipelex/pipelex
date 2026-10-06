@@ -67,6 +67,7 @@ def _make_anthropic_not_found_error(message: str) -> anthropic.NotFoundError:
 
 def _make_worker(mocker: MockerFixture) -> AnthropicLLMWorker:
     worker = object.__new__(AnthropicLLMWorker)
+    worker.extras_factory = None
     mock_model = mocker.MagicMock()
     mock_model.desc = "test-model-desc"
     mock_model.model_id = "claude-sonnet-4-20250514"
@@ -306,11 +307,10 @@ class TestAnthropicWorkerObjectErrorHandling:
         assert user_action_dict["kind"] == UserActionKind.CHECK_BILLING
         assert isinstance(user_action_dict["detail"], str)
 
-    async def test_real_instructor_propagates_transport_error_raw(self, mocker: MockerFixture) -> None:
-        """End-to-end: drive the real instructor library with an SDK transport exception and
-        verify the W2.3 behavior — instructor, confined to schema re-ask, does NOT retry the
-        transport error and does NOT wrap it in ``InstructorRetryException``. It propagates as
-        the raw SDK exception, which the worker's ``except`` clause classifies as TRANSIENT.
+    async def test_real_instructor_transport_error_is_unwrapped(self, mocker: MockerFixture) -> None:
+        """End-to-end: drive the real instructor library with an SDK transport exception and verify
+        that instructor, confined to schema re-ask, does not retry it: it raises an ``InstructorRetryException``
+        from it after the one attempt, which the worker unwraps to classify the SDK exception as TRANSIENT.
         """
         import instructor  # ruff: ignore[import-outside-top-level]  # imported here to mirror runtime usage
 
@@ -326,8 +326,10 @@ class TestAnthropicWorkerObjectErrorHandling:
             await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
-        # The raw SDK exception propagates and chains directly — instructor no longer wraps it.
-        assert exc_info.value.__cause__ is sdk_exc
+        # instructor raises its InstructorRetryException from the SDK exception, which it did not retry
+        wrapper_exc = exc_info.value.__cause__
+        assert wrapper_exc is not None
+        assert wrapper_exc.__cause__ is sdk_exc
 
     @pytest.mark.parametrize(
         ("sdk_exc", "expected_category"),
@@ -344,9 +346,9 @@ class TestAnthropicWorkerObjectErrorHandling:
         sdk_exc: Exception,
         expected_category: InferenceErrorCategory,
     ) -> None:
-        """W2.3 regression: now that ``instructor`` no longer retries transport errors, a raw SDK
-        transport exception is the primary path out of ``create_with_completion`` — it must be
-        classified into the right category, never flattened to ``UNKNOWN``, never escape unhandled.
+        """W2.3 regression: a raw SDK transport exception reaching the worker unwrapped, as it would if
+        ``instructor`` stopped wrapping the exception that ends its loop, must be classified into the
+        right category, never flattened to ``UNKNOWN``, never escape unhandled.
         """
         _patch_gen_object_dependencies(mocker)
         worker = _make_worker(mocker)

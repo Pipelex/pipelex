@@ -24,6 +24,7 @@ from pipelex.tools.tabular.csv_codec import is_tabular_path, list_content_from_c
 from pipelex.tools.tabular.exceptions import CsvError
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.tools.uri.resolved_uri import ResolvedLocalPath
+from pipelex.tools.uri.uri_read_scope import authorize_uri_read
 from pipelex.tools.uri.uri_resolver import resolve_uri
 
 
@@ -112,6 +113,20 @@ class StuffFactory:
         return the_stuff
 
     @classmethod
+    def _make_text_content(cls, *, concept: Concept, text: str) -> TextContent:
+        """A string under a Text-compatible concept, held in the concept's own class when that class is a text one.
+
+        So `{"concept": "Markdown", "content": "..."}` holds a `MarkdownContent`, which the views format, and a
+        concept refining Text or Markdown keeps its generated class, as the YesNo and Date arms keep theirs. A
+        concept that is Text-compatible through its shape alone, or whose class is not registered, gets a
+        `TextContent`, as every Text-compatible concept did before.
+        """
+        the_class = get_class_registry().get_class(name=concept.structure_class_name)
+        if isinstance(the_class, type) and issubclass(the_class, TextContent):
+            return the_class(text=text)
+        return TextContent(text=text)
+
+    @classmethod
     def combine_stuffs(
         cls,
         stuff_contents: dict[str, StuffContent],
@@ -143,9 +158,10 @@ class StuffFactory:
         content: dict[str, Any],
         name: str | None,
         code: str | None,
+        read_scope: str | None,
     ) -> Stuff | None:
         """Wrap :meth:`try_make_csv_list_content` into a ``Stuff`` (Case 2.5 envelope path)."""
-        list_content = cls.try_make_csv_list_content(concept, concept_provider=concept_provider, content=content, name=name)
+        list_content = cls.try_make_csv_list_content(concept, concept_provider=concept_provider, content=content, name=name, read_scope=read_scope)
         if list_content is None:
             return None
         return cls.make_stuff(concept=concept, content=list_content, name=name, code=code)
@@ -158,6 +174,7 @@ class StuffFactory:
         concept_provider: ConceptProviderAbstract,
         content: dict[str, Any],
         name: str | None,
+        read_scope: str | None,
     ) -> ListContent[StuffContent] | None:
         """Build a ``ListContent[row-concept]`` from a ``{"url": "...csv"}`` input reference.
 
@@ -177,6 +194,9 @@ class StuffFactory:
 
         v1 reads LOCAL paths only: a tabular-suffixed remote ``url`` (``http(s)``/``s3``/``gs``/
         ``pipelex-storage``) is rejected with a clear ``CsvError`` rather than opened as a local path.
+        And a local path is read only when ``read_scope`` allows it: a run with a read scope reads
+        nothing from the local disk (see :mod:`pipelex.tools.uri.uri_read_scope`), so there a table
+        input is refused before it is opened.
         (A base64 data URL carries no file suffix, so it is never detected as tabular and simply
         falls through to ordinary record handling.)
         """
@@ -242,6 +262,11 @@ class StuffFactory:
             # caller-fixable input problem, not a raw ValueError that escapes into core/runner.
             msg = f"CSV input for stuff '{name}': concept '{concept.concept_ref}' has no registered structure class to read CSV rows into."
             raise CsvError(msg) from exc
+        authorize_uri_read(
+            uri=url,
+            read_scope=read_scope,
+            position=f"the table given for input '{name}'" if name is not None else "a table given as an input",
+        )
         return list_content_from_csv(Path(resolved.path), row_model=row_model)
 
     @classmethod
@@ -273,8 +298,12 @@ class StuffFactory:
         name: str | None = None,
         code: str | None = None,
         search_scope: str | None = None,
+        read_scope: str | None,
     ) -> Stuff:
         """Create a Stuff from StuffContentOrData covering all pipeline inputs cases.
+
+        ``read_scope`` is the run's read scope, which a table read from a ``{"url": "...csv"}``
+        content (Case 2.5) must satisfy; ``None`` for an unscoped run.
 
         Case 1: Direct content (no 'concept' key)
             1.1: str → TextContent with Text concept
@@ -288,12 +317,13 @@ class StuffFactory:
 
         Case 2: Dict with 'concept' AND 'content' keys (can be plain dict or DictStuff instance)
             2.1/2.1b: {"concept": "Text"/"native.Text", "content": str} → TextContent with Text concept
-            2.1c: {"concept": "domain.Concept", "content": str} → TextContent with that concept (if compatible)
+            2.1c: {"concept": "Markdown"/"domain.Concept", "content": str} → that concept's text class, e.g. MarkdownContent
+                  (if Text-compatible; TextContent when the class is not a TextContent subclass)
             2.1d: {"concept": "YesNo"/"domain.Concept", "content": bool} → YesNoContent (if YesNo-compatible)
             2.1e: {"concept": "Date"/"domain.Concept", "content": date/datetime obj} → DateContent (if Date-compatible)
             2.1f: {"concept": "Date"/"domain.Concept", "content": ISO str} → DateContent (if Date-compatible, checked after Text)
             2.1g: {"concept": "Time"/"domain.Concept", "content": time obj or ISO str} → TimeContent (if Time-compatible)
-            2.2/2.2b: {"concept": "...", "content": list[str]} → ListContent[TextContent]
+            2.2/2.2b: {"concept": "...", "content": list[str]} → ListContent of the concept's text class, as in 2.1c
             2.3: {"concept": "...", "content": StuffContent} → Use the StuffContent
             2.4: {"concept": "...", "content": list[StuffContent]} → ListContent[StuffContent]
             2.5: {"concept": "...", "content": dict} → Create StuffContent from dict
@@ -516,7 +546,7 @@ class StuffFactory:
             if concept_provider.is_compatible(tested_concept=concept, wanted_concept=text_concept, strict=True):
                 return cls.make_stuff(
                     concept=concept,
-                    content=TextContent(text=content),
+                    content=cls._make_text_content(concept=concept, text=content),
                     name=name,
                     code=code,
                 )
@@ -598,7 +628,9 @@ class StuffFactory:
         if isinstance(content, dict):
             content_dict = cast("dict[str, Any]", content)
             # CSV input: a {"url": "...csv"} under a structured row concept loads as ListContent[row-concept].
-            csv_stuff = cls._try_make_csv_list_stuff(concept=concept, concept_provider=concept_provider, content=content_dict, name=name, code=code)
+            csv_stuff = cls._try_make_csv_list_stuff(
+                concept=concept, concept_provider=concept_provider, content=content_dict, name=name, code=code, read_scope=read_scope
+            )
             if csv_stuff is not None:
                 return csv_stuff
 
@@ -650,7 +682,7 @@ class StuffFactory:
 
                 text_concept = concept_provider.get_native_concept(native_concept=NativeConceptCode.TEXT)
                 if concept_provider.is_compatible(tested_concept=concept, wanted_concept=text_concept, strict=True):
-                    items = [TextContent(text=item) for item in list_content_2]
+                    items = [cls._make_text_content(concept=concept, text=item) for item in list_content_2]
                     return cls.make_stuff(
                         concept=concept,
                         content=ListContent(items=items),

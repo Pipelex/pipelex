@@ -255,5 +255,4 @@ This helps you understand all possible output structures that the pipe could ret
 ## Related Documentation
 
 - [Build Inputs](inputs.md) - Generate example input JSON for a pipe
-- [Build Runner](runner.md) - Generate Python code to run a pipe
 - [Pipe Output](../../../building-methods/pipes/pipe-output.md) - Learn about pipe outputs

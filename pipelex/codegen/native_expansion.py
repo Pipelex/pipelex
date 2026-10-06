@@ -14,12 +14,13 @@ its pinned blueprint, proving the two can never drift silently.
 Reflection is faithful-or-absent: a native's structure is reflected only when *every* field of its
 content class maps unambiguously to a blueprint field — primitive, dict, list, a reference to
 another native, or a nested non-native model (whose wire form is a JSON object, so it maps honestly
-to a `dict` blueprint with unspecified value types — declared imprecision). A field whose
+to a `dict` blueprint with unspecified value types — declared imprecision). A dict states its value
+type when that type is a scalar the blueprint vocabulary names, and `Any` otherwise. A field whose
 annotation has no honest blueprint form at all (e.g. a non-Optional union) makes the whole
 reflected structure absent.
 """
 
-from typing import Any, cast, get_origin
+from typing import Annotated, Any, cast, get_args, get_origin
 
 from pydantic import BaseModel
 
@@ -99,7 +100,11 @@ def _annotation_to_blueprint(annotation: Any, *, description: str) -> ConceptStr
     origin = get_origin(inner)
     if origin is dict:
         return ConceptStructureBlueprint(
-            description=description, type=ConceptStructureBlueprintFieldType.DICT, key_type="text", value_type="Any", required=required
+            description=description,
+            type=ConceptStructureBlueprintFieldType.DICT,
+            key_type="text",
+            value_type=_dict_value_type(dict_annotation=inner),
+            required=required,
         )
     if origin is list:
         return _list_blueprint(inner, description=description, required=required)
@@ -123,6 +128,21 @@ def _annotation_to_blueprint(annotation: Any, *, description: str) -> ConceptStr
         )
 
     raise _UnmappableAnnotationError
+
+
+def _dict_value_type(*, dict_annotation: Any) -> str:
+    """A dict's value type in the spec vocabulary: a scalar it maps, else the reserved `Any` marker (declared imprecision)."""
+    args = get_args(dict_annotation)
+    if len(args) != 2:
+        return "Any"
+    value_annotation = args[1]
+    if get_origin(value_annotation) is Annotated:
+        # A constrained value type (`UnitInterval`) is its base type: the blueprint vocabulary states no range.
+        value_annotation = get_args(value_annotation)[0]
+    scalar_type = scalar_field_type(annotation=value_annotation)
+    if scalar_type is None:
+        return "Any"
+    return scalar_type.value
 
 
 def _list_blueprint(list_annotation: Any, *, description: str, required: bool) -> ConceptStructureBlueprint:

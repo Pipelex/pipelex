@@ -15,11 +15,12 @@ import pytest
 
 from pipelex.cli.dev_cli.commands.generate_projection_corpus_cmd import (
     COMPACT_SHAPE,
+    EXPLICIT_SHAPE,
     MOCK_URL_PREFIX,
     DivergenceCollector,
 )
 from pipelex.core.pipes.variable_multiplicity import PresenceMarker
-from pipelex.pipeline.input_form import ListField, PipeInputFormDescriptor, TextItem
+from pipelex.pipeline.input_form import ListField, ObjectField, ObjectItem, PipeInputFormDescriptor, TextItem, UnknownField
 
 
 def _list_slot_descriptor(*, name: str, item_count: int | None) -> PipeInputFormDescriptor:
@@ -34,6 +35,31 @@ def _list_slot_descriptor(*, name: str, item_count: int | None) -> PipeInputForm
                 item=TextItem(required=True),
                 item_count=item_count,
             )
+        ]
+    )
+
+
+def _json_slots_descriptor() -> PipeInputFormDescriptor:
+    """A descriptor with a `JSON` slot and a `JSON[]` slot, each node an object holding a required `json_obj`."""
+    return PipeInputFormDescriptor(
+        fields=[
+            ObjectField(
+                name="json_in",
+                required=True,
+                presence=PresenceMarker.PLAIN,
+                gating=False,
+                concept_ref="native.JSON",
+                fields=[UnknownField(name="json_obj", required=True)],
+            ),
+            ListField(
+                name="records",
+                required=True,
+                presence=PresenceMarker.PLAIN,
+                gating=False,
+                concept_ref="native.JSON",
+                item=ObjectItem(required=True, concept_ref="native.JSON", fields=[UnknownField(name="json_obj", required=True)]),
+                item_count=None,
+            ),
         ]
     )
 
@@ -150,8 +176,41 @@ class TestTheDivergenceGateSeesEveryDifference:
         collector.compare(
             engine_value={"json_obj_key": "json_obj_value"},
             projected_value={},
-            path=["scaffold.scaffold_open_natives", COMPACT_SHAPE, "json_in", "json_obj"],
+            path=["scaffold.scaffold_open_natives", EXPLICIT_SHAPE, "json_in", "content", "json_obj"],
         )
 
         assert collector.counts == {"unknown-empty-object": 1}
         assert not collector.unclassified
+
+    def test_an_unwrapped_json_slot_keeps_its_class(self) -> None:
+        """The compact shape unwraps `json_obj`, so the placeholder sits at the slot, and at each item of a list."""
+        collector = DivergenceCollector()
+        collector.register_json_unwraps(pipe_ref="scaffold.scaffold_open_natives", descriptor=_json_slots_descriptor())
+
+        collector.compare(
+            engine_value={"json_obj_key": "json_obj_value"},
+            projected_value={},
+            path=["scaffold.scaffold_open_natives", COMPACT_SHAPE, "json_in"],
+        )
+        collector.compare(
+            engine_value={"json_obj_key": "json_obj_value"},
+            projected_value={},
+            path=["scaffold.scaffold_open_natives", COMPACT_SHAPE, "records", "0"],
+        )
+
+        assert collector.counts == {"unknown-empty-object": 2}
+        assert not collector.unclassified
+
+    def test_an_unregistered_json_slot_is_not_absorbed(self) -> None:
+        """Without the descriptor's word, a slot-level placeholder keyed `json_obj` is a difference the capture refuses."""
+        collector = DivergenceCollector()
+
+        collector.compare(
+            engine_value={"json_obj_key": "json_obj_value"},
+            projected_value={},
+            path=["scaffold.scaffold_open_natives", COMPACT_SHAPE, "json_in"],
+        )
+
+        assert "unknown-empty-object" not in collector.counts
+        with pytest.raises(ValueError, match="Undeclared divergence class"):
+            collector.declared()

@@ -15,20 +15,24 @@ from tests.helpers.instructor_test_utils import DummySchema, wrap_in_instructor_
 class TestInstructorTestUtils:
     """Verify the shared helpers behave as documented."""
 
-    def test_wrap_with_failed_attempts_exposes_sdk_exception(self) -> None:
+    def test_wrap_chains_from_the_sdk_exception(self) -> None:
         sdk_exc = RuntimeError("boom")
         wrapped = wrap_in_instructor_retry(sdk_exc)
 
         assert isinstance(wrapped, InstructorRetryException)
-        assert wrapped.failed_attempts is not None
-        assert wrapped.failed_attempts[-1].exception is sdk_exc
+        assert wrapped.__cause__ is sdk_exc
+        assert wrapped.failed_attempts == []
+        assert wrapped.n_attempts == 1
 
-    def test_wrap_without_failed_attempts_leaves_attempts_empty(self) -> None:
+    def test_wrap_records_earlier_parse_failures_only(self) -> None:
         sdk_exc = RuntimeError("boom")
-        wrapped = wrap_in_instructor_retry(sdk_exc, include_failed_attempts=False)
+        parse_failure = ValueError("bad shape")
+        wrapped = wrap_in_instructor_retry(sdk_exc, earlier_parse_failures=[parse_failure])
 
-        assert isinstance(wrapped, InstructorRetryException)
-        assert wrapped.failed_attempts is None or wrapped.failed_attempts == []
+        assert wrapped.__cause__ is sdk_exc
+        assert wrapped.failed_attempts is not None
+        assert [failed_attempt.exception for failed_attempt in wrapped.failed_attempts] == [parse_failure]
+        assert wrapped.n_attempts == 2
 
     def test_dummy_schema_has_single_text_field(self) -> None:
         assert issubclass(DummySchema, BaseModel)

@@ -145,8 +145,18 @@ SCAN_ROOTS: tuple[Path, ...] = (SOURCE_ROOT, TESTS_ROOT)
 #: caller — the exact property the package exists to provide. Declaring it also enrols it in the
 #: `pipelex.exceptions` aggregate gate, whose domain *is* this tuple.
 #:
+#: `pipelex.migration` and `pipelex.fix_ops` are declared because a kernel-layer boot *runs* them:
+#: a configuration file that fails validation is replayed through the migration engine in memory
+#: before the boot gives up, so the engine is part of every kernel-layer boot that meets a stale file.
+#: The engine applies its operations through `fix_ops`, the applier and file transaction it shares
+#: with the `.mthds` fix loop; while those lived under `pipelex.pipeline`, a stale file put three
+#: interpreter modules into a kernel-only process and no static gate could see it, because the
+#: engine never reached `interpreter_hub`. Declaring both is what keeps the next such import loud.
+#:
 #: `pipelex.kit` is data files with no module to police; `pipelex.language`, `pipelex.runtime_bridge`
-#: and `pipelex.cli` all measure dirty and are interpreter-side by construction. That is every
+#: and `pipelex.cli` all measure dirty and are interpreter-side by construction. `pipelex.methods`
+#: measures dirty as well, without reaching `interpreter_hub`: its structures check reads the stamp
+#: the code generator writes, and `pipelex.codegen` is an interpreter package. That is every
 #: top-level package accounted for.
 #: That the declaration is a claim rather than a hope is why it is asserted by a test.
 #: See the "Where core splits" section of ``docs/contribute/hub-layering.md``.
@@ -154,8 +164,10 @@ KERNEL_LAYER_PACKAGES: tuple[str, ...] = (
     "pipelex.cogt",
     "pipelex.core",
     "pipelex.errors",
+    "pipelex.fix_ops",
     "pipelex.graph",
     "pipelex.kernel",
+    "pipelex.migration",
     "pipelex.observer",
     "pipelex.plugins",
     "pipelex.providers",

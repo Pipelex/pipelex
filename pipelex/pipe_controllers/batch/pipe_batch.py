@@ -4,14 +4,12 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.content_generation.dry_mock import stamp_mock_main_coordination
 from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeRunError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
-from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import get_pipe_router, get_required_pipe
@@ -142,8 +140,20 @@ class PipeBatch(PipeController):
                 f"rate-limited, resumable runs: {URLs.durable_execution}"
             )
 
-        async def _run_branch(item_input_stuff: "Stuff", *, branch_output_item_code: str) -> PipeOutput:
+        item_concept = self.inputs.get_required_stuff_spec(input_list_stuff_name).concept
+
+        async def _run_branch(*, branch_index: int, branch_input_item_code: str, branch_output_item_code: str) -> PipeOutput:
             branch_memory = working_memory.make_deep_copy()
+            # The item is taken from the branch's own copy of the list, never from the parent's: a branch gets
+            # its own copy of its item as it does of the rest of working memory, so a branch that rewrites its
+            # item in place (a PipeFunc can) leaves the batched list and every sibling branch as they were.
+            branch_list_content = cast("ListContent[StuffContent]", branch_memory.get_stuff(input_list_stuff_name).content)
+            item_input_stuff = StuffFactory.make_stuff(
+                code=branch_input_item_code,
+                concept=item_concept,
+                content=branch_list_content.items[branch_index],
+                name=input_item_stuff_name,
+            )
             branch_memory.set_new_main_stuff(stuff=item_input_stuff, name=input_item_stuff_name)
 
             # We create a deep copy of the run params to avoid modifying the original run params,
@@ -175,15 +185,9 @@ class PipeBatch(PipeController):
         # Build one factory per branch. Each factory defers its working-memory deep copy until it
         # actually runs, so gather_bounded materializes at most `max_concurrency` of them at once.
         branch_factories: list[Callable[[], Awaitable[PipeOutput]]] = []
-        for branch_index, item in enumerate(input_content.items):
+        for branch_index in range(item_count):
             branch_output_item_code = f"{batch_output_stuff_code}-branch-{branch_index}"
             branch_input_item_code = f"{input_stuff.stuff_code}-branch-{branch_index}"
-            item_input_stuff = StuffFactory.make_stuff(
-                code=branch_input_item_code,
-                concept=self.inputs.get_required_stuff_spec(input_list_stuff_name).concept,
-                content=item,
-                name=input_item_stuff_name,
-            )
 
             # Register batch item extraction with graph tracer
             if job_metadata.trace_context is not None:
@@ -199,7 +203,14 @@ class PipeBatch(PipeController):
                         batch_controller_node_id=batch_controller_node_id,
                     )
 
-            branch_factories.append(functools.partial(_run_branch, item_input_stuff, branch_output_item_code=branch_output_item_code))
+            branch_factories.append(
+                functools.partial(
+                    _run_branch,
+                    branch_index=branch_index,
+                    branch_input_item_code=branch_input_item_code,
+                    branch_output_item_code=branch_output_item_code,
+                )
+            )
 
         pipe_outputs = await gather_bounded(branch_factories, max_concurrency=max_concurrency)
 
@@ -267,23 +278,13 @@ class PipeBatch(PipeController):
         output_name: str | None = None,
         library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
-        pipe_output = await self._live_run_controller_pipe(
+        return await self._live_run_controller_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=pipe_run_params,
             output_name=output_name,
             library_crate=library_crate,
         )
-        # Dry-run coordination: see stamp_mock_main_coordination's docstring (single home, D3).
-        # Tri-state read for robustness: the batch's own aggregated output is always stamped by the
-        # live arm today, but this site must never crash on a resolved-as-absent main.
-        main_resolved = pipe_output.working_memory.resolve_main_stuff()
-        if isinstance(main_resolved, Stuff):
-            content = main_resolved.content
-            if isinstance(content, ListContent):
-                list_content = cast("ListContent[StuffContent]", content)
-                stamp_mock_main_coordination(list_content.items)
-        return pipe_output
 
     @override
     async def _validate_after_run(

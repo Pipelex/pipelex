@@ -4,7 +4,8 @@ from typing import Any
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import CogtError, ExtractCapabilityError
+from pipelex.cogt.exceptions import CogtError, ExtractCapabilityError, ExtractInputFormatError
+from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
@@ -12,6 +13,12 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.job_metadata import UnitJobId
+from pipelex.tools.misc.filetype_utils import IMAGE_FORMAT_KEY, describe_file_format, describe_format_keys, format_key_from_mime_type
+from pipelex.tools.uri.resolved_uri import ResolvedHttpUrl
+from pipelex.tools.uri.uri_resolver import resolve_uri
+
+# How a web-page model's declaration is named among the formats it reads, in a refusal.
+_WEB_PAGE_INPUT: str = "web_page"
 
 
 class ExtractWorkerAbstract(InferenceWorkerAbstract):
@@ -65,6 +72,42 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
             if not self.inference_model.is_caption_supported_for_extract:
                 msg = f"Extract engine '{self.inference_model.tag}' does not support image captioning."
                 raise ExtractCapabilityError(msg)
+        self._check_input_format(extract_input=extract_input)
+
+    def _check_input_format(self, *, extract_input: ExtractInput) -> None:
+        """Refuse a file whose known format the model does not read, naming the input and what the model reads.
+
+        An unknown format is left to the provider. A web-page model given an http(s) URL fetches the
+        page itself, so its format is not checked. A file given as an image must be an image,
+        whatever else the model reads.
+
+        Raises:
+            ExtractInputFormatError: If the file's format is known and the model does not read it.
+        """
+        format_key = format_key_from_mime_type(mime_type=extract_input.mime_type)
+        if format_key is None:
+            return
+        if (
+            extract_input.document_uri is not None
+            and self.inference_model.is_web_page_supported_for_extract
+            and isinstance(resolve_uri(extract_input.document_uri), ResolvedHttpUrl)
+        ):
+            return
+        readable_formats = self.inference_model.readable_formats_for_extract
+        if extract_input.image_uri is not None:
+            readable_formats &= {IMAGE_FORMAT_KEY}
+        if format_key in readable_formats:
+            return
+        listed_formats = set(readable_formats)
+        if extract_input.document_uri is not None and self.inference_model.is_web_page_supported_for_extract:
+            listed_formats.add(_WEB_PAGE_INPUT)
+        subject = f"Input '{extract_input.input_name}' is" if extract_input.input_name else "The file to extract is"
+        msg = (
+            f"{subject} {describe_file_format(format_key=format_key, mime_type=extract_input.mime_type)}, "
+            f"which model '{self.inference_model.name}' cannot extract: it reads {describe_format_keys(format_keys=listed_formats)}. "
+            "Give a file in one of those formats, or use an extract model that reads this one."
+        )
+        raise ExtractInputFormatError(msg)
 
     async def extract_pages(
         self,

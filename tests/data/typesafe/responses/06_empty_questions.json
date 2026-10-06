@@ -1,0 +1,9 @@
+{
+  "class": "TypeSafeError",
+  "module": "typesafe_sdk._core.errors",
+  "mro": [
+    "Exception",
+    "BaseException"
+  ],
+  "str": "At least one question is required."
+}

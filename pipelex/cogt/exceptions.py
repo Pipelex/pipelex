@@ -7,7 +7,6 @@ from typing_extensions import override
 
 from pipelex.base_exceptions import ErrorDomain, ErrorReport, PipelexError, iter_cause_chain
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
-from pipelex.system.pipelex_service.types import RemoteConfigSource
 
 if TYPE_CHECKING:
     from pipelex.cogt.model_backends.model_type import ModelType
@@ -195,7 +194,11 @@ class SdkTypeError(CogtError):
 
 
 class ModelChoiceNotFoundError(CogtError):
-    """Error raised when a model choice cannot be found in the model deck.
+    """Raised when a model reference names a handle, alias, preset or waterfall the model deck does not define:
+    by the deck check a pipe runs when it is built, and by the deck when a run resolves a reference. When a
+    pipe is built, the pipe operator raises it again as a ``PipeOperatorModelChoiceError`` located on the pipe
+    and the field, so a bundle naming an unknown model is an invalid validation verdict (error type
+    ``unknown_model``), never a failure of the validator.
 
     Includes available options and migration hints in error message.
     """
@@ -210,6 +213,11 @@ class ModelChoiceNotFoundError(CogtError):
     # local ``.mthds`` file. An operator-side deck fault surfaces as
     # ``ModelDeckPresetValidatonError`` instead, which keeps the derived ``CONFIG``.
     error_domain = ErrorDomain.INPUT
+    # The message is caller-facing copy for the same reason: it names only the caller's own model
+    # reference and the deck's public handles (suggestions, sigil hints, available options). Without
+    # the flag, STRICT disclosure on the hosted API replaced it with the generic placeholder, so a
+    # method naming an unknown model failed its dry run with no hint of which model or what to use.
+    _authors_caller_facing_message = True
 
     def __init__(
         self,
@@ -340,6 +348,24 @@ class SearchHandleNotFoundError(CogtError):
         super().__init__(message)
 
 
+class DocGenHandleNotFoundError(CogtError):
+    error_category = InferenceErrorCategory.CONFIGURATION
+
+    def __init__(self, message: str, preset_id: str, model_handle: str):
+        self.preset_id = preset_id
+        self.model_handle = model_handle
+        super().__init__(message)
+
+
+class JudgmentHandleNotFoundError(CogtError):
+    error_category = InferenceErrorCategory.CONFIGURATION
+
+    def __init__(self, message: str, preset_id: str, model_handle: str):
+        self.preset_id = preset_id
+        self.model_handle = model_handle
+        super().__init__(message)
+
+
 class ExtractOutputError(CogtError):
     pass
 
@@ -384,6 +410,17 @@ class PromptDocumentFactoryError(CogtError):
     error_category = InferenceErrorCategory.CONTENT
 
 
+class PromptDocumentFormatError(CogtError):
+    """A prompt document's known format is one the LLM does not read.
+
+    A content error, and so in the input domain: the model is fixed by the method and reads the
+    formats it declares, while the file changes from run to run. A model that reads no documents at
+    all is the author's choice of model, which stays an `LLMCapabilityError`.
+    """
+
+    error_category = InferenceErrorCategory.CONTENT
+
+
 class ImgGenModelNotFoundError(ModelNotFoundError):
     pass
 
@@ -408,6 +445,17 @@ class ExtractCapabilityError(CogtError):
     error_category = InferenceErrorCategory.CONFIGURATION
 
 
+class ExtractInputFormatError(CogtError):
+    """The file given to an extraction has a known format that the extract model does not read.
+
+    A content error, and so in the input domain: the model is fixed by the method and reads the
+    formats it declares, while the file changes from run to run, and the person who can act is the
+    one supplying it.
+    """
+
+    error_category = InferenceErrorCategory.CONTENT
+
+
 class ExtractJobFailureError(CogtError):
     pass
 
@@ -422,6 +470,51 @@ class SearchJobFailureError(CogtError):
 
 class SearchModelNotFoundError(ModelNotFoundError):
     pass
+
+
+class JudgmentJobFailureError(CogtError):
+    pass
+
+
+class JudgmentAnswerMismatchError(CogtError):
+    """A judgment worker answered questions nobody asked, or answered one in the wrong shape."""
+
+
+class JudgmentCapabilityError(CogtError):
+    """A judgment job carries files its model does not read: images to a model without vision, documents to one that reads none.
+
+    The author's choice of model, and so a configuration error, as `LLMCapabilityError` is for an LLM.
+    A document of a format the model does not read is the caller's file, which stays a
+    `PromptDocumentFormatError`.
+    """
+
+    error_category = InferenceErrorCategory.CONFIGURATION
+
+
+class JudgmentModelNotFoundError(ModelNotFoundError):
+    pass
+
+
+class JudgmentModelMissingError(PipelexError):
+    """A judgment has no model to run on: the step names none, and the model deck names no default.
+
+    The deck serves no judgment model out of the box, since a judgment backend is one the user brings,
+    so a step that names no model is refused when its method loads, before a run spends anything, and
+    by the kernel's resolver for a programmatic caller. The message names only the step and the two
+    remedies, so it is kept verbatim for the caller.
+    """
+
+    error_domain = ErrorDomain.INPUT
+    _authors_caller_facing_message = True
+
+    def __init__(self, *, pipe_code: str | None = None):
+        self.pipe_code = pipe_code
+        step = f"PipeJudge '{pipe_code}'" if pipe_code else "This judgment"
+        message = (
+            f"{step} has no judgment model: it names none, and the model deck names no default for judgments. "
+            "Name the model in the step's `model` field, or set a `choice_default` under `[judgment]` in the model deck."
+        )
+        super().__init__(message)
 
 
 class RoutingProfileLibraryNotFoundError(CogtError):
@@ -452,6 +545,9 @@ class InferenceBackendCredentialsErrorType(StrEnum):
     VAR_NOT_FOUND = "var_not_found"
     UNKNOWN_VAR_PREFIX = "unknown_var_prefix"
     VAR_FALLBACK_PATTERN = "var_fallback_pattern"
+    # The process booted without inference, which loads every backend but resolves no credential,
+    # and was then asked for a backend to call.
+    NOT_RESOLVED_ON_KEYLESS_BOOT = "not_resolved_on_keyless_boot"
 
 
 class InferenceBackendCredentialsError(CogtError):
@@ -467,10 +563,22 @@ class InferenceBackendCredentialsError(CogtError):
         backend_name: str,
         message: str,
         key_name: str,
+        user_action: UserAction | None = None,
     ):
+        """A credential a backend needs that this process does not hold.
+
+        Args:
+            credentials_error_type: Why the credential is missing.
+            backend_name: The backend whose credential it is.
+            message: The error's message.
+            key_name: The variable the credential is read from, or the field when no variable names it.
+            user_action: This error's own next step, when the class's ("set the variable") is not it.
+        """
         self.credentials_error_type = credentials_error_type
         self.backend_name = backend_name
         self.key_name = key_name
+        if user_action is not None:
+            self.user_action = user_action
         super().__init__(message)
 
 
@@ -490,6 +598,22 @@ class RoutingProfileDisabledBackendError(CogtError):
 
 class ModelManagerError(CogtError):
     pass
+
+
+class PluginModelDeclarationError(CogtError):
+    """A model a plugin declares, or a model deck default it sets, cannot be merged into this installation's inference configuration.
+
+    The model manager validates the plugins' declarations when it merges them at boot, since a plugin's ``register``
+    only stores them: a model whose name the installation's ``internal.toml`` already declares, a table that is not a
+    valid model spec, or a default for a format and source no step composes. The message names the plugin, and the
+    file when one is involved.
+    """
+
+    error_category = InferenceErrorCategory.CONFIGURATION
+
+    def __init__(self, message: str, *, plugin: str):
+        self.plugin = plugin
+        super().__init__(message)
 
 
 class ModelListingUnsupportedError(CogtError):
@@ -514,43 +638,3 @@ class ModelDeckNotFoundError(CogtError):
 
 class ModelDeckValidationError(CogtError):
     pass
-
-
-class GatewayUnknownModelError(CogtError):
-    """A model handle the active routing profile sends to a managed gateway is absent from its specs.
-
-    Carries the provenance of the gateway config (``FRESH`` vs ``CACHED``) so the message can
-    branch: a cached-source failure suggests stale gateway specs and points the user at
-    ``pipelex init`` to refresh while online; a fresh-source failure is a genuine
-    misconfiguration.
-
-    **And it carries the backend name**, because more than one managed gateway can be live at once
-    and "which one" is then a question the message has to answer — the handle may be perfectly
-    present in the other service's section, which is a legitimate configuration rather than a
-    contradiction.
-    """
-
-    error_category = InferenceErrorCategory.CONFIGURATION
-
-    def __init__(self, model_name: str, backend_name: str, source: RemoteConfigSource) -> None:
-        self.model_name = model_name
-        self.backend_name = backend_name
-        self.source = source
-        match source:
-            case RemoteConfigSource.FRESH:
-                msg = (
-                    f"Model handle '{model_name}' is routed to backend '{backend_name}' by the active routing profile, "
-                    f"but is not present in the model specs we just fetched for it. Either the model name is wrong, that "
-                    f"gateway no longer offers it, or your deck overrides need updating.\n"
-                    f"  - Run `pipelex doctor` to inspect the active gateway models.\n"
-                    f"  - Route this model to another backend in .pipelex/inference/routing_profiles.toml.\n"
-                    f"  - Or disable {backend_name} in .pipelex/inference/backends.toml to fall back to BYOK."
-                )
-            case RemoteConfigSource.CACHED:
-                msg = (
-                    f"Model handle '{model_name}' is routed to backend '{backend_name}' by the active routing profile, "
-                    f"but is not present in the model specs loaded for it from the on-disk cache. The cache may be stale.\n"
-                    f"  - Run `pipelex init` while online to refresh the cached gateway config.\n"
-                    f"  - Or disable {backend_name} in .pipelex/inference/backends.toml to operate offline (BYOK)."
-                )
-        super().__init__(msg)

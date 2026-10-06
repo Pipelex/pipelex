@@ -1,31 +1,56 @@
 import re
-from typing import Any, cast
+from typing import Any, cast, get_args
 
+from pydantic import ValidationError
 from pydantic_core import ErrorDetails
+from pydantic_core.core_schema import CoreSchemaType
 
 from pipelex import log
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
+from pipelex.core.pipes.exceptions import PipeVariableMultiplicityError
+from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.mthds_parsing.exceptions import (
     InvalidPipeCodeSyntaxError,
     NativeConceptRedeclarationError,
 )
 from pipelex.mthds_parsing.handle_pipe_errors import extract_wrapped_pipe_validation_error
 from pipelex.mthds_parsing.helpers import ValidationErrorScope, get_error_scope
+from pipelex.pipe_controllers.binding.binding_concept_resolvers import BlueprintConceptWalkResolver, qualify_concept_ref
+from pipelex.pipe_controllers.binding.binding_derivation import BindingRoot, derive_binding
+from pipelex.pipe_controllers.binding.exceptions import BindingPathUnresolvedError
+from pipelex.pipe_machinery.pipe_blueprint import PIPE_SIGNATURE_TYPE_TAG, PipeType
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.validation_error_types import PipeValidationErrorType
 
 PIPELEX_BUNDLE_BLUEPRINT_DOMAIN_FIELD = "domain"
 PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD = "source"
 PIPELEX_BUNDLE_BLUEPRINT_MAIN_PIPE_FIELD = "main_pipe"
 PIPELEX_BUNDLE_BLUEPRINT_PIPE_FIELD = "pipe"
+PIPELEX_BUNDLE_BLUEPRINT_CONCEPT_FIELD = "concept"
 
-# Distinctive fragments of the two type-tag errors raised by the `pipe` before-validators (via
-# `normalize_typeless_signature_section` in `pipe_blueprint.py`, shared by the blueprint and spec
-# layers). Kept in sync with those single-source messages. They map to DIFFERENT structured
+# Distinctive fragments of the two type-tag errors raised by the bundle blueprint's `pipe`
+# before-validator (via `normalize_typeless_signature_section` in `pipe_blueprint.py`). Kept in sync
+# with those single-source messages. They map to DIFFERENT structured
 # categories — no-type-declared is `MISSING_PIPE_TYPE`, the retired-tag-declared is `UNKNOWN_PIPE_TYPE`
 # (a declared-but-invalid type) — and both name the pipe as ``Pipe `<code>``` so the pipe code is
 # recoverable from the message. See `_categorize_typeless_pipe_error`.
 _MISSING_PIPE_TYPE_MARKER = "has no `type` but declares"
 _EXPLICIT_SIGNATURE_TAG_MARKER = "is no longer a pipe type"
+
+# The tags of the union a `[pipe.<code>]` section validates through. Pydantic names the tag it routed to in
+# an error's location (`pipe.<code>.PipeLLM.<field>`), but the tag is not a field of the bundle.
+_PIPE_UNION_TAGS = frozenset([*PipeType.value_list(), PIPE_SIGNATURE_TYPE_TAG])
+
+# Pydantic's own schema tags that contain a hyphen ("function-after", "tagged-union"...). A key an author
+# writes may contain one too ("prompt-template"), so a hyphen alone does not make a location element pydantic's.
+_PYDANTIC_HYPHENATED_SCHEMA_TAGS = frozenset(tag for tag in get_args(CoreSchemaType) if "-" in tag)
+
+# The pydantic error type of a key the model does not define, whose location ends with the key as written.
+_PYDANTIC_EXTRA_FORBIDDEN_ERROR_TYPE = "extra_forbidden"
+
+# The prefix pydantic puts before the message of a ``ValueError`` a validator raised.
+_PYDANTIC_VALUE_ERROR_PREFIX = "Value error, "
 
 
 def _extract_wrapped_native_concept_redeclaration_error(error: ErrorDetails) -> NativeConceptRedeclarationError | None:
@@ -92,60 +117,57 @@ def _main_pipe_strip_is_safe(*, offending_code: str, stripped_code: str, bluepri
     return (offending_code in pipe_keys) != (stripped_code in pipe_keys)
 
 
-def _extract_variable_names_from_message(message: str) -> list[str] | None:
-    """Extract variable names from error messages like 'Missing input variable(s): var1, var2.'"""
-    # Pattern to match variable names after the colon
-    match = re.search(r"variable\(s\):\s*([^.]+)\.", message)
-    if match:
-        vars_str = match.group(1)
-        return [var.strip() for var in vars_str.split(",")]
-    return None
-
-
-def _categorize_input_validation_error(
-    message: str,
+def _redundant_input_unwalkable_reason(
     *,
-    domain: str | None,
-    source: str | None,
+    dotted_input_name: str,
     pipe_code: str | None,
-) -> PipelexBundleBlueprintValidationErrorData | None:
-    """Categorize input validation errors (missing or unused inputs).
+    domain: str | None,
+    blueprint_dict: dict[str, Any],
+) -> str | None:
+    """Why a redundant dotted input's path cannot be read through its root's declared concept, or ``None`` when it can.
 
-    Args:
-        message: The error message from the validation
-        domain: Domain code
-        source: Source file path
-        pipe_code: Pipe code being validated
-
-    Returns:
-        Categorized error data, or None if not an input validation error
+    Deleting the dotted key leaves the root typed by its own declaration, which the deletion is safe for only when
+    that concept holds the field the key named. The raise site sees the `inputs` table alone, so the check is made
+    here, on the raw bundle dict, by the binding walk over the bundle's own concepts and the natives: a concept the
+    bundle does not declare cannot be walked, and the deletion is then not proven safe. A template reads a
+    single-field native's pinned field (`$data.text` on a `Text`), which a binding refuses as a leaf, so the walk is
+    told to read those natives through their field.
     """
-    message_lower = message.lower()
-
-    # Detect missing input variables
-    if "missing input variable" in message_lower:
-        variable_names = _extract_variable_names_from_message(message)
-        return PipelexBundleBlueprintValidationErrorData(
-            error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
-            domain_code=domain,
-            source=source,
-            pipe_code=pipe_code,
-            message=message,
-            variable_names=variable_names,
+    if pipe_code is None or domain is None:
+        return "the pipe or its domain is unknown"
+    raw_pipes = blueprint_dict.get(PIPELEX_BUNDLE_BLUEPRINT_PIPE_FIELD)
+    raw_pipe = cast("dict[str, Any]", raw_pipes).get(pipe_code) if isinstance(raw_pipes, dict) else None
+    raw_inputs = cast("dict[str, Any]", raw_pipe).get("inputs") if isinstance(raw_pipe, dict) else None
+    root_name = get_root_from_dotted_path(dotted_input_name)
+    raw_root_spec = cast("dict[str, Any]", raw_inputs).get(root_name) if isinstance(raw_inputs, dict) else None
+    if not isinstance(raw_root_spec, str):
+        return f"the root '{root_name}' is not declared with a concept"
+    try:
+        parsed_root_spec = parse_concept_with_multiplicity(raw_root_spec)
+    except PipeVariableMultiplicityError:
+        return f"the root '{root_name}' is declared as '{raw_root_spec}', which is not a concept"
+    concept_blueprints: dict[str, ConceptBlueprint | str] = {}
+    raw_concepts = blueprint_dict.get(PIPELEX_BUNDLE_BLUEPRINT_CONCEPT_FIELD)
+    if isinstance(raw_concepts, dict):
+        for concept_code, raw_concept in cast("dict[Any, Any]", raw_concepts).items():
+            if not isinstance(concept_code, str):
+                continue
+            if isinstance(raw_concept, str):
+                concept_blueprints[f"{domain}.{concept_code}"] = raw_concept
+                continue
+            try:
+                concept_blueprints[f"{domain}.{concept_code}"] = ConceptBlueprint.model_validate(raw_concept)
+            except ValidationError:
+                continue
+    root_concept_ref = qualify_concept_ref(concept_ref=parsed_root_spec.concept_ref_or_code, domain_code=domain)
+    try:
+        derive_binding(
+            path=dotted_input_name,
+            root=BindingRoot(concept_ref=root_concept_ref, multiplicity=parsed_root_spec.multiplicity),
+            resolver=BlueprintConceptWalkResolver(concept_blueprints=concept_blueprints, walks_single_field_natives=True),
         )
-
-    # Detect unused/extraneous input variables
-    if "unused input variable" in message_lower:
-        variable_names = _extract_variable_names_from_message(message)
-        return PipelexBundleBlueprintValidationErrorData(
-            error_type=PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
-            domain_code=domain,
-            source=source,
-            pipe_code=pipe_code,
-            message=message,
-            variable_names=variable_names,
-        )
-
+    except BindingPathUnresolvedError as exc:
+        return str(exc)
     return None
 
 
@@ -238,8 +260,9 @@ def _is_pydantic_internal_loc_element(element: str) -> bool:
     internal type discriminators (e.g. "ConceptBlueprint", "dict[str,union[str,function-after]]",
     "function-after", "str"). We filter out the internal ones to build cleaner error paths.
     """
-    # Elements containing brackets or hyphens are pydantic type names (e.g. "dict[str,...]", "function-after")
-    if "[" in element or "-" in element:
+    # Elements containing brackets are pydantic type names (e.g. "dict[str,...]"), and so are its hyphenated
+    # schema tags (e.g. "function-after"); a hyphenated key the author wrote is kept.
+    if "[" in element or element in _PYDANTIC_HYPHENATED_SCHEMA_TAGS:
         return True
     # Builtin type names and pydantic model class names used as union discriminators
     return element in {"str", "int", "float", "bool", "list", "dict", "set", "tuple", "none", "ConceptBlueprint"}
@@ -290,22 +313,75 @@ def _categorize_concept_validation_error(
     )
 
 
+def _bundle_field_path(*, loc: tuple[int | str, ...], ends_with_authored_key: bool) -> str | None:
+    """The dot path from the bundle root that a pydantic ``loc`` names, without pydantic's own elements.
+
+    A pipe section validates through a union tagged by its ``type``, so pydantic puts the tag in the
+    location (``pipe.summarize.PipeLLM.promtp``); the tag and pydantic's type discriminators are
+    dropped, leaving the path the author would follow in the file (``pipe.summarize.promtp``). When the
+    location ends with a key the author wrote (``ends_with_authored_key``), that key is kept whatever it
+    looks like, since a key named ``str`` is still the key to fix.
+    """
+    parts = [str(part) for part in loc]
+    if len(parts) >= 3 and parts[0] == PIPELEX_BUNDLE_BLUEPRINT_PIPE_FIELD and parts[2] in _PIPE_UNION_TAGS:
+        del parts[2]
+    authored_key = parts.pop() if ends_with_authored_key and parts else None
+    clean_parts = [part for part in parts if not _is_pydantic_internal_loc_element(part)]
+    if authored_key is not None:
+        clean_parts.append(authored_key)
+    return ".".join(clean_parts) or None
+
+
+def _make_uncategorized_blueprint_error(
+    *,
+    error: ErrorDetails,
+    domain: str | None,
+    source: str | None,
+    pipe_code: str | None,
+) -> PipelexBundleBlueprintValidationErrorData:
+    """Keep an error no categorizer knows as an item of its own, with the locators its location gives.
+
+    It carries no ``error_type``: no closed code identifies the fault, as for the parse-level residual.
+    It keeps the ``source`` the parser seeded, the pipe its location names and the ``field_path``, so an
+    error such as a misspelled field reaches the author beside the errors that are categorized, rather
+    than only once those are fixed.
+    """
+    field_path = _bundle_field_path(loc=error["loc"], ends_with_authored_key=error["type"] == _PYDANTIC_EXTRA_FORBIDDEN_ERROR_TYPE)
+    message = error["msg"].removeprefix(_PYDANTIC_VALUE_ERROR_PREFIX)
+    return PipelexBundleBlueprintValidationErrorData(
+        domain_code=domain,
+        source=source,
+        pipe_code=pipe_code,
+        field_path=field_path,
+        message=f"Validation error at '{field_path}': {message}" if field_path else message,
+    )
+
+
 def categorize_blueprint_validation_error(
     error: ErrorDetails,
     *,
     blueprint_dict: dict[str, Any],
 ) -> PipelexBundleBlueprintValidationErrorData | None:
-    """Categorize a BLUEPRINT validation error and create structured error data or return None if the error cannot be categorized.
+    """Categorize a BLUEPRINT validation error into structured error data.
+
+    An error no categorizer knows is kept as an uncategorized item (no ``error_type``) located by its
+    source, pipe and field path, so every error of a bundle becomes an item. ``None`` is returned only
+    for the union-branch noise of a concept declared as ``ConceptBlueprint | str``, whose table branch
+    already reports the fault.
 
     Args:
         error: Pydantic error from PipelexBundleBlueprint.model_validate()
         blueprint_dict: The blueprint dict being validated (for context extraction)
 
     Returns:
-        PipelexBundleBlueprintValidationErrorData with all relevant fields populated, or None if error cannot be categorized
+        PipelexBundleBlueprintValidationErrorData with all relevant fields populated, or None for concept union noise
     """
-    domain = cast("str | None", blueprint_dict.get(PIPELEX_BUNDLE_BLUEPRINT_DOMAIN_FIELD)) if blueprint_dict else None
-    source = cast("str | None", blueprint_dict.get(PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD)) if blueprint_dict else None
+    # Read off the raw dict, whose values are whatever the author wrote: a `domain = 123` is itself one of
+    # the errors being categorized, so a value that is not a string locates nothing.
+    raw_domain = blueprint_dict.get(PIPELEX_BUNDLE_BLUEPRINT_DOMAIN_FIELD) if blueprint_dict else None
+    raw_source = blueprint_dict.get(PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD) if blueprint_dict else None
+    domain = raw_domain if isinstance(raw_domain, str) else None
+    source = raw_source if isinstance(raw_source, str) else None
 
     loc = error["loc"]
     message = error["msg"]
@@ -318,8 +394,9 @@ def categorize_blueprint_validation_error(
         pipe_code = str(loc[1])
 
     # A blueprint-stage ``PipeValidationError`` (e.g. the PipeBatch ``input_item_name`` ==
-    # ``input_list_name`` collision raised by ``PipeBatchBlueprint.validate_inputs``, or the SubPipe
-    # ``batch_over`` == ``batch_as`` collision raised by ``SubPipeBlueprint.validate_batch_params``) is
+    # ``input_list_name`` collision raised by ``PipeBatchBlueprint.validate_inputs``, the SubPipe
+    # ``batch_over`` == ``batch_as`` collision raised by ``SubPipeBlueprint.validate_batch_params``, or a
+    # missing or unread input raised by the operators' shared ``check_inputs_match_variables``) is
     # raised *inside* a pydantic model validator, so pydantic wraps it as a ``value_error`` with the
     # original exception in ``ctx["error"]``. Unwrap it — mirroring the pipe categorizer's
     # ``extract_wrapped_pipe_validation_error`` (one shared helper) — so its structured ``error_type``
@@ -335,6 +412,16 @@ def categorize_blueprint_validation_error(
     # bundle dict, preferring any the error does carry.
     wrapped_pipe_error = extract_wrapped_pipe_validation_error(error)
     if wrapped_pipe_error is not None:
+        # A redundant dotted input is safe to delete only when the root's declared concept holds the field the key named,
+        # which only this document-level view, holding the bundle's concepts, can check.
+        redundant_input_unwalkable_reason: str | None = None
+        if wrapped_pipe_error.redundant_input_name is not None:
+            redundant_input_unwalkable_reason = _redundant_input_unwalkable_reason(
+                dotted_input_name=wrapped_pipe_error.redundant_input_name,
+                pipe_code=wrapped_pipe_error.pipe_code or pipe_code,
+                domain=domain,
+                blueprint_dict=blueprint_dict,
+            )
         return PipelexBundleBlueprintValidationErrorData(
             error_type=wrapped_pipe_error.error_type,
             domain_code=wrapped_pipe_error.domain_code or domain,
@@ -342,6 +429,10 @@ def categorize_blueprint_validation_error(
             pipe_code=wrapped_pipe_error.pipe_code or pipe_code,
             message=wrapped_pipe_error.explanation or str(wrapped_pipe_error),
             variable_names=wrapped_pipe_error.variable_names,
+            redundant_input_name=wrapped_pipe_error.redundant_input_name,
+            dropped_input_marker=wrapped_pipe_error.dropped_input_marker,
+            root_input_marker=wrapped_pipe_error.root_input_marker,
+            redundant_input_unwalkable_reason=redundant_input_unwalkable_reason,
         )
 
     # A native-concept redeclaration: ``validate_concept_keys`` raised a typed ``ValueError``
@@ -429,16 +520,6 @@ def categorize_blueprint_validation_error(
     if missing_type_error:
         return missing_type_error
 
-    # Try to categorize input validation errors (missing/unused inputs)
-    input_error = _categorize_input_validation_error(
-        message=message,
-        domain=domain,
-        source=source,
-        pipe_code=pipe_code,
-    )
-    if input_error:
-        return input_error
-
     # Try to categorize syntax validation errors (invalid pipe code, main_pipe)
     syntax_error = _categorize_syntax_validation_error(
         message=message,
@@ -448,7 +529,6 @@ def categorize_blueprint_validation_error(
     if syntax_error:
         return syntax_error
 
-    # If we couldn't categorize the error, log a warning
-    log.warning(f"Pipelex bundle blueprint validation error that is not categorized: {error_scope} - {source} - {domain}")
-
-    return None
+    # No categorizer knows it: keep it as an item of its own, never dropped because another item exists.
+    log.verbose(f"Pipelex bundle blueprint validation error that is not categorized: {error_scope} - {source} - {domain}")
+    return _make_uncategorized_blueprint_error(error=error, domain=domain, source=source, pipe_code=pipe_code)

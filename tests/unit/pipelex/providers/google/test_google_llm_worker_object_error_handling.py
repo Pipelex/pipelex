@@ -240,11 +240,10 @@ class TestGoogleLLMWorkerObjectErrorHandling:
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.CONTACT_SUPPORT
 
-    async def test_real_instructor_propagates_client_error_raw(self, mocker: MockerFixture) -> None:
-        """End-to-end: drive the real instructor library with a ``ClientError`` and verify the
-        W2.3 behavior — instructor, confined to schema re-ask, does NOT retry the transport error
-        and does NOT wrap it in ``InstructorRetryException``. It propagates as the raw
-        ``ClientError``, which the worker classifies as TRANSIENT with provider metadata.
+    async def test_real_instructor_client_error_is_unwrapped(self, mocker: MockerFixture) -> None:
+        """End-to-end: drive the real instructor library with a ``ClientError`` and verify
+        that instructor, confined to schema re-ask, does not retry it: it raises an ``InstructorRetryException``
+        from it after the one attempt, which the worker unwraps to classify the SDK exception as TRANSIENT.
         """
         import instructor  # ruff: ignore[import-outside-top-level]
         from google.genai import Client as GoogleGenAiClient  # ruff: ignore[import-outside-top-level]
@@ -278,8 +277,10 @@ class TestGoogleLLMWorkerObjectErrorHandling:
         assert metadata is not None
         assert metadata.provider == "google"
         assert metadata.status_code == 429
-        # The raw SDK exception propagates and chains directly — instructor no longer wraps it.
-        assert exc_info.value.__cause__ is sdk_exc
+        # instructor raises its InstructorRetryException from the SDK exception, which it did not retry
+        wrapper_exc = exc_info.value.__cause__
+        assert wrapper_exc is not None
+        assert wrapper_exc.__cause__ is sdk_exc
 
     @pytest.mark.parametrize(
         ("sdk_exc", "expected_category"),

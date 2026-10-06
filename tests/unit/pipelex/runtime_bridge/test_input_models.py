@@ -7,7 +7,7 @@ from pipelex.runtime_bridge.payloads import PipelexPipeDispatchAck, PipelexPipeR
 
 class TestInputOutputModels:
     def test_input_defaults_match_design(self):
-        payload = PipelexPipeRunInput(storage_scope="test/scope", user_id="test-user", pipe_code="some_pipe")
+        payload = PipelexPipeRunInput(storage_scope="test/scope", read_scope=None, user_id="test-user", pipe_code="some_pipe")
         assert payload.pipe_code == "some_pipe"
         assert payload.inputs == {}
         assert payload.output_name is None
@@ -39,6 +39,7 @@ class TestInputOutputModels:
     def test_input_round_trip_via_json(self):
         original = PipelexPipeRunInput(
             storage_scope="test/scope",
+            read_scope=None,
             pipe_code="some_pipe",
             inputs={"foo": "bar"},
             orchestration_mode="temporal",
@@ -143,8 +144,8 @@ class TestTheWireRefusesAnUnusableScope:
     )
     def test_an_unsafe_scope_is_refused_at_construction(self, bad_scope: str):
         with pytest.raises(ValidationError):
-            PipelexPipeRunInput(storage_scope=bad_scope, user_id="test-user", pipe_code="some_pipe")
+            PipelexPipeRunInput(storage_scope=bad_scope, read_scope=None, user_id="test-user", pipe_code="some_pipe")
 
     def test_a_usable_scope_still_passes(self):
-        payload = PipelexPipeRunInput(storage_scope="org_a/mt_b/run_c", user_id="test-user", pipe_code="some_pipe")
+        payload = PipelexPipeRunInput(storage_scope="org_a/mt_b/run_c", read_scope=None, user_id="test-user", pipe_code="some_pipe")
         assert payload.storage_scope == "org_a/mt_b/run_c"

@@ -31,7 +31,6 @@
 [collections.backends]
 # --- All Available Backends ---
 all = [
-  "pipelex_gateway",
   "anthropic",
   "azure_openai",
   "bedrock",
@@ -49,6 +48,7 @@ all = [
   "vertexai",
   "xai",
   "linkup",
+  "typesafe",
   "internal",
 ]
 
@@ -239,6 +239,10 @@ qwen = ["qwen-image"]
 # --- Search Models ---
 linkup = ["linkup-standard", "linkup-deep"]
 
+[collections.judgment]
+# --- Judgment Models ---
+typesafe = ["jev-1.13.0"]
+
 [collections.extract]
 # --- Web Extraction Models ---
 from_web = ["linkup-fetch"]
@@ -252,7 +256,6 @@ from_pdf = [
   "mistral-ocr-2505",
   "mistral-ocr-2512",
   "mistral-document-ai-2505",
-  "azure-document-intelligence",
 ]
 
 # --- Image Extraction Models ---
@@ -263,7 +266,6 @@ from_image = [
   "mistral-ocr-2505",
   "mistral-ocr-2512",
   "deepseek-ocr",
-  "azure-document-intelligence",
 ]
 
 ################################################################################
@@ -280,13 +282,14 @@ llm_models = ["gpt-4o-mini"]
 img_gen_models = []
 extract_models = []
 search_models = []
+judgment_models = []
 
 ################################################################################
 # Dev Profile
 ################################################################################
 [profiles.dev]
 description = "Quick dev testing with fast and cheap models from key providers"
-backends = ["pipelex_gateway", "internal"]
+backends = ["anthropic", "openai", "google", "mistral", "linkup", "internal"]
 llm_models = [
   "claude-4.5-haiku",
   "gpt-4o-mini",
@@ -296,31 +299,22 @@ llm_models = [
 img_gen_models = ["gpt-image-1-mini"]
 extract_models = ["@from_pdf", "linkup-fetch"]
 search_models = ["linkup-standard"]
+judgment_models = []
 
 ################################################################################
-# Manifold Profile
+# TypeSafe Profile
 ################################################################################
-# The `dev` profile's shape, served by Pipelex Manifold instead of the Pipelex
-# Gateway. Deliberately not a copy of `dev`: the two catalogs are allowed to
-# diverge, so this names what the manifold section actually serves. `linkup` is
-# absent from it, and `@from_pdf` is not used because most of that collection is
-# other backends' — the manifold text extractors are named directly.
-#
-# The three LLMs are chosen to cover all three of the dialect's completion SDKs
-# in one run: `claude-4.5-haiku` on `anthropic` (POST /v1/messages),
-# `gpt-4o-mini` on `manifold_responses`, `gemini-2.5-flash-lite` on
-# `manifold_completions`.
-[profiles.manifold]
-description = "The dev model set, served by Pipelex Manifold (private beta)"
-backends = ["pipelex_manifold", "internal"]
-llm_models = [
-  "claude-4.5-haiku",
-  "gpt-4o-mini",
-  "gemini-2.5-flash-lite",
-]
-img_gen_models = ["gpt-image-1-mini"]
-extract_models = ["azure-document-intelligence", "linkup-fetch"]
-search_models = ["linkup-standard"]
+# The judgment family's live tests and nothing else. Every other model list is empty on purpose:
+# the combo fixtures route the whole deck to one backend for the duration of a run, and TypeSafe
+# serves judgments alone — a profile naming an LLM here would send it somewhere that cannot answer.
+[profiles.typesafe]
+description = "TypeSafe judgment models, for the judgment family's live tests"
+backends = ["typesafe"]
+llm_models = []
+img_gen_models = []
+extract_models = []
+search_models = []
+judgment_models = ["@typesafe"]
 
 ################################################################################
 # Coverage Profile
@@ -337,28 +331,31 @@ llm_models = [
 img_gen_models = ["gpt-image-1", "nano-banana"]
 extract_models = ["pypdfium2-extract-pdf"]
 search_models = ["linkup-standard"]
+judgment_models = []
 
 ################################################################################
 # Claude Latest Profile
 ################################################################################
 [profiles.claude_latest]
 description = "All Claude 4.5 models"
-backends = ["anthropic", "pipelex_gateway"]
+backends = ["anthropic"]
 llm_models = ["claude-4.5-*"]
 img_gen_models = []
 extract_models = []
 search_models = []
+judgment_models = []
 
 ################################################################################
 # GPT No Codex Profile
 ################################################################################
 [profiles.gpt_no_codex]
 description = "All GPT models except codex variants"
-backends = ["openai", "pipelex_gateway"]
+backends = ["openai"]
 llm_models = ["gpt-*", "!*-codex", "!*-codex-*"]
 img_gen_models = ["gpt-image-*"]
 extract_models = []
 search_models = []
+judgment_models = []
 
 ################################################################################
 # All Backends Profile - Test across all backends with select models
@@ -370,6 +367,7 @@ llm_models = ["claude-4.5-haiku", "gpt-4o-mini", "gemini-2.5-flash-lite"]
 img_gen_models = ["gpt-image-1-mini"]
 extract_models = ["@from_pdf"]
 search_models = ["@linkup"]
+judgment_models = []
 
 ################################################################################
 # Full Profile - All available models (use with caution)
@@ -377,30 +375,3 @@ search_models = ["@linkup"]
 [profiles.full]
 description = "All available models"
 include_all = true
-
-################################################################################
-# All Configs GW Profile - One model per Portkey config and model type
-################################################################################
-[profiles.all_configs_gw]
-description = "One model per Portkey config (auto-generated)"
-backends = ["pipelex_gateway"]
-llm_models = [
-  "gpt-4o-mini",
-  "gpt-oss-20b",
-  "claude-4-sonnet",
-  "deepseek-v3.2",
-  "gemini-2.5-pro",
-  "grok-3",
-]
-img_gen_models = [
-  "nano-banana-2",
-  "gpt-image-1",
-  "nano-banana",
-]
-extract_models = [
-  "azure-document-intelligence",
-  "deepseek-ocr",
-]
-search_models = [
-  "linkup-standard",
-]

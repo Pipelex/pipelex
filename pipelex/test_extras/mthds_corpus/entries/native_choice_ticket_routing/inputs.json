@@ -1,0 +1,19 @@
+{
+  "ticket": {
+    "concept": "native.Text",
+    "content": {
+      "text": "I was charged twice for the March invoice."
+    }
+  },
+  "team": {
+    "concept": "ticket_routing.Team",
+    "content": {
+      "choice": "billing",
+      "confidence": 0.82,
+      "probabilities": {
+        "billing": 0.91,
+        "technical": 0.09
+      }
+    }
+  }
+}

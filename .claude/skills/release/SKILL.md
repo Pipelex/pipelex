@@ -1,11 +1,13 @@
 ---
 name: release
 description: >
-  Cut a release of the pipelex Python package: the gates, the migration-ledger
-  cross-check, the CHANGELOG.md entry, the pyproject.toml bump with the lock and
-  the badge, one commit, and a pull request to main that publishes to PyPI on
-  merge. Use when the user says "release", "cut a release", "bump version",
-  "prepare a release", "make a release", "ship it", "create release branch",
+  Cut a release of pipelex, which ships the pipelex and pipelex-api packages and
+  the pipelex/pipelex-api Docker image under one version: the gates, the
+  migration-ledger cross-check, the CHANGELOG.md entry, the pyproject.toml bump
+  with the lock and the badge, one commit, and a pull request to main that
+  publishes to PyPI and Docker Hub on merge. Use when the user says "release",
+  "cut a release", "bump version", "prepare a release", "make a release",
+  "ship it", "create release branch",
   "promote dev to main", or any variation of shipping a new version of pipelex.
   Changelog content passed inline ("/release Added new extract backend") becomes
   the entry. The merge is landed by /ledger-land, never by this skill.
@@ -13,25 +15,36 @@ description: >
 
 # Releasing pipelex
 
-The procedure is the workspace release play, [`docs/releasing.md`](../../../../docs/releasing.md) at the workspace root — `../docs/releasing.md` from this repo's own root, which resolves the same from the main checkout and from any worktree. Read it first, then run it with what follows. The repo key is `pipelex`, the base is `dev`, and the pull request targets `main`. The release worktree is `_pipelex--release`, made with `wt add pipelex release --branch release/vX.Y.Z`.
+The procedure is the workspace release play, [`docs/workspace/releasing.md`](../../../../docs/workspace/releasing.md) at the workspace root — `../docs/workspace/releasing.md` from this repo's own root, which resolves the same from the main checkout and from any worktree. Read it first, then run it with what follows. The repo key is `pipelex`, the base is `dev`, and the pull request targets `main`. The release worktree is `_pipelex--release`, made with `wt add pipelex release --branch release/vX.Y.Z`.
 
 ## What ships
 
-- **PyPI: `pipelex`.** `.github/workflows/publish-pypi.yml` builds and publishes through trusted publishing. It fires on the release pull request **closing merged into `main`** (`pull_request: types: [closed]`), not on the push to `main` — so the run is keyed to the release branch and its `headSha` is that branch's last commit, never the merge commit. Where the play says "the run on the merge SHA", read it here as the run on `release/vX.Y.Z`.
-- **The GitHub Release and the `vX.Y.Z` tag.** The same workflow's `github-release` job creates them, and the tag exists only as a side effect of `gh release create`. The release is created and the dists attached *before* Sigstore signing, which is allowed to fail: an unsigned release is reported as a warning, not a failure, because the tag is the record of what shipped.
-- **The documentation site.** `.github/workflows/deploy-docs.yml` fires on the push to `main` and runs `make docs-deploy-stable`, which deploys the version read from `pyproject.toml` with the `latest` alias and republishes the root sitemap.
+One version, three artifacts, all from one run of `.github/workflows/publish-pypi.yml`, in this order: the `pipelex` wheel, the GitHub Release that tags the release commit, the `pipelex-api` wheel, then the image. The server in `api/` takes the library's version, so nothing of it is bumped separately.
 
-The landing verifies the publish from three places:
+- **PyPI: `pipelex`.** `.github/workflows/publish-pypi.yml` builds and publishes through trusted publishing. It fires on the release pull request **closing merged into `main`** (`pull_request: types: [closed]`), not on the push to `main` — so the run is keyed to the release branch and its `headSha` is that branch's last commit, never the merge commit. Where the play says "the run on the merge SHA", read it here as the run on `release/vX.Y.Z`.
+- **PyPI: `pipelex-api`.** The same workflow's `build-api` job builds the server's wheel and sdist and refuses them unless `api/scripts/check_lockstep_pin.py` finds `pipelex[...]==X.Y.Z` in both, the pin `api/hatch_build.py` writes, and `publish-to-pypi` waits for it, so a server that does not build stops the release before anything is uploaded; `publish-api-to-pypi` uploads them through trusted publishing in the same `pypi` environment, only after `github-release`, so the `pipelex` they pin is on PyPI and the tag guard has accepted the commit they were built from before a server file reaches PyPI.
+- **Docker Hub: `pipelex/pipelex-api:X.Y.Z`, and `latest`.** The `publish-docker-hub` job calls `.github/workflows/publish-docker-hub.yml` with the version once both distributions are on PyPI: it checks out the commit the `vX.Y.Z` tag names, runs `make -C api deploy-docker-hub` there (build for `linux/amd64` from the repository root, smoke-test that the image boots and reports X.Y.Z for the server and its pipelex, push the version tag, and `latest` when X.Y.Z is the newest stable release), and confirms the tags through Docker Hub's tags API. A pre-release pushes its own tag and leaves `latest` alone, and so does a retry of an older release. The Docker Hub overview is not part of the release and is still updated by hand, by pasting `api/README.md` into the repository's overview on Docker Hub when it has changed.
+- **The GitHub Release and the `vX.Y.Z` tag.** The same workflow's `github-release` job creates them, and the tag exists only as a side effect of `gh release create`. The release is created and the dists attached *before* Sigstore signing, which is allowed to fail: an unsigned release is reported as a warning, not a failure, because the tag is the record of what shipped.
+- **The documentation site.** `.github/workflows/deploy-docs.yml` fires on the push to `main` and runs `make docs-deploy-stable`, which deploys the version read from `pyproject.toml` with the `latest` alias and republishes the root sitemap. The API server's pages are part of it, under `api-server/`, with the OpenAPI artifact beside them.
+
+The landing verifies the publish from the run, the registries and the tag:
 
 ```bash
 gh run list --workflow=publish-pypi.yml --branch release/vX.Y.Z --limit 3 --json name,conclusion,headSha,event,url   # success
 pip index versions pipelex                                          # the registry answers X.Y.Z
+pip index versions pipelex-api                                      # the registry answers X.Y.Z
+curl -fsS https://hub.docker.com/v2/namespaces/pipelex/repositories/pipelex-api/tags/X.Y.Z | jq -r .digest   # Docker Hub serves the tag
+curl -fsS https://hub.docker.com/v2/namespaces/pipelex/repositories/pipelex-api/tags/latest | jq -r .digest   # the same digest, for a stable version
 git -C <main> fetch --tags --prune origin && git -C <main> tag --list vX.Y.Z
 ```
 
+The run concludes `success` only when every job did, the image's included, so a green run already says all three artifacts shipped; the registry answers are what confirms it from the outside. `docker manifest inspect pipelex/pipelex-api:X.Y.Z` is the other way to read the image tag.
+
 `gh release view vX.Y.Z` confirms the Release and its notes. A publish that failed *after* the merge is recovered by **re-running that run's failed jobs**, which keeps the successful ones, and that is the path to reach for. It is safe once the dists have reached PyPI: `skip-existing` opens on a re-run and on a dispatch, so the publish job no longer dies on the files already there, and the build job recovers the bytes this version published rather than rebuilding them — the artifact an attempt of the same run stored, else one an earlier run stored for the same commit, else the files PyPI serves — then refuses to go on unless what it holds is byte-for-byte what PyPI publishes. The Release step itself is idempotent: it edits an existing release rather than failing on one.
 
-`workflow_dispatch` is the other path, needed when the failure calls for a change to the workflow file, since a re-run replays the file the run started with. **Once the release exists, a dispatch succeeds only from a ref whose head is the commit the release is tagged at** — the release pull request's base branch, `main` normally, while nothing further has landed on it. The tag names the merge commit, a dispatch ships the head of the ref it was dispatched from, and `github-release`'s tag guard refuses any other commit: a dispatch from `release/vX.Y.Z` is therefore always refused, although it is the ref the failed run is listed under. That dispatch recovers from PyPI rather than from an artifact, the release branch's build being keyed to a different commit, and the bytes are the same either way. A dispatch accepts `main`, `release/vX.Y.Z` and `pre-release/v*` and nothing else, and its run lists under the ref it was dispatched from rather than under the release branch.
+The same goes for the server's two artifacts. A failed `publish-api-to-pypi` is re-run on its own, from the build its run stored. A failed `publish-docker-hub` is re-run on its own too: a version Docker Hub already serves is never built again, since a rebuild would be a different image under the same tag, so a retry that finds it there only moves `latest`, when the version is the newest stable release, and confirms the tags. When that failure needs a change to `publish-docker-hub.yml`, which a re-run would not pick up, dispatch it alone from the branch carrying the fix, `gh workflow run publish-docker-hub.yml --ref <branch> -f version=X.Y.Z`: whatever the ref, it builds the commit the `vX.Y.Z` tag names. The Dockerfile and the `deploy-docker-hub` recipe are that commit's too, so a fix there needs a new release. Docker Hub's tags API then confirms the push, as above. Such a fix must use only actions the organization's Actions allowlist accepts, or GitHub rejects the whole workflow at startup and nothing publishes; `make check-actions-allowlist` checks every workflow against `.github/actions-allowlist.toml` on every pull request, since pull-request CI never loads the publish workflows.
+
+`workflow_dispatch` of `publish-pypi.yml` is the other path, needed when the failure calls for a change to the workflow file, since a re-run replays the file the run started with. **Once the release exists, a dispatch succeeds only from a ref whose head is the commit the release is tagged at** — the release pull request's base branch, `main` normally, while nothing further has landed on it. The tag names the merge commit, a dispatch ships the head of the ref it was dispatched from, and `github-release`'s tag guard refuses any other commit: a dispatch from `release/vX.Y.Z` is therefore always refused, although it is the ref the failed run is listed under. That dispatch recovers from PyPI rather than from an artifact, the release branch's build being keyed to a different commit, and the bytes are the same either way. A dispatch accepts `main`, `release/vX.Y.Z` and `pre-release/v*` and nothing else, and its run lists under the ref it was dispatched from rather than under the release branch.
 
 ## Version files and the lock
 
@@ -39,6 +52,7 @@ git -C <main> fetch --tags --prune origin && git -C <main> tag --list vX.Y.Z
 - **The lock** — `make li` (lock + install) regenerates `uv.lock`. Stop and report if it fails; `uv-lock-check` in CI fails the pull request over a stale lock.
 - **Also stamped:**
   - **`.badges/tests.json`** — set `"message"` to what `make test-count` prints, leaving every other field alone, then run `make check-test-badge` to confirm the two agree. A mismatch is a CI failure on the pull request.
+  - **`docs/api-server/openapi/pipelex-api.openapi.yaml`** — `make -C api openapi-export`. The API server in `api/` takes the library's version, and its committed OpenAPI artifact carries it as `info.version`, so the bump moves the artifact and `make agent-check`, whose `api-agent-check` runs `openapi-check`, fails until it is re-exported. The only change it should show is that one line; anything more is a wire change that belongs in the changelog.
   - **`.test_durations`** — `make store-test-durations`, the per-test timing map `pytest-split` uses to balance the CI test shards. The refresh is incremental: it collects the suite and measures only the tests missing from the map, so it takes seconds on a quiet release and writes no diff at all when nothing was missing. Read the coverage line it prints before judging how long it should take — past roughly 40% of the suite missing it falls back to re-measuring everything, which takes minutes; treat a long run as a hang only when it reported few tests missing. Include the file in the commit only when it changed. `make store-test-durations-force` is **not** part of the release flow; it is for when recorded values are no longer comparable to each other because the machine or the suite changed shape. The rationale is `docs/contribute/test-duration-map.md`.
   - **`pipelex/migration/ledgers/*.toml` and `pipelex/migration/goldens/`** — only when the migration gate below finds an unaccounted schema change, and then written by the `add-migration` skill, never by hand.
 
@@ -62,7 +76,7 @@ git -C <main> fetch --tags --prune origin && git -C <main> tag --list vX.Y.Z
 
 ## The release commit
 
-`pyproject.toml`, `CHANGELOG.md`, `uv.lock`, `.badges/tests.json`, `.test_durations` when `make store-test-durations` changed it, whatever `make agent-check` rewrote, and the `pipelex/migration/ledgers/*.toml` and `pipelex/migration/goldens/` files the `add-migration` skill wrote when it ran. By name.
+`pyproject.toml`, `CHANGELOG.md`, `uv.lock`, `.badges/tests.json`, `docs/api-server/openapi/pipelex-api.openapi.yaml`, `.test_durations` when `make store-test-durations` changed it, whatever `make agent-check` rewrote, and the `pipelex/migration/ledgers/*.toml` and `pipelex/migration/goldens/` files the `add-migration` skill wrote when it ran. By name.
 
 ## CI on the release pull request
 
@@ -76,15 +90,17 @@ The checks that exist for the release:
 
 The pre-main gates a release pull request meets that a pull request to `dev` never does — they are slower, and a red here is the release stopping:
 
-- **`lint-fresh-check.yml`** — the read-only lint suite across every supported Python version with no mypy cache, so incremental-mypy drift and version-specific breakage cannot reach `main`.
-- **`tests-full-check.yml`** — the full Python matrix, sharded and balanced by `.test_durations`.
+- **`lint-fresh-check.yml`** — the read-only lint suite across every supported Python version with no mypy cache, so incremental-mypy drift and version-specific breakage cannot reach `main`. Each version's leg checks the API server too.
+- **`tests-full-check.yml`** — the full Python matrix, sharded and balanced by `.test_durations`, and the API server's tests on every supported version (`Tests full (api, pyX)`).
 - **`doc-check.yml`** — `mkdocs build --strict`, which runs unconditionally when the base is `main` rather than only when `docs/` changed.
 
-Everything that runs on every pull request gates it too, including `lint-check.yml`'s `Lint (agent-rules)` and `Lint (config-sync)` jobs (`make check-rules` and `make check-config-sync`, neither of which `make agent-check` runs), `tests-check.yml`, `mthds-standard-check.yml`, and `dependency-review.yml`, which fails on a newly introduced dependency vulnerable at moderate severity or above and runs on pull requests to `dev` just the same. A red in `mthds-standard-check.yml` with no pinned-set change in the branch means the MTHDS standard moved, and the remedy is a dedicated change bringing the pinned natives to the standard's page — never a tweak to the release branch.
+Everything that runs on every pull request gates it too, including the server's `Lint (api)`, `Tests (api)`, `Tests (packages)`, which builds both packages and checks the `pipelex-api` pin, and `Tests (api image)`, which builds and smoke-tests the image, and `lint-check.yml`'s `Lint (agent-rules)` and `Lint (config-sync)` jobs (`make check-rules` and `make check-config-sync`, neither of which `make agent-check` runs), `tests-check.yml`, `mthds-standard-check.yml`, and `dependency-review.yml`, which fails on a newly introduced dependency vulnerable at moderate severity or above and runs on pull requests to `dev` just the same. A red in `mthds-standard-check.yml` with no pinned-set change in the branch means the MTHDS standard moved, and the remedy is a dedicated change bringing the pinned natives to the standard's page — never a tweak to the release branch.
 
 ## Particulars
 
+- **The first release that ships the server explains the image's version jump.** The `pipelex/pipelex-api` image was released on its own until `0.33.2`, from the `Pipelex/pipelex-api` repository; its next tag is this release's version. `[Unreleased]` already says so in its `The Pipelex API server ships with pipelex` entry: keep that sentence when folding the entry, and say it in the pull request body. Releases after that one need no such note.
+- **A server change is an entry in this changelog.** `api/CHANGELOG.md` stops at `0.33.2` and is never extended.
 - **The migration gate feeds back into the bump.** A breaking entry found by the cross-check above turns a patch into a minor, so the bump is not final until that gate has run.
-- **The pre-release track is a different flow, not this play.** `pre-release/vX.Y.Z(a|b|rc)N` is a *base* branch that work merges into: `prerelease-version-check.yml` validates the PEP 440 form against the branch name, `publish-pypi.yml` also fires on a merge into it and marks the GitHub Release a pre-release, and `deploy-docs.yml` fires on the push to it as well — though its pre-release branch calls `make docs-deploy-specific-version`, a name with no recipe behind it (the recipe is `docs-deploy-specific-version-pre-release`), so that step succeeds and publishes nothing. A `release/vX.Y.Z` branch therefore never carries a pre-release version: `version-check.yml` fails on the mismatch with the branch name, and `guard-branches.yml` refuses a `release/vX.Y.Z(a|b|rc)N` head into `main` outright.
+- **The pre-release track is a different flow, not this play.** `pre-release/vX.Y.Z(a|b|rc)N` is a *base* branch that work merges into: `prerelease-version-check.yml` validates the PEP 440 form against the branch name, `publish-pypi.yml` also fires on a merge into it, marks the GitHub Release a pre-release and publishes the server's wheel and image as well, the image under its own tag with `latest` left on the last stable release, and `deploy-docs.yml` fires on the push to it as well — though its pre-release branch calls `make docs-deploy-specific-version`, a name with no recipe behind it (the recipe is `docs-deploy-specific-version-pre-release`), so that step succeeds and publishes nothing. A `release/vX.Y.Z` branch therefore never carries a pre-release version: `version-check.yml` fails on the mismatch with the branch name, and `guard-branches.yml` refuses a `release/vX.Y.Z(a|b|rc)N` head into `main` outright.
 - **The changelog heading carries the `v`** — `## [vX.Y.Z] - YYYY-MM-DD`, which is exactly what `changelog-check.yml` greps for and what `publish-pypi.yml` slices the GitHub Release notes out of. No `[Unreleased]` heading is left behind; the next change re-creates one.
 - **`.worktreeinclude` names the gitignored files a fresh worktree needs** — `.env`, the `.pipelex/` overrides and `.pipelex-dev/test_profiles_override.toml` — and `wt add` provisions them. A gate that fails in `_pipelex--release` on a missing local config means that file is short: add it there rather than hand-copying the file every release.

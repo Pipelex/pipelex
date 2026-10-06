@@ -2,6 +2,8 @@ import pytest
 from pydantic import ValidationError
 
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint, StructuringMethod
+from pipelex.validation_error_types import PipeValidationErrorType
+from tests.unit.pipelex.pipe_operators.input_check_helpers import refused_input_error
 
 
 class TestPipeLLMBlueprint:
@@ -62,58 +64,170 @@ class TestPipeLLMBlueprint:
         assert set(blueprint.input_names) == {"topic", "style"}
 
     def test_validate_inputs_incorrect_missing_variable(self):
-        """Test that missing input variable raises ValueError."""
-        with pytest.raises(ValueError, match="Missing input variable") as exc_info:
-            PipeLLMBlueprint(
-                description="lorem ipsum",
-                inputs={"input_one": "native.Text", "input_two": "native.Text"},
-                output="native.Text",
-                prompt="Process $input_one, $input_two, and $input_three",
-            )
-        error_msg = str(exc_info.value)
-        assert "Missing input variable(s):" in error_msg
-        assert "input_three" in error_msg
-        assert "not declared in inputs" in error_msg
+        """A variable the prompt reads but no input declares is refused, and the error names it."""
+        error = refused_input_error(
+            blueprint_class=PipeLLMBlueprint,
+            blueprint_kwargs={
+                "description": "lorem ipsum",
+                "inputs": {"input_one": "native.Text", "input_two": "native.Text"},
+                "output": "native.Text",
+                "prompt": "Process $input_one, $input_two, and $input_three",
+            },
+        )
+        assert error.error_type == PipeValidationErrorType.MISSING_INPUT_VARIABLE
+        assert error.variable_names == ["input_three"]
+        assert "not declared in `inputs`" in str(error)
 
     def test_validate_inputs_incorrect_missing_multiple_variables(self):
-        """Test that multiple missing variables are all reported."""
-        with pytest.raises(ValueError, match="Missing input variable") as exc_info:
-            PipeLLMBlueprint(
-                description="lorem ipsum",
-                inputs={"input_one": "native.Text"},
-                output="native.Text",
-                prompt="Process $input_one, $input_two, and $input_three",
-            )
-        error_msg = str(exc_info.value)
-        assert "Missing input variable(s):" in error_msg
-        assert "input_two" in error_msg
-        assert "input_three" in error_msg
+        """Every missing variable is reported, sorted."""
+        error = refused_input_error(
+            blueprint_class=PipeLLMBlueprint,
+            blueprint_kwargs={
+                "description": "lorem ipsum",
+                "inputs": {"input_one": "native.Text"},
+                "output": "native.Text",
+                "prompt": "Process $input_one, $input_two, and $input_three",
+            },
+        )
+        assert error.error_type == PipeValidationErrorType.MISSING_INPUT_VARIABLE
+        assert error.variable_names == ["input_three", "input_two"]
 
     def test_validate_inputs_incorrect_missing_in_system_prompt(self):
-        """Test that missing variables in system_prompt are caught."""
-        with pytest.raises(ValueError, match="Missing input variable") as exc_info:
-            PipeLLMBlueprint(
-                description="lorem ipsum",
-                inputs={"query": "native.Text"},
-                output="native.Text",
-                system_prompt="Use context: $context",
-                prompt="Answer: $query",
-            )
-        error_msg = str(exc_info.value)
-        assert "Missing input variable(s):" in error_msg
-        assert "context" in error_msg
+        """Missing variables in system_prompt are caught."""
+        error = refused_input_error(
+            blueprint_class=PipeLLMBlueprint,
+            blueprint_kwargs={
+                "description": "lorem ipsum",
+                "inputs": {"query": "native.Text"},
+                "output": "native.Text",
+                "system_prompt": "Use context: $context",
+                "prompt": "Answer: $query",
+            },
+        )
+        assert error.error_type == PipeValidationErrorType.MISSING_INPUT_VARIABLE
+        assert error.variable_names == ["context"]
 
     def test_validate_inputs_incorrect_empty_inputs_with_variables(self):
-        """Test that variables in prompt require inputs to be declared."""
-        with pytest.raises((ValidationError, ValueError)) as exc_info:
-            PipeLLMBlueprint(
-                description="lorem ipsum",
-                inputs={},
-                output="native.Text",
-                prompt="Process $data",
-            )
-        error_msg = str(exc_info.value)
-        assert "Missing input variable(s):" in error_msg or "data" in error_msg
+        """Variables in the prompt require inputs to be declared."""
+        error = refused_input_error(
+            blueprint_class=PipeLLMBlueprint,
+            blueprint_kwargs={"description": "lorem ipsum", "inputs": {}, "output": "native.Text", "prompt": "Process $data"},
+        )
+        assert error.error_type == PipeValidationErrorType.MISSING_INPUT_VARIABLE
+        assert error.variable_names == ["data"]
+
+    def test_validate_inputs_incorrect_unread_inputs_are_named_plainly(self):
+        """Unread inputs are all reported, sorted and unquoted: the names are data, not message text."""
+        error = refused_input_error(
+            blueprint_class=PipeLLMBlueprint,
+            blueprint_kwargs={
+                "description": "lorem ipsum",
+                "inputs": {"topic": "native.Text", "bbb": "native.Text", "aaa": "native.Text"},
+                "output": "native.Text",
+                "prompt": "Write about $topic",
+            },
+        )
+        assert error.error_type == PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE
+        assert error.variable_names == ["aaa", "bbb"]
+        assert "Reference them in the prompt or system_prompt" in str(error)
+
+    def test_validate_inputs_correct_reading_fields_through_the_root(self):
+        """Every template form reads a field through the root it names, with only the root declared."""
+        blueprint = PipeLLMBlueprint(
+            description="lorem ipsum",
+            inputs={"page": "Page"},
+            output="native.Text",
+            prompt="Describe:\n@page.page_view\n\nText: $page.text_and_images.text.text\nStored at {{ page.page_view.url }}",
+        )
+        assert blueprint.input_names == ["page"]
+
+    def test_validate_inputs_refuses_a_lone_dotted_input_name(self):
+        """An input name is a plain name, so a dotted one is refused before the prompt is read, naming both remedies."""
+        error = refused_input_error(
+            blueprint_class=PipeLLMBlueprint,
+            blueprint_kwargs={
+                "description": "lorem ipsum",
+                "inputs": {"page.page_view": "native.Image"},
+                "output": "native.Text",
+                "prompt": "Describe:\n@page.page_view",
+            },
+        )
+        assert error.error_type == PipeValidationErrorType.INVALID_INPUT_NAME
+        assert error.variable_names == ["page.page_view"]
+        assert error.redundant_input_name is None
+
+    def test_validate_inputs_refuses_a_dotted_input_name_beside_its_root(self):
+        """The root declared beside the dotted key makes the key redundant, which the error names for the fix planner."""
+        error = refused_input_error(
+            blueprint_class=PipeLLMBlueprint,
+            blueprint_kwargs={
+                "description": "lorem ipsum",
+                "inputs": {"page.page_view": "native.Image", "page": "Page"},
+                "output": "native.Text",
+                "prompt": "Describe:\n@page.page_view",
+            },
+        )
+        assert error.error_type == PipeValidationErrorType.INVALID_INPUT_NAME
+        assert error.variable_names == ["page.page_view"]
+        assert error.redundant_input_name == "page.page_view"
+
+    def test_validate_inputs_correct_with_attribute_after_subscript(self):
+        """An input read only through a subscript followed by an attribute counts as read."""
+        blueprint = PipeLLMBlueprint(
+            description="lorem ipsum",
+            inputs={"items": "native.Text[]"},
+            output="native.Text",
+            prompt="Summarize {{ items[0].text }}",
+        )
+        assert set(blueprint.input_names) == {"items"}
+
+    def test_validate_inputs_correct_with_a_set_read_in_its_loop_body(self):
+        """A name a loop body sets is the template's own where the body reads it, not an input."""
+        blueprint = PipeLLMBlueprint(
+            description="lorem ipsum",
+            inputs={"expenses": "native.Text[]"},
+            output="native.Text",
+            prompt="Plan these:\n{% for expense in expenses %}{% set day = expense.text %}- {{ day }}\n{% endfor %}",
+        )
+        assert set(blueprint.input_names) == {"expenses"}
+
+    def test_validate_inputs_incorrect_input_read_only_through_a_loop_set(self):
+        """An input declared only for a name the loop body sets is never read: the body reads its own `day`."""
+        error = refused_input_error(
+            blueprint_class=PipeLLMBlueprint,
+            blueprint_kwargs={
+                "description": "lorem ipsum",
+                "inputs": {"expenses": "native.Text[]", "day": "native.Text"},
+                "output": "native.Text",
+                "prompt": "{% for expense in expenses %}{% set day = expense.text %}- {{ day }}\n{% endfor %}",
+            },
+        )
+        assert error.error_type == PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE
+        assert error.variable_names == ["day"]
+
+    def test_validate_inputs_incorrect_set_in_only_some_branches(self):
+        """A name only some branches of an `if` set is read from the inputs on the paths where none ran."""
+        error = refused_input_error(
+            blueprint_class=PipeLLMBlueprint,
+            blueprint_kwargs={
+                "description": "lorem ipsum",
+                "inputs": {"topic": "native.Text"},
+                "output": "native.Text",
+                "prompt": "{% if topic %}{% set tone = 'formal' %}{% endif %}Write about $topic in a {{ tone }} tone",
+            },
+        )
+        assert error.error_type == PipeValidationErrorType.MISSING_INPUT_VARIABLE
+        assert error.variable_names == ["tone"]
+
+    def test_validate_inputs_correct_with_input_named_like_a_jinja_global(self):
+        """An input named like a Jinja global shadows it, so reading the name reads the input."""
+        blueprint = PipeLLMBlueprint(
+            description="lorem ipsum",
+            inputs={"range": "native.Text"},
+            output="native.Text",
+            prompt="Summarize the price range: $range",
+        )
+        assert set(blueprint.input_names) == {"range"}
 
     def test_validate_inputs_ignores_internal_variables(self):
         """Test that internal variables (starting with _) are ignored."""

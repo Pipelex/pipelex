@@ -13,15 +13,16 @@ def setup_telemetry(*, console: Console, telemetry_config_path: Path, for_projec
     """Set up telemetry configuration by copying the appropriate kit template.
 
     The global template (`telemetry.toml`) carries active defaults and seeds
-    `~/.pipelex/telemetry.toml`. The project template (`telemetry.project.toml`)
-    is fully commented out so a project's `.pipelex/telemetry.toml` does not
-    override the user's global telemetry settings during layered loading.
+    `telemetry.toml` in the home configuration directory (`~/.pipelex/`, or
+    `PIPELEX_HOME`). The project template (`telemetry.project.toml`) is fully
+    commented out so a project's `.pipelex/telemetry.toml` does not override
+    the user's global telemetry settings during layered loading.
 
     Args:
         console: Rich Console instance for user interaction.
         telemetry_config_path: Path to save the telemetry configuration.
         for_project: True when targeting a project's `.pipelex/`; False when
-            targeting the global `~/.pipelex/`.
+            targeting the home configuration directory.
     """
     telemetry_config_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -41,6 +42,3 @@ def setup_telemetry(*, console: Console, telemetry_config_path: Path, for_projec
         console.print("[dim]  • \\[posthog] - Send traces to your own PostHog project[/dim]")
         console.print("[dim]  • \\[langfuse] - Enable Langfuse LLM observability[/dim]")
         console.print("[dim]  • \\[\\[otlp]] - Add custom OpenTelemetry exporters[/dim]")
-    console.print()
-    console.print("[dim]💡 Note: If you use Pipelex Gateway, separate telemetry is sent to Pipelex[/dim]")
-    console.print("[dim]servers regardless of these settings.[/dim]")

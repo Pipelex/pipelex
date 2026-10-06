@@ -1,0 +1,16 @@
+{
+  "catalog": {
+    "concept": "nursery_catalog.Catalog",
+    "content": {
+      "season": "spring",
+      "pages": [
+        {
+          "title": "Climbing roses"
+        },
+        {
+          "title": "Fruit trees"
+        }
+      ]
+    }
+  }
+}

@@ -7,7 +7,7 @@ GraphSpec is renderer-agnostic and designed for JSON serialization.
 from collections.abc import Sequence
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self
+from typing import Annotated, Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
@@ -48,6 +48,8 @@ class NodeKind(StrEnum):
     OUTPUT = "output"
     ARTIFACT = "artifact"
     ERROR = "error"
+    # A PipeSequence binding step: it runs no pipe, and produces the stuff it binds from a path in working memory.
+    BINDING = "binding"
 
 
 class NodeStatus(StrEnum):
@@ -185,6 +187,11 @@ class TimingSpec(BaseModel):
         return data
 
 
+# How many values a stuff holds on a GraphSpec io item: `True` for a variable-length list, a
+# positive integer for a fixed count, `False` for a single value (as is `None` where it is optional).
+IOMultiplicity = bool | Annotated[int, Field(gt=0)]
+
+
 class IOSpec(BaseModel):
     """Specification for an input or output variable.
 
@@ -193,6 +200,11 @@ class IOSpec(BaseModel):
 
     The optional `data` field can hold the full serialized content when
     full data capture is enabled (via --graph-full-data CLI option).
+
+    `concept` is always the bare concept code; whether the stuff is a list is `multiplicity`,
+    in the encoding the pipe registry uses for a stuff spec's multiplicity: `True` for a
+    variable-length list, a positive integer for a fixed count, `None` (or `False`) for a single
+    value, a count of one reading as single. A reader takes absence as single.
     """
 
     model_config = ConfigDict(extra="forbid", strict=True)
@@ -204,6 +216,7 @@ class IOSpec(BaseModel):
     size: int | None = None
     digest: str | None = None
     data: str | dict[str, Any] | list[str] | list[dict[str, Any]] | None = None
+    multiplicity: IOMultiplicity | None = None
     extra: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("preview", mode="after")
@@ -211,6 +224,25 @@ class IOSpec(BaseModel):
     def truncate_preview(cls, value: str | None) -> str | None:
         """Truncate preview to MAX_PREVIEW_LENGTH."""
         return _truncate_string(value, max_length=MAX_PREVIEW_LENGTH)
+
+    @property
+    def concept_label(self) -> str | None:
+        """The concept as a renderer labels this stuff, with its multiplicity marker (`Record[]`)."""
+        return make_io_concept_label(concept=self.concept, multiplicity=self.multiplicity)
+
+
+def make_io_concept_label(*, concept: str | None, multiplicity: IOMultiplicity | None) -> str | None:
+    """A concept with the marker an author would write for the multiplicity: `[]`, `[N]` or nothing.
+
+    A count of one, `False` and `None` all read as single and get no marker. `None` when there is no concept.
+    """
+    if concept is None:
+        return None
+    if multiplicity is True:
+        return f"{concept}[]"
+    if isinstance(multiplicity, int) and not isinstance(multiplicity, bool) and multiplicity > 1:
+        return f"{concept}[{multiplicity}]"
+    return concept
 
 
 def output_digest_is_optional(*, output_specs: Sequence[IOSpec], digest: str) -> bool:
@@ -279,10 +311,11 @@ class ModelUsageSpec(BaseModel):
 
     inference_model_name: str
     inference_model_id: str
-    # Kind of inference: "llm", "img_gen", "extract", "search". The discriminator a
+    # Kind of inference: "llm", "img_gen", "extract", "search", "judgment". The discriminator a
     # consumer needs before displaying token counts: extract/search/img_gen are billed
     # PER REQUEST, and that price is encoded by putting 1_000_000 in each token
     # category (rates are per-million), so their "tokens" are a scaled request counter.
+    # llm and judgment report the real tokens the provider read and wrote.
     model_type: str
     inference_calls: int = 0
     rated_inference_calls: int = 0

@@ -34,7 +34,7 @@ Run in a **subprocess** for the reason its two siblings state: a suite-level boo
 process singletons, and both hubs are sticky class attributes that `teardown` deliberately does not
 clear — so an in-process check would answer from a stale `Pipelex` and pass vacuously.
 
-`needs_inference=False` keeps the boot offline (no gateway terms gate, no model-deck validation), and
+`needs_inference=False` keeps the boot offline (no remote config fetch, no model-deck validation), and
 `PipeRunMode.DRY` keeps the call offline: every cogt leaf mocks before a worker is looked up, so each
 setting below names a model the deck never has to resolve. The settings are built literally rather
 than through the `resolve_*_setting` helpers for that same reason — those read the deck, which is a
@@ -65,7 +65,7 @@ SUBPROCESS_TIMEOUT_SECONDS = 300
 #: Both LLM arms run because they share almost nothing below the façade — `resolve_llm_setting_for_text`
 #: vs `_for_object`, and `dry_llm_gen_text` vs `dry_llm_gen_object` — so covering one leaves the
 #: other's closure unproven, and the contract is stated over *a kernel call*, not over one of them.
-#: The five operator ops below are called as module-level functions rather than through `PipelexKernel`
+#: The operator ops below are called as module-level functions rather than through `PipelexKernel`
 #: for the plain reason that the façade does not expose them.
 _KERNEL_CALL_SCRIPT = textwrap.dedent(
     """
@@ -77,6 +77,8 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     from pipelex.cogt.extract.extract_input import ExtractInput
     from pipelex.cogt.extract.extract_setting import ExtractSetting
     from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
+    from pipelex.cogt.judgment.judgment_models import ChoiceQuestion
+    from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
     from pipelex.cogt.llm.llm_setting import LLMSetting
     from pipelex.cogt.search.search_setting import SearchSetting
     from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
@@ -88,6 +90,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
     from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
     from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
+    from pipelex.core.stuffs.choice_content import ChoiceContent
     from pipelex.core.stuffs.image_content import ImageContent
     from pipelex.core.stuffs.list_content import ListContent
     from pipelex.core.stuffs.number_content import NumberContent
@@ -100,6 +103,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     from pipelex.kernel.func_ops import run_func
     from pipelex.kernel.img_gen_ops import build_img_gen_job_params, run_img_gen
     from pipelex.kernel.img_gen_prompt import assemble_img_gen_prompt
+    from pipelex.kernel.judgment_ops import run_judgment
     from pipelex.kernel.llm_results import LlmObjectResult, LlmTextResult
     from pipelex.kernel.memory_ops import (
         extract_main_content,
@@ -118,6 +122,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     from pipelex.system.registries.func_registry import func_registry
     from pipelex.system.runtime import IntegrationMode
     from pipelex.tools.jinja2.template_category import TemplateCategory
+    from pipelex.tools.log.log_context import get_log_context
 
     interpreter_packages = frozenset(sys.argv[1:])
     # An empty set would make the sweep flag nothing and the test pass vacuously — the same guard both
@@ -175,7 +180,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
 
     RuntimeBoot.make(integration_mode=IntegrationMode.PYTEST, needs_inference=False)
 
-    kernel = PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="kernel-boot-contract")
+    kernel = PipelexKernel.make(storage_scope="test/scope", read_scope=None, run_mode=PipeRunMode.DRY, user_id="kernel-boot-contract")
     model = LLMSetting(model="kernel-boot-contract-model", temperature=0.5)
     text_concept = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT)
 
@@ -187,6 +192,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
         inputs={"topic": SHAPED_TOPIC},
         concept_provider=NativeOnlyConceptProvider(),
         input_specs=InputStuffSpecs(root={"topic": StuffSpec(concept=text_concept)}),
+        read_scope=None,
     )
     if extract_named_content(memory=shaped_memory, name="topic", content_type=TextContent).text != SHAPED_TOPIC:
         fail("shape_inputs did not land the provided value under its declared name")
@@ -243,14 +249,21 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
             if not isinstance(extracted_item, NumberContent):
                 fail(f"a list extraction helper yielded a {type(extracted_item).__name__}, not the NumberContent it was asked for")
 
-    text_result = asyncio.run(
-        kernel.llm_text(
-            memory=WorkingMemoryFactory.make_empty(),
-            model=model,
-            user="Say something.",
-            result="reply",
+    # The host's run-level log binding, entered the way a host enters it: around its kernel calls.
+    # It binds the run and no step, and releases the binding on exit.
+    with kernel.log_context() as run_binding:
+        if run_binding.pipeline_run_id != kernel.job_metadata.run_metadata.pipeline_run_id or run_binding.pipe_run_id is not None:
+            fail(f"kernel.log_context() bound {run_binding!r}, not the run's own id with no step")
+        text_result = asyncio.run(
+            kernel.llm_text(
+                memory=WorkingMemoryFactory.make_empty(),
+                model=model,
+                user="Say something.",
+                result="reply",
+            )
         )
-    )
+    if get_log_context() is not None:
+        fail("kernel.log_context() did not release its binding on exit")
 
     if not isinstance(text_result, LlmTextResult):
         fail(f"llm_text returned {type(text_result).__name__}, not an LlmTextResult")
@@ -355,6 +368,28 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     if search_result.rendered_query != search_query:
         fail(f"run_search rendered {search_result.rendered_query!r}, not the query it was given")
     check_stored(search_result, "run_search", SearchResultContent)
+
+    judgment_memory = WorkingMemoryFactory.make_from_single_stuff(
+        stuff=StuffFactory.make_stuff(concept=text_concept, content=TextContent(text="My invoice is wrong."), name="message")
+    )
+    judgment_result = asyncio.run(
+        run_judgment(
+            memory=judgment_memory,
+            question=ChoiceQuestion(instructions="Which team handles {{ message }}?", options={"billing": None, "technical": None}),
+            input_names=["message"],
+            judgment_setting=JudgmentSetting(model="kernel-boot-contract-judgment-model"),
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.CHOICE),
+            job_metadata=kernel.make_step_metadata(),
+            cogt_run_params=kernel.cogt_run_params,
+            templating_style=templating_style,
+            result_name="team",
+        )
+    )
+
+    # The rendered question proves the templating ran against memory rather than being skipped.
+    if judgment_result.rendered_question != "Which team handles My invoice is wrong.?":
+        fail(f"run_judgment rendered {judgment_result.rendered_question!r}, not the question over its memory")
+    check_stored(judgment_result, "run_judgment", ChoiceContent)
 
     composed_text = "Composed on a kernel-only boot."
     compose_result = asyncio.run(

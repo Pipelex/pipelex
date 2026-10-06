@@ -2,11 +2,12 @@ from pydantic import BaseModel
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.document.prompt_document import PromptDocument
+from pipelex.cogt.document.prompt_document import PromptDocument, PromptDocumentUri
 from pipelex.cogt.exceptions import LLMPromptParameterError
-from pipelex.cogt.image.prompt_image import PromptImage
+from pipelex.cogt.image.prompt_image import PromptImage, PromptImageUri
 from pipelex.system.runtime import ProblemReaction, runtime_manager
 from pipelex.tools.misc.string_utils import is_none_or_has_text, is_not_none_and_has_text
+from pipelex.tools.uri.uri_read_scope import UriReference
 
 
 class LLMPrompt(BaseModel):
@@ -14,6 +15,20 @@ class LLMPrompt(BaseModel):
     user_text: str | None = None
     user_images: list[PromptImage] = []
     user_documents: list[PromptDocument] = []
+
+    def referenced_uris(self) -> list[UriReference]:
+        """The URLs a worker will read to send this prompt: its images and documents given by URI."""
+        uri_references = [
+            UriReference(uri=image.uri, position=f"image {index} of the prompt")
+            for index, image in enumerate(self.user_images, start=1)
+            if isinstance(image, PromptImageUri)
+        ]
+        uri_references.extend(
+            UriReference(uri=document.uri, position=f"document {index} of the prompt")
+            for index, document in enumerate(self.user_documents, start=1)
+            if isinstance(document, PromptDocumentUri)
+        )
+        return uri_references
 
     def validate_before_execution(self):
         reaction = runtime_manager.problem_reactions.job

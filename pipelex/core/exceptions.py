@@ -46,11 +46,45 @@ class PipelexBundleBlueprintValidationErrorData(BaseModel):
     message: str
     variable_names: list[str] | None = None
 
+    # The bundle-root dot path of the failing field, set on an error the categorizer does not know,
+    # so the item keeps the location its pydantic ``loc`` named (``pipe.<code>.<field>``).
+    field_path: str | None = None
+
+    # The 1-based position where a TOML syntax error was found, in the file ``source`` names or in
+    # the submitted content when there is none.
+    line: int | None = None
+    column: int | None = None
+
+    # The bare codes of the concepts the validated bundle declares in ``domain_code``, set on an
+    # ``unresolved_concept`` error so the author sees what the reference could have named.
+    declared_concepts: list[str] | None = None
+
     # The namespace-stripped bare code for a strippable same-domain over-qualified pipe code
     # (``strip-namespace`` enrichment). Present only when the fix planner can act; ``pipe_code``
     # discriminates the two raise sites — set to the offending dotted code for a declaration-key
     # rename, ``None`` for a ``main_pipe`` value strip (which is a root ``set_key``, not a rename).
     stripped_pipe_code: str | None = None
+
+    # A dotted input name whose root the same `inputs` table also declares (``delete-redundant-dotted-input``
+    # enrichment), set on an ``invalid_input_name`` error only when it holds: the declared root already
+    # supplies every field a template reads through it, so the planner can delete the key. A lone dotted
+    # name or a malformed one leaves it unset, because its repair is the author's to choose.
+    redundant_input_name: str | None = None
+
+    # Set beside ``redundant_input_name`` only when deleting that key would change its root's contract: the marker
+    # the key declares, as MTHDS writes it after the concept (``!``, ``[]``, or the empty string for a plain single
+    # value). As the last declaration under its root, the key set the root's presence and multiplicity, so the
+    # planner offers the deletion as unsafe. Unset, the deletion is safe.
+    dropped_input_marker: str | None = None
+
+    # Set together with ``dropped_input_marker``: the marker the root declares, written the same way. The planner's
+    # warning compares the two markers' multiplicity and presence apart, and names only the part that differs.
+    root_input_marker: str | None = None
+
+    # Set beside ``redundant_input_name`` only when the root's declared concept does not hold the field the dotted key named,
+    # as the binding walk over the bundle's own concepts finds: the walk's refusal. Deleting the key would then leave the
+    # root typed by a concept that lacks the field, so the planner offers the deletion as unsafe, whatever the markers say.
+    redundant_input_unwalkable_reason: str | None = None
 
 
 class PipesAndConceptValidationErrorData(BaseModel):
@@ -77,8 +111,12 @@ class PipesAndConceptValidationErrorData(BaseModel):
     field_name: str | None = Field(default=None, description="Specific field that failed")
 
     # === Error Classification ===
-    error_type: PipeValidationErrorType = Field(
-        description="Type of pipe/concept validation error",
+    # ``None`` for a refusal no closed code fits: a load-time refusal located on a pipe but carrying no
+    # code of its own (the general arm of the bundle-loading cascade), exactly as the parse-level
+    # residual carries none rather than a code that would claim to know which fault occurred.
+    error_type: PipeValidationErrorType | None = Field(
+        default=None,
+        description="Type of pipe/concept validation error, or None when no closed code fits the refusal",
     )
 
     # === Error Details ===
@@ -87,6 +125,12 @@ class PipesAndConceptValidationErrorData(BaseModel):
 
     # === Variable names for input/output errors ===
     variable_names: list[str] | None = Field(default=None, description="Variable names (for input errors)")
+
+    # === Declared concepts (for unresolved_concept errors) ===
+    declared_concepts: list[str] | None = Field(
+        default=None,
+        description="The bare codes of the concepts the validated bundle declares in the domain the reference was looked up in",
+    )
 
     # === Enriched expected value (for output-mismatch errors) ===
     expected_output_ref: str | None = Field(
@@ -105,3 +149,27 @@ class PipesAndConceptValidationErrorData(BaseModel):
         description="The pipe's currently declared inputs mapping, rendered like expected_inputs, "
         "so a fix planner can diff the two without file access",
     )
+
+    # === Unknown-model locators (for unknown_model errors) ===
+    model_reference: str | None = Field(default=None, description="The model reference exactly as the author wrote it")
+    model_type: str | None = Field(default=None, description="The model type the field takes (llm, text_extractor, img_gen, search)")
+    suggestions: list[str] | None = Field(
+        default=None,
+        description="The deck's close matches of the same kind, each spelled as a reference the field accepts",
+    )
+
+
+class DryRunFailureErrorData(BaseModel):
+    """Structured error data for one pipe whose dry run failed.
+
+    The dry-run sweep records one per failing pipe, located at the innermost pipe that failed: a
+    failure that makes an enclosing controller fail for the same cause is kept once, at the pipe
+    where it happened. ``message`` is built from that pipe's own failure under the disclosure rule
+    for an item built from a raised error: the failure's own message when it is caller-facing, its
+    title otherwise, because the verdict that carries it is caller-facing as a whole.
+    """
+
+    pipe_code: str | None = Field(default=None, description="Bare code of the pipe whose dry run failed")
+    domain_code: str | None = Field(default=None, description="Domain of the pipe whose dry run failed")
+    source: str | None = Field(default=None, description="Source file of the pipe, when the library knows it")
+    message: str = Field(description="The pipe's own failure, as the disclosure rule allows it")

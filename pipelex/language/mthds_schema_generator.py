@@ -11,6 +11,15 @@ import copy
 from typing import TYPE_CHECKING, Any, cast, get_args
 
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipeBlueprintUnion, PipelexBundleBlueprint
+from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
+from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
+from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
+from pipelex.pipe_machinery.validation import (
+    INPUT_NAME_PATTERN,
+    PARALLEL_BRANCH_BATCH_OVER_PATTERN,
+    RESERVED_NAME_PATTERN,
+    SEQUENCE_STEP_BATCH_OVER_PATTERN,
+)
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
 from pipelex.tools.misc.package_utils import get_package_version
 
@@ -35,6 +44,14 @@ _PIPE_DEFINITION_NAMES: frozenset[str] = frozenset(member.__name__ for member in
 # is rejected (extra property under the arm's `additionalProperties: false`).
 _SIGNATURE_DEFINITION_NAME = PipeSignatureBlueprint.__name__
 
+# The definition a PipeParallel branch takes: `SubPipeBlueprint`'s, with a `batch_over` that is never dotted
+# (`_constrain_batch_over`). No Python class carries the name, since steps and branches share one blueprint.
+_PARALLEL_BRANCH_DEFINITION_NAME = "ParallelBranchBlueprint"
+
+# The fields of a pipe step, and of a PipeParallel branch, naming a slot of working memory: the runtime refuses each when it
+# takes the prefix reserved for the bound list of a dotted `batch_over` (`_reserve_private_binding_names`).
+_PIPE_STEP_NAME_FIELDS: tuple[str, ...] = ("result", "batch_as", "batch_over")
+
 
 def generate_mthds_schema() -> dict[str, Any]:
     """Generate a Taplo-compatible JSON Schema for .mthds files.
@@ -56,6 +73,10 @@ def generate_mthds_schema() -> dict[str, Any]:
     schema = _normalize_type_on_pipe_definitions(schema)
     schema = _convert_to_draft4(schema)
     schema = _patch_construct_schema(schema)
+    schema = _constrain_input_names(schema)
+    # Before `_constrain_batch_over`, so the branch definition it copies from the pipe step's carries the reservation too.
+    schema = _reserve_private_binding_names(schema)
+    schema = _constrain_batch_over(schema)
 
     return _add_taplo_metadata(schema)
 
@@ -254,6 +275,115 @@ def _patch_construct_schema(schema: dict[str, Any]) -> dict[str, Any]:
         }
 
     return schema
+
+
+def _constrain_input_names(schema: dict[str, Any]) -> dict[str, Any]:
+    """Constrain every input name to the plain-name grammar, so a structural check refuses a dotted one.
+
+    An input name is a plain snake_case identifier (`INPUT_NAME_PATTERN`), on every pipe's `inputs` keys
+    and on a PipeBatch's `input_list_name`; the runtime refuses anything else as `invalid_input_name`, and
+    this makes the schema refuse it first, which is what that error type's `fails_at = "schema"` records.
+
+    The keys are constrained with `patternProperties` plus `additionalProperties: false` rather than with
+    `propertyNames`: the schema is Draft 4, which has no `propertyNames`, and a Draft-4 validator such as
+    plxt's ignores the keyword silently. Moving the value schema under the pattern says the same thing in
+    every draft: a key matching the pattern takes the slot schema, and any other key is refused.
+    """
+    schema = copy.deepcopy(schema)
+    definitions = schema.get("definitions", {})
+
+    for def_name in _PIPE_DEFINITION_NAMES:
+        inputs_schema = definitions.get(def_name, {}).get("properties", {}).get("inputs")
+        if inputs_schema is None:
+            continue
+        for arm in inputs_schema.get("anyOf", [inputs_schema]):
+            if arm.get("type") != "object" or "additionalProperties" not in arm:
+                continue
+            arm["patternProperties"] = {INPUT_NAME_PATTERN: arm.pop("additionalProperties")}
+            arm["additionalProperties"] = False
+
+    input_list_name_schema = definitions.get(PipeBatchBlueprint.__name__, {}).get("properties", {}).get("input_list_name")
+    if input_list_name_schema is not None:
+        input_list_name_schema["pattern"] = INPUT_NAME_PATTERN
+
+    return schema
+
+
+def _reserve_private_binding_names(schema: dict[str, Any]) -> dict[str, Any]:
+    """Refuse the names the runtime reserves for the bound list of a dotted `batch_over`, as the runtime does.
+
+    A pipe step's `result`, `batch_as` and plain `batch_over`, and a PipeBatch's `input_item_name`, never take the `_bound_`
+    prefix: the runtime refuses each as `invalid_input_name` when the bundle is parsed, which keeps that error type's
+    `fails_at = "schema"` true. Each is a Draft-4 `not` holding a `pattern` on the field's string arm: a negative lookahead in
+    the pattern itself would say the same, but not every validator's regex engine has one, while every Draft-4 validator
+    applies `not`, plxt's included. The other names an author writes into working memory, input names and a binding step's
+    `result`, already follow the plain-name grammar, which no underscore-led name matches.
+    """
+    schema = copy.deepcopy(schema)
+    definitions = schema.get("definitions", {})
+    pipe_step_properties = definitions.get(SubPipeBlueprint.__name__, {}).get("properties", {})
+    for field_name in _PIPE_STEP_NAME_FIELDS:
+        _refuse_reserved_names(field_schema=pipe_step_properties.get(field_name))
+    _refuse_reserved_names(field_schema=definitions.get(PipeBatchBlueprint.__name__, {}).get("properties", {}).get("input_item_name"))
+    return schema
+
+
+def _refuse_reserved_names(*, field_schema: dict[str, Any] | None) -> None:
+    if field_schema is None:
+        return
+    for arm in field_schema.get("anyOf", [field_schema]):
+        if arm.get("type") == "string":
+            arm["not"] = {"pattern": RESERVED_NAME_PATTERN}
+
+
+def _constrain_batch_over(schema: dict[str, Any]) -> dict[str, Any]:
+    """Give `batch_over` its grammar: a dotted path on a PipeSequence step, and a name with no dot on a PipeParallel branch.
+
+    A dotted `batch_over` binds the list at its path before batching over it, so on a sequence's pipe step it follows the
+    binding path grammar, and a PipeParallel branch, which never binds, carries none: the runtime refuses both faults as
+    `binding_step_invalid`, which this makes the schema refuse first. Both steps and branches parse into `SubPipeBlueprint`,
+    so the branch takes a copy of its definition, `ParallelBranchBlueprint`, carrying the stricter `pattern`. Each is a
+    `pattern` on the string arm of the field, which a Draft-4 validator such as plxt's applies.
+    """
+    schema = copy.deepcopy(schema)
+    definitions = schema.get("definitions", {})
+    pipe_step_schema = definitions.get(SubPipeBlueprint.__name__)
+    branches_schema = definitions.get(PipeParallelBlueprint.__name__, {}).get("properties", {}).get("branches")
+    if pipe_step_schema is None or branches_schema is None:
+        return schema
+
+    branch_schema = copy.deepcopy(pipe_step_schema)
+    branch_schema["title"] = _PARALLEL_BRANCH_DEFINITION_NAME
+    _set_batch_over_grammar(
+        step_schema=pipe_step_schema,
+        pattern=SEQUENCE_STEP_BATCH_OVER_PATTERN,
+        description=(
+            "The list in working memory to batch this step over, running the pipe once per item. A dotted path such as "
+            "`catalog.pages` is a binding followed by a batch: the path is bound under a private name, by the rules of a binding "
+            "step's `from`, and the step batches over the bound list, which must be a list."
+        ),
+    )
+    _set_batch_over_grammar(
+        step_schema=branch_schema,
+        pattern=PARALLEL_BRANCH_BATCH_OVER_PATTERN,
+        description=(
+            "The list in working memory to batch this branch over, running the pipe once per item. A name with no dot: a branch "
+            "never binds, so a list held in a field is bound by the calling sequence before the PipeParallel step."
+        ),
+    )
+    definitions[_PARALLEL_BRANCH_DEFINITION_NAME] = branch_schema
+    branches_schema["items"] = {"$ref": f"#/definitions/{_PARALLEL_BRANCH_DEFINITION_NAME}"}
+    return schema
+
+
+def _set_batch_over_grammar(*, step_schema: dict[str, Any], pattern: str, description: str) -> None:
+    batch_over_schema = step_schema.get("properties", {}).get("batch_over")
+    if batch_over_schema is None:
+        return
+    batch_over_schema["description"] = description
+    for arm in batch_over_schema.get("anyOf", [batch_over_schema]):
+        if arm.get("type") == "string":
+            arm["pattern"] = pattern
 
 
 def _build_construct_field_schema() -> dict[str, Any]:

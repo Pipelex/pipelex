@@ -1,0 +1,12 @@
+name = "invalid_binding_step_result_not_plain"
+description = "An invoice total bound under a name that is not a plain input name"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.binding_step_invalid",
+]
+
+expected_error = "binding_step_invalid"

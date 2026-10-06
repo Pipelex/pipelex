@@ -17,7 +17,6 @@ from pipelex.cogt.inference.error_classification import UserAction, UserActionKi
 from pipelex.cogt.inference.error_classify import classify_inference_error
 from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
-from pipelex.cogt.model_backends.backend import MANAGED_GATEWAY_BACKEND_NAMES
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.providers.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -38,8 +37,22 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
         sdk_instance: Any,
         inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
+        fixed_output_format: ImageFormat | None = None,
     ):
+        """Build the worker.
+
+        Args:
+            openai_completions_factory: The factory building the request's messages and extras.
+            sdk_instance: The `openai.AsyncOpenAI` client to call.
+            inference_model: The model this worker serves.
+            reporting_delegate: Where inference usage is reported.
+            fixed_output_format: The one image format the service answers in, for a service that
+                normalises every image to a fixed format and may answer with a URL, from which no
+                format can be read. Whoever registers the worker for such a service passes it; a
+                request for another format is refused before the call.
+        """
         super().__init__(inference_model=inference_model, reporting_delegate=reporting_delegate)
+        self.fixed_output_format = fixed_output_format
 
         if not isinstance(sdk_instance, openai.AsyncOpenAI):
             msg = f"Provided ImgGen sdk_instance is not of type openai.AsyncOpenAI: it's a '{type(sdk_instance)}'"
@@ -54,26 +67,15 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
         img_gen_job: ImgGenJob,
     ) -> GeneratedImageRawDetails:
         log.debug(f"Generating image with model: {self.inference_model.tag}")
-        image_format: ImageFormat | None = None
-        # Both Pipelex-managed gateways, not just the Portkey-cloud one: the manifold service relays
-        # the same models through the same gateway codebase, so it normalises a completions image
-        # response the same way — a URL to a PNG, with no format to read off the bytes.
-        if self.inference_model.backend_name in MANAGED_GATEWAY_BACKEND_NAMES:
-            if img_gen_job.job_params.output_format and not img_gen_job.job_params.output_format.is_png:
+        image_format = self.fixed_output_format
+        if image_format is not None:
+            requested_format = img_gen_job.job_params.output_format
+            if requested_format is not None and requested_format != image_format:
                 msg = (
-                    f"Completions ImgGen worker for backend '{self.inference_model.backend_name}' only supports PNG output format. "
-                    f"Requested output format: {img_gen_job.job_params.output_format}"
+                    f"Completions ImgGen worker for backend '{self.inference_model.backend_name}' only supports {image_format} output format. "
+                    f"Requested output format: {requested_format}"
                 )
                 raise ImgGenParameterError(msg)
-            image_format = ImageFormat.PNG
-        if self.inference_model.backend_name == "blackboxai":
-            if img_gen_job.job_params.output_format and not img_gen_job.job_params.output_format.is_jpeg:
-                msg = (
-                    f"Completions ImgGen worker for BlackboxAI only supports JPEG output format. "
-                    f"Requested output format: {img_gen_job.job_params.output_format}"
-                )
-                raise ImgGenParameterError(msg)
-            image_format = ImageFormat.JPEG
 
         # Build message content with optional input images
         messages = await self._build_messages_with_images(img_gen_job)
@@ -123,14 +125,12 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
                             )
                         base64_str, base64_extracted_mime_type = extracted
         elif (content := openai_message.content) and content.startswith("http"):
-            # OpenAI response message is a URL, this happens with blackboxai and pipelex_gateway which have a fixed output format.
-            # Otherwise we won't know what format the image is in.
+            # The response message is a URL, which only a service with a fixed output format answers with:
+            # otherwise we won't know what format the image is in.
             if image_format is None:
                 msg = (
-                    f"OpenAI response message is a URL but output_format is not set. This shouldn't be possible. "
-                    f"This response should only happen when using backend 'blackboxai' or a Pipelex-managed gateway "
-                    f"({', '.join(MANAGED_GATEWAY_BACKEND_NAMES)}). "
-                    f"Backend is: '{self.inference_model.backend_name}'"
+                    f"The completions image response is a URL, but the worker for backend '{self.inference_model.backend_name}' "
+                    f"was built with no fixed output format, so the image's format cannot be known."
                 )
                 raise ImgGenParameterError(msg)
             actual_url = openai_message.content

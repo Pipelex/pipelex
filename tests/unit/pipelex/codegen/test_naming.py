@@ -1,27 +1,20 @@
-from pipelex.codegen.emitters.naming import allocate_ts_type_names, python_class_name, runtime_to_emitted_class_names, snake_to_pascal, ts_type_name
+from pipelex.codegen.emitters.naming import allocate_ts_type_names, python_class_name, snake_to_pascal, ts_type_name
 from pipelex.codegen.resolved_concepts import ResolvedConcept, ResolvedLibrary
 
 
-def _resolved_concept(
-    *,
-    domain: str,
-    code: str,
-    is_native: bool = False,
-    needs_qualification: bool = False,
-    opaque_python_class: str | None = None,
-) -> ResolvedConcept:
+def _resolved_concept(*, domain: str, code: str, needs_qualification: bool = False) -> ResolvedConcept:
     return ResolvedConcept(
         concept_ref=f"{domain}.{code}",
         domain=domain,
         code=code,
         description=f"{code} concept",
-        is_native=is_native,
+        is_native=False,
         needs_qualification=needs_qualification,
         base_ref=None,
         fields=[],
-        structureless=opaque_python_class is not None,
+        structureless=False,
         imprecision_reason=None,
-        opaque_python_class=opaque_python_class,
+        opaque_python_class=None,
     )
 
 
@@ -103,24 +96,4 @@ class TestNaming:
         assert allocate_ts_type_names(library) == {
             "demo.Foo": "Foo",
             "demo.FooSchema": "FooSchema2",
-        }
-
-    def test_runtime_to_emitted_class_names(self):
-        """Runtime-qualified spellings map to the emitted names; natives and opaque classes are skipped."""
-        library = ResolvedLibrary(
-            mthds_version="0.1.0",
-            concepts=[
-                _resolved_concept(domain="pipeline", code="Report"),
-                _resolved_concept(domain="alpha", code="Result", needs_qualification=True),
-                _resolved_concept(domain="native", code="Text", is_native=True),
-                _resolved_concept(domain="pipeline", code="Wrapped", opaque_python_class="UserClass"),
-            ],
-        )
-
-        mapping = runtime_to_emitted_class_names(library)
-
-        # Unique code: runtime-qualified -> bare; collision: identity; native + opaque: absent.
-        assert mapping == {
-            "pipeline__Report": "Report",
-            "alpha__Result": "alpha__Result",
         }

@@ -148,28 +148,29 @@ async def generate_object_content(
     generator, so nothing rebuilds a class from a schema when the class already exists. The schema
     round-trip further down still serves the distributed-activity boundary and is untouched.
     """
-    content_generator = get_content_generator()
-    if is_multiple_output:
-        count_desc = f"{fixed_nb_output}x" if fixed_nb_output else "list of "
-        log.verbose(f"Kernel generating {count_desc}{output_class.__name__} by object_direct")
-        generated_objects = await content_generator.make_object_list(
+    with job_metadata.log_context():
+        content_generator = get_content_generator()
+        if is_multiple_output:
+            count_desc = f"{fixed_nb_output}x" if fixed_nb_output else "list of "
+            log.verbose(f"Kernel generating {count_desc}{output_class.__name__} by object_direct")
+            generated_objects = await content_generator.make_object_list(
+                job_metadata=job_metadata,
+                cogt_run_params=cogt_run_params,
+                object_class=output_class,
+                llm_prompt_for_object_list=llm_prompt,
+                llm_setting_for_object_list=llm_setting,
+                nb_items=fixed_nb_output,
+            )
+            return ListContent(items=generated_objects)
+
+        log.verbose(f"Kernel generating a single {output_class.__name__} by object_direct")
+        return await content_generator.make_object(
             job_metadata=job_metadata,
             cogt_run_params=cogt_run_params,
             object_class=output_class,
-            llm_prompt_for_object_list=llm_prompt,
-            llm_setting_for_object_list=llm_setting,
-            nb_items=fixed_nb_output,
+            llm_prompt_for_object=llm_prompt,
+            llm_setting_for_object=llm_setting,
         )
-        return ListContent(items=generated_objects)
-
-    log.verbose(f"Kernel generating a single {output_class.__name__} by object_direct")
-    return await content_generator.make_object(
-        job_metadata=job_metadata,
-        cogt_run_params=cogt_run_params,
-        object_class=output_class,
-        llm_prompt_for_object=llm_prompt,
-        llm_setting_for_object=llm_setting,
-    )
 
 
 async def run_llm_text(
@@ -191,31 +192,32 @@ async def run_llm_text(
     `templating_style` is an argument because the style is an authoring decision the caller holds —
     what the step declared, resolved against the runtime default — not something derivable here.
     """
-    llm_prompt = await assemble_llm_prompt(
-        prompt_content=prompt_content,
-        context_provider=memory,
-        output_structure_prompt=None,
-        extra_params=extra_params,
-        templating_style=templating_style,
-    )
-    generated_text = await get_content_generator().make_llm_text(
-        job_metadata=job_metadata,
-        cogt_run_params=cogt_run_params,
-        llm_prompt_for_text=llm_prompt,
-        llm_setting_main=llm_setting,
-    )
-    # `model_validate` rather than `output_class(text=...)`: the class arrives typed as
-    # `type[StuffContent]`, whose declared fields do not include `text` — the subclasses that a
-    # Text-compatible concept resolves to are what carry it. Validation, and the `ValidationError`
-    # a mismatch raises, are identical either way.
-    content = output_class.model_validate({"text": generated_text})
-    return LlmTextResult(
-        memory=store_result(memory=memory, concept=concept, content=content, result_name=result_name, result_code=result_code),
-        text=generated_text,
-        rendered_prompt=llm_prompt,
-        llm_setting=llm_setting,
-        structuring_path=StructuringPath.TEXT,
-    )
+    with job_metadata.log_context():
+        llm_prompt = await assemble_llm_prompt(
+            prompt_content=prompt_content,
+            context_provider=memory,
+            output_structure_prompt=None,
+            extra_params=extra_params,
+            templating_style=templating_style,
+        )
+        generated_text = await get_content_generator().make_llm_text(
+            job_metadata=job_metadata,
+            cogt_run_params=cogt_run_params,
+            llm_prompt_for_text=llm_prompt,
+            llm_setting_main=llm_setting,
+        )
+        # `model_validate` rather than `output_class(text=...)`: the class arrives typed as
+        # `type[StuffContent]`, whose declared fields do not include `text` — the subclasses that a
+        # Text-compatible concept resolves to are what carry it. Validation, and the `ValidationError`
+        # a mismatch raises, are identical either way.
+        content = output_class.model_validate({"text": generated_text})
+        return LlmTextResult(
+            memory=store_result(memory=memory, concept=concept, content=content, result_name=result_name, result_code=result_code),
+            text=generated_text,
+            rendered_prompt=llm_prompt,
+            llm_setting=llm_setting,
+            structuring_path=StructuringPath.TEXT,
+        )
 
 
 async def run_llm_object(
@@ -242,31 +244,32 @@ async def run_llm_object(
     same prompt by default — a prompt supplied only from outside would have left the derivation at
     each caller and let the two defaults fork.
     """
-    output_structure_prompt = (
-        structure_prompt
-        if structure_prompt is not None
-        else await derive_structure_prompt(output_class=output_class, templating_style=templating_style)
-    )
-    llm_prompt = await assemble_llm_prompt(
-        prompt_content=prompt_content,
-        context_provider=memory,
-        output_structure_prompt=output_structure_prompt,
-        extra_params=extra_params,
-        templating_style=templating_style,
-    )
-    content = await generate_object_content(
-        job_metadata=job_metadata,
-        cogt_run_params=cogt_run_params,
-        llm_prompt=llm_prompt,
-        llm_setting=llm_setting,
-        output_class=output_class,
-        is_multiple_output=is_multiple_output,
-        fixed_nb_output=fixed_nb_output,
-    )
-    return LlmObjectResult(
-        memory=store_result(memory=memory, concept=concept, content=content, result_name=result_name, result_code=result_code),
-        content=content,
-        rendered_prompt=llm_prompt,
-        llm_setting=llm_setting,
-        structuring_path=StructuringPath.OBJECT_LIST if is_multiple_output else StructuringPath.OBJECT_DIRECT,
-    )
+    with job_metadata.log_context():
+        output_structure_prompt = (
+            structure_prompt
+            if structure_prompt is not None
+            else await derive_structure_prompt(output_class=output_class, templating_style=templating_style)
+        )
+        llm_prompt = await assemble_llm_prompt(
+            prompt_content=prompt_content,
+            context_provider=memory,
+            output_structure_prompt=output_structure_prompt,
+            extra_params=extra_params,
+            templating_style=templating_style,
+        )
+        content = await generate_object_content(
+            job_metadata=job_metadata,
+            cogt_run_params=cogt_run_params,
+            llm_prompt=llm_prompt,
+            llm_setting=llm_setting,
+            output_class=output_class,
+            is_multiple_output=is_multiple_output,
+            fixed_nb_output=fixed_nb_output,
+        )
+        return LlmObjectResult(
+            memory=store_result(memory=memory, concept=concept, content=content, result_name=result_name, result_code=result_code),
+            content=content,
+            rendered_prompt=llm_prompt,
+            llm_setting=llm_setting,
+            structuring_path=StructuringPath.OBJECT_LIST if is_multiple_output else StructuringPath.OBJECT_DIRECT,
+        )

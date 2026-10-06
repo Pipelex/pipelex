@@ -91,6 +91,12 @@ _PIPE_TYPE_PREFIX = "Pipe"
 # coverage the corpus does not have is worse than a short vocabulary. Rendered in alphabetical order,
 # there being no registry order to follow.
 _FEATURE_TAGS: dict[str, str] = {
+    "binding_step": (
+        'A PipeSequence step `{ from = "invoice.total", result = "total_amount" }` that binds the value at a '
+        "path in working memory to a new name: its concept is derived from the declared structures the path walks, "
+        "its value is a deep copy taken when the step runs, a path crossing a list binds a flat list, and a path "
+        "reaching nothing records an absence."
+    ),
     "optionals": (
         "An input declared optional with the `?` suffix, so a run that has no value for it proceeds "
         "instead of failing and the absence is recorded in the working memory. How a method copes with "
@@ -144,14 +150,6 @@ _PIPE_TYPE_EXCLUSIONS: dict[PipeType, str] = {
 # exclusion maps are: a code that leaves the registry breaks this module at import instead of leaving
 # a dead exclusion behind in the generated file.
 _ERROR_TYPE_EXCLUSIONS: dict[ValidationErrorType, str] = {
-    PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR: (
-        "Raised only from the pipe sorter, and the pipe sorter runs only on `PipelexBundleSpec.to_blueprint()` "
-        "— the builder's spec-to-blueprint conversion, which is how an AI-authored spec becomes a bundle. A "
-        "`.mthds` file parses straight into a blueprint and never passes through it, so no corpus entry can "
-        "produce this. Measured rather than read off the call graph: a self-referencing PipeSequence fails the "
-        "dry run with `DryRunError`, and a mutually recursive PipeCondition pair exhausts the interpreter's "
-        "stack — neither reports a circular dependency."
-    ),
     PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT: (
         "Advisory-only: it rides the validation report's `warnings` array and never makes a verdict invalid. An "
         "entry contract that models one `expected_error` on an invalid entry has nowhere to put a warning on a "
@@ -164,6 +162,13 @@ _ERROR_TYPE_EXCLUSIONS: dict[ValidationErrorType, str] = {
         "on is VALID — a gating input whose concept declares no required field is legal, merely undefinable for "
         "a caller — so there is no `expected_error` an entry could carry. Revisit if the manifest ever grows a "
         "warnings axis."
+    ),
+    PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY: (
+        "It refuses a reference to a pipe an installed dependency package loads but does not export, so the "
+        "bundle that produces it needs that package installed beside it, with a manifest declaring `[exports]`. "
+        "A focused entry is one self-contained bundle validated where nothing is installed, and an "
+        "address-based reference to a package that is not installed fails as a missing method instead. "
+        "Revisit if an entry can ever carry the packages it depends on."
     ),
     HintLintErrorType.HINT_UNKNOWN_KEY: _ADVISORY_HINT_LINT_EXCLUSION,
     HintLintErrorType.HINT_UNKNOWN_INTENT: _ADVISORY_HINT_LINT_EXCLUSION,
@@ -220,6 +225,16 @@ _ERROR_TYPE_SCHEMA_FAULTS: frozenset[ValidationErrorType] = frozenset(
         # A `type` naming a pipe kind that does not exist, which the schema's closed enum of pipe
         # kinds rejects on sight.
         PipeValidationErrorType.UNKNOWN_PIPE_TYPE,
+        # An input name that is not a plain snake_case identifier, a dotted `"page.page_view"` included,
+        # which the schema's pattern on every `inputs` key and on `input_list_name` rejects. Measured on
+        # both of its entries: plxt reports `error[schema]` on the lone dotted key and on the one beside
+        # its declared root.
+        PipeValidationErrorType.INVALID_INPUT_NAME,
+        # A malformed binding step: `pipe` beside `from`, a binding without `result` or carrying a pipe step's
+        # batch fields, a `from` outside the path grammar or a `result` outside the plain-name grammar, and a
+        # binding written as a parallel branch. The schema's closed step shapes and their patterns reject each.
+        # Measured on all of its entries: plxt reports `error[schema]` on every one of them.
+        PipeValidationErrorType.BINDING_STEP_INVALID,
     }
 )
 

@@ -1,7 +1,9 @@
 from typing import Any
 
 import httpx
-from mistralai import Mistral, MistralError
+from mistralai.client import Mistral
+from mistralai.client.errors import MistralError
+from mistralai.client.models import DocumentURLChunkTypedDict, ImageURLChunkTypedDict
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import ExtractCapabilityError, SdkTypeError
@@ -44,9 +46,15 @@ class MistralExtractWorker(ExtractWorkerAbstract):
         extract_job: ExtractJob,
     ) -> ExtractOutput:
         # TODO: report usage
+        # Refused before either path starts, so a document is never uploaded for a request that cannot be served.
+        if extract_job.job_params.should_caption_images:
+            msg = "Captioning is not implemented for Mistral OCR."
+            raise ExtractCapabilityError(msg)
+
         if image_uri := extract_job.extract_input.image_uri:
             extract_output = await self._extract_page_from_image(
                 image_uri=image_uri,
+                extract_job_params=extract_job.job_params,
             )
 
         elif document_uri := extract_job.extract_input.document_uri:
@@ -61,27 +69,12 @@ class MistralExtractWorker(ExtractWorkerAbstract):
 
     async def _extract_page_from_image(
         self,
+        *,
         image_uri: str,
+        extract_job_params: ExtractJobParams,
     ) -> ExtractOutput:
         document = await MistralFactory.make_mistral_image_url_chunk_from_uri(uri=image_uri)
-        try:
-            extract_response = await self.mistral_client.ocr.process_async(
-                model=self.inference_model.model_id,
-                document=document,
-            )
-        except (MistralError, httpx.TransportError) as sdk_exc:
-            metadata = extract_mistral_metadata(sdk_exc)
-            classification = classify_inference_error(metadata)
-            raise render_inference_error(
-                metadata=metadata,
-                classification=classification,
-                family=InferenceErrorFamily.EXTRACT,
-                model_desc=self.inference_model.desc,
-                model_handle=self.inference_model.name,
-            ) from sdk_exc
-        return await MistralFactory.make_extract_output_from_mistral_response(
-            mistral_extract_response=extract_response,
-        )
+        return await self._ocr(document=document, extract_job_params=extract_job_params)
 
     async def _extract_pages_from_document(
         self,
@@ -89,15 +82,23 @@ class MistralExtractWorker(ExtractWorkerAbstract):
         *,
         extract_job_params: ExtractJobParams,
     ) -> ExtractOutput:
-        if extract_job_params.should_caption_images:
-            msg = "Captioning is not implemented for Mistral OCR."
-            raise ExtractCapabilityError(msg)
-
         document = await MistralFactory.make_mistral_document_url_chunk_from_uri(
             mistral_client=self.mistral_client,
             uri=document_uri,
         )
+        return await self._ocr(document=document, extract_job_params=extract_job_params)
 
+    async def _ocr(
+        self,
+        *,
+        document: ImageURLChunkTypedDict | DocumentURLChunkTypedDict,
+        extract_job_params: ExtractJobParams,
+    ) -> ExtractOutput:
+        """Run Mistral OCR on an image or a document, with the same image options for both.
+
+        OCR finds figures inside an image as well as inside a document, and returns each without its
+        pixels unless `include_image_base64` is set, so both requests ask for them.
+        """
         # max_nb_images: None=unlimited, 0=no images, N=limit to N images
         image_limit: int | None = extract_job_params.max_nb_images
         image_min_size: int | None = extract_job_params.image_min_size if image_limit != 0 else None

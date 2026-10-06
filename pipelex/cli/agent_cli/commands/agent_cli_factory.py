@@ -2,28 +2,16 @@
 
 import logging
 import sys
-import warnings
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
-import typer
-
-from pipelex.cli.agent_cli.commands.agent_output import agent_error, record_setup_warning
-from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelDeckPresetValidatonError
+from pipelex.cli.agent_cli.commands.agent_output import agent_error
+from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.pipelex import Pipelex
 from pipelex.runtime_hub import RuntimeHub
 from pipelex.system.console_target import ConsoleTarget
-from pipelex.system.pipelex_service.exceptions import (
-    GatewayApiKeyMissingError,
-    GatewayDoNotTrackConflictError,
-    GatewayTermsNotAcceptedError,
-    InferenceSetupRequiredError,
-    RemoteConfigStaleWarning,
-    RemoteConfigUnavailableError,
-    RemoteConfigValidationError,
-)
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 from pipelex.tools.log.log import log
@@ -111,7 +99,7 @@ def silence_logging_for_agent_cli() -> None:
     Idempotent. The primary call site is ``app_callback`` in
     ``pipelex.cli.agent_cli._agent_cli`` — Typer routes every ``pipelex-agent``
     subcommand through that callback, so the cutoff is armed before any command body
-    runs (including commands like ``init`` and ``accept-gateway-terms`` that bypass
+    runs (including commands like ``init`` that bypass
     ``make_pipelex_for_agent_cli``). The additional invocations at the top of
     ``make_pipelex_for_agent_cli`` and ``agent_doctor_cmd`` are belt-and-braces
     defense for direct library callers that bypass the Typer entry point (and for
@@ -146,16 +134,17 @@ def apply_agent_cli_output_discipline() -> None:
     start of every agent CLI entry point); this helper handles the channels that are
     INDEPENDENT of Python's logging system:
 
-      1. ``log.redirect_to_stderr`` keeps the RichHandler's console on stderr — defense
-         in case ``logging.disable`` is ever cleared.
+      1. ``log.redirect_to_stderr`` points the installed sink at stderr when it writes to a
+         process stream — defense in case ``logging.disable`` is ever cleared.
       2. ``PrettyPrinter.mode = SILENT`` neutralizes ``pretty_print(...)`` entirely
          (Rich-based, not logging-based).
       3. Hub-level ``set_console_print_target(STDERR)`` for the Rich ``Console`` used by
          banners / tables (also Rich-based, not logging-based).
 
     Safe to call from the broken-config doctor path where ``setup_doctor_runtime`` was
-    skipped: ``log.redirect_to_stderr`` no-ops when no rich_handler is registered, and
-    the hub print-target call is gated on a hub being installed.
+    skipped: ``log.redirect_to_stderr`` no-ops before a sink is installed, a sink that
+    writes to no process stream ignores it, and the hub print-target call is gated on a
+    hub being installed.
     """
     log.redirect_to_stderr()
     PrettyPrinter.mode = PrettyPrintMode.SILENT
@@ -164,19 +153,13 @@ def apply_agent_cli_output_discipline() -> None:
         hub.set_console_print_target(target=ConsoleTarget.STDERR)
 
 
-def make_pipelex_for_agent_cli(
-    *, library_dirs: list[str] | list[Path] | None = None, needs_inference: bool = True, needs_model_specs: bool | None = None
-) -> Pipelex:
+def make_pipelex_for_agent_cli(*, library_dirs: list[str] | list[Path] | None = None, needs_inference: bool = True) -> Pipelex:
     """Initialize Pipelex for agent CLI commands with JSON error output.
 
     This is the agent CLI counterpart of ``make_pipelex_for_cli`` in
     ``pipelex.cli.cli_factory``.  It catches the same initialization
     exceptions but routes them through ``agent_error()`` so the output
     is always machine-parseable JSON on stderr.
-
-    One intentional exception: ``InferenceSetupRequiredError`` prints
-    human-readable markdown to stdout and exits 0, so the calling agent
-    can display setup guidance directly.
 
     Stdout / stderr contract: every ``pipelex-agent`` invocation reserves stdout
     exclusively for the structured success envelope (JSON via ``--format json``, or
@@ -198,65 +181,27 @@ def make_pipelex_for_agent_cli(
 
     Args:
         library_dirs: Optional library directories to use for the Pipelex instance.
-        needs_inference: When False, skip inference setup (credentials, gateway, telemetry).
-        needs_model_specs: When True, load real model specs even without inference.
+        needs_inference: When False, boot without inference: every enabled backend and its models
+            load, no credential is resolved, and every run this process starts is forced to DRY.
 
     Returns:
         Initialized Pipelex instance.
 
     Raises:
-        typer.Exit: If initialization fails (after printing JSON error to stderr),
-            or if inference setup is required (after printing markdown to stdout).
+        typer.Exit: If initialization fails (after printing JSON error to stderr).
     """
     # Process-global logging cutoff, BEFORE Pipelex.make can trigger any third-party
     # log line (anthropic/httpx/botocore credential probes, telemetry setup, etc.).
     silence_logging_for_agent_cli()
     try:
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always", RemoteConfigStaleWarning)
-            pipelex_instance = Pipelex.make(
-                integration_mode=IntegrationMode.CLI,
-                library_dirs=library_dirs,
-                needs_inference=needs_inference,
-                needs_model_specs=needs_model_specs,
-                config_overrides=dict(AGENT_CLI_CONFIG_OVERRIDES),
-            )
-        # Surface a structured ``RemoteConfigStale`` entry so JSON consumers can react to
-        # stale-cache operation without parsing stderr.
-        for item in caught:
-            if issubclass(item.category, RemoteConfigStaleWarning):
-                record_setup_warning({"type": "RemoteConfigStale", "message": str(item.message)})
-    except InferenceSetupRequiredError:
-        print(
-            "# First-time inference setup required\n"
-            "\n"
-            "This looks like your first time running a method with live inference.\n"
-            "You need to configure an inference backend before running.\n"
-            "\n"
-            "Use `/mthds-runner-setup` for guided setup, "
-            "or run `pipelex-agent init` with appropriate backend configuration."
+        pipelex_instance = Pipelex.make(
+            integration_mode=IntegrationMode.CLI,
+            library_dirs=library_dirs,
+            needs_inference=needs_inference,
+            config_overrides=dict(AGENT_CLI_CONFIG_OVERRIDES),
         )
-        raise typer.Exit(0) from None
     except TelemetryConfigValidationError as exc:
         agent_error(exc.message, error_type="TelemetryConfigValidationError", cause=exc)
-    except GatewayTermsNotAcceptedError as exc:
-        agent_error(exc.message, error_type="GatewayTermsNotAcceptedError", cause=exc)
-    except GatewayApiKeyMissingError as exc:
-        agent_error(exc.message, error_type="GatewayApiKeyMissingError", cause=exc)
-    except GatewayDoNotTrackConflictError as exc:
-        agent_error(exc.message, error_type="GatewayDoNotTrackConflictError", cause=exc)
-    except RemoteConfigUnavailableError as exc:
-        agent_error(exc.message, error_type="RemoteConfigUnavailableError", cause=exc)
-    except RemoteConfigValidationError as exc:
-        agent_error(exc.message, error_type="RemoteConfigValidationError", cause=exc)
-    except GatewayUnknownModelError as exc:
-        agent_error(
-            exc.message,
-            error_type="GatewayUnknownModelError",
-            cause=exc,
-            model_name=exc.model_name,
-            source=exc.source,
-        )
     except ModelDeckPresetValidatonError as exc:
         agent_error(
             exc.message,

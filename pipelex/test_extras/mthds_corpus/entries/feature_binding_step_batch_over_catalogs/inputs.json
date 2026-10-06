@@ -1,0 +1,26 @@
+{
+  "catalogs": {
+    "concept": "furniture_catalogs.Catalog",
+    "content": [
+      {
+        "season": "spring",
+        "pages": [
+          {
+            "title": "Garden chairs"
+          },
+          {
+            "title": "Parasols"
+          }
+        ]
+      },
+      {
+        "season": "autumn",
+        "pages": [
+          {
+            "title": "Bookcases"
+          }
+        ]
+      }
+    ]
+  }
+}

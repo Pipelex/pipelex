@@ -11,16 +11,12 @@ Dry runs validate pipeline structure without executing inference. This requires 
 
 ## Why Mock Generation Matters
 
-Pydantic models in Pipelex often enforce format constraints via `field_validator` or `model_validator`:
+The structures a method declares can enforce format constraints via `field_validator` or `model_validator`:
 
 ```python
-class BundleHeaderSpec(StructuredContent):
-    domain_code: str  # Must be snake_case
-    main_pipe: str  # Must be snake_case, must exist in pipe dict
-
-
-class ConceptSpec(StructuredContent):
-    concept_code: str  # Must be PascalCase
+class ComponentRecord(StructuredContent):
+    component_code: str  # A validator requires snake_case
+    concept_code: str  # A validator requires PascalCase
 ```
 
 Standard mock generators (like Polyfactory) produce random strings like `"uygNjiAuDMOtZEyibgHw"` which fail validation. The dry run system addresses this at two levels:
@@ -47,7 +43,7 @@ flowchart TD
     J --> K[model_validate with resolved values]
 ```
 
-A dry run does not swap in a special content generator: `run_mode=DRY` rides `CogtRunParams` on every cogt assignment, and each inference leaf (`llm_generate`, the `*_and_store` image/extract leaves, search, templating) branches to its `dry_*` mock helper in `dry_mock.py` — identically whether the leaf runs inline or inside a Temporal activity.
+A dry run does not swap in a special content generator: `run_mode=DRY` rides `CogtRunParams` on every cogt assignment, and each inference leaf (`llm_generate`, the `*_and_store` image/extract leaves, search, judgment, templating) branches to its `dry_*` mock helper in `dry_mock.py` — identically whether the leaf runs inline or inside a Temporal activity.
 
 | Trigger | Entry Point | Mock Generation |
 |---------|-------------|-----------------|
@@ -116,9 +112,13 @@ class DryRunFactory:
 | `PASCAL_CASE` | `generate_pascal_case_code()` | `MockAbcd` | `concept_code` |
 | `CONCEPT_REF` | `generate_concept_ref()` | `mock_abcd.MockCdef` | `concept_ref` field (domain.ConceptCode format) |
 | `IGNORE` | Sets field to `Ignore()` | None/default | `default_value`, `structure` fields |
-| `DICT_SNAKE_KEY_PASCAL_VALUE` | `generate_dict_snake_key_pascal_value()` | `{mock_abcd: MockCdef}` | `inputs` dict in PipeSpec |
-| `DICT_SINGLE_EXTRACT_INPUT` | `generate_dict_single_extract_input()` | `{mock_abcd: "Image"}` | `inputs` dict in PipeExtract |
+| `DICT_SNAKE_KEY_PASCAL_VALUE` | `generate_dict_snake_key_pascal_value()` | `{mock_abcd: MockCdef}` | a dict of input names to concept codes |
+| `DICT_SINGLE_EXTRACT_INPUT` | `generate_dict_single_extract_input()` | `{mock_abcd: "Image"}` | a single-entry dict of an input name to an image or document concept |
+| Image URL | `generate_mock_image_url()` | one of `inference.dry_run.image_urls` | `url` of an `ImageContent`, at any depth |
+| Document URL | `generate_mock_document_url()` | `data:application/pdf;base64,…` (a blank one-page PDF) | `url` of a `DocumentContent`, at any depth |
 | Random string | Polyfactory default | `uygNjiAuDMOtZEyibgHw` | All other string fields |
+
+A mocked image or document never carries a random string as its `url`, because `resolve_uri` takes a random string for a local path. A run with a read scope refuses to read a local path, and it checks before the dry-run branch, so a dry run on such a run would otherwise refuse its own mocks: a mocked input, or an image inside a structure a dry model call returned. An `https://` URL and a `data:` URL are read on nobody's leave, so they are what a mock carries. The providers are keyed on the class (`ImageContent`, `DocumentContent` and their subclasses), not on a field annotation, so they apply wherever such a class is nested. They also recognise a copy of either class rebuilt from a JSON schema, by its name and its `url` field: a worker running a dry model call out of process gets only the output's schema, and the nested file classes it rebuilds are no subclasses of the real ones.
 
 ---
 
@@ -131,7 +131,7 @@ from pydantic import Field
 from pipelex.cogt.content_generation.dry_run_factory import MockFormat
 
 
-class ConceptStructureSpec(StructuredContent):
+class FieldDefinition(StructuredContent):
     # Snake case field
     the_field_name: str = Field(description="Field name. Must be snake_case.", json_schema_extra={"mock_format": MockFormat.SNAKE_CASE})
 
@@ -153,20 +153,18 @@ class ConceptStructureSpec(StructuredContent):
 For fields that should pick from a set of valid values (like enum members or known strings), use the `examples` parameter. The factory's `__use_examples__: True` configuration makes Polyfactory randomly select from provided examples:
 
 ```python
-class ConceptSpec(StructuredContent):
+class Ticket(StructuredContent):
     # Refines should be one of the native concepts
     refines: str | None = Field(
         default=None,
         examples=["Text", "Image", "Document", "TextAndImages", "Number", "Page"],
     )
 
-
-class PipeComposeSpec(PipeSpec):
-    # Target format should be a valid TargetFormat value
-    target_format: TargetFormat | str | None = Field(
+    # Status should be a valid TicketStatus value
+    status: TicketStatus | str | None = Field(
         default=None,
-        description="Target format for the output (template mode)",
-        examples=list(TargetFormat),  # Polyfactory picks randomly from these
+        description="Where the ticket stands",
+        examples=list(TicketStatus),  # Polyfactory picks randomly from these
     )
 ```
 
@@ -292,7 +290,7 @@ There is one fallback: when composition fails with a `StructuredContentComposerV
 ### Using the New Format on Fields
 
 ```python
-class MySpec(StructuredContent):
+class MyStructure(StructuredContent):
     my_kebab_field: str = Field(description="A kebab-case identifier", json_schema_extra={"mock_format": MockFormat.KEBAB_CASE})
 ```
 
@@ -306,7 +304,7 @@ class MySpec(StructuredContent):
 | File | Purpose |
 |------|---------|
 | `pipelex/cogt/content_generation/dry_run_factory.py` | `DryRunFactory` class with `MockFormat` enum and generators |
-| `pipelex/cogt/content_generation/dry_mock.py` | Leaf-level dry/mock helpers (`dry_llm_gen_*`, `build_mock_object`, `stamp_mock_main_coordination`) |
+| `pipelex/cogt/content_generation/dry_mock.py` | Leaf-level dry/mock helpers (`dry_llm_gen_*`, `build_mock_object`) |
 | `pipelex/core/memory/working_memory_factory.py` | `WorkingMemoryFactory.make_mock_content()` with field constraints |
 | `pipelex/pipe_operators/compose/structured_content_composer.py` | Composes `StructuredContent` from working memory (no mocks) |
 | `pipelex/pipeline/dry_run_pipeline.py` | `dry_run_pipeline()` orchestration |

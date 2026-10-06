@@ -12,8 +12,12 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 from pipelex.cli.commands.doctor_cmd import (
+    DoctorRuntimeSetup,
+    LogSinkCheck,
     PendingMigrationsCheck,
     PendingMigrationsFinding,
+    PluginsCheck,
+    SecretsProviderCheck,
     TelemetryConfigCheck,
     TelemetryConfigFinding,
     check_backend_credentials,
@@ -23,6 +27,7 @@ from pipelex.cli.commands.doctor_cmd import (
 from pipelex.cogt.models.deck_manifest import DeckSyncReport
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
+from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
 # Minimal valid telemetry TOML — only [custom_posthog].mode is needed, rest defaults
 TELEMETRY_OFF = '[custom_posthog]\nmode = "off"\n'
@@ -33,6 +38,18 @@ TELEMETRY_ANONYMOUS = '[custom_posthog]\nmode = "anonymous"\n'
 NO_PENDING_MIGRATIONS = PendingMigrationsCheck(
     finding=PendingMigrationsFinding.UP_TO_DATE,
     message="Every configuration file is at the current schema",
+)
+
+
+HEALTHY_LOG_SINK = LogSinkCheck(is_healthy=True, message="Log sink 'console' installed")
+HEALTHY_PLUGINS = PluginsCheck(is_healthy=True, message="Plugins discovered and registered")
+HEALTHY_SECRETS_PROVIDER = SecretsProviderCheck(is_healthy=True, message="Secrets provider 'env' built")
+BUILT_SECRETS_PROVIDER = EnvSecretsProvider()
+HEALTHY_RUNTIME_SETUP = DoctorRuntimeSetup(
+    plugins=HEALTHY_PLUGINS,
+    secrets_provider=HEALTHY_SECRETS_PROVIDER,
+    log_sink=HEALTHY_LOG_SINK,
+    built_secrets_provider=BUILT_SECRETS_PROVIDER,
 )
 
 
@@ -52,7 +69,7 @@ class TestDoctorLayeredResolution:
         """
         # Stub the runtime bootstrap so the test doesn't load real config or call log.configure
         # (once-per-process). The bootstrap call itself is exercised separately.
-        mock_setup = mocker.patch("pipelex.cli.commands.doctor_cmd.setup_doctor_runtime")
+        mock_setup = mocker.patch("pipelex.cli.commands.doctor_cmd.setup_doctor_runtime", return_value=HEALTHY_RUNTIME_SETUP)
         mock_check_config = mocker.patch(
             "pipelex.cli.commands.doctor_cmd.check_config_files",
             return_value=(True, 0, "OK"),
@@ -77,6 +94,14 @@ class TestDoctorLayeredResolution:
                 "OK",
             ),
         )
+        mock_check_internal_backend = mocker.patch(
+            "pipelex.cli.commands.doctor_cmd.check_internal_backend_sync",
+            return_value=(
+                True,
+                DeckSyncReport(kit_version="1.0.0", installed_kit_version="1.0.0", manifest_present=True, files={}),
+                "OK",
+            ),
+        )
         mock_check_migrations = mocker.patch(
             "pipelex.cli.commands.doctor_cmd.check_pending_migrations",
             return_value=NO_PENDING_MIGRATIONS,
@@ -93,8 +118,10 @@ class TestDoctorLayeredResolution:
         mock_check_config.assert_called_once_with()
         mock_check_telemetry.assert_called_once_with()
         mock_check_backends.assert_called_once_with()
-        mock_check_models.assert_called_once_with()
+        # The models row resolves the backends' credentials through the provider the bootstrap built.
+        mock_check_models.assert_called_once_with(secrets_provider=BUILT_SECRETS_PROVIDER)
         mock_check_deck.assert_called_once_with()
+        mock_check_internal_backend.assert_called_once_with()
         # The migration row takes no directory at all — it answers for `pipelex migrate`, which
         # walks both configuration directories and has no way to be pointed at one.
         mock_check_migrations.assert_called_once_with()
@@ -131,6 +158,14 @@ class TestDoctorLayeredResolution:
         )
         mocker.patch(
             "pipelex.cli.commands.doctor_cmd.check_deck_sync",
+            return_value=(
+                True,
+                DeckSyncReport(kit_version="1.0.0", installed_kit_version="1.0.0", manifest_present=True, files={}),
+                "OK",
+            ),
+        )
+        mocker.patch(
+            "pipelex.cli.commands.doctor_cmd.check_internal_backend_sync",
             return_value=(
                 True,
                 DeckSyncReport(kit_version="1.0.0", installed_kit_version="1.0.0", manifest_present=True, files={}),

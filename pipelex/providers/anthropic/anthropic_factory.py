@@ -9,6 +9,7 @@ from anthropic.types.document_block_param import DocumentBlockParam
 from anthropic.types.image_block_param import ImageBlockParam
 from anthropic.types.message_param import MessageParam
 
+from pipelex import log
 from pipelex.cogt.document.prompt_document_utils import prep_prompt_documents
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.llm.llm_job import LLMJob
@@ -16,8 +17,11 @@ from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
 from pipelex.plugins.model_handle import ModelHandle
+from pipelex.providers.anthropic.anthropic_bedrock_sigv4 import AsyncAnthropicBedrockSigV4
 from pipelex.providers.anthropic.anthropic_exceptions import AnthropicFactoryError
-from pipelex.tools.aws.aws_config import BedrockAccessVariant
+from pipelex.system.environment import get_optional_env
+from pipelex.tools.aws.aws_config import BEDROCK_TOKEN_VAR_NAME, AwsKeyMethod, BedrockAccessVariant
+from pipelex.tools.aws.exceptions import AwsCredentialsError
 from pipelex.tools.uri.prepared_file import PreparedFile, PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
 
 if TYPE_CHECKING:
@@ -49,12 +53,19 @@ class AnthropicFactory:
         model_handle: ModelHandle,
         *,
         backend: InferenceBackend,
+        sdk_variant: AnthropicSdkVariant | None = None,
     ) -> AsyncAnthropic | AsyncAnthropicBedrock:
-        try:
-            sdk_variant = AnthropicSdkVariant(model_handle.sdk)
-        except ValueError as exc:
-            msg = f"ModelHandle '{model_handle}' is not supported by AnthropicFactory"
-            raise AnthropicFactoryError(msg) from exc
+        """Build the client for the handle's sdk, or for `sdk_variant` when one is given.
+
+        `sdk_variant` is for a plugin that registers an sdk token of its own over the Anthropic protocol:
+        its token names its worker, and the variant names the client that worker speaks through.
+        """
+        if sdk_variant is None:
+            try:
+                sdk_variant = AnthropicSdkVariant(model_handle.sdk)
+            except ValueError as exc:
+                msg = f"ModelHandle '{model_handle}' is not supported by AnthropicFactory"
+                raise AnthropicFactoryError(msg) from exc
 
         # Tier 1 transport retry: set the SDK client's retry budget explicitly from config
         # instead of inheriting the silent SDK default (anthropic's own DEFAULT_MAX_RETRIES).
@@ -65,11 +76,9 @@ class AnthropicFactory:
                 auth_header_config = backend.get_extra_config(AnthropicExtraField.AUTH_HEADER)
                 if auth_header_config is not None:
                     # The backend speaks the Anthropic protocol but authenticates on a header of
-                    # its own rather than on `x-api-key`. The Pipelex Manifold service is the case
-                    # this exists for: it reads `x-pipelex-api-key` (or an `Authorization` bearer)
-                    # and never looks at `x-api-key`, so a key left in the SDK's own slot reaches
-                    # it as an anonymous request. Carry it in the named header instead — the same
-                    # move the manifold OpenAI-substrate factories already make.
+                    # its own rather than on `x-api-key`: a gateway that never looks at `x-api-key`
+                    # would receive a key left in the SDK's own slot as an anonymous request. Carry it
+                    # in the named header instead.
                     if not backend.api_key:
                         msg = f"Backend '{backend.name}' sets '{AnthropicExtraField.AUTH_HEADER}' but carries no api_key"
                         raise AnthropicFactoryError(msg)
@@ -88,10 +97,38 @@ class AnthropicFactory:
                 aws_config = get_config().runtime.aws
                 match aws_config.bedrock_access_variant:
                     case BedrockAccessVariant.AWS_ACCESS:
-                        aws_access_key_id, aws_secret_access_key, aws_region = aws_config.get_aws_access_keys()
-                        return AsyncAnthropicBedrock(
-                            aws_secret_key=aws_secret_access_key,
+                        # The configured variant wins over a Bedrock bearer token in the environment, which the SDK
+                        # would otherwise pick up and refuse beside the access keys: see AsyncAnthropicBedrockSigV4.
+                        is_bedrock_token_in_env = bool(get_optional_env(BEDROCK_TOKEN_VAR_NAME))
+                        try:
+                            aws_access_key_id, aws_secret_access_key, aws_region = aws_config.get_aws_access_keys()
+                        except AwsCredentialsError as exc:
+                            if not is_bedrock_token_in_env:
+                                raise
+                            # The cause's message may or may not end its sentence, depending on where the keys were looked for.
+                            cause_message = str(exc).rstrip(".")
+                            msg = (
+                                f"{cause_message}. The environment sets {BEDROCK_TOKEN_VAR_NAME}, a Bedrock bearer token, which "
+                                f'bedrock_access_variant = "{BedrockAccessVariant.AWS_ACCESS}" ignores: to authenticate with a '
+                                f'bearer token instead, set bedrock_access_variant = "{BedrockAccessVariant.BEDROCK_TOKEN}" in [runtime.aws].'
+                            )
+                            match aws_config.api_key_method:
+                                case AwsKeyMethod.ENV:
+                                    pass
+                                case AwsKeyMethod.SECRET_PROVIDER:
+                                    msg += (
+                                        f' Under api_key_method = "{AwsKeyMethod.SECRET_PROVIDER}", that variant reads '
+                                        f"{BEDROCK_TOKEN_VAR_NAME} from the secrets provider, not from the environment."
+                                    )
+                            raise AwsCredentialsError(msg) from exc
+                        if is_bedrock_token_in_env:
+                            log.verbose(
+                                f"Ignoring {BEDROCK_TOKEN_VAR_NAME} from the environment: "
+                                f'bedrock_access_variant = "{BedrockAccessVariant.AWS_ACCESS}" signs with the configured AWS access keys.'
+                            )
+                        return AsyncAnthropicBedrockSigV4(
                             aws_access_key=aws_access_key_id,
+                            aws_secret_key=aws_secret_access_key,
                             aws_region=aws_region,
                             max_retries=transport_max_retries,
                         )

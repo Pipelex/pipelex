@@ -11,6 +11,10 @@ from pipelex.tools.secrets.exceptions import (
 )
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
+# A ``${…}`` placeholder: ``${VAR_NAME}``, ``${prefix:VAR_NAME}`` or ``${env:VAR|secret:VAR}``. Restricted so as not to
+# match across newlines, quotes or nested braces. Its one group is what sits between the braces.
+VAR_PLACEHOLDER_PATTERN = re.compile(r"\$\{([^}\n\"'$]+)\}")
+
 
 class VarPrefix(StrEnum):
     """Variable prefix types for variable substitution."""
@@ -83,15 +87,46 @@ def substitute_vars(
                 raise
             return match.group(0)  # Keep original placeholder
 
-    # Pattern matches ${VAR_NAME} or ${prefix:VAR_NAME} or ${env:VAR|secret:VAR}
-    # Restrict to not match across newlines, quotes, or nested braces
-    pattern = r"\$\{([^}\n\"'$]+)\}"
-    return re.sub(pattern, replace_var, content)
+    return VAR_PLACEHOLDER_PATTERN.sub(replace_var, content)
+
+
+def placeholder_var_names(*, content: str) -> list[str]:
+    """The names of the variables the placeholders in `content` reference, in order and without repeats.
+
+    Resolves nothing: `${VAR}`, `${env:VAR}`, `${secret:VAR}` and every candidate of a fallback
+    pattern such as `${env:VAR|secret:OTHER}` each contribute their name. A prefix this module does
+    not know is refused as `substitute_vars` refuses it, so a file that names its variables without
+    resolving them gets the same verdict on its syntax as one that resolves them.
+
+    Raises:
+        UnknownVarPrefixError: If a placeholder carries a prefix other than `env` or `secret`.
+    """
+    var_names: list[str] = []
+    for match in VAR_PLACEHOLDER_PATTERN.finditer(content):
+        for part in match.group(1).split("|"):
+            var_name = part
+            if ":" in part:
+                prefix_str, var_name = part.split(":", 1)
+                prefix_str = prefix_str.strip()
+                try:
+                    VarPrefix(prefix_str)
+                except ValueError as exc:
+                    raise UnknownVarPrefixError(var_name=var_name.strip(), message=f"Unknown variable prefix: '{prefix_str}'") from exc
+            var_name = var_name.strip()
+            if var_name not in var_names:
+                var_names.append(var_name)
+    return var_names
 
 
 def _handle_fallback_pattern(var_spec: str, *, secrets_provider: SecretsProviderAbstract) -> str:
-    """Handle fallback pattern like 'env:VAR|secret:VAR'."""
+    """Handle fallback pattern like 'env:VAR|secret:VAR'.
+
+    Every candidate's prefix is checked before any is resolved, so an unknown one is refused whether or
+    not an earlier candidate resolves: the verdict on a file's syntax never depends on which variables
+    the machine holds, and `placeholder_var_names` gives the same one without resolving anything.
+    """
     parts = [part.strip() for part in var_spec.split("|")]
+    placeholder_var_names(content=f"${{{var_spec}}}")
 
     for part in parts:
         if ":" in part:

@@ -1,0 +1,12 @@
+name = "invalid_binding_step_parallel_branch"
+description = "An invoice total bound as a branch of a parallel, where only pipe steps run"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.binding_step_invalid",
+]
+
+expected_error = "binding_step_invalid"

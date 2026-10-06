@@ -4,12 +4,14 @@ This test suite systematically validates that model deck references point to val
 preventing configuration errors from being discovered at runtime.
 """
 
-from typing import cast
+from collections.abc import Mapping
 
 import pytest
 
+from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
 from pipelex.cogt.extract.extract_setting import ExtractSetting
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
+from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import (
@@ -20,7 +22,6 @@ from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind
 from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.system.configuration.config_loader import config_manager
-from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.misc.toml_utils import load_toml_from_path_if_exists
 from tests.unit.pipelex.cogt.models.model_deck_validation_utils import (
@@ -41,40 +42,12 @@ class TestModelDeckReferences:
 
     @pytest.fixture(scope="class")
     def all_known_model_handles(self) -> dict[str, ModelType]:
-        """Collect all valid model handles with their types from local backends + Pipelex Gateway.
-
-        Sources:
-        1. Local backend TOML files (.pipelex/inference/backends/*.toml)
-        2. Pipelex Gateway remote config (uses session-level cache from conftest.py)
+        """Collect all valid model handles with their types from the local backend TOML files.
 
         Returns:
             Mapping of model_handle -> ModelType
         """
-        known_handles: dict[str, ModelType] = {}
-
-        # 1. Parse local backend TOML files
-        known_handles.update(self._get_local_backend_models())
-
-        # 2. Get gateway models from cached remote config
-        gateway_specs = RemoteConfigFetcher.fetch_remote_config().config.backend_model_specs  # Uses cached version
-
-        # Get default model_type from gateway defaults section (same pattern as local backends)
-        gateway_defaults = gateway_specs.get("defaults", {})
-        gateway_default_model_type_str: str | None = None
-        if isinstance(gateway_defaults, dict):
-            typed_defaults = cast("dict[str, str]", gateway_defaults)
-            gateway_default_model_type_str = typed_defaults.get("model_type")
-
-        for model_name, spec in gateway_specs.items():
-            if model_name == "defaults":
-                continue  # Skip the defaults section itself
-            if isinstance(spec, dict):
-                typed_spec = cast("dict[str, str]", spec)
-                model_type_str: str | None = typed_spec.get("model_type") or gateway_default_model_type_str
-                if model_type_str:
-                    known_handles[model_name] = ModelType(model_type_str)
-
-        return known_handles
+        return self._get_local_backend_models()
 
     # ============================================================
     # Helper methods
@@ -114,7 +87,7 @@ class TestModelDeckReferences:
 
     def _find_invalid_preset_references(
         self,
-        presets: dict[str, LLMSetting] | dict[str, ExtractSetting] | dict[str, ImgGenSetting] | dict[str, SearchSetting],
+        presets: Mapping[str, LLMSetting | ExtractSetting | ImgGenSetting | SearchSetting | DocGenSetting | JudgmentSetting],
         all_aliases: dict[str, str],
         all_waterfalls: dict[str, list[str]],
         known_model_handles: dict[str, ModelType],
@@ -177,6 +150,10 @@ class TestModelDeckReferences:
                 return model_deck_blueprint.img_gen
             case ModelType.SEARCH:
                 return model_deck_blueprint.search
+            case ModelType.DOC_GEN:
+                return model_deck_blueprint.doc_gen
+            case ModelType.JUDGMENT:
+                return model_deck_blueprint.judgment
 
     @pytest.mark.parametrize(
         ("model_type", "deck_name"),
@@ -185,6 +162,8 @@ class TestModelDeckReferences:
             (ModelType.TEXT_EXTRACTOR, "Extract"),
             (ModelType.IMG_GEN, "ImgGen"),
             (ModelType.SEARCH, "Search"),
+            (ModelType.DOC_GEN, "DocGen"),
+            (ModelType.JUDGMENT, "Judgment"),
         ],
     )
     def test_aliases_reference_valid_targets(
@@ -218,6 +197,8 @@ class TestModelDeckReferences:
             (ModelType.TEXT_EXTRACTOR, "Extract"),
             (ModelType.IMG_GEN, "ImgGen"),
             (ModelType.SEARCH, "Search"),
+            (ModelType.DOC_GEN, "DocGen"),
+            (ModelType.JUDGMENT, "Judgment"),
         ],
     )
     def test_presets_reference_valid_models(
@@ -251,6 +232,8 @@ class TestModelDeckReferences:
             (ModelType.TEXT_EXTRACTOR, "Extract"),
             (ModelType.IMG_GEN, "ImgGen"),
             (ModelType.SEARCH, "Search"),
+            (ModelType.DOC_GEN, "DocGen"),
+            (ModelType.JUDGMENT, "Judgment"),
         ],
     )
     def test_waterfalls_contain_valid_models(
@@ -283,6 +266,8 @@ class TestModelDeckReferences:
             (ModelType.TEXT_EXTRACTOR, "Extract"),
             (ModelType.IMG_GEN, "ImgGen"),
             (ModelType.SEARCH, "Search"),
+            (ModelType.DOC_GEN, "DocGen"),
+            (ModelType.JUDGMENT, "Judgment"),
         ],
     )
     def test_aliases_no_circular_references(

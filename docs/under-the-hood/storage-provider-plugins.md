@@ -73,7 +73,7 @@ registrar.add_storage_provider(method="azure", factory=_make_azure_storage_provi
 
 The factory is a plain callable stored at registration and **invoked only at the boot apply-point**. Two invariants follow, and they are what let an SDK-backed provider ship without weighing down every boot:
 
-- **Import-light.** The plugin module must import no backend SDK at module load. Registering the built-in `s3`/`gcp` factories pulls in neither `aioboto3` nor `google-cloud-storage` — the SDK guard lives *inside* the provider's I/O methods (`_get_session` / `_get_bucket`), not its `__init__`. Selecting `s3` therefore *constructs* an `S3StorageProvider` even with the extra absent; the guard fires only on the first actual load/store.
+- **Import-light.** The plugin module must import no backend SDK at module load. Registering the built-in `s3`/`gcp` factories pulls in neither `aiobotocore` nor `google-cloud-storage` — the SDK guard lives *inside* the provider's I/O methods (`_get_session` / `_get_bucket`), not its `__init__`. Selecting `s3` therefore *constructs* an `S3StorageProvider` even with the extra absent; the guard fires only on the first actual load/store.
 - **Fail at use, not at boot.** An optional dependency raises `MissingDependencyError` (naming the package and the `pipelex[<extra>]` install hint) when the backend is *used*, not when it is registered or selected.
 
 ---
@@ -113,7 +113,7 @@ def _make_gcp_storage_provider(config: StorageProviderConfig) -> StorageProvider
 
 ## Selecting a method by config
 
-`runtime.storage.method` is an **open `str` token** (Decision D1), not a closed enum. The built-ins use the `StorageMethod` values; an external `pipelex-storage-<backend>` plugin registers its own (e.g. `"azure"`). A config naming an external method **parses fine** — the per-method sub-config validator requires a matching sub-config only for the four built-in tokens and lets any other token through:
+`runtime.storage.method` is an **open `str` token**, not a closed enum. The built-ins use the `StorageMethod` values; an external `pipelex-storage-<backend>` plugin registers its own (e.g. `"azure"`). A config naming an external method **parses fine** — the per-method sub-config validator requires a matching sub-config only for the four built-in tokens and lets any other token through:
 
 ```toml
 # .pipelex/pipelex.toml
@@ -124,7 +124,7 @@ method = "azure"          # an out-of-tree provider — no built-in sub-config r
 Whether that token names an *installed* provider is validated at **registry lookup**, not at parse: an unknown method surfaces as `UnknownStorageMethodError` at boot, which is the right layer — it lists the registered methods so the fix is obvious.
 
 !!! note "External-provider config surface is a scoped follow-up"
-    `StorageProviderConfig` has fixed, typed per-method sub-models, so an out-of-tree `azure` provider has nowhere to read *its* structured config yet. The seam for built-in methods lands first; a generic passthrough sub-config for external providers is a captured follow-up (Decision D3), not built speculatively. Until it lands, an external provider reads its own config from the environment or its own file. **One live gap:** `StorageProviderConfig.uri_format` (read by `GeneratedContentFactory._build_storage_key` on every content store, where it renders the FILENAME only — its placeholders are `{hash}` and `{extension}`, while the prefix `{storage_scope}/generated/` is composed in code so a config cannot omit it) is only defined for the four built-in methods and raises `StorageConfigError` for any other token — so an external provider selects and boots cleanly but a *generated-content store* through it fails until D3 gives external methods a `uri_format`. External providers are therefore usable today for their own direct storage API, not yet as the backing store for generated content.
+    `StorageProviderConfig` has fixed, typed per-method sub-models, so an out-of-tree `azure` provider has nowhere to read *its* structured config yet. The seam for built-in methods lands first; a generic passthrough sub-config for external providers is a possible follow-up, not built speculatively. Until it lands, an external provider reads its own config from the environment or its own file. **One live gap:** `StorageProviderConfig.uri_format` (read by `GeneratedContentFactory._build_storage_key` on every content store, where it renders the FILENAME only — its placeholders are `{hash}` and `{extension}`, while the prefix `{storage_scope}/generated/` is composed in code so a config cannot omit it) is only defined for the four built-in methods and raises `StorageConfigError` for any other token — so an external provider selects and boots cleanly but a *generated-content store* through it fails until every storage method has a `uri_format`. External providers are therefore usable today for their own direct storage API, not yet as the backing store for generated content.
 
 ---
 
@@ -160,6 +160,10 @@ azure_storage = "pipelex_storage_azure.plugin:AzureStoragePlugin"
 Installing the distribution makes the method selectable (`runtime.storage.method = "azure"`); uninstalling removes it. No core change, no central registration list — *presence* is the source of truth. A discovered plugin can be quarantined without uninstalling via the `runtime.plugins.disabled` denylist (matched against the entry-point name *before* load, so a broken install can still be disabled to recover startup — see [Inference Backend Plugins](inference-backend-plugins.md) for the shared discovery/denylist machinery).
 
 Use `pipelex plugins list` to see every discovered plugin, the entry-point group it was found under, what each contributed, and its denylist state. The **Group** column is the first thing to read when a plugin is missing: a built-in shows `—`, and an external plugin that resolved to the wrong layer shows it there.
+
+### A provider is not the tenant boundary
+
+A provider reads any key it is handed with the process's own credentials, and it should: it has no notion of whose run asked. On a host serving several tenants, what bounds a run's reads is the **read scope** the host passes with the run, which the content-generation leaves and the input seam check before they call a provider. A key outside that prefix, and any local path, is refused there, so a provider never sees it. A self-hosted deployment serving one tenant passes no read scope and reads as before. See [Distributed Content Generation](distributed-content-generation.md#what-a-leaf-may-read-the-read-scope) for the rule and where it runs.
 
 ---
 

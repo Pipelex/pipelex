@@ -1,14 +1,16 @@
 import html
 import json
 import re
+from typing import TYPE_CHECKING
 
 from pydantic import Field
-from rich.markdown import Markdown
-from rich.syntax import Syntax
 from typing_extensions import override
 
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.tools.misc.pretty import PrettyPrintable
+from pipelex.tools.misc.pretty import require_rich_for_rendering
+
+if TYPE_CHECKING:
+    from pipelex.tools.misc.pretty import PrettyPrintable
 
 HTML_PATTERN = re.compile(r"^\s*<(!DOCTYPE|!--|[a-zA-Z])", re.IGNORECASE)
 
@@ -46,7 +48,11 @@ class TextContent(StuffContent):
         return bool(HTML_PATTERN.match(self.text))
 
     @override
-    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
+        require_rich_for_rendering()
+        from rich.markdown import Markdown
+        from rich.syntax import Syntax
+
         if self._looks_like_html():
             return Syntax(self.text, "html", word_wrap=True)
         return Markdown(self.text)

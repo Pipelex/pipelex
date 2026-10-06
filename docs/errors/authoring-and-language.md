@@ -42,6 +42,7 @@ own page. Classes are grouped by subsystem.
 - [`PipeFactoryError`](pipe-factory-error.md) — Pipe factory
 - [`PipeInputError`](pipe-input-error.md) — Pipe input
 - [`PipeInputsFactoryError`](pipe-inputs-factory-error.md) — Pipe inputs factory
+- [`PipeLoadRefusalError`](pipe-load-refusal-error.md) — Pipe load refusal
 - [`PipeOperatorModelChoiceError`](pipe-operator-model-choice-error.md) — Pipe operator model choice
 - [`PipeRunError`](pipe-run-error.md) — Pipe run
 - [`PipeRunInputsError`](pipe-run-inputs-error.md) — Pipe run inputs
@@ -72,11 +73,17 @@ own page. Classes are grouped by subsystem.
 - [`ConstructFieldBlueprintValueError`](construct-field-blueprint-value-error.md) — Construct field blueprint value
 - [`PipeComposeError`](pipe-compose-error.md) — Pipe compose
 - [`PipeComposeFactoryError`](pipe-compose-factory-error.md) — Pipe compose factory
+- [`PipeDocGenFactoryError`](pipe-doc-gen-factory-error.md) — Pipe doc gen factory
+- [`PipeDocGenRunError`](pipe-doc-gen-run-error.md) — Pipe doc gen run
+- [`PipeDocGenTemplateCheckError`](pipe-doc-gen-template-check-error.md) — Pipe doc gen template check
+- [`PipeDocGenUndefinedValueError`](pipe-doc-gen-undefined-value-error.md) — Pipe doc gen undefined value
 - [`PipeExtractFactoryError`](pipe-extract-factory-error.md) — Pipe extract factory
 - [`PipeFuncExecutionError`](pipe-func-execution-error.md) — Pipe func execution
 - [`PipeFuncTransportError`](pipe-func-transport-error.md) — Pipe func transport
 - [`PipeImgGenFactoryError`](pipe-img-gen-factory-error.md) — Pipe img gen factory
 - [`PipeImgGenRunError`](pipe-img-gen-run-error.md) — Pipe img gen run
+- [`PipeJudgeError`](pipe-judge-error.md) — Pipe judge
+- [`PipeJudgeInputCapabilityError`](pipe-judge-input-capability-error.md) — Pipe judge input capability
 - [`PipeLLMFactoryError`](pipe-llm-factory-error.md) — Pipe LLM factory
 - [`PipeOperatorModelAvailabilityError`](pipe-operator-model-availability-error.md) — Pipe operator model availability
 - [`PipeSearchError`](pipe-search-error.md) — Pipe search
@@ -84,11 +91,12 @@ own page. Classes are grouped by subsystem.
 - [`StructuredContentComposerTypeError`](structured-content-composer-type-error.md) — Structured content composer type
 - [`StructuredContentComposerValidationError`](structured-content-composer-validation-error.md) — Structured content composer validation
 - [`StructuredContentComposerValueError`](structured-content-composer-value-error.md) — Structured content composer value
-- [`UnusedInputError`](unused-input-error.md) — Unused input
 - [`WithImagesFilterError`](with-images-filter-error.md) — With images filter
 
 ## Pipe controllers
 
+- [`BindingPathUnresolvedError`](binding-path-unresolved-error.md) — Binding path unresolved
+- [`BindingStepRunError`](binding-step-run-error.md) — Binding step run
 - [`PipeBatchFactoryError`](pipe-batch-factory-error.md) — Pipe batch factory
 - [`PipeConditionFactoryError`](pipe-condition-factory-error.md) — Pipe condition factory
 - [`PipeControllerError`](pipe-controller-error.md) — Pipe controller
@@ -99,12 +107,6 @@ own page. Classes are grouped by subsystem.
 ## Pipe signatures
 
 - [`PipeSignatureNotExecutableError`](pipe-signature-not-executable-error.md) — Pipe signature not executable
-
-## Builder
-
-- [`ConceptSpecError`](concept-spec-error.md) — Concept spec
-- [`PipeSpecError`](pipe-spec-error.md) — Pipe spec
-- [`PipelexBundleSpecBlueprintError`](pipelex-bundle-spec-blueprint-error.md) — Pipelex bundle spec blueprint
 
 ## Libraries
 

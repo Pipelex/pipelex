@@ -24,11 +24,22 @@ exclude = [
   "node_modules/**",
   ".git/**",
   "*.lock",
+  # The `api/` workspace member's own environment and caches, which the patterns above name only at the root.
+  "api/.venv/**",
+  "api/.mypy_cache/**",
+  "api/.ruff_cache/**",
+  "api/.pytest_cache/**",
+  "api/site/**",
+  # Its vendored inference tree, which its own sync keeps byte-identical to the kit, so a reformat here
+  # would read as drift; the kit's copy is formatted and linted where it lives, in `pipelex/kit/`.
+  "api/.pipelex/inference/**",
+  # Its deliberately invalid sample bundles, whose faults are the point of the files.
+  "api/postman/sample-bundles/invalid/**",
   # The MTHDS Test Corpus's schema-fault entries, and ONLY those. Every other deliberately invalid
   # entry is linted like any other .mthds file in this repo: its fault needs the runtime to notice,
-  # so the schema has nothing to say about it and a clean lint is the correct outcome. The two below
-  # are the exceptions — their fault is structural, so the schema rejects them as the very error they
-  # were written to trigger, and linting them would report a defect that is the entry's whole point.
+  # so the schema has nothing to say about it and a clean lint is the correct outcome. The entries
+  # below are the exceptions — their fault is structural, so the schema rejects them as the very error
+  # they were written to trigger, and linting them would report a defect that is the entry's whole point.
   #
   # This list is not hand-maintained: it is gated against the corpus vocabulary's `fails_at` signal by
   # tests/unit/pipelex/test_extras/test_mthds_corpus_plxt_exclusions.py, which fails if the two
@@ -37,9 +48,19 @@ exclude = [
   # `make plxt-lint` goes red naming it.
   #
   # Excluded rather than schema-exempted because a per-rule `exclude` does not lift the schema, only
-  # narrows which rule applies. What guards these two instead is strictly stronger: the corpus's
+  # narrows which rule applies. What guards these entries instead is strictly stronger: the corpus's
   # entry-validation gate runs the real validation engine over every entry in CI and is red both when
   # an invalid entry fails differently and when it accidentally validates.
+  "**/mthds_corpus/entries/invalid_binding_step_batch_fields/*.mthds",
+  "**/mthds_corpus/entries/invalid_binding_step_dotted_batch_over_branch/*.mthds",
+  "**/mthds_corpus/entries/invalid_binding_step_dotted_batch_over_malformed/*.mthds",
+  "**/mthds_corpus/entries/invalid_binding_step_malformed_path/*.mthds",
+  "**/mthds_corpus/entries/invalid_binding_step_parallel_branch/*.mthds",
+  "**/mthds_corpus/entries/invalid_binding_step_pipe_and_from/*.mthds",
+  "**/mthds_corpus/entries/invalid_binding_step_result_not_plain/*.mthds",
+  "**/mthds_corpus/entries/invalid_binding_step_without_result/*.mthds",
+  "**/mthds_corpus/entries/invalid_input_name_lone_dotted/*.mthds",
+  "**/mthds_corpus/entries/invalid_input_name_redundant_dotted/*.mthds",
   "**/mthds_corpus/entries/invalid_missing_pipe_type/*.mthds",
   "**/mthds_corpus/entries/invalid_unknown_pipe_type/*.mthds",
 ] # Glob patterns for files to ignore.

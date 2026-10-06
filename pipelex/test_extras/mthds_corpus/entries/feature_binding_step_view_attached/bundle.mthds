@@ -1,0 +1,23 @@
+domain      = "catalog_captions"
+description = "Captioning the photograph of a catalog page"
+main_pipe   = "caption_page"
+
+[pipe.caption_page]
+type = "PipeSequence"
+description = "Binds the view of a page, then captions it, when the page has a view"
+inputs = { page = "Page" }
+output = "Text?"
+steps = [
+  { from = "page.page_view", result = "page_view" },
+  { pipe = "write_caption", result = "caption" },
+]
+
+[pipe.write_caption]
+type = "PipeLLM"
+description = "Writes a one-line caption for a catalog photograph"
+inputs = { page_view = "Image" }
+output = "Text"
+prompt = """
+Write a one-line caption for this catalog photograph:
+@page_view
+"""

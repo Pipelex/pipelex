@@ -1,20 +1,18 @@
 """Every whole-bundle validate channel carries the same advisory-warning families.
 
 The `warnings` array used to be assembled site by site, and the sites disagreed: the protocol path
-emitted the optionality and hint lints, the agent CLI, the builder ops and the bare CLI emitted the
-optionality lint alone. One composition point (`pipelex.pipeline.advisory_warnings`) now builds them
-all, and these pin that the channels agree — the agent-CLI JSON envelope, its markdown rendering,
-the builder-ops envelopes, and the bare CLI's yellow echo.
+emitted the optionality and hint lints, the agent CLI and the bare CLI emitted the optionality lint
+alone. One composition point (`pipelex.pipeline.advisory_warnings`) now builds them all, and these pin
+that the channels agree — the agent-CLI JSON envelope, its markdown rendering, and the bare CLI's
+yellow echo.
 
 `validate all` is the channel that reaches for the *library manager's* accumulated blueprints to
 know which pipes are entry pipes (it holds no `ValidateBundleResult` of its own), so its case here
 doubles as the proof that the `acquire_library` load path really does accumulate them.
 
-Two surfaces are deliberately absent. The builder's `validate_all` carries no `warnings` key at all
-and never did — see `wip/full-optional/deferred.md`. And the bare CLI's single-pipe `validate
-<PIPE_CODE>` echoes none of them: it makes no bundle-wide claim, and neither lint has anything to say
-about one pipe in isolation (the vacuous lint is scoped to entry pipes, the optionality lint
-aggregates across flows).
+One surface is deliberately absent: the bare CLI's single-pipe `validate <PIPE_CODE>` echoes none of
+them. It makes no bundle-wide claim, and neither lint has anything to say about one pipe in isolation
+(the vacuous lint is scoped to entry pipes, the optionality lint aggregates across flows).
 """
 
 from __future__ import annotations
@@ -27,7 +25,6 @@ from typing import TYPE_CHECKING, Any
 import pytest
 import typer
 
-from pipelex.builder.operations import validate_ops
 from pipelex.cli.agent_cli.commands.validate._validate_core import validate_all_core, validate_bundle_core
 from pipelex.cli.commands.validate._validate_core import (
     _validate_pipe_or_bundle,  # pyright: ignore[reportPrivateUsage]
@@ -202,12 +199,6 @@ class TestAdvisoryWarningChannels:
         # reserved for a reference that did not resolve, spelled as the author wrote it.
         assert "concept_code" not in vacuous[0]
 
-    def test_builder_validate_bundle_content_twin(self) -> None:
-        result = asyncio.run(validate_ops.validate_bundle_content(mthds_contents=[_VACUOUS_MTHDS]))
-
-        assert result["is_valid"] is True
-        assert PipeValidationErrorType.INPUT_PRESENCE_VACUOUS in _error_types(result["warnings"])
-
     def test_agent_cli_markdown_renders_the_warning_under_its_heading(self, vacuous_bundle_dir: Path) -> None:
         """The markdown stream is the one an agent actually reads on `--format markdown` (the default)."""
         result = asyncio.run(validate_bundle_core(bundle_path=vacuous_bundle_dir / "bundle.mthds", library_dirs=[vacuous_bundle_dir]))
@@ -221,17 +212,6 @@ class TestAdvisoryWarningChannels:
 
     def test_agent_cli_bundle_envelope_carries_all_three_families(self, all_families_bundle_dir: Path) -> None:
         result = asyncio.run(validate_bundle_core(bundle_path=all_families_bundle_dir / "bundle.mthds", library_dirs=[all_families_bundle_dir]))
-
-        assert _error_types(result["warnings"]) == [
-            PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT,
-            PipeValidationErrorType.INPUT_PRESENCE_VACUOUS,
-            HintLintErrorType.HINT_UNKNOWN_KEY,
-        ]
-
-    def test_builder_bundle_file_envelope_carries_all_three_families(self, all_families_bundle_dir: Path) -> None:
-        result = asyncio.run(
-            validate_ops.validate_bundle_file(bundle_path=all_families_bundle_dir / "bundle.mthds", library_dirs=[all_families_bundle_dir])
-        )
 
         assert _error_types(result["warnings"]) == [
             PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT,

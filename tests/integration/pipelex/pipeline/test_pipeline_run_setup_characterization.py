@@ -114,6 +114,7 @@ class TestPipelineRunSetupCharacterization:
 
         pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
             storage_scope="test/scope",
+            read_scope=None,
             user_id="test-user",
             execution_config=_dry_mock_config(),
             mthds_contents=[_CHAR_MTHDS],
@@ -154,6 +155,7 @@ class TestPipelineRunSetupCharacterization:
         )
         _, _, library_id = await pipeline_run_setup(
             storage_scope="test/scope",
+            read_scope=None,
             user_id="test-user",
             execution_config=_dry_mock_config(),
             mthds_contents=[_CHAR_MTHDS],
@@ -170,6 +172,7 @@ class TestPipelineRunSetupCharacterization:
     async def test_empty_inputs_behave_like_no_inputs(self) -> None:
         pipe_job, _, library_id = await pipeline_run_setup(
             storage_scope="test/scope",
+            read_scope=None,
             user_id="test-user",
             execution_config=_no_mock_config(),
             mthds_contents=[_CHAR_MTHDS],
@@ -213,6 +216,7 @@ class TestPipelineRunSetupCharacterization:
         with pytest.raises(PipeNotFoundError):
             await pipeline_run_setup(
                 storage_scope="test/scope",
+                read_scope=None,
                 user_id="test-user",
                 execution_config=_dry_mock_config(),
                 mthds_contents=[_CHAR_MTHDS],
@@ -266,6 +270,7 @@ class TestPipelineRunSetupCharacterization:
             with pytest.raises(PipeNotFoundError):
                 await pipeline_run_setup(
                     storage_scope="test/scope",
+                    read_scope=None,
                     user_id="test-user",
                     execution_config=_dry_mock_config(),
                     mthds_contents=[_CHAR_MTHDS],
@@ -293,6 +298,7 @@ class TestPipelineRunSetupCharacterization:
             with pytest.raises(PipeNotFoundError):
                 await pipeline_run_setup(
                     storage_scope="test/scope",
+                    read_scope=None,
                     user_id="test-user",
                     execution_config=_dry_mock_config(),
                     library_id=collide_library_id,

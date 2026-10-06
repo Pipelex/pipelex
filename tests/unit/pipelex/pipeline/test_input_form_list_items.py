@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
-from pipelex.pipeline.input_form import InputFormDeriver, ObjectItem, TextItem
+from pipelex.pipeline.input_form import FormPosition, InputFormDeriver, ObjectItem, TextItem
 from tests.helpers.input_form import as_list, as_object
 
 
@@ -31,7 +31,7 @@ class TestDerivedListItemsAreNameless:
                 },
             ),
         }
-        post = InputFormDeriver(concepts=concepts).derive_concept(name="post", concept_ref="demo.Post")
+        post = InputFormDeriver(concepts=concepts, position=FormPosition.INPUT).derive_concept(name="post", concept_ref="demo.Post")
 
         item = as_list(as_object(post).fields[0]).item
         assert isinstance(item, TextItem), f"Expected the nameless text model, got '{type(item).__name__}'"
@@ -53,7 +53,7 @@ class TestDerivedListItemsAreNameless:
                 },
             ),
         }
-        box = InputFormDeriver(concepts=concepts).derive_concept(name="box", concept_ref="demo.Box")
+        box = InputFormDeriver(concepts=concepts, position=FormPosition.INPUT).derive_concept(name="box", concept_ref="demo.Box")
 
         item = as_list(as_object(box).fields[0]).item
         assert isinstance(item, ObjectItem), f"Expected the nameless object model, got '{type(item).__name__}'"

@@ -12,12 +12,16 @@ from pipelex.pipe_machinery.pipe_abstract import PipeAbstractType
 from pipelex.pipe_machinery.pipe_factory import PipeFactoryProtocol
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.compose.pipe_compose_factory import PipeComposeFactory
+from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
+from pipelex.pipe_operators.doc_gen.pipe_doc_gen_factory import PipeDocGenFactory
 from pipelex.pipe_operators.extract.pipe_extract import PipeExtract
 from pipelex.pipe_operators.extract.pipe_extract_factory import PipeExtractFactory
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_factory import PipeFuncFactory
 from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_factory import PipeImgGenFactory
+from pipelex.pipe_operators.judge.pipe_judge import PipeJudge
+from pipelex.pipe_operators.judge.pipe_judge_factory import PipeJudgeFactory
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 from pipelex.pipe_operators.search.pipe_search import PipeSearch
@@ -46,7 +50,9 @@ class PipeRegistryModels(RegistryModels):
         PipeLLM,
         PipeExtract,
         PipeSearch,
+        PipeJudge,
         PipeStructure,
+        PipeDocGen,
     ]
 
     PIPE_OPERATORS_FACTORY: ClassVar[list[PipeFactoryProtocol[Any, Any]]] = [
@@ -56,7 +62,9 @@ class PipeRegistryModels(RegistryModels):
         PipeLLMFactory,
         PipeExtractFactory,
         PipeSearchFactory,
+        PipeJudgeFactory,
         PipeStructureFactory,
+        PipeDocGenFactory,
     ]
 
     PIPE_CONTROLLERS: ClassVar[list[PipeAbstractType]] = [

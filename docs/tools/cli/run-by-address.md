@@ -48,19 +48,17 @@ The pipe to run defaults to the manifest's `main_pipe`; `--pipe <code>` override
 
 The fetched clone is temporary: it lives in a system temp directory and is deleted when the CLI process exits. Default outputs therefore anchor in **your current working directory** — `pipelex run method <ref>` writes into `./results/`, and the `pipelex build` method commands write their generated files there too, so nothing you produced disappears with the clone. An explicit `--output-dir` / `--output` is honored verbatim. For an installed method or a local path, defaults stay inside the method's own directory, as before.
 
-`pipelex build runner method <ref>` goes one step further: the generated script embeds the library directory it loads at run time, so the fetched package is copied beside the script (into a directory named after the method) and the script references that copy — a self-contained artifact that still works after the clone is gone.
-
 ## Python in fetched methods: the hosted rule
 
 What decides whether Python in a method is acceptable is **where it would execute**:
 
 - `.mthds` content is data — always fine.
 - **PipeFunc `.py`** is supported: on hosted deployments it executes in a network-blocked sandbox, never in the runner's process.
-- **Python structure classes** (`StructuredContent` subclasses) are imported into the runner's own process, so *hosted execution accepts MTHDS concepts and sandboxed PipeFuncs, not in-process Python*. A fetched method declaring structure classes runs locally, but the CLI prints a hosted-parity warning: express the types as MTHDS concepts (inline structures) to keep the method hosted-runnable.
+- **Python structure classes** (`StructuredContent` subclasses) would have to be imported into the runner's own process to back a concept, so *hosted execution accepts MTHDS concepts and sandboxed PipeFuncs, not in-process Python*. A fetched method declaring structure classes runs locally, but the CLI prints a hosted-parity warning with the route: declare the types as MTHDS concepts with inline structures, and have a PipeFunc import the classes the sandbox generates from them (`from structures import <domain>__<Concept>`). The module `pipelex build structures` writes is accepted as long as it is left as generated.
 
 ## Bounds
 
-Fetched packages are bounded: the clone has a fixed timeout, and the selected package is capped in file count and total bytes (tunable via the `PIPELEX_MAX_FETCHED_PACKAGE_FILES` and `PIPELEX_MAX_FETCHED_PACKAGE_TOTAL_KIB` environment variables). The manifest scan that locates the package is bounded too: at most `PIPELEX_MAX_SCANNED_MANIFESTS` manifests are considered per repository, and a `METHODS.toml` larger than `PIPELEX_MAX_MANIFEST_FILE_KIB` is skipped and reported rather than read. Content exceeding the caps is rejected with a clear error. Symlinks are refused outright: a fetched package containing one (file or directory) is rejected, because a link's target would bypass the content scans.
+Fetched packages are bounded: the clone has a fixed timeout, and the selected package is capped in file count and total bytes (tunable via the `PIPELEX_MAX_FETCHED_PACKAGE_FILES` and `PIPELEX_MAX_FETCHED_PACKAGE_TOTAL_KIB` environment variables). The manifest scan that locates the package is bounded too: at most `PIPELEX_MAX_SCANNED_MANIFESTS` manifests are considered per repository, and each `METHODS.toml` is read only if it is a regular file. A `METHODS.toml` that is a symlink, or is not a regular file, is skipped and reported without ever being opened, so a repository cannot make the scan read a file outside the clone. The read itself stops at `PIPELEX_MAX_MANIFEST_FILE_KIB`, whatever size the file reports, and a manifest over that ceiling, or not valid UTF-8, is skipped and reported too. Content exceeding the caps is rejected with a clear error. Symlinks are refused outright: a fetched package containing one (file or directory) is rejected, because a link's target would bypass the content scans.
 
 ## Referencing a Method by Address from Your Own Method
 

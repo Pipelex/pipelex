@@ -148,19 +148,19 @@ class _RefusingConceptProvider(ConceptProviderAbstract):
 class TestStuffSpecStructurelessRender:
     """`native.Anything` renders without resolving a structure class.
 
-    SCHEMA publishes the permissive schema — no constraint keywords, only the concept's identity
-    annotations (`title` = concept ref, `description` = authored description); JSON renders the
-    empty mapping. Multiplicity wraps exactly as for class-backed concepts.
+    SCHEMA publishes the concept's identity annotations (`title` = concept ref, `description` =
+    authored description) and excludes only array and null; JSON renders the empty mapping.
+    Multiplicity wraps exactly as for class-backed concepts, so every item carries the exclusion.
     """
 
-    def test_schema_single_is_annotated_permissive(self):
+    def test_schema_single_excludes_array_and_null(self):
         concept = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.ANYTHING)
         stuff_spec = StuffSpec(concept=concept)
 
         result = stuff_spec.render_stuff_spec(concept_provider=_RefusingConceptProvider(), output_format=ConceptRepresentationFormat.SCHEMA)
 
         assert result["concept"] == "native.Anything"
-        assert result["content"] == {"title": "native.Anything", "description": concept.description}
+        assert result["content"] == {"title": "native.Anything", "description": concept.description, "not": {"type": ["array", "null"]}}
 
     def test_schema_variable_list_wraps_in_unbounded_array(self):
         concept = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.ANYTHING)
@@ -170,7 +170,7 @@ class TestStuffSpecStructurelessRender:
 
         assert result["content"] == {
             "type": "array",
-            "items": {"title": "native.Anything", "description": concept.description},
+            "items": {"title": "native.Anything", "description": concept.description, "not": {"type": ["array", "null"]}},
         }
 
     def test_schema_fixed_count_bounds_the_array(self):
@@ -181,7 +181,7 @@ class TestStuffSpecStructurelessRender:
 
         assert result["content"] == {
             "type": "array",
-            "items": {"title": "native.Anything", "description": concept.description},
+            "items": {"title": "native.Anything", "description": concept.description, "not": {"type": ["array", "null"]}},
             "minItems": 3,
             "maxItems": 3,
         }

@@ -70,20 +70,54 @@ jobs:
           fi
 
 # --------------------------------------------------------------------------
+#  The API server (`api/`) on every supported version, in its own environment
+#  against the pipelex of this commit. Its suite is small, so one job per
+#  version, unsharded. `Tests (api)` in tests-check.yml runs the floor version
+#  on every pull request.
+# --------------------------------------------------------------------------
+  api-test-full:
+    name: Tests full (api, py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+    env:
+      ENV: dev
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install the server's environment
+        run: PYTHON_VERSION=${{ matrix.python-version }} make -C api install
+
+      - name: Run the server's tests (py${{ matrix.python-version }})
+        run: make -C api gha-tests
+
+# --------------------------------------------------------------------------
 #  Aggregator — the single required status check for the full-matrix gate.
-#  Green only if all 32 shards across all 4 versions pass.
+#  Green only if every shard of every version passes, and the API server's
+#  tests on every version with them.
 # --------------------------------------------------------------------------
   tests-full-all:
     name: Tests full (all)
     runs-on: ubuntu-latest
-    needs: [matrix-test-full]
+    needs: [matrix-test-full, api-test-full]
     if: always()
 
     steps:
       - name: Fail unless every version and shard passed
         run: |
-          if [ "${{ needs.matrix-test-full.result }}" != "success" ]; then
-            echo "::error::At least one full-matrix shard failed."
+          if [ "${{ needs.matrix-test-full.result }}" != "success" ] || \
+             [ "${{ needs.api-test-full.result }}" != "success" ]; then
+            echo "::error::At least one full-matrix job failed."
             exit 1
           fi
-          echo "All full-matrix shards passed."
+          echo "All full-matrix jobs passed."

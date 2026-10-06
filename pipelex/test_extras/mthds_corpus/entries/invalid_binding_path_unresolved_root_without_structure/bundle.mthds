@@ -1,0 +1,21 @@
+domain      = "delivery_notes"
+description = "Passing on the note left for a driver"
+main_pipe   = "pass_on_note"
+
+[pipe.pass_on_note]
+type        = "PipeSequence"
+description = "Binds the note's text, then writes the reminder"
+inputs      = { note = "Text" }
+output      = "Text"
+# Wrong on purpose: a Text is a leaf to a binding, so `note.text` walks into nothing; bind `note` itself.
+steps = [
+  { from = "note.text", result = "note_text" },
+  { pipe = "write_reminder", result = "reminder" },
+]
+
+[pipe.write_reminder]
+type        = "PipeCompose"
+description = "Writes the reminder handed to the driver"
+inputs      = { note_text = "Text" }
+output      = "Text"
+template    = "Reminder: $note_text"

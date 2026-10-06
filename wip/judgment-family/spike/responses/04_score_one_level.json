@@ -1,0 +1,20 @@
+{
+  "answers": {
+    "q": {
+      "confidence": 1.0,
+      "legend": {
+        "0": "Minor"
+      },
+      "probabilities": {
+        "0": 1.0
+      },
+      "score": 0.0,
+      "type": "score"
+    }
+  },
+  "model": "jev-1.13.0",
+  "usage": {
+    "input_tokens": 329,
+    "output_tokens": 17
+  }
+}

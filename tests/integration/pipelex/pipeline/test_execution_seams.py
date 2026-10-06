@@ -144,6 +144,7 @@ class TestExecutionSeams:
             pipe = get_required_entry_pipe(pipe_code=qualified_main_pipe)
             pipe_job = await prepare_pipe_job(
                 storage_scope="test/scope",
+                read_scope=None,
                 user_id="test-user",
                 pipe=pipe,
                 library_id=library_id,
@@ -188,7 +189,7 @@ class TestExecutionSeams:
         try:
             assert qualified_main_pipe is not None
             pipe = get_required_entry_pipe(pipe_code=qualified_main_pipe)
-            normalize_spy = mocker.spy(execution_seams_module, "normalize_data_urls_to_storage")
+            normalize_spy = mocker.spy(execution_seams_module, "prepare_file_inputs")
             normalize_config = (
                 get_config()
                 .interpreter.pipeline_execution.with_execution_overrides(
@@ -201,6 +202,7 @@ class TestExecutionSeams:
             with pytest.raises(ValueError, match="Invalid storage_scope"):
                 await prepare_pipe_job(
                     storage_scope=bad_scope,
+                    read_scope=None,
                     pipe=pipe,
                     library_id=library_id,
                     execution_config=normalize_config,
@@ -234,7 +236,7 @@ class TestExecutionSeams:
         try:
             assert qualified_main_pipe is not None
             pipe = get_required_entry_pipe(pipe_code=qualified_main_pipe)
-            normalize_spy = mocker.spy(execution_seams_module, "normalize_data_urls_to_storage")
+            normalize_spy = mocker.spy(execution_seams_module, "prepare_file_inputs")
             normalize_config = (
                 get_config()
                 .interpreter.pipeline_execution.with_execution_overrides(
@@ -246,6 +248,7 @@ class TestExecutionSeams:
 
             pipe_job = await prepare_pipe_job(
                 storage_scope="test/scope",
+                read_scope=None,
                 pipe=pipe,
                 library_id=library_id,
                 execution_config=normalize_config,

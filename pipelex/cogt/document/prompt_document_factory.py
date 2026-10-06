@@ -24,7 +24,9 @@ class PromptDocumentFactory:
             uri: A URI string (file path, HTTP URL, pipelex-storage://, or data: URL)
             base64_data: Base64 string (with or without data: prefix)
             raw_bytes: Raw binary document data
-            mime_type: Optional MIME type for the document (only used with uri)
+            mime_type: The document's MIME type, as run setup established it or the caller declared it.
+                For inline bytes it refines what the bytes alone identify; a data URL's own type is
+                the fallback.
 
         Returns:
             A PromptDocument instance (PromptDocumentUri, PromptDocumentBase64, or PromptDocumentBinary)
@@ -33,16 +35,16 @@ class PromptDocumentFactory:
             PromptDocumentFactoryError: If no valid input is provided
         """
         if raw_bytes:
-            return PromptDocumentBinary(raw_bytes=raw_bytes)
+            return PromptDocumentBinary(raw_bytes=raw_bytes, mime_type=mime_type)
         if base64_data:
             stripped_base64_data = strip_base64_str_if_needed(base64_data)
-            return PromptDocumentBase64(base64_data=stripped_base64_data)
+            return PromptDocumentBase64(base64_data=stripped_base64_data, mime_type=mime_type)
         if uri:
             # Check if it's a data URL and extract base64 data to avoid URL_MAX_LENGTH validation
             extracted = extract_base64_str_from_base64_url_if_possible(uri)
             if extracted is not None:
-                extracted_base64_data, _mime_type = extracted
-                return PromptDocumentBase64(base64_data=extracted_base64_data)
+                extracted_base64_data, data_url_mime_type = extracted
+                return PromptDocumentBase64(base64_data=extracted_base64_data, mime_type=mime_type or data_url_mime_type)
             return PromptDocumentUri(uri=uri, mime_type=mime_type)
         msg = "PromptDocumentFactory requires one of: uri, base64_data, or raw_bytes"
         raise PromptDocumentFactoryError(msg)

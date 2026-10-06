@@ -28,6 +28,8 @@ Template mode supports two syntax variants:
 
 The Jinja2 template has access to all the "stuffs" currently in the working memory. You can access them by the names they were given in previous pipeline steps. For example, if a previous step produced an output named `user_profile`, you can access its attributes in the template like `{{ user_profile.name }}` or `{{ user_profile.email }}`.
 
+A template reads data and calls methods of plain values, and nothing else: it can read fields, call `isoformat()` on a date or `upper()` on a string, and apply any filter, but it cannot call methods of Pipelex objects or read names starting with an underscore, other than an input's metadata fields such as `_stuff_name`. This applies to every template a method contains, PipeLLM prompts and PipeCondition expressions included. The [Template Sandbox](../../../under-the-hood/template-sandbox.md) page lists what is allowed and how a refusal is reported.
+
 ### Template Mode Configuration
 
 | Parameter       | Type              | Description                                                                 | Required |
@@ -37,6 +39,8 @@ The Jinja2 template has access to all the "stuffs" currently in the working memo
 | `inputs`        | table             | Input variables needed for the template                                     | No       |
 | `output`        | string            | The concept for the output                                                  | Yes      |
 | `template`      | string or section | An inline template string, or a `[pipe.name.template]` section (see below)  | Yes*     |
+
+Every input the pipe declares must be read by the template, and every variable the template reads must be declared in `inputs`. Validation refuses an input the template never reads as `extraneous_input_variable`, naming the input, so you either reference it in the template or remove it from `inputs`; an undeclared variable is refused as `missing_input_variable`. A name the template sets with `{% set %}` is its own, not an input, from that statement on: after an `{% if %}` it stays set only when every branch sets it, the `{% else %}` included, so a name only some branches set is read from the input of that name on the other paths; and a loop, a macro or a block keeps what it sets to its own body.
 
 *Template mode requires `template`. When using the rich form (`[pipe.name.template]` section), the following sub-fields are available:
 
@@ -105,6 +109,8 @@ template = """
 """
 ```
 
+**The `markdown` filter.** An HTML template can turn Markdown held in a plain text field into HTML with `{{ order.notes | markdown }}`. Raw HTML inside the Markdown is shown as text rather than passed through. A bare URL becomes a link only when it has a scheme, such as `https://example.com`, so a file name like `README.md` stays text; a link written in Markdown, such as `[the guide](docs/guide.md)`, is a link whatever its target. A [`Markdown`](../../concepts/native-concepts.md) input needs no filter: it renders as HTML by itself in an HTML template. Converting Markdown is charged to the template's [render budget](../../../under-the-hood/template-sandbox.md#the-render-budget), so one render converts at most about 65,000 characters of it, each conversion counting.
+
 ## Construct Mode
 
 Construct mode builds structured objects by mapping fields from inputs. Use this when you need to assemble a complex output concept from multiple inputs without using an LLM.
@@ -128,6 +134,8 @@ Instead of rendering a template, construct mode creates a structured object by s
 | `construct`   | section| Field mappings (see below)                                | Yes*     |
 
 *Either `template` or `construct` must be provided, but not both.
+
+The input rule of template mode applies to a construct too: what reads the inputs is every `from` path and every field template, nested constructs included. A declared input none of them reads is refused as `extraneous_input_variable`, and a path whose input is not declared as `missing_input_variable`.
 
 ### Construct Field Methods
 
@@ -156,6 +164,8 @@ products_by_sku = { from = "products", list_to_dict_keyed_by = "sku" }
 
 The referenced value must be a list, and every item must carry the key attribute with a string value — otherwise the composer raises an error.
 
+A `from` path and a `list_to_dict_keyed_by` name read public fields only: validation refuses a segment starting with an underscore, such as `{ from = "order._stuff" }`, for the reason the [Template Sandbox](../../../under-the-hood/template-sandbox.md) gives.
+
 ### Copying Whole Inputs Into Native Fields
 
 The `from` reference is not limited to dotted paths like `"customer.name"` — it can name a whole input variable. When the referenced input is a native stuff (`Text`, `Number`, `YesNo`, `Date`, `Time`, or a list of them) and the target field is native-typed, the composer automatically converts the content wrapper into the field's native value. This works for required and optional fields alike.
@@ -176,6 +186,8 @@ Conversion matrix:
 | `Time[]` | `type = "list"`, `item_type = "time"` | the list of times of day |
 
 When the target field expects a content object rather than a native value (e.g. a field typed with a concept), the object is kept as-is — the conversion only fires when the field expects the native type.
+
+`Choice` and `Rating` are not in the matrix: reach their verdict by path, `{ from = "team.choice" }` or `{ from = "severity.level" }`. A `YesNo` converts to its boolean and leaves its probability behind, so copy `{ from = "approved.probability" }` into a `number` field when you need it.
 
 One fidelity guard: a `Date` stuff that carries a time of day cannot be copied into a bare `date` field — that would silently drop the time and its UTC offset, so the composer raises an error instead. Target a `Date`-typed field to keep the full timestamp. The same guard applies per item when copying a `Date[]` into a list of `date` items.
 

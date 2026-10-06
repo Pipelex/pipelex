@@ -16,7 +16,7 @@ The only genuinely per-repo bit — the ``.mthds`` bundle each repo ships to dri
 
 from typing import ClassVar
 
-from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, SearchJobFailureError
+from pipelex.cogt.exceptions import InferenceErrorCategory, JudgmentJobFailureError, LLMCompletionError, SearchJobFailureError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 
 
@@ -100,6 +100,49 @@ class SearchErrorReportParityTestData:
             user_action=UserAction(kind=cls.EXPECTED_USER_ACTION_KIND, detail=cls.FAILURE_USER_ACTION_DETAIL),
         )
         # model_handle / backend_name are declared on CogtError; a real search worker fills them at its
+        # public-method chokepoint. This test mocks above the worker, so set them directly.
+        error.model_handle = cls.FAILURE_MODEL
+        error.backend_name = cls.FAILURE_PROVIDER
+        return error
+
+
+class JudgeErrorReportParityTestData:
+    """Constants + factory driving both arms of the local / Temporal ``ErrorReport`` parity test for judgment.
+
+    The judgment counterpart of :class:`SearchErrorReportParityTestData`. A single deliberately-failing
+    ``PipeJudge`` leaf is the source of truth for both arms: the local arm runs the ``native_judge`` pipe
+    through the direct ``ContentGenerator`` with ``make_judgment_answers`` mocked to fail; a distributed
+    arm runs the same pipe with its activity-side leaf mocked to fail. Both assert the same ``EXPECTED_*``
+    classification.
+    """
+
+    PIPE_CODE: ClassVar[str] = "native_judge"
+
+    # The worker-side failure injected into the judgment call. CONFIGURATION is non-retryable, so a
+    # distributed activity is not retried and the workflow fails on the first attempt — fast and deterministic.
+    FAILURE_MESSAGE: ClassVar[str] = "Judgment provider rejected the request: invalid API key"
+    FAILURE_MODEL: ClassVar[str] = "jev-1.13.0"
+    FAILURE_PROVIDER: ClassVar[str] = "typesafe"
+    FAILURE_CATEGORY: ClassVar[InferenceErrorCategory] = InferenceErrorCategory.CONFIGURATION
+    FAILURE_USER_ACTION_DETAIL: ClassVar[str] = "Verify the API key configured for this judgment provider."
+
+    # The classification both arms must surface on the recovered ErrorReport.
+    EXPECTED_RETRYABLE: ClassVar[bool] = False
+    EXPECTED_USER_ACTION_KIND: ClassVar[UserActionKind] = UserActionKind.CHECK_CREDENTIALS
+
+    @classmethod
+    def make_failing_judgment_error(cls) -> JudgmentJobFailureError:
+        """Build a fresh classified ``JudgmentJobFailureError``.
+
+        Each arm builds its own instance — an exception carries traceback state, so a single shared
+        instance must not be reused across runs.
+        """
+        error = JudgmentJobFailureError(
+            cls.FAILURE_MESSAGE,
+            error_category=cls.FAILURE_CATEGORY,
+            user_action=UserAction(kind=cls.EXPECTED_USER_ACTION_KIND, detail=cls.FAILURE_USER_ACTION_DETAIL),
+        )
+        # model_handle / backend_name are declared on CogtError; a real judgment worker fills them at its
         # public-method chokepoint. This test mocks above the worker, so set them directly.
         error.model_handle = cls.FAILURE_MODEL
         error.backend_name = cls.FAILURE_PROVIDER

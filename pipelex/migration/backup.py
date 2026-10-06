@@ -36,7 +36,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import NamedTuple
 
-from pipelex.pipeline.fixes.file_transaction import FileSnapshot, write_staged_file
+from pipelex.fix_ops.file_transaction import FileSnapshot, write_staged_file
 
 BACKUP_INFIX = ".bak."
 """What marks a file as one of our backups. Appended to the whole file name, extension included,

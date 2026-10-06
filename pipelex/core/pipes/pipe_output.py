@@ -5,12 +5,15 @@ from pydantic import Field, PrivateAttr
 
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_io_artifacts import PipeIOArtifacts
+from pipelex.core.stuffs.choice_content import ChoiceContent
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.markdown_content import MarkdownContent
 from pipelex.core.stuffs.mermaid_content import MermaidContent
 from pipelex.core.stuffs.number_content import NumberContent
+from pipelex.core.stuffs.rating_content import RatingContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContentType
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
@@ -130,6 +133,16 @@ class PipeOutput(PipeOutputAbstract[WorkingMemory]):
         return self.working_memory.main_stuff_as_yes_no
 
     @property
+    def main_stuff_as_choice(self) -> ChoiceContent:
+        """Get main stuff content as ChoiceContent if applicable."""
+        return self.working_memory.main_stuff_as_choice
+
+    @property
+    def main_stuff_as_rating(self) -> RatingContent:
+        """Get main stuff content as RatingContent if applicable."""
+        return self.working_memory.main_stuff_as_rating
+
+    @property
     def main_stuff_as_date(self) -> DateContent:
         """Get main stuff content as DateContent if applicable."""
         return self.working_memory.main_stuff_as_date
@@ -138,6 +151,11 @@ class PipeOutput(PipeOutputAbstract[WorkingMemory]):
     def main_stuff_as_html(self) -> HtmlContent:
         """Get main stuff content as HtmlContent if applicable."""
         return self.working_memory.main_stuff_as_html
+
+    @property
+    def main_stuff_as_markdown(self) -> MarkdownContent:
+        """Get main stuff content as MarkdownContent if applicable."""
+        return self.working_memory.main_stuff_as_markdown
 
     @property
     def main_stuff_as_mermaid(self) -> MermaidContent:

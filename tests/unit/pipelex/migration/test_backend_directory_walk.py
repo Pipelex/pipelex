@@ -42,12 +42,14 @@ class TestAFreshMachinesBackendDirectory:
     def test_every_backend_definition_is_claimed_and_the_documentation_beside_them_is_not(self, tmp_path: Path) -> None:
         """The claim rule over the real registry and a real directory listing, not a synthetic one.
 
-        The `.md` files are the half that only a real directory can prove: they are there because the
-        kit ships them next to the backends it documents, and a surface claiming `*.toml` leaves them
-        alone by extension rather than by an exclusion anybody has to maintain.
+        The kit ships no documentation in there, but a machine initialised by an older kit
+        still carries the model list it used to copy beside the backends, so one is written next to
+        the real files: a surface claiming `*.toml` leaves it alone by extension rather than by an
+        exclusion anybody has to maintain.
         """
-        seeded = self._seed(root=tmp_path)
-        assert [path.name for path in seeded if path.suffix == ".md"], "worthless unless the kit still ships documentation in there"
+        self._seed(root=tmp_path)
+        (tmp_path / INFERENCE_DIR_NAME / BACKENDS_DIR_NAME / "pipelex_gateway_models.md").write_text("# Models\n", encoding="utf-8")
+        seeded = sorted((tmp_path / INFERENCE_DIR_NAME / BACKENDS_DIR_NAME).iterdir())
 
         claimed = build_config_surface_registry().files_by_surface_in_directory(directory=tmp_path)
 

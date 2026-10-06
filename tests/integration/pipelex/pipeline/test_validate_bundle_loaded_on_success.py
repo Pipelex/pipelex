@@ -1,19 +1,19 @@
 """Pin: a successful ``validate_bundle`` leaves the library loaded + current (D6 inner-sweep contract).
 
-The build/inputs/output CLIs and builder operations (``inputs_ops``, ``output_ops``,
-``runner_code_ops``, ``validate_pipe_in_bundle``) call ``validate_bundle`` (or ``validate_pipes``
-directly) and then immediately ``get_required_entry_pipe(...)`` against the library it left open. The
-migration to ``BundleValidator.validate_pipes`` — the public inner sweep, which deliberately never
-tears the library down — must preserve this: a sweep that tore the library down on success would
-strand every one of those callers with ``No current library set`` / ``PipeNotFoundError``.
+The build inputs/output CLIs and the inputs template engine (``build_inputs_for_pipe``) call
+``validate_bundle`` and then immediately ``get_required_entry_pipe(...)`` against the library it left
+open. The migration to ``BundleValidator.validate_pipes`` — the public inner sweep, which
+deliberately never tears the library down — must preserve this: a sweep that tore the library down on
+success would strand every one of those callers with ``No current library set`` /
+``PipeNotFoundError``.
 """
 
 from __future__ import annotations
 
 import pytest
 
-from pipelex.builder.operations.runner_code_ops import build_runner_code_for_pipe
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_entry_pipe
+from pipelex.pipeline.inputs_template import build_inputs_for_pipe
 from pipelex.pipeline.validate_bundle import validate_bundle
 
 _LOADED_DOMAIN = "loaded_on_success"
@@ -50,13 +50,14 @@ class TestValidateBundleLoadedOnSuccess:
                 get_library_manager().teardown(library_id=library_id)
             clear_current_library()
 
-    async def test_runner_code_ops_resolves_pipe_after_inner_sweep(self) -> None:
-        # runner_code_ops is the caller that drives the inner sweep (validate_pipes) directly and then
-        # resolves + generates code against the still-open library — the loaded-on-success contract in action.
-        runner_code = await build_runner_code_for_pipe(mthds_contents=[_LOADED_MTHDS], pipe_code="summarize_doc")
+    async def test_inputs_template_resolves_pipe_after_validation(self) -> None:
+        # The inputs template engine validates the bundle, then resolves the pipe and renders its inputs
+        # against the still-open library — the loaded-on-success contract in action.
+        inputs_result = await build_inputs_for_pipe(mthds_contents=[_LOADED_MTHDS], pipe_code="summarize_doc")
         library_id = get_current_library_id_or_none()
         try:
-            assert "summarize_doc" in runner_code
+            assert inputs_result["pipe_ref"] == f"{_LOADED_DOMAIN}.summarize_doc"
+            assert "doc" in inputs_result["inputs"]
         finally:
             if library_id is not None:
                 get_library_manager().teardown(library_id=library_id)

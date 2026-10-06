@@ -1,6 +1,10 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import pytest
 
-from pipelex.cogt.exceptions import ImgGenParameterError
+from pipelex.cogt.exceptions import ImgGenParameterError, InferenceErrorCategory
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_gemini_mapping import (
     GeminiAspectRatioType,
@@ -9,6 +13,10 @@ from pipelex.cogt.img_gen.img_gen_gemini_mapping import (
 )
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, SizeTier
 from pipelex.cogt.img_gen.img_gen_model_rules import AspectRatioTaxonomy
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 BANNER_ASPECT_RATIOS = [
     AspectRatio.LANDSCAPE_4_1,
@@ -200,14 +208,65 @@ class TestImgGenGeminiMapping:
             )
 
     def test_non_google_taxonomy_rejected(self) -> None:
-        """A non-Gemini taxonomy value has no Google resolution grids."""
-        with pytest.raises(ImgGenParameterError, match="not a Google Gemini image generation taxonomy"):
+        """A non-Gemini taxonomy value has no Google resolution grids, which is the model configuration's fault."""
+        with pytest.raises(ImgGenParameterError, match="not a Google Gemini image generation taxonomy") as exc_info:
             ImgGenGeminiMapping.dimensions_for_aspect_ratio_and_size(
                 AspectRatioTaxonomy.FLUX,
                 aspect_ratio=AspectRatio.SQUARE,
                 size="1K",
                 model_name="flux-dev",
             )
+        assert exc_info.value.error_category == InferenceErrorCategory.CONFIGURATION
+
+    @pytest.mark.parametrize(
+        ("topic", "method_name", "rules", "error_match"),
+        [
+            ("required_without_rules", "img_gen_taxonomy", None, "no 'aspect_ratio' rules configured"),
+            ("required_unknown_value", "img_gen_taxonomy", {"aspect_ratio": "gemini_from_the_future"}, "unknown aspect_ratio taxonomy"),
+            ("gemini_without_rules", "optional_gemini_taxonomy", None, "declares no aspect_ratio rule"),
+            ("gemini_without_aspect_ratio", "optional_gemini_taxonomy", {"prompt": "positive_only"}, "declares no aspect_ratio rule"),
+            ("gemini_unknown_value", "optional_gemini_taxonomy", {"aspect_ratio": "gemini_from_the_future"}, "unknown aspect_ratio taxonomy"),
+        ],
+    )
+    def test_unusable_taxonomy_rules_are_a_configuration_fault(
+        self,
+        mocker: MockerFixture,
+        topic: str,  # ruff: ignore[unused-method-argument]
+        method_name: str,
+        rules: dict[str, str] | None,
+        error_match: str,
+    ) -> None:
+        """Rules that cannot name the model's taxonomy are refused as the model configuration's fault, naming the model."""
+        inference_model = mocker.MagicMock(spec=InferenceModelSpec)
+        inference_model.name = "nano-banana-misconfigured"
+        inference_model.rules = rules
+
+        with pytest.raises(ImgGenParameterError, match=error_match) as exc_info:
+            getattr(ImgGenGeminiMapping, method_name)(inference_model)
+
+        assert exc_info.value.error_category == InferenceErrorCategory.CONFIGURATION
+        assert "nano-banana-misconfigured" in str(exc_info.value)
+
+    @pytest.mark.parametrize(
+        ("rules", "expected_taxonomy"),
+        [
+            ({"aspect_ratio": "gemini_3_pro"}, AspectRatioTaxonomy.GEMINI_3_PRO),
+            ({"aspect_ratio": "gpt_image_2"}, None),
+            ({"aspect_ratio": "flux"}, None),
+        ],
+    )
+    def test_optional_gemini_taxonomy_reads_the_declared_taxonomy(
+        self,
+        mocker: MockerFixture,
+        rules: dict[str, str],
+        expected_taxonomy: AspectRatioTaxonomy | None,
+    ) -> None:
+        """A declared Gemini taxonomy is returned and a declared non-Gemini one answers None."""
+        inference_model = mocker.MagicMock(spec=InferenceModelSpec)
+        inference_model.name = "some-image-model"
+        inference_model.rules = rules
+
+        assert ImgGenGeminiMapping.optional_gemini_taxonomy(inference_model) == expected_taxonomy
 
     @pytest.mark.parametrize(
         ("taxonomy", "exact_size", "expected_ratio", "expected_image_size"),
@@ -316,14 +375,15 @@ class TestImgGenGeminiMapping:
         assert resolved == ("16:9", "2K", 2752, 1536)
 
     def test_resolve_image_config_rejects_tier_beyond_taxonomy(self) -> None:
-        """A tier outside the taxonomy's grids is a validation error, not a silent downgrade."""
-        with pytest.raises(ImgGenParameterError, match="does not support image size"):
+        """A tier outside the taxonomy's grids is a validation error of the caller's request, not a silent downgrade."""
+        with pytest.raises(ImgGenParameterError, match="does not support image size") as exc_info:
             ImgGenGeminiMapping.resolve_image_config(
                 AspectRatioTaxonomy.GEMINI_2_5,
                 aspect_ratio=AspectRatio.SQUARE,
                 size=SizeTier.TWO_K,
                 model_name="nano-banana",
             )
+        assert exc_info.value.error_category == InferenceErrorCategory.CONTENT
 
     def test_resolve_image_config_rejects_half_k(self) -> None:
         with pytest.raises(ImgGenParameterError, match=r"0\.5k"):

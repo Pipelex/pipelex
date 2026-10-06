@@ -17,7 +17,6 @@ Replace `<paths>` with the test directories from the mapping below. Concatenate 
 
 | Changed source | Test paths to run |
 |---|---|
-| `pipelex/builder/` | `tests/unit/pipelex/builder/ tests/integration/pipelex/builder/` |
 | `pipelex/cli/` | `tests/unit/pipelex/cli/ tests/integration/pipelex/cli/ tests/e2e/pipelex/cli/` |
 | `pipelex/codegen/` | `tests/unit/pipelex/codegen/ tests/integration/pipelex/codegen/` |
 | `pipelex/cogt/` | `tests/unit/pipelex/cogt/ tests/integration/pipelex/cogt/` |
@@ -46,7 +45,7 @@ Note: `pipe_controllers/`, `pipe_operators/`, and `pipe_run/` share integration 
 Add these to any targeted run when applicable:
 
 - **Config TOML changes** (`pipelex/pipelex.toml`, `pipelex/kit/configs/`): also run `make tb` (boot test)
-- **`.mthds` file changes**: also add `tests/unit/pipelex/builder/ tests/integration/pipelex/builder/ tests/integration/pipelex/pipes/`
+- **`.mthds` file changes**: also add `tests/integration/pipelex/pipes/`
 - **Test fixtures changed** (`tests/data/`, `tests/cases/`): also run tests that import from those fixtures
 
 ## When to run full `make agent-test`

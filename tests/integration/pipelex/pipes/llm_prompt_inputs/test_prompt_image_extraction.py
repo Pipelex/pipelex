@@ -322,11 +322,12 @@ class TestPromptImageExtraction:
         pretty_print(llm_prompt.user_text, title="with_images | tag - images extracted AND wrapped in tags")
 
     async def test_direct_nested_image_via_dotted_path(self, load_test_library: Callable[[list[Path]], None]) -> None:
-        """Test that direct nested image reference via dotted path produces [Image N] token.
+        """`@page.page_view`, read through the root `page = "Page"`, is attached as an image and produces an [Image N] token.
 
         This tests the case where:
-        - inputs declares a dotted path to an image field: {"page.page_view": "Image"}
+        - inputs declare only the root, `page = "Page"`: an input name is a plain name, never a path into a field
         - prompt uses @page.page_view which becomes {{ page.page_view|tag("page.page_view") }}
+        - the image is detected by the concept the path reaches, `Image`, through the pinned structure of `Page`
         - The tag filter should detect the registered image and return [Image N]
 
         This verifies that the tag filter correctly substitutes registered images,
@@ -336,9 +337,9 @@ class TestPromptImageExtraction:
 
         pipe_llm_blueprint = PipeLLMBlueprint(
             description="Test direct nested image reference",
-            inputs={"page.page_view": "Image", "page": "Page"},
+            inputs={"page": "Page"},
             output="Text",
-            prompt="Describe this image: $page.page_view",
+            prompt="Describe this image:\n@page.page_view",
         )
 
         pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
@@ -657,7 +658,7 @@ class TestPromptImageExtraction:
 
         pipe_llm_blueprint = PipeLLMBlueprint(
             description="Test bare Jinja2 dotted path image",
-            inputs={"page.page_view": "Image", "page": "Page"},
+            inputs={"page": "Page"},
             output="Text",
             prompt="Describe this image: {{ page.page_view }}",
         )
@@ -710,7 +711,7 @@ class TestPromptImageExtraction:
 
         pipe_llm_blueprint = PipeLLMBlueprint(
             description="Test dollar dotted path image",
-            inputs={"page.page_view": "Image", "page": "Page"},
+            inputs={"page": "Page"},
             output="Text",
             prompt="Describe this image: $page.page_view",
         )
@@ -751,3 +752,45 @@ class TestPromptImageExtraction:
         assert "[Image 1]" in llm_prompt.user_text, f"Expected '[Image 1]' in prompt, got: {llm_prompt.user_text}"
         assert ImageTestCases.IMAGE_FILE_PATH_PNG_1 not in llm_prompt.user_text, f"URL should not appear in prompt text: {llm_prompt.user_text}"
         pretty_print(llm_prompt.user_text, title="$page.page_view - should show [Image 1]")
+
+    async def test_dotted_path_to_a_scalar_through_the_root_renders_its_value(self, load_test_library: Callable[[list[Path]], None]) -> None:
+        """`{{ page.page_view.url }}` reads a text field through the root `page = "Page"`, so it renders as text and attaches no image."""
+        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
+
+        pipe_llm_blueprint = PipeLLMBlueprint(
+            description="Test a dotted path to a scalar field read through the root",
+            inputs={"page": "Page"},
+            output="Text",
+            prompt="Where the page view is stored: {{ page.page_view.url }}",
+        )
+
+        pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
+            domain_code="test_pipes",
+            pipe_code="test_dotted_path_to_scalar",
+            blueprint=pipe_llm_blueprint,
+        )
+
+        page_content = PageContent(
+            text_and_images=TextAndImagesContent(
+                text=TextContent(text="Some text content"),
+                images=[],
+            ),
+            page_view=ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG_1),
+        )
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(
+            stuff=StuffFactory.make_stuff(
+                concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.PAGE),
+                content=page_content,
+                name="page",
+            ),
+        )
+
+        llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
+            output_concept_ref="Text",
+            context_provider=working_memory,
+        )
+
+        assert not llm_prompt.user_images
+        assert llm_prompt.user_text is not None
+        assert f"Where the page view is stored: {ImageTestCases.IMAGE_FILE_PATH_PNG_1}" in llm_prompt.user_text

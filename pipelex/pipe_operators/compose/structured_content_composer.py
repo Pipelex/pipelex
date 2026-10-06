@@ -22,6 +22,7 @@ from pipelex.pipe_operators.compose.exceptions import (
     StructuredContentComposerValueError,
 )
 from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.misc.string_utils import find_private_path_segment
 from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.tools.typing.annotation_utils import unwrap_optional
 from pipelex.tools.typing.class_utils import are_classes_equivalent
@@ -240,6 +241,9 @@ class StructuredContentComposer:
             msg = f"list_to_dict_keyed_by requires ListContent or list, got {type(value).__name__}"
             raise StructuredContentComposerTypeError(msg)
 
+        if find_private_path_segment(path=key_attr):
+            msg = f"list_to_dict_keyed_by names '{key_attr}', which starts with an underscore: it names a public field only"
+            raise StructuredContentComposerValueError(msg)
         log.verbose(f"  Converting list of {len(items)} items to dict keyed by '{key_attr}'")
 
         result: dict[str, Any] = {}
@@ -282,6 +286,10 @@ class StructuredContentComposer:
         Returns:
             The value at the end of the attribute path, converted as appropriate
         """
+        # The blueprint refuses these at load; the walk below is raw `getattr`, so it refuses them again.
+        if private_segment := find_private_path_segment(path=path):
+            msg = f"Cannot resolve path '{path}': '{private_segment}' starts with an underscore, and a path reads public fields only"
+            raise StructuredContentComposerValueError(msg)
         parts = path.split(".", 1)
         base_name = parts[0]
         attr_path = parts[1]

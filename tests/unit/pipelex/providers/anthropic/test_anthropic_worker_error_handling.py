@@ -64,6 +64,7 @@ def _make_anthropic_not_found_error(message: str) -> anthropic.NotFoundError:
 def _make_worker(mocker: MockerFixture) -> AnthropicLLMWorker:
     """Create a minimal AnthropicLLMWorker with mocked internals."""
     worker = object.__new__(AnthropicLLMWorker)
+    worker.extras_factory = None
     mock_model = mocker.MagicMock()
     mock_model.desc = "test-model-desc"
     mock_model.model_id = "claude-sonnet-4-20250514"

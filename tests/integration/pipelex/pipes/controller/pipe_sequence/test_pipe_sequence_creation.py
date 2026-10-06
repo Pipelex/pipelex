@@ -45,6 +45,6 @@ class TestPipeSequenceCreation:
         assert pipe_sequence.code == "test_sequence"
         assert pipe_sequence.domain_code == domain_code
         assert len(pipe_sequence.sequential_sub_pipes) == 1
-        assert pipe_sequence.sequential_sub_pipes[0].pipe_code == "test_pipe_1"
+        assert pipe_sequence.pipe_steps[0].pipe_code == "test_pipe_1"
         assert pipe_sequence.sequential_sub_pipes[0].output_name == "intermediate_result"
         concept_library.teardown()

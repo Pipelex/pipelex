@@ -15,6 +15,12 @@ The `PipeCondition` controller adds branching logic to your pipelines. It evalua
 3.  **Use Default**: If the key is not found in `outcomes`, the `default_outcome` is used.
 4.  **Execute Chosen Pipe**: The chosen pipe is then executed. It receives the exact same `WorkingMemory` and inputs that were passed to the `PipeCondition` operator. The output of the chosen pipe becomes the output of the `PipeCondition` itself.
 
+When the expression renders nothing, no outcome can be chosen and the pipe fails with `Conditional expression returned no result`, naming the pipe. That refusal and the others a condition makes are faults in your method, each reported with its reason and a next step. In a run, an expression that renders nothing, a `fail` outcome and a chosen pipe whose inputs are missing fail the run, which a hosted run answers with HTTP 422. In the dry run of `pipelex validate`, which runs every branch instead of choosing one, an expression that renders nothing over the mock inputs and a condition whose every outcome is `fail` give a `dry_run` item.
+
+A dry run, which is what `pipelex validate` and `pipelex run … --dry-run` do, runs every outcome because it cannot know which one a live run would take. Each outcome runs on a copy of the memory the condition received, so no outcome reads what another one wrote, and the default outcome runs last: the steps after the condition read its output, which is what a live run falls back to when no key matches. The graph of a dry run draws the condition's output as one stuff that every outcome produces and the next step reads.
+
+An expression that does not parse, whether written as `expression` or as `expression_template`, is refused when the bundle loads, before anything runs, and so is one the run could not compile, such as one naming a filter or a test that does not exist outside any conditional. Jinja2 resolves a name inside an `{% if %}` block or an inline `if` only when the expression renders, so a wrong name there fails the run rather than the load. `pipelex validate` reports either as an item on the condition naming the field and the line of it that fails, and a run of the bundle is refused with the same item, which a hosted run answers with HTTP 422. The item quotes none of the expression, which may be a host library's.
+
 ## Configuration
 
 `PipeCondition` is configured in your pipeline's `.mthds` file.
@@ -118,7 +124,7 @@ description = "Process invoice documents"
 inputs = { classification = "DocumentType" }
 output = "ProcessedDocument"
 prompt = """
-Process this invoice document...
+Process this invoice document, classified as $classification...
 """
 
 [pipe.process_receipt]
@@ -127,7 +133,7 @@ description = "Process receipt documents"
 inputs = { classification = "DocumentType" }
 output = "ProcessedDocument"
 prompt = """
-Process this receipt document...
+Process this receipt document, classified as $classification...
 """
 
 [pipe.process_unknown]
@@ -136,7 +142,7 @@ description = "Handle unknown document types"
 inputs = { classification = "DocumentType" }
 output = "ProcessedDocument"
 prompt = """
-Process this unknown document type...
+Process this document of unknown type, classified as $classification...
 """
 ```
 
@@ -144,8 +150,8 @@ Process this unknown document type...
 
 Beside pipe names, an outcome (or the `default_outcome`) can be one of two special outcomes:
 
-- **`fail`**: the run fails loudly with an error naming the pipe and the evaluated expression. Use it to make "this should never happen" branches explicit.
-- **`continue`**: the condition declares that it produced **no output**. The runtime records an absence for the declared output (with the evaluated expression as the reason) and the run continues as a success — the rest of the working memory is unchanged.
+- **`fail`**: the run fails loudly with an error naming the pipe. Use it to make "this should never happen" branches explicit. The failure is a refusal written into your method, so a hosted run answers it with HTTP 422 and keeps its message, with a next step, under STRICT disclosure. The message leaves out the value the expression rendered, which the run's execution graph keeps: that value can be text of a condition a host's library declared.
+- **`continue`**: the condition declares that it produced **no output**. The runtime records an absence for the declared output, whose reason names the condition and its `continue` outcome, and the run continues as a success — the rest of the working memory is unchanged. The reason leaves out the value the expression rendered, which the run's execution graph keeps, for the same reason a `fail` outcome's message does: a pipe that later requires the output quotes the reason to the caller.
 
 Because `continue` resolves the declared output as absent, a `continue`-reachable condition (any outcome mapped to `continue`, or `default_outcome = "continue"`) **must declare its output optional** — `output = "Constraint?"`. Validation enforces this statically (`optional_output_required`), so the no-output path is always visible to the type system. The same visibility rule applies at the condition's boundary: if a mapped outcome pipe declares an optional output, the condition must declare `?` too (`optional_not_handled`).
 

@@ -23,7 +23,7 @@ class TestInputShaperFilePaths:
         """A bare relative path for an Image-refining input becomes the base_dir-resolved path."""
         input_specs = build_input_specs([("photo", "shaper_test.Photo", None)])
         working_memory = InputShaper.shape(
-            {"photo": "photo.jpg"}, input_specs=input_specs, inputs_base_dir=tmp_path, concept_provider=get_concept_library()
+            {"photo": "photo.jpg"}, input_specs=input_specs, inputs_base_dir=tmp_path, concept_provider=get_concept_library(), read_scope=None
         )
 
         photo_stuff = working_memory.get_stuff("photo")
@@ -36,7 +36,7 @@ class TestInputShaperFilePaths:
         absolute_path = str(tmp_path / "elsewhere" / "photo.jpg")
         input_specs = build_input_specs([("photo", "shaper_test.Photo", None)])
         working_memory = InputShaper.shape(
-            {"photo": absolute_path}, input_specs=input_specs, inputs_base_dir=tmp_path, concept_provider=get_concept_library()
+            {"photo": absolute_path}, input_specs=input_specs, inputs_base_dir=tmp_path, concept_provider=get_concept_library(), read_scope=None
         )
 
         photo_stuff = working_memory.get_stuff("photo")
@@ -46,7 +46,7 @@ class TestInputShaperFilePaths:
     def test_bare_relative_path_without_base_dir_untouched(self):
         """No base_dir (in-process / inline-JSON callers): a relative path keeps today's CWD contract."""
         input_specs = build_input_specs([("photo", "shaper_test.Photo", None)])
-        working_memory = InputShaper.shape({"photo": "photo.jpg"}, input_specs=input_specs, concept_provider=get_concept_library())
+        working_memory = InputShaper.shape({"photo": "photo.jpg"}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         photo_stuff = working_memory.get_stuff("photo")
         assert isinstance(photo_stuff.content, Photo)
@@ -65,7 +65,7 @@ class TestInputShaperFilePaths:
         """Remote URLs and scheme-qualified URIs are not local paths — never rewritten."""
         input_specs = build_input_specs([("photo", "shaper_test.Photo", None)])
         working_memory = InputShaper.shape(
-            {"photo": url_value}, input_specs=input_specs, inputs_base_dir=tmp_path, concept_provider=get_concept_library()
+            {"photo": url_value}, input_specs=input_specs, inputs_base_dir=tmp_path, concept_provider=get_concept_library(), read_scope=None
         )
 
         photo_stuff = working_memory.get_stuff("photo")
@@ -77,7 +77,11 @@ class TestInputShaperFilePaths:
         absolute_path = str(tmp_path / "other" / "b.pdf")
         input_specs = build_input_specs([("exhibits", "shaper_test.Exhibit", True)])
         working_memory = InputShaper.shape(
-            {"exhibits": ["a.pdf", absolute_path]}, input_specs=input_specs, inputs_base_dir=tmp_path, concept_provider=get_concept_library()
+            {"exhibits": ["a.pdf", absolute_path]},
+            input_specs=input_specs,
+            inputs_base_dir=tmp_path,
+            concept_provider=get_concept_library(),
+            read_scope=None,
         )
 
         exhibits_stuff = working_memory.get_stuff("exhibits")
@@ -92,7 +96,7 @@ class TestInputShaperFilePaths:
         value: dict[str, Any] = {"url": "photo.jpg"}
         input_specs = build_input_specs([("photo", "shaper_test.Photo", None)])
         working_memory = InputShaper.shape(
-            {"photo": value}, input_specs=input_specs, inputs_base_dir=tmp_path, concept_provider=get_concept_library()
+            {"photo": value}, input_specs=input_specs, inputs_base_dir=tmp_path, concept_provider=get_concept_library(), read_scope=None
         )
 
         photo_stuff = working_memory.get_stuff("photo")
@@ -103,7 +107,7 @@ class TestInputShaperFilePaths:
         """A ~-prefixed path is home-anchored: it expands to the home dir, never joined onto base_dir."""
         input_specs = build_input_specs([("photo", "shaper_test.Photo", None)])
         working_memory = InputShaper.shape(
-            {"photo": "~/photo.jpg"}, input_specs=input_specs, inputs_base_dir=tmp_path, concept_provider=get_concept_library()
+            {"photo": "~/photo.jpg"}, input_specs=input_specs, inputs_base_dir=tmp_path, concept_provider=get_concept_library(), read_scope=None
         )
 
         photo_stuff = working_memory.get_stuff("photo")
@@ -113,7 +117,7 @@ class TestInputShaperFilePaths:
     def test_bare_tilde_path_expands_without_base_dir(self):
         """No base_dir: a ~-prefixed path still expands to home (~ is home-anchored, not CWD-relative)."""
         input_specs = build_input_specs([("photo", "shaper_test.Photo", None)])
-        working_memory = InputShaper.shape({"photo": "~/photo.jpg"}, input_specs=input_specs, concept_provider=get_concept_library())
+        working_memory = InputShaper.shape({"photo": "~/photo.jpg"}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
         photo_stuff = working_memory.get_stuff("photo")
         assert isinstance(photo_stuff.content, Photo)

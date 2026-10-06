@@ -85,7 +85,6 @@ class Pipelex(RuntimeBoot):
         integration_mode: IntegrationMode,
         needs_inference: bool = True,
         boot_orchestrator: str | None = None,
-        needs_model_specs: bool | None = None,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
         storage_provider: StorageProviderAbstract | None = None,
@@ -115,7 +114,6 @@ class Pipelex(RuntimeBoot):
             integration_mode=integration_mode,
             needs_inference=needs_inference,
             boot_orchestrator=boot_orchestrator,
-            needs_model_specs=needs_model_specs,
             builtin_plugins=BUILTIN_PLUGINS,
             core_unconditional_plugin_names=CORE_UNCONDITIONAL_PLUGIN_NAMES,
             entry_point_groups=ENTRY_POINT_GROUPS,
@@ -235,7 +233,6 @@ class Pipelex(RuntimeBoot):
         integration_mode: IntegrationMode = IntegrationMode.PYTHON,
         needs_inference: bool = True,
         boot_orchestrator: str | None = None,
-        needs_model_specs: bool | None = None,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
         storage_provider: StorageProviderAbstract | None = None,
@@ -264,18 +261,17 @@ class Pipelex(RuntimeBoot):
             integration_mode: Integration mode (CLI, FASTAPI, DOCKER, MCP, N8N, PYTHON, PYTEST)
             needs_inference: When False, forces every run THIS process initiates to DRY mode
                 (applied at runtime_hub.resolve_run_mode_for_boot, which every run-params factory
-                calls: operators dispatch normally and the cogt leaf mocks) and loads backends leniently
-                (skipping those with missing credentials). This skips gateway terms check and model
-                deck validation. Useful for commands like validate/show that don't call inference
-                APIs. Generator selection stays backend-keyed. Submitter-side contract only: it does
-                not constrain work this process executes as a Temporal worker.
+                calls: operators dispatch normally and the cogt leaf mocks) and loads every enabled
+                backend with its models without resolving any credential, so it knows every model a
+                boot with inference knows; a backend it did not credential refuses to be called. This
+                skips model deck validation. Useful for commands like validate/show that don't call
+                inference APIs. Generator selection stays backend-keyed. The forced DRY mode binds
+                only the runs this process submits, but the unresolved credentials bind everything
+                it executes: a Temporal worker that runs live work boots with inference.
             boot_orchestrator: When provided, boots this process under the orchestrator plugin
                 of this name (e.g. "temporal" to run pipes through the Temporal worker runtime).
                 Any other value (or None) leaves execution in-process. Core names no orchestrator;
                 the matching plugin gates on its own name.
-            needs_model_specs: When True, load real model specs even if needs_inference
-                is False. When None (default), follows needs_inference. Useful for validate
-                commands that need gateway-provided model specs without enabling full inference.
             class_registry: Custom class registry for dynamic loading
             secrets_provider: Custom secrets/credentials provider
             storage_provider: Custom storage backend
@@ -297,9 +293,9 @@ class Pipelex(RuntimeBoot):
                 to this directory (package defaults + this directory) instead of following
                 project/global layering. Note the limit: it scopes *that load* and nothing else. The
                 inference files — backends, routing profiles and the model deck — still resolve through
-                the layered paths, and the gateway consent/onboarding state is read from the global
-                config dir outright. So this does not fully isolate a boot from the surrounding
-                project.
+                the layered paths, and the credentials `.env` is the home directory's. So this does
+                not fully isolate a boot from the surrounding project; `PIPELEX_HOME` is how a
+                process keeps the machine's home configuration out.
             config_overrides: Optional dict deep-merged on top of all TOML config layers
                 as the highest-priority override. Useful for tests that need specific
                 config without editing TOML files.
@@ -324,7 +320,6 @@ class Pipelex(RuntimeBoot):
                 integration_mode=integration_mode,
                 needs_inference=needs_inference,
                 boot_orchestrator=boot_orchestrator,
-                needs_model_specs=needs_model_specs,
                 class_registry=class_registry,
                 secrets_provider=secrets_provider,
                 storage_provider=storage_provider,

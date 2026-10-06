@@ -5,8 +5,8 @@ away. Historically every such key was moved to `extra_headers` and sent to the p
 header — which is right for `x-portkey-config` and wrong for a typo or a field deleted from the blueprint,
 both of which then went out on the wire while the real setting stayed unset.
 
-The rule here is a shape rule, not a name allowlist, so the served gateway config can start carrying a
-new `x-portkey-*` header without waiting for a client release: **an unknown key is a header only if it
+The rule here is a shape rule, not a name allowlist, so a backend file can carry a new provider
+header without waiting for a client release: **an unknown key is a header only if it
 contains a hyphen and its value is a string.** Header names conventionally do; blueprint field names
 never do, because they are Python identifiers. A hyphenated spelling of a known field (`max-tokens`) is
 the one hole that leaves, and it is closed by name. The value half is not coercion: `x-foo = 3` is an
@@ -25,9 +25,8 @@ not become "whatever this version of h11 does".
 
 This module is deliberately pure and deliberately silent. It runs on the success path of every backend
 load, including loads that precede `runtime_hub.set_config()`, so a `log` call here would turn a data
-transform into a boot-order dependency. It also does not decide what a rejected key *means*: only the
-caller knows whether the table came from a local file (where a rejected key is the author's typo, and
-fatal) or from the served gateway config (where it is version skew, and pruned).
+transform into a boot-order dependency. It also does not report a rejected key: the caller does, naming
+the file or the plugin the table came from.
 """
 
 import re
@@ -42,13 +41,6 @@ HEADER_NAME_CHARACTERS = "letters, digits and the characters !#$%&'*+-.^_`|~"
 # An RFC 7230 header field name is a token, and a field value is printable ASCII on a single line.
 _HEADER_NAME_PATTERN = re.compile(r"[!#$%&'*+\-.^_`|~0-9A-Za-z]+")
 _HEADER_VALUE_PATTERN = re.compile(r"([\x21-\x7e]([ \t\x21-\x7e]*[\x21-\x7e])?)?")
-
-
-class ModelSpecSource(StrEnum):
-    """Where a per-model table was read from — the only thing that decides what a rejected key means."""
-
-    LOCAL_FILE = "local_file"
-    REMOTE_GATEWAY = "remote_gateway"
 
 
 class ModelSpecKeyRejection(StrEnum):

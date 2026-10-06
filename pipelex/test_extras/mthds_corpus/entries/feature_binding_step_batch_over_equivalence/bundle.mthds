@@ -1,0 +1,34 @@
+domain      = "order_pricing"
+description = "Pricing every line of an order in the customer's currency, twice, to compare the two spellings of a batch over a field"
+main_pipe   = "price_order"
+
+[concept.OrderLine]
+description = "One line of an order"
+
+[concept.OrderLine.structure]
+article = { type = "text", description = "The article ordered", required = true }
+amount  = { type = "number", description = "What the line costs", required = true }
+
+[concept.Order]
+description = "An order placed by a customer"
+
+[concept.Order.structure]
+lines = { type = "list", item_type = "concept", item_concept_ref = "OrderLine", description = "The lines of the order", required = true }
+
+[pipe.price_order]
+type = "PipeSequence"
+description = "Prices every line of an order with a dotted batch_over, then again with a binding followed by a batch over the bound name"
+inputs = { order = "Order", currency = "Text" }
+output = "Text[]"
+steps = [
+  { pipe = "price_line", batch_over = "order.lines", batch_as = "line", result = "priced_by_path" },
+  { from = "order.lines", result = "lines" },
+  { pipe = "price_line", batch_over = "lines", batch_as = "line", result = "priced_by_binding" },
+]
+
+[pipe.price_line]
+type        = "PipeCompose"
+description = "Writes the price of one line in the customer's currency"
+inputs      = { line = "OrderLine", currency = "Text" }
+output      = "Text"
+template    = "{{ line.article }}: {{ line.amount }} {{ currency.text }}"

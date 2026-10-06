@@ -25,7 +25,7 @@ This section covers all Pipelex capabilities, organized by area.
 
 -   **[Pipe Operators](pipe-operators.md)**
 
-    The workers that do the actual processing: PipeLLM, PipeStructure, PipeExtract, PipeImgGen, PipeSearch, PipeCompose, and PipeFunc.
+    The workers that do the actual processing: PipeLLM, PipeStructure, PipeExtract, PipeImgGen, PipeSearch, PipeJudge, PipeCompose, PipeDocGen, and PipeFunc.
 
 -   **[Pipeline Orchestration](pipeline-orchestration.md)**
 
@@ -38,10 +38,6 @@ This section covers all Pipelex capabilities, organized by area.
 ## AI Capabilities
 
 <div class="grid cards" markdown>
-
--   **[Pipelex Gateway & Model Access](gateway.md)**
-
-    Unified access to 60+ AI models through a single API key, or bring your own keys for direct provider access. Open-source model support via Hugging Face, Scaleway, and Groq.
 
 -   **[LLM Integration](llm-integration.md)**
 
@@ -58,6 +54,10 @@ This section covers all Pipelex capabilities, organized by area.
 -   **[Web Search](web-search.md)**
 
     Structured web search results with source citations and advanced filters via PipeSearch.
+
+-   **[Judgment](judgment.md)**
+
+    Closed questions answered with a verdict and its probabilities via PipeJudge: yes or no, one option out of a set, or a level on a scale.
 
 </div>
 

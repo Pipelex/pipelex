@@ -39,6 +39,7 @@ class _FakeBundleValidator:
         allow_signatures: bool,
         library_dirs: Sequence[Path] | None,
         caller_identity: CallerIdentity | None,
+        graph_pipe_code: str | None,
     ) -> PipelexValidationReport | ErrorReport:
         raise NotImplementedError
 

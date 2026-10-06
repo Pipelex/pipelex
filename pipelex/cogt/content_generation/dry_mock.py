@@ -33,7 +33,6 @@ class than the one the provider is constrained by. Exotic format constraints
 must declare ``examples`` / ``mock_format`` — see ``DryRunObjectFidelityError``.
 """
 
-from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, Protocol
 
@@ -45,8 +44,10 @@ from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import (
     ExtractAssignment,
     ImgGenAssignment,
+    JudgmentAssignment,
     LLMAssignment,
     ObjectAssignment,
+    RenderDocumentAssignment,
     RenderPageViewsAssignment,
     SearchAssignment,
     SearchObjectAssignment,
@@ -57,6 +58,15 @@ from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.cogt.content_generation.exceptions import DryRunMockBuildError, OutputStructureSchemaError
 from pipelex.cogt.content_generation.object_class_resolution import resolve_object_class
 from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
+from pipelex.cogt.judgment.judgment_models import (
+    ChoiceAnswer,
+    ChoiceQuestion,
+    JudgmentAnswer,
+    RatingAnswer,
+    RatingQuestion,
+    YesNoAnswer,
+    YesNoQuestion,
+)
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobReport
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -74,10 +84,6 @@ from pipelex.runtime_hub import get_report_delegate
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
-
-# The pipe code every mocked bundle answers to — shared with BundleHeaderSpec.main_pipe's
-# examples so bundle dry-validation's mocked header names a pipe that exists (D3).
-MOCK_MAIN_PIPE_CODE = "mock_main"
 
 # Sentinel model identifiers so a synthetic usage record is never confused with real inference.
 DRY_RUN_INFERENCE_MODEL_NAME = "dry_run"
@@ -200,29 +206,6 @@ def build_mock_objects(model_class: type[BaseModelTypeVar], *, count: int) -> li
         raise DryRunMockBuildError.for_object_class(model_class.__name__) from exc
 
 
-def stamp_mock_main_coordination(items: Sequence[Any]) -> None:
-    """Set the first item's ``pipe_code`` to ``"mock_main"`` — the single home of this coordination (D3).
-
-    WHY: bundle dry-validation mocks a ``BundleHeaderSpec`` whose ``main_pipe`` field declares
-    ``examples=["mock_main"]`` (``pipelex/builder/bundle_header_spec.py``), so the polyfactory mock
-    header names ``mock_main`` as the bundle's main pipe. Every mock that fabricates a *list of pipe
-    specs* must therefore make its first item answer to that name, or the mocked bundle fails its own
-    main-pipe check. Callers: the mock-input factory (``working_memory_factory``), the batch
-    controller's dry aggregation (``pipe_batch``), and the dry object-list leaf mock
-    (:func:`dry_llm_gen_object_list`). The stamp is a no-op for items without a ``pipe_code`` field.
-
-    The item is now the *caller's own* class, not a throwaway schema rebuild, so the assignment can hit
-    a model config the caller chose — ``frozen=True`` or ``validate_assignment`` — and raise. Surface
-    that as the same typed :class:`DryRunMockBuildError` the surrounding mock build uses, rather than
-    letting a raw ``ValidationError`` escape from a mutation the caller never asked for.
-    """
-    if items and hasattr(items[0], "pipe_code"):
-        try:
-            items[0].pipe_code = MOCK_MAIN_PIPE_CODE
-        except ValidationError as exc:
-            raise DryRunMockBuildError.for_object_class(type(items[0]).__name__) from exc
-
-
 def _nb_list_items(object_assignment: ObjectAssignment) -> int:
     """Resolve the object-list mock length: the assignment's fixed ``nb_items`` wins (D11), including 0."""
     if object_assignment.nb_items is not None:
@@ -311,17 +294,9 @@ def dry_llm_gen_object(object_assignment: ObjectAssignment, *, object_class: typ
 
 
 def dry_llm_gen_object_list(object_assignment: ObjectAssignment, *, object_class: type[BaseModel] | None = None) -> list[BaseModel]:
-    """Dry leaf for ``llm_gen_object_list``: ``nb_items`` mocks + one synthetic report.
-
-    Applies :func:`stamp_mock_main_coordination` so bundle dry-validation's mocked
-    ``BundleHeaderSpec.main_pipe`` check passes through the leaf mock (D3). The stamp is
-    unconditional on ``is_mock_usage`` — it only matters to bundle dry-validation and is
-    harmless elsewhere.
-    """
+    """Dry leaf for ``llm_gen_object_list``: ``nb_items`` mocks + one synthetic report."""
     log.verbose(f"🤡 DRY RUN: llm_gen_object_list for '{object_assignment.object_class_name}'")
-    items = _leaf_gen_object_list(object_assignment, report_func=_dry_report_func(object_assignment.cogt_run_params), object_class=object_class)
-    stamp_mock_main_coordination(items)
-    return items
+    return _leaf_gen_object_list(object_assignment, report_func=_dry_report_func(object_assignment.cogt_run_params), object_class=object_class)
 
 
 def dry_templating_gen_text(templating_assignment: TemplatingAssignment) -> str:
@@ -408,12 +383,44 @@ def dry_render_page_views(render_assignment: RenderPageViewsAssignment) -> list[
     return [_dry_image_content(image_url=image_urls[page_index % len(image_urls)]) for page_index in range(nb_pages)]
 
 
+def dry_render_document(render_assignment: RenderDocumentAssignment) -> DocumentContent:
+    """Dry leaf for document printing: a mock Document named as the live one would be, no engine, no storage IO.
+
+    Its URL is the blank one-page PDF every mocked document carries, whatever the format asked for.
+    """
+    composition = render_assignment.composition
+    log.verbose(f"🤡 DRY RUN: render_document '{composition.filename}' for '{render_assignment.job_metadata.run_metadata.pipeline_run_id}'")
+    return DocumentContent(url=DryRunFactory.generate_mock_document_url(), mime_type=composition.format.mime_type, filename=composition.filename)
+
+
 def dry_search_gen_sourced_answer(search_assignment: SearchAssignment) -> SearchResultContent:
     """Dry leaf for sourced-answer search: polyfactory-built result with mock sources, no provider."""
     log.verbose(f"🤡 DRY RUN: search_gen_sourced_answer for '{search_assignment.search_handle}'")
     nb_sources = get_config().inference.dry_run.nb_list_items
     mock_sources = build_mock_objects(DocumentContent, count=nb_sources)
     return build_mock_object(SearchResultContent, sources=mock_sources)
+
+
+def dry_judgment_gen_answers(judgment_assignment: JudgmentAssignment) -> dict[str, JudgmentAnswer]:
+    """Dry leaf for a judgment: a deterministic verdict per question, with no uncertainty at all.
+
+    Every answer is the first thing its question allows — yes, the first option, the lowest level —
+    because a dry run must be reproducible and nothing here measured anything. The uncertainty
+    members are left absent for the same reason: the contract makes them optional precisely so a
+    producer that measured nothing can say so, and a mock probability would be the one number in the
+    whole family that nobody could tell apart from a real one.
+    """
+    log.verbose(f"🤡 DRY RUN: judgment_gen_answers for '{judgment_assignment.judgment_handle}'")
+    answers: dict[str, JudgmentAnswer] = {}
+    for question_key, question in judgment_assignment.questions.items():
+        match question:
+            case YesNoQuestion():
+                answers[question_key] = YesNoAnswer(yes_no=True)
+            case ChoiceQuestion():
+                answers[question_key] = ChoiceAnswer(choice=next(iter(question.options)))
+            case RatingQuestion():
+                answers[question_key] = RatingAnswer(level=0)
+    return answers
 
 
 def dry_search_gen_structured(search_object_assignment: SearchObjectAssignment) -> dict[str, Any]:

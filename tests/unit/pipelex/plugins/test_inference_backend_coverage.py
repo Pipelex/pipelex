@@ -37,19 +37,15 @@ EXPECTED_BACKENDS: list[tuple[InferenceFamily, str]] = [
     (InferenceFamily.LLM, "azure_openai"),
     (InferenceFamily.LLM, "openai_responses"),
     (InferenceFamily.LLM, "azure_openai_responses"),
-    (InferenceFamily.LLM, "gateway_completions"),
-    (InferenceFamily.LLM, "gateway_responses"),
     (InferenceFamily.LLM, "portkey_completions"),
     (InferenceFamily.LLM, "portkey_responses"),
     (InferenceFamily.LLM, "anthropic"),
     (InferenceFamily.LLM, "bedrock_anthropic"),
     (InferenceFamily.LLM, "mistral"),
     (InferenceFamily.LLM, "bedrock_boto3"),
-    (InferenceFamily.LLM, "bedrock_aioboto3"),
+    (InferenceFamily.LLM, "bedrock_aioboto"),
     (InferenceFamily.LLM, "google"),
     # IMG_GEN
-    (InferenceFamily.IMG_GEN, "gateway_img_gen"),
-    (InferenceFamily.IMG_GEN, "gateway_completions"),
     (InferenceFamily.IMG_GEN, "openai_img_gen"),
     (InferenceFamily.IMG_GEN, "blackboxai_img_gen"),
     (InferenceFamily.IMG_GEN, "openrouter_img_gen"),
@@ -58,14 +54,14 @@ EXPECTED_BACKENDS: list[tuple[InferenceFamily, str]] = [
     (InferenceFamily.IMG_GEN, "azure_rest_img_gen"),
     (InferenceFamily.IMG_GEN, "google"),
     # EXTRACT
-    (InferenceFamily.EXTRACT, "gateway_extract"),
     (InferenceFamily.EXTRACT, "mistral"),
     (InferenceFamily.EXTRACT, "pypdfium2"),
     (InferenceFamily.EXTRACT, "docling_sdk"),
     (InferenceFamily.EXTRACT, "linkup_fetch"),
     # SEARCH
     (InferenceFamily.SEARCH, "linkup"),
-    (InferenceFamily.SEARCH, "gateway_search"),
+    # JUDGMENT
+    (InferenceFamily.JUDGMENT, "typesafe"),
 ]
 
 
@@ -84,16 +80,6 @@ class TestInferenceBackendCoverage:
             pytest.param([(InferenceFamily.LLM, "google"), (InferenceFamily.IMG_GEN, "google")], "google", id="google"),
             pytest.param([(InferenceFamily.LLM, "openai"), (InferenceFamily.IMG_GEN, "openai_img_gen")], "openai", id="openai"),
             pytest.param([(InferenceFamily.EXTRACT, "linkup_fetch"), (InferenceFamily.SEARCH, "linkup")], "linkup", id="linkup"),
-            pytest.param(
-                [
-                    (InferenceFamily.LLM, "gateway_completions"),
-                    (InferenceFamily.IMG_GEN, "gateway_img_gen"),
-                    (InferenceFamily.EXTRACT, "gateway_extract"),
-                    (InferenceFamily.SEARCH, "gateway_search"),
-                ],
-                "gateway",
-                id="gateway",
-            ),
         ],
     )
     def test_cross_family_vendor_registers_into_all_its_families(self, vendor_families: list[tuple[InferenceFamily, str]], vendor: str) -> None:

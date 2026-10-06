@@ -1,0 +1,33 @@
+otlp = []
+
+[custom_posthog]
+mode = "off"
+endpoint = "https://us.i.posthog.com"
+geoip = true
+debug = false
+redact_properties = []
+
+[custom_posthog.tracing]
+enabled = false
+
+[custom_posthog.tracing.capture]
+content = false
+pipe_codes = false
+output_class_names = false
+
+[custom_portkey]
+force_debug_enabled = false
+force_tracing_enabled = false
+
+[langfuse]
+enabled = false
+
+[telemetry_allowed_modes]
+ci = false
+cli = true
+docker = true
+fastapi = true
+mcp = true
+n8n = true
+pytest = false
+python = false

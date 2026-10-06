@@ -49,7 +49,7 @@ Provide sentiment (positive/negative/neutral) and confidence score.
 [pipe.aggregate_review_results]
 type = "PipeLLM"
 description = "Aggregate all review analyses into final rating"
-inputs = { sentiment_analyses = "SentimentAnalysis" }
+inputs = { sentiment_analyses = "SentimentAnalysis[]" }
 output = "ProductRating"
 model = "$testing-text"
 prompt = """

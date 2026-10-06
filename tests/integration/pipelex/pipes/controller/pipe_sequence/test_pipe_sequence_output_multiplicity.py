@@ -12,6 +12,7 @@ from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
+from pipelex.validation_error_types import PipeValidationErrorType
 
 
 class TestPipeSequenceOutputMultiplicity:
@@ -453,19 +454,25 @@ class TestPipeSequenceOutputMultiplicity:
         error_message = str(exc_info.value).lower()
         assert "multiplicity" in error_message, f"Error should mention multiplicity mismatch, got: {exc_info.value}"
 
-    def test_batch_over_with_nb_output_fixed_multiplicity(
+    @pytest.mark.parametrize(
+        ("sequence_output", "nb_output", "is_refused"),
+        [
+            pytest.param("Text[6]", 6, True, id="a-fixed-count-output-is-refused"),
+            pytest.param("Text", 1, True, id="a-single-output-is-refused"),
+            pytest.param("Text[]", 6, False, id="a-variable-list-output-validates"),
+        ],
+    )
+    def test_batch_over_with_nb_output_yields_a_variable_list(
         self,
         load_empty_library: Callable[[], str],
+        sequence_output: str,
+        nb_output: int,
+        is_refused: bool,
     ):
-        """Test that when last step has batch_over/batch_as AND nb_output, multiplicity uses nb_output.
+        """A batched last step yields the variable list of its branches' results, whatever `nb_output` it asks for.
 
-        When a step has batch_over, batch_as, AND nb_output=3, the effective output multiplicity
-        should be 3, not True.
-
-        Creates:
-        - A PipeLLM with output="Text" (single output)
-        - A PipeSequence with output="Text[3]" where last step has batch_over/batch_as and nb_output=3
-        The validation should pass because nb_output=3 overrides to give multiplicity=3.
+        The run stores one result per item of the batched list, so the sequence's output must be a variable list: a fixed
+        count, or the single form `nb_output = 1` spells, is refused as the typed flow reads the step (`SubPipe.result_spec`).
         """
         load_empty_library()
 
@@ -490,14 +497,14 @@ class TestPipeSequenceOutputMultiplicity:
         sequence_blueprint = PipeSequenceBlueprint(
             description="Sequence that batches with fixed output count",
             inputs={"cvs": "Document[]"},  # Multiple PDFs input
-            output="Text[6]",  # Fixed multiplicity - should match nb_output
+            output=sequence_output,
             steps=[
                 SubPipeBlueprint(
                     pipe=f"{domain}.process_cv_fixed",
                     result="match_analyses",
                     batch_over="cvs",
                     batch_as="cv_pdf",
-                    nb_output=6,  # Fixed output count
+                    nb_output=nb_output,
                 ),
             ],
         )
@@ -508,8 +515,14 @@ class TestPipeSequenceOutputMultiplicity:
         )
         get_pipe_library().add_new_pipe(sequence_pipe)
 
-        # Validation should pass - nb_output=3 gives multiplicity=3
-        sequence_pipe.validate_with_libraries()
+        if not is_refused:
+            sequence_pipe.validate_with_libraries()
+            return
+        with pytest.raises(PipeValidationError) as exc_info:
+            sequence_pipe.validate_with_libraries()
+
+        assert exc_info.value.error_type == PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
+        assert f"declares its output as '{sequence_output}', but its last step 'process_cv_fixed' yields 'Text[]'" in str(exc_info.value)
 
     def test_nb_output_only_fixed_multiplicity(
         self,

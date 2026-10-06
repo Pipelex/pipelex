@@ -161,7 +161,7 @@ def _capture_hop2(*, blueprints: list[PipelexBundleBlueprint], output_dir: Path)
                 captures[concept_ref] = None
                 continue
             # `.py.txt` on purpose: these are evidence artifacts, not code — a bare `.py`
-            # extension would drag them into the repo's linters when captured under wip/.
+            # extension would drag them into the repo's linters when the output directory is inside the repository.
             relative_path = f"{HOP2_DIR_NAME}/{concept_ref}.py.txt"
             source_path = output_dir / relative_path
             source_path.parent.mkdir(parents=True, exist_ok=True)
@@ -352,7 +352,7 @@ def trace_input_semantics_cmd(*, bundle_paths: list[Path], output_dir: Path, all
             console.print(f"[red]Bundle file not found: {bundle_path}[/red]")
             sys.exit(2)
 
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION, needs_inference=False, needs_model_specs=True)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION, needs_inference=False)
     try:
         manifest = asyncio.run(
             trace_input_semantics(

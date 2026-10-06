@@ -7,7 +7,7 @@ description: "How Pipelex serializes dynamic Pydantic models and large binary co
 
 This page is for contributors working on Pipelex internals. For the capability overview, see the user-facing [Distributed Execution](../distributed-execution/index.md) page instead.
 
-When content generation (LLM structured output, image generation, PDF extraction, web search) runs on a separate worker process, two serialization problems appear that single-process execution never faces. This page covers them backend-neutrally — the mechanisms live in open core and are the same regardless of which host runtime carries the payload. The concrete activity dispatch is a [commercial platform capability](https://pipelex.com/products#durable-execution); each backend (Temporal, Mistral Workflows) realizes it in its own plugin.
+When content generation (LLM structured output, image generation, PDF extraction, web search, judgment) runs on a separate worker process, two serialization problems appear that single-process execution never faces. This page covers them backend-neutrally — the mechanisms live in open core and are the same regardless of which host runtime carries the payload. The concrete activity dispatch is a [commercial platform capability](https://pipelex.com/products#durable-execution); each backend (Temporal, Mistral Workflows) realizes it in its own plugin.
 
 !!! note "Every inference leaf goes through the same seam"
     All inference operators dispatch their leaf call through the swappable `ContentGenerator` abstraction (`pipelex/cogt/content_generation/content_generator.py`): direct inline, or — on a host runtime — wrapped as an activity by the runtime's in-workflow content generator. The backend choice is independent of the run mode: under `run_mode=DRY` the chosen backend still dispatches and the leaf mocks inside it. Wrapping the leaf as a host-runtime activity is what makes it replay-safe (the result is recorded in the run's history) and lets a leaf failure cross the worker boundary as a classified error, instead of re-executing on every replay and hanging the submitter with an unclassified fault.
@@ -127,6 +127,10 @@ Structured web search (`PipeSearch` with a non-text output concept) faces the id
 
 The sourced-answer path (`make_search_sourced_answer`) has no dynamic class at all: it returns a `SearchResultContent`, a native serializable model.
 
+### Judgments need neither mechanism
+
+A judgment's leaf, `judgment_gen_answers`, has one entry point where search has three, because nothing about it is dynamic. Its `JudgmentAssignment` carries the state as a JSON object, the image and document inputs as prompt files keyed by input name, which cross the boundary as an LLM prompt's files do, the questions as the family's own discriminated models and the resolved `JudgmentSetting`; its result is a map of answers that are plain models of the same package. No caller class travels down and no schema is shipped, so the in-process arm and the boundary arm would be the same function, and there is nothing to split.
+
 ---
 
 ## Large payload management
@@ -150,6 +154,8 @@ async def generate_and_store_images(img_gen_assignment):
     )
 ```
 
+Each object is stored under `{storage_scope}/generated/<filename>`, the filename rendered from the storage method's `uri_format` (`{hash}.{extension}` by default). The extension follows the MIME type the object is stored under, so the key and the stored content type always agree: `jpg` for `image/jpeg`, `svg` for `image/svg+xml`, and `bin` for a type with no extension of its own.
+
 !!! info "What crosses the boundary"
     `ImageContent` carries `url` (storage URI), `public_url`, `mime_type`, paired `width`/`height`, and `caption` — but never raw bytes. The `url` can be an S3 URI, HTTP URL, or local file path depending on storage configuration.
 
@@ -164,8 +170,19 @@ What gets stored vs. what crosses the boundary, by content type:
 | LLM object | Nothing (JSON is small) | `BaseModel` + `__kajson_class_source__` in metadata |
 | Search sourced answer | Nothing (answer + source refs are small) | `SearchResultContent` (answer + `DocumentContent` sources) |
 | Search structured | Nothing (JSON is small) | Raw `dict`, re-validated against the output class on the submitter |
+| Judgment answers | Nothing (verdicts are small) | `dict[str, JudgmentAnswer]` keyed as the questions were |
 
 Each host-runtime plugin dispatches these through its own activities and queue routing; for the Temporal realization (the `act_*` activity set, per-activity task queues), see our Temporal plugin's own docs.
+
+### What a leaf may read: the read scope
+
+A reference is only as safe as whoever reads it. A value can carry any URL its method chose — a `PipeCompose` construct that assembles one from plain text, a model's structured output, a function's result — and the next leaf reads it: a `pipelex-storage://` key with the process's own storage credentials, or a bare path or `file://` URI from the worker's disk. On a host serving many tenants that is a read of another tenant's file, so `RunMetadata` carries a second host-supplied prefix beside `storage_scope`: the **read scope**.
+
+On a run whose read scope is set, a storage key is read only when it lies under the read scope, compared segment by segment, with no empty, `.` or `..` segment; a local path is never read; `https://` and `data:` URLs are untouched. The storage scope must lie under the read scope, since a run reads its own outputs back, and a mismatch is refused when the metadata is built. A run whose read scope is `None` (a laptop, a single-tenant server) reads exactly as before.
+
+The check runs in the leaves, because both orchestration modes call the same leaves and every read of a value's URL happens while one of them handles an assignment. Each assignment declares the URLs it will read through `referenced_uris()` — the prompt's images and documents given by URI, an image generation's input images, the image or document to extract, the document to render as page views — and the leaf authorizes them as its first statement, before the dry-run branch and before any worker is built. A dry run therefore refuses the same method a live run would, and the check performs no IO. The input seam applies the same rule to what it reads itself: a table given as a CSV input, and a file the normalization would upload or link. A refused read raises `UriReadRefusedError`, a caller-facing input error answered as a 422, which names where the URL sat and never quotes it. A unit test walks every assignment model's fields for URL-shaped ones, so a new assignment or a new field that carries a URL fails until its `referenced_uris()` declares it.
+
+The read scope leaves `https://` URLs alone because they are not the process's to scope: they are fetched over the network, and the network fetch has its own guard. Every leaf that needs the bytes behind a URL — prompt images and documents for a provider that does not take URLs, the document an extractor reads, the PDF rendered as page views, a generated image a provider returned as a link — goes through one fetch helper, and that helper connects through `SsrfGuardedTransport` unless `[runtime.network] is_fetch_ssrf_guard_enabled` is off. The transport resolves the host when each connection opens, on the first request and on every redirect hop to a new origin, refuses a name that resolves to any private, loopback, link-local or metadata address, and dials the address it vetted. A refusal raises `SsrfBlockedError`, a security error that no leaf's download fallback absorbs, so the pipe fails. The guard connects directly and ignores `HTTP(S)_PROXY`; a deployment whose egress goes through a proxy, or that reads documents from an intranet host, turns the switch off, as the [network configuration](../configuration/config-technical/network-config.md) explains. Checking in the fetch helper rather than in input normalization is deliberate: a construct, a structured output or a function result can produce a URL as easily as an input can.
 
 ---
 
@@ -206,6 +223,7 @@ Resolution order:
 | Content generator (type bridge) | `pipelex/cogt/content_generation/content_generator.py` |
 | LLM generation functions | `pipelex/cogt/content_generation/llm_generate.py` |
 | Search generation functions | `pipelex/cogt/content_generation/search_generate.py` |
+| Judgment generation function | `pipelex/cogt/content_generation/judgment_generate.py` |
 | Generated content factory (storage) | `pipelex/cogt/content_generation/generated_content_factory.py` |
 | Kajson serialization | `kajson` (external PyPI package) |
 | ImageContent model | `pipelex/core/stuffs/image_content.py` |

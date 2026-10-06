@@ -1,6 +1,6 @@
 import importlib.util
-import inspect
 from typing import Any
+from urllib.parse import quote
 
 from typing_extensions import override
 
@@ -16,7 +16,7 @@ class S3StorageProvider(StorageProviderAbstract):
     """Storage provider implementation for AWS S3 storage.
 
     Files are stored in an S3 bucket with keys being path strings.
-    Uses aioboto3 for async S3 operations.
+    Uses aiobotocore for async S3 operations.
     """
 
     def __init__(
@@ -38,15 +38,15 @@ class S3StorageProvider(StorageProviderAbstract):
         self._session: Any = None
 
     def _check_dependency(self) -> None:
-        """Check if aioboto3 is installed.
+        """Check if aiobotocore is installed.
 
         Raises:
-            MissingDependencyError: If aioboto3 is not installed.
+            MissingDependencyError: If aiobotocore is not installed.
         """
-        if importlib.util.find_spec("aioboto3") is None:
-            lib_name = "aioboto3"
+        if importlib.util.find_spec("aiobotocore") is None:
+            lib_name = "aiobotocore"
             lib_extra_name = "s3"
-            msg = "aioboto3 is required for S3 storage."
+            msg = "aiobotocore is required for S3 storage."
             raise MissingDependencyError(
                 lib_name,
                 lib_extra_name,
@@ -54,17 +54,17 @@ class S3StorageProvider(StorageProviderAbstract):
             )
 
     def _get_session(self) -> Any:
-        """Get or create the aioboto3 session (lazy initialization).
+        """Get or create the aiobotocore session (lazy initialization).
 
         Returns:
-            The aioboto3 Session.
+            The aiobotocore AioSession.
         """
         self._check_dependency()
 
         if self._session is None:
-            import aioboto3  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
+            from aiobotocore.session import get_session  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
 
-            self._session = aioboto3.Session()  # pyright: ignore[reportUnknownMemberType]
+            self._session = get_session()
         return self._session
 
     def _get_client_config(self) -> dict[str, Any]:
@@ -73,10 +73,14 @@ class S3StorageProvider(StorageProviderAbstract):
         Returns:
             Dictionary of client configuration parameters.
         """
-        from botocore.config import Config  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
+        from aiobotocore.config import AioConfig  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
 
         endpoint_url = f"https://s3.{self._region}.amazonaws.com"
-        config = Config(signature_version="s3v4")  # pyright: ignore[reportUnknownArgumentType]
+        # botocore addresses path-style whenever an endpoint is given, which puts every link on the region's
+        # shared host. A content security policy can allow a bucket only by its own host, so pin the virtual
+        # style: `<bucket>.s3.<region>.amazonaws.com`. botocore still falls back to path-style for a bucket
+        # name that cannot be a hostname, a dotted one included.
+        config = AioConfig(signature_version="s3v4", s3={"addressing_style": "virtual"})
 
         return {
             "service_name": "s3",
@@ -107,7 +111,7 @@ class S3StorageProvider(StorageProviderAbstract):
         session = self._get_session()
         client_config = self._get_client_config()
 
-        async with session.client(**client_config) as client:  # pyright: ignore[reportUnknownMemberType]
+        async with session.create_client(**client_config) as client:
             try:
                 response = await client.get_object(Bucket=self._bucket_name, Key=key)
                 async with response["Body"] as stream:
@@ -123,6 +127,56 @@ class S3StorageProvider(StorageProviderAbstract):
                 raise StorageS3Error(msg) from exc
             except ClientError as exc:
                 error_code = (exc.response.get("Error") or {}).get("Code", "Unknown")
+                if error_code == "NoSuchKey":
+                    msg = f"Object not found in S3: '{key}'"
+                    raise StorageFileNotFoundError(msg) from exc
+                msg = f"S3 ClientError ({error_code}) for key '{key}'"
+                raise StorageS3Error(msg) from exc
+            except BotoCoreError as exc:
+                msg = f"S3 backend error for key '{key}': {type(exc).__name__}"
+                raise StorageS3Error(msg) from exc
+
+    @override
+    async def _load_head(self, key: str, *, nb_bytes: int) -> bytes:
+        """Load the first bytes of an S3 object with a ranged GET, instead of the whole object.
+
+        Args:
+            key: Storage key (without scheme prefix).
+            nb_bytes: How many leading bytes to read. An object shorter than this is read whole.
+
+        Returns:
+            At most `nb_bytes` leading bytes of the object.
+
+        Raises:
+            StorageFileNotFoundError: If the object does not exist.
+            StorageS3Error: If the S3 operation fails (any other ClientError or BotoCoreError).
+        """
+        from botocore.exceptions import (  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
+            BotoCoreError,
+            ClientError,
+        )
+
+        session = self._get_session()
+        client_config = self._get_client_config()
+
+        async with session.create_client(**client_config) as client:
+            try:
+                # The Range header's end offset is inclusive.
+                response = await client.get_object(Bucket=self._bucket_name, Key=key, Range=f"bytes=0-{nb_bytes - 1}")
+                async with response["Body"] as stream:
+                    data: bytes = await stream.read()
+                return data[:nb_bytes]
+            except client.exceptions.NoSuchKey as exc:
+                msg = f"Object not found in S3: '{key}'"
+                raise StorageFileNotFoundError(msg) from exc
+            except client.exceptions.NoSuchBucket as exc:
+                msg = f"Bucket not found in S3: '{self._bucket_name}'"
+                raise StorageS3Error(msg) from exc
+            except ClientError as exc:
+                error_code = (exc.response.get("Error") or {}).get("Code", "Unknown")
+                if error_code == "InvalidRange":
+                    # S3 refuses any range over an empty object: its head is empty.
+                    return b""
                 if error_code == "NoSuchKey":
                     msg = f"Object not found in S3: '{key}'"
                     raise StorageFileNotFoundError(msg) from exc
@@ -152,7 +206,7 @@ class S3StorageProvider(StorageProviderAbstract):
         session = self._get_session()
         client_config = self._get_client_config()
 
-        async with session.client(**client_config) as client:  # pyright: ignore[reportUnknownMemberType]
+        async with session.create_client(**client_config) as client:
             try:
                 put_params: dict[str, Any] = {
                     "Bucket": self._bucket_name,
@@ -174,7 +228,14 @@ class S3StorageProvider(StorageProviderAbstract):
                 raise StorageS3Error(msg) from exc
 
     def _make_public_url(self, key: str) -> str:
-        """Build a public URL for an S3 object.
+        """Build an unsigned public URL for an S3 object, on the same host and path a signed one would name.
+
+        The URL is virtual-hosted on the bucket's regional host, except for a bucket name that cannot be a
+        hostname: a dotted name breaks the `*.s3.<region>.amazonaws.com` wildcard certificate over HTTPS, and a
+        legacy name with uppercase letters or an underscore is no hostname at all, so its URL is path-style on
+        the regional host. botocore's own test decides, so the two forms cannot disagree. The key is
+        percent-encoded as botocore signs it, since a caller's own upload can name a key holding a space,
+        a `#` or a `?`.
 
         Args:
             key: Storage key (without scheme prefix).
@@ -182,7 +243,12 @@ class S3StorageProvider(StorageProviderAbstract):
         Returns:
             Public URL for the object.
         """
-        return f"https://{self._bucket_name}.s3.{self._region}.amazonaws.com/{key}"
+        from botocore.utils import check_dns_name  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
+
+        encoded_key = quote(key, safe="/~")
+        if check_dns_name(self._bucket_name):
+            return f"https://{self._bucket_name}.s3.{self._region}.amazonaws.com/{encoded_key}"
+        return f"https://s3.{self._region}.amazonaws.com/{self._bucket_name}/{encoded_key}"
 
     @override
     async def public_url(self, uri: str) -> str | None:
@@ -207,15 +273,13 @@ class S3StorageProvider(StorageProviderAbstract):
         session = self._get_session()
         client_config = self._get_client_config()
 
-        async with session.client(**client_config) as client:  # pyright: ignore[reportUnknownMemberType]
+        async with session.create_client(**client_config) as client:
             try:
-                # generate_presigned_url may be sync or async depending on aioboto3 version
-                maybe_url = client.generate_presigned_url(
+                presigned_url: str = await client.generate_presigned_url(
                     "get_object",
                     Params={"Bucket": self._bucket_name, "Key": key},
                     ExpiresIn=self._signed_urls_lifespan,
                 )
-                presigned_url: str = await maybe_url if inspect.isawaitable(maybe_url) else maybe_url
                 return presigned_url
             except (BotoCoreError, ClientError):
                 # ClientError (signing rejected) and BotoCoreError (transport failure) both

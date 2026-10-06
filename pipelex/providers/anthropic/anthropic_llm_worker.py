@@ -30,10 +30,12 @@ from pipelex.cogt.llm.llm_utils import (
     dump_response_from_structured_gen,
 )
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
+from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.constraints import ListedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
+from pipelex.plugins.backend_extras_factory import BackendExtrasFactory
 from pipelex.providers.anthropic.anthropic_exceptions import (
     AnthropicWorkerConfigurationError,
 )
@@ -42,6 +44,7 @@ from pipelex.providers.anthropic.anthropic_factory import (
     AnthropicSdkVariant,
 )
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.system.telemetry.otel_constants import InferenceOutputType
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 if TYPE_CHECKING:
@@ -67,6 +70,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         extra_config: dict[str, Any],
         inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
+        extras_factory: BackendExtrasFactory | None = None,
     ):
         LLMWorkerAbstract.__init__(
             self,
@@ -74,6 +78,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
             reporting_delegate=reporting_delegate,
         )
         self.extra_config: dict[str, Any] = extra_config
+        self.extras_factory = extras_factory
         self.default_max_tokens: int = 0
         if inference_model.max_tokens:
             self.default_max_tokens = inference_model.max_tokens
@@ -248,6 +253,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                 max_tokens=max_tokens,
                 thinking=thinking_params.thinking or omit,
                 output_config=thinking_params.output_config or omit,
+                **self._request_extras_kwargs(llm_job=llm_job, output_desc=InferenceOutputType.TEXT),
             ) as stream:
                 final_message: Message = await stream.get_final_message()
         except (APIStatusError, APIConnectionError) as sdk_exc:
@@ -304,6 +310,41 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
 
         return full_reply_content
 
+    def _request_extras_kwargs(self, *, llm_job: LLMJob, output_desc: str) -> dict[str, Any]:
+        """The per-request headers and body additions this call sends, as SDK keyword arguments.
+
+        None without an extras factory, which is every direct Anthropic and Bedrock path. A plugin that
+        reaches a service of its own over the Anthropic protocol builds this worker with a
+        `BackendExtrasFactory`, the same seam the OpenAI-substrate workers take, and its factory decides
+        per request what joins the call: a header naming the job, for instance, where the credential is
+        a client default.
+        """
+        if self.extras_factory is None:
+            return {}
+        extra_headers, extra_body = self.extras_factory.make_extras(self.inference_model, inference_job=llm_job, output_desc=output_desc)
+        kwargs: dict[str, Any] = {}
+        if extra_headers:
+            kwargs["extra_headers"] = extra_headers
+        if extra_body:
+            kwargs["extra_body"] = extra_body
+        return kwargs
+
+    def _structure_method_kwargs(self) -> dict[str, Any]:
+        """What the structured call sends, beyond what instructor's mode sets, for the model's structure method.
+
+        instructor resolves `anthropic_reasoning_tools` to its core tool mode, which forces `tool_choice` onto
+        the response tool unless thinking is on, and thinking never is for a structured call. A model that
+        refuses a forced tool choice, Fable 5.1 among them, names that method to get the request instructor used
+        to make for it: `tool_choice` left on auto, with a system line steering the model to the tool call.
+        instructor leaves a `tool_choice` it is given as it is, and sends a `system` it is given ahead of the prompt's.
+        """
+        if self.inference_model.structure_method != StructureMethod.INSTRUCTOR_ANTHROPIC_REASONING_TOOLS:
+            return {}
+        return {
+            "tool_choice": {"type": "auto"},
+            "system": [{"type": "text", "text": "Return only the tool call and no additional text."}],
+        }
+
     @override
     async def _gen_object(
         self,
@@ -335,13 +376,16 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                 messages=messages,
                 response_model=schema,
                 # instructor's retry is confined to schema re-ask: this validation-only AsyncRetrying
-                # re-asks on a malformed/invalid output but lets a transport error propagate as the raw
-                # SDK exception — transport retry is the SDK client floor (Tier 1) alone.
+                # re-asks on a malformed/invalid output but never retries a transport error, which ends the
+                # loop and comes out wrapped, for the except clause below to unwrap — transport retry is the
+                # SDK client floor (Tier 1) alone.
                 max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.schema_reask_max_attempts),
                 model=self.inference_model.model_id,
                 temperature=omit if temperature_unsupported else job_params.temperature,
                 max_tokens=effective_max_tokens,
                 timeout=float(timeout_seconds),  # Explicit timeout disables SDK's long-request protection
+                **self._structure_method_kwargs(),
+                **self._request_extras_kwargs(llm_job=llm_job, output_desc=schema.__name__),
             )
         except InstructorRetryException as instructor_exc:
             # instructor wraps SDK exceptions during retries; recover the underlying

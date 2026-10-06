@@ -9,10 +9,10 @@ if TYPE_CHECKING:
     import pytest
     from pytest_mock import MockerFixture
 
-from pipelex.builder.operations.models_ops import ModelCategory
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.check_model_cmd import agent_check_model_cmd
 from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.cogt.models.model_listing import ModelCategory
 
 MODULE_PATH = "pipelex.cli.agent_cli.commands.check_model_cmd"
 

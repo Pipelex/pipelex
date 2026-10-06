@@ -65,7 +65,9 @@ def _make_extract_job() -> ExtractJob:
         job_params=ExtractJobParams.make_default_extract_job_params(),
         job_config=ExtractJobConfig(),
         job_report=ExtractJobReport(),
-        job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="test-run")),
+        job_metadata=JobMetadata(
+            run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="test-user", pipeline_run_id="test-run")
+        ),
     )
 
 

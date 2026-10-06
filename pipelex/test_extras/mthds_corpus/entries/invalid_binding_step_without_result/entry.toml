@@ -1,0 +1,12 @@
+name = "invalid_binding_step_without_result"
+description = "An invoice total bound by a step that never names the value it binds"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.binding_step_invalid",
+]
+
+expected_error = "binding_step_invalid"

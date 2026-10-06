@@ -1,0 +1,40 @@
+domain      = "ticket_routing"
+description = "Sending a support ticket to the team a verdict picked for it"
+main_pipe   = "route_ticket"
+
+[concept]
+Team = { description = "The team a support ticket is routed to", refines = "Choice" }
+
+[pipe.route_ticket]
+type            = "PipeCondition"
+description     = "Sends the ticket to the team its routing verdict picked"
+inputs          = { ticket = "Text", team = "Team" }
+output          = "Text?"
+expression      = "team.choice"
+default_outcome = "continue"
+
+[pipe.route_ticket.outcomes]
+billing   = "reply_billing"
+technical = "reply_technical"
+
+[pipe.reply_billing]
+type = "PipeLLM"
+description = "Writes the billing team's first reply to the ticket"
+inputs = { ticket = "Text" }
+output = "Text"
+prompt = """
+Write the billing team's first one-line reply to this ticket.
+
+$ticket
+"""
+
+[pipe.reply_technical]
+type = "PipeLLM"
+description = "Writes the technical team's first reply to the ticket"
+inputs = { ticket = "Text" }
+output = "Text"
+prompt = """
+Write the technical team's first one-line reply to this ticket.
+
+$ticket
+"""

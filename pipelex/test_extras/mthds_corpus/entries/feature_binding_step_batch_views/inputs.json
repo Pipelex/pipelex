@@ -1,0 +1,36 @@
+{
+  "pages": {
+    "concept": "native.Page",
+    "content": [
+      {
+        "text_and_images": {
+          "text": {
+            "text": "Garden chairs"
+          }
+        },
+        "page_view": {
+          "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGOQOyEHAAIMAQUtuDZBAAAAAElFTkSuQmCC",
+          "caption": "Garden chairs on a lawn"
+        }
+      },
+      {
+        "text_and_images": {
+          "text": {
+            "text": "Order form"
+          }
+        }
+      },
+      {
+        "text_and_images": {
+          "text": {
+            "text": "Parasols"
+          }
+        },
+        "page_view": {
+          "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGOQkzsBAAFiAQURG6MhAAAAAElFTkSuQmCC",
+          "caption": "Two parasols"
+        }
+      }
+    ]
+  }
+}

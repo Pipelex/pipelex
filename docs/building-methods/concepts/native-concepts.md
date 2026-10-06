@@ -26,11 +26,14 @@ Here are all the native concepts you can use out of the box:
 | Concept | Description | Content Class Name |
 |-----------------|-------------|---------------------|
 | `Text` | A text | `TextContent` |
-| `Image` | An image | `ImageContent` |
-| `Document` | A document (PDF, DOCX, PPTX, web page) | `DocumentContent` |
+| `Markdown` | A text written in Markdown, which refines `Text` | `MarkdownContent` |
+| `Image` | An image file | `ImageContent` |
+| `Document` | A document: PDF, Office (Word, PowerPoint, Excel), web page, or a text file such as Markdown or CSV | `DocumentContent` |
 | `TextAndImages` | Text with its associated images | `TextAndImagesContent` |
 | `Number` | A number | `NumberContent` |
-| `YesNo` | The answer to a yes/no question | `YesNoContent` |
+| `YesNo` | The answer to a yes/no question, with an optional probability | `YesNoContent` |
+| `Choice` | One option picked out of a declared set | `ChoiceContent` |
+| `Rating` | A position on an ordered scale of described levels | `RatingContent` |
 | `Date` | A calendar date, optionally with a time of day | `DateContent` |
 | `Time` | A time of day, optionally with a UTC offset | `TimeContent` |
 | `Page` | A document page with text, images, and optional page view | `PageContent` |
@@ -40,6 +43,36 @@ Here are all the native concepts you can use out of the box:
 | `SearchResult` | A web search result with answer and sources | `SearchResultContent` |
 | `Composite` | A named composition of contents | `CompositeContent` |
 | `Anything` | Any type of content | *No specific implementation* |
+
+## Choosing among `Anything`, `JSON` and `Dynamic`
+
+Three natives hold data whose shape your method does not describe, and each takes a different kind of input. Choose in this order:
+
+1. **Data you already have as JSON objects: name it.** Declare a concept that refines `JSON`, with a plain-language description. It takes the object exactly as you have it, with no data model to write, and its name and description tell an agent or a reader what the object means, which a bare `JSON` does not. When you later want the fields validated, turn it into a concept with a structure.
+2. **`JSON` or `JSON[]`** when the data has no name worth giving it. `JSON` is a JSON object, not any JSON value; a list of objects is `JSON[]`.
+3. **`Anything`** when the pipe is generic over its input: it passes a value along or renders it, whatever it is. It is not the place to put JSON data.
+4. **`Dynamic`** is not recommended for inputs for now: what a `Dynamic` input holds is still being settled.
+
+For example, a pipe summarizing orders from a shop's API names them:
+
+```toml
+[concept.Order]
+description = "A customer order, as the shop's API returns it"
+refines = "JSON"
+
+[pipe.summarize_order]
+type = "PipeLLM"
+description = "Summarize a customer order"
+inputs = { order = "Order" }
+output = "Text"
+prompt = """
+Summarize this order in two sentences:
+
+@order
+"""
+```
+
+The input is the object itself, `{"order": {"id": 42, "items": [{"sku": "A-1", "quantity": 2}]}}`, and a list of orders would be declared `Order[]`.
 
 ## Native Concept Structures
 
@@ -55,6 +88,51 @@ class TextContent(StuffContent):
 ```
 
 **Use for:** Plain text outputs, summaries, descriptions, etc.
+
+### MarkdownContent
+
+A text written in Markdown. `Markdown` refines `Text`, and its content class keeps the single field of `TextContent`, which holds the Markdown source:
+
+```python
+class MarkdownContent(TextContent):
+    text: str
+```
+
+What sets it apart from `Text` is how it is shown: the HTML view, an HTML template and a PDF laid out without a template format a `Markdown` value and show a `Text` value as it is, so a stray `#` or `1.` in a plain text never turns into a heading or a list there. The terminal's pretty view is the exception: it renders both through Markdown.
+
+As a `PipeLLM` output, `output = "Markdown"` gives a report whose headings, bold text, lists, tables and links are formatted downstream. The LLM writes free text, exactly as it does for `Text`:
+
+```toml
+[pipe.write_inspection_report]
+type = "PipeLLM"
+description = "Write site notes up as an inspection report"
+inputs = { notes = "Text" }
+output = "Markdown"
+prompt = """
+Write these site notes up as an inspection report in Markdown, with a heading for each area inspected.
+
+@notes
+"""
+```
+
+Read the report from a Python caller via `pipe_output.main_stuff_as_markdown.text`.
+
+**Refinement.** A `Markdown` value is accepted wherever a `Text` is: a pipe whose input is `Text` takes a `Markdown` report, and its prompt receives the source. The reverse does not hold: a `Text` value, or a concept that refines `Text`, is not accepted where a `Markdown` is required, since nothing says it was written as Markdown. To name a specific kind of report, declare a concept with `refines = "Markdown"`.
+
+**As an input**, `Markdown` takes a string, as `Text` does: `"report": "# Roof\n\n- two cracked tiles"`, or the envelope form `{"concept": "Markdown", "content": "# Roof"}`.
+
+**How it renders:**
+
+- In a prompt, and in the plain and Markdown views, it is its source as it is. `pipelex run --save-main-stuff` writes that source verbatim as `main_stuff.md`.
+- Its HTML view converts the Markdown to HTML rather than escaping it, so `main_stuff.html` and the HTML tab of `main_stuff_viewer.html` show the formatted report. Raw HTML inside the source is shown as text rather than passed through, and only URLs with a scheme, such as `https://example.com`, become links, so a file name like `README.md` stays text.
+- The pretty view in the terminal renders it as Markdown.
+- Its JSON form is `{"text": "..."}`, the same as a `Text`.
+
+**Inside an HTML template**, such as a `PipeCompose` template with `category = "html"`, `{{ report }}` prints a `Markdown` value as its converted HTML with no filter, while a `Text` value keeps being escaped. A `Markdown` field of a structure converts the same way, as in `{{ digest.summary }}`. `{{ report.text }}` is the Markdown source, escaped like any string. The `$report` sigil and `{{ report | format }}` print the converted HTML too, unless the template names another format, as in `{{ report | format("plain") }}`, which prints the Markdown source, escaped. The `@report` sigil wraps the source in tags for a prompt and is not meant for HTML templates.
+
+**In a document**, a [`PipeDocGen`](../pipes/pipe-operators/PipeDocGen.md) step that prints a PDF without a template formats a `Markdown` value, with its headings, lists, tables, code and links, and prints a `Text` value as plain paragraphs.
+
+**Use for:** Reports, summaries and write-ups an LLM writes to be read formatted, in an HTML page or a PDF.
 
 ### ImageContent
 
@@ -76,18 +154,20 @@ class ImageContent(StuffContent):
 **Fields:**
 
 - `url`: Location of the image (a storage URI, an HTTP(S) URL, or a base64 data URL)
-- `public_url`: Optional public-facing URL (when `url` is a private/internal reference)
+- `public_url`: A URL a viewer can open, which the runtime fills for every image input it normalizes, passed alone, in a list or in a structured field: the storage provider's link for a stored file (a `pipelex-storage://` reference, a `data:` URL or an uploaded local file), and the URL itself for an `http(s)` one unless the input names another. A stored file's link is signed when signed URLs are configured, so it expires: a template writing `{{ image.public_url }}` into HTML produces a report that stops showing the image once the link has expired.
 - `source_prompt` / `source_negative_prompt`: The prompts used to generate the image (if applicable)
 - `caption`: Descriptive text for the image
-- `mime_type`: Optional MIME type of the image
+- `mime_type`: The MIME type of the image. For every image input, the runtime sets it at the start of the run from the file's own bytes, which win over a declared type (see [File formats are checked before the run](#file-formats-are-checked-before-the-run))
 - `width` / `height`: Pixel dimensions — present together or not at all
 - `filename`: Optional original filename
 
 **Use for:** Photos, generated images, diagrams, screenshots.
 
+An `Image` must hold an image file, such as PNG, JPEG or WebP. A run whose `Image` input, or an input of a concept refining `Image`, holds a file whose bytes say it is something else, a PDF for one, is refused before it starts. A scanned letter that arrives as a PDF belongs in a `Document` input.
+
 ### DocumentContent
 
-Represents a document (PDF, DOCX, PPTX, etc.):
+Represents a document: a PDF, an Office file (Word, PowerPoint, Excel), a web page, or a text file such as Markdown, CSV, plain text, WebVTT captions or an email message.
 
 ```python
 class DocumentContent(StuffContent):
@@ -102,13 +182,32 @@ class DocumentContent(StuffContent):
 **Fields:**
 
 - `url`: Location of the document file, storage URL, or web page URL
-- `public_url`: Optional public-facing URL (when `url` is a private/internal reference)
-- `mime_type`: Optional MIME type of the document (e.g., "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+- `public_url`: A URL a viewer can open, filled by the runtime for every document input it normalizes, exactly as for `ImageContent`: the storage provider's link for a stored file, which expires when signed URLs are configured, and the URL itself for an `http(s)` one
+- `mime_type`: The MIME type of the document (e.g., "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"). For every document input, the runtime sets it at the start of the run from the file's own bytes, and keeps the declared type only when the bytes do not identify the file, as for plain text, Markdown or HTML
 - `filename`: Optional filename of the document
 - `title`: Optional title of the document or source
 - `snippet`: Optional text snippet or excerpt from the document
 
 **Use for:** Contracts, invoices, reports, presentations, web pages, search source citations, any document file.
+
+Which document formats a method can take depends on the models that read them: a `PipeExtract` step reads the formats its extract model declares, and a `PipeLLM` step the document formats its model declares. A Word document works with an extract model that reads Word files, and fails with one that reads only PDF.
+
+### File formats are checked before the run
+
+At the start of every run, before any pipe runs, the runtime establishes the format of each image and document input, including the items of a list and the fields of a structured input:
+
+- A file given as a `data:` URL, a local path or a `pipelex-storage://` reference is identified from its first bytes. The identified type replaces any declared one, so a `data:image/png` URL holding a PDF is a PDF. An Office file whose bytes show only that it is a zip archive is known by its declared type or by its file name's extension (`.docx`, `.pptx`, `.xlsx`), and otherwise its format is unknown.
+- A file the bytes do not identify, such as plain text, Markdown, CSV or HTML, keeps the type it was declared with.
+- An `http(s)` URL is not fetched before the run, so its format is the type it was declared with, and only that type is checked. An `http(s)` URL with no declared type is not checked: the provider receives it as it is.
+
+The run is then refused, with an input error naming the input, when:
+
+- an `Image` input holds a file that is not an image, whatever reads it;
+- a document input is certain to reach a step whose model does not read its format: for example, Word transcripts batched into a `PipeExtract` whose extract model reads only PDF. The error names each input, its format, the step, the model and the formats that model reads.
+
+The check follows each input through the steps of the method: the items of a batch, the fields of a structured input, and what a binding step or a dotted `batch_over` binds, so a Word transcript at `cases[1].transcripts[0]`, batched through `batch_over = "cases.transcripts"` over a list of cases, is refused before the run. A list a binding gathers from a field that is not itself a list, such as `cases.attachment` over a list of cases, is not followed, and a step that reads its items refuses a file when it gets to it.
+
+A step reached only through a `PipeCondition`, or a step that may be skipped because an optional input is absent, may never run, so the run is not refused on its account. If it does run, it refuses the file itself, with the same kind of input error. The same holds for files a run produces along the way.
 
 ### NumberContent
 
@@ -123,14 +222,15 @@ class NumberContent(StuffContent):
 
 ### YesNoContent
 
-Represents the answer to a yes/no question — a single boolean verdict:
+Represents the answer to a yes/no question — a boolean verdict, and the probability that the answer is yes when its producer reports one:
 
 ```python
 class YesNoContent(StuffContent):
     yes_no: bool
+    probability: float | None = None  # from 0 to 1
 ```
 
-Renders as `yes` or `no` when injected into a prompt. Especially handy as a `PipeLLM` output for judgments — `output = "YesNo"` makes the model return a typed boolean instead of free text answering "yes"/"no":
+Renders as `yes` or `no` when injected into a prompt, whatever the probability. Especially handy as a `PipeLLM` output for judgments — `output = "YesNo"` makes the model return a typed boolean instead of free text answering "yes"/"no":
 
 ```toml
 [pipe.judge_is_urgent]
@@ -144,6 +244,32 @@ prompt = "Is the following message urgent? Answer yes or no.\n\n$message"
 Read the verdict from a Python caller via `pipe_output.main_stuff_as_yes_no.yes_no`.
 
 **Use for:** Yes/no judgments, boolean classifications, presence/absence checks, pass/fail verdicts.
+
+### The verdict natives: `YesNo`, `Choice` and `Rating`
+
+`YesNo`, `Choice` and `Rating` are verdicts, and they follow one rule: **a verdict native requires its verdict and nothing else.** The verdict — the boolean, the option key, the level — is what every producer can state. Every measure of uncertainty beside it is optional and defined by what it means, never by how a producer computes it, so a producer that measures less fills in less, and one that measures nothing still writes a valid verdict. An unreported measure is absent: a bare yes is never a probability of 1.
+
+```python
+class ChoiceContent(StuffContent):
+    choice: str  # the key of the selected option
+    confidence: float | None = None  # from 0 to 1
+    probabilities: dict[str, float] | None = None  # keyed by option key
+
+
+class RatingContent(StuffContent):
+    level: int  # the index of the selected level, 0 being the first
+    confidence: float | None = None  # from 0 to 1
+    probabilities: dict[str, float] | None = None  # keyed by level index written as text: "0", "1", ...
+    position: float | None = None  # a continuous position, from 0 to the last level's index
+```
+
+A `Choice` renders as its key and a `Rating` as its level, so `$team` in a later prompt reads `billing` and `$severity` reads `2`. Branch on them with a `PipeCondition`: `expression = "team.choice"` routes by the key, and `expression = "'severe' if severity.level >= 2 else 'mild'"` by the level.
+
+A measure is only as good as its producer. A language model asked to fill a verdict — a `PipeLLM` whose output is `YesNo`, `Choice` or `Rating` — sees the uncertainty members, optional and described, and may fill them with its own estimate of its verdict. That estimate is worth having, and it is not the probability a dedicated judging model measures over the options it was given: a `Choice` written by a `PipeLLM` has no declared option set behind it, so its `probabilities` are keyed by whatever the model wrote. When a `PipeCondition` gates on a probability, read which producer wrote it, and guard against its absence: `approved.probability is not none and approved.probability >= 0.8`.
+
+**Where a caller supplies a verdict, and where a producer reports one.** An input declared `YesNo` takes the bare verdict, `true` or `false`, and builds a `YesNo` with no probability; send its object form inside the explicit envelope when you have a probability to pass on. A result is read the other way: a `YesNo` a pipe produces is an object carrying `yes_no` and, when reported, `probability`, at every depth of the result. A `Choice` or `Rating` input is provided in its envelope, `{"concept": "native.Choice", "content": {"choice": "billing"}}`, since a bare `"billing"` would read as a text.
+
+**Use for:** `Choice` for routing and classification over a declared set of options, `Rating` for grading on an ordered scale whose levels are described, and both wherever a method branches on a verdict and may weigh how sure its producer was.
 
 ### DateContent
 
@@ -240,6 +366,10 @@ class JSONContent(StuffContent):
     json_obj: dict[str, Any]
 ```
 
+A `JSON` input takes a JSON object as it is, `{"a": 1}`, and its inputs template shows the bare object; `JSON[]` takes a list of objects. `JSON` is a JSON object, not any JSON value, so a string or a number there is refused. The explicit form carries the content form: `{"concept": "JSON", "content": {"json_obj": {"a": 1}}}`.
+
+**Use for:** Data you already have as JSON objects, preferably through a concept that refines `JSON` (see [Choosing among `Anything`, `JSON` and `Dynamic`](#choosing-among-anything-json-and-dynamic)).
+
 ### HtmlContent
 
 Represents HTML content with styling:
@@ -289,8 +419,12 @@ Each named sub-content is a top-level field of the composite — there is no wra
 
 ### Anything
 
-!!! note "Special Concepts"
-    `Anything` is referenced in the native concept definitions but does not have specific implementations. It is handled through the generic content system and is primarily used as semantic markers.
+`Anything` has no content class of its own: an `Anything` value is held in the content class matching what it is.
+
+- **As an input**, it takes any JSON value but an array or null. A string, a number, a boolean or an object becomes text, a number, a yes/no or a JSON object, and the input keeps the `Anything` concept. A typed envelope, `{"concept": "Text", "content": "hi"}`, hands it a specific concept, which it keeps, since every concept satisfies `Anything`. `Anything[]` takes a list of such values.
+- **As an output**, it promises nothing narrower: a pipe declared to output `Anything` may produce any concept.
+
+**Use for:** Pipes that are generic over their input, passing a value along or rendering it whatever it is.
 
 ## Using Native Concepts
 

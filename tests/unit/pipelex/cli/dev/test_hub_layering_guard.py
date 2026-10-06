@@ -175,6 +175,23 @@ class TestHubLayeringGuard:
             "fail by design. Declare pipelex.runtime_boot instead; that is the half that stays clean."
         )
 
+    def test_the_boot_tolerance_replay_stays_declared(self) -> None:
+        """`pipelex.migration` and `pipelex.fix_ops` must stay declared — a kernel-layer boot runs them.
+
+        A configuration file that fails validation is replayed through the migration engine before the
+        boot gives up, so the engine and the applier it uses are part of the kernel layer's boot on any
+        machine with a stale file. Both used to be interpreter-side: the applier lived under
+        `pipelex.pipeline`, which the engine imported without ever reaching `interpreter_hub`, so every
+        static gate stayed green while a stale file loaded interpreter modules into a kernel-only
+        process. Membership is the whole assertion, for the reason the neighbouring tests give.
+        """
+        for package in ("pipelex.migration", "pipelex.fix_ops"):
+            assert package in KERNEL_LAYER_PACKAGES, (
+                f"{package} runs inside a kernel-layer boot that meets a stale configuration file, and it "
+                "is no longer declared kernel-layer. Undeclared means unchecked, not flagged — restore the "
+                "entry, or move whatever made it dirty to the layer it belongs to."
+            )
+
     def test_the_pipelex_kernel_stays_declared(self) -> None:
         """`pipelex.kernel` must stay declared — it is the package the whole extraction exists to keep clean.
 

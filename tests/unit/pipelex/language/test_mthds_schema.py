@@ -25,6 +25,8 @@ _PIPE_KIND_EXTRA_FIELDS: dict[str, dict[str, Any]] = {
     "PipeExtract": {},
     "PipeSearch": {"prompt": "find it"},
     "PipeStructure": {},
+    "PipeDocGen": {"format": "pdf"},
+    "PipeJudge": {"question": "is it?"},
     "PipeBatch": {"branch_pipe_code": "sub_pipe", "input_list_name": "items", "input_item_name": "item"},
     "PipeCondition": {"default_outcome": "fallback_pipe", "outcomes": {"yes": "yes_pipe"}},
     "PipeParallel": {"branches": [{"pipe": "sub_pipe"}]},
@@ -284,6 +286,23 @@ class TestMthdsSchemaGeneration:
         assert not errors, f"{pipe_type} table should match exactly one oneOf arm, got errors: {[e.message for e in errors]}"
 
     @pytest.mark.parametrize(
+        ("question_fields", "should_validate"),
+        [
+            pytest.param({"question": "is it?"}, True, id="question"),
+            pytest.param({"prompt": "is it?"}, True, id="prompt-synonym"),
+            pytest.param({"question": "is it?", "prompt": "is it?"}, False, id="both"),
+            pytest.param({}, False, id="neither"),
+        ],
+    )
+    def test_pipe_judge_takes_its_question_or_the_prompt_synonym(
+        self, schema: dict[str, Any], question_fields: dict[str, Any], should_validate: bool
+    ) -> None:
+        """A PipeJudge writes its question as `question` or as `prompt`, exactly one, as its blueprint reads it."""
+        validator = _pipe_union_oneof_validator(schema)
+        table = {"type": "PipeJudge", "description": "A judge", "output": "YesNo", **question_fields}
+        assert validator.is_valid(table) is should_validate, f"{sorted(question_fields)} should {'' if should_validate else 'not '}validate"
+
+    @pytest.mark.parametrize(
         ("size_value", "should_validate"),
         [
             pytest.param("1k", True, id="tier-token"),
@@ -298,6 +317,155 @@ class TestMthdsSchemaGeneration:
         validator = _pipe_union_oneof_validator(schema)
         table = {**_minimal_pipe_table("PipeImgGen"), "size": size_value}
         assert validator.is_valid(table) is should_validate, f"size={size_value!r} should {'' if should_validate else 'not '}validate"
+
+    @pytest.mark.parametrize("pipe_type", [*sorted(_PIPE_KIND_EXTRA_FIELDS), None])
+    @pytest.mark.parametrize(
+        ("input_name", "should_validate"),
+        [
+            pytest.param("invoice", True, id="plain"),
+            pytest.param("invoice_total_2", True, id="plain-with-digits"),
+            pytest.param("invoice.total", False, id="dotted"),
+            pytest.param("InvoiceTotal", False, id="pascal-case"),
+            pytest.param("2nd_total", False, id="leading-digit"),
+            pytest.param("_total", False, id="leading-underscore"),
+        ],
+    )
+    def test_input_names_follow_the_plain_name_grammar(
+        self, schema: dict[str, Any], pipe_type: str | None, input_name: str, should_validate: bool
+    ) -> None:
+        """Every pipe kind's `inputs` keys, the typeless signature's included, are refused by the schema unless plain.
+
+        This is what makes `invalid_input_name` a schema fault: a structural check refuses a dotted or
+        malformed input name before the runtime is asked, on every pipe, with no per-kind exception.
+        """
+        validator = _pipe_union_oneof_validator(schema)
+        if pipe_type is None:
+            table: dict[str, Any] = {"description": "A signature", "output": "Text"}
+        else:
+            table = _minimal_pipe_table(pipe_type)
+        table["inputs"] = {input_name: "Text"}
+        assert validator.is_valid(table) is should_validate, f"{pipe_type or 'signature'} inputs key {input_name!r}"
+
+    @pytest.mark.parametrize(
+        ("input_list_name", "should_validate"),
+        [
+            pytest.param("pages", True, id="plain"),
+            pytest.param("catalog.pages", False, id="dotted"),
+            pytest.param("Pages", False, id="pascal-case"),
+        ],
+    )
+    def test_batch_input_list_name_follows_the_plain_name_grammar(self, schema: dict[str, Any], input_list_name: str, should_validate: bool) -> None:
+        """A PipeBatch's `input_list_name` is a plain input name, refused by the schema otherwise, as the runtime does."""
+        validator = _pipe_union_oneof_validator(schema)
+        table = {**_minimal_pipe_table("PipeBatch"), "input_list_name": input_list_name}
+        assert validator.is_valid(table) is should_validate
+
+    @pytest.mark.parametrize(
+        ("step", "should_validate"),
+        [
+            pytest.param({"pipe": "sub_pipe"}, True, id="pipe-step"),
+            pytest.param({"from": "invoice.total", "result": "total_amount"}, True, id="binding-step"),
+            pytest.param({"from": "invoice", "result": "invoice_copy"}, True, id="binding-step-bare-name"),
+            pytest.param({"from": "page.page_view.caption", "result": "caption"}, True, id="binding-step-deep-path"),
+            pytest.param({"from": "invoice.Total2", "result": "total"}, True, id="binding-step-mixed-case-segment"),
+            pytest.param({"from": "invoice.total", "result": "TotalAmount"}, False, id="result-not-plain"),
+            pytest.param({"from": "invoice.total", "result": "invoice.total"}, False, id="result-dotted"),
+            pytest.param({"from": "pages[0].text", "result": "text"}, False, id="from-with-a-subscript"),
+            pytest.param({"from": "invoice._total", "result": "total"}, False, id="from-with-an-underscore-led-segment"),
+            pytest.param({"from": "invoice..total", "result": "total"}, False, id="from-with-an-empty-segment"),
+            pytest.param({"from": "invoice.total ", "result": "total"}, False, id="from-with-whitespace"),
+            pytest.param({"from": "invoice.total"}, False, id="binding-without-result"),
+            pytest.param({"pipe": "sub_pipe", "from": "invoice.total", "result": "total"}, False, id="pipe-and-from"),
+            pytest.param({"from": "invoice.lines", "result": "lines", "batch_over": "lines"}, False, id="binding-with-batch-over"),
+            pytest.param({"from": "invoice.total", "result": "total", "note": "x"}, False, id="binding-with-a-stray-field"),
+            pytest.param({"from_path": "invoice.total", "result": "total"}, False, id="binding-spelled-from-path"),
+            pytest.param({"from": "invoice.total", "from_path": "invoice.total", "result": "total"}, False, id="binding-with-from-path-beside-from"),
+            pytest.param({"result": "total"}, False, id="neither-pipe-nor-from"),
+        ],
+    )
+    def test_sequence_steps_are_pipe_steps_or_binding_steps(self, schema: dict[str, Any], step: dict[str, Any], should_validate: bool) -> None:
+        """A PipeSequence step is a closed pipe step or a closed binding step, `from` following the path grammar and `result` the plain name's."""
+        validator = _pipe_union_oneof_validator(schema)
+        table = {**_minimal_pipe_table("PipeSequence"), "steps": [step]}
+        assert validator.is_valid(table) is should_validate, f"step {step!r}"
+
+    def test_parallel_branches_keep_the_pipe_step_shape(self, schema: dict[str, Any]) -> None:
+        """A PipeParallel branch is a pipe step only: a binding step there matches no shape, since branches run concurrently."""
+        validator = _pipe_union_oneof_validator(schema)
+        table = {**_minimal_pipe_table("PipeParallel"), "branches": [{"from": "invoice.total", "result": "total"}]}
+        assert validator.is_valid(table) is False
+        branch_items = schema["definitions"]["PipeParallelBlueprint"]["properties"]["branches"]["items"]
+        assert branch_items == {"$ref": "#/definitions/ParallelBranchBlueprint"}
+        branch_schema = dict(schema["definitions"]["ParallelBranchBlueprint"])
+        pipe_step_schema = dict(schema["definitions"]["SubPipeBlueprint"])
+        for step_schema in (branch_schema, pipe_step_schema):
+            step_schema.pop("title")
+            step_schema["properties"] = {name: field for name, field in step_schema["properties"].items() if name != "batch_over"}
+        assert branch_schema == pipe_step_schema
+
+    @pytest.mark.parametrize(
+        ("batch_over", "is_valid_on_a_step", "is_valid_on_a_branch"),
+        [
+            pytest.param("pages", True, True, id="a-plain-name"),
+            pytest.param("PagesOfTheCatalog", True, True, id="a-name-a-pipe-step-may-store-under"),
+            pytest.param("catalog.pages", True, False, id="a-dotted-path"),
+            pytest.param("catalogs.pages.page_view", True, False, id="a-deep-dotted-path"),
+            pytest.param("catalog..pages", False, False, id="an-empty-segment"),
+            pytest.param("catalog.pages[0]", False, False, id="a-subscript"),
+            pytest.param("catalog._pages", False, False, id="an-underscore-led-segment"),
+            pytest.param(".pages", False, False, id="a-leading-dot"),
+        ],
+    )
+    def test_batch_over_is_a_path_on_a_sequence_step_and_a_plain_name_on_a_parallel_branch(
+        self, schema: dict[str, Any], batch_over: str, is_valid_on_a_step: bool, is_valid_on_a_branch: bool
+    ) -> None:
+        """A dotted `batch_over` binds before it batches: it follows the path grammar on a sequence step, and a branch never binds.
+
+        Both refusals are `binding_step_invalid`, which the runtime raises when the bundle is parsed and the schema refuses first.
+        """
+        validator = _pipe_union_oneof_validator(schema)
+        pipe_step = {"pipe": "describe_page", "batch_over": batch_over, "batch_as": "page", "result": "descriptions"}
+        sequence_table = {**_minimal_pipe_table("PipeSequence"), "steps": [pipe_step]}
+        parallel_table = {**_minimal_pipe_table("PipeParallel"), "branches": [pipe_step]}
+        assert validator.is_valid(sequence_table) is is_valid_on_a_step, f"sequence step batch_over {batch_over!r}"
+        assert validator.is_valid(parallel_table) is is_valid_on_a_branch, f"parallel branch batch_over {batch_over!r}"
+
+    @pytest.mark.parametrize(
+        ("name", "should_validate"),
+        [
+            pytest.param("catalog_pages", True, id="a-plain-name"),
+            pytest.param("bound_pages", True, id="the-prefix-without-its-underscore"),
+            pytest.param("_draft", True, id="another-underscore-led-name"),
+            pytest.param("_bound_catalog_pages", False, id="the-reserved-prefix"),
+            pytest.param("_bound_", False, id="the-reserved-prefix-alone"),
+        ],
+    )
+    @pytest.mark.parametrize("field_name", ["result", "batch_as", "batch_over"])
+    def test_a_step_and_a_branch_refuse_the_reserved_prefix(self, schema: dict[str, Any], field_name: str, name: str, should_validate: bool) -> None:
+        """A pipe step's `result`, `batch_as` and plain `batch_over` never take `_bound_`, the runtime's prefix for a dotted `batch_over`'s list.
+
+        The runtime refuses them as `invalid_input_name` when the bundle is parsed, and the schema refuses them first, through a
+        Draft-4 `not` on the string arm, on a PipeSequence step and on a PipeParallel branch alike.
+        """
+        validator = _pipe_union_oneof_validator(schema)
+        pipe_step: dict[str, Any] = {"pipe": "describe_page", "batch_over": "pages", "batch_as": "page", "result": "descriptions", field_name: name}
+        sequence_table = {**_minimal_pipe_table("PipeSequence"), "steps": [pipe_step]}
+        parallel_table = {**_minimal_pipe_table("PipeParallel"), "branches": [pipe_step]}
+        assert validator.is_valid(sequence_table) is should_validate, f"sequence step {field_name} {name!r}"
+        assert validator.is_valid(parallel_table) is should_validate, f"parallel branch {field_name} {name!r}"
+
+    @pytest.mark.parametrize(
+        ("input_item_name", "should_validate"),
+        [
+            pytest.param("item", True, id="a-plain-name"),
+            pytest.param("_draft_item", True, id="another-underscore-led-name"),
+            pytest.param("_bound_item", False, id="the-reserved-prefix"),
+        ],
+    )
+    def test_batch_input_item_name_refuses_the_reserved_prefix(self, schema: dict[str, Any], input_item_name: str, should_validate: bool) -> None:
+        validator = _pipe_union_oneof_validator(schema)
+        table = {**_minimal_pipe_table("PipeBatch"), "input_item_name": input_item_name}
+        assert validator.is_valid(table) is should_validate
 
     def test_minimal_table_coverage_matches_schema_pipe_kinds(self, schema: dict[str, Any]) -> None:
         """Guard: the test's per-kind table map covers exactly the *concrete* pipe kinds in the schema.
