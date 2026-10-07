@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Claude Haiku 5.5 on the `anthropic` backend**: `claude-5.5-haiku` (model id `claude-haiku-5-5`) takes text, images and PDF, produces text and structured output, and reasons with adaptive thinking, with up to 128K output tokens. It costs $0.10 / $0.50 per million tokens for a prompt up to 100,000 tokens and $0.50 / $2.50 above, of which the backend file records the first. It refuses `temperature` but, unlike Sonnet 5.5 and Opus 5.5, accepts a forced `tool_choice`, so structured output keeps `instructor/anthropic_tools`.
+
 ## [v0.77.0] - 2026-10-07
 
 ### Added
