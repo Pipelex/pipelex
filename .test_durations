@@ -2386,7 +2386,6 @@
     "tests/unit/pipelex/cli/dev/test_hub_layering_guard.py::TestHubLayeringGuard::test_string_literal_import_module_form_is_caught": 0.0005,
     "tests/unit/pipelex/cli/dev/test_hub_layering_guard.py::TestHubLayeringGuard::test_tests_may_reference_the_interpreter_hub": 0.0004,
     "tests/unit/pipelex/cli/dev/test_hub_layering_guard.py::TestHubLayeringGuard::test_the_boot_split_left_the_kernel_half_declared": 0.0007,
-    "tests/unit/pipelex/cli/dev/test_hub_layering_guard.py::TestHubLayeringGuard::test_the_boot_split_left_the_runtime_half_declared": 0.0004,
     "tests/unit/pipelex/cli/dev/test_hub_layering_guard.py::TestHubLayeringGuard::test_the_boot_tolerance_replay_stays_declared": 0.1557,
     "tests/unit/pipelex/cli/dev/test_hub_layering_guard.py::TestHubLayeringGuard::test_the_measured_clean_packages_stay_declared": 0.0007,
     "tests/unit/pipelex/cli/dev/test_hub_layering_guard.py::TestHubLayeringGuard::test_the_pipelex_kernel_stays_declared": 0.0016,

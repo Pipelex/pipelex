@@ -28,7 +28,7 @@ from pipelex.cli.agent_cli.commands.run._run_hosted import (
     run_hosted_for_agent,
 )
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs
-from pipelex.cli.commands.run._hosted_sources import collect_mthds_files
+from pipelex.cli.commands.run._hosted_sources import collect_mthds_files, hosted_library_dirs
 from pipelex.hosted.exceptions import HostedRunSourceError
 from pipelex.hosted.hosted_run import HostedRunRequest
 from pipelex.hosted.run_config import RunExecution  # ruff: ignore[typing-only-first-party-import] - typer reads the --runner annotation at runtime
@@ -192,9 +192,9 @@ def run_bundle_cmd(
     execution = resolve_agent_run_execution(runner=runner, hosted=hosted, base_url=base_url)
     if execution.is_hosted:
         refuse_local_only_flags(dry_run=dry_run, mock_inputs=mock_inputs)
-        # The bundle goes first, then the rest of the library a local run would load with it.
+        # The bundle goes first, then the rest of the library a local run would load with it: -L, else PIPELEXPATH.
         try:
-            bundle_files = collect_mthds_files(primary=Path(bundle_path), library_dirs=library_dir)
+            bundle_files = collect_mthds_files(primary=Path(bundle_path), library_dirs=hosted_library_dirs(library_dirs=library_dir))
         except HostedRunSourceError as exc:
             agent_error(exc.message, error_type=type(exc).__name__, cause=exc)
         request = HostedRunRequest(

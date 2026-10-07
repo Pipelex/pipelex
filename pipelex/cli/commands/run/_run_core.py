@@ -15,6 +15,7 @@ from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.commands.run._inputs_file_loader import load_inputs_dict_from_path
 from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths
 from pipelex.cli.commands.run._main_stuff_file import save_main_stuff_file
+from pipelex.cli.deck_notice import warn_if_deck_stale
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_dedicated_failure_panel,
@@ -511,8 +512,10 @@ def execute_run(
 ) -> None:
     """Synchronous entry point that wraps the async execution with Pipelex setup/teardown.
 
-    Shared between the ``method`` and ``pipe`` subcommands.
+    Shared between the ``method``, ``pipe`` and ``bundle`` subcommands, for a run that executes on this machine. It
+    prints the deck staleness notice, which the root callback leaves to it: only a local run reads the deck.
     """
+    warn_if_deck_stale()
     # A dry run makes no inference call, so it must not demand credentials: `needs_inference=False`
     # forces every run to DRY and resolves no backend's credentials, yet keeps every enabled backend
     # with its models, so a dry run resolves model handles exactly as a live run would, whichever keys

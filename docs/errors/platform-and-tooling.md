@@ -106,7 +106,9 @@ own page. Classes are grouped by subsystem.
 ## Hosted
 
 - [`HostedBaseUrlError`](hosted-base-url-error.md) — Hosted base url
+- [`HostedMethodInvalidError`](hosted-method-invalid-error.md) — Hosted method invalid
 - [`HostedRunError`](hosted-run-error.md) — Hosted run error
+- [`HostedRunPollingError`](hosted-run-polling-error.md) — Hosted run polling
 - [`HostedRunSourceError`](hosted-run-source-error.md) — Hosted run source
 
 ## Methods

@@ -1,11 +1,12 @@
-"""What went wrong on a hosted run, and what to do next, read off the error pipelex-sdk raised.
+"""What went wrong on a hosted run, and what to do next, read off the error pipelex-sdk or pipelex raised.
 
 Every error of a hosted run that is not pipelex's own arrives as one of the SDK's classes, all of which derive from
-the protocol's `PipelineRequestError`. An `ApiResponseError` carries the hosted API's problem document: its reason
-(the problem's `detail`) and, when the server advised one, its next step (`user_action.detail`). Answers the hosted
-plane authors in front of the runner (a refused key, an unknown route, a rate limit, an unavailable runner) advise
-none, so their next step follows their status here. Both CLIs read the same table, so a person and an agent are
-told the same thing.
+the protocol's `PipelineRequestError`; pipelex's own derive from `HostedRunError`. An `ApiResponseError` carries the
+hosted API's problem document: its reason (the problem's `detail`) and, when the server advised one, its next step
+(`user_action.detail`). Answers the hosted plane authors in front of the runner (a refused key, an unknown route, a
+rate limit, an unavailable runner) advise none, so their next step follows their status here. Both CLIs read the
+same view of an error, its run id and its validation items included, so a person and an agent are told the same
+thing.
 """
 
 from typing import NamedTuple
@@ -16,6 +17,7 @@ from pipelex_sdk.errors import (
     ApiUnreachableError,
     InputPreparationError,
     InvalidLocalSourceError,
+    MissingMainStuffError,
     PipelineExecuteTimeoutError,
     RejectedAssetError,
     RunFailedError,
@@ -23,10 +25,13 @@ from pipelex_sdk.errors import (
     RunTimeoutError,
     UnsupportedUploadCapabilityError,
     UploadAuthenticationError,
+    UploadTransportError,
 )
+from pipelex_sdk.validation_models import ValidationErrorItem
 
 from pipelex.base_exceptions import ErrorDomain
 from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
+from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunError, HostedRunPollingError
 
 #: Where a hosted run takes its key from, and where a person gets one.
 HOSTED_API_KEY_NEXT_STEP = (
@@ -65,6 +70,8 @@ HOSTED_REFUSAL_CALLER_NEXT_STEP = (
 HOSTED_SERVER_FAULT_NEXT_STEP = (
     "The hosted API failed on its side: report it with the request_id, or with the http_status when the error carries no request_id"
 )
+#: The next step of a request that never reached the hosted API.
+HOSTED_UNREACHABLE_NEXT_STEP = f"Check the network connection. {HOSTED_BASE_URL_NEXT_STEP}"
 
 
 class HostedErrorView(NamedTuple):
@@ -72,7 +79,9 @@ class HostedErrorView(NamedTuple):
 
     `error_domain` says who acts (`input`: the caller's request; `config`: the key, the base URL or the network;
     `runtime`: the run itself), as the hosted API said it when it did; `retryable` is the hosted API's own verdict,
-    `None` when it gave none.
+    `None` when it gave none. `pipeline_run_id` names the run once the hosted API acknowledged it, so a run that failed,
+    outlived the wait or was lost on the way can be looked up. `validation_errors` are the hosted API's items locating
+    the faults of a method it refused, each naming its file when the file was sent under a label.
     """
 
     error_type: str
@@ -80,6 +89,8 @@ class HostedErrorView(NamedTuple):
     next_step: str
     error_domain: str | None = None
     retryable: bool | None = None
+    pipeline_run_id: str | None = None
+    validation_errors: tuple[ValidationErrorItem, ...] = ()
 
 
 def hosted_refusal_next_step(*, error: ApiResponseError) -> str:
@@ -102,51 +113,73 @@ def hosted_refusal_message(*, error: ApiResponseError) -> str:
     return message
 
 
-def describe_hosted_error(*, error: PipelineRequestError) -> HostedErrorView:
-    """Read a hosted run's failure off the error pipelex-sdk raised.
+def describe_hosted_error(*, error: PipelineRequestError | HostedRunError) -> HostedErrorView:
+    """Read a hosted run's failure off the error pipelex-sdk or pipelex raised.
 
     Args:
-        error: The SDK's error. Its class decides the next step; an `ApiResponseError` names the runner's own class
-            when the problem document carries one, and a failed run names its stored report's.
+        error: The SDK's error, or one pipelex raised during the run. Its class decides the next step; an
+            `ApiResponseError` names the runner's own class when the problem document carries one, and a failed run
+            names its stored report's.
 
     Returns:
-        The class to report, the message, and the next step.
+        The class to report, the message, the next step, and the run and the validation items when there are any.
     """
     error_type = type(error).__name__
     message = str(error)
     next_step: str
     error_domain: str | None = None
     retryable: bool | None = None
+    pipeline_run_id: str | None = None
+    validation_errors: tuple[ValidationErrorItem, ...] = ()
     match error:
+        case HostedRunError():
+            message = error.message
+            next_step = error.user_action.detail if error.user_action is not None else "Check the run request: the method, the pipe and the inputs"
+            error_domain = error.error_domain
+            if isinstance(error, HostedRunPollingError):
+                pipeline_run_id = error.pipeline_run_id
+            if isinstance(error, HostedMethodInvalidError):
+                validation_errors = tuple(error.validation_errors)
         case ApiResponseError():
             error_type = error.error_type or error_type
             message = hosted_refusal_message(error=error)
             next_step = hosted_refusal_next_step(error=error)
             error_domain = error.error_domain
             retryable = error.retryable
+            validation_errors = tuple(error.validation_errors or ())
         case RunFailedError():
             report = error.error
+            pipeline_run_id = error.run_id
             error_domain = ErrorDomain.RUNTIME
             if report is not None:
                 error_type = report.error_type or error_type
                 error_domain = report.error_domain or error_domain
                 retryable = report.retryable
+                validation_errors = tuple(report.validation_errors or ())
             if report is not None and report.user_action is not None and report.user_action.detail:
                 next_step = report.user_action.detail
             else:
                 next_step = f"The run {error.run_id} ended {error.status}: change what the message names, then run again"
         case RunTimeoutError():
+            pipeline_run_id = error.run_id
             error_domain = ErrorDomain.RUNTIME
             next_step = (
                 f"The run {error.run_id} keeps running on the hosted API: find it on app.pipelex.com, or read its result "
                 "later with pipelex-sdk's PipelexAPIClient.wait_for_result"
+            )
+        case MissingMainStuffError():
+            pipeline_run_id = error.run_id
+            error_domain = ErrorDomain.RUNTIME
+            next_step = (
+                f"The run {error.run_id} completed, but the hosted API delivered no main output: look the run up by its id on "
+                "app.pipelex.com, and report it with the run id"
             )
         case PipelineExecuteTimeoutError():
             error_domain = ErrorDomain.RUNTIME
             next_step = "The run outlived the hosted API's synchronous ceiling: run it again, it starts and polls the run instead"
         case ApiUnreachableError():
             error_domain = ErrorDomain.CONFIG
-            next_step = f"Check the network connection. {HOSTED_BASE_URL_NEXT_STEP}"
+            next_step = HOSTED_UNREACHABLE_NEXT_STEP
         case RunLifecycleUnavailableError():
             error_domain = ErrorDomain.CONFIG
             next_step = f"The server at the base URL is a bare runner without run polling. {HOSTED_BASE_URL_NEXT_STEP}"
@@ -162,9 +195,26 @@ def describe_hosted_error(*, error: PipelineRequestError) -> HostedErrorView:
         case UnsupportedUploadCapabilityError():
             error_domain = ErrorDomain.CONFIG
             next_step = f"The server at the base URL takes no uploads: pass the file as an http(s) URL. {HOSTED_BASE_URL_NEXT_STEP}"
+        case UploadTransportError():
+            # The SDK raises it for an upload that never reached the hosted API, chained from `ApiUnreachableError`,
+            # and for one the hosted API failed on its side, a 5xx.
+            if isinstance(error.__cause__, ApiUnreachableError):
+                error_domain = ErrorDomain.CONFIG
+                next_step = HOSTED_UNREACHABLE_NEXT_STEP
+            else:
+                error_domain = ErrorDomain.RUNTIME
+                next_step = HOSTED_SERVER_FAULT_NEXT_STEP
         case InputPreparationError():
             error_domain = ErrorDomain.INPUT
             next_step = "Check the inputs against the pipe's signature (pipelex-agent inputs prints a template), then run again"
         case _:
             next_step = "Check the run request: the method, the pipe and the inputs"
-    return HostedErrorView(error_type=error_type, message=message, next_step=next_step, error_domain=error_domain, retryable=retryable)
+    return HostedErrorView(
+        error_type=error_type,
+        message=message,
+        next_step=next_step,
+        error_domain=error_domain,
+        retryable=retryable,
+        pipeline_run_id=pipeline_run_id,
+        validation_errors=validation_errors,
+    )

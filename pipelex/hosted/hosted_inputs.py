@@ -8,6 +8,7 @@ anchor each relative path at a file position to the inputs file's directory, and
 file at all: inputs naming none are sent as they are, with no upload round trip.
 """
 
+import re
 from pathlib import Path
 from typing import Any, NamedTuple, cast
 
@@ -27,12 +28,17 @@ from mthds.protocol.input_form import (
     UnknownItem,
 )
 from pipelex_sdk.client import PipelexAPIClient
-from pipelex_sdk.crate_models import MthdsFileItem, PipeIORequest, PipeIOValidReport
+from pipelex_sdk.crate_models import CrateInvalidReport, MthdsFileItem, PipeIORequest
 from pipelex_sdk.upload import UploadRecord
 
-#: The source forms a file position may hold that are not files on this machine: the SDK passes the first three
-#: through, and uploads a data URL from the bytes it carries.
-_NOT_LOCAL_PREFIXES: tuple[str, ...] = ("pipelex-storage://", "http://", "https://", "data:")
+from pipelex.hosted.exceptions import HostedMethodInvalidError
+
+#: An `http(s)://` URL, which the SDK passes through for the hosted API to fetch. Matched as the SDK matches it,
+#: whatever the case of the scheme.
+_HTTP_URL_PATTERN = re.compile(r"^https?://", re.IGNORECASE)
+#: The other source forms a file position may hold that are not files on this machine, matched as the SDK matches
+#: them, case included: a storage URI it passes through, and a data URL it uploads from the bytes it carries.
+_NOT_LOCAL_PREFIXES: tuple[str, ...] = ("pipelex-storage://", "data:")
 
 
 class AnchoredInputs(NamedTuple):
@@ -52,7 +58,7 @@ class PreparedHostedInputs(NamedTuple):
 
 def _anchor_source(*, source: str, base_dir: Path | None, local_sources: list[str]) -> str:
     """A source at a file position, a local path anchored to `base_dir` and recorded, any other form unchanged."""
-    if source.startswith(_NOT_LOCAL_PREFIXES):
+    if source.startswith(_NOT_LOCAL_PREFIXES) or _HTTP_URL_PATTERN.match(source):
         return source
     path = Path(source).expanduser()
     if base_dir is not None and not path.is_absolute():
@@ -120,9 +126,9 @@ def anchor_local_file_sources(*, inputs: dict[str, Any], descriptor: PipeInputFo
 
     Returns:
         A copy of the inputs with each relative local path at a file position joined to `base_dir` (and `~` expanded),
-        and every local file found, anchored, in walk order. A `pipelex-storage://`, an `http(s)://` or a `data:` URL
-        is not a local file. A value at a position the signature does not declare a file is never touched, whatever it
-        looks like.
+        and every local file found, anchored, in walk order. A `pipelex-storage://` URI, an `http(s)://` URL (whatever
+        the case of its scheme) or a `data:` URL is not a local file. A value at a position the signature does not
+        declare a file is never touched, whatever it looks like.
     """
     declared = {field.name: field for field in descriptor.fields}
     local_sources: list[str] = []
@@ -155,10 +161,15 @@ async def prepare_hosted_inputs(
     One `POST /v1/pipe-io` reads the signature of the pipe that runs, `pipe_code` or the method's entry pipe, and
     qualifies a bare pipe code, which the SDK's preparation requires. When the inputs name a local file at a file
     position, `prepare_inputs` uploads it and rewrites it to its `pipelex-storage://` URI; otherwise the inputs go as
-    they are. A method whose signature does not resolve is not prepared at all: the run route refuses it, with the
-    located diagnostics a preparation error would not carry.
+    they are. A method whose signature does not resolve is refused here, before any run starts: pipe-io's verdict
+    names each faulty file by the label it was sent under, which the run route, taking the files as bare contents,
+    cannot do.
+
+    The SDK's `prepare_inputs` reads the signature again with one more pipe-io request: it takes no signature already
+    read, so a run whose inputs name a local file pays for that second request.
 
     Raises:
+        HostedMethodInvalidError: If the method does not load, with the hosted API's labelled validation items.
         ApiResponseError: If the hosted API refuses the pipe-io request (an unknown method, a key it refuses).
         InputPreparationError: If an upload fails, or a local file cannot be read.
     """
@@ -166,8 +177,9 @@ async def prepare_hosted_inputs(
         return PreparedHostedInputs(inputs=inputs, uploads=[], pipe_ref=None)
 
     report = await client.pipe_io(PipeIORequest(files=mthds_files, method_ref=method_ref, method_id=method_id, pipe_ref=pipe_code))
-    if not isinstance(report, PipeIOValidReport):
-        return PreparedHostedInputs(inputs=inputs, uploads=[], pipe_ref=None)
+    if isinstance(report, CrateInvalidReport):
+        msg = f"The hosted API cannot load the method: {report.message}"
+        raise HostedMethodInvalidError(msg, validation_errors=report.validation_errors)
     selected_pipe_ref = report.pipe_ref
     descriptor = report.input_form.get(selected_pipe_ref) if selected_pipe_ref is not None else None
     if descriptor is None:

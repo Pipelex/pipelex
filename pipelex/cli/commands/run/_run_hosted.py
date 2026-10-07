@@ -22,6 +22,7 @@ from pipelex.cli.commands.run._run_core import load_run_inputs
 from pipelex.cli.error_handlers import handle_validate_bundle_error, print_traceback_if_requested
 from pipelex.hosted.client_factory import make_hosted_client
 from pipelex.hosted.error_rendering import describe_hosted_error
+from pipelex.hosted.exceptions import HostedRunError
 from pipelex.hosted.execution import resolve_run_execution
 from pipelex.hosted.hosted_run import HostedRunOutcome, HostedRunRequest, run_hosted
 from pipelex.hosted.run_config import RunExecution
@@ -103,18 +104,26 @@ def refuse_local_only_flags(
         raise _fail(message=msg)
 
 
-def _print_hosted_failure(*, error: PipelineRequestError) -> None:
+def _print_hosted_failure(*, error: PipelineRequestError | HostedRunError) -> None:
+    """Print a hosted run's failure as `pipelex.hosted.error_rendering` reads it, the view the agent CLI's envelope carries.
+
+    Its validation items name the file each fault is in when the hosted API was told it, and the run id is printed
+    once the hosted API acknowledged the run, so a run that failed, outlived the wait or was lost on the way can be
+    looked up.
+    """
     view = describe_hosted_error(error=error)
     console = get_console()
     console.print("\n[bold red]Failed to run on the hosted API[/bold red]\n")
     console.print(f"  {escape(view.message)}\n")
-    if isinstance(error, ApiResponseError) and error.validation_errors:
-        for item in error.validation_errors:
+    if view.validation_errors:
+        for item in view.validation_errors:
             location = item.source or item.pipe_code or item.concept_code or item.domain_code
             prefix = f"{location}: " if location else ""
             console.print(f"  - {escape(prefix + item.message)}")
         console.print("")
     console.print(f"  [bold]Next step:[/bold] {escape(view.next_step)}\n")
+    if view.pipeline_run_id is not None:
+        console.print(f"  Run id: {escape(view.pipeline_run_id)}\n")
     if isinstance(error, ApiResponseError) and error.request_id:
         console.print(f"  Request id: {escape(error.request_id)}\n")
 
@@ -125,10 +134,14 @@ async def _start_and_wait(*, client: PipelexAPIClient, request: HostedRunRequest
 
 
 def _main_stuff_concept_ref(*, outcome: HostedRunOutcome) -> str | None:
+    """The concept of the main output, read from the working memory, where a step that named its output keeps it
+    under that name and points the `main_stuff` alias at it.
+    """
     working_memory = outcome.results.working_memory
     if working_memory is None:
         return None
-    main_stuff = working_memory.root.get(_MAIN_STUFF_NAME)
+    main_stuff_name = working_memory.aliases.get(_MAIN_STUFF_NAME, _MAIN_STUFF_NAME)
+    main_stuff = working_memory.root.get(main_stuff_name)
     return main_stuff.concept if main_stuff is not None else None
 
 
@@ -213,9 +226,15 @@ def execute_hosted_run(
     console.print(f"Running on the hosted Pipelex API at [bold]{escape(client.base_url)}[/bold]")
     try:
         outcome = asyncio.run(_start_and_wait(client=client, request=request))
-    except PipelineRequestError as exc:
+    except (PipelineRequestError, HostedRunError) as exc:
         print_traceback_if_requested(console=console)
         _print_hosted_failure(error=exc)
+        raise typer.Exit(1) from exc
+    except Exception as exc:
+        # CLI command root: any unexpected failure is reported to the user and exits non-zero via typer.Exit.
+        print_traceback_if_requested(console=console)
+        console.print("\n[bold red]Failed to run on the hosted API[/bold red]\n")
+        console.print(f"  {escape(f'{type(exc).__name__}: {exc}')}\n")
         raise typer.Exit(1) from exc
 
     results = outcome.results

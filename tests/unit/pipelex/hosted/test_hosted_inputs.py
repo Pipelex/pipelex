@@ -51,6 +51,12 @@ class TestHostedInputs:
                 [],
             ),
             (
+                "a URL scheme is told apart whatever its case, as the SDK tells it",
+                {"document": "HTTPS://example.com/invoice.pdf", "pages": ["Http://example.com/page.png"]},
+                {"document": "HTTPS://example.com/invoice.pdf", "pages": ["Http://example.com/page.png"]},
+                [],
+            ),
+            (
                 "a text that reads like a file name is not a file position",
                 {"notes": "invoice.pdf"},
                 {"notes": "invoice.pdf"},

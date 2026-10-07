@@ -10,11 +10,14 @@ from pipelex_sdk.errors import (
     ApiResponseError,
     ApiUnreachableError,
     InvalidLocalSourceError,
+    MissingMainStuffError,
     RunFailedError,
     RunTimeoutError,
     UploadAuthenticationError,
+    UploadTransportError,
 )
 from pipelex_sdk.runs import RunStatus
+from pipelex_sdk.validation_models import ValidationErrorItem
 
 from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
 from pipelex.hosted.error_rendering import (
@@ -24,9 +27,13 @@ from pipelex.hosted.error_rendering import (
     describe_hosted_error,
     hosted_refusal_next_step,
 )
+from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunPollingError
 from tests.unit.pipelex.hosted.test_data import HostedRefusals
 
 API_URL = "https://api.test"
+LABELLED_ITEM = ValidationErrorItem.model_validate(
+    {"category": "blueprint_validation", "message": "unknown concept Foo", "source": "lib/b.mthds", "pipe_code": "step2"}
+)
 
 
 def _refusal(*, status: int, body: str) -> ApiResponseError:
@@ -144,3 +151,68 @@ class TestHostedErrorRendering:
         view = describe_hosted_error(error=error)
 
         assert PIPELEX_API_KEY_ENV_KEY in view.next_step
+
+    def test_an_upload_that_could_not_reach_the_api_points_at_the_network_and_the_origin(self) -> None:
+        unreachable = ApiUnreachableError("Could not reach Pipelex API at https://api.test (ConnectError)", api_url=API_URL, code="ConnectError")
+        error = UploadTransportError('Upload of "a.pdf" could not reach the Pipelex API (ConnectError).')
+        error.__cause__ = unreachable
+
+        view = describe_hosted_error(error=error)
+
+        assert view.error_type == "UploadTransportError"
+        assert view.error_domain == "config"
+        assert PIPELEX_BASE_URL_ENV_KEY in view.next_step
+        assert "network" in view.next_step
+
+    def test_an_upload_the_server_failed_is_a_server_fault(self) -> None:
+        error = UploadTransportError('Upload of "a.pdf" failed (502): Bad Gateway.')
+
+        view = describe_hosted_error(error=error)
+
+        assert view.next_step == HOSTED_SERVER_FAULT_NEXT_STEP
+        assert view.error_domain == "runtime"
+
+    def test_a_failed_run_carries_its_id_and_its_validation_items(self) -> None:
+        report = RunErrorReport.model_validate(
+            {"error_type": "ValidateBundleError", "message": "bundle invalid", "validation_errors": [LABELLED_ITEM.model_dump(mode="json")]}
+        )
+        error = RunFailedError("Run finished with status FAILED: bundle invalid", run_id="run_9", status=RunStatus.FAILED, error=report)
+
+        view = describe_hosted_error(error=error)
+
+        assert view.pipeline_run_id == "run_9"
+        assert view.validation_errors == (LABELLED_ITEM,)
+
+    @pytest.mark.parametrize(
+        "error",
+        [
+            RunTimeoutError("Run 'run_7' did not finish within 1200s", run_id="run_7", timeout_seconds=1200.0),
+            MissingMainStuffError("Completed run 'run_7' returned no main stuff", run_id="run_7"),
+            HostedRunPollingError("The run run_7 started on the hosted API, but following it failed", pipeline_run_id="run_7"),
+        ],
+    )
+    def test_an_error_after_the_start_names_the_run(self, error: Exception) -> None:
+        assert isinstance(error, (RunTimeoutError, MissingMainStuffError, HostedRunPollingError))
+        view = describe_hosted_error(error=error)
+
+        assert view.pipeline_run_id == "run_7"
+        assert "run_7" in view.next_step
+
+    def test_a_lost_run_is_not_reported_as_a_network_failure(self) -> None:
+        error = HostedRunPollingError("The run run_7 started on the hosted API, but following it failed", pipeline_run_id="run_7")
+
+        view = describe_hosted_error(error=error)
+
+        assert view.error_type == "HostedRunPollingError"
+        assert view.error_domain == "runtime"
+        assert "may still be running" in view.next_step
+
+    def test_a_method_that_does_not_load_carries_its_labelled_items(self) -> None:
+        error = HostedMethodInvalidError("The hosted API cannot load the method: Bundle does not load", validation_errors=[LABELLED_ITEM])
+
+        view = describe_hosted_error(error=error)
+
+        assert view.error_type == "HostedMethodInvalidError"
+        assert view.error_domain == "input"
+        assert view.validation_errors == (LABELLED_ITEM,)
+        assert view.pipeline_run_id is None

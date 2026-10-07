@@ -14,7 +14,8 @@ from typing import TYPE_CHECKING, Any, NoReturn, cast
 from mthds.protocol.exceptions import PipelineRequestError
 from pipelex_sdk.errors import ApiResponseError, RunFailedError
 
-from pipelex.base_exceptions import PipelexError
+from pipelex.base_exceptions import PipelexConfigError, PipelexError
+from pipelex.cli.agent_cli.commands.agent_cli_factory import AGENT_INIT_FAILURE_HINT
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
     agent_error,
@@ -24,6 +25,7 @@ from pipelex.cli.agent_cli.commands.agent_output import (
 from pipelex.cli.agent_cli.commands.run._output_helpers import build_run_output, format_run_markdown
 from pipelex.hosted.client_factory import make_hosted_client
 from pipelex.hosted.error_rendering import describe_hosted_error
+from pipelex.hosted.exceptions import HostedRunError
 from pipelex.hosted.execution import resolve_run_execution
 from pipelex.hosted.hosted_run import HostedRunOutcome, HostedRunRequest, run_hosted
 from pipelex.hosted.run_config import RunExecution
@@ -53,6 +55,9 @@ def resolve_agent_run_execution(*, runner: RunExecution | None, hosted: bool | N
         agent_error(f"--runner {runner} contradicts --{from_flag}: name one place for the run to execute", error_type="ArgumentError")
     try:
         execution = resolve_run_execution(requested=requested)
+    except PipelexConfigError as exc:
+        # The same configuration a local boot reads, so the same next step a failed boot gives.
+        agent_error(exc.message, error_type=type(exc).__name__, cause=exc, hint=AGENT_INIT_FAILURE_HINT)
     except PipelexError as exc:
         agent_error(exc.message, error_type=type(exc).__name__, cause=exc)
     if base_url is not None and not execution.is_hosted:
@@ -74,13 +79,15 @@ def refuse_local_only_flags(*, dry_run: bool, mock_inputs: bool) -> None:
         )
 
 
-def agent_error_hosted(*, error: PipelineRequestError) -> NoReturn:
+def agent_error_hosted(*, error: PipelineRequestError | HostedRunError) -> NoReturn:
     """Report a hosted run's failure in the agent error envelope.
 
     A refusal the hosted API answered carries its problem document and goes through `agent_error_api_response`, whose
-    envelope matches a local failure's. A run that started and failed carries its stored error report: its class, its
-    reason, its next step and its domain. Every other failure the SDK raises (an unreachable API, an upload that
-    failed, a run past the wait) is reported with the next step `pipelex.hosted.error_rendering` gives it.
+    envelope matches a local failure's. Every other failure is reported as `pipelex.hosted.error_rendering` reads it,
+    the view the human CLI prints: its class, its reason, its next step and its domain, the run's `pipeline_run_id`
+    once the hosted API acknowledged the run (a run that failed, outlived the wait or was lost on the way), and the
+    `validation_errors` of a method that does not load. A run that started and failed adds its stored report's status,
+    category, model and provider.
     """
     if isinstance(error, ApiResponseError):
         agent_error_api_response(error=error)
@@ -90,15 +97,16 @@ def agent_error_hosted(*, error: PipelineRequestError) -> NoReturn:
         extra["error_domain"] = str(view.error_domain)
     if view.retryable:
         extra["retryable"] = True
+    if view.pipeline_run_id is not None:
+        extra["pipeline_run_id"] = view.pipeline_run_id
+    if view.validation_errors:
+        extra["validation_errors"] = [item.model_dump(mode="json", exclude_none=True) for item in view.validation_errors]
     if isinstance(error, RunFailedError):
-        extra["pipeline_run_id"] = error.run_id
         extra["run_status"] = str(error.status)
         report = error.error
         if report is not None:
             reported = {"error_category": report.error_category, "model": report.model, "provider": report.provider}
             extra.update({field_name: value for field_name, value in reported.items() if value})
-            if report.validation_errors:
-                extra["validation_errors"] = [item.model_dump(mode="json") for item in report.validation_errors]
     agent_error(view.message, error_type=view.error_type, cause=error, **extra)
 
 
@@ -138,7 +146,10 @@ def run_hosted_for_agent(*, request: HostedRunRequest, base_url: str | None, wit
         agent_error(exc.message, error_type=type(exc).__name__, cause=exc)
     try:
         outcome = asyncio.run(_start_and_wait(client=client, request=request))
-    except PipelineRequestError as exc:
+    except (PipelineRequestError, HostedRunError) as exc:
         agent_error_hosted(error=exc)
+    except Exception as exc:  # ruff: ignore[blind-except]
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
+        agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
     result = build_hosted_run_output(outcome=outcome, with_memory=with_memory)
     agent_success_formatted(result, markdown_renderer=functools.partial(format_run_markdown, with_memory=with_memory), output_format=output_format)

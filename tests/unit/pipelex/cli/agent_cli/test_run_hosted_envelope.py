@@ -12,17 +12,25 @@ from typing import TYPE_CHECKING, Any
 import pytest
 import typer
 from pipelex_sdk.error_models import RunErrorReport
-from pipelex_sdk.errors import RunFailedError
+from pipelex_sdk.errors import MissingMainStuffError, RunFailedError, RunTimeoutError
 from pipelex_sdk.runs import RunResults, RunStatus
 from pipelex_sdk.upload import UploadRecord
+from pipelex_sdk.validation_models import ValidationErrorItem
+from pydantic import ValidationError
 
+from pipelex.base_exceptions import PipelexConfigError
+from pipelex.cli.agent_cli.commands.agent_cli_factory import AGENT_INIT_FAILURE_HINT
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
+from pipelex.cli.agent_cli.commands.run.bundle_cmd import run_bundle_cmd
 from pipelex.cli.agent_cli.commands.run.method_cmd import run_method_cmd
 from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
-from pipelex.hosted.hosted_run import HostedRunOutcome
+from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunPollingError
+from pipelex.hosted.hosted_run import HostedRunOutcome, HostedRunRequest
 from pipelex.hosted.run_config import RunExecution
+from pipelex.system.environment import PIPELEXPATH_ENV_KEY
 
 if TYPE_CHECKING:
+    from pathlib import Path
     from unittest.mock import AsyncMock
 
     from pytest_mock import MockerFixture
@@ -126,3 +134,81 @@ class TestRunHostedEnvelope:
         assert envelope["model"] == "claude-5.5-sonnet"
         assert envelope["pipeline_run_id"] == "run_9"
         assert envelope["run_status"] == "FAILED"
+
+    def test_an_unexpected_failure_is_an_envelope(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+        """A failure no hosted arm names, such as a results body that drifted, still leaves as the JSON envelope."""
+        with pytest.raises(ValidationError) as drift:
+            RunResults.model_validate({"main_stuff": 1})
+        mocker.patch(f"{AGENT_RUN_HOSTED_MODULE}.run_hosted", new=mocker.AsyncMock(side_effect=drift.value))
+
+        with pytest.raises(typer.Exit) as exc_info:
+            run_method_cmd(name=METHOD_REF, runner=RunExecution.HOSTED, output_format=CliOutputFormat.JSON)
+
+        assert exc_info.value.exit_code == 1
+        envelope = json.loads(capsys.readouterr().err)
+        assert envelope["error"] is True
+        assert envelope["error_type"] == "ValidationError"
+
+    @pytest.mark.parametrize(
+        "error",
+        [
+            RunTimeoutError("Run 'run_7' did not finish within 1200s", run_id="run_7", timeout_seconds=1200.0),
+            MissingMainStuffError("Completed run 'run_7' returned no main stuff", run_id="run_7"),
+            HostedRunPollingError("The run run_7 started on the hosted API, but following it failed", pipeline_run_id="run_7"),
+        ],
+    )
+    def test_an_error_after_the_start_carries_the_run_id(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], error: Exception) -> None:
+        mocker.patch(f"{AGENT_RUN_HOSTED_MODULE}.run_hosted", new=mocker.AsyncMock(side_effect=error))
+
+        with pytest.raises(typer.Exit):
+            run_method_cmd(name=METHOD_REF, runner=RunExecution.HOSTED, output_format=CliOutputFormat.JSON)
+
+        envelope = json.loads(capsys.readouterr().err)
+        assert envelope["error_type"] == type(error).__name__
+        assert envelope["pipeline_run_id"] == "run_7"
+        assert "run_7" in envelope["hint"]
+
+    def test_a_method_that_does_not_load_lists_its_labelled_items(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+        item = ValidationErrorItem.model_validate(
+            {"category": "blueprint_validation", "message": "unknown concept Foo", "source": "lib/b.mthds", "pipe_code": "step2"}
+        )
+        refused = HostedMethodInvalidError("The hosted API cannot load the method: Bundle does not load", validation_errors=[item])
+        mocker.patch(f"{AGENT_RUN_HOSTED_MODULE}.run_hosted", new=mocker.AsyncMock(side_effect=refused))
+
+        with pytest.raises(typer.Exit):
+            run_method_cmd(name=METHOD_REF, runner=RunExecution.HOSTED, output_format=CliOutputFormat.JSON)
+
+        envelope = json.loads(capsys.readouterr().err)
+        assert envelope["error_type"] == "HostedMethodInvalidError"
+        assert envelope["error_domain"] == "input"
+        assert envelope["validation_errors"][0]["source"] == "lib/b.mthds"
+        assert envelope["validation_errors"][0]["message"] == "unknown concept Foo"
+
+    def test_a_configuration_that_cannot_be_read_gives_the_boot_hint(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+        """Reading `[run] execution` meets the configuration a local boot meets, and says what a local boot says."""
+        mocker.patch(f"{EXECUTION_MODULE}.configured_run_execution", side_effect=PipelexConfigError("pipelex.toml is invalid"))
+
+        with pytest.raises(typer.Exit):
+            run_method_cmd(name=METHOD_REF, output_format=CliOutputFormat.JSON)
+
+        envelope = json.loads(capsys.readouterr().err)
+        assert envelope["error_type"] == "PipelexConfigError"
+        assert envelope["hint"] == AGENT_INIT_FAILURE_HINT
+
+    def test_a_bundle_file_without_a_library_sends_pipelexpath(
+        self, monkeypatch: pytest.MonkeyPatch, run_hosted: AsyncMock, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        bundle_path = tmp_path / "bundle.mthds"
+        bundle_path.write_text('domain = "probe"\nmain_pipe = "entry"\n', encoding="utf-8")
+        shared_dir = tmp_path / "shared"
+        shared_dir.mkdir()
+        (shared_dir / "shared.mthds").write_text('domain = "probe_lib"\n', encoding="utf-8")
+        monkeypatch.setenv(PIPELEXPATH_ENV_KEY, str(shared_dir))
+
+        run_bundle_cmd(path=str(bundle_path), pipe="entry", runner=RunExecution.HOSTED, output_format=CliOutputFormat.JSON)
+
+        capsys.readouterr()
+        assert run_hosted.await_args is not None
+        request = run_hosted.await_args.kwargs["request"]
+        assert isinstance(request, HostedRunRequest)
+        assert [mthds_file.source for mthds_file in request.mthds_files or []] == [str(bundle_path), str(shared_dir / "shared.mthds")]

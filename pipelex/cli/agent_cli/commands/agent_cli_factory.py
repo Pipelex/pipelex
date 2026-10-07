@@ -127,6 +127,10 @@ AGENT_CLI_CONFIG_OVERRIDES: Mapping[str, Any] = MappingProxyType(
 )
 
 
+#: The next step of a boot that failed, and of any other failure to read this machine's configuration.
+AGENT_INIT_FAILURE_HINT = "Initialization failed. Run 'pipelex-agent doctor' to diagnose, or 'pipelex init config' to reset configuration"
+
+
 def apply_agent_cli_output_discipline() -> None:
     """Reaffirm the agent CLI output contract on the Rich/hub channels post-init.
 
@@ -218,7 +222,7 @@ def make_pipelex_for_agent_cli(*, library_dirs: list[str] | list[Path] | None = 
             f"Pipelex initialization failed: {exc}",
             error_type=type(exc).__name__,
             cause=exc,
-            hint="Initialization failed. Run 'pipelex-agent doctor' to diagnose, or 'pipelex init config' to reset configuration",
+            hint=AGENT_INIT_FAILURE_HINT,
         )
 
     # Silence pipelex logs and Rich pretty-printing so the agent CLI emits only the

@@ -4,12 +4,13 @@ Both CLIs resolve a hosted run's source here, so `pipelex run --hosted` and `pip
 send the same thing for the same arguments:
 
 - `run bundle` sends the bundle file, then every `.mthds` file in the library directories a local run would load
-  (the bundle's own directory when the target is one, then `-L`), each file once.
+  (the bundle's own directory when the target is one, then `-L`; with neither, `PIPELEXPATH`), each file once.
 - `run pipe` sends every `.mthds` file in its library directories: the installed method exporting the pipe and
   `-L`, else `PIPELEXPATH`. With none of them there is nothing to send, and the run is refused.
 - `run method` names a published address as `method_ref` and a stored method's catalog id (`mt_…`) as `method_id`,
   both resolved by the hosted API, so nothing is fetched or read here. An installed method's name or a local
-  method directory is resolved as a local run resolves it, and its files are sent.
+  method directory is resolved as a local run resolves it, and its files are sent; an installed method wins over a
+  catalog id spelled the same, since `mt_reports` is a valid method name too.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ from typing import TYPE_CHECKING
 from pipelex_sdk.crate_models import MthdsFileItem
 from pydantic import BaseModel, ConfigDict
 
+from pipelex.cli.installed_methods import DuplicateMethodNameError, MethodNotFoundError, find_method_by_name
 from pipelex.cli.method_resolver import method_output_base_dir, resolve_method_target
 from pipelex.hosted.exceptions import HostedRunSourceError
 from pipelex.hosted.execution import get_or_load_pipelex_config
@@ -37,8 +39,33 @@ METHOD_ID_PATTERN = re.compile(r"^mt_[A-Za-z0-9_-]{1,64}$")
 
 
 def looks_like_method_id(target: str) -> bool:
-    """Whether a `run method` target is a stored method's catalog id (`mt_…`) rather than an installed method's name."""
+    """Whether a `run method` target is spelled as a stored method's catalog id (`mt_…`).
+
+    The spelling alone does not decide it: a method may be installed under such a name, and then that method is the
+    target. `resolve_hosted_method_target` checks.
+    """
     return METHOD_ID_PATTERN.fullmatch(target) is not None
+
+
+def _names_an_installed_method(*, name: str, library_dirs: list[str] | None) -> bool:
+    """Whether an installed method, or one in the library directories, bears this name; several count, and are refused later."""
+    try:
+        find_method_by_name(name, library_dirs=library_dirs)
+    except MethodNotFoundError:
+        return False
+    except DuplicateMethodNameError:
+        return True
+    return True
+
+
+def hosted_library_dirs(*, library_dirs: Sequence[str] | None) -> Sequence[str | Path] | None:
+    """The library directories a local run would load: `-L` when given, which replaces `PIPELEXPATH`, else `PIPELEXPATH`.
+
+    `None` when neither names any.
+    """
+    if library_dirs is not None:
+        return library_dirs
+    return get_pipelexpath_dirs()
 
 
 def collect_mthds_files(*, primary: Path | None, library_dirs: Sequence[str | Path] | None) -> list[MthdsFileItem]:
@@ -46,8 +73,8 @@ def collect_mthds_files(*, primary: Path | None, library_dirs: Sequence[str | Pa
 
     A library directory is scanned recursively, skipping the configured `[interpreter.scan] excluded_dirs`, as a
     local load scans it; a library entry naming a `.mthds` file is taken as it is; a missing one is skipped, as a
-    local load skips it. Each file carries its path as the provenance label the hosted API threads into its
-    diagnostics.
+    local load skips it. Each file carries its path as its label: the hosted API names it in the validation errors
+    of the method's signature, read before the run, while the run route takes the bare contents.
 
     Raises:
         HostedRunSourceError: If a file cannot be read.
@@ -86,7 +113,7 @@ def hosted_pipe_library_files(*, library_dirs: Sequence[str] | None) -> list[Mth
     Raises:
         HostedRunSourceError: If no directory names a library, or the ones named hold no `.mthds` file.
     """
-    effective_dirs: Sequence[str | Path] | None = library_dirs or get_pipelexpath_dirs()
+    effective_dirs = hosted_library_dirs(library_dirs=library_dirs or None)
     if not effective_dirs:
         msg = (
             f"A hosted pipe run sends the library that defines the pipe, and none is named: pass -L <dir> (repeatable), "
@@ -127,7 +154,7 @@ def resolve_hosted_method_target(*, name: str, pipe_override: str | None, librar
 
     Args:
         name: A catalog id (`mt_…`), a method address or GitHub URL, an installed method's name, or a local method
-            directory.
+            directory. A name spelled as a catalog id that an installed method bears is that method.
         pipe_override: `--pipe`.
         library_dirs: `-L`, sent along with a local method's files. A method the hosted API resolves loads no local
             library, so `-L` is refused with one.
@@ -140,7 +167,7 @@ def resolve_hosted_method_target(*, name: str, pipe_override: str | None, librar
     cwd = Path.cwd()
     remote_ref: str | None = None
     remote_id: str | None = None
-    if looks_like_method_id(name):
+    if looks_like_method_id(name) and not _names_an_installed_method(name=name, library_dirs=library_dirs):
         remote_id = name
     elif looks_like_method_ref(name):
         remote_ref = parse_method_ref(name).ref_str

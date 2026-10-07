@@ -111,7 +111,9 @@ GoogleLLMWorkerError | Google LLM worker | https://docs.pipelex.com/latest/error
 GraphSpecError | Graph spec | https://docs.pipelex.com/latest/errors/graph-spec-error/
 GraphSpecValidationError | Graph spec validation | https://docs.pipelex.com/latest/errors/graph-spec-validation-error/
 HostedBaseUrlError | Hosted base url | https://docs.pipelex.com/latest/errors/hosted-base-url-error/
+HostedMethodInvalidError | Hosted method invalid | https://docs.pipelex.com/latest/errors/hosted-method-invalid-error/
 HostedRunError | Hosted run error | https://docs.pipelex.com/latest/errors/hosted-run-error/
+HostedRunPollingError | Hosted run polling | https://docs.pipelex.com/latest/errors/hosted-run-polling-error/
 HostedRunSourceError | Hosted run source | https://docs.pipelex.com/latest/errors/hosted-run-source-error/
 HubSlotAlreadyClaimedError | Hub slot already claimed | https://docs.pipelex.com/latest/errors/hub-slot-already-claimed-error/
 ImageContentError | Image content | https://docs.pipelex.com/latest/errors/image-content-error/

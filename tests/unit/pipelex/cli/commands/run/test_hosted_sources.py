@@ -9,6 +9,7 @@ import pytest
 
 from pipelex.cli.commands.run._hosted_sources import (
     collect_mthds_files,
+    hosted_library_dirs,
     hosted_pipe_library_files,
     looks_like_method_id,
     resolve_hosted_method_target,
@@ -20,6 +21,28 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 SOURCES_MODULE = "pipelex.cli.commands.run._hosted_sources"
+
+
+MT_REPORTS_MANIFEST = """[package]
+address = "github.com/acme/reports"
+version = "1.0.0"
+description = "Reports"
+name = "mt_reports"
+main_pipe = "shout"
+
+[exports.reports]
+pipes = ["shout"]
+"""
+MT_REPORTS_BUNDLE = """domain = "reports"
+main_pipe = "shout"
+
+[pipe.shout]
+type = "PipeLLM"
+description = "Shout"
+inputs = { text = "Text" }
+output = "Text"
+prompt = "Shout $text"
+"""
 
 
 def _write(*, path: Path, content: str) -> Path:
@@ -101,3 +124,35 @@ class TestHostedSources:
         assert target.pipe_code == "summarize"
         assert target.output_base_dir == method_dir
         assert target.inputs_anchor_dir == method_dir
+
+    def test_an_installed_method_named_like_a_catalog_id_is_the_installed_method(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        """`mt_reports` is a valid method name: the installed method wins, as a local run would run it."""
+        method_dir = tmp_path / ".mthds" / "methods" / "mt_reports"
+        _write(path=method_dir / "METHODS.toml", content=MT_REPORTS_MANIFEST)
+        _write(path=method_dir / "bundle.mthds", content=MT_REPORTS_BUNDLE)
+        monkeypatch.chdir(tmp_path)
+
+        target = resolve_hosted_method_target(name="mt_reports", pipe_override=None, library_dirs=None)
+
+        assert target.method_id is None
+        assert [mthds_file.content for mthds_file in target.mthds_files or []] == [MT_REPORTS_BUNDLE]
+        assert target.pipe_code == "shout"
+
+    def test_a_catalog_id_no_installed_method_bears_is_sent_as_an_id(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        monkeypatch.chdir(tmp_path)
+
+        target = resolve_hosted_method_target(name="mt_reports", pipe_override=None, library_dirs=None)
+
+        assert target.method_id == "mt_reports"
+        assert target.mthds_files is None
+
+    def test_the_library_of_a_run_is_its_library_dirs_else_pipelexpath(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        """As a local run loads it: `-L` replaces PIPELEXPATH, and PIPELEXPATH is read only without it."""
+        monkeypatch.setenv(PIPELEXPATH_ENV_KEY, str(tmp_path / "shared"))
+
+        assert hosted_library_dirs(library_dirs=["lib"]) == ["lib"]
+        assert hosted_library_dirs(library_dirs=[]) == []
+        assert hosted_library_dirs(library_dirs=None) == [tmp_path / "shared"]
+
+        monkeypatch.delenv(PIPELEXPATH_ENV_KEY)
+        assert hosted_library_dirs(library_dirs=None) is None

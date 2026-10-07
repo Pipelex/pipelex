@@ -5,16 +5,25 @@ from typing import TYPE_CHECKING, Any
 import httpx
 import pytest
 from mthds.protocol.input_form import PipeInputFormDescriptor
+from mthds.protocol.models import VersionInfo
 from pipelex_sdk.client import PipelexAPIClient
 from pipelex_sdk.crate_models import CrateInvalidReport, MthdsFileItem, PipeIORequest, PipeIOValidReport
-from pipelex_sdk.errors import ApiUnreachableError
+from pipelex_sdk.errors import (
+    ApiUnreachableError,
+    MissingMainStuffError,
+    RunFailedError,
+    RunLifecycleUnavailableError,
+    RunTimeoutError,
+)
 from pipelex_sdk.prepare_inputs import PreparedInputs
-from pipelex_sdk.runs import RunResults
+from pipelex_sdk.runs import PipelexRunResultStart, RunResults, RunStatus
 from pipelex_sdk.upload import UploadRecord
+from pipelex_sdk.validation_models import ValidationErrorItem
 from pydantic import ValidationError
 
+from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunPollingError
 from pipelex.hosted.hosted_run import HostedRunRequest, run_hosted
-from tests.unit.pipelex.hosted.test_data import HostedDescriptors
+from tests.unit.pipelex.hosted.test_data import HostedDescriptors, HostedVersions
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -24,6 +33,9 @@ if TYPE_CHECKING:
 
 BUNDLE_FILE = MthdsFileItem(content='domain = "probe"\n', source="probe.mthds")
 DOCUMENT_METHOD_REF = "github.com/Pipelex/methods/documents@v0.1.7"
+HOSTED_RUN_MODULE = "pipelex.hosted.hosted_run"
+RUN_ID = "run_1"
+DONE = RunResults(pipeline_run_id=RUN_ID, main_stuff={"text": "done"})
 
 
 def _valid_report(*, pipe_ref: str, descriptor_json: str) -> PipeIOValidReport:
@@ -41,9 +53,15 @@ def _valid_report(*, pipe_ref: str, descriptor_json: str) -> PipeIOValidReport:
     )
 
 
-def _mocked_client(mocker: MockerFixture, *, pipe_io_report: PipeIOValidReport | CrateInvalidReport | None = None) -> MagicMock:
+def _mocked_client(
+    mocker: MockerFixture, *, pipe_io_report: PipeIOValidReport | CrateInvalidReport | None = None, version: str = HostedVersions.HOSTED
+) -> MagicMock:
+    """A client whose handshake names `version`, whose start is acknowledged as `RUN_ID`, and whose run completes."""
     client: MagicMock = mocker.create_autospec(PipelexAPIClient, instance=True)
-    client.start_and_wait.return_value = RunResults(pipeline_run_id="run_1", main_stuff={"text": "done"})
+    client.base_url = "https://hosted.test"
+    client.version.return_value = VersionInfo.model_validate_json(version)
+    client.start.return_value = PipelexRunResultStart(pipeline_run_id=RUN_ID)
+    client.wait_for_result.return_value = DONE
     if pipe_io_report is not None:
         client.pipe_io.return_value = pipe_io_report
     return client
@@ -58,7 +76,7 @@ class TestHostedRun:
 
         outcome = await run_hosted(client=client, request=request)
 
-        client.start_and_wait.assert_awaited_once_with(
+        client.start.assert_awaited_once_with(
             pipe_code="entry",
             mthds_contents=[BUNDLE_FILE.content],
             inputs=None,
@@ -66,6 +84,7 @@ class TestHostedRun:
             method_ref=None,
             method_id=None,
         )
+        client.wait_for_result.assert_awaited_once_with(RUN_ID)
         client.pipe_io.assert_not_awaited()
         client.prepare_inputs.assert_not_awaited()
         assert outcome.results.pipeline_run_id == "run_1"
@@ -94,7 +113,7 @@ class TestHostedRun:
 
         await run_hosted(client=client, request=request)
 
-        client.start_and_wait.assert_awaited_once_with(
+        client.start.assert_awaited_once_with(
             pipe_code=None,
             mthds_contents=None,
             inputs=None,
@@ -115,7 +134,7 @@ class TestHostedRun:
 
         client.pipe_io.assert_awaited_once_with(PipeIORequest(method_ref="github.com/Pipelex/methods/text_stats@v0.1.7"))
         client.prepare_inputs.assert_not_awaited()
-        assert client.start_and_wait.await_args.kwargs["inputs"] == inputs
+        assert client.start.await_args.kwargs["inputs"] == inputs
         assert outcome.pipe_ref == HostedDescriptors.TEXT_ONLY_PIPE_REF
 
     @pytest.mark.asyncio
@@ -143,23 +162,117 @@ class TestHostedRun:
             pipe_ref=HostedDescriptors.MIXED_FILE_POSITIONS_PIPE_REF,
             inputs={"document": str(tmp_path / "docs" / "invoice.pdf"), "notes": "see attached"},
         )
-        assert client.start_and_wait.await_args.kwargs["inputs"] == prepared_inputs
+        assert client.start.await_args.kwargs["inputs"] == prepared_inputs
         assert outcome.uploads == [upload]
         assert outcome.pipe_ref == HostedDescriptors.MIXED_FILE_POSITIONS_PIPE_REF
 
     @pytest.mark.asyncio
-    async def test_a_method_that_does_not_load_runs_unprepared_so_the_run_says_why(self, mocker: MockerFixture) -> None:
-        """Preparation has no signature to walk; the run route refuses the method with its own located diagnostics."""
-        invalid = CrateInvalidReport(is_valid=False, validation_errors=[], message="Bundle does not load")
+    async def test_a_method_that_does_not_load_is_refused_before_the_run_with_its_labelled_items(self, mocker: MockerFixture) -> None:
+        """pipe-io's verdict names each file by the label it was sent under; `/v1/start` takes bare contents and could not."""
+        item = ValidationErrorItem.model_validate(
+            {"category": "blueprint_validation", "message": "unknown concept Foo", "source": "lib/b.mthds", "pipe_code": "step2"}
+        )
+        invalid = CrateInvalidReport(is_valid=False, validation_errors=[item], message="Bundle does not load")
         client = _mocked_client(mocker, pipe_io_report=invalid)
-        inputs = {"document": "invoice.pdf"}
-        request = HostedRunRequest(mthds_files=[BUNDLE_FILE], inputs=inputs)
+        request = HostedRunRequest(mthds_files=[BUNDLE_FILE], inputs={"document": "invoice.pdf"})
 
-        outcome = await run_hosted(client=client, request=request)
+        with pytest.raises(HostedMethodInvalidError) as exc_info:
+            await run_hosted(client=client, request=request)
 
+        assert exc_info.value.validation_errors == [item]
+        assert "Bundle does not load" in exc_info.value.message
         client.prepare_inputs.assert_not_awaited()
-        assert client.start_and_wait.await_args.kwargs["inputs"] == inputs
-        assert outcome.pipe_ref is None
+        client.start.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "follow_error",
+        [
+            ApiUnreachableError(
+                "Could not reach Pipelex API at https://hosted.test (ConnectError)", api_url="https://hosted.test", code="ConnectError"
+            ),
+            httpx.RemoteProtocolError("server disconnected"),
+        ],
+    )
+    async def test_a_failure_while_following_a_started_run_keeps_its_id(self, mocker: MockerFixture, follow_error: Exception) -> None:
+        """A paid run that is still going is not reported as a plain network failure: the error names it."""
+        client = _mocked_client(mocker)
+        client.wait_for_result.side_effect = follow_error
+
+        with pytest.raises(HostedRunPollingError) as exc_info:
+            await run_hosted(client=client, request=HostedRunRequest(mthds_files=[BUNDLE_FILE]))
+
+        error = exc_info.value
+        assert error.pipeline_run_id == RUN_ID
+        assert error.__cause__ is follow_error
+        assert RUN_ID in error.message
+        assert error.user_action is not None
+        assert RUN_ID in error.user_action.detail
+
+    @pytest.mark.asyncio
+    async def test_a_results_body_that_does_not_parse_keeps_the_run_id(self, mocker: MockerFixture) -> None:
+        """A drift in the results body fails after the run completed: the run id still locates it."""
+        with pytest.raises(ValidationError) as drift:
+            RunResults.model_validate({"main_stuff": 1})
+        client = _mocked_client(mocker)
+        client.wait_for_result.side_effect = drift.value
+
+        with pytest.raises(HostedRunPollingError) as exc_info:
+            await run_hosted(client=client, request=HostedRunRequest(mthds_files=[BUNDLE_FILE]))
+
+        assert exc_info.value.pipeline_run_id == RUN_ID
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "terminal_error",
+        [
+            RunFailedError("Run finished with status FAILED: boom", run_id=RUN_ID, status=RunStatus.FAILED),
+            RunTimeoutError(f"Run '{RUN_ID}' did not finish within 1200s", run_id=RUN_ID, timeout_seconds=1200.0),
+            MissingMainStuffError(f"Completed run '{RUN_ID}' returned no main stuff", run_id=RUN_ID),
+        ],
+    )
+    async def test_an_error_that_names_the_run_already_is_raised_as_it_is(self, mocker: MockerFixture, terminal_error: Exception) -> None:
+        client = _mocked_client(mocker)
+        client.wait_for_result.side_effect = terminal_error
+
+        with pytest.raises(type(terminal_error)) as exc_info:
+            await run_hosted(client=client, request=HostedRunRequest(mthds_files=[BUNDLE_FILE]))
+
+        assert exc_info.value is terminal_error
+
+    @pytest.mark.asyncio
+    async def test_a_bare_runner_runs_the_blocking_route(self, mocker: MockerFixture) -> None:
+        """A runner whose handshake names no run store is never started: it gets the blocking execute, as the SDK does."""
+        bare_version = '{"protocol_version":"0.1.0","implementation":"pipelex-api","implementation_version":"0.76.0"}'
+        client = _mocked_client(mocker, version=bare_version)
+        lift = mocker.patch(f"{HOSTED_RUN_MODULE}.results_from_execute", return_value=DONE)
+
+        outcome = await run_hosted(client=client, request=HostedRunRequest(method_ref=DOCUMENT_METHOD_REF, pipe_code="extract"))
+
+        client.start.assert_not_awaited()
+        client.execute.assert_awaited_once_with(
+            pipe_code="extract",
+            mthds_contents=None,
+            inputs=None,
+            dynamic_output_concept_ref=None,
+            method_ref=DOCUMENT_METHOD_REF,
+            method_id=None,
+        )
+        lift.assert_called_once_with(client.execute.return_value)
+        assert outcome.results is DONE
+
+    @pytest.mark.asyncio
+    async def test_a_server_without_the_run_store_falls_back_to_the_blocking_route(self, mocker: MockerFixture) -> None:
+        """A start refused for a missing run store created no run, so the blocking execute cannot run it twice."""
+        client = _mocked_client(mocker)
+        client.start.side_effect = RunLifecycleUnavailableError("no run store", api_url="https://hosted.test")
+        mocker.patch(f"{HOSTED_RUN_MODULE}.results_from_execute", return_value=DONE)
+
+        outcome = await run_hosted(client=client, request=HostedRunRequest(mthds_files=[BUNDLE_FILE]))
+
+        client.execute.assert_awaited_once()
+        client.wait_for_result.assert_not_awaited()
+        assert outcome.results is DONE
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -174,8 +287,7 @@ class TestHostedRun:
     ) -> None:
         """The SDK lets httpx's error through on the routes it inherits from mthds; the run maps it as the SDK's own routes do."""
         client = _mocked_client(mocker)
-        client.base_url = "https://hosted.test"
-        client.start_and_wait.side_effect = transport_error
+        client.start.side_effect = transport_error
 
         with pytest.raises(ApiUnreachableError) as exc_info:
             await run_hosted(client=client, request=HostedRunRequest(mthds_files=[BUNDLE_FILE]))
