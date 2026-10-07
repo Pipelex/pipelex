@@ -9,14 +9,14 @@ init command runs itself.
 from collections.abc import Mapping
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, NamedTuple, cast
 
 import tomlkit
 from rich.console import Console
 from rich.markup import escape
 
 from pipelex.cli.commands.login.api_key_store import find_pipelex_api_key
-from pipelex.cli.commands.login.command import LOGIN_PASTE_COMMAND, login_with_browser
+from pipelex.cli.commands.login.command import LOGIN_PASTE_COMMAND, login_with_browser, warn_about_shadowing_env_file
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.hosted.api_key_check import PIPELEX_API_KEY_PREFIX, is_well_formed_pipelex_api_key
 from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY
@@ -43,6 +43,19 @@ class SetupPath(StrEnum):
                 return RunExecution.HOSTED
             case SetupPath.LOCAL:
                 return RunExecution.LOCAL
+
+    @property
+    def is_hosted(self) -> bool:
+        return self.run_execution.is_hosted
+
+    @classmethod
+    def from_run_execution(cls, *, execution: RunExecution) -> "SetupPath":
+        """The path that writes this `[run] execution`."""
+        match execution:
+            case RunExecution.HOSTED:
+                return SetupPath.HOSTED
+            case RunExecution.LOCAL:
+                return SetupPath.LOCAL
 
 
 #: The path Enter takes, and the one taken when nobody is asked (`pipelex doctor --fix`).
@@ -92,16 +105,77 @@ def write_run_execution(*, pipelex_toml_path: Path, execution: RunExecution) -> 
     save_toml_to_path(document, path=pipelex_toml_path)
 
 
-def apply_setup_path_setting(*, console: Console, setup_path: SetupPath, pipelex_toml_path: Path) -> None:
-    """Write where runs execute for this setup path, and say so."""
-    write_run_execution(pipelex_toml_path=pipelex_toml_path, execution=setup_path.run_execution)
-    match setup_path:
-        case SetupPath.HOSTED:
-            where = "on the hosted Pipelex API"
-        case SetupPath.LOCAL:
-            where = "on this machine"
-    setting = escape(f'[{RUN_SECTION}] {RUN_EXECUTION_KEY} = "{setup_path.value}"')
-    console.print(f"[green]✓[/green] Runs execute {where} by default [dim]({setting} in {escape(str(pipelex_toml_path))})[/dim]")
+def describe_where_runs_execute(*, execution: RunExecution) -> str:
+    """Where runs with this execution run, in words."""
+    match execution:
+        case RunExecution.HOSTED:
+            return "on the hosted Pipelex API"
+        case RunExecution.LOCAL:
+            return "on this machine"
+
+
+def _setting_text(*, execution: RunExecution) -> str:
+    return f'[{RUN_SECTION}] {RUN_EXECUTION_KEY} = "{execution}"'
+
+
+class ProjectExecutionShadow(NamedTuple):
+    """A project's `pipelex.toml` setting another `[run] execution` than the one just written to the home directory."""
+
+    pipelex_toml_path: Path
+    execution: RunExecution
+
+
+def find_project_execution_shadow(
+    *, target_config_dir: Path, execution: RunExecution, project_config_dir: Path | None
+) -> ProjectExecutionShadow | None:
+    """The project's `pipelex.toml` when it sets another `[run] execution` than the one written to `target_config_dir`.
+
+    The project's setting wins over the home one, so a choice written globally does not apply to runs started in that
+    project. Nothing is found when there is no project configuration, when it is the target itself, or when it sets the
+    same execution or none.
+
+    Args:
+        target_config_dir: The configuration directory the setting was written to.
+        execution: The setting written there.
+        project_config_dir: The `.pipelex/` of the project around the working directory, when there is one.
+    """
+    if project_config_dir is None or project_config_dir.resolve() == target_config_dir.resolve():
+        return None
+    project_pipelex_toml_path = project_config_dir / "pipelex.toml"
+    project_execution = read_run_execution(pipelex_toml_path=project_pipelex_toml_path)
+    if project_execution is None or project_execution == execution:
+        return None
+    return ProjectExecutionShadow(pipelex_toml_path=project_pipelex_toml_path, execution=project_execution)
+
+
+def describe_project_execution_shadow(*, shadow: ProjectExecutionShadow) -> str:
+    """The warning for a project that overrides the global choice, as plain text."""
+    return (
+        f"{shadow.pipelex_toml_path} sets {_setting_text(execution=shadow.execution)}, and a project's setting wins over the "
+        f"global one: runs started in that project execute {describe_where_runs_execute(execution=shadow.execution)}. "
+        "Change it there, or pass --hosted or --local on a run."
+    )
+
+
+def apply_setup_path_setting(*, console: Console, setup_path: SetupPath, pipelex_toml_path: Path, project_config_dir: Path | None) -> None:
+    """Write where runs execute for this setup path, say so, and warn when the working directory's project overrides it.
+
+    Args:
+        console: Where to say it.
+        setup_path: The path chosen.
+        pipelex_toml_path: The `pipelex.toml` to write the setting to.
+        project_config_dir: The `.pipelex/` of the project around the working directory, when there is one.
+    """
+    execution = setup_path.run_execution
+    write_run_execution(pipelex_toml_path=pipelex_toml_path, execution=execution)
+    setting = escape(_setting_text(execution=execution))
+    console.print(
+        f"[green]✓[/green] Runs execute {describe_where_runs_execute(execution=execution)} by default "
+        f"[dim]({setting} in {escape(str(pipelex_toml_path))})[/dim]"
+    )
+    shadow = find_project_execution_shadow(target_config_dir=pipelex_toml_path.parent, execution=execution, project_config_dir=project_config_dir)
+    if shadow is not None:
+        console.print(f"[yellow]⚠ {escape(describe_project_execution_shadow(shadow=shadow))}[/yellow]")
 
 
 def ensure_pipelex_api_key(*, console: Console, interactive: bool) -> None:
@@ -121,6 +195,7 @@ def ensure_pipelex_api_key(*, console: Console, interactive: bool) -> None:
         console.print(f"[green]✓[/green] A Pipelex API key is already set ({PIPELEX_API_KEY_ENV_KEY}); hosted runs will use it.")
         if not is_well_formed_pipelex_api_key(api_key=existing_key):
             console.print(f"[yellow]⚠ It does not look like a Pipelex API key, which starts with {PIPELEX_API_KEY_PREFIX}.[/yellow]")
+        warn_about_shadowing_env_file(console=console)
         console.print("[dim]To replace it, run[/dim] [cyan]pipelex login[/cyan][dim].[/dim]")
         return
     if not interactive:

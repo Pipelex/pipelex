@@ -7,43 +7,15 @@ not wait for a browser: Enter takes the hosted Pipelex API, and the key already 
 from __future__ import annotations
 
 import json
-import stat
 import subprocess  # ruff: ignore[suspicious-subprocess-import] -- invokes the real pipelex binaries on purpose
 from pathlib import Path
 
-import pytest
-
 from pipelex.cli.commands.init.setup_path import read_run_execution
 from pipelex.hosted.run_config import RunExecution
+from tests.helpers.login_browser import TEST_KEY
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 VENV_BIN = REPO_ROOT / ".venv" / "bin"
-TEST_KEY = "plx_sk_test_not_a_secret"
-
-# Stands in for the `code` and `cursor` CLIs, reporting the Pipelex extension as installed, so init's offer to
-# install it neither prompts nor touches a real editor.
-_IDE_SHADOW_SCRIPT = '#!/bin/sh\nif [ "$1" = "--list-extensions" ]; then\n    echo "Pipelex.pipelex"\nfi\nexit 0\n'
-
-
-@pytest.fixture
-def fresh_home_env(tmp_path: Path) -> dict[str, str]:
-    """An empty `HOME`, no `PIPELEX_HOME`, a Pipelex API key, and an unreachable hosted API should anything call it."""
-    home = tmp_path / "home"
-    home.mkdir()
-    shadow_dir = tmp_path / "ide_shadow"
-    shadow_dir.mkdir()
-    for command in ("code", "cursor"):
-        script = shadow_dir / command
-        script.write_text(_IDE_SHADOW_SCRIPT, encoding="utf-8")
-        script.chmod(stat.S_IRWXU)
-    return {
-        "HOME": str(home),
-        "PATH": f"{shadow_dir}:/usr/bin:/bin",
-        "RUN_MODE": "ci_test",
-        "PIPELEX_API_KEY": TEST_KEY,
-        "PIPELEX_BASE_URL": "http://127.0.0.1:9",
-        "PIPELEX_APP_URL": "http://127.0.0.1:9",
-    }
 
 
 class TestInitHostedSubprocess:

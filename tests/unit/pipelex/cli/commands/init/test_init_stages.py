@@ -40,7 +40,7 @@ def _inspect(*, focus: InitFocus) -> InitInspection:
     return inspect_initialization(focus=focus, local=False)
 
 
-class TestInspectInitialization:
+class TestInitStages:
     @pytest.mark.parametrize("focus", [InitFocus.ALL, InitFocus.CONFIG])
     def test_a_first_setup_asks_where_runs_execute(self, config_dir: Path, focus: InitFocus) -> None:
         inspection = _inspect(focus=focus)
@@ -63,6 +63,7 @@ class TestInspectInitialization:
         assert not inspection.asks_setup_path
         assert inspection.configured_execution == RunExecution.HOSTED
         assert inspection.kept_execution == RunExecution.HOSTED
+        assert inspection.keeps_hosted_runs
 
     @pytest.mark.parametrize("focus", [InitFocus.INFERENCE, InitFocus.ROUTING, InitFocus.TELEMETRY])
     def test_the_focused_setups_never_ask(self, config_dir: Path, focus: InitFocus) -> None:
@@ -72,10 +73,8 @@ class TestInspectInitialization:
         assert not inspection.asks_setup_path
         assert inspection.kept_execution is None
 
-
-class TestChooseInitialization:
     @pytest.mark.usefixtures("config_dir")
-    def test_without_anyone_to_answer_the_hosted_default_is_taken(self, mocker: MockerFixture) -> None:
+    def test_without_anyone_to_answer_and_no_setting_the_hosted_default_is_taken(self, mocker: MockerFixture) -> None:
         prompt = mocker.patch("pipelex.cli.commands.init.command.prompt_setup_path")
         confirm = mocker.patch("pipelex.cli.commands.init.command.Confirm.ask")
 
@@ -85,6 +84,21 @@ class TestChooseInitialization:
         assert not choices.interactive
         prompt.assert_not_called()
         confirm.assert_not_called()
+
+    @pytest.mark.parametrize("configured", [RunExecution.LOCAL, RunExecution.HOSTED])
+    def test_without_anyone_to_answer_a_configured_setting_is_kept(self, config_dir: Path, mocker: MockerFixture, configured: RunExecution) -> None:
+        """`pipelex doctor --fix` installs what is missing; it never turns runs on this machine into hosted ones."""
+        write_run_execution(pipelex_toml_path=config_dir / "pipelex.toml", execution=configured)
+        prompt = mocker.patch("pipelex.cli.commands.init.command.prompt_setup_path")
+        inspection = _inspect(focus=InitFocus.CONFIG)
+        assert inspection.asks_setup_path
+
+        choices = choose_initialization(console=Console(quiet=True), inspection=inspection, skip_confirmation=True)
+
+        assert choices.setup_path is not None
+        assert choices.setup_path == SetupPath.from_run_execution(execution=configured)
+        assert choices.setup_path.run_execution == configured
+        prompt.assert_not_called()
 
     @pytest.mark.usefixtures("config_dir")
     def test_the_question_follows_the_confirmation(self, mocker: MockerFixture) -> None:

@@ -79,7 +79,12 @@ def _problem(*, status: int) -> Callable[[httpx.Request], httpx.Response]:
     return _handler
 
 
-class TestPipelexApiKeyFormat:
+class TestApiKeyCheck:
+    @pytest.fixture(autouse=True)
+    def no_hosted_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        isolate_pipelex_api_key(monkeypatch, value="plx_sk_the_environment_key")
+        monkeypatch.delenv(PIPELEX_BASE_URL_ENV_KEY, raising=False)
+
     @pytest.mark.parametrize("api_key", [TEST_KEY, "plx_sk_0123abcdef", "plx_sk_a.b~c-d_e"])
     def test_a_pipelex_api_key_is_well_formed(self, api_key: str) -> None:
         assert is_well_formed_pipelex_api_key(api_key=api_key)
@@ -87,13 +92,6 @@ class TestPipelexApiKeyFormat:
     @pytest.mark.parametrize("api_key", ["", "plx_sk_", "sk-openai", "plx_pk_abc", "plx_sk_abc def", "plx_sk_abc'", "plx_sk_abc#x", " plx_sk_abc"])
     def test_anything_else_is_not(self, api_key: str) -> None:
         assert not is_well_formed_pipelex_api_key(api_key=api_key)
-
-
-class TestCheckPipelexApiKey:
-    @pytest.fixture(autouse=True)
-    def no_hosted_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        isolate_pipelex_api_key(monkeypatch, value="plx_sk_the_environment_key")
-        monkeypatch.delenv(PIPELEX_BASE_URL_ENV_KEY, raising=False)
 
     def test_an_accepted_key_names_its_account_and_is_the_one_sent(self, mocker: MockerFixture) -> None:
         requests = _patch_client(mocker, handler=lambda request: httpx.Response(200, json=PROFILE, request=request))

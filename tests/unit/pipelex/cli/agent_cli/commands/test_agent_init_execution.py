@@ -10,7 +10,7 @@ import typer
 from typer.testing import CliRunner
 
 from pipelex.cli.agent_cli.commands.init_cmd import agent_init_cmd
-from pipelex.cli.commands.init.setup_path import read_run_execution
+from pipelex.cli.commands.init.setup_path import read_run_execution, write_run_execution
 from pipelex.hosted.run_config import RunExecution
 from pipelex.kit.paths import get_kit_configs_dir
 from tests.helpers.pipelex_api_key_env import isolate_pipelex_api_key
@@ -32,14 +32,17 @@ def target_dir(tmp_path: Path, mocker: MockerFixture, monkeypatch: pytest.Monkey
     config_manager = mocker.MagicMock()
     config_manager.project_root = project_root
     config_manager.global_config_dir = tmp_path / "home"
+    config_manager.project_config_dir = None
     mocker.patch("pipelex.cli.agent_cli.commands.init_cmd.config_manager", config_manager)
     mocker.patch("pipelex.cli.commands.init.credentials.config_manager", config_manager)
     isolate_pipelex_api_key(monkeypatch)
     return project_root / ".pipelex"
 
 
-def _init(*, config: dict[str, Any] | None) -> tuple[int, dict[str, Any]]:
+def _init(*, config: dict[str, Any] | None, global_: bool = False) -> tuple[int, dict[str, Any]]:
     args = ["--format", "json"]
+    if global_:
+        args.append("--global")
     if config is not None:
         args.extend(["--config", json.dumps(config)])
     result = CliRunner().invoke(_app, args)
@@ -99,3 +102,29 @@ class TestAgentInitExecution:
         assert exit_code != 0
         assert payload["error_type"] == "ArgumentError"
         assert not target_dir.exists()
+
+    def test_a_global_init_names_a_project_that_overrides_it(self, target_dir: Path, mocker: MockerFixture, tmp_path: Path) -> None:
+        project_pipelex_toml = target_dir / "pipelex.toml"
+        write_run_execution(pipelex_toml_path=project_pipelex_toml, execution=RunExecution.LOCAL)
+        config_manager = mocker.patch("pipelex.cli.agent_cli.commands.init_cmd.config_manager")
+        config_manager.global_config_dir = tmp_path / "home"
+        config_manager.project_config_dir = target_dir
+
+        exit_code, payload = _init(config={"execution": "hosted"}, global_=True)
+
+        assert exit_code == 0
+        assert read_run_execution(pipelex_toml_path=tmp_path / "home" / "pipelex.toml") == RunExecution.HOSTED
+        (warning,) = payload["warnings"]
+        assert str(project_pipelex_toml) in warning
+        assert 'execution = "local"' in warning
+
+    def test_a_global_init_matching_the_project_warns_nothing(self, target_dir: Path, mocker: MockerFixture, tmp_path: Path) -> None:
+        write_run_execution(pipelex_toml_path=target_dir / "pipelex.toml", execution=RunExecution.HOSTED)
+        config_manager = mocker.patch("pipelex.cli.agent_cli.commands.init_cmd.config_manager")
+        config_manager.global_config_dir = tmp_path / "home"
+        config_manager.project_config_dir = target_dir
+
+        exit_code, payload = _init(config={"execution": "hosted"}, global_=True)
+
+        assert exit_code == 0
+        assert "warnings" not in payload

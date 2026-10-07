@@ -62,7 +62,7 @@ Where should your runs execute?
 
 Enter takes the hosted Pipelex API. Your answer is written to `[run] execution` in the target `pipelex.toml`, the default every `pipelex run` and `pipelex-agent run` takes when the command passes neither `--hosted` nor `--local` (see [Run Configuration](../../configuration/config-practical/run-config.md)). A single run can always go the other way with one of those flags.
 
-- **The hosted Pipelex API** writes `execution = "hosted"` and then gets you a key: it runs [`pipelex login`](login.md), which opens the Pipelex app in your browser and saves the key it returns to `~/.pipelex/.env`. When a Pipelex API key is already set, in `PIPELEX_API_KEY` or saved in that file, it is kept and nothing opens; run `pipelex login` to replace it. No provider key is asked for, and the inference files are left as the kit ships them, since a hosted run uses none of them. If the login does not complete, the rest of the setup is kept, and `pipelex login` gets the key later.
+- **The hosted Pipelex API** writes `execution = "hosted"` and then gets you a key: it runs [`pipelex login`](login.md), which opens the Pipelex app in your browser and saves the key it returns to `~/.pipelex/.env`. When a Pipelex API key is already set, in `PIPELEX_API_KEY` or saved in that file, it is kept and nothing opens; run `pipelex login` to replace it. An empty `PIPELEX_API_KEY=` counts as no key, and a `.env` in the working directory that sets another value is named, since Pipelex loads it after the home one. No provider key is asked for, and the inference files are left as the kit ships them, since a hosted run uses none of them. If the login does not complete, the rest of the setup is kept, and `pipelex login` gets the key later.
 - **This machine** writes `execution = "local"` and runs the backend selection, routing and credential prompts described below.
 
 `pipelex init inference` configures the backends of runs on this machine and never asks this question, so it does not change where your runs execute. To switch, run `pipelex init` again, or set `[run] execution` yourself.
@@ -98,7 +98,9 @@ When you run `pipelex init`, Pipelex can guide you through:
 
 `pipelex init config` on an existing setup resets `pipelex.toml` without asking the question again, so it keeps the `[run] execution` it found, and asks for no provider key when that is `"hosted"`.
 
-`pipelex doctor --fix` installs missing configuration files with nobody there to answer: on a first setup it takes the hosted Pipelex API, writes `execution = "hosted"`, and prints `pipelex login` instead of opening a browser.
+`pipelex doctor --fix` installs missing configuration files with nobody there to answer. On a first setup it keeps the `[run] execution` the target `pipelex.toml` already sets, so runs that execute on this machine stay there, and takes the hosted Pipelex API only when no `[run] execution` is set, writing `execution = "hosted"` and printing `pipelex login` instead of opening a browser.
+
+**A project can override the global choice.** A project's `.pipelex/pipelex.toml` wins over the one in `~/.pipelex/`, and the one `pipelex init --local` copies sets `execution = "local"`. When you set up the home configuration from inside a project whose own file sets the other value, `pipelex init` warns you, naming that file: runs started in that project execute where it says, until you change it there or pass `--hosted` or `--local` on a run.
 
 ## Non-Interactive Init (`pipelex-agent init`)
 
@@ -133,7 +135,7 @@ All fields are optional:
 | `backends` | `list[str]` | Backend keys to enable (e.g. `openai`, `anthropic`, `openrouter`). Omit to keep the template's enabled backends and its routing profile, which sends each model to the first of them that serves it. |
 | `primary_backend` | `str` | Required when 2+ backends are named. Named without `backends`, it routes the template's backends to it first. |
 
-**Output:** `success`, `target_dir`, `config_files_copied` and `execution`. A local setup adds `backends_enabled` and `routing_profile`; a hosted one adds `api_key_set`, whether a Pipelex API key is set in `PIPELEX_API_KEY` or saved in `~/.pipelex/.env`, never the key itself.
+**Output:** `success`, `target_dir`, `config_files_copied` and `execution`. A local setup adds `backends_enabled` and `routing_profile`; a hosted one adds `api_key_set`, whether a Pipelex API key is set in `PIPELEX_API_KEY` or saved in `~/.pipelex/.env`, never the key itself. A `warnings` list is added when the project around the working directory sets another `[run] execution` in its own `.pipelex/pipelex.toml`, which wins over the one just written.
 
 Telemetry is not configured via `--config`: init seeds a `telemetry.toml` from a template (a global init writes an active one; a project init drops a commented-out one).
 

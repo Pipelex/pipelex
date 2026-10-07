@@ -38,7 +38,7 @@ All commands except `credentials` perform a **full reset** (overwrite existing f
 ### Inputs
 
 - **`focus`** (`InitFocus` enum): Determines which steps run. Derived from the CLI subcommand.
-- **`skip_confirmation`** (`bool`): When `True`, asks nothing: skips the confirmation, takes the hosted Pipelex API as where runs execute, and prints `pipelex login` instead of opening a browser. Used when called from `pipelex doctor --fix`.
+- **`skip_confirmation`** (`bool`): When `True`, asks nothing: skips the confirmation, keeps the `[run] execution` the target already sets, takes the hosted Pipelex API only when no `[run] execution` is set, and prints `pipelex login` instead of opening a browser. Used when called from `pipelex doctor --fix`.
 - **`local`** (`bool`): When `True`, targets the project-level `.pipelex/` directory instead of the global `~/.pipelex/`. Maps to the `--local` CLI flag.
 
 ### Outputs / Side Effects
@@ -82,7 +82,7 @@ flowchart TD
 
     FOCUS -- "all / config / inference / routing / telemetry" --> INSPECT["inspect_initialization<br/>determine_needs, first-time detection,<br/>current run execution"]
     INSPECT --> SKIP{skip_confirmation?}
-    SKIP -- "Yes (doctor --fix)" --> DEFAULT["Setup path: hosted<br/>(when the run asks it)"]
+    SKIP -- "Yes (doctor --fix)" --> DEFAULT["Setup path: the configured one,<br/>else hosted (when the run asks it)"]
     SKIP -- No --> CONFIRM{User confirms?}
     CONFIRM -- No --> CANCEL([Cancelled])
     CONFIRM -- Yes --> ASKS{asks_setup_path?}
@@ -177,7 +177,7 @@ if needs_config and is_first_time_backends_setup:
 
 ### Where Runs Execute
 
-`pipelex/cli/commands/init/setup_path.py` holds the choice: `SetupPath` (`HOSTED`, `LOCAL`), `DEFAULT_SETUP_PATH` (hosted, the answer Enter takes and the one `doctor --fix` takes), and the tomlkit edit of `[run] execution`, `write_run_execution()` and `read_run_execution()`, which keep every other line of `pipelex.toml`, comments included. The question itself is `prompt_setup_path()` in `ui/setup_path_ui.py`.
+`pipelex/cli/commands/init/setup_path.py` holds the choice: `SetupPath` (`HOSTED`, `LOCAL`), `DEFAULT_SETUP_PATH` (hosted, the answer Enter takes, and the one `doctor --fix` takes when no `[run] execution` is set; `InitInspection.unattended_setup_path` otherwise keeps the configured one), and the tomlkit edit of `[run] execution`, `write_run_execution()` and `read_run_execution()`, which keep every other line of `pipelex.toml`, comments included. The question itself is `prompt_setup_path()` in `ui/setup_path_ui.py`.
 
 - **Hosted** writes `execution = "hosted"` in Step 2, leaves the kit's inference files as copied, skips the credentials step, and, once every file is written (Step 5), calls `ensure_pipelex_api_key()`: a key already in `PIPELEX_API_KEY` or saved in the home `.env` is kept with no login and no network call; otherwise an interactive run calls `login_with_browser()` from `pipelex/cli/commands/login/` (see [`pipelex login`](../tools/cli/login.md)), and a run with nobody to answer prints `pipelex login`.
 - **Local** runs the backend and routing steps unchanged, writes `execution = "local"`, and runs the credentials step.
@@ -251,7 +251,8 @@ On the hosted path only, `ensure_pipelex_api_key()` runs last, so every file is 
 | Fresh project, full init, hosted | `all` | Copies config files | Copies templates, writes `execution = "hosted"` | Skipped (sign-in instead) | Skipped | Copies template |
 | Fresh project, full init, this machine | `all` | Copies config files | Copies templates + interactive selection, writes `execution = "local"` | Prompted | Auto (part of inference) | Copies template |
 | Fresh project, config only | `config` | Copies config files | Forced (first-time detected), asks where runs execute | Prompted on this machine | Auto on this machine | Skipped |
-| `doctor --fix`, fresh project | `config` | Copies config files | Forced, hosted taken without asking | Skipped (prints `pipelex login`) | Skipped | Skipped |
+| `doctor --fix`, fresh project, no `[run] execution` set | `config` | Copies config files | Forced, hosted taken without asking | Skipped (prints `pipelex login`) | Skipped | Skipped |
+| `doctor --fix`, fresh project, `[run] execution` set | `config` | Copies config files | Forced, the configured setting kept without asking | Prompted on this machine | Auto on this machine | Skipped |
 | Existing project, full re-init | `all` | Overwrites config files | Resets templates, asks where runs execute again | Prompted on this machine | Auto on this machine | Overwrites template |
 | Existing project, config only | `config` | Overwrites config files, keeps `[run] execution` | Skipped (backends already exist) | Prompted unless hosted | Skipped | Skipped |
 | Existing project, inference only | `inference` | Skipped | Resets templates + interactive selection | Prompted | Auto (part of inference) | Skipped |
@@ -424,6 +425,10 @@ flowchart TD
 ## Doctor Fix: Config Dir Handling
 
 `pipelex doctor` and `pipelex doctor --fix` use the config directory resolution to find and fix configuration issues wherever they live.
+
+### Where Runs Execute
+
+Once the configuration files are healthy, `resolve_doctor_run_execution()` reads the effective `[run] execution`, local when the configuration does not load. A hosted run boots nothing on this machine, so under `"hosted"` the backend credentials and models rows, which load this machine's backends, are shown as information, needed only for `--local` runs: they count toward neither the overall status nor the exit code, and no provider key is asked for. A Pipelex API Key row counts instead: `check_pipelex_api_key_set()` finds the key where a run reads it, `PIPELEX_API_KEY` and then the home `.env`, healthy when it is set and starts with `plx_sk_`, otherwise naming `pipelex login`. It makes no network call and never prints the key. `pipelex-agent doctor` reports the same: `execution` at the top level, `checks.pipelex_api_key` with a `finding` of `set`, `not_a_pipelex_key` or `missing`, and `informational: true` on the two rows it does not count.
 
 **Source:** `pipelex/cli/commands/doctor_cmd.py`
 

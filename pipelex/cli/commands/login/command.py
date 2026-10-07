@@ -17,7 +17,8 @@ from rich.console import Console
 from rich.markup import escape
 from rich.prompt import Prompt
 
-from pipelex.cli.commands.login.api_key_store import save_pipelex_api_key
+from pipelex.cli.commands.init.credentials import get_global_env_path
+from pipelex.cli.commands.login.api_key_store import find_shadowing_env_file, save_pipelex_api_key
 from pipelex.cli.commands.login.loopback import CallbackRefusal, LoopbackListener
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.hosted.api_key_check import PIPELEX_API_KEY_PREFIX, ApiKeyVerdict, check_pipelex_api_key, is_well_formed_pipelex_api_key
@@ -127,6 +128,7 @@ def check_and_save_api_key(*, console: Console, api_key: str) -> LoginOutcome:
             console.print(
                 f"[green]✓[/green] Logged in{account}. Your Pipelex API key is saved to {escape(str(env_path))} as {PIPELEX_API_KEY_ENV_KEY}."
             )
+            warn_about_shadowing_env_file(console=console)
             return LoginOutcome.SAVED
         case ApiKeyVerdict.UNCHECKED:
             env_path = save_pipelex_api_key(api_key=api_key)
@@ -135,7 +137,25 @@ def check_and_save_api_key(*, console: Console, api_key: str) -> LoginOutcome:
                 f"It is saved to {escape(str(env_path))} as {PIPELEX_API_KEY_ENV_KEY} anyway: "
                 "run pipelex login again if a hosted run refuses it.[/yellow]"
             )
+            warn_about_shadowing_env_file(console=console)
             return LoginOutcome.SAVED_UNCHECKED
+
+
+def warn_about_shadowing_env_file(*, console: Console) -> None:
+    """Say so when the working directory's `.env` sets `PIPELEX_API_KEY` to something other than the saved key.
+
+    The runtime loads that file after the home one, so commands run in this directory would send its value instead. Neither
+    value is printed.
+    """
+    shadow = find_shadowing_env_file()
+    if shadow is None:
+        return
+    what = "to an empty value" if shadow.sets_empty_value else "to another key"
+    console.print(
+        f"[yellow]⚠ {escape(str(shadow.path))} also sets {PIPELEX_API_KEY_ENV_KEY} ({what}) and is loaded after "
+        f"{escape(str(get_global_env_path()))}, so commands run in this directory send that value instead. "
+        f"Remove the {PIPELEX_API_KEY_ENV_KEY} line from it.[/yellow]"
+    )
 
 
 def _say_refusal(*, console: Console, refusal: CallbackRefusal) -> None:
@@ -168,11 +188,12 @@ def login_with_browser(*, console: Console, timeout_seconds: float | None = None
         auth_url = build_cli_auth_url(app_origin=app_origin, callback_port=listener.port, state=listener.state)
         console.print("[bold]Opening your browser to sign in to Pipelex…[/bold]")
         console.print(f"[dim]If it does not open, visit:[/dim] {escape(auth_url)}")
-        try:
-            webbrowser.open(auth_url)
-        except webbrowser.Error:
-            # The link is printed above: a machine with no usable browser still has a way through.
-            console.print("[dim]No browser could be opened here.[/dim]")
+        if not webbrowser.open(auth_url):
+            # The link is printed above, so a machine with no usable browser still has a way through.
+            console.print(
+                "[yellow]No browser could be opened here.[/yellow] Open the link above in a browser on this machine, "
+                f"or press Ctrl-C and run [cyan]{LOGIN_PASTE_COMMAND}[/cyan]."
+            )
         console.print(f"[dim]Waiting up to {int(timeout_seconds)} seconds for the key…[/dim]")
         api_key = listener.wait_for_api_key(
             timeout_seconds=timeout_seconds,

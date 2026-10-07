@@ -15,7 +15,7 @@ pipelex login --paste
 
 ## What It Does
 
-1. It opens the Pipelex app in your browser, on a page that creates a key for the command line, and prints the same link in case the browser does not open. Sign in, or create an account, on that page.
+1. It opens the Pipelex app in your browser, on a page that creates a key for the command line, and prints the same link in case the browser does not open. When no browser can be opened at all, it says so at once: open the link in a browser on this machine, or press Ctrl-C and run `pipelex login --paste`. Sign in, or create an account, on that page.
 2. The app hands the new key back to `pipelex login`, which waits for it on a port of `127.0.0.1` it opened for this one login. It waits up to five minutes.
 3. It checks the key: the key must start with `plx_sk_`, and the hosted API must accept it, which it asks by reading the account the key belongs to.
 4. It saves the key as `PIPELEX_API_KEY` in `~/.pipelex/.env` (or in the `.env` of the directory `PIPELEX_HOME` names), the file Pipelex loads into its environment at startup.
@@ -28,6 +28,8 @@ The key is never printed. The `.env` file is readable and writable by you only (
 - When the hosted API refuses it (HTTP 401 or 403), nothing is saved and the command exits with code `1`, naming the status.
 - When the key cannot be checked, because the hosted API cannot be reached or answers anything else, it is saved anyway, with a warning saying why it was not checked.
 - A value that does not start with `plx_sk_` is refused before any check.
+
+**A `.env` in the working directory wins.** Pipelex loads the `.env` of the directory a command runs in after `~/.pipelex/.env`, so a `PIPELEX_API_KEY` line there, even an empty one, is what commands run in that directory send. When that file sets another value than the key just saved, `pipelex login` names it, without printing either value: remove the line from it.
 
 **The handover is protected.** Each login sends the app a random `state` value along with the port, and the app sends it back with the key. A request to the port that does not carry this login's `state` is refused and its key discarded: any page open in your browser can send a request to a local port, so a key that arrives without it did not come from the page this login opened. The command says so in the terminal and keeps waiting.
 

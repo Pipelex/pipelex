@@ -75,6 +75,7 @@ def set_env_file_entry(*, env_path: Path, key: str, value: str) -> None:
     Creates the file and its parent directories when missing. Every assignment of `key` already in the file, an
     `export` one included, is replaced by `key=value`, so no later line can shadow it. The file is readable and
     writable by its owner only (mode 0600), before and after the write, so the value never sits in a file others can read.
+    A `.env` that is a symlink, as a dotfiles setup makes it, stays one: the write goes to the file it points to.
 
     Args:
         env_path: Path to the .env file.
@@ -86,7 +87,7 @@ def set_env_file_entry(*, env_path: Path, key: str, value: str) -> None:
     if env_path.is_file():
         # The rewrite keeps the mode it finds, so tighten it first rather than after.
         env_path.chmod(owner_only)
-    set_key(env_path, key, value, quote_mode="never")
+    set_key(env_path, key, value, quote_mode="never", follow_symlinks=True)
     env_path.chmod(owner_only)
 
 

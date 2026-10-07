@@ -164,7 +164,7 @@ These commands do not have subcommands:
 | `fmt` | Format a `.mthds`/`.toml`/`.plx` file in-place (delegates to `plxt`) |
 | `lint` | Lint a `.mthds`/`.toml`/`.plx` file for errors (delegates to `plxt`) |
 | `models` | List available model presets, aliases, and waterfalls (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
-| `doctor` | Check config, credentials, and model health (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
+| `doctor` | Check config, credentials, and model health; a hosted setup (`[run] execution = "hosted"`) is judged by its Pipelex API key, reported in `checks.pipelex_api_key`, with `execution` at the top level and the provider credentials and models rows marked `informational` (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
 
 ## Output Contract
 

@@ -127,6 +127,24 @@ class InitInspection(BaseModel):
             return self.configured_execution
         return None
 
+    @property
+    def keeps_hosted_runs(self) -> bool:
+        """Whether a reset that does not ask again keeps runs on the hosted Pipelex API, so asks for no provider key."""
+        return self.kept_execution is not None and self.kept_execution.is_hosted
+
+    @property
+    def unattended_setup_path(self) -> SetupPath | None:
+        """The path taken when nobody is asked (`pipelex doctor --fix`).
+
+        None when this run does not decide where runs execute; the one the target's `[run] execution` already sets, so
+        installing missing files never moves runs off this machine; the hosted default only when none is set.
+        """
+        if not self.asks_setup_path:
+            return None
+        if self.configured_execution is None:
+            return DEFAULT_SETUP_PATH
+        return SetupPath.from_run_execution(execution=self.configured_execution)
+
 
 class InitChoices(BaseModel):
     """What the person chose, or what was taken for them when nobody was asked."""
@@ -278,8 +296,9 @@ def choose_initialization(*, console: Console, inspection: InitInspection, skip_
     Args:
         console: Rich Console instance for user interaction.
         inspection: What stage 1 found.
-        skip_confirmation: Ask nothing (`pipelex doctor --fix`): the confirmation is skipped and the default setup
-            path, the hosted Pipelex API, is taken.
+        skip_confirmation: Ask nothing (`pipelex doctor --fix`): the confirmation is skipped, and where runs execute
+            is the one the target's `[run] execution` already sets, or the hosted Pipelex API when no `[run] execution`
+            is set.
 
     Returns:
         The choices stage 3 executes.
@@ -289,7 +308,7 @@ def choose_initialization(*, console: Console, inspection: InitInspection, skip_
     """
     if skip_confirmation:
         console.print()
-        return InitChoices(setup_path=DEFAULT_SETUP_PATH if inspection.asks_setup_path else None, interactive=False)
+        return InitChoices(setup_path=inspection.unattended_setup_path, interactive=False)
 
     confirm_initialization(
         console=console,
@@ -298,7 +317,7 @@ def choose_initialization(*, console: Console, inspection: InitInspection, skip_
         needs_routing=inspection.needs_routing,
         needs_telemetry=inspection.needs_telemetry,
         # A reset that keeps hosted runs asks for no provider key, as the execute stage skips that step.
-        check_credentials=inspection.check_credentials and inspection.kept_execution is not RunExecution.HOSTED,
+        check_credentials=inspection.check_credentials and not inspection.keeps_hosted_runs,
         reset=inspection.reset,
         focus=inspection.focus,
         asks_setup_path=inspection.asks_setup_path,
@@ -396,7 +415,12 @@ def execute_initialization(*, console: Console, inspection: InitInspection, choi
         match setup_path:
             case SetupPath.HOSTED:
                 # Hosted runs use none of this machine's backends: the kit's inference files stay as written.
-                apply_setup_path_setting(console=console, setup_path=setup_path, pipelex_toml_path=inspection.pipelex_toml_path)
+                apply_setup_path_setting(
+                    console=console,
+                    setup_path=setup_path,
+                    pipelex_toml_path=inspection.pipelex_toml_path,
+                    project_config_dir=config_manager.project_config_dir,
+                )
                 if choices.interactive:
                     _suggest_extension(console=console)
             case SetupPath.LOCAL | None:
@@ -410,10 +434,15 @@ def execute_initialization(*, console: Console, inspection: InitInspection, choi
 
                 if setup_path is not None:
                     console.print()
-                    apply_setup_path_setting(console=console, setup_path=setup_path, pipelex_toml_path=inspection.pipelex_toml_path)
+                    apply_setup_path_setting(
+                        console=console,
+                        setup_path=setup_path,
+                        pipelex_toml_path=inspection.pipelex_toml_path,
+                        project_config_dir=config_manager.project_config_dir,
+                    )
 
     # Step 2.5: Prompt for missing credentials, which only runs on this machine use
-    runs_hosted = setup_path is SetupPath.HOSTED or kept_execution is RunExecution.HOSTED
+    runs_hosted = (setup_path is not None and setup_path.is_hosted) or inspection.keeps_hosted_runs
     if inspection.check_credentials and not runs_hosted:
         prompt_credentials(console=console, backends_toml_path=backends_toml_path)
 
@@ -440,7 +469,7 @@ def execute_initialization(*, console: Console, inspection: InitInspection, choi
         setup_telemetry(console=console, telemetry_config_path=inspection.telemetry_config_path, for_project=inspection.for_project)
 
     # Step 5: Hosted runs need a key. Last, so every file is written before a sign-in that can take minutes.
-    if setup_path is SetupPath.HOSTED:
+    if setup_path is not None and setup_path.is_hosted:
         ensure_pipelex_api_key(console=console, interactive=choices.interactive)
 
     console.print()
@@ -459,8 +488,9 @@ def init_cmd(
 
     Args:
         focus: What to initialize - 'all', 'config', 'credentials', 'inference', 'routing', or 'telemetry'
-        skip_confirmation: If True, ask nothing (used when called from doctor --fix): skip the confirmation, take the
-            hosted Pipelex API as where runs execute, and print `pipelex login` instead of opening a browser.
+        skip_confirmation: If True, ask nothing (used when called from doctor --fix): skip the confirmation, keep the
+            `[run] execution` already set, take the hosted Pipelex API when no `[run] execution` is set, and print
+            `pipelex login` instead of opening a browser.
         local: If True, create project-level .pipelex/ at the detected project root.
             Otherwise, create the home configuration directory (~/.pipelex/, or PIPELEX_HOME).
     """

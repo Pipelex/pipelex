@@ -16,7 +16,7 @@ from pipelex.cli.agent_cli.commands.agent_output import (
 )
 from pipelex.cli.commands.init.backends import get_selected_backend_keys, update_backends_in_toml
 from pipelex.cli.commands.init.config_files import init_config
-from pipelex.cli.commands.init.setup_path import write_run_execution
+from pipelex.cli.commands.init.setup_path import describe_project_execution_shadow, find_project_execution_shadow, write_run_execution
 from pipelex.cli.commands.init.ui.backends_ui import get_backend_options_from_toml
 from pipelex.cli.commands.login.api_key_store import find_pipelex_api_key
 from pipelex.cogt.models.deck_manifest import stamp_kit_manifests
@@ -70,7 +70,10 @@ def _format_init_markdown(result: dict[str, Any]) -> str:
         "",
         f"**Execution:** `{result['execution']}`",
     ]
-    if result["execution"] == RunExecution.HOSTED:
+    warning_lines = [f"**Warning:** {warning}" for warning in result.get("warnings", [])]
+    if warning_lines:
+        lines.extend(["", *warning_lines])
+    if RunExecution(result["execution"]).is_hosted:
         key_line = (
             f"set in `{PIPELEX_API_KEY_ENV_KEY}`"
             if result.get("api_key_set")
@@ -110,7 +113,7 @@ def _resolve_execution(*, config: dict[str, Any]) -> RunExecution:
             f"Unknown execution: {requested!r}. Available: {', '.join(RunExecution)}",
             error_type="ArgumentError",
         )
-    if execution is RunExecution.HOSTED:
+    if execution.is_hosted:
         local_only_keys = [key for key in _LOCAL_ONLY_CONFIG_KEYS if key in config]
         if local_only_keys:
             agent_error(
@@ -455,6 +458,13 @@ def agent_init_cmd(
 
                 result_payload["backends_enabled"] = backends_enabled
                 result_payload["routing_profile"] = routing_profile
+
+        # A project's own setting wins over the one just written, so a global choice it overrides is reported
+        shadow = find_project_execution_shadow(
+            target_config_dir=target_dir, execution=execution, project_config_dir=config_manager.project_config_dir
+        )
+        if shadow is not None:
+            result_payload["warnings"] = [describe_project_execution_shadow(shadow=shadow)]
 
         # Output result
         agent_success_formatted(result_payload, markdown_renderer=_format_init_markdown, output_format=output_format)
