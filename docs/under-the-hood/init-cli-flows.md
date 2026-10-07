@@ -1,11 +1,11 @@
 ---
 title: "Init CLI Flows"
-description: "Inside the pipelex init command — how focus-based dispatch sets up config files, backends, routing profiles, and telemetry independently."
+description: "Inside the pipelex init command — its inspect, choose and execute stages, where runs execute, and how focus-based dispatch sets up config files, backends, routing profiles, and telemetry independently."
 ---
 
 # Init CLI Flows
 
-`pipelex init` sets up the `.pipelex/` configuration directory. It handles four independent concerns — config files, inference backends, routing profiles, and telemetry — through a focus-based dispatch system. Each concern owns its own file-copying and customization logic, so they can be run together or individually without interference.
+`pipelex init` sets up the `.pipelex/` configuration directory and decides where runs execute: on the hosted Pipelex API, with a Pipelex API key, or on this machine, with the user's own provider keys. It handles four independent concerns — config files, inference backends, routing profiles, and telemetry — through a focus-based dispatch system, in three stages: inspect, choose, execute. Each concern owns its own file-copying and customization logic, so they can be run together or individually without interference.
 
 ---
 
@@ -26,9 +26,9 @@ These two categories are managed by separate steps. `init_config()` copies only 
 
 | Command | Focus | What It Does |
 |---------|-------|--------------|
-| `pipelex init` | `all` | Full setup: config + inference + routing + telemetry |
-| `pipelex init config` | `config` | Copy config templates, then trigger inference if first-time |
-| `pipelex init inference` | `inference` | Interactive backend selection + routing |
+| `pipelex init` | `all` | Full setup: config, where runs execute, then inference + routing + credentials (this machine) or sign-in (hosted), then telemetry |
+| `pipelex init config` | `config` | Copy config templates, then ask where runs execute and set it up if first-time |
+| `pipelex init inference` | `inference` | Interactive backend selection + routing for runs on this machine; never asks where runs execute |
 | `pipelex init routing` | `routing` | Routing profile customization only |
 | `pipelex init telemetry` | `telemetry` | Telemetry config template copy |
 | `pipelex init credentials` | `credentials` | Credential setup for enabled backends |
@@ -38,21 +38,21 @@ All commands except `credentials` perform a **full reset** (overwrite existing f
 ### Inputs
 
 - **`focus`** (`InitFocus` enum): Determines which steps run. Derived from the CLI subcommand.
-- **`skip_confirmation`** (`bool`): When `True`, skips the interactive confirmation prompt. Used when called from `pipelex doctor --fix`.
+- **`skip_confirmation`** (`bool`): When `True`, asks nothing: skips the confirmation, takes the hosted Pipelex API as where runs execute, and prints `pipelex login` instead of opening a browser. Used when called from `pipelex doctor --fix`.
 - **`local`** (`bool`): When `True`, targets the project-level `.pipelex/` directory instead of the global `~/.pipelex/`. Maps to the `--local` CLI flag.
 
 ### Outputs / Side Effects
 
 | Artifact | Produced By | Target Dir | Path |
 |----------|-------------|------------|------|
-| `pipelex.toml` | `init_config()` | Project or global | `.pipelex/pipelex.toml` |
+| `pipelex.toml` | `init_config()`, then the setup path writes `[run] execution` | Project or global | `.pipelex/pipelex.toml` |
 | `plxt.toml` | `init_config()` | Project or global | `.pipelex/plxt.toml` |
 | `backends.toml` | Inference step | Project or global | `.pipelex/inference/backends.toml` |
 | `backends/*.toml` | Inference step | Project or global | `.pipelex/inference/backends/` |
 | `deck/*.toml` | Inference step | Project or global | `.pipelex/inference/deck/` |
 | `routing_profiles.toml` | Inference step | Project or global | `.pipelex/inference/routing_profiles.toml` |
 | `telemetry.toml` | Telemetry step | Project or global | `.pipelex/telemetry.toml` |
-| `.env` | Credentials step | **Always global** | `~/.pipelex/.env`, or `.env` under `PIPELEX_HOME` (mode 0600) |
+| `.env` | Credentials step, or the sign-in (`PIPELEX_API_KEY`) | **Always global** | `~/.pipelex/.env`, or `.env` under `PIPELEX_HOME` (mode 0600) |
 
 !!! info "Project vs global"
     Most files are written to the target directory chosen at init time (project `.pipelex/` or global `~/.pipelex/`). The exception is `.env` (credentials), which is **always** written to and read from the global directory. Wherever this page says `~/.pipelex/`, the `PIPELEX_HOME` environment variable relocates it ([Configuration](../configuration/index.md#the-home-configuration-directory-pipelex_home)).
@@ -60,6 +60,16 @@ All commands except `credentials` perform a **full reset** (overwrite existing f
 ---
 
 ## Architecture
+
+### Three Stages
+
+`init_cmd()` runs every focus but `credentials` through three functions:
+
+1. **Inspect** — `inspect_initialization(focus=, local=)` resolves the target directory, reads what is on disk and returns an `InitInspection`: which steps are needed, whether this run asks where runs execute (`asks_setup_path`), and the `[run] execution` the target `pipelex.toml` sets now (`configured_execution`). It asks nothing and writes nothing, so a check of the existing configuration, such as one for a former release's files, belongs here.
+2. **Choose** — `choose_initialization(console=, inspection=, skip_confirmation=)` shows the confirmation panel, then, when `asks_setup_path`, the question `prompt_setup_path()` asks. It returns an `InitChoices`: the `SetupPath` (`HOSTED` or `LOCAL`, `None` when this run does not decide it) and whether anyone answers prompts. A remedy that must run before that question, such as cleaning up what the inspection found, belongs at the start of this stage.
+3. **Execute** — `execute_initialization(console=, inspection=, choices=)` writes the files and runs the steps the choices call for.
+
+`asks_setup_path` is true when the run sets up inference and its focus is `all` or `config`: the full setup always, and a configuration reset only on a first setup. `inference` configures this machine's backends on purpose and never asks.
 
 ### Overall Flow
 
@@ -70,34 +80,37 @@ flowchart TD
     FOCUS -- credentials --> CREDS_DIRECT["prompt_credentials<br/>Prompt for missing API keys"]
     CREDS_DIRECT --> DONE
 
-    FOCUS -- "all / config / inference / routing / telemetry" --> NEEDS[determine_needs]
-    NEEDS --> CONFIRM{User confirms?}
+    FOCUS -- "all / config / inference / routing / telemetry" --> INSPECT["inspect_initialization<br/>determine_needs, first-time detection,<br/>current run execution"]
+    INSPECT --> SKIP{skip_confirmation?}
+    SKIP -- "Yes (doctor --fix)" --> DEFAULT["Setup path: hosted<br/>(when the run asks it)"]
+    SKIP -- No --> CONFIRM{User confirms?}
     CONFIRM -- No --> CANCEL([Cancelled])
-    CONFIRM -- Yes --> EXEC[execute_initialization]
+    CONFIRM -- Yes --> ASKS{asks_setup_path?}
+    ASKS -- Yes --> QUESTION["prompt_setup_path<br/>1 hosted (Enter) / 2 this machine"]
+    ASKS -- No --> EXEC
+    QUESTION --> EXEC
+    DEFAULT --> EXEC[execute_initialization]
 
     EXEC --> S1{needs_config?}
-    S1 -- Yes --> INITCFG["init_config()<br/>Copies non-inference files"]
-    INITCFG --> DETECT{backends.toml<br/>existed before?}
-    DETECT -- "No (first time)" --> FORCE_INF[Force needs_inference = True]
-    DETECT -- Yes --> CHK_INF{check_inference<br/>in focus?}
-    CHK_INF -- Yes --> FORCE_INF
-    CHK_INF -- No --> S2
-
+    S1 -- Yes --> INITCFG["init_config()<br/>Copies non-inference files<br/>(writes back a kept run execution)"]
     S1 -- No --> S2
-
-    FORCE_INF --> S2
+    INITCFG --> S2
 
     S2{needs_inference?}
     S2 -- Yes --> COPY_INF["Copy inference templates<br/>(backends, deck, routing)"]
-    COPY_INF --> CUST_BE[customize_backends_config<br/>Interactive backend selection]
+    COPY_INF --> PATH{setup path?}
+    PATH -- hosted --> HOSTED["Write execution = hosted<br/>Suggest IDE extension"]
+    PATH -- "local / none" --> CUST_BE[customize_backends_config<br/>Interactive backend selection]
     CUST_BE --> CHK_RT{check_routing?}
     CHK_RT -- "No (auto-route)" --> CUST_RT[customize_routing_profile<br/>Auto-routing based on selection]
-    CUST_RT --> S25
-    CHK_RT -- "Yes (focus=routing)" --> S25
+    CHK_RT -- "Yes (focus=routing)" --> LOCAL_SET
+    CUST_RT --> LOCAL_SET["Write execution = local<br/>(when the run asked)"]
+    HOSTED --> S25
+    LOCAL_SET --> S25
 
     S2 -- No --> S25
 
-    S25{check_credentials?}
+    S25{check_credentials<br/>and not hosted?}
     S25 -- Yes --> CREDS["prompt_credentials<br/>Prompt for missing API keys"]
     S25 -- No --> S3
     CREDS --> S3
@@ -110,9 +123,13 @@ flowchart TD
 
     S4{needs_telemetry?}
     S4 -- Yes --> TELEM[setup_telemetry<br/>Copy telemetry template]
-    S4 -- No --> DONE2([Done])
+    S4 -- No --> S5
+    TELEM --> S5
 
-    TELEM --> DONE2
+    S5{setup path hosted?}
+    S5 -- Yes --> KEY["ensure_pipelex_api_key<br/>key set: keep it / interactive: pipelex login /<br/>doctor --fix: print pipelex login"]
+    S5 -- No --> DONE2([Done])
+    KEY --> DONE2
 ```
 
 ---
@@ -121,7 +138,7 @@ flowchart TD
 
 ### Determine Needs
 
-`determine_needs()` evaluates the current state of `.pipelex/` to decide which steps are required:
+`determine_needs()`, called by the inspect stage, evaluates the current state of `.pipelex/` to decide which steps are required:
 
 ```python
 nb_missing_config_files = init_config(reset=False, dry_run=True) if check_config else 0
@@ -144,6 +161,29 @@ The `check_*` flags are derived from the `focus` parameter:
 !!! info "Routing is separate from inference"
     `check_routing` is only `True` for `focus=routing`. When `focus=all`, routing is handled automatically as part of the inference step (Step 2), not as a standalone step.
 
+### First-Time Inference Detection
+
+`init_config()` never copies `inference/`, so a configuration reset on a directory with no `inference/backends.toml` is a first setup. The inspect stage sets up inference too in that case, whatever the focus:
+
+```python
+if needs_config and is_first_time_backends_setup:
+    needs_inference = True
+```
+
+| Condition | Meaning | Action |
+|-----------|---------|--------|
+| `needs_config` and no `backends.toml` | First-time setup (no inference yet) | Force the inference step, and ask where runs execute |
+| `check_inference` | Inference in focus | Re-run inference (reset) |
+
+### Where Runs Execute
+
+`pipelex/cli/commands/init/setup_path.py` holds the choice: `SetupPath` (`HOSTED`, `LOCAL`), `DEFAULT_SETUP_PATH` (hosted, the answer Enter takes and the one `doctor --fix` takes), and the tomlkit edit of `[run] execution`, `write_run_execution()` and `read_run_execution()`, which keep every other line of `pipelex.toml`, comments included. The question itself is `prompt_setup_path()` in `ui/setup_path_ui.py`.
+
+- **Hosted** writes `execution = "hosted"` in Step 2, leaves the kit's inference files as copied, skips the credentials step, and, once every file is written (Step 5), calls `ensure_pipelex_api_key()`: a key already in `PIPELEX_API_KEY` or saved in the home `.env` is kept with no login and no network call; otherwise an interactive run calls `login_with_browser()` from `pipelex/cli/commands/login/` (see [`pipelex login`](../tools/cli/login.md)), and a run with nobody to answer prints `pipelex login`.
+- **Local** runs the backend and routing steps unchanged, writes `execution = "local"`, and runs the credentials step.
+
+A configuration reset that does not ask the question (`pipelex init config` on an existing setup) copies the kit's `pipelex.toml`, whose `execution` is `"local"`, so the execute stage writes back the `configured_execution` the inspection read, and skips the credentials step when that is `"hosted"`.
+
 ### Step 1: Config Step — `init_config()`
 
 Copies the config template tree from `kit/configs/` to `.pipelex/`, with two skip mechanisms:
@@ -164,26 +204,6 @@ if os.path.isdir(src_item):
     # recurse...
 ```
 
-### First-Time Inference Detection
-
-After `init_config()` runs, `execute_initialization` decides whether inference setup is needed — even if inference was not in the original focus:
-
-```python
-backends_existed_before = path_exists(backends_toml_path)
-init_config(reset=reset)
-backends_exists_now = path_exists(backends_toml_path)
-
-if not backends_existed_before or (check_inference and backends_exists_now):
-    needs_inference = True
-```
-
-This handles two scenarios:
-
-| Condition | Meaning | Action |
-|-----------|---------|--------|
-| `not backends_existed_before` | First-time setup (no inference yet) | Force inference step regardless of focus |
-| `check_inference and backends_exists_now` | Inference in focus + existing config | Re-run inference (reset) |
-
 ### Step 2: Inference Step
 
 When `needs_inference` is `True` and `reset` is `True`, the inference step copies its own template files independently:
@@ -193,16 +213,17 @@ When `needs_inference` is `True` and `reset` is `True`, the inference step copie
 3. `deck/*.toml` — model deck configurations
 4. `routing_profiles.toml` — routing profile definitions
 
-Then runs interactive customization:
+Then, on the hosted path, writes `execution = "hosted"` and offers the IDE extension, customizing nothing. On the local path, or when the run does not decide where runs execute (`focus=inference`), it runs interactive customization:
 
 1. `customize_backends_config()` — prompts user to select backends and suggests IDE extension installation via `suggest_extension_install_if_needed()`
 2. `customize_routing_profile()` — auto-configures routing based on selected backends (**only when `check_routing` is `False`**, i.e. when routing is not the specific focus)
+3. On the local path, `execution = "local"` is written
 
 When `focus=routing`, the inference step skips routing entirely because Step 3 handles it as a standalone operation.
 
 ### Step 2.5: Credentials Step
 
-When `check_credentials` is `True` (for `focus` in `all`, `config`, `inference`), `prompt_credentials()` checks which backends are enabled and prompts the user for any missing API keys. Credentials are stored in `~/.pipelex/.env` with mode 0600.
+When `check_credentials` is `True` (for `focus` in `all`, `config`, `inference`) and runs do not execute on the hosted Pipelex API, `prompt_credentials()` checks which backends are enabled and prompts the user for any missing API keys. Credentials are stored in `~/.pipelex/.env` with mode 0600.
 
 ### Step 3: Routing Step
 
@@ -217,16 +238,22 @@ Copies a telemetry template and prints instructions. No interactive prompts. Whi
 
 `setup_telemetry()` selects the template via a `for_project: bool` arg passed down from the `--local` flag on `pipelex init`.
 
+### Step 5: Pipelex API Key
+
+On the hosted path only, `ensure_pipelex_api_key()` runs last, so every file is written before a sign-in that can take minutes. A login that saves nothing leaves the setup as written and names `pipelex login`.
+
 ---
 
 ## Scenario Matrix
 
 | Scenario | Focus | Config Step | Inference Step | Credentials | Routing Step | Telemetry Step |
 |----------|-------|:-----------:|:--------------:|:-----------:|:------------:|:--------------:|
-| Fresh project, full init | `all` | Copies config files | Copies templates + interactive selection | Prompted | Auto (part of inference) | Copies template |
-| Fresh project, config only | `config` | Copies config files | Forced (first-time detected) | Prompted | Auto (part of inference) | Skipped |
-| Existing project, full re-init | `all` | Overwrites config files | Resets templates + interactive selection | Prompted | Auto (part of inference) | Overwrites template |
-| Existing project, config only | `config` | Overwrites config files | Skipped (backends already exist) | Prompted | Skipped | Skipped |
+| Fresh project, full init, hosted | `all` | Copies config files | Copies templates, writes `execution = "hosted"` | Skipped (sign-in instead) | Skipped | Copies template |
+| Fresh project, full init, this machine | `all` | Copies config files | Copies templates + interactive selection, writes `execution = "local"` | Prompted | Auto (part of inference) | Copies template |
+| Fresh project, config only | `config` | Copies config files | Forced (first-time detected), asks where runs execute | Prompted on this machine | Auto on this machine | Skipped |
+| `doctor --fix`, fresh project | `config` | Copies config files | Forced, hosted taken without asking | Skipped (prints `pipelex login`) | Skipped | Skipped |
+| Existing project, full re-init | `all` | Overwrites config files | Resets templates, asks where runs execute again | Prompted on this machine | Auto on this machine | Overwrites template |
+| Existing project, config only | `config` | Overwrites config files, keeps `[run] execution` | Skipped (backends already exist) | Prompted unless hosted | Skipped | Skipped |
 | Existing project, inference only | `inference` | Skipped | Resets templates + interactive selection | Prompted | Auto (part of inference) | Skipped |
 | Existing project, routing only | `routing` | Skipped | Skipped | Skipped | Resets template + interactive selection | Skipped |
 | Existing project, credentials only | `credentials` | Skipped | Skipped | Prompted | Skipped | Skipped |
@@ -262,12 +289,15 @@ Copies a telemetry template and prints instructions. No interactive prompts. Whi
 
 | Module | Purpose |
 |--------|---------|
-| `pipelex/cli/commands/init/command.py` | Orchestration: `init_cmd()`, `execute_initialization()`, `determine_needs()` |
+| `pipelex/cli/commands/init/command.py` | Orchestration: `init_cmd()`, the three stages `inspect_initialization()`, `choose_initialization()`, `execute_initialization()`, and `determine_needs()` |
+| `pipelex/cli/commands/init/setup_path.py` | Where runs execute: `SetupPath`, `write_run_execution()`, `read_run_execution()`, `ensure_pipelex_api_key()` |
+| `pipelex/cli/commands/init/ui/setup_path_ui.py` | The question: `prompt_setup_path()` |
+| `pipelex/cli/commands/login/` | `pipelex login`: the loopback listener, the key store, `login_with_browser()` and `login_with_paste()` |
 | `pipelex/cli/commands/init/config_files.py` | Config file copying: `init_config()`, skip lists |
 | `pipelex/cli/commands/init/backends.py` | Backend customization: `customize_backends_config()`, `get_selected_backend_keys()` |
 | `pipelex/cli/commands/init/routing.py` | Routing customization: `customize_routing_profile()` |
 | `pipelex/cli/commands/init/telemetry.py` | Telemetry setup: `setup_telemetry()` |
-| `pipelex/cli/commands/init/credentials.py` | Credential prompting: `prompt_credentials()`, `write_env_file()`, `read_env_file()` |
+| `pipelex/cli/commands/init/credentials.py` | Credential prompting: `prompt_credentials()`, `write_env_file()`, `read_env_file()`, and the single-entry `set_env_file_entry()` the sign-in saves its key with |
 | `pipelex/cli/commands/init/ide_extension.py` | IDE extension suggestion: `suggest_extension_install_if_needed()` |
 | `pipelex/cli/commands/init/ui/types.py` | `InitFocus` enum definition |
 
@@ -331,7 +361,7 @@ This means a project-level file **wins** over the global one, but only if it act
 
 ## Agent CLI Init
 
-`pipelex-agent init` is the non-interactive counterpart to `pipelex init`. It runs the same steps but takes all inputs from a JSON config argument instead of interactive prompts.
+`pipelex-agent init` is the non-interactive counterpart to `pipelex init`. It runs the same steps but takes all inputs from a JSON config argument instead of interactive prompts, and never signs in: a hosted setup reads its key from `PIPELEX_API_KEY`.
 
 **Source:** `pipelex/cli/agent_cli/commands/init_cmd.py`
 
@@ -352,6 +382,7 @@ If no project root is found and `--global` is not set, the command fails with an
 
 | Field | Type | Purpose |
 |-------|------|---------|
+| `execution` | `"hosted"` or `"local"` | Written to `[run] execution`. `"hosted"` skips the backend and routing steps and refuses `backends` and `primary_backend`; absent means `"local"` |
 | `backends` | `list[str]` | Backend keys to enable (e.g. `"openai"`, `"anthropic"`, `"openrouter"`). Omitted, the template's enabled set and its routing profile are kept |
 | `primary_backend` | `str` | Required when 2+ backends are named. Named without `backends`, it routes the template's enabled set to it first |
 
@@ -364,9 +395,13 @@ flowchart TD
     RESOLVE --> STEP1["Step 1: init_config()<br/>Copy config templates (skips inference/)"]
     STEP1 --> STEP15["Step 1.5: Copy inference templates<br/>(backends.toml, backends/*, deck/*, routing_profiles.toml)"]
     STEP15 --> STEP16["Step 1.6: Copy telemetry template<br/>(global: active defaults; project: commented-out)"]
-    STEP16 --> STEP2["Step 2: Configure backends<br/>Enable requested backends in backends.toml"]
+    STEP16 --> STEP17["Step 1.7: Write [run] execution"]
+    STEP17 --> EXECUTION{execution?}
+    EXECUTION -- hosted --> HOSTED_OUT["Report execution and api_key_set"]
+    EXECUTION -- "local (or absent)" --> STEP2["Step 2: Configure backends<br/>Enable requested backends in backends.toml"]
     STEP2 --> STEP3["Step 3: Configure routing<br/>Auto-derive routing profile<br/>(the template's, when the config names neither field)"]
     STEP3 --> OUTPUT["Output result<br/>(Markdown, or JSON via --format json)"]
+    HOSTED_OUT --> OUTPUT
 ```
 
 !!! note "No credentials step"
@@ -379,6 +414,8 @@ flowchart TD
 | Prompts | Interactive (Rich prompts) | None — all input from `--config` JSON |
 | Output | Rich console output | Markdown by default (`agent_success_formatted()` / `agent_error()`), structured JSON via `--format json` |
 | Credentials | Prompted interactively | Not configured — use `pipelex-agent doctor` or `pipelex init credentials` |
+| Where runs execute | Asked, hosted by default | `execution` in `--config`, local by default |
+| Pipelex API key | `pipelex login` through the browser, unless one is set | Read from `PIPELEX_API_KEY`; reported as `api_key_set` |
 | Focus dispatch | Supports individual focus (`config`, `inference`, etc.) | Runs config, inference, routing, telemetry (no credentials) |
 | Target dir default | Global (`~/.pipelex/`), use `--local` for project | Project (`{project_root}/.pipelex/`), use `--global` for global |
 

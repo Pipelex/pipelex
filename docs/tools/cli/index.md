@@ -23,7 +23,8 @@ The Pipelex CLI is organized into several command groups:
 
 | Command | Description |
 |---------|-------------|
-| [**init**](init.md) | Initialize Pipelex configuration |
+| [**init**](init.md) | Initialize Pipelex configuration and choose where your runs execute: the hosted Pipelex API or this machine |
+| [**login**](login.md) | Get a Pipelex API key through your browser, or paste one, and save it for runs on the hosted Pipelex API |
 | [**update**](update.md) | Refresh the model deck and `backends/internal.toml` to match the installed pipelex version |
 | [**migrate**](migrate.md) | Bring your configuration files up to the schema the installed version expects |
 | [**validate**](validate.md) | Validate configuration and pipelines |
@@ -70,8 +71,9 @@ Package manifest management currently lives in the `mthds` CLI:
 
 1. **Initial Setup**
 
-    - Run `pipelex init` to create configuration files and select your backends
-    - Configure your AI providers in `.pipelex/inference/backends.toml`
+    - Run `pipelex init` to create configuration files and choose where your runs execute
+    - On the hosted Pipelex API, `pipelex init` signs you in for a Pipelex API key; `pipelex login` does it again on its own
+    - On this machine, it asks for your backends and their keys; configure them further in `.pipelex/inference/backends.toml`
 
 2. **Development Workflow**
 
