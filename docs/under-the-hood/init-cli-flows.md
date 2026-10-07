@@ -264,7 +264,7 @@ Copies a telemetry template and prints instructions. No interactive prompts. Whi
 |--------|---------|
 | `pipelex/cli/commands/init/command.py` | Orchestration: `init_cmd()`, `execute_initialization()`, `determine_needs()` |
 | `pipelex/cli/commands/init/config_files.py` | Config file copying: `init_config()`, skip lists |
-| `pipelex/kit/template_copy.py` | The kit template walk `init_config()` shares with the first-boot fill: `copy_kit_templates()` |
+| `pipelex/kit/template_copy.py` | The kit template walk `init_config()` shares with the first-boot fill, `copy_kit_templates()`, and the atomic writes `copy_file_atomically()` and `write_text_atomically()` |
 | `pipelex/cli/commands/init/backends.py` | Backend customization: `customize_backends_config()`, `get_selected_backend_keys()` |
 | `pipelex/cli/commands/init/routing.py` | Routing customization: `customize_routing_profile()` |
 | `pipelex/cli/commands/init/telemetry.py` | Telemetry setup: `setup_telemetry()` |
@@ -323,7 +323,7 @@ The `inference/` directory is one unit, as the inference step of `pipelex init` 
 
 A home the process cannot write to, such as a read-only mount or a directory another user owns, is read as it is, and the boot then reports whatever configuration is missing. Any other error that stops a copy is raised.
 
-The copy is `copy_kit_templates()` in `pipelex/kit/template_copy.py`, the same walk `init_config()` copies the configuration files with, so the bootstrap and `pipelex init config` agree on which files a directory receives. Both write each file with `copy_file_atomically()`, which is also how the bootstrap writes `backends.toml`. Only the bootstrap refuses to follow a link: `pipelex init`, which overwrites, follows one as a plain copy does, so the template lands at a linked file's target, written beside it and renamed into place, and the link survives. A configuration file linked from a dotfiles repository, as chezmoi, stow or yadm lay them out, therefore stays linked.
+The copy is `copy_kit_templates()` in `pipelex/kit/template_copy.py`, the same walk `init_config()` copies the configuration files with, so the bootstrap and `pipelex init config` agree on which files a directory receives. Both write each file with `copy_file_atomically()`, which is also how the bootstrap writes `backends.toml`, and the kit manifests are written the same way, through `write_text_atomically()` in the same module, so a manifest cut short leaves no truncated `.kit_manifest.json` for the next boot to keep. The two differ on what already stands at a destination. The bootstrap copies without overwriting, so it keeps every file there and never follows a link. `init_config()` copies with `overwrite=reset`, and every `pipelex init` or `pipelex init config` run passes `reset=True`, as `pipelex-agent init` does, because configuration updates are not supported and there is no flag that keeps the existing files; only the dry run that counts missing files for `pipelex init` and `pipelex doctor` passes `reset=False`, and it writes nothing. Overwriting follows a link as a plain copy does, so the template lands at a linked file's target, written beside it and renamed into place, and the link survives. A configuration file linked from a dotfiles repository, as chezmoi, stow or yadm lay them out, therefore stays linked through a reset.
 
 ### Config Loading Chain
 

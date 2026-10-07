@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from pipelex.kit.template_copy import copy_kit_templates
+from pipelex.kit.template_copy import copy_kit_templates, write_text_atomically
 
 
 def _write_files(directory: Path, *, files: dict[str, str]) -> None:
@@ -113,8 +113,9 @@ class TestKitTemplateCopy:
     def test_a_link_at_a_file_s_destination_survives(self, template_dir: Path, tmp_path: Path, overwrite: bool, expected_linked_content: str) -> None:
         """A configuration file linked from a dotfiles repository stays linked.
 
-        The fill, which never overwrites, leaves the link and the file it points to alone; `pipelex init`,
-        which overwrites, rewrites the file it points to, whole, and leaves nothing else beside it.
+        The fill, which never overwrites, leaves the link and the file it points to alone; `init_config(reset=True)`,
+        which every `pipelex init` and `pipelex-agent init` copy takes, rewrites the file it points to, whole,
+        and leaves nothing else beside it.
         """
         target_dir = tmp_path / "target"
         target_dir.mkdir()
@@ -191,3 +192,16 @@ class TestKitTemplateCopy:
             "inference/deck/1_llm_deck.toml",
             "pipelex.toml",
         ]
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits do not apply on Windows")
+    def test_a_text_written_atomically_gets_the_mode_a_plain_write_gives_and_leaves_nothing_beside_it(self, tmp_path: Path) -> None:
+        """A temporary file made private, as `mkstemp` makes one, would leave the renamed manifest readable by its owner only."""
+        plainly_written = tmp_path / "plain.json"
+        plainly_written.write_text("{}\n", encoding="utf-8")
+        atomically_written = tmp_path / "atomic.json"
+
+        write_text_atomically(destination=atomically_written, text="{}\n")
+
+        assert atomically_written.read_text(encoding="utf-8") == "{}\n"
+        assert atomically_written.stat().st_mode == plainly_written.stat().st_mode
+        assert sorted(path.name for path in tmp_path.iterdir()) == ["atomic.json", "plain.json"]

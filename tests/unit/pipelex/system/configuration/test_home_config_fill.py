@@ -313,37 +313,66 @@ class TestHomeConfigFill:
                 assert entry.read_text(encoding="utf-8") == "not a directory\n"
         assert (home / "pipelex.toml").read_bytes() == _kit_files()["pipelex.toml"]
 
-    @pytest.mark.parametrize("kit_file", ["pipelex.toml", "inference/deck/3_extract_deck.toml", "inference/backends.toml"])
-    def test_a_copy_cut_off_mid_write_leaves_no_partial_file_and_the_next_boot_completes_it(
-        self, home: Path, mocker: MockerFixture, kit_file: str
+    @pytest.mark.parametrize(
+        "cut_file",
+        [
+            "pipelex.toml",
+            "inference/deck/3_extract_deck.toml",
+            "inference/backends.toml",
+            f"inference/{KitManagedArea.DECK}/{MANIFEST_FILENAME}",
+            f"inference/{KitManagedArea.BACKENDS}/{MANIFEST_FILENAME}",
+        ],
+    )
+    def test_a_write_cut_off_mid_way_leaves_no_partial_file_and_the_next_boot_completes_it(
+        self, home: Path, mocker: MockerFixture, cut_file: str
     ) -> None:
-        """A file appears whole or not at all: a truncated `backends.toml` above all would pass for a finished inference setup."""
+        """A file appears whole or not at all, copied from the kit or written as a manifest.
+
+        A truncated `backends.toml` would pass for a finished inference setup, and a truncated manifest for a
+        recorded one that the next fill keeps and every boot then reports as stale.
+        """
         real_copy2 = shutil.copy2
+        real_write_text = Path.write_text
 
         def copy2_cut_off_mid_write(src: Any, dst: Any, **kwargs: Any) -> Any:
-            if Path(src).as_posix().endswith(f"/configs/{kit_file}"):
+            if Path(src).as_posix().endswith(f"/configs/{cut_file}"):
                 Path(dst).write_bytes(Path(src).read_bytes()[:16])
                 raise OSError(errno.ENOSPC, "No space left on device")
             return real_copy2(src, dst, **kwargs)
 
+        def write_text_cut_off_mid_write(path: Path, data: str, *args: Any, **kwargs: Any) -> int:
+            # The written path is the file itself, or a temporary name beside it carrying its name.
+            if path.parent == (home / cut_file).parent and Path(cut_file).name in path.name:
+                real_write_text(path, data[:16], *args, **kwargs)
+                raise OSError(errno.ENOSPC, "No space left on device")
+            return real_write_text(path, data, *args, **kwargs)
+
         copy2_patch = mocker.patch.object(shutil, "copy2", side_effect=copy2_cut_off_mid_write)
+        write_text_patch = mocker.patch.object(Path, "write_text", autospec=True, side_effect=write_text_cut_off_mid_write)
         with pytest.raises(OSError, match="No space left on device"):
             ConfigLoader().ensure_global_config_exists()
-        # Every file left behind is a whole kit file or a manifest: no truncated copy, and no temporary one.
+        # Every file left behind is a whole kit file or a whole manifest: nothing truncated, nothing temporary.
         kit_files = _kit_files()
         installed = _files_under(home)
-        assert kit_file not in installed
+        assert cut_file not in installed
         assert set(installed) <= set(kit_files) | _MANIFESTS
         assert {path: content for path, content in installed.items() if path in kit_files} == {
             path: kit_files[path] for path in installed if path in kit_files
         }
+        for area in KitManagedArea:
+            manifest = f"inference/{area}/{MANIFEST_FILENAME}"
+            if manifest in installed:
+                assert json.loads(installed[manifest]) == compute_kit_manifest(area=area).model_dump()
         mocker.stop(copy2_patch)
+        mocker.stop(write_text_patch)
 
         ConfigLoader().ensure_global_config_exists()
 
         installed = _files_under(home)
         assert set(installed) == set(kit_files) | _MANIFESTS
         assert {path: installed[path] for path in kit_files} == kit_files
+        for area in KitManagedArea:
+            assert json.loads(installed[f"inference/{area}/{MANIFEST_FILENAME}"]) == compute_kit_manifest(area=area).model_dump()
 
     @pytest.mark.parametrize(
         ("home_is_filled", "expects_manifest_module"),

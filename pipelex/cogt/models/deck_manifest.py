@@ -29,7 +29,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.kit.paths import get_kit_configs_dir
-from pipelex.kit.template_copy import can_fill_directory
+from pipelex.kit.template_copy import can_fill_directory, write_text_atomically
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.package_utils import get_package_version
 
@@ -229,11 +229,14 @@ def read_manifest(installed_dir: Path) -> DeckManifest | None:
 
 
 def write_manifest(manifest: DeckManifest, *, installed_dir: Path) -> None:
-    """Persist the manifest, creating the area's directory if needed."""
+    """Persist the manifest, creating the area's directory if needed.
+
+    Written whole or not at all: a write cut short leaves no truncated manifest, which a fill would keep as
+    recorded and every boot would then report as stale.
+    """
     installed_dir.mkdir(parents=True, exist_ok=True)
     payload = manifest.model_dump()
-    target = manifest_path(installed_dir)
-    target.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_text_atomically(destination=manifest_path(installed_dir), text=json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
 def is_deck_stale_fast(deck_dir: Path) -> bool:

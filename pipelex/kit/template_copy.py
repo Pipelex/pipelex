@@ -6,16 +6,21 @@ means. It imports nothing but the standard library, because the boot's configura
 
 A symbolic link is treated according to `overwrite`. Without it, the first boot's mode, a link is never
 followed: one at a file's path is kept, even when it dangles, and the walk never enters a link to a
-directory. With it, the mode of `pipelex init`, a link is followed as a plain copy follows it: a linked
-file's target receives the template and the link survives, so a configuration file linked from a dotfiles
-repository stays linked, and a linked directory is entered. Either way a file appears whole or not at all:
+directory. With it, the mode `init_config(reset=True)` copies in, a link is followed as a plain copy
+follows it: a linked file's target receives the template and the link survives, so a configuration file
+linked from a dotfiles repository stays linked, and a linked directory is entered. Every run of
+`pipelex init`, `pipelex init config` and `pipelex-agent init` that copies configuration files takes that
+mode, since configuration updates are not supported and they always reset; `init_config` copies without
+`overwrite` only in its dry run, which counts the missing files and writes nothing. Either way a file appears whole or not at all:
 it is written under a temporary name beside the place it lands and renamed into place, so a copy cut short
-by a full disk or a killed process leaves no truncated file behind.
+by a full disk or a killed process leaves no truncated file behind. The kit manifests the fill stamps are
+written the same way, through `write_text_atomically`.
 """
 
 import os
+import secrets
 import shutil
-import tempfile
+from collections.abc import Callable
 from pathlib import Path, PurePosixPath
 
 
@@ -32,27 +37,43 @@ def can_fill_directory(*, directory: Path) -> bool:
     return not directory.is_symlink() and directory.is_dir()
 
 
-def copy_file_atomically(*, source: Path, destination: Path) -> None:
-    """Copy a file so that it appears whole or not at all, at its destination or at the target of a link there.
+def _write_atomically(*, destination: Path, write_temporary: Callable[[Path], object]) -> None:
+    """Have `write_temporary` write a file under a temporary name, then rename it into place.
 
-    A destination that is a symbolic link is followed, as a plain copy follows it: the file lands at the
+    A destination that is a symbolic link is followed, as a plain write follows it: the file lands at the
     link's resolved target and the link survives. A dangling link's target is created when its directory
-    exists, and the copy raises `FileNotFoundError` when it does not. A caller that must never write through
+    exists, and the write raises `FileNotFoundError` when it does not. A caller that must never write through
     a link, as the first boot's fill must not, checks for one before calling.
 
-    The copy, with the metadata `shutil.copy2` carries, is written under a temporary name in the directory it
-    lands in, which must exist, then renamed into place. The temporary file is removed when the copy fails;
-    only a process killed between the two steps can leave one behind, under a name no reader looks for.
+    The temporary file sits in the directory the file lands in, which must exist. It is created exclusively,
+    so nothing already standing at its name is written through, and with the mode a plain write gives a new
+    file, the process umask applied. It is removed when the write fails; only a process killed between the
+    two steps can leave one behind, under a name no reader looks for.
     """
     landing = Path(os.path.realpath(destination)) if destination.is_symlink() else destination
-    file_descriptor, temporary_name = tempfile.mkstemp(dir=landing.parent, prefix=f".{landing.name}.", suffix=".partial")
-    os.close(file_descriptor)
-    temporary = Path(temporary_name)
+    temporary = landing.with_name(f".{landing.name}.{secrets.token_hex(8)}.partial")
+    os.close(os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o666))
     try:
-        shutil.copy2(source, temporary)
+        write_temporary(temporary)
         temporary.replace(landing)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def copy_file_atomically(*, source: Path, destination: Path) -> None:
+    """Copy a file, with the metadata `shutil.copy2` carries, so that it appears whole or not at all.
+
+    It lands at its destination, or at the target of a link standing there, as `_write_atomically` explains.
+    """
+    _write_atomically(destination=destination, write_temporary=lambda temporary: shutil.copy2(source, temporary))
+
+
+def write_text_atomically(*, destination: Path, text: str) -> None:
+    """Write a text file in UTF-8 so that it appears whole or not at all.
+
+    It lands at its destination, or at the target of a link standing there, as `_write_atomically` explains.
+    """
+    _write_atomically(destination=destination, write_temporary=lambda temporary: temporary.write_text(text, encoding="utf-8"))
 
 
 def copy_kit_templates(
