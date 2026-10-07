@@ -234,7 +234,7 @@ What an out-of-tree backend plugin imports *is* the contract. The published surf
 |--------|--------|------|
 | `PipelexPlugin`, `PLUGIN_API_VERSION` | `pipelex.plugins.contract` | the plugin protocol + version gate |
 | `PluginRegistrar` | `pipelex.plugins.registrar` | the accumulator `register` writes into |
-| `InferenceFamily`, `MakeWorkerFn`, `require_sdk` | `pipelex.plugins.inference_backend_registry` | family enum, callable type, dependency guard |
+| `InferenceFamily`, `MakeWorkerFn`, `CheckLLMRequestFn`, `require_sdk` | `pipelex.plugins.inference_backend_registry` | family enum, the worker factory and LLM request check callable types, dependency guard |
 | `ListModelsFn` | `pipelex.plugins.model_lister_registry` | the optional model-listing callable type |
 | `ModelListingUnsupportedError` | `pipelex.cogt.exceptions` | soft signal a lister raises when its client variant cannot list |
 | `ModelHandle` | `pipelex.plugins.model_handle` | the backend selector derived from a model spec |
@@ -251,6 +251,7 @@ What an out-of-tree backend plugin imports *is* the contract. The published surf
 | `InferenceJobAbstract` | `pipelex.cogt.inference.inference_job_abstract` | the base of every job a worker serves |
 | `LLMWorkerAbstract` | `pipelex.cogt.llm.llm_worker_abstract` | the LLM worker contract |
 | `LLMJob` | `pipelex.cogt.llm.llm_job` | the LLM job |
+| `LLMJobParams` | `pipelex.cogt.llm.llm_job_components` | the LLM job's parameters, which an LLM request check reads |
 | `ImgGenWorkerAbstract` | `pipelex.cogt.img_gen.img_gen_worker_abstract` | the image-generation worker contract |
 | `ImgGenJob` | `pipelex.cogt.img_gen.img_gen_job` | the image-generation job |
 | `ImgGenJobParams` | `pipelex.cogt.img_gen.img_gen_job_components` | the image-generation job's parameters |
@@ -271,6 +272,7 @@ What an out-of-tree backend plugin imports *is* the contract. The published surf
 | `NbTokensByCategoryDict`, `TokenCategory` | `pipelex.cogt.usage.token_category` | the token usage a worker reports |
 | `BaseModelTypeVar` | `pipelex.tools.typing.pydantic_utils` | the schema type variable of a structured-output signature |
 | `CogtError`, `SdkTypeError`, `ImgGenGenerationError`, `ImgGenParameterError`, `InferenceErrorCategory` | `pipelex.cogt.exceptions` | the inference error bases and categories a worker raises with |
+| `LLMCapabilityError` | `pipelex.cogt.exceptions` | a request the model refuses, raised by an LLM request check |
 
 **Building on an OpenAI- or Anthropic-compatible service**
 
