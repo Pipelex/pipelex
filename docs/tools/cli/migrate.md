@@ -43,17 +43,20 @@ Releases up to v0.72 ran models through the Pipelex Gateway, and offered Pipelex
 - a `pipelex_gateway` or `pipelex_manifold` backend left enabled in `inference/backends.toml`, or another backend still naming `model_specs_section`, whose model specs are no longer downloaded;
 - an active routing profile that sends models to one of them: `all_pipelex_gateway`, which those releases made the default, or a profile routing some models there.
 
-The cleanup of what those releases left is this command's first step, before any file is migrated, in both directories:
+The cleanup of what those releases left is this command's first step, before any file is migrated. It reads the home directory and the project's together, the way Pipelex merges them when it starts, so a profile defined in one and made active from the other is cleaned up as one:
 
 - the `pipelex_gateway` and `pipelex_manifold` tables are removed from `inference/backends.toml` and its personal override, and a `model_specs_section` key from any other backend, which stays;
 - a routing profile whose default is one of them is removed, and so is a route that sends a model to one of them, from a profile that otherwise stays;
-- an active routing profile of theirs moves to `all_enabled_backends`, the profile a fresh install makes active, which routes each model to the first enabled backend that serves it. When the file does not define that profile, it is added as the current release ships it. A personal override that names one stops naming any, so its base file decides;
+- when a profile of your own is only pointed at one of them by a personal override, only that `default` is removed from the override, so your profile and its routes stay as you wrote them;
+- an active routing profile that is removed is replaced in every file that names it, in either directory. In a base file it moves to `all_enabled_backends`, the profile a fresh install makes active, which routes each model to the first enabled backend that serves it; when the file does not define that profile, it is added as the current release ships it. A personal override that names it stops naming any, so the file read before it decides;
 - `inference/backends/pipelex_gateway.toml`, `inference/backends/pipelex_manifold.toml`, the Gateway's model lists `inference/backends/pipelex_gateway_models*.md` and `pipelex_service.toml`, which recorded the Gateway's terms acceptance, are removed;
-- the comments at the head of a rewritten file that spoke of the Gateway or Manifold go with it; any other comment stays.
+- the comments at the head of a rewritten file that name the Pipelex Gateway or Pipelex Manifold go with it; any other comment stays, including a note of yours about some other gateway.
 
-Nothing else is touched: your other backends, your own profiles and routes, and your keys stay as they are. Each file the cleanup rewrites or removes is copied first, exactly as a migrated file is (below), so a removed file is one rename away from being back. The dry run shows each change, file by file, and the question that follows counts the files of both steps.
+Nothing else is touched: your other backends, your own profiles and routes, and your keys stay as they are. Each file the cleanup rewrites or removes is copied first, exactly as a migrated file is (below), so a removed file is one rename away from being back. The dry run shows each change, file by file, and the question that follows counts the files of both steps. A file the cleanup removes is never also counted among the files to migrate, nor reported as needing a look.
 
-`pipelex doctor` lists these files in its **Configuration Migrations** row, says when they stop Pipelex from starting, and `pipelex doctor --fix` runs the cleanup. `pipelex init` finds them too, and offers the same cleanup before it asks anything else.
+Two cases end with something for you to do, and the command exits non-zero for both. A routing profiles file written as one inline `profiles = { … }` table is left as it is, because the cleanup cannot add a profile to it without restructuring it; the report says what to change by hand, then run the command again. And after writing, the command reads the files Pipelex starts on once more: if they still stop it — an active routing profile that no file defines, for instance — it says so under **After the cleanup, Pipelex still cannot start** instead of reporting success.
+
+`pipelex doctor` lists these files in its **Configuration Migrations** row, says when they stop Pipelex from starting, and `pipelex doctor --fix` runs the cleanup. Both judge that from the files Pipelex actually starts on in the current directory: a project with configuration files of its own is not told it cannot start because of what your home directory still carries, though the files are listed and the cleanup is offered. `pipelex init` finds them too, and offers the same cleanup before it asks anything else.
 
 ## When it cannot do the whole job
 
@@ -79,7 +82,7 @@ Nothing that Pipelex tells you about an out-of-date file will ever suggest delet
 
 ## For agents
 
-`pipelex-agent migrate` is the machine-facing counterpart. It writes only when passed `--yes`, since it cannot ask, and answers with a structured plan — `--format json` for the contract, `--format markdown` to read. Branch on the `needs_attention` field, never on the exit code. The cleanup of a former release is under `former_release`: each file it rewrites or removes, with its `action` (`rewrite` or `remove`), its `changes` in words, the `backup_path` once applied, and why it was left when it could not be cleaned. It counts toward `needs_attention` and `is_clean` like the migration itself.
+`pipelex-agent migrate` is the machine-facing counterpart. It writes only when passed `--yes`, since it cannot ask, and answers with a structured plan — `--format json` for the contract, `--format markdown` to read. Branch on the `needs_attention` field, never on the exit code. The cleanup of a former release is under `former_release`: each file it rewrites or removes, with its `action` (`rewrite` or `remove`), its `changes` in words, the `backup_path` once applied, and why it was left when it could not be cleaned (`needs_a_hand_edit` for an inline profiles table, with what to change in `blocked_detail`). After `--yes`, `former_release.still_blocking` lists what still stops Pipelex from starting, one sentence each; it is empty when the machine can start. Both count toward `needs_attention` and `is_clean` like the migration itself. The files the cleanup removes are never among the `plans`.
 
 An agent whose boot fails with `FormerReleaseConfigError` runs the same loop: `pipelex-agent migrate --dry-run --format json`, show the user what would be removed, then `--yes`.
 
