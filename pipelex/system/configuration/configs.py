@@ -5,6 +5,7 @@ from pydantic import Field, field_validator, model_validator
 
 from pipelex.cogt.config_cogt import InferenceConfig
 from pipelex.graph.graph_config import GraphConfig
+from pipelex.hosted.run_config import RunConfig
 from pipelex.language.mthds_config import MthdsConfig
 from pipelex.methods.methods_config import MethodsConfig
 from pipelex.system.configuration.config_model import ConfigModel
@@ -214,4 +215,5 @@ class PipelexConfig(ConfigRoot):
     runtime: RuntimeConfig
     inference: InferenceConfig
     interpreter: InterpreterConfig
+    run: RunConfig
     kit: KitConfig

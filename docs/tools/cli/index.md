@@ -29,7 +29,7 @@ The Pipelex CLI is organized into several command groups:
 | [**validate**](validate.md) | Validate configuration and pipelines |
 | [**fix**](fix.md) | Apply deterministic safe fixes to a bundle and re-validate |
 | [**show**](show.md) | Inspect configuration, pipes, and AI models |
-| [**run**](run.md) | Execute pipelines |
+| [**run**](run.md) | Execute pipelines, on this machine or on the hosted Pipelex API |
 | [**run method by address**](run-by-address.md) | Fetch and run a method straight from a public GitHub repository |
 | [**build**](build/index.md) | Generate concept structures and example inputs and outputs for a pipe |
 

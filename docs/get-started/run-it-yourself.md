@@ -39,6 +39,7 @@ uv tool install "pipelex[cli,anthropic,google,google-genai,mistralai,bedrock,fal
 
 - **Bring Your Own Keys** — Use existing API keys from OpenAI, Anthropic, Google, Mistral, etc. See [Configure AI Providers](./configure-ai-providers.md).
 - **Local AI** — Ollama, vLLM, LM Studio, or llama.cpp — no API keys required. See [Configure AI Providers](./configure-ai-providers.md).
+- **The hosted API** — Set `PIPELEX_API_KEY` and add `--hosted` to a run, or set `[run] execution = "hosted"`, to run on the hosted Pipelex API with no provider key on this machine. See [Running on the Hosted API](../tools/cli/run.md#running-on-the-hosted-api).
 
 ## Run a method
 

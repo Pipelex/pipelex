@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from mthds.runners.types import RunnerType
 
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.run.method_cmd import run_method_cmd
@@ -42,18 +41,13 @@ class TestAgentRunMethodOutputLocation:
         mocker.patch(f"{RUN_METHOD_MODULE}.Pipelex.teardown_if_needed")
         return mocker.patch(f"{RUN_METHOD_MODULE}.run_pipeline_core", new=mocker.AsyncMock(return_value={"answer": "42"}))
 
-    def _make_ctx(self, mocker: MockerFixture) -> Any:
-        ctx = mocker.MagicMock()
-        ctx.obj = {"runner": RunnerType.PIPELEX}
-        return ctx
-
     @pytest.mark.usefixtures("tty_stdin")
     def test_fetched_method_overrides_output_dir_to_cwd(self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         """A fetched method (provenance set) re-anchors run outputs under the caller's CWD, not the clone."""
         clone_dir = tmp_path / "mthds_remote_clone"
         run_core_mock = self._patch_method_run(mocker, method_dir=clone_dir, fetched=True)
 
-        run_method_cmd(ctx=self._make_ctx(mocker), name="github.com/test/remote-method", output_format=CliOutputFormat.JSON)
+        run_method_cmd(name="github.com/test/remote-method", output_format=CliOutputFormat.JSON)
 
         capsys.readouterr()
         override = run_core_mock.call_args.kwargs["output_dir_override"]
@@ -65,7 +59,7 @@ class TestAgentRunMethodOutputLocation:
         """An installed method (no provenance) keeps the bundle-adjacent default: no override is passed."""
         run_core_mock = self._patch_method_run(mocker, method_dir=tmp_path, fetched=False)
 
-        run_method_cmd(ctx=self._make_ctx(mocker), name="my-method", output_format=CliOutputFormat.JSON)
+        run_method_cmd(name="my-method", output_format=CliOutputFormat.JSON)
 
         capsys.readouterr()
         assert run_core_mock.call_args.kwargs["output_dir_override"] is None

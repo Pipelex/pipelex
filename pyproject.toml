@@ -40,6 +40,10 @@ dependencies = [
   "opentelemetry-sdk>=1.39.0",                      # 1.39+ exports InMemoryLogRecordExporter, which the otlp sink's tests use
   "pillow>=12.1.1",
   "pipelex-tools-py>=0.1.3",
+  # The client for the hosted Pipelex API, behind hosted runs (pipelex/hosted/). Pinned exactly, like
+  # mthds: each pipelex-sdk release pins mthds exactly too, so the release chosen here must pin the
+  # same mthds as this file, and the two pins move together (the bump-mthds skill says so).
+  "pipelex-sdk==0.31.0",
   "polyfactory>=2.21.0",
   "portkey-ai>=2.1.0",
   "posthog>=6.7.0",
@@ -48,7 +52,7 @@ dependencies = [
   "pydantic>=2.10.6,<3.0.0",
   "python-dotenv>=1.2.2",
   "PyYAML>=6.0.2",
-  "reportlab>=4.0,<5",                              # the built-in PDF engine of PipeDocGen, and synthetic PDFs in tests
+  "reportlab>=4.0,<5",                 # the built-in PDF engine of PipeDocGen, and synthetic PDFs in tests
   "requests>=2.33.0",
   "semantic-version>=2.10.0",
   "shortuuid>=1.0.13",

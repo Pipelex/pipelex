@@ -475,6 +475,17 @@ default_bundle_file_name = "bundle"
 default_directory_base_name = "pipeline"
 
 ####################################################################################################
+# Run — where `pipelex run` and `pipelex-agent run` execute a method
+####################################################################################################
+
+[run]
+# Where a run executes when the command passes neither --hosted nor --local:
+# - "local" runs on this machine, on the backends configured in .pipelex/inference/ (your own provider keys)
+# - "hosted" runs on the hosted Pipelex API, with the key in PIPELEX_API_KEY (the environment or ~/.pipelex/.env),
+#   at the origin in PIPELEX_BASE_URL (https://api.pipelex.com when unset)
+execution = "local"
+
+####################################################################################################
 # Kit Config
 ####################################################################################################
 

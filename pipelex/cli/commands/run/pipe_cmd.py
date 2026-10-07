@@ -5,8 +5,11 @@ from typing import Annotated
 
 import typer
 
+from pipelex.cli.commands.run._hosted_sources import hosted_pipe_library_files
 from pipelex.cli.commands.run._run_core import COMMAND, execute_run, validate_run_flag_combination
+from pipelex.cli.commands.run._run_hosted import execute_hosted_run, refuse_local_only_flags, resolve_cli_run_execution
 from pipelex.cli.method_resolver import resolve_pipe_from_exports
+from pipelex.hosted.exceptions import HostedRunSourceError
 from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
 
 
@@ -99,6 +102,20 @@ def run_pipe_cmd(
             help="Write the main stuff to this literal CSV path (not under --output-dir; absolute/~/relative ok). Requires a flat list output.",
         ),
     ] = None,
+    hosted: Annotated[
+        bool | None,
+        typer.Option(
+            "--hosted/--local",
+            help="Run on the hosted Pipelex API (key in PIPELEX_API_KEY) or on this machine. Default: [run] execution, else local.",
+        ),
+    ] = None,
+    base_url: Annotated[
+        str | None,
+        typer.Option(
+            "--base-url",
+            help="Origin of the hosted API a hosted run calls, scheme://host[:port]. Overrides PIPELEX_BASE_URL; default https://api.pipelex.com.",
+        ),
+    ] = None,
 ) -> None:
     """Run a pipe by code.
 
@@ -107,6 +124,7 @@ def run_pipe_cmd(
         pipelex run pipe my_pipe --inputs data.json
         pipelex run pipe my_pipe --dry-run
         pipelex run pipe my_pipe --dry-run --mock-inputs
+        pipelex run pipe my_pipe -L my_library/ --hosted --inputs data.json
     """
     # Helpful error if the user passes a path instead of a pipe code
     target_path = Path(pipe_code)
@@ -136,6 +154,39 @@ def run_pipe_cmd(
             library_dir = extra_dirs
         else:
             library_dir = [*extra_dirs, *library_dir]
+
+    execution = resolve_cli_run_execution(hosted=hosted, base_url=base_url)
+    if execution.is_hosted:
+        refuse_local_only_flags(
+            dry_run=dry_run,
+            mock_usage=mock_usage,
+            mock_inputs=mock_inputs,
+            orchestrator=orchestrator,
+            save_csv=save_csv,
+            costs=costs,
+            graph_full_data=graph_full_data,
+        )
+        # The hosted API holds no library of yours: the one a local run would load is sent along.
+        try:
+            library_files = hosted_pipe_library_files(library_dirs=library_dir)
+        except HostedRunSourceError as exc:
+            typer.secho(f"Failed to run: {exc.message}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1) from exc
+        execute_hosted_run(
+            mthds_files=library_files,
+            pipe_code=pipe_code,
+            inputs=inputs,
+            dynamic_output_concept_ref=dynamic_output_concept_ref,
+            base_url=base_url,
+            output_label=pipe_code,
+            output_dir=output_dir,
+            save_working_memory=save_working_memory,
+            working_memory_path=working_memory_path,
+            save_main_stuff=save_main_stuff,
+            no_pretty_print=no_pretty_print,
+            graph=graph,
+        )
+        return
 
     execute_run(
         pipe_code=pipe_code,

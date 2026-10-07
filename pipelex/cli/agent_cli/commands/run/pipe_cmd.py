@@ -8,24 +8,31 @@ from pathlib import Path
 from typing import Annotated, Any
 
 import typer
-from mthds.protocol.exceptions import PipelineRequestError
-from mthds.runners.api.exceptions import ApiResponseError, ClientAuthenticationError
-from mthds.runners.types import RunnerType
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
     agent_error,
-    agent_error_api_response,
     agent_success_formatted,
     run_failure_fields,
     set_agent_cli_error_format,
 )
 from pipelex.cli.agent_cli.commands.run._output_helpers import format_run_markdown
 from pipelex.cli.agent_cli.commands.run._run_core import run_pipeline_core
-from pipelex.cli.agent_cli.commands.run._run_core_api import run_pipeline_core_api
+from pipelex.cli.agent_cli.commands.run._run_hosted import (
+    BASE_URL_OPTION_HELP,
+    HOSTED_OPTION_HELP,
+    RUNNER_OPTION_HELP,
+    refuse_local_only_flags,
+    resolve_agent_run_execution,
+    run_hosted_for_agent,
+)
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs
+from pipelex.cli.commands.run._hosted_sources import hosted_pipe_library_files
 from pipelex.cli.method_resolver import resolve_pipe_from_exports
+from pipelex.hosted.exceptions import HostedRunSourceError
+from pipelex.hosted.hosted_run import HostedRunRequest
+from pipelex.hosted.run_config import RunExecution  # ruff: ignore[typing-only-first-party-import] - typer reads the --runner annotation at runtime
 from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
@@ -33,7 +40,6 @@ from pipelex.pipeline.exceptions import PipelineExecutionError
 
 
 def run_pipe_cmd(
-    ctx: typer.Context,
     pipe_code: Annotated[
         str,
         typer.Argument(help="Pipe code to run"),
@@ -74,6 +80,18 @@ def run_pipe_cmd(
         CliOutputFormat | None,
         typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
     ] = None,
+    runner: Annotated[
+        RunExecution | None,
+        typer.Option("--runner", help=RUNNER_OPTION_HELP),
+    ] = None,
+    hosted: Annotated[
+        bool | None,
+        typer.Option("--hosted/--local", help=HOSTED_OPTION_HELP),
+    ] = None,
+    base_url: Annotated[
+        str | None,
+        typer.Option("--base-url", help=BASE_URL_OPTION_HELP),
+    ] = None,
 ) -> None:
     """Execute a pipeline by pipe code and output the results.
 
@@ -86,6 +104,7 @@ def run_pipe_cmd(
         pipelex-agent run pipe my_pipe --inputs data.json
         pipelex-agent run pipe my_pipe --dry-run --mock-inputs
         pipelex-agent run pipe my_pipe --format json
+        pipelex-agent run pipe my_pipe -L my_library/ --runner hosted --inputs data.json
     """
     set_agent_cli_error_format(error_format or output_format)
 
@@ -121,80 +140,60 @@ def run_pipe_cmd(
     parsed_inputs = parse_cli_inputs(inputs_arg=inputs, stdin_fallback=True)
     pipeline_inputs: dict[str, Any] | None = parsed_inputs.pipeline_inputs
 
-    runner_type: RunnerType = ctx.obj["runner"]
+    execution = resolve_agent_run_execution(runner=runner, hosted=hosted, base_url=base_url)
+    if execution.is_hosted:
+        refuse_local_only_flags(dry_run=dry_run, mock_inputs=mock_inputs)
+        # The hosted API holds no library of yours: the one a local run would load is sent along.
+        try:
+            library_files = hosted_pipe_library_files(library_dirs=library_dir)
+        except HostedRunSourceError as exc:
+            agent_error(exc.message, error_type=type(exc).__name__, cause=exc)
+        request = HostedRunRequest(
+            mthds_files=library_files,
+            pipe_code=pipe_code,
+            inputs=pipeline_inputs,
+            inputs_base_dir=parsed_inputs.inputs_base_dir,
+        )
+        run_hosted_for_agent(request=request, base_url=base_url, with_memory=with_memory, output_format=output_format)
+        return
 
-    match runner_type:
-        case RunnerType.API:
-            # Validate unsupported flags for API runner
-            if dry_run:
-                agent_error("--dry-run is not supported with --runner api", error_type="ArgumentError")
-            if mock_inputs:
-                agent_error("--mock-inputs is not supported with --runner api", error_type="ArgumentError")
+    make_pipelex_for_agent_cli(needs_inference=not dry_run)
 
-            try:
-                result = asyncio.run(
-                    run_pipeline_core_api(
-                        pipe_code=pipe_code,
-                        inputs=pipeline_inputs,
-                        with_memory=with_memory,
-                    )
-                )
-                agent_success_formatted(
-                    result, markdown_renderer=functools.partial(format_run_markdown, with_memory=with_memory), output_format=output_format
-                )
+    try:
+        result = asyncio.run(
+            run_pipeline_core(
+                pipe_code=pipe_code,
+                inputs=pipeline_inputs,
+                dry_run=dry_run,
+                mock_inputs=mock_inputs,
+                library_dirs=library_dir,
+                graph=graph,
+                costs=costs,
+                with_memory=with_memory,
+                inputs_base_dir=parsed_inputs.inputs_base_dir,
+            )
+        )
+        agent_success_formatted(
+            result, markdown_renderer=functools.partial(format_run_markdown, with_memory=with_memory), output_format=output_format
+        )
 
-            except ClientAuthenticationError as exc:
-                agent_error(str(exc), error_type="ClientAuthenticationError", cause=exc)
+    except PipelineExecutionError as exc:
+        agent_error(exc.message, error_type="PipelineExecutionError", cause=exc, **run_failure_fields(error=exc))
 
-            except ApiResponseError as exc:
-                # The runner answered non-2xx: its problem document says why, where, and what to do next.
-                agent_error_api_response(error=exc)
+    except PipeOperatorModelAvailabilityError as exc:
+        availability_extra: dict[str, Any] = {
+            "pipe_code": exc.pipe_code,
+            "model_handle": exc.model_handle,
+        }
+        if exc.fallback_list:
+            availability_extra["fallback_list"] = exc.fallback_list
+        if exc.pipe_stack:
+            availability_extra["pipe_stack"] = exc.pipe_stack
+        agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
 
-            except PipelineRequestError as exc:
-                agent_error(str(exc), error_type="PipelineRequestError", cause=exc)
+    except Exception as exc:  # ruff: ignore[blind-except]
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
+        agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
 
-            except Exception as exc:  # ruff: ignore[blind-except]
-                # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-                agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
-
-        case RunnerType.PIPELEX:
-            make_pipelex_for_agent_cli(needs_inference=not dry_run)
-
-            try:
-                result = asyncio.run(
-                    run_pipeline_core(
-                        pipe_code=pipe_code,
-                        inputs=pipeline_inputs,
-                        dry_run=dry_run,
-                        mock_inputs=mock_inputs,
-                        library_dirs=library_dir,
-                        graph=graph,
-                        costs=costs,
-                        with_memory=with_memory,
-                        inputs_base_dir=parsed_inputs.inputs_base_dir,
-                    )
-                )
-                agent_success_formatted(
-                    result, markdown_renderer=functools.partial(format_run_markdown, with_memory=with_memory), output_format=output_format
-                )
-
-            except PipelineExecutionError as exc:
-                agent_error(exc.message, error_type="PipelineExecutionError", cause=exc, **run_failure_fields(error=exc))
-
-            except PipeOperatorModelAvailabilityError as exc:
-                availability_extra: dict[str, Any] = {
-                    "pipe_code": exc.pipe_code,
-                    "model_handle": exc.model_handle,
-                }
-                if exc.fallback_list:
-                    availability_extra["fallback_list"] = exc.fallback_list
-                if exc.pipe_stack:
-                    availability_extra["pipe_stack"] = exc.pipe_stack
-                agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
-
-            except Exception as exc:  # ruff: ignore[blind-except]
-                # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-                agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
-
-            finally:
-                Pipelex.teardown_if_needed()
+    finally:
+        Pipelex.teardown_if_needed()

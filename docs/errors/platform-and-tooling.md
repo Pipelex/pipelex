@@ -103,6 +103,12 @@ own page. Classes are grouped by subsystem.
 - [`FixTransactionError`](fix-transaction-error.md) — Fix transaction
 - [`FixWriteConflictError`](fix-write-conflict-error.md) — Fix write conflict
 
+## Hosted
+
+- [`HostedBaseUrlError`](hosted-base-url-error.md) — Hosted base url
+- [`HostedRunError`](hosted-run-error.md) — Hosted run error
+- [`HostedRunSourceError`](hosted-run-source-error.md) — Hosted run source
+
 ## Methods
 
 - [`MethodDependencyFetchError`](method-dependency-fetch-error.md) — Method dependency fetch

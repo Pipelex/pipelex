@@ -19,14 +19,12 @@ from typing import TYPE_CHECKING
 
 import pytest
 import typer
-from mthds.runners.types import RunnerType
 
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.run.pipe_cmd import run_pipe_cmd
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import ParsedCliInputs
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
-from pipelex.tools.log.log_levels import LogLevel
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -57,12 +55,8 @@ class TestRunErrorChain:
         transient_error.backend_name = WORKER_PROVIDER
         mocker.patch.object(ContentGenerator, "make_llm_text", side_effect=transient_error)
 
-        ctx = mocker.MagicMock()
-        ctx.obj = {"log_level": LogLevel.WARNING, "runner": RunnerType.PIPELEX}
-
         with pytest.raises(typer.Exit) as exit_info:
             run_pipe_cmd(
-                ctx=ctx,
                 pipe_code="greet",
                 graph=False,
                 library_dir=[str(ERROR_CHAIN_LIBRARY_DIR)],

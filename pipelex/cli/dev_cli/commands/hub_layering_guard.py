@@ -153,6 +153,11 @@ SCAN_ROOTS: tuple[Path, ...] = (SOURCE_ROOT, TESTS_ROOT)
 #: interpreter modules into a kernel-only process and no static gate could see it, because the
 #: engine never reached `interpreter_hub`. Declaring both is what keeps the next such import loud.
 #:
+#: `pipelex.hosted` is declared from its first commit for the same reason as `pipelex.kernel`: a hosted run
+#: boots nothing, and it has to work on a machine with no inference configured, so its whole value is that it
+#: loads no interpreter module. It reads the configuration files, builds pipelex-sdk's client and maps a run onto
+#: it; the CLI parts that need a bundle parsed stay in `pipelex.cli`.
+#:
 #: `pipelex.kit` is data files with no module to police; `pipelex.language`, `pipelex.runtime_bridge`
 #: and `pipelex.cli` all measure dirty and are interpreter-side by construction. `pipelex.methods`
 #: measures dirty as well, without reaching `interpreter_hub`: its structures check reads the stamp
@@ -166,6 +171,7 @@ KERNEL_LAYER_PACKAGES: tuple[str, ...] = (
     "pipelex.errors",
     "pipelex.fix_ops",
     "pipelex.graph",
+    "pipelex.hosted",
     "pipelex.kernel",
     "pipelex.migration",
     "pipelex.observer",
