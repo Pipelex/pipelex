@@ -5,6 +5,9 @@ from rich.panel import Panel
 
 from pipelex.cli.commands.init.credentials import get_global_env_path
 
+#: A reset copies the kit's inference files over the target's, so customised backends and routing are lost.
+_INFERENCE_RESET_LINE = "• [yellow]Reset[/yellow] inference backends, model deck and routing to the kit's defaults"
+
 
 def build_initialization_panel(
     *,
@@ -38,8 +41,13 @@ def build_initialization_panel(
         if needs_config:
             verb = "[yellow]Reset and reconfigure[/yellow]" if reset else "Create"
             message_parts.append(f"• {verb} configuration files in [cyan].pipelex/[/cyan]")
+        if reset and needs_inference:
+            message_parts.append(_INFERENCE_RESET_LINE)
         message_parts.append("• Ask where your runs execute:")
-        message_parts.append("    on the hosted Pipelex API: sign in to get a Pipelex API key (default)")
+        message_parts.append(
+            "    on the hosted Pipelex API: sign in to get a Pipelex API key (default); "
+            "[cyan]pipelex init inference[/cyan] reconfigures the backends later"
+        )
         message_parts.append(
             f"    on this machine: choose your inference backends and enter their API keys (saved to [cyan]{credentials_file}[/cyan])"
         )
@@ -51,7 +59,7 @@ def build_initialization_panel(
         if needs_config:
             message_parts.append("• [yellow]Reset and reconfigure[/yellow] configuration files in [cyan].pipelex/[/cyan]")
         if needs_inference:
-            message_parts.append("• [yellow]Reset and reconfigure[/yellow] inference backends")
+            message_parts.append(f"{_INFERENCE_RESET_LINE}, then ask you to choose your inference backends")
             message_parts.append("• Suggest IDE extension for [cyan].mthds[/cyan] syntax highlighting")
         if check_credentials:
             message_parts.append(f"• Prompt for missing API keys (saved to [cyan]{credentials_file}[/cyan])")

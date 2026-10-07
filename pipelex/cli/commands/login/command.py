@@ -10,6 +10,7 @@ never printed.
 
 import webbrowser
 from enum import StrEnum
+from pathlib import Path
 from urllib.parse import urlencode, urlsplit
 
 import typer
@@ -44,13 +45,15 @@ class LoginOutcome(StrEnum):
     SAVED_UNCHECKED = "saved_unchecked"
     REFUSED = "refused"
     NO_KEY = "no_key"
+    #: The key was good, but the home `.env` could not be written.
+    NOT_SAVED = "not_saved"
 
     @property
     def is_saved(self) -> bool:
         match self:
             case LoginOutcome.SAVED | LoginOutcome.SAVED_UNCHECKED:
                 return True
-            case LoginOutcome.REFUSED | LoginOutcome.NO_KEY:
+            case LoginOutcome.REFUSED | LoginOutcome.NO_KEY | LoginOutcome.NOT_SAVED:
                 return False
 
 
@@ -92,6 +95,23 @@ def build_cli_auth_url(*, app_origin: str, callback_port: int, state: str) -> st
     return f"{app_origin}{CLI_AUTH_PATH}?{query}"
 
 
+def _save_or_report(*, console: Console, api_key: str) -> Path | None:
+    """Save the key to the home `.env`, or say why it could not be, never quoting the key.
+
+    Returns:
+        The file it was saved to, or `None` when the file could not be written.
+    """
+    try:
+        return save_pipelex_api_key(api_key=api_key)
+    except OSError as exc:
+        console.print(f"[red]The key could not be saved to {escape(str(get_global_env_path()))}: {escape(str(exc))}. Nothing was saved.[/red]")
+        console.print(
+            "[dim]The key this login received went unused: revoke it in the Pipelex app, make that file writable, "
+            "then run[/dim] [cyan]pipelex login[/cyan] [dim]again.[/dim]"
+        )
+        return None
+
+
 def check_and_save_api_key(*, console: Console, api_key: str) -> LoginOutcome:
     """Check a key's format, then ask the hosted API about it, and save it unless it is malformed or refused.
 
@@ -101,7 +121,8 @@ def check_and_save_api_key(*, console: Console, api_key: str) -> LoginOutcome:
 
     Returns:
         `SAVED` when the hosted API accepted it, `SAVED_UNCHECKED` when it could not be checked, `REFUSED` when it is
-        not a Pipelex API key or the hosted API refused it (nothing is saved then).
+        not a Pipelex API key or the hosted API refused it, `NOT_SAVED` when the home `.env` could not be written
+        (nothing is saved in those two cases).
     """
     api_key = api_key.strip()
     if not is_well_formed_pipelex_api_key(api_key=api_key):
@@ -123,7 +144,9 @@ def check_and_save_api_key(*, console: Console, api_key: str) -> LoginOutcome:
             )
             return LoginOutcome.REFUSED
         case ApiKeyVerdict.ACCEPTED:
-            env_path = save_pipelex_api_key(api_key=api_key)
+            env_path = _save_or_report(console=console, api_key=api_key)
+            if env_path is None:
+                return LoginOutcome.NOT_SAVED
             account = f" as {escape(check.account_email)}" if check.account_email else ""
             console.print(
                 f"[green]✓[/green] Logged in{account}. Your Pipelex API key is saved to {escape(str(env_path))} as {PIPELEX_API_KEY_ENV_KEY}."
@@ -131,7 +154,9 @@ def check_and_save_api_key(*, console: Console, api_key: str) -> LoginOutcome:
             warn_about_shadowing_env_file(console=console)
             return LoginOutcome.SAVED
         case ApiKeyVerdict.UNCHECKED:
-            env_path = save_pipelex_api_key(api_key=api_key)
+            env_path = _save_or_report(console=console, api_key=api_key)
+            if env_path is None:
+                return LoginOutcome.NOT_SAVED
             console.print(
                 f"[yellow]⚠ Could not check the key: {escape(check.reason or 'no answer')}. "
                 f"It is saved to {escape(str(env_path))} as {PIPELEX_API_KEY_ENV_KEY} anyway: "

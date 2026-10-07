@@ -42,6 +42,7 @@ from pipelex.cli.commands.init.telemetry import setup_telemetry
 from pipelex.cli.commands.init.ui.general_ui import build_initialization_panel
 from pipelex.cli.commands.init.ui.setup_path_ui import prompt_setup_path
 from pipelex.cli.commands.init.ui.types import InitFocus
+from pipelex.cli.commands.login.command import LOGIN_PASTE_COMMAND
 from pipelex.cogt.models.deck_manifest import stamp_kit_manifests
 from pipelex.hosted.run_config import RunExecution
 from pipelex.kit.paths import get_kit_configs_dir
@@ -104,6 +105,8 @@ class InitInspection(BaseModel):
     routing_profiles_toml_path: Path
     telemetry_config_path: Path
     pipelex_toml_path: Path
+    #: Whether the target `pipelex.toml` exists: a home without one is brand new.
+    pipelex_toml_exists: bool
     is_first_time_backends_setup: bool
     #: The `[run] execution` the target `pipelex.toml` sets now, kept across a reset that does not ask again.
     configured_execution: RunExecution | None
@@ -136,14 +139,18 @@ class InitInspection(BaseModel):
     def unattended_setup_path(self) -> SetupPath | None:
         """The path taken when nobody is asked (`pipelex doctor --fix`).
 
-        None when this run does not decide where runs execute; the one the target's `[run] execution` already sets, so
-        installing missing files never moves runs off this machine; the hosted default only when none is set.
+        None when this run does not decide where runs execute. Otherwise installing missing files never moves runs off
+        this machine: the target's `[run] execution` is kept when it sets one, a `pipelex.toml` that sets none, such as
+        one written before `[run]` existed, runs locally as the package default says and stays local, and the hosted
+        default is taken only for a brand-new home, with no `pipelex.toml` yet.
         """
         if not self.asks_setup_path:
             return None
-        if self.configured_execution is None:
-            return DEFAULT_SETUP_PATH
-        return SetupPath.from_run_execution(execution=self.configured_execution)
+        if self.configured_execution is not None:
+            return SetupPath.from_run_execution(execution=self.configured_execution)
+        if self.pipelex_toml_exists:
+            return SetupPath.LOCAL
+        return DEFAULT_SETUP_PATH
 
 
 class InitChoices(BaseModel):
@@ -219,6 +226,7 @@ def inspect_initialization(*, focus: InitFocus, local: bool) -> InitInspection:
         routing_profiles_toml_path=routing_profiles_toml_path,
         telemetry_config_path=telemetry_config_path,
         pipelex_toml_path=pipelex_toml_path,
+        pipelex_toml_exists=pipelex_toml_path.is_file(),
         is_first_time_backends_setup=is_first_time_backends_setup,
         configured_execution=read_run_execution(pipelex_toml_path=pipelex_toml_path),
         check_credentials=check_credentials,
@@ -297,8 +305,8 @@ def choose_initialization(*, console: Console, inspection: InitInspection, skip_
         console: Rich Console instance for user interaction.
         inspection: What stage 1 found.
         skip_confirmation: Ask nothing (`pipelex doctor --fix`): the confirmation is skipped, and where runs execute
-            is the one the target's `[run] execution` already sets, or the hosted Pipelex API when no `[run] execution`
-            is set.
+            is the one the target's `[run] execution` already sets, local for a `pipelex.toml` that sets none, and the
+            hosted Pipelex API only for a brand-new home with no `pipelex.toml` yet.
 
     Returns:
         The choices stage 3 executes.
@@ -470,7 +478,12 @@ def execute_initialization(*, console: Console, inspection: InitInspection, choi
 
     # Step 5: Hosted runs need a key. Last, so every file is written before a sign-in that can take minutes.
     if setup_path is not None and setup_path.is_hosted:
-        ensure_pipelex_api_key(console=console, interactive=choices.interactive)
+        try:
+            ensure_pipelex_api_key(console=console, interactive=choices.interactive)
+        except OSError as exc:
+            # Every file is written by now, so the setup stands; only the key is missing, and the login is its remedy.
+            console.print(f"[yellow]⚠ Your setup is saved, but no Pipelex API key was: {escape(str(exc))}[/yellow]")
+            console.print(f"Run [cyan]pipelex login[/cyan] (or [cyan]{LOGIN_PASTE_COMMAND}[/cyan]) to get one.")
 
     console.print()
 
@@ -489,8 +502,8 @@ def init_cmd(
     Args:
         focus: What to initialize - 'all', 'config', 'credentials', 'inference', 'routing', or 'telemetry'
         skip_confirmation: If True, ask nothing (used when called from doctor --fix): skip the confirmation, keep the
-            `[run] execution` already set, take the hosted Pipelex API when no `[run] execution` is set, and print
-            `pipelex login` instead of opening a browser.
+            `[run] execution` already set (local for a `pipelex.toml` that sets none), take the hosted Pipelex API only
+            for a brand-new home with no `pipelex.toml`, and print `pipelex login` instead of opening a browser.
         local: If True, create project-level .pipelex/ at the detected project root.
             Otherwise, create the home configuration directory (~/.pipelex/, or PIPELEX_HOME).
     """

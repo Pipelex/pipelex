@@ -38,7 +38,7 @@ All commands except `credentials` perform a **full reset** (overwrite existing f
 ### Inputs
 
 - **`focus`** (`InitFocus` enum): Determines which steps run. Derived from the CLI subcommand.
-- **`skip_confirmation`** (`bool`): When `True`, asks nothing: skips the confirmation, keeps the `[run] execution` the target already sets, takes the hosted Pipelex API only when no `[run] execution` is set, and prints `pipelex login` instead of opening a browser. Used when called from `pipelex doctor --fix`.
+- **`skip_confirmation`** (`bool`): When `True`, asks nothing: skips the confirmation, keeps the `[run] execution` the target already sets (local for a `pipelex.toml` that sets none), takes the hosted Pipelex API only for a brand-new home with no `pipelex.toml`, and prints `pipelex login` instead of opening a browser. Used when called from `pipelex doctor --fix`.
 - **`local`** (`bool`): When `True`, targets the project-level `.pipelex/` directory instead of the global `~/.pipelex/`. Maps to the `--local` CLI flag.
 
 ### Outputs / Side Effects
@@ -82,7 +82,7 @@ flowchart TD
 
     FOCUS -- "all / config / inference / routing / telemetry" --> INSPECT["inspect_initialization<br/>determine_needs, first-time detection,<br/>current run execution"]
     INSPECT --> SKIP{skip_confirmation?}
-    SKIP -- "Yes (doctor --fix)" --> DEFAULT["Setup path: the configured one,<br/>else hosted (when the run asks it)"]
+    SKIP -- "Yes (doctor --fix)" --> DEFAULT["Setup path: the configured one, local for a<br/>pipelex.toml without it, hosted for a new home<br/>(when the run asks it)"]
     SKIP -- No --> CONFIRM{User confirms?}
     CONFIRM -- No --> CANCEL([Cancelled])
     CONFIRM -- Yes --> ASKS{asks_setup_path?}
@@ -177,9 +177,9 @@ if needs_config and is_first_time_backends_setup:
 
 ### Where Runs Execute
 
-`pipelex/cli/commands/init/setup_path.py` holds the choice: `SetupPath` (`HOSTED`, `LOCAL`), `DEFAULT_SETUP_PATH` (hosted, the answer Enter takes, and the one `doctor --fix` takes when no `[run] execution` is set; `InitInspection.unattended_setup_path` otherwise keeps the configured one), and the tomlkit edit of `[run] execution`, `write_run_execution()` and `read_run_execution()`, which keep every other line of `pipelex.toml`, comments included. The question itself is `prompt_setup_path()` in `ui/setup_path_ui.py`.
+`pipelex/cli/commands/init/setup_path.py` holds the choice: `SetupPath` (`HOSTED`, `LOCAL`), `DEFAULT_SETUP_PATH` (hosted, the answer Enter takes, and the one `doctor --fix` takes for a brand-new home with no `pipelex.toml`; otherwise `InitInspection.unattended_setup_path` keeps the configured `[run] execution`, and local for a `pipelex.toml` that sets none), and the tomlkit edit of `[run] execution`, `write_run_execution()` and `read_run_execution()`, which keep every other line of `pipelex.toml`, comments included. The question itself is `prompt_setup_path()` in `ui/setup_path_ui.py`.
 
-- **Hosted** writes `execution = "hosted"` in Step 2, leaves the kit's inference files as copied, skips the credentials step, and, once every file is written (Step 5), calls `ensure_pipelex_api_key()`: a key already in `PIPELEX_API_KEY` or saved in the home `.env` is kept with no login and no network call; otherwise an interactive run calls `login_with_browser()` from `pipelex/cli/commands/login/` (see [`pipelex login`](../tools/cli/login.md)), and a run with nobody to answer prints `pipelex login`.
+- **Hosted** writes `execution = "hosted"` in Step 2 and reconfigures nothing after the reset, so the inference files are the kit's defaults, any customised backends and routing included, until `pipelex init inference` reconfigures them; it skips the credentials step, and, once every file is written (Step 5), calls `ensure_pipelex_api_key()`: a key already in `PIPELEX_API_KEY` or saved in the home `.env` is kept with no login and no network call; otherwise an interactive run calls `login_with_browser()` from `pipelex/cli/commands/login/` (see [`pipelex login`](../tools/cli/login.md)), and a run with nobody to answer prints `pipelex login`. An `OSError` in that step, such as a loopback listener that cannot bind, is reported as a saved setup with no key, naming `pipelex login` and `pipelex login --paste`, since every file is already written.
 - **Local** runs the backend and routing steps unchanged, writes `execution = "local"`, and runs the credentials step.
 
 A configuration reset that does not ask the question (`pipelex init config` on an existing setup) copies the kit's `pipelex.toml`, whose `execution` is `"local"`, so the execute stage writes back the `configured_execution` the inspection read, and skips the credentials step when that is `"hosted"`.
@@ -213,7 +213,7 @@ When `needs_inference` is `True` and `reset` is `True`, the inference step copie
 3. `deck/*.toml` — model deck configurations
 4. `routing_profiles.toml` — routing profile definitions
 
-Then, on the hosted path, writes `execution = "hosted"` and offers the IDE extension, customizing nothing. On the local path, or when the run does not decide where runs execute (`focus=inference`), it runs interactive customization:
+A reset therefore puts customised backends and routing back to the kit's defaults, which the confirmation panel says. Then, on the hosted path, it writes `execution = "hosted"` and offers the IDE extension, customizing nothing, so the defaults stay until `pipelex init inference`. On the local path, or when the run does not decide where runs execute (`focus=inference`), it runs interactive customization:
 
 1. `customize_backends_config()` — prompts user to select backends and suggests IDE extension installation via `suggest_extension_install_if_needed()`
 2. `customize_routing_profile()` — auto-configures routing based on selected backends (**only when `check_routing` is `False`**, i.e. when routing is not the specific focus)
@@ -251,8 +251,8 @@ On the hosted path only, `ensure_pipelex_api_key()` runs last, so every file is 
 | Fresh project, full init, hosted | `all` | Copies config files | Copies templates, writes `execution = "hosted"` | Skipped (sign-in instead) | Skipped | Copies template |
 | Fresh project, full init, this machine | `all` | Copies config files | Copies templates + interactive selection, writes `execution = "local"` | Prompted | Auto (part of inference) | Copies template |
 | Fresh project, config only | `config` | Copies config files | Forced (first-time detected), asks where runs execute | Prompted on this machine | Auto on this machine | Skipped |
-| `doctor --fix`, fresh project, no `[run] execution` set | `config` | Copies config files | Forced, hosted taken without asking | Skipped (prints `pipelex login`) | Skipped | Skipped |
-| `doctor --fix`, fresh project, `[run] execution` set | `config` | Copies config files | Forced, the configured setting kept without asking | Prompted on this machine | Auto on this machine | Skipped |
+| `doctor --fix`, brand-new home, no `pipelex.toml` | `config` | Copies config files | Forced, hosted taken without asking | Skipped (prints `pipelex login`) | Skipped | Skipped |
+| `doctor --fix`, no `backends.toml`, `pipelex.toml` present | `config` | Copies config files | Forced, the configured setting kept without asking, local when it sets none | Prompted on this machine | Auto on this machine | Skipped |
 | Existing project, full re-init | `all` | Overwrites config files | Resets templates, asks where runs execute again | Prompted on this machine | Auto on this machine | Overwrites template |
 | Existing project, config only | `config` | Overwrites config files, keeps `[run] execution` | Skipped (backends already exist) | Prompted unless hosted | Skipped | Skipped |
 | Existing project, inference only | `inference` | Skipped | Resets templates + interactive selection | Prompted | Auto (part of inference) | Skipped |

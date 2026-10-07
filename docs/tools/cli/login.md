@@ -63,7 +63,7 @@ Set them in `~/.pipelex/.env` to keep them for every command.
 ## Exit Codes
 
 - `0`: a key was saved, checked or not.
-- `1`: nothing was saved: no key arrived in time, none was pasted, the value was not a Pipelex API key, the hosted API refused it, or `PIPELEX_APP_URL` is not an origin.
+- `1`: nothing was saved: no key arrived in time, none was pasted, the value was not a Pipelex API key, the hosted API refused it, `PIPELEX_APP_URL` is not an origin, or the `.env` could not be written. In that last case the command names the file and the error; the key it received went unused, so revoke it in the Pipelex app and run `pipelex login` again once the file can be written.
 
 ## Related
 

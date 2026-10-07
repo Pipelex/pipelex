@@ -66,7 +66,8 @@ class TestProjectExecutionShadow:
         )
 
         assert read_run_execution(pipelex_toml_path=pipelex_home / "pipelex.toml") == RunExecution.HOSTED
-        printed = recorded_console.text().replace("\n", "")
+        # Rich wraps long lines at spaces; joining the words back reads the message as written
+        printed = " ".join(recorded_console.text().split())
         assert str(project_config_dir / "pipelex.toml") in printed
         assert 'execution = "local"' in printed
         assert "--hosted" in printed

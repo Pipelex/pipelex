@@ -58,6 +58,38 @@ class TestLoginWithPaste:
         assert "remove" in printed.lower()
         assert TEST_KEY not in printed
 
+    @pytest.mark.parametrize("unwritable", ["set_key_raises", "read_only_home"])
+    def test_a_key_that_cannot_be_saved_exits_1_and_says_it_went_unused(
+        self, mocker: MockerFixture, pipelex_home: Path, output: StringIO, unwritable: str
+    ) -> None:
+        mocker.patch("pipelex.cli.commands.login.command.Prompt.ask", return_value=TEST_KEY)
+        patch_check(mocker, check=ACCEPTED)
+        env_path = pipelex_home / ".env"
+        if unwritable == "set_key_raises":
+            mocker.patch(
+                "pipelex.cli.commands.init.credentials.set_key",
+                side_effect=PermissionError(13, "Permission denied", str(env_path)),
+            )
+        else:
+            pipelex_home.mkdir()
+            pipelex_home.chmod(0o500)
+
+        try:
+            with pytest.raises(typer.Exit) as exc_info:
+                login_cmd(paste=True)
+        finally:
+            if pipelex_home.exists():
+                pipelex_home.chmod(0o700)
+
+        assert exc_info.value.exit_code == 1
+        assert saved_key(home=pipelex_home) is None
+        # Rich wraps long lines at spaces; joining the words back reads the message as written
+        printed = " ".join(output.getvalue().split())
+        assert str(env_path) in printed
+        assert "Permission denied" in printed
+        assert "revoke" in printed.lower()
+        assert TEST_KEY not in printed
+
     @pytest.mark.parametrize("answer", ["", "   "])
     def test_nothing_pasted_saves_nothing(self, mocker: MockerFixture, pipelex_home: Path, output: StringIO, answer: str) -> None:
         mocker.patch("pipelex.cli.commands.login.command.Prompt.ask", return_value=answer)

@@ -74,7 +74,7 @@ class TestInitStages:
         assert inspection.kept_execution is None
 
     @pytest.mark.usefixtures("config_dir")
-    def test_without_anyone_to_answer_and_no_setting_the_hosted_default_is_taken(self, mocker: MockerFixture) -> None:
+    def test_without_anyone_to_answer_a_brand_new_home_takes_the_hosted_default(self, mocker: MockerFixture) -> None:
         prompt = mocker.patch("pipelex.cli.commands.init.command.prompt_setup_path")
         confirm = mocker.patch("pipelex.cli.commands.init.command.Confirm.ask")
 
@@ -84,6 +84,22 @@ class TestInitStages:
         assert not choices.interactive
         prompt.assert_not_called()
         confirm.assert_not_called()
+
+    @pytest.mark.parametrize("content", ["# written before [run] existed\n[log]\nlevel = 'info'\n", "", "[run\nbroken"])
+    def test_without_anyone_to_answer_an_existing_pipelex_toml_without_the_setting_stays_local(
+        self, config_dir: Path, mocker: MockerFixture, content: str
+    ) -> None:
+        """A `pipelex.toml` older than `[run]` runs on this machine, the package default, so a repair keeps it there."""
+        config_dir.mkdir(parents=True)
+        (config_dir / "pipelex.toml").write_text(content, encoding="utf-8")
+        mocker.patch("pipelex.cli.commands.init.command.prompt_setup_path")
+        inspection = _inspect(focus=InitFocus.CONFIG)
+        assert inspection.asks_setup_path
+        assert inspection.configured_execution is None
+
+        choices = choose_initialization(console=Console(quiet=True), inspection=inspection, skip_confirmation=True)
+
+        assert choices.setup_path == SetupPath.LOCAL
 
     @pytest.mark.parametrize("configured", [RunExecution.LOCAL, RunExecution.HOSTED])
     def test_without_anyone_to_answer_a_configured_setting_is_kept(self, config_dir: Path, mocker: MockerFixture, configured: RunExecution) -> None:
