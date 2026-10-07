@@ -60,7 +60,7 @@ from pipelex.hosted.run_config import RunExecution
 from pipelex.interpreter_plugins.builtins import BUILTIN_PLUGINS, CORE_UNCONDITIONAL_PLUGIN_NAMES, ENTRY_POINT_GROUPS
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.migration.exceptions import FormerReleaseConfigError, MigrationError
-from pipelex.migration.former_release import RETIRED_BACKEND_NAMES, detect_former_release, former_release_boot_blockers
+from pipelex.migration.former_release import RETIRED_BACKEND_NAMES, former_release_boot_blockers
 from pipelex.migration.former_release_cleanup import clean_former_release
 from pipelex.migration.run import config_directories_to_migrate, migrate_config_directories, scan_config_surface
 from pipelex.plugins.discovery import build_registrar
@@ -354,7 +354,8 @@ class PendingMigrationsCheck(BaseModel):
     Pipelex Manifold left, each rewritten without it or removed, a copy of each kept."""
 
     former_release_blocks_boot: bool = False
-    """Whether what that release left stops every boot until it is cleaned up."""
+    """Whether what that release left stops this machine's boot until it is cleaned up: read off the files that boot
+    merges, the project's own bases included, never off one directory alone."""
 
     @property
     def is_healthy(self) -> bool:
@@ -387,12 +388,22 @@ def check_pending_migrations() -> PendingMigrationsCheck:
 
     **The command's first step is the cleanup of a former release**, and the row reports it too: the
     files a release that ran on the Pipelex Gateway or Pipelex Manifold left, which the command
-    removes or rewrites, and whether what is in them stops the boot.
+    removes or rewrites, and whether what is in them stops the boot. That verdict is the boot's own
+    check over the files it merges, home and project together: a project booting on bases of its own
+    is not told it cannot start because of the home's, and a profile one directory activates from
+    the other is not missed. The replay leaves the files the cleanup removes out of its walk, as the
+    command does.
     """
     config_dirs = config_directories_to_migrate()
     try:
         cleanup = clean_former_release(config_dirs=config_dirs, dry_run=True)
-        report = migrate_config_directories(config_dirs=config_dirs, dry_run=True)
+        report = migrate_config_directories(config_dirs=config_dirs, dry_run=True, skipped_paths=cleanup.removed_paths)
+        former_release_blocks_boot = bool(
+            former_release_boot_blockers(
+                backends_library_paths=config_manager.backends_file_paths(),
+                routing_profile_library_paths=config_manager.routing_profiles_file_paths(),
+            )
+        )
     except (MigrationError, OSError) as exc:
         return PendingMigrationsCheck(
             finding=PendingMigrationsFinding.UNAVAILABLE,
@@ -406,7 +417,6 @@ def check_pending_migrations() -> PendingMigrationsCheck:
         )
 
     former_release_files = [str(file.file_path) for file in cleanup.files if not file.is_blocked]
-    former_release_blocks_boot = any(detect_former_release(config_dir=config_dir).blocks_boot for config_dir in config_dirs)
     migratable_files = [str(plan.file_path) for plan in report.changed_plans]
     # In the order the run visited them, and deduplicated: one file can be both blocked and
     # carrying a path the schema cannot explain.
@@ -1903,12 +1913,20 @@ def do_doctor_cmd(
                 try:
                     console.print()
                     config_dirs = config_directories_to_migrate()
-                    # The cleanup first, as `pipelex migrate` runs it: it removes files the replay would otherwise walk.
+                    # The cleanup first, as `pipelex migrate` runs it: the replay leaves the files it removes out of its walk.
+                    removed_paths: frozenset[Path] = frozenset()
                     if former_release_count:
                         cleaned = apply_former_release_cleanup(config_dirs=config_dirs)
-                        console.print(f"[green]✓[/green] Cleaned up {len(cleaned.applied_files)} file(s) a former release left")
+                        removed_paths = cleaned.removed_paths
+                        if cleaned.needs_attention:
+                            console.print(
+                                f"[yellow]⚠[/yellow] Cleaned up {len(cleaned.applied_files)} file(s) a former release left, "
+                                "and something is left for you to look at, as marked above"
+                            )
+                        else:
+                            console.print(f"[green]✓[/green] Cleaned up {len(cleaned.applied_files)} file(s) a former release left")
                     if migratable_count:
-                        applied = apply_pending_migrations(config_dirs=config_dirs)
+                        applied = apply_pending_migrations(config_dirs=config_dirs, skipped_paths=removed_paths)
                         console.print(f"[green]✓[/green] Migrated {len(applied.written_plans)} configuration file(s)")
                     # The rows below were measured before this ran, so a file this just repaired can
                     # still be reported as broken further down.

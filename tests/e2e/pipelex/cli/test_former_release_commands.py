@@ -20,7 +20,7 @@ from pathlib import Path
 
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.migration.former_release import detect_former_release
-from pipelex.system.configuration.config_loader import BACKENDS_FILE_NAME, INFERENCE_DIR_NAME, ROUTING_PROFILES_FILE_NAME
+from pipelex.system.configuration.config_loader import BACKENDS_DIR_NAME, BACKENDS_FILE_NAME, INFERENCE_DIR_NAME, ROUTING_PROFILES_FILE_NAME
 from tests.e2e.agent_cli.conftest import REPO_ROOT
 
 PIPELEX_BIN = REPO_ROOT / ".venv" / "bin" / "pipelex"
@@ -31,8 +31,11 @@ V0_72_CLEANED_DIR = REPO_ROOT / "tests" / "data" / "migration" / "former_release
 
 PROJECT_DIR_NAME = "workspace"
 
-# The files the cleanup touches in one v0.72 directory: two rewritten, five removed.
-V0_72_FILES_PER_DIRECTORY = 7
+# The files the cleanup touches in one v0.72 directory, rewritten or removed.
+V0_72_FILES_PER_DIRECTORY = len(detect_former_release(config_dir=V0_72_CONFIG_DIR).file_paths)
+
+# A model table whose key the inference-backend ledger renames.
+MIGRATABLE_MODEL_TABLE = '\n["gpt-4o"]\nprompting_target = "openai"\n'
 
 
 def _plant_a_former_release_machine(*, hermetic_home: Path) -> tuple[Path, Path, Path]:
@@ -109,6 +112,10 @@ class TestAFormerReleaseMachine:
         self, hermetic_home: Path, offline_subprocess_env: dict[str, str]
     ) -> None:
         project_dir, home_config_dir, project_config_dir = _plant_a_former_release_machine(hermetic_home=hermetic_home)
+        # A key the ledger would carry forward, in a file the cleanup removes: the replay never walks it.
+        gateway_file = home_config_dir / INFERENCE_DIR_NAME / BACKENDS_DIR_NAME / "pipelex_gateway.toml"
+        with gateway_file.open("a", encoding="utf-8") as stream:
+            stream.write(MIGRATABLE_MODEL_TABLE)
 
         planned = _run(args=[str(PIPELEX_AGENT_BIN), "migrate", "--dry-run", "--format", "json"], env=offline_subprocess_env, cwd=project_dir)
 
@@ -119,6 +126,7 @@ class TestAFormerReleaseMachine:
         assert plan["needs_attention"] is False
         assert plan["summary"]["former_release_files"] == 2 * V0_72_FILES_PER_DIRECTORY
         assert {file["action"] for file in plan["former_release"]["files"]} == {"rewrite", "remove"}
+        assert str(gateway_file) not in {migration_plan["file_path"] for migration_plan in plan["plans"]}
         assert not detect_former_release(config_dir=home_config_dir).is_clean, "a dry run writes nothing"
 
         applied = _run(args=[str(PIPELEX_AGENT_BIN), "migrate", "--yes", "--format", "json"], env=offline_subprocess_env, cwd=project_dir)
@@ -127,6 +135,7 @@ class TestAFormerReleaseMachine:
         result = json.loads(applied.stdout)
         assert result["summary"]["former_release_files_cleaned"] == 2 * V0_72_FILES_PER_DIRECTORY
         assert all(file["backup_path"] for file in result["former_release"]["files"])
+        assert result["former_release"]["still_blocking"] == []
         _assert_cleaned(config_dirs=(home_config_dir, project_config_dir))
         booted = _boot(env=offline_subprocess_env, cwd=project_dir)
         assert booted.returncode == 0, booted.stdout + booted.stderr

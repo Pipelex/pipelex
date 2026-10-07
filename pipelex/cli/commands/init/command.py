@@ -4,7 +4,8 @@
 
 1. **Inspect** (`inspect_initialization`): read what is on disk and what the focus asks for, and decide which steps
    are needed. It asks nothing and writes nothing. It also finds what a former release that ran on the Pipelex Gateway
-   or Pipelex Manifold left in the configuration directories a boot reads.
+   or Pipelex Manifold left in the configuration directories a boot reads, read together as the boot merges them, and
+   whether it stops this machine's boot, which is the boot's own check over the files it merges.
 2. **Choose** (`choose_initialization`): first, when the inspection found what a former release left, say so and
    offer the cleanup `pipelex migrate` runs, then run it on a yes (unasked when nobody answers); then the
    confirmation, then where runs execute, the hosted Pipelex API or this machine.
@@ -49,7 +50,13 @@ from pipelex.cogt.models.deck_manifest import stamp_kit_manifests
 from pipelex.core.validation import MIGRATE_COMMAND
 from pipelex.hosted.run_config import RunExecution
 from pipelex.kit.paths import get_kit_configs_dir
-from pipelex.migration.former_release import FormerReleaseFindings, detect_former_release, kit_default_routing_profile_name
+from pipelex.migration.former_release import (
+    FormerReleaseFinding,
+    FormerReleaseFindings,
+    detect_former_release_across,
+    former_release_boot_blockers,
+    kit_default_routing_profile_name,
+)
 from pipelex.runtime_hub import get_console
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
@@ -121,8 +128,12 @@ class InitInspection(BaseModel):
     needs_inference: bool
     needs_routing: bool
     needs_telemetry: bool
-    #: What a former release left in each configuration directory a boot reads, the target among them; empty when nothing.
+    #: The configuration directories a boot reads, the home's then the project's, which the former-release cleanup runs over.
+    former_release_config_dirs: list[Path]
+    #: What a former release left in each of them, read as the boot merges them; empty when nothing.
     former_release_findings: list[FormerReleaseFindings]
+    #: What of it stops this machine's boot, read off the files that boot merges; empty when the boot starts.
+    former_release_boot_blockers: list[FormerReleaseFinding]
 
     @property
     def asks_setup_path(self) -> bool:
@@ -223,11 +234,14 @@ def inspect_initialization(*, focus: InitFocus, local: bool) -> InitInspection:
     if needs_config and is_first_time_backends_setup:
         needs_inference = True
 
-    # Every directory a boot reads, not only the target: a former release's files in the other one stop the boot as surely.
-    inspected_dirs = list(dict.fromkeys([target_config_dir, *config_manager.existing_config_dirs]))
-    former_release_findings = [
-        findings for findings in (detect_former_release(config_dir=config_dir) for config_dir in inspected_dirs) if not findings.is_clean
-    ]
+    # Every directory a boot reads, not only the target, read together: a profile one of them activates can be defined in the
+    # other, and a former release's files there stop the boot as surely.
+    former_release_config_dirs = list(config_manager.existing_config_dirs)
+    former_release_findings = [findings for findings in detect_former_release_across(config_dirs=former_release_config_dirs) if not findings.is_clean]
+    boot_blockers = former_release_boot_blockers(
+        backends_library_paths=config_manager.backends_file_paths(),
+        routing_profile_library_paths=config_manager.routing_profiles_file_paths(),
+    )
 
     return InitInspection(
         focus=focus,
@@ -248,21 +262,26 @@ def inspect_initialization(*, focus: InitFocus, local: bool) -> InitInspection:
         needs_inference=needs_inference,
         needs_routing=needs_routing,
         needs_telemetry=needs_telemetry,
+        former_release_config_dirs=former_release_config_dirs,
         former_release_findings=former_release_findings,
+        former_release_boot_blockers=boot_blockers,
     )
 
 
-def describe_former_release_findings(*, findings: list[FormerReleaseFindings]) -> str:
+def describe_former_release_findings(*, findings: list[FormerReleaseFindings], blockers: list[FormerReleaseFinding]) -> str:
     """What a former release left, in words: what of it stops the boot, the files it is in, and what the cleanup does.
 
     The findings that stop the boot are spelled out; the rest are counted by file, since `pipelex migrate --dry-run`
     lists every change for whoever wants each one.
+
+    Args:
+        findings: What the former release left, per directory.
+        blockers: What of it stops this machine's boot, as `former_release_boot_blockers` reads the files the boot merges.
     """
     lead = (
         "This machine was set up by a former Pipelex release, which ran models through the Pipelex Gateway or Pipelex Manifold, "
         "and this release has neither."
     )
-    blockers = [finding for directory_findings in findings for finding in directory_findings.findings if finding.blocks_boot]
     if blockers:
         lines = [f"{lead} Pipelex cannot start until what that release left is cleaned up:", *(f"• {finding.description}" for finding in blockers)]
     else:
@@ -292,17 +311,22 @@ def offer_former_release_cleanup(*, console: Console, inspection: InitInspection
     console.print()
     console.print(
         Panel(
-            escape(describe_former_release_findings(findings=inspection.former_release_findings)),
+            escape(describe_former_release_findings(findings=inspection.former_release_findings, blockers=inspection.former_release_boot_blockers)),
             title="[bold yellow]Left by a former release[/bold yellow]",
             border_style="yellow",
         )
     )
     if interactive and not Confirm.ask("[bold]Clean it up now?[/bold]", default=True):
-        until = " Pipelex will not start until then." if any(findings.blocks_boot for findings in inspection.former_release_findings) else ""
+        until = " Pipelex will not start until then." if inspection.former_release_boot_blockers else ""
         console.print(f"[yellow]Left as it is.[/yellow] [cyan]{MIGRATE_COMMAND}[/cyan] cleans it up whenever you are ready.{until}")
         return
-    cleanup = apply_former_release_cleanup(config_dirs=[findings.config_dir for findings in inspection.former_release_findings])
-    if cleanup.needs_attention:
+    cleanup = apply_former_release_cleanup(config_dirs=inspection.former_release_config_dirs)
+    if cleanup.still_blocking:
+        console.print(
+            f"[yellow]⚠ Pipelex still cannot start after the cleanup, as marked above. Fix what is named there, then run "
+            f"[cyan]{MIGRATE_COMMAND}[/cyan] to check.[/yellow]"
+        )
+    elif cleanup.needs_attention:
         console.print(
             f"[yellow]⚠ Some files could not be cleaned up, as marked above. Run [cyan]{MIGRATE_COMMAND}[/cyan] once they can be written.[/yellow]"
         )

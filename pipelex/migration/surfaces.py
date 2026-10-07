@@ -26,6 +26,7 @@ from pipelex.cogt.model_backends.model_spec_document import (
     describe_model_spec_document_rejection,
 )
 from pipelex.cogt.model_backends.model_spec_keys import is_header_shaped, is_legal_header_name
+from pipelex.kit.paths import RETIRED_SERVICE_FILE_NAME
 from pipelex.migration.exceptions import MigrationRegistryError
 from pipelex.migration.fingerprint import SurfaceFingerprint, compute_fingerprint
 from pipelex.suggested_fix import WILDCARD_SEGMENT
@@ -45,7 +46,7 @@ PIPELEX_CONFIG_FILE_NAME = "pipelex.toml"
 # installation may still hold one, and it is inert: nothing reads it. It is claimed by no surface,
 # which matters because a retired name can still match a live surface's glob — `pipelex_service.toml`
 # is a `pipelex_*.toml` — and that surface's ledger must not be replayed over a document it never saw.
-RETIRED_CONFIG_FILE_NAMES: frozenset[str] = frozenset({"pipelex_service.toml"})
+RETIRED_CONFIG_FILE_NAMES: frozenset[str] = frozenset({RETIRED_SERVICE_FILE_NAME})
 
 # The package directory, `pipelex/` — this module sits one level under it.
 _PACKAGE_ROOT = Path(__file__).resolve().parent.parent

@@ -12,6 +12,7 @@ engine replays the whole ledger over every file and the applier skips whatever i
 See `docs/migration-ledger.md` → "Applying" and "Per-file transactions".
 """
 
+from collections.abc import Collection
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, NamedTuple
@@ -368,12 +369,17 @@ def migrate_directories(
     config_dirs: list[Path],
     dry_run: bool,
     only_surface_id: str | None = None,
+    skipped_paths: Collection[Path] = (),
     moment: datetime | None = None,
 ) -> MigrationReport:
     """Migrate every claimed file in every given configuration directory.
 
     The walk is over the directories a caller names — in practice the global `~/.pipelex/` and the
     project's `.pipelex/`, and only those. A directory that does not exist is skipped.
+
+    `skipped_paths` are files the walk leaves out altogether: the ones the former-release cleanup
+    removes, which `pipelex migrate` runs first. A file about to be deleted is neither counted among
+    the files to migrate nor reported as needing a look, in the rehearsal or in the write pass.
 
     `only_surface_id` narrows the answer to one surface, for a caller that is diagnosing a
     particular model's refusal rather than migrating the machine. **It narrows the result, not the
@@ -383,11 +389,19 @@ def migrate_directories(
     it. Arbitration first, then the filter.
     """
     stamp = moment if moment is not None else datetime.now(UTC)
+    skipped = {_walk_identity(path=path) for path in skipped_paths}
     plans: list[MigrationPlan] = []
     for directory in config_dirs:
         for surface, file_path in registry.files_by_surface_in_directory(directory=directory):
             if only_surface_id is not None and surface.surface_id != only_surface_id:
                 continue
+            if _walk_identity(path=file_path) in skipped:
+                continue
             ledger = load_ledger_cached(migration_dir=migration_dir, surface_id=surface.surface_id)
             plans.append(migrate_file(surface=surface, ledger=ledger, file_path=file_path, dry_run=dry_run, moment=stamp))
     return MigrationReport(plans=plans)
+
+
+def _walk_identity(*, path: Path) -> Path:
+    """A file as the walk compares it: its directory resolved and its own name kept, so a link is the link itself."""
+    return path.parent.resolve() / path.name

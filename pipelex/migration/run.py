@@ -30,6 +30,7 @@ user would be told one thing by their boot and another by their tool.
 See `docs/migration-ledger.md` → "Surfaces" and "Applying".
 """
 
+from collections.abc import Collection
 from pathlib import Path
 
 from pipelex.migration.gitignore import ensure_config_dir_gitignore
@@ -72,7 +73,7 @@ def ensure_config_dir_gitignores(*, config_dirs: list[Path]) -> None:
         ensure_config_dir_gitignore(directory=directory)
 
 
-def migrate_config_directories(*, config_dirs: list[Path], dry_run: bool) -> MigrationReport:
+def migrate_config_directories(*, config_dirs: list[Path], dry_run: bool, skipped_paths: Collection[Path] = ()) -> MigrationReport:
     """Replay every surface's shipped ledger over every claimed file in the given directories.
 
     The registry and the ledger directory are the package's own, which is what makes this the
@@ -86,6 +87,10 @@ def migrate_config_directories(*, config_dirs: list[Path], dry_run: bool) -> Mig
     This covers the run that *writes*. It is deliberately not the only place the rule is ensured:
     a run with nothing to carry forward never reaches this function at all, and that is the state
     most machines are in. See `ensure_config_dir_gitignores`.
+
+    `skipped_paths` are the files the former-release cleanup removes, which every caller running
+    that cleanup first hands here, in its rehearsal and its write pass alike: a file about to go is
+    neither migrated nor reported on.
     """
     if not dry_run:
         ensure_config_dir_gitignores(config_dirs=config_dirs)
@@ -94,6 +99,7 @@ def migrate_config_directories(*, config_dirs: list[Path], dry_run: bool) -> Mig
         migration_dir=packaged_migration_dir(),
         config_dirs=config_dirs,
         dry_run=dry_run,
+        skipped_paths=skipped_paths,
     )
 
 

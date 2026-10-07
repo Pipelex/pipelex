@@ -12,12 +12,12 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from pipelex.cogt.model_routing.routing_profile_loader import load_active_routing_profile
 from pipelex.fix_ops.file_transaction import PendingFileUpdate, commit_file_updates
-from pipelex.kit.paths import get_kit_configs_dir
+from pipelex.kit.paths import RETIRED_SERVICE_FILE_NAME, get_kit_configs_dir
 from pipelex.migration.backup import backup_path_for, existing_backups_of
 from pipelex.migration.former_release import (
     MODEL_SPECS_SECTION_KEY,
-    SERVICE_FILE_NAME,
     detect_former_release,
     kit_default_routing_profile_name,
 )
@@ -53,7 +53,7 @@ V0_72_ACTIONS = [
     (f"{BACKEND_FILES}/pipelex_manifold.toml", FormerReleaseFileAction.REMOVE),
     (f"{BACKEND_FILES}/pipelex_gateway_models.md", FormerReleaseFileAction.REMOVE),
     (f"{BACKEND_FILES}/pipelex_gateway_models_plain.md", FormerReleaseFileAction.REMOVE),
-    (SERVICE_FILE_NAME, FormerReleaseFileAction.REMOVE),
+    (RETIRED_SERVICE_FILE_NAME, FormerReleaseFileAction.REMOVE),
     (ROUTING, FormerReleaseFileAction.REWRITE),
 ]
 
@@ -144,7 +144,7 @@ class TestCleanFormerRelease:
             "removed the route of 'grok-3' to 'pipelex_gateway' from the routing profile 'example_routing_using_specific_models'",
             "removed a comment about the Pipelex Gateway",
         ]
-        assert changes[SERVICE_FILE_NAME] == ["removed the record of the Pipelex Gateway's terms acceptance"]
+        assert changes[RETIRED_SERVICE_FILE_NAME] == ["removed the record of the Pipelex Gateway's terms acceptance"]
 
     def test_an_override_loses_its_retired_active_profile_and_its_base_moves(self, tmp_path: Path) -> None:
         """An override that named the Gateway's profile stops naming any, so its base, moved to the kit default, applies."""
@@ -182,8 +182,8 @@ class TestCleanFormerRelease:
         [
             pytest.param('active = "all_pipelex_gateway"\n', id="no_profiles"),
             pytest.param(
-                'active = "all_pipelex_gateway"\n\n[profiles.all_openai]\ndefault = "openai"\n\n[notes]\nseen = true\n\n'
-                '[profiles.all_anthropic]\ndefault = "anthropic"\n',
+                'active = "all_pipelex_gateway"\n\n[profiles.all_openai]\ndescription = "o"\ndefault = "openai"\n\n[notes]\nseen = true\n\n'
+                '[profiles.all_anthropic]\ndescription = "a"\ndefault = "anthropic"\n',
                 id="profiles_spread_between_tables",
             ),
         ],
@@ -195,7 +195,9 @@ class TestCleanFormerRelease:
 
         cleanup = clean_former_release(config_dirs=[config_dir], dry_run=False, moment=MOMENT)
 
-        assert not cleanup.needs_attention
+        # The shape is the cleanup's to handle; a table the routing library does not know, like the `notes` one, is
+        # the boot's to refuse, and the check after the write reports it rather than calling the machine fixed.
+        assert not cleanup.blocked_files
         kit_default = kit_default_routing_profile_name()
         routing = load_toml_from_path(config_dir / ROUTING)
         kit_routing = load_toml_from_path(Path(str(get_kit_configs_dir())) / ROUTING)
@@ -234,19 +236,19 @@ class TestCleanFormerRelease:
         assert routing_path.read_bytes() == original_routing
         assert existing_backups_of(path=routing_path) == [], "the copy taken for a write that did not happen is taken back"
         assert (config_dir / BACKENDS).read_bytes() == (V0_72_CLEANED_DIR / BACKENDS).read_bytes()
-        assert not (config_dir / SERVICE_FILE_NAME).exists()
+        assert not (config_dir / RETIRED_SERVICE_FILE_NAME).exists()
 
     def test_a_symlinked_file_of_its_own_is_removed_as_a_link_and_what_it_names_is_kept(self, tmp_path: Path) -> None:
         config_dir = _copy_v0_72(tmp_path=tmp_path)
-        dotfiles_copy = tmp_path / "dotfiles" / SERVICE_FILE_NAME
+        dotfiles_copy = tmp_path / "dotfiles" / RETIRED_SERVICE_FILE_NAME
         dotfiles_copy.parent.mkdir()
-        (config_dir / SERVICE_FILE_NAME).rename(dotfiles_copy)
-        (config_dir / SERVICE_FILE_NAME).symlink_to(dotfiles_copy)
+        (config_dir / RETIRED_SERVICE_FILE_NAME).rename(dotfiles_copy)
+        (config_dir / RETIRED_SERVICE_FILE_NAME).symlink_to(dotfiles_copy)
 
         clean_former_release(config_dirs=[config_dir], dry_run=False, moment=MOMENT)
 
-        assert not (config_dir / SERVICE_FILE_NAME).is_symlink()
-        assert not (config_dir / SERVICE_FILE_NAME).exists()
+        assert not (config_dir / RETIRED_SERVICE_FILE_NAME).is_symlink()
+        assert not (config_dir / RETIRED_SERVICE_FILE_NAME).exists()
         assert dotfiles_copy.is_file()
 
     def test_each_directory_is_cleaned_once_and_a_clean_one_reports_nothing(self, tmp_path: Path) -> None:
@@ -267,3 +269,69 @@ class TestCleanFormerRelease:
         clean_former_release(config_dirs=[clean_dir], dry_run=dry_run)
 
         assert not (clean_dir / ".gitignore").exists()
+
+    @pytest.mark.parametrize("dry_run", [True, False])
+    def test_inline_profiles_are_left_for_a_hand_edit_rather_than_activating_a_profile_they_lack(self, tmp_path: Path, dry_run: bool) -> None:
+        """The kit's profile cannot be added to an inline `profiles` table, so `active` is not moved to it either."""
+        config_dir = tmp_path / ".pipelex"
+        routing_path = config_dir / ROUTING
+        routing_path.parent.mkdir(parents=True)
+        routing_path.write_text(
+            'active = "all_pipelex_gateway"\n'
+            'profiles = { all_pipelex_gateway = { description = "g", default = "pipelex_gateway" }, '
+            'mine = { description = "m", default = "openai" } }\n',
+            encoding="utf-8",
+        )
+        before = routing_path.read_bytes()
+
+        cleanup = clean_former_release(config_dirs=[config_dir], dry_run=dry_run, moment=MOMENT)
+
+        assert [(file.file_path, file.blocked_reason) for file in cleanup.files] == [(routing_path, FileBlockedReason.NEEDS_A_HAND_EDIT)]
+        assert kit_default_routing_profile_name() in (cleanup.files[0].blocked_detail or "")
+        assert cleanup.needs_attention
+        assert routing_path.read_bytes() == before
+
+    def test_an_override_retargeting_a_profile_to_a_retired_backend_loses_that_default_and_nothing_else(self, tmp_path: Path) -> None:
+        """The profile is the user's, defined in the base with routes of its own: only the override's choice of backend goes."""
+        config_dir = tmp_path / ".pipelex"
+        base_path = config_dir / ROUTING
+        override_path = config_dir / INFERENCE_DIR_NAME / ROUTING_PROFILES_OVERRIDE_FILE_NAME
+        base_path.parent.mkdir(parents=True)
+        base_path.write_text(
+            'active = "custom"\n\n[profiles.custom]\ndescription = "my tuned routes"\ndefault = "openai"\n\n'
+            '[profiles.custom.routes]\n"claude-*" = "anthropic"\n"gpt-5*" = "openai"\n',
+            encoding="utf-8",
+        )
+        override_path.write_text('[profiles.custom]\ndefault = "pipelex_gateway"\n', encoding="utf-8")
+        base_before = base_path.read_bytes()
+
+        cleanup = clean_former_release(config_dirs=[config_dir], dry_run=False, moment=MOMENT)
+
+        assert not cleanup.needs_attention
+        assert [(file.file_path, file.changes) for file in cleanup.files] == [
+            (override_path, ["removed 'default', which named 'pipelex_gateway', from the routing profile 'custom'"])
+        ]
+        assert base_path.read_bytes() == base_before
+        assert override_path.read_text(encoding="utf-8") == "", "a table left with nothing to override goes with its key"
+        profile = load_active_routing_profile(routing_profile_library_paths=[base_path, override_path], enabled_backends=["openai", "anthropic"])
+        assert (profile.name, profile.default, profile.routes) == ("custom", "openai", {"claude-*": "anthropic", "gpt-5*": "openai"})
+        assert detect_former_release(config_dir=config_dir).is_clean
+
+    def test_a_note_of_the_users_about_a_gateway_of_their_own_stays(self, tmp_path: Path) -> None:
+        """Only the former release's own wording marks a head comment as its own; a user's note about another gateway is theirs."""
+        config_dir = tmp_path / ".pipelex"
+        backends_path = config_dir / BACKENDS
+        backends_path.parent.mkdir(parents=True)
+        user_note = (
+            "# Team note: all OpenAI traffic goes through our corporate API gateway (see wiki).\n# Do not change the endpoint without asking infra.\n"
+        )
+        backends_path.write_text(
+            f'{user_note}\n[openai]\nenabled = true\napi_key = "${{OPENAI_API_KEY}}"\n\n[pipelex_gateway]\nenabled = false\n', encoding="utf-8"
+        )
+
+        cleanup = clean_former_release(config_dirs=[config_dir], dry_run=False, moment=MOMENT)
+
+        assert [file.changes for file in cleanup.files] == [["removed the 'pipelex_gateway' backend"]]
+        text = backends_path.read_text(encoding="utf-8")
+        assert text.startswith(user_note)
+        assert "pipelex_gateway" not in text

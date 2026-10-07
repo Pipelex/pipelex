@@ -20,7 +20,9 @@ deck, no credentials, no network. A broken configuration is the reason to reach 
 
 **Its first step is the cleanup of a former release**, as in the human command: what a release that
 ran on the Pipelex Gateway or Pipelex Manifold left, reported under ``former_release`` and counted in
-the verdict, so a machine whose boot names this command ends the loop able to boot.
+the verdict, so a machine whose boot names this command ends the loop able to boot. The replay never
+walks a file the cleanup removes, and what still stops the boot after a write is listed under
+``former_release.still_blocking`` and makes the verdict ``needs_attention``.
 
 See ``docs/migration-ledger.md``.
 """
@@ -76,9 +78,9 @@ def agent_migrate_cmd(
         )
 
     config_dirs = config_directories_to_migrate()
-    # The cleanup first: it removes files the replay would otherwise walk.
+    # The cleanup first: the replay leaves the files it removes out of its walk.
     cleanup = clean_former_release(config_dirs=config_dirs, dry_run=not yes)
-    report = migrate_config_directories(config_dirs=config_dirs, dry_run=not yes)
+    report = migrate_config_directories(config_dirs=config_dirs, dry_run=not yes, skipped_paths=cleanup.removed_paths)
     result = _result_payload(report=report, cleanup=cleanup, config_dirs=[str(directory) for directory in config_dirs], applied=yes)
     agent_success_formatted(result, markdown_renderer=_render_markdown, output_format=output_format)
     if report.needs_attention or cleanup.needs_attention:
@@ -113,6 +115,7 @@ def _result_payload(*, report: MigrationReport, cleanup: FormerReleaseCleanup, c
             "is_clean": cleanup.is_clean,
             "needs_attention": cleanup.needs_attention,
             "files": [file.model_dump(mode="json") for file in cleanup.files],
+            "still_blocking": cleanup.still_blocking,
         },
         "plans": [plan.model_dump(mode="json") for plan in report.plans],
     }
@@ -146,6 +149,10 @@ def _render_markdown(result: dict[str, Any]) -> str:
         file = FormerReleaseFileCleanup.model_validate(file_dict)
         lines += ["", f"## `{file.file_path}`", "", "Left by a former release that ran on the Pipelex Gateway or Pipelex Manifold.", ""]
         lines += _former_release_lines(file=file, applied=applied)
+    still_blocking: list[str] = result["former_release"]["still_blocking"]
+    if still_blocking:
+        lines += ["", "## Pipelex still cannot start", "", "After the cleanup, a boot of this machine is still refused:", ""]
+        lines += [f"- {problem}" for problem in still_blocking]
 
     for plan_dict in result["plans"]:
         plan = MigrationPlan.model_validate(plan_dict)

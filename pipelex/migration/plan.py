@@ -101,8 +101,8 @@ class FileBlockedReason(StrEnum):
     """Why a file could not be processed at all.
 
     One member per *state the file is in*, because that is what decides what the user does next —
-    not one per exception the run happened to catch. Four of the five leave the file exactly as it
-    was found; the fifth is the one that does not, and it says so.
+    not one per exception the run happened to catch. Every member but `STATE_UNCERTAIN` leaves the
+    file exactly as it was found; that one does not, and it says so.
     """
 
     UNREADABLE = "unreadable"
@@ -127,6 +127,12 @@ class FileBlockedReason(StrEnum):
     CHANGED_DURING_RUN = "changed_during_run"
     """The file was removed or edited between the read and the write, so the run refused to write
     over work it had not seen. The file is whatever that other writer left."""
+
+    NEEDS_A_HAND_EDIT = "needs_a_hand_edit"
+    """The file is valid, and holds a shape the run will not rewrite on its own: changing it safely
+    would mean restructuring what the user wrote — routing profiles written as one inline table,
+    which the former-release cleanup cannot add a profile to. Nothing was written; the detail says
+    what to change by hand before running again."""
 
     STATE_UNCERTAIN = "state_uncertain"
     """The write could not be confirmed: the transaction could not describe what it left behind,

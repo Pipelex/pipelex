@@ -27,7 +27,10 @@ through the Pipelex Gateway or Pipelex Manifold carries tables, profiles and fil
 longer has, and the boot refuses it with an error naming this command. That cleanup is no ledger
 entry — it removes what a release left rather than reshaping a file — so it runs beside the replay,
 first, under the same two passes, the same question and the same backups
-(`pipelex/migration/former_release_cleanup.py`).
+(`pipelex/migration/former_release_cleanup.py`). The replay leaves the files the cleanup removes out
+of its walk in both passes, so a file about to go is never counted, migrated or reported on. After
+writing, the cleanup reads the files each boot merges again, and a machine that still cannot start
+is reported as such, with a non-zero exit, never as a success.
 
 See `docs/migration-ledger.md`.
 """
@@ -47,6 +50,7 @@ from pipelex.runtime_hub import get_console
 from pipelex.suggested_fix import WILDCARD_SEGMENT, DeleteKeyOp, DeleteTableOp, MoveKeyOp, RemapValueOp, RenameTableKeyOp
 
 if TYPE_CHECKING:
+    from collections.abc import Collection
     from pathlib import Path
 
     from pipelex.migration.former_release_cleanup import FormerReleaseCleanup
@@ -82,7 +86,7 @@ def migrate_cmd(*, dry_run: bool = False, yes: bool = False) -> None:
 
     former_release = clean_former_release(config_dirs=config_dirs, dry_run=True)
     print_former_release_cleanup(cleanup=former_release)
-    rehearsal = migrate_config_directories(config_dirs=config_dirs, dry_run=True)
+    rehearsal = migrate_config_directories(config_dirs=config_dirs, dry_run=True, skipped_paths=former_release.removed_paths)
     _print_report(report=rehearsal, wrote=False)
 
     if rehearsal.is_clean and former_release.is_clean:
@@ -123,9 +127,9 @@ def migrate_cmd(*, dry_run: bool = False, yes: bool = False) -> None:
         _exit_on_attention(report=rehearsal, cleanup=former_release)
         return
 
-    # The cleanup first: it removes files the replay would otherwise walk, and rewrites two it never claims.
+    # The cleanup first: it removes files the replay leaves out of its walk, and rewrites two it never claims.
     cleaned = apply_former_release_cleanup(config_dirs=config_dirs)
-    applied = apply_pending_migrations(config_dirs=config_dirs)
+    applied = apply_pending_migrations(config_dirs=config_dirs, skipped_paths=cleaned.removed_paths)
     done = _done_in_words(cleaned=len(cleaned.applied_files), migrated=len(applied.written_plans))
     unconfirmed = any(plan.blocked_reason is not None and plan.blocked_reason.leaves_the_write_unconfirmed for plan in applied.plans) or any(
         file.blocked_reason is not None and file.blocked_reason.leaves_the_write_unconfirmed for file in cleaned.files
@@ -134,6 +138,9 @@ def migrate_cmd(*, dry_run: bool = False, yes: bool = False) -> None:
         # Tested first: a file in an unknown state is the verdict of the run, however many others landed.
         lead = f"{done}, but no write could be confirmed for every file" if done else "No write could be confirmed"
         console.print(_panel(message=f"{lead} — compare each file marked above against the rescue copy named there.", style="red"))
+    elif cleaned.still_blocking:
+        lead = f"{done}, but Pipelex still cannot start" if done else "Pipelex still cannot start"
+        console.print(_panel(message=f"{lead} — see the lines marked ✗ above.", style="red"))
     elif done:
         console.print(_panel(message=f"{done}; a copy of each original is beside it.", style="green"))
     else:
@@ -174,7 +181,10 @@ def apply_former_release_cleanup(*, config_dirs: list[Path]) -> FormerReleaseCle
 
 
 def print_former_release_cleanup(*, cleanup: FormerReleaseCleanup) -> None:
-    """Each file the cleanup touches, with its changes: rehearsed (`→`) or made (`✓`), and the copy kept of it."""
+    """Each file the cleanup touches, with its changes: rehearsed (`→`) or made (`✓`), and the copy kept of it.
+
+    Then, after a write, what still stops the boot: the check the cleanup ran on its own work.
+    """
     console = get_console()
     for file in cleanup.files:
         console.print()
@@ -187,9 +197,14 @@ def print_former_release_cleanup(*, cleanup: FormerReleaseCleanup) -> None:
             console.print(f"    {marker} {escape(change)}")
         if file.backup_path is not None:
             console.print(f"    [dim]backup: {escape(str(file.backup_path))}[/dim]")
+    if cleanup.still_blocking:
+        console.print()
+        console.print("  [bold]After the cleanup, Pipelex still cannot start:[/bold]")
+        for problem in cleanup.still_blocking:
+            console.print(f"    [red]✗[/red] {escape(problem)}")
 
 
-def apply_pending_migrations(*, config_dirs: list[Path]) -> MigrationReport:
+def apply_pending_migrations(*, config_dirs: list[Path], skipped_paths: Collection[Path] = ()) -> MigrationReport:
     """Write what a migration would write, render what it did, and hand the report back.
 
     The second of this command's two passes on its own, with no exit code attached to it. A
@@ -198,8 +213,10 @@ def apply_pending_migrations(*, config_dirs: list[Path]) -> MigrationReport:
     pending-migrations row *is* the dry run. Calling `migrate_cmd` there instead would end the
     doctor's own run: the command exits the process when something is left for a person, and the
     doctor still has rows to render and an exit code of its own to set.
+
+    `skipped_paths` are the files the former-release cleanup removes, which the walk leaves out.
     """
-    applied = migrate_config_directories(config_dirs=config_dirs, dry_run=False)
+    applied = migrate_config_directories(config_dirs=config_dirs, dry_run=False, skipped_paths=skipped_paths)
     _print_written(report=applied)
     return applied
 

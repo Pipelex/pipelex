@@ -1,4 +1,4 @@
-"""What a former release left in a configuration directory, found by reading it and nothing else.
+"""What a former release left in the configuration directories, found by reading them and nothing else.
 
 Releases up to v0.72 ran models through the Pipelex Gateway and offered Pipelex Manifold as a private beta. The
 installations they set up still carry what that took: a `pipelex_gateway` and a `pipelex_manifold` table in
@@ -8,18 +8,29 @@ configuration used to serve, the `pipelex_service.toml` that recorded the Gatewa
 `pipelex_gateway_models*.md` model lists. The runtime no longer has either backend, so an enabled table or an active
 profile pointing at one stops every boot with a refusal about one file that says nothing of the release behind it.
 
-`detect_former_release` is the one reading of that state. The boot, `pipelex doctor`, `pipelex init`'s inspect stage
-and the `pipelex migrate` cleanup (`former_release_cleanup.py`) all ask it, so what one of them calls a former
-release's configuration is what every other one finds and removes. It reads, and it never writes or imports anything
-from the CLI.
+`detect_former_release_across` is the one reading of that state. The boot, `pipelex doctor`, `pipelex init`'s inspect
+stage and the `pipelex migrate` cleanup (`former_release_cleanup.py`) all ask it or `former_release_boot_blockers`,
+which reads the same way, so what one of them calls a former release's configuration is what every other one finds and
+removes. It reads, and it never writes or imports anything from the CLI.
+
+**The documents are read as the boot merges them, across directories.** A boot reads one base `backends.toml` and one
+base `routing_profiles.toml` — the project's when it has one, the home's otherwise — then the home's override, then the
+project's (`inference_merge_sequences`). A profile one directory defines can be made active by a file in the other, and
+an override can retarget a profile its base defines, so each finding is decided over every sequence its file is read
+in, never over its own directory alone.
 
 **A finding says which file it is in, and whether it stops the boot.** Only two shapes do: a retired backend, or a
 backend still naming `model_specs_section`, left enabled; and an active routing profile that sends models to a retired
 backend. Everything else — a disabled table, a profile nobody activates, the files beside the backends, the service
-file — is inert, and is found so that the cleanup leaves nothing of that release behind. Whether a table is enabled
-and which profile is active are read off the base file merged with its override, as the boot reads them;
-`former_release_boot_blockers` reads them off exactly the files a boot merges, across the home and project
-directories.
+file — is inert, and is found so that the cleanup leaves nothing of that release behind. Whether a machine's boot is
+refused is `former_release_boot_blockers` over the exact sequences that boot reads: a per-directory reading can be
+wrong both ways, since a project's own base hides the home's, and an `active` in one directory can name a profile
+defined in the other.
+
+**What the cleanup does to a routing profile is decided per file.** A profile goes from a file whose own `default` is a
+retired backend, unless another file still gives it a live one: then only that `default` goes, and the user's routes
+stay. A part of a profile left in an override, whose definition goes from every file before it, goes with it. An
+`active` naming a profile that goes moves off it in every file that sets it.
 
 See `docs/migration-ledger.md` → "A former release's configuration".
 """
@@ -34,7 +45,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.validation import MIGRATE_COMMAND
-from pipelex.kit.paths import get_kit_configs_dir
+from pipelex.kit.paths import RETIRED_SERVICE_FILE_NAME, get_kit_configs_dir
 from pipelex.system.configuration.config_loader import (
     BACKENDS_DIR_NAME,
     BACKENDS_FILE_NAME,
@@ -60,9 +71,6 @@ RETIRED_ROUTING_PROFILE_NAMES: frozenset[str] = frozenset({"all_pipelex_gateway"
 #: The `backends.toml` key that named the remote-configuration section holding a backend's model specs.
 MODEL_SPECS_SECTION_KEY = "model_specs_section"
 
-#: The file a former release wrote to record the Gateway's terms acceptance. Nothing reads it any more.
-SERVICE_FILE_NAME = "pipelex_service.toml"
-
 #: The model lists a former release copied beside the backend files, a Markdown one and its plain-text twin.
 GATEWAY_MODELS_REFERENCE_GLOB = "pipelex_gateway_models*.md"
 
@@ -76,6 +84,7 @@ ACTIVE_KEY = "active"
 
 _ROUTES_KEY = "routes"
 _DEFAULT_KEY = "default"
+_DESCRIPTION_KEY = "description"
 _ENABLED_KEY = "enabled"
 
 
@@ -98,7 +107,11 @@ class FormerReleaseFindingKind(StrEnum):
     """The `pipelex_service.toml` that recorded the Gateway's terms acceptance."""
 
     RETIRED_ROUTING_PROFILE = "retired_routing_profile"
-    """A routing profile whose default backend is a retired one."""
+    """A routing profile whose default backend is a retired one, or the part an override holds of one, which goes."""
+
+    RETIRED_PROFILE_DEFAULT = "retired_profile_default"
+    """The `default` of a routing profile that otherwise stays, naming a retired backend: an override retargeting a
+    profile its base defines, or a base whose profile another file retargets to a live backend. Only the key goes."""
 
     ROUTE_TO_RETIRED_BACKEND = "route_to_retired_backend"
     """A route of a profile that otherwise stays, sending a pattern to a retired backend."""
@@ -120,6 +133,7 @@ class FormerReleaseFindingKind(StrEnum):
                 FormerReleaseFindingKind.RETIRED_BACKEND_TABLE
                 | FormerReleaseFindingKind.MODEL_SPECS_SECTION_KEY
                 | FormerReleaseFindingKind.RETIRED_ROUTING_PROFILE
+                | FormerReleaseFindingKind.RETIRED_PROFILE_DEFAULT
                 | FormerReleaseFindingKind.ROUTE_TO_RETIRED_BACKEND
                 | FormerReleaseFindingKind.ACTIVE_ROUTING_PROFILE
             ):
@@ -152,6 +166,10 @@ class FormerReleaseFinding(BaseModel):
     blocks_boot: bool = False
     """Whether this stops a boot that reads the file: the runtime refuses it rather than ignoring it."""
 
+    profile_is_removed: bool = False
+    """For an active routing profile: whether the cleanup removes the profile it names, so `active` has to move off it.
+    When the profile stays, losing only a retired `default` or a route, the file's `active` is left as it is."""
+
     @property
     def description(self) -> str:
         """The finding as one sentence, for a report a person reads."""
@@ -174,6 +192,8 @@ class FormerReleaseFinding(BaseModel):
                 return f"{where} recorded the Pipelex Gateway's terms acceptance, and nothing reads it any more"
             case FormerReleaseFindingKind.RETIRED_ROUTING_PROFILE:
                 return f"{where} defines the routing profile '{self.subject}', which sends models to '{self.retired_backend}'"
+            case FormerReleaseFindingKind.RETIRED_PROFILE_DEFAULT:
+                return f"the routing profile '{self.subject}' in {where} sets its default backend to '{self.retired_backend}'"
             case FormerReleaseFindingKind.ROUTE_TO_RETIRED_BACKEND:
                 return f"the routing profile '{self.subject}' in {where} routes '{self.route_pattern}' to '{self.retired_backend}'"
             case FormerReleaseFindingKind.ACTIVE_ROUTING_PROFILE:
@@ -199,7 +219,11 @@ class FormerReleaseFindings(BaseModel):
 
     @property
     def blocks_boot(self) -> bool:
-        """Whether a boot reading this directory's files would be refused because of them."""
+        """Whether a finding here stops one of the sequences it was read in.
+
+        Never a machine's verdict: whether its boot is refused is `former_release_boot_blockers` over the files that
+        boot merges, which a project's own base or the other directory's override can change both ways.
+        """
         return any(finding.blocks_boot for finding in self.findings)
 
     @property
@@ -223,27 +247,96 @@ def routing_profile_library_paths_in(*, config_dir: Path) -> list[Path]:
     return [inference_dir / ROUTING_PROFILES_FILE_NAME, inference_dir / ROUTING_PROFILES_OVERRIDE_FILE_NAME]
 
 
+def distinct_config_dirs(*, config_dirs: Sequence[Path]) -> list[Path]:
+    """The directories, each once, in the order given: one named twice, or through a link, is read once."""
+    seen: set[Path] = set()
+    directories: list[Path] = []
+    for config_dir in config_dirs:
+        resolved = config_dir.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        directories.append(config_dir)
+    return directories
+
+
+def inference_merge_sequences(*, config_dirs: Sequence[Path], file_name: str, override_file_name: str) -> list[list[Path]]:
+    """The merge sequences a boot reads one inference document from, over the home and a project directory.
+
+    `config_dirs` is in tier order, as `ConfigLoader.existing_config_dirs` gives it: the home configuration directory,
+    then the project's. A boot started outside the project reads the home's base and override; one started in it reads
+    the project's base when the project has one and the home's otherwise, then the home's override, then the project's.
+    That is `ConfigLoader._inference_file_paths`, which a test holds this derivation to. Over one directory, the one
+    sequence is its base and its override.
+
+    Args:
+        config_dirs: The home directory, then the project's; a directory named twice counts once.
+        file_name: The base file's name, `backends.toml` or `routing_profiles.toml`.
+        override_file_name: Its override's name.
+
+    Returns:
+        One sequence per kind of boot, each base first: the home's alone, then the project's when there is one.
+    """
+    directories = distinct_config_dirs(config_dirs=config_dirs)
+    if not directories:
+        return []
+    if len(directories) > 2:
+        msg = f"a boot reads the home and one project directory, and was handed {len(directories)} directories — caller bug"
+        raise PipelexUnexpectedError(msg)
+    home_dir = directories[0]
+    home_sequence = [home_dir / INFERENCE_DIR_NAME / file_name, home_dir / INFERENCE_DIR_NAME / override_file_name]
+    if len(directories) == 1:
+        return [home_sequence]
+    project_inference_dir = directories[1] / INFERENCE_DIR_NAME
+    project_base = project_inference_dir / file_name
+    base = project_base if project_base.exists() else home_sequence[0]
+    return [home_sequence, [base, home_sequence[1], project_inference_dir / override_file_name]]
+
+
 def detect_former_release(*, config_dir: Path) -> FormerReleaseFindings:
-    """Find what a former release left in one configuration directory, `~/.pipelex/` or a project's `.pipelex/`.
+    """Find what a former release left in one configuration directory standing alone.
+
+    The reading of a machine with that one directory; `detect_former_release_across` reads the home and a project
+    together, as their boot does, and is what the cleanup and the commands ask.
+    """
+    return detect_former_release_across(config_dirs=[config_dir])[0]
+
+
+def detect_former_release_across(*, config_dirs: Sequence[Path]) -> list[FormerReleaseFindings]:
+    """Find what a former release left in the home and project configuration directories, read as their boots read them.
 
     A pure read: nothing is written, and a directory or a file that is not there is simply clean. A document that does
     not parse is skipped rather than raised, because whether it parses is for the boot and the doctor to report, and
-    the rest of the directory can still be judged.
+    the rest can still be judged.
 
     Args:
-        config_dir: The configuration directory to read.
+        config_dirs: The home directory, then the project's, as `ConfigLoader.existing_config_dirs` lists them.
 
     Returns:
-        The findings, in a stable order: the backend library, the files beside the backends, the service file, then
-        the routing profile library.
+        The findings of each distinct directory, clean ones included, in the order given; each in a stable order:
+        the backend library, the files beside the backends, the service file, then the routing profile library.
     """
-    findings = backend_library_findings(paths=backend_library_paths_in(config_dir=config_dir))
-    findings.extend(_backend_directory_findings(backends_dir=config_dir / INFERENCE_DIR_NAME / BACKENDS_DIR_NAME))
-    service_file = config_dir / SERVICE_FILE_NAME
-    if service_file.is_file():
-        findings.append(FormerReleaseFinding(kind=FormerReleaseFindingKind.SERVICE_FILE, file_path=service_file))
-    findings.extend(routing_profile_findings(paths=routing_profile_library_paths_in(config_dir=config_dir)))
-    return FormerReleaseFindings(config_dir=config_dir, findings=findings)
+    directories = distinct_config_dirs(config_dirs=config_dirs)
+    backend_findings = backend_library_findings(
+        sequences=inference_merge_sequences(config_dirs=directories, file_name=BACKENDS_FILE_NAME, override_file_name=BACKENDS_OVERRIDE_FILE_NAME)
+    )
+    routing_findings = routing_profile_findings(
+        sequences=inference_merge_sequences(
+            config_dirs=directories, file_name=ROUTING_PROFILES_FILE_NAME, override_file_name=ROUTING_PROFILES_OVERRIDE_FILE_NAME
+        )
+    )
+    all_findings: list[FormerReleaseFindings] = []
+    for config_dir in directories:
+        backend_files = set(backend_library_paths_in(config_dir=config_dir))
+        routing_files = set(routing_profile_library_paths_in(config_dir=config_dir))
+        findings = [finding for finding in backend_findings if finding.file_path in backend_files]
+        findings.extend(_backend_directory_findings(backends_dir=config_dir / INFERENCE_DIR_NAME / BACKENDS_DIR_NAME))
+        service_file = config_dir / RETIRED_SERVICE_FILE_NAME
+        if service_file.is_file():
+            findings.append(FormerReleaseFinding(kind=FormerReleaseFindingKind.SERVICE_FILE, file_path=service_file))
+        findings.extend(finding for finding in routing_findings if finding.file_path in routing_files)
+        all_findings.append(FormerReleaseFindings(config_dir=config_dir, findings=findings))
+    return all_findings
 
 
 def former_release_boot_blockers(
@@ -253,7 +346,7 @@ def former_release_boot_blockers(
 
     The boot merges a base file with the overrides of the home and the project directories, so a base in one directory
     can be lifted by an override in the other; reading the same sequences the boot reads is what keeps this from
-    refusing a boot that would have succeeded.
+    refusing a boot that would have succeeded, or passing one that will not.
 
     Args:
         backends_library_paths: The `backends.toml` merge sequence the boot reads, base first.
@@ -262,7 +355,9 @@ def former_release_boot_blockers(
     Returns:
         The blocking findings, the backend library's first; empty when nothing a former release left stops the boot.
     """
-    findings = backend_library_findings(paths=backends_library_paths) + routing_profile_findings(paths=routing_profile_library_paths)
+    findings = backend_library_findings(sequences=[list(backends_library_paths)]) + routing_profile_findings(
+        sequences=[list(routing_profile_library_paths)]
+    )
     return [finding for finding in findings if finding.blocks_boot]
 
 
@@ -309,16 +404,17 @@ def describe_former_release_boot_refusal(*, blockers: Sequence[FormerReleaseFind
     return "\n".join(lines)
 
 
-def backend_library_findings(*, paths: Sequence[Path]) -> list[FormerReleaseFinding]:
-    """The retired backend tables and `model_specs_section` keys in a `backends.toml` merge sequence.
+def backend_library_findings(*, sequences: Sequence[Sequence[Path]]) -> list[FormerReleaseFinding]:
+    """The retired backend tables and `model_specs_section` keys in the `backends.toml` merge sequences.
 
-    Each file holding one is reported; whether it stops the boot is read off the merged document, so an override that
-    disables a table lifts the finding in the base too.
+    Each file holding one is reported once; whether it stops the boot is read off the merged document of each sequence
+    the file is read in, so an override that disables a table lifts the finding in the base too.
     """
-    documents = _read_documents(paths=paths)
-    merged = _merged(documents=documents)
+    documents = _read_documents(sequences=sequences)
+    read_sequences = _read_sequences(sequences=sequences, documents=documents)
+    merged_documents = [(set(sequence), _merged(documents=[documents[path] for path in sequence])) for sequence in read_sequences]
     findings: list[FormerReleaseFinding] = []
-    for path, document in documents:
+    for path, document in documents.items():
         for backend_name, backend_table in document.items():
             if not isinstance(backend_table, dict):
                 continue
@@ -328,42 +424,37 @@ def backend_library_findings(*, paths: Sequence[Path]) -> list[FormerReleaseFind
                 kind = FormerReleaseFindingKind.MODEL_SPECS_SECTION_KEY
             else:
                 continue
-            findings.append(
-                FormerReleaseFinding(
-                    kind=kind, file_path=path, subject=backend_name, blocks_boot=_is_enabled(document=merged, backend_name=backend_name)
-                )
-            )
+            blocks_boot = any(_is_enabled(document=merged, backend_name=backend_name) for members, merged in merged_documents if path in members)
+            findings.append(FormerReleaseFinding(kind=kind, file_path=path, subject=backend_name, blocks_boot=blocks_boot))
     return findings
 
 
-def routing_profile_findings(*, paths: Sequence[Path]) -> list[FormerReleaseFinding]:
-    """The retired profiles, the routes to retired backends and a retired active profile in a `routing_profiles.toml` merge sequence.
+def routing_profile_findings(*, sequences: Sequence[Sequence[Path]]) -> list[FormerReleaseFinding]:
+    """The retired profiles, retired defaults, routes to retired backends and retired active profiles in the `routing_profiles.toml` sequences.
 
-    A profile is retired when its default, as merged, is a retired backend. A retired active profile is reported in
-    each file that sets `active`, and the last one of the sequence to set it, the one the boot reads, stops the boot.
+    What goes from each profile table is decided per file over every sequence the file is read in (`_profile_fates`),
+    and each `active` is judged over each sequence that reads it (`_active_profile_findings`).
     """
-    documents = _read_documents(paths=paths)
-    merged = _merged(documents=documents)
-    merged_profiles = _profiles_of(document=merged)
-    retired_profiles = {
-        profile_name: default
-        for profile_name, profile in merged_profiles.items()
-        if isinstance(default := profile.get(_DEFAULT_KEY), str) and default in RETIRED_BACKEND_NAMES
-    }
-
-    findings = _active_profile_findings(documents=documents, merged_profiles=merged_profiles, retired_profiles=retired_profiles)
-    for path, document in documents:
+    documents = _read_documents(sequences=sequences)
+    read_sequences = _read_sequences(sequences=sequences, documents=documents)
+    fates = _profile_fates(sequences=read_sequences, documents=documents)
+    findings = _active_profile_findings(sequences=read_sequences, documents=documents, fates=fates)
+    for path, document in documents.items():
         for profile_name, profile in _profiles_of(document=document).items():
-            if profile_name in retired_profiles:
+            fate, retired_backend = fates[path, profile_name]
+            if fate is _ProfileFate.REMOVED:
                 findings.append(
                     FormerReleaseFinding(
-                        kind=FormerReleaseFindingKind.RETIRED_ROUTING_PROFILE,
-                        file_path=path,
-                        subject=profile_name,
-                        retired_backend=retired_profiles[profile_name],
+                        kind=FormerReleaseFindingKind.RETIRED_ROUTING_PROFILE, file_path=path, subject=profile_name, retired_backend=retired_backend
                     )
                 )
                 continue
+            if fate is _ProfileFate.LOSES_ITS_DEFAULT:
+                findings.append(
+                    FormerReleaseFinding(
+                        kind=FormerReleaseFindingKind.RETIRED_PROFILE_DEFAULT, file_path=path, subject=profile_name, retired_backend=retired_backend
+                    )
+                )
             for route_table, route_pattern, backend_name in retired_routes_of(profile=profile):
                 findings.append(
                     FormerReleaseFinding(
@@ -391,47 +482,128 @@ def retired_routes_of(*, profile: dict[str, Any]) -> list[tuple[str, str, str]]:
     return retired
 
 
-def _active_profile_findings(
-    *, documents: list[tuple[Path, dict[str, Any]]], merged_profiles: dict[str, dict[str, Any]], retired_profiles: dict[str, str]
-) -> list[FormerReleaseFinding]:
-    """Each file whose `active` names a profile sending models to a retired backend, by default or by a route it must honour.
+class _ProfileFate(StrEnum):
+    """What the cleanup does to one profile table in one file."""
 
-    Every such file is reported, because each is something the cleanup must move; only the last of the sequence to set
-    `active` is the one the boot reads, so only its finding stops the boot. Optional routes are not counted: one naming
-    a disabled backend is inert, and the boot never refuses it.
+    KEPT = "kept"
+    LOSES_ITS_DEFAULT = "loses_its_default"
+    REMOVED = "removed"
+
+
+def _profile_fates(*, sequences: list[list[Path]], documents: dict[Path, dict[str, Any]]) -> dict[tuple[Path, str], tuple[_ProfileFate, str | None]]:
+    """What becomes of each profile table of each file, with the retired backend that decides it.
+
+    A table whose own `default` is a retired backend goes, unless the profile stays alive without it: a file read
+    before this one keeps a definition of it, or a file read after gives it a live `default`. Then only the `default`
+    goes, and the routes the user tuned stay. A table with no `default` of its own and no `description`, in a file
+    whose every earlier definition of the profile goes, is a part of a profile that no longer exists, and goes too:
+    left alone, it would be a profile with no description, which the boot refuses. Files are decided in the order
+    they are read, so a file's earlier neighbours are always decided first.
     """
-    setters = [(path, document[ACTIVE_KEY]) for path, document in documents if ACTIVE_KEY in document]
-    findings: list[FormerReleaseFinding] = []
-    for index, (path, active) in enumerate(setters):
-        if not isinstance(active, str):
-            continue
-        route_pattern: str | None = None
-        route_table: str | None = None
-        retired_backend: str | None
-        if active in retired_profiles:
-            retired_backend = retired_profiles[active]
-        elif active in merged_profiles:
-            # Optional routes are left out: the boot refuses a route to a backend it cannot reach, never an optional one.
-            retired_route = next((route for route in retired_routes_of(profile=merged_profiles[active]) if route[0] == _ROUTES_KEY), None)
-            if retired_route is None:
+    fates: dict[tuple[Path, str], tuple[_ProfileFate, str | None]] = {}
+    for path in _in_reading_order(sequences=sequences):
+        earlier = _neighbours(path=path, sequences=sequences, before=True)
+        later = _neighbours(path=path, sequences=sequences, before=False)
+        for profile_name, profile in _profiles_of(document=documents[path]).items():
+            earlier_definitions = [neighbour for neighbour in earlier if profile_name in _profiles_of(document=documents[neighbour])]
+            kept_earlier = any(fates[neighbour, profile_name][0] is not _ProfileFate.REMOVED for neighbour in earlier_definitions)
+            own_default = profile.get(_DEFAULT_KEY)
+            if _names_a_retired_backend(value=own_default):
+                later_live_default = any(
+                    _names_a_live_backend(value=_profiles_of(document=documents[neighbour])[profile_name].get(_DEFAULT_KEY))
+                    for neighbour in later
+                    if profile_name in _profiles_of(document=documents[neighbour])
+                )
+                fate = _ProfileFate.LOSES_ITS_DEFAULT if kept_earlier or later_live_default else _ProfileFate.REMOVED
+                fates[path, profile_name] = (fate, cast("str", own_default))
+            elif earlier_definitions and not kept_earlier and own_default is None and _DESCRIPTION_KEY not in profile:
+                fates[path, profile_name] = (_ProfileFate.REMOVED, fates[earlier_definitions[0], profile_name][1])
+            else:
+                fates[path, profile_name] = (_ProfileFate.KEPT, None)
+    return fates
+
+
+def _active_profile_findings(
+    *,
+    sequences: list[list[Path]],
+    documents: dict[Path, dict[str, Any]],
+    fates: dict[tuple[Path, str], tuple[_ProfileFate, str | None]],
+) -> list[FormerReleaseFinding]:
+    """Each file whose `active` names a profile sending models to a retired backend, or one the cleanup removes.
+
+    Every such file is reported, because each is something the cleanup may have to move; only the last file of a
+    sequence to set `active` is the one that boot reads, so only its finding can stop the boot. A file read in two
+    sequences is reported once, with what either says. Optional routes are not counted: one naming a disabled backend
+    is inert, and the boot never refuses it.
+    """
+    found: dict[Path, FormerReleaseFinding] = {}
+    for sequence in sequences:
+        merged_profiles = _profiles_of(document=_merged(documents=[documents[path] for path in sequence]))
+        setters = [(path, documents[path][ACTIVE_KEY]) for path in sequence if ACTIVE_KEY in documents[path]]
+        for index, (path, active) in enumerate(setters):
+            if not isinstance(active, str):
                 continue
-            route_table, route_pattern, retired_backend = retired_route
-        elif active in RETIRED_ROUTING_PROFILE_NAMES:
-            retired_backend = None
-        else:
-            continue
-        findings.append(
-            FormerReleaseFinding(
-                kind=FormerReleaseFindingKind.ACTIVE_ROUTING_PROFILE,
-                file_path=path,
-                subject=active,
-                route_pattern=route_pattern,
-                route_table=route_table,
-                retired_backend=retired_backend,
-                blocks_boot=index == len(setters) - 1,
+            finding = _active_profile_finding(
+                path=path,
+                active=active,
+                is_read_by_the_boot=index == len(setters) - 1,
+                merged_profiles=merged_profiles,
+                still_defined=any(
+                    fates[neighbour, active][0] is not _ProfileFate.REMOVED
+                    for neighbour in sequence
+                    if active in _profiles_of(document=documents[neighbour])
+                ),
             )
-        )
-    return findings
+            if finding is not None:
+                found[path] = _combined(earlier=found.get(path), later=finding)
+    return [found[path] for path in documents if path in found]
+
+
+def _active_profile_finding(
+    *, path: Path, active: str, is_read_by_the_boot: bool, merged_profiles: dict[str, dict[str, Any]], still_defined: bool
+) -> FormerReleaseFinding | None:
+    """One file's `active`, judged over one sequence: whether it names a retired profile, and whether that profile goes."""
+    defined = active in merged_profiles
+    merged_default = merged_profiles[active].get(_DEFAULT_KEY) if defined else None
+    default_is_retired = _names_a_retired_backend(value=merged_default)
+    is_a_retired_name = not defined and active in RETIRED_ROUTING_PROFILE_NAMES
+    removed = (defined and not still_defined) or is_a_retired_name
+    # Optional routes are left out: the boot refuses a route to a backend it cannot reach, never an optional one.
+    retired_route = (
+        next((route for route in retired_routes_of(profile=merged_profiles[active]) if route[0] == _ROUTES_KEY), None)
+        if defined and not default_is_retired
+        else None
+    )
+    if not (default_is_retired or removed or retired_route):
+        return None
+    retired_backend = cast("str", merged_default) if default_is_retired else (retired_route[2] if retired_route else None)
+    return FormerReleaseFinding(
+        kind=FormerReleaseFindingKind.ACTIVE_ROUTING_PROFILE,
+        file_path=path,
+        subject=active,
+        route_pattern=retired_route[1] if retired_route else None,
+        route_table=retired_route[0] if retired_route else None,
+        retired_backend=retired_backend,
+        blocks_boot=is_read_by_the_boot and (default_is_retired or is_a_retired_name or retired_route is not None),
+        profile_is_removed=removed,
+    )
+
+
+def _combined(*, earlier: FormerReleaseFinding | None, later: FormerReleaseFinding) -> FormerReleaseFinding:
+    """One file's `active` judged over two sequences: the stronger reading, which either stopping the boot or removing the profile makes."""
+    if earlier is None:
+        return later
+
+    def strength(*, finding: FormerReleaseFinding) -> int:
+        return 2 if finding.profile_is_removed else 1 if finding.route_pattern is None else 0
+
+    primary = earlier if strength(finding=earlier) >= strength(finding=later) else later
+    return primary.model_copy(
+        update={
+            "blocks_boot": earlier.blocks_boot or later.blocks_boot,
+            "profile_is_removed": earlier.profile_is_removed or later.profile_is_removed,
+        }
+    )
 
 
 def _backend_directory_findings(*, backends_dir: Path) -> list[FormerReleaseFinding]:
@@ -452,27 +624,56 @@ def _backend_directory_findings(*, backends_dir: Path) -> list[FormerReleaseFind
     return findings
 
 
-def _read_documents(*, paths: Sequence[Path]) -> list[tuple[Path, dict[str, Any]]]:
-    """Each file of a merge sequence that exists and parses, with its document, in merge order."""
-    documents: list[tuple[Path, dict[str, Any]]] = []
-    for path in paths:
-        if not path.is_file():
-            continue
-        try:
-            documents.append((path, load_toml_from_path(path)))
-        except (OSError, TomlError, UnicodeDecodeError):
-            continue
+def _read_documents(*, sequences: Sequence[Sequence[Path]]) -> dict[Path, dict[str, Any]]:
+    """Each file of the sequences that exists and parses, with its document, each once, in the order first met."""
+    documents: dict[Path, dict[str, Any]] = {}
+    for sequence in sequences:
+        for path in sequence:
+            if path in documents or not path.is_file():
+                continue
+            try:
+                documents[path] = load_toml_from_path(path)
+            except (OSError, TomlError, UnicodeDecodeError):
+                continue
     return documents
 
 
-def _merged(*, documents: list[tuple[Path, dict[str, Any]]]) -> dict[str, Any]:
+def _read_sequences(*, sequences: Sequence[Sequence[Path]], documents: dict[Path, dict[str, Any]]) -> list[list[Path]]:
+    """The sequences without the files that are not there or did not parse, which the boot reads as nothing."""
+    return [[path for path in sequence if path in documents] for sequence in sequences]
+
+
+def _in_reading_order(*, sequences: list[list[Path]]) -> list[Path]:
+    """Every file of the sequences, each after every file read before it in any of them."""
+    remaining = list(dict.fromkeys(path for sequence in sequences for path in sequence))
+    ordered: list[Path] = []
+    while remaining:
+        ready = next(path for path in remaining if set(_neighbours(path=path, sequences=sequences, before=True)) <= set(ordered))
+        ordered.append(ready)
+        remaining.remove(ready)
+    return ordered
+
+
+def _neighbours(*, path: Path, sequences: list[list[Path]], before: bool) -> list[Path]:
+    """The files read before (or after) this one, in any sequence that reads it, each once."""
+    neighbours: dict[Path, None] = {}
+    for sequence in sequences:
+        if path not in sequence:
+            continue
+        index = sequence.index(path)
+        for neighbour in sequence[:index] if before else sequence[index + 1 :]:
+            neighbours.setdefault(neighbour, None)
+    return list(neighbours)
+
+
+def _merged(*, documents: list[dict[str, Any]]) -> dict[str, Any]:
     """The documents deep-merged in order, as the loaders merge a base and its overrides.
 
     Each is copied first: `deep_update` stores the tables of the first document it is given by reference, so merging
     the originals would let an override rewrite the base document every per-file finding is read from.
     """
     merged: dict[str, Any] = {}
-    for _, document in documents:
+    for document in documents:
         deep_update(merged, updates=copy.deepcopy(document))
     return merged
 
@@ -486,6 +687,14 @@ def _profiles_of(*, document: dict[str, Any]) -> dict[str, dict[str, Any]]:
         for profile_name, profile in cast("dict[str, Any]", profiles).items()
         if isinstance(profile, dict)
     }
+
+
+def _names_a_retired_backend(*, value: Any) -> bool:
+    return isinstance(value, str) and value in RETIRED_BACKEND_NAMES
+
+
+def _names_a_live_backend(*, value: Any) -> bool:
+    return isinstance(value, str) and value not in RETIRED_BACKEND_NAMES
 
 
 def _is_enabled(*, document: dict[str, Any], backend_name: str) -> bool:

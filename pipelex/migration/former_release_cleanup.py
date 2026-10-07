@@ -1,19 +1,29 @@
 """The cleanup of what a former release left: the `pipelex migrate` step that removes it, with a copy of every file.
 
-`former_release.py` finds what a release that ran on the Pipelex Gateway or Pipelex Manifold left in a configuration
-directory; this module removes exactly that, and nothing else. Each finding becomes one change:
+`former_release.py` finds what a release that ran on the Pipelex Gateway or Pipelex Manifold left in the home and
+project configuration directories, read as their boots merge them; this module removes exactly that, and nothing else.
+Each finding becomes one change:
 
 - a retired backend table, a retired routing profile and a route to a retired backend are deleted, the comment
   introducing each going with it;
+- a retired `default` of a profile that stays — an override retargeting the user's own profile — is deleted alone,
+  so the profile's routes stay;
 - a `model_specs_section` key is deleted from the backend that carries it, and the backend stays;
-- the active routing profile, when it is a retired one, moves to the profile the kit makes active
-  (`all_enabled_backends`), which is added to the file as the kit ships it when the file does not define it; an
-  override naming a retired profile stops naming one, so its base decides;
+- an `active` naming a profile the cleanup removes moves off it in every file that sets it, whichever directory the
+  profile was defined in: a base moves to the profile the kit makes active (`all_enabled_backends`), which is added to
+  the file as the kit ships it when the file does not define it, and an override stops naming one, so the file read
+  before it decides;
 - a file of its own — a retired backend's per-model file, the Gateway's model lists, `pipelex_service.toml` — is
   removed.
 
 A file that is rewritten also loses the comments at the head of the document that speak of the Pipelex Gateway or
-Pipelex Manifold, the instructions that came with that release; a comment anywhere else is the user's and stays.
+Pipelex Manifold by name, the instructions that came with that release; a comment anywhere else, or one about another
+gateway, is the user's and stays. A file whose shape the cleanup cannot rewrite safely — routing profiles written as one
+inline table, where the kit's profile cannot be added — is left as it is and reported, with what to change by hand.
+
+**After writing, the cleanup checks its own work.** It reads the files every boot of the machine merges, and anything
+that still stops one — what a former release left, or an active routing profile no file defines — is reported as
+needing attention rather than as a success.
 
 Every file gets the backup the ledger replay gives the files it rewrites, through the same per-file transaction
 (`runner.write_file_with_backup` and `runner.remove_file_with_backup`): one `.bak.<stamp>` copy, taken first and
@@ -29,16 +39,18 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, NamedTuple, cast
 
 import tomlkit
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from tomlkit import TOMLDocument
 from tomlkit.container import OutOfOrderTableProxy
 from tomlkit.exceptions import TOMLKitError
 from tomlkit.items import Comment, Item, Null, Table, Whitespace
 
 from pipelex.base_exceptions import PipelexUnexpectedError
+from pipelex.cogt.model_routing.routing_profile_factory import RoutingProfileLibraryBlueprint
+from pipelex.core.validation import MIGRATE_COMMAND
 from pipelex.fix_ops.file_transaction import read_file_snapshot
 from pipelex.migration.engine import apply_ops_over_text
 from pipelex.migration.former_release import (
@@ -48,7 +60,10 @@ from pipelex.migration.former_release import (
     ROUTING_PROFILES_KEY,
     FormerReleaseFinding,
     FormerReleaseFindingKind,
-    detect_former_release,
+    detect_former_release_across,
+    distinct_config_dirs,
+    former_release_boot_blockers,
+    inference_merge_sequences,
     kit_default_routing_profile_name,
     kit_routing_profile_library_path,
 )
@@ -56,10 +71,21 @@ from pipelex.migration.gitignore import ensure_config_dir_gitignore
 from pipelex.migration.plan import FileBlockedReason
 from pipelex.migration.runner import FileWriteOutcome, remove_file_with_backup, write_file_with_backup
 from pipelex.suggested_fix import DeleteKeyOp, DeleteTableOp, MigrationOp, RemapValueOp
-from pipelex.system.configuration.config_loader import BACKENDS_OVERRIDE_FILE_NAME, ROUTING_PROFILES_OVERRIDE_FILE_NAME
+from pipelex.system.configuration.config_loader import (
+    BACKENDS_FILE_NAME,
+    BACKENDS_OVERRIDE_FILE_NAME,
+    ROUTING_PROFILES_FILE_NAME,
+    ROUTING_PROFILES_OVERRIDE_FILE_NAME,
+)
+from pipelex.tools.misc.exceptions import TomlError
+from pipelex.tools.misc.toml_utils import describe_toml_base_and_overrides, load_toml_from_base_and_overrides, load_toml_from_content
+from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
-#: What marks a comment at the head of a document as one a former release wrote about its own backends.
-_FORMER_RELEASE_COMMENT_PATTERN = re.compile(r"gateway|manifold", re.IGNORECASE)
+#: What marks a comment at the head of a document as one a former release wrote about its own backends: their names,
+#: as prose or as the keys and variables that spelled them. A comment about any other gateway is the user's.
+_FORMER_RELEASE_COMMENT_PATTERN = re.compile(r"pipelex[ _]gateway|pipelex[ _]manifold", re.IGNORECASE)
+
+_DEFAULT_KEY = "default"
 
 _OVERRIDE_FILE_NAMES = frozenset({BACKENDS_OVERRIDE_FILE_NAME, ROUTING_PROFILES_OVERRIDE_FILE_NAME})
 
@@ -107,11 +133,19 @@ class FormerReleaseCleanup(BaseModel):
 
     dry_run: bool
     files: list[FormerReleaseFileCleanup] = Field(default_factory=list[FormerReleaseFileCleanup])
+    still_blocking: list[str] = Field(default_factory=list[str])
+    """What still stops a boot of this machine once the cleanup has written, each in a sentence; read after a write
+    pass only, and empty when the cleanup left a machine that starts."""
 
     @property
     def is_clean(self) -> bool:
         """Whether the directories held nothing a former release left, so there was nothing to do."""
         return not self.files
+
+    @property
+    def removed_paths(self) -> frozenset[Path]:
+        """The files the cleanup removes, or would: the ledger replay leaves them out of its walk, written or not."""
+        return frozenset(file.file_path for file in self.files if file.action is FormerReleaseFileAction.REMOVE)
 
     @property
     def applied_files(self) -> list[FormerReleaseFileCleanup]:
@@ -123,16 +157,20 @@ class FormerReleaseCleanup(BaseModel):
 
     @property
     def needs_attention(self) -> bool:
-        """Whether a file could not be cleaned and is left as it was found, which the user has to look at."""
-        return bool(self.blocked_files)
+        """Whether a file could not be cleaned, or the machine still cannot start once it was: the user has to look."""
+        return bool(self.blocked_files) or bool(self.still_blocking)
 
 
 def clean_former_release(*, config_dirs: Sequence[Path], dry_run: bool, moment: datetime | None = None) -> FormerReleaseCleanup:
     """Remove what a former release left in each configuration directory, keeping a copy of every file.
 
+    The directories are read together, as their boots merge them, so an `active` in one directory naming a profile the
+    other defines moves when that profile goes. After a write, the files every boot of the machine merges are read
+    again, and what still stops one is reported in `still_blocking` rather than as a success.
+
     Args:
-        config_dirs: The directories to clean, `~/.pipelex/` and a project's `.pipelex/`; one named twice is
-            cleaned once.
+        config_dirs: The directories to clean in tier order, `~/.pipelex/` then a project's `.pipelex/`, as
+            `ConfigLoader.existing_config_dirs` lists them; one named twice is cleaned once.
         dry_run: Report what would change and write nothing, not even the `.gitignore` that hides the backups.
         moment: The time the backups are stamped with, one for the whole run; now when not given.
 
@@ -141,24 +179,68 @@ def clean_former_release(*, config_dirs: Sequence[Path], dry_run: bool, moment: 
     """
     stamp_moment = moment or datetime.now(UTC)
     kit_default = kit_default_routing_profile_name()
+    directories = distinct_config_dirs(config_dirs=config_dirs)
     files: list[FormerReleaseFileCleanup] = []
-    seen: set[Path] = set()
-    for config_dir in config_dirs:
-        resolved_dir = config_dir.resolve()
-        if resolved_dir in seen:
-            continue
-        seen.add(resolved_dir)
-        findings = detect_former_release(config_dir=config_dir)
+    for findings in detect_former_release_across(config_dirs=directories):
         if findings.is_clean:
             continue
         if not dry_run:
-            ensure_config_dir_gitignore(directory=config_dir)
+            ensure_config_dir_gitignore(directory=findings.config_dir)
         for file_path in findings.file_paths:
             file_findings = [finding for finding in findings.findings if finding.file_path == file_path]
             file_cleanup = _clean_file(file_path=file_path, findings=file_findings, kit_default=kit_default, dry_run=dry_run, moment=stamp_moment)
             if file_cleanup is not None:
                 files.append(file_cleanup)
-    return FormerReleaseCleanup(dry_run=dry_run, files=files)
+    wrote = any(file.was_applied for file in files)
+    still_blocking = what_stops_the_boot(config_dirs=directories) if wrote else []
+    return FormerReleaseCleanup(dry_run=dry_run, files=files, still_blocking=still_blocking)
+
+
+def what_stops_the_boot(*, config_dirs: Sequence[Path]) -> list[str]:
+    """What stops a boot of this machine, read off the files each boot merges: the home's alone, and the project's.
+
+    The check the cleanup runs on its own work. It names what a former release left that a boot refuses, and a routing
+    profile library the boot cannot load — above all an `active` naming a profile no file of the sequence defines,
+    which is what a cleanup that removed a profile and missed a file activating it would leave. A sequence without its
+    base file, or with a file that does not parse, is not judged here: those are the boot's and `pipelex init`'s to name.
+
+    Args:
+        config_dirs: The home directory, then the project's.
+
+    Returns:
+        Each problem in a sentence, each once; empty when every boot of the machine can start on these files.
+    """
+    backends_sequences = inference_merge_sequences(
+        config_dirs=config_dirs, file_name=BACKENDS_FILE_NAME, override_file_name=BACKENDS_OVERRIDE_FILE_NAME
+    )
+    routing_sequences = inference_merge_sequences(
+        config_dirs=config_dirs, file_name=ROUTING_PROFILES_FILE_NAME, override_file_name=ROUTING_PROFILES_OVERRIDE_FILE_NAME
+    )
+    problems: list[str] = []
+    for backends_paths, routing_paths in zip(backends_sequences, routing_sequences, strict=True):
+        blockers = former_release_boot_blockers(backends_library_paths=backends_paths, routing_profile_library_paths=routing_paths)
+        problems.extend(finding.description for finding in blockers)
+        if (problem := _routing_library_problem(paths=routing_paths)) is not None:
+            problems.append(problem)
+    return list(dict.fromkeys(problems))
+
+
+def _routing_library_problem(*, paths: Sequence[Path]) -> str | None:
+    """Why the boot could not load this routing profile library, or `None` when it could, or when that is not ours to say."""
+    if not paths[0].is_file():
+        return None
+    try:
+        library = load_toml_from_base_and_overrides(paths=paths)
+    except (OSError, TomlError, UnicodeDecodeError):
+        return None
+    description = describe_toml_base_and_overrides(paths=paths)
+    try:
+        blueprint = RoutingProfileLibraryBlueprint.model_validate(library)
+    except ValidationError as exc:
+        return f"the routing profile library {description} is not valid: {format_pydantic_validation_error(exc)}"
+    if blueprint.active not in blueprint.profiles:
+        return f"the routing profile library {description} makes '{blueprint.active}' the active routing profile, and none of its files defines it"
+    return None
 
 
 def _clean_file(
@@ -223,7 +305,7 @@ def _rewrite_file(
         )
     try:
         text = snapshot.content.decode("utf-8")
-        new_text, changes = cleaned_text(text=text, findings=findings, kit_default=kit_default, is_override=file_path.name in _OVERRIDE_FILE_NAMES)
+        cleaned = cleaned_text(text=text, findings=findings, kit_default=kit_default, is_override=file_path.name in _OVERRIDE_FILE_NAMES)
     except (UnicodeDecodeError, TOMLKitError) as exc:
         # It parsed when it was read for the findings, so this is a file changed since or an operation failing on
         # valid TOML. Either way it is this file's to report, never a reason to stop the run.
@@ -234,29 +316,56 @@ def _rewrite_file(
             reason=FileBlockedReason.UNPARSEABLE,
             detail=f"the file could not be cleaned: {exc}",
         )
-    if new_text == text:
+    if cleaned.hand_edit is not None:
+        return _blocked(
+            file_path=file_path,
+            action=FormerReleaseFileAction.REWRITE,
+            changes=[finding.description for finding in findings],
+            reason=FileBlockedReason.NEEDS_A_HAND_EDIT,
+            detail=cleaned.hand_edit,
+        )
+    if cleaned.text == text:
         return None
     if dry_run:
-        return FormerReleaseFileCleanup(file_path=file_path, action=FormerReleaseFileAction.REWRITE, changes=changes)
-    outcome = write_file_with_backup(snapshot=snapshot, new_content=new_text, moment=moment)
-    return _with_outcome(file_path=file_path, action=FormerReleaseFileAction.REWRITE, changes=changes, outcome=outcome)
+        return FormerReleaseFileCleanup(file_path=file_path, action=FormerReleaseFileAction.REWRITE, changes=cleaned.changes)
+    outcome = write_file_with_backup(snapshot=snapshot, new_content=cleaned.text, moment=moment)
+    return _with_outcome(file_path=file_path, action=FormerReleaseFileAction.REWRITE, changes=cleaned.changes, outcome=outcome)
 
 
-def cleaned_text(*, text: str, findings: Sequence[FormerReleaseFinding], kit_default: str, is_override: bool) -> tuple[str, list[str]]:
+class CleanedText(NamedTuple):
+    """One document's cleanup: the text, the changes in words, or why it is left for a person to edit."""
+
+    text: str
+    changes: list[str]
+    hand_edit: str | None = None
+    """What the user has to change by hand, when the cleanup cannot rewrite this document safely; the text is then
+    the document as read."""
+
+
+class _KitProfilePlacement(StrEnum):
+    ADDED = "added"
+    ALREADY_THERE = "already_there"
+    IMPOSSIBLE = "impossible"
+
+
+def cleaned_text(*, text: str, findings: Sequence[FormerReleaseFinding], kit_default: str, is_override: bool) -> CleanedText:
     """One document without what a former release left in it, and each change in words.
 
     The kit's default profile goes in first, ahead of the deletions, so that the banner heading the profiles stays at
-    the head of them instead of leaving with the first profile it introduced. The comments at the head of the
-    document go last, and only from a document something else changed.
+    the head of them instead of leaving with the first profile it introduced. When it cannot go in — the profiles are
+    one inline table — the active profile is not moved to it either, and nothing is changed: an `active` naming a
+    profile the file lacks would stop the boot as surely, so the document is left for a hand edit. The comments at
+    the head of the document go last, and only from a document something else changed.
 
     Args:
         text: The document as read.
-        findings: What `detect_former_release` found in this document.
+        findings: What `detect_former_release_across` found in this document.
         kit_default: The routing profile the kit makes active.
         is_override: Whether the document is a personal override, whose retired `active` is deleted rather than moved.
 
     Returns:
-        The cleaned text, the same string when nothing changed, and the changes made, in order.
+        The cleaned text, the same string when nothing changed, and the changes made, in order; or the document as
+        read and what to edit by hand.
     """
     changes: list[str] = []
     current_text = text
@@ -267,21 +376,57 @@ def cleaned_text(*, text: str, findings: Sequence[FormerReleaseFinding], kit_def
     moves_active = any(isinstance(op, RemapValueOp) for op, _ in ops)
     if moves_active:
         document = tomlkit.loads(current_text)
-        if _add_kit_profile(document=document, kit_default=kit_default):
-            current_text = tomlkit.dumps(document)  # pyright: ignore[reportUnknownMemberType]
-            changes.append(f"added the routing profile '{kit_default}', as this release ships it")
+        match _add_kit_profile(document=document, kit_default=kit_default):
+            case _KitProfilePlacement.ADDED:
+                current_text = tomlkit.dumps(document)  # pyright: ignore[reportUnknownMemberType]
+                changes.append(f"added the routing profile '{kit_default}', as this release ships it")
+            case _KitProfilePlacement.ALREADY_THERE:
+                pass
+            case _KitProfilePlacement.IMPOSSIBLE:
+                return CleanedText(text=text, changes=[], hand_edit=_inline_profiles_hand_edit(kit_default=kit_default))
 
     application = apply_ops_over_text(text=current_text, ops=[op for op, _ in ops])
     current_text = application.text
     changes.extend(change for (_, change), applied in zip(ops, application.applications, strict=True) if applied.outcome.did_apply)
+    current_text = _without_emptied_profiles(text=current_text, findings=findings)
     if current_text == text:
-        return text, []
+        return CleanedText(text=text, changes=[])
 
     document = tomlkit.loads(current_text)
     if _drop_former_release_comments(document=document):
         current_text = tomlkit.dumps(document)  # pyright: ignore[reportUnknownMemberType]
         changes.append("removed a comment about the Pipelex Gateway")
-    return current_text, _deduplicated(changes=changes)
+    return CleanedText(text=current_text, changes=_deduplicated(changes=changes))
+
+
+def _without_emptied_profiles(*, text: str, findings: Sequence[FormerReleaseFinding]) -> str:
+    """The document without a profile table that losing its retired `default` left empty.
+
+    An override that only retargeted a profile is a `[profiles.<name>]` table holding that one key: once the key goes,
+    the header overrides nothing, and it goes too, with no change line of its own, since the key's says what happened.
+    """
+    retargeted = {finding.subject for finding in findings if finding.kind is FormerReleaseFindingKind.RETIRED_PROFILE_DEFAULT}
+    if not retargeted:
+        return text
+    profiles = load_toml_from_content(text).get(ROUTING_PROFILES_KEY)
+    if not isinstance(profiles, dict):
+        return text
+    emptied = [
+        name
+        for name, profile in cast("dict[str, Any]", profiles).items()
+        if name in retargeted and isinstance(profile, dict) and not cast("dict[str, Any]", profile)
+    ]
+    if not emptied:
+        return text
+    return apply_ops_over_text(text=text, ops=[DeleteTableOp(table_path=[ROUTING_PROFILES_KEY, name]) for name in emptied]).text
+
+
+def _inline_profiles_hand_edit(*, kit_default: str) -> str:
+    return (
+        f"the routing profiles are written as one inline table, where the cleanup cannot add the profile '{kit_default}' to make it "
+        f"active in place of the former release's. By hand, either write each profile as a [profiles.<name>] table, or make one of "
+        f"your own profiles active, then run '{MIGRATE_COMMAND}' again"
+    )
 
 
 def _ops_for(*, finding: FormerReleaseFinding, kit_default: str, is_override: bool) -> list[tuple[MigrationOp, str]]:
@@ -300,6 +445,13 @@ def _ops_for(*, finding: FormerReleaseFinding, kit_default: str, is_override: bo
             return [
                 (DeleteTableOp(table_path=[ROUTING_PROFILES_KEY, _subject_of(finding=finding)]), f"removed the routing profile '{finding.subject}'")
             ]
+        case FormerReleaseFindingKind.RETIRED_PROFILE_DEFAULT:
+            return [
+                (
+                    DeleteKeyOp(table_path=[ROUTING_PROFILES_KEY, _subject_of(finding=finding)], key=_DEFAULT_KEY),
+                    f"removed '{_DEFAULT_KEY}', which named '{finding.retired_backend}', from the routing profile '{finding.subject}'",
+                )
+            ]
         case FormerReleaseFindingKind.ROUTE_TO_RETIRED_BACKEND:
             route_table = finding.route_table or ROUTE_TABLE_KEYS[0]
             route_pattern = finding.route_pattern or ""
@@ -310,15 +462,15 @@ def _ops_for(*, finding: FormerReleaseFinding, kit_default: str, is_override: bo
                 )
             ]
         case FormerReleaseFindingKind.ACTIVE_ROUTING_PROFILE:
-            if finding.route_pattern is not None:
-                # The active profile stays; the route that made it retired is a finding of its own, in the file that
-                # holds the profile, and goes there.
+            if not finding.profile_is_removed:
+                # The active profile stays: what made it retired — a route, or a retired `default` another file
+                # overrides — is a finding of its own, in the file that holds it, and goes there.
                 return []
             if is_override:
                 return [
                     (
                         DeleteKeyOp(table_path=[], key=ACTIVE_KEY),
-                        f"removed '{ACTIVE_KEY}', which named the routing profile '{finding.subject}', so the base file's applies",
+                        f"removed '{ACTIVE_KEY}', which named the routing profile '{finding.subject}', so the file read before this one decides",
                     )
                 ]
             return [
@@ -345,29 +497,34 @@ def _removal_in_words(*, finding: FormerReleaseFinding) -> str:
             FormerReleaseFindingKind.RETIRED_BACKEND_TABLE
             | FormerReleaseFindingKind.MODEL_SPECS_SECTION_KEY
             | FormerReleaseFindingKind.RETIRED_ROUTING_PROFILE
+            | FormerReleaseFindingKind.RETIRED_PROFILE_DEFAULT
             | FormerReleaseFindingKind.ROUTE_TO_RETIRED_BACKEND
             | FormerReleaseFindingKind.ACTIVE_ROUTING_PROFILE
         ):
             return finding.description
 
 
-def _add_kit_profile(*, document: TOMLDocument, kit_default: str) -> bool:
+def _add_kit_profile(*, document: TOMLDocument, kit_default: str) -> _KitProfilePlacement:
     """Put the kit's default profile first among the document's profiles, as the kit ships it, unless it is there.
 
     Copied from the kit's own document, so its comments come with it and it lands as `pipelex init` would write it.
+    An inline `profiles` table, which no release wrote, cannot take it without being restructured, and is not.
     """
     profiles: Table | None = None
     if ROUTING_PROFILES_KEY in document:
         existing = document.item(ROUTING_PROFILES_KEY)
-        if kit_default in cast("dict[str, Any]", existing):
-            return False
         if isinstance(existing, OutOfOrderTableProxy):
+            if kit_default in existing:
+                return _KitProfilePlacement.ALREADY_THERE
             # Profiles spread across the file between other tables: the profile joins them where tomlkit puts it.
             existing[kit_default] = _kit_profile(kit_default=kit_default)
-            return True
+            return _KitProfilePlacement.ADDED
         if not isinstance(existing, Table):
-            # An inline `profiles` table, which no release wrote: left as it is rather than restructured.
-            return False
+            if isinstance(existing, dict) and kit_default in existing:
+                return _KitProfilePlacement.ALREADY_THERE
+            return _KitProfilePlacement.IMPOSSIBLE
+        if kit_default in existing:
+            return _KitProfilePlacement.ALREADY_THERE
         profiles = existing
     if profiles is None:
         profiles = tomlkit.table(is_super_table=True)
@@ -376,7 +533,7 @@ def _add_kit_profile(*, document: TOMLDocument, kit_default: str) -> bool:
         profiles.append(kit_default, _kit_profile(kit_default=kit_default))
     else:
         profiles.value._insert_at(0, kit_default, _kit_profile(kit_default=kit_default))  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
-    return True
+    return _KitProfilePlacement.ADDED
 
 
 def _kit_profile(*, kit_default: str) -> Item:

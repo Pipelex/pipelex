@@ -5,7 +5,9 @@ that ran on the Pipelex Gateway or Pipelex Manifold left, so the row reports it 
 row would otherwise meet the refusal a boot meets on such a machine, about one backend or one profile; it names the
 cleanup instead.
 
-The home is the v0.72 kit, copied from that release's wheel.
+The home is the v0.72 kit, copied from that release's wheel. Whether what it left stops the boot is read off the files
+the boot itself merges, across the home and the project, so a project that boots on a base of its own is not told it
+cannot start, and a profile one directory activates from the other is not missed.
 """
 
 from __future__ import annotations
@@ -16,9 +18,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from pipelex.cli.commands import doctor_cmd as doctor_cmd_module
 from pipelex.cli.commands.doctor_cmd import PendingMigrationsFinding, check_backend_credentials, check_models, check_pending_migrations
 from pipelex.core.validation import MIGRATE_COMMAND
-from pipelex.migration.former_release import RETIRED_BACKEND_NAMES, SERVICE_FILE_NAME
+from pipelex.kit.paths import RETIRED_SERVICE_FILE_NAME, get_kit_configs_dir
+from pipelex.migration.former_release import RETIRED_BACKEND_NAMES
 from pipelex.system.configuration.config_loader import BACKENDS_DIR_NAME, BACKENDS_FILE_NAME, INFERENCE_DIR_NAME, ROUTING_PROFILES_FILE_NAME
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
@@ -36,21 +40,31 @@ V0_72_CLEANUP_FILES = [
     f"{INFERENCE_DIR_NAME}/{BACKENDS_DIR_NAME}/pipelex_manifold.toml",
     f"{INFERENCE_DIR_NAME}/{BACKENDS_DIR_NAME}/pipelex_gateway_models.md",
     f"{INFERENCE_DIR_NAME}/{BACKENDS_DIR_NAME}/pipelex_gateway_models_plain.md",
-    SERVICE_FILE_NAME,
+    RETIRED_SERVICE_FILE_NAME,
     f"{INFERENCE_DIR_NAME}/{ROUTING_PROFILES_FILE_NAME}",
 ]
 
+# A model table whose key the inference-backend ledger renames.
+MIGRATABLE_MODEL_TABLE = '\n["gpt-4o"]\nprompting_target = "openai"\n'
+
 
 @pytest.fixture
-def former_release_home(tmp_path: Path, mocker: MockerFixture) -> Path:
-    """A fake home holding the v0.72 kit, and a project without a `.pipelex/`, so the walk reads this test's files."""
+def machine(tmp_path: Path, mocker: MockerFixture) -> tuple[Path, Path]:
+    """A fake home and a project, both configuration directories still to be written: the home's and the project's."""
     fake_home = tmp_path / "home"
-    config_dir = fake_home / ".pipelex"
-    shutil.copytree(V0_72_CONFIG_DIR, config_dir)
+    fake_home.mkdir()
     project_root = tmp_path / "project"
     (project_root / ".git").mkdir(parents=True)
     mocker.patch.object(Path, "home", return_value=fake_home)
     mocker.patch.object(Path, "cwd", return_value=project_root)
+    return fake_home / ".pipelex", project_root / ".pipelex"
+
+
+@pytest.fixture
+def former_release_home(machine: tuple[Path, Path]) -> Path:
+    """A fake home holding the v0.72 kit, and a project without a `.pipelex/`, so the walk reads this test's files."""
+    config_dir, _ = machine
+    shutil.copytree(V0_72_CONFIG_DIR, config_dir)
     return config_dir
 
 
@@ -92,3 +106,48 @@ class TestTheDoctorOnAFormerRelease:
 
         assert backend_reports, "the other enabled backends are still checked"
         assert not set(backend_reports) & RETIRED_BACKEND_NAMES
+
+    @pytest.mark.usefixtures("former_release_home")
+    def test_a_project_booting_on_a_base_of_its_own_is_not_told_it_cannot_start(self, machine: tuple[Path, Path]) -> None:
+        """The common case: a v0.72 home, and a project set up since, whose own base files are the ones the boot reads."""
+        _, project_config_dir = machine
+        shutil.copytree(Path(str(get_kit_configs_dir())), project_config_dir)
+
+        check = check_pending_migrations()
+
+        assert check.former_release_files, "the home still carries what the release left, and the row lists it"
+        assert not check.former_release_blocks_boot
+        assert "cannot start" not in check.message
+
+    def test_a_retired_profile_activated_from_the_other_directory_stops_the_boot(self, machine: tuple[Path, Path]) -> None:
+        """Each directory alone boots; merged as the boot merges them, the home's override activates the project's retired profile."""
+        home_config_dir, project_config_dir = machine
+        kit_inference = Path(str(get_kit_configs_dir())) / INFERENCE_DIR_NAME
+        for config_dir in (home_config_dir, project_config_dir):
+            shutil.copytree(kit_inference, config_dir / INFERENCE_DIR_NAME)
+        (home_config_dir / INFERENCE_DIR_NAME / "routing_profiles_override.toml").write_text('active = "my_gw"\n', encoding="utf-8")
+        with (project_config_dir / INFERENCE_DIR_NAME / ROUTING_PROFILES_FILE_NAME).open("a", encoding="utf-8") as stream:
+            stream.write('\n[profiles.my_gw]\ndescription = "mine"\ndefault = "pipelex_gateway"\n')
+
+        check = check_pending_migrations()
+
+        assert check.former_release_blocks_boot
+        assert "cannot start" in check.message
+
+    @pytest.mark.usefixtures("former_release_home")
+    def test_a_failure_reading_what_the_boot_reads_leaves_the_row_unchecked(self, mocker: MockerFixture) -> None:
+        mocker.patch.object(doctor_cmd_module, "former_release_boot_blockers", side_effect=PermissionError(13, "Permission denied"))
+
+        check = check_pending_migrations()
+
+        assert check.finding == PendingMigrationsFinding.UNAVAILABLE
+
+    def test_a_file_the_cleanup_removes_is_not_offered_for_migration(self, former_release_home: Path) -> None:
+        gateway_file = former_release_home / INFERENCE_DIR_NAME / BACKENDS_DIR_NAME / "pipelex_gateway.toml"
+        with gateway_file.open("a", encoding="utf-8") as stream:
+            stream.write(MIGRATABLE_MODEL_TABLE)
+
+        check = check_pending_migrations()
+
+        assert str(gateway_file) in check.former_release_files
+        assert str(gateway_file) not in check.migratable_files
