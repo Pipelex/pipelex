@@ -5,6 +5,7 @@
 ### Added
 
 - **Claude Opus 5.5 and Claude Sonnet 5.5 on the `anthropic` backend**: `claude-5.5-opus` (model id `claude-opus-5-5`, $4 / $20 per million tokens) and `claude-5.5-sonnet` (model id `claude-sonnet-5-5`, $2 / $10) take text, images and PDF, produce text and structured output, and reason with adaptive thinking, with up to 128K output tokens each. Both refuse `temperature` and a forced `tool_choice`, so structured output uses `instructor/anthropic_reasoning_tools`, as `claude-5.1-fable` does.
+- **GPT-6.1 Sol and GPT-6 Luna on the `openai` and `azure_openai` backends**: `gpt-6.1-sol` ($2 / $10 per million tokens) and `gpt-6-luna` ($0.10 / $0.50) take text, images and PDF, produce text and structured output, reason with a manual effort and fix their temperature at 1, like the rest of the GPT-6 series. On `azure_openai` their model ids are the deployments `gpt-6.1-sol-2026-09-29` and `gpt-6-luna-2026-09-22`. The shipped deck is unchanged.
 
 ### Fixed
 
