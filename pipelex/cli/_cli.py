@@ -12,6 +12,7 @@ from pipelex.cli.commands.fix.app import fix_app
 from pipelex.cli.commands.graph_cmd import graph_app
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
+from pipelex.cli.commands.login.command import login_cmd
 from pipelex.cli.commands.migrate_cmd import migrate_cmd
 from pipelex.cli.commands.plugins_cmd import plugins_app
 from pipelex.cli.commands.resolve_cmd import resolve_cmd
@@ -30,6 +31,7 @@ from pipelex.tools.misc.package_utils import get_package_version
 # Core commands in display order (natural ordering doesn't work between Typer groups and commands).
 _CORE_COMMAND_ORDER: list[str] = [
     "init",
+    "login",
     "doctor",
     "update",
     "migrate",
@@ -151,7 +153,7 @@ def app_callback(
 """
         )
     # Skip checks if no command is being run (e.g., just --help) or if running setup/diagnostic commands
-    if ctx.invoked_subcommand is None or ctx.invoked_subcommand in {"init", "doctor", "update", "migrate", "which"}:
+    if ctx.invoked_subcommand is None or ctx.invoked_subcommand in {"init", "login", "doctor", "update", "migrate", "which"}:
         return
 
     # Check system readiness (dependencies and venv for dev installs)
@@ -163,7 +165,10 @@ def app_callback(
         warn_if_deck_stale()
 
 
-@app.command(name="init", help="Initialize Pipelex configuration, backends, credentials, routing, and telemetry")
+@app.command(
+    name="init",
+    help="Initialize Pipelex: configuration, where runs execute (the hosted Pipelex API or this machine), backends, credentials, and telemetry",
+)
 def init_command(
     focus: Annotated[
         InitFocus,
@@ -187,19 +192,41 @@ def init_command(
 
     Focus options:
 
-      all          Full setup: config files, backends, credentials, routing, telemetry (default)
+      all          Full setup (default): config files, then where runs execute: on the hosted Pipelex API
+                   (signs you in for a Pipelex API key) or on this machine (backends, routing, provider keys);
+                   then telemetry
 
-      config       Reset configuration files and prompt for missing API keys
+      config       Reset configuration files; on a first setup, ask where runs execute as 'all' does
 
       credentials  Prompt for missing API keys only (reads enabled backends, saves to the .env in the home configuration directory)
 
-      inference    Reset inference backends selection and prompt for missing API keys
+      inference    Reset the inference backends runs on this machine use and prompt for missing API keys
+                   (where runs execute stays as it is)
 
       routing      Reset routing profile
 
       telemetry    Reset telemetry preferences
     """
     init_cmd(focus=focus, local=local)
+
+
+@app.command(name="login", help="Get a Pipelex API key through your browser and save it for runs on the hosted Pipelex API")
+def login_command(
+    paste: Annotated[
+        bool,
+        typer.Option(
+            "--paste",
+            help="Paste a key created in the Pipelex app instead of opening a browser (for a remote machine or CI)",
+        ),
+    ] = False,
+) -> None:
+    """Get a Pipelex API key and save it to the .env in the home configuration directory (~/.pipelex/.env, or PIPELEX_HOME) as PIPELEX_API_KEY.
+
+    Opens the Pipelex app in your browser, which hands a new key back to this command on a local port. The key is checked
+    with the hosted API before it is saved, and never printed. PIPELEX_APP_URL aims the command at another Pipelex app,
+    PIPELEX_BASE_URL at another hosted API.
+    """
+    login_cmd(paste=paste)
 
 
 @app.command(name="doctor", help="Check Pipelex configuration health and suggest fixes")
