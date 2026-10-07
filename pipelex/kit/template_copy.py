@@ -5,6 +5,7 @@ directory with it, so the two agree on which files a directory receives and on w
 means. It imports nothing but the standard library, because the boot's configuration loader calls it.
 """
 
+import os
 import shutil
 from pathlib import Path, PurePosixPath
 
@@ -21,9 +22,10 @@ def copy_kit_templates(
 
     Every file under `template_dir` is copied to the same relative path under `target_dir`, and the
     directories a copied file needs are created on the way. An entry whose name is in `skip_names`, a file
-    or a directory, is left out at any depth, with everything under it. A file the target already holds is
-    kept as it is unless `overwrite` is set, so without it a directory that holds every file is not written
-    at all. With `dry_run` nothing is written, and the result says what a real run would copy.
+    or a directory, is left out at any depth, with everything under it. A file the target already holds, a
+    symbolic link included even when it dangles, is kept as it is unless `overwrite` is set, so without it a
+    directory that holds every file is not written at all, and nothing is written through a link. With
+    `dry_run` nothing is written, and the result says what a real run would copy.
 
     Returns:
         The paths of the files copied, relative to `template_dir` and in POSIX form, in walk order.
@@ -39,7 +41,9 @@ def copy_kit_templates(
                 mirror(src_dir=src_item, relative_dir=relative_item)
                 continue
             dst_item = target_dir / relative_item
-            if dst_item.exists() and not overwrite:
+            # `lexists` rather than `exists`: a link is there even when it dangles, and copying through it
+            # would write wherever it points, or fail on every run when that place does not exist.
+            if not overwrite and os.path.lexists(dst_item):
                 continue
             if not dry_run:
                 dst_item.parent.mkdir(parents=True, exist_ok=True)

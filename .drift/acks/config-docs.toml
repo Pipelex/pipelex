@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:a2f2f8c8cbb9d87b7ddc99f5c092c6bf6aef7a12fe2b070821ec4f47bf63ff1b"
+digest = "sha256:33d8333bc5cb282f063293581ebd203526ac0e1afcc6d59987ca0392247e2e78"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-07T12:54:37Z"
-rationale = "real-catch: ensure_global_config_exists now copies each kit file a home configuration directory lacks, never overwriting one it holds, with the inference directory laid down as one unit only when inference/backends.toml is absent and an unwritable home read as it is. The PIPELEX_HOME section of docs/configuration/index.md said a directory with anything in it is left alone, and now describes the fill. No config model, default, validator or load order moved, so the migration ledgers, configs.py and config_cogt.py owe nothing."
+reviewed_at = "2026-10-07T14:09:42Z"
+rationale = "real-catch: the home fill in config_loader.py now writes inference/backends.toml last, after the other inference files and the manifests, so an interrupted fill is completed by the next boot, and it counts a symbolic link as present even when it dangles, so nothing is written through one. The PIPELEX_HOME section of docs/configuration/index.md now says both. No config model, default, validator or load order moved, so the migration ledgers, configs.py and config_cogt.py owe nothing."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:02f71cb4a6b01aebda59c2e31f262ef9c865e17b"
@@ -13,7 +13,7 @@ rationale = "real-catch: ensure_global_config_exists now copies each kit file a 
 "pipelex/pipelex.toml" = "blob:cb3431d9d8a3265121d730eaef34cfbe5e8c4cbf"
 "pipelex/system/configuration/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
 "pipelex/system/configuration/config_check.py" = "blob:2d5de29aba3d2ce205d3d82b4623f37b53108332"
-"pipelex/system/configuration/config_loader.py" = "blob:db0677e498ddfcd08389cda609ca5f141ca02a17"
+"pipelex/system/configuration/config_loader.py" = "blob:7c7076844ce875c15df0aa89eabc13a1bc125ab0"
 "pipelex/system/configuration/config_model.py" = "blob:83b29dc6e93393c9b98c4353636caf0135c80339"
 "pipelex/system/configuration/config_root.py" = "blob:c7d43851270912d17413cfc6a511247d3c7cc160"
 "pipelex/system/configuration/config_surface.py" = "blob:dc6c877564254aa97ce0b20fd29118def31c957c"

@@ -7,12 +7,16 @@ reads as "inference not set up yet". Every test points `PIPELEX_HOME` at a direc
 so none of them can reach the developer's own `~/.pipelex`.
 """
 
+import errno
 import json
 import os
+import shutil
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
+from pytest_mock import MockerFixture
 
 from pipelex.cogt.models.deck_manifest import MANIFEST_FILENAME, KitManagedArea, compute_kit_manifest
 from pipelex.kit.paths import GIT_IGNORED_CONFIG_FILES, get_kit_configs_dir
@@ -174,3 +178,75 @@ class TestHomeConfigFill:
             assert not (home / "plxt.toml").exists()
         finally:
             home.chmod(0o755)
+
+    @pytest.mark.parametrize(
+        "unwritable_error",
+        [
+            pytest.param(PermissionError(errno.EACCES, "Permission denied"), id="permission_denied"),
+            pytest.param(OSError(errno.EROFS, "Read-only file system"), id="read_only_file_system"),
+        ],
+    )
+    def test_an_error_saying_the_home_cannot_be_written_is_tolerated(self, home: Path, mocker: MockerFixture, unwritable_error: OSError) -> None:
+        mocker.patch.object(shutil, "copy2", side_effect=unwritable_error)
+
+        ConfigLoader().ensure_global_config_exists()
+
+        assert not _files_under(home)
+
+    @pytest.mark.usefixtures("home")
+    def test_any_other_error_that_stops_a_copy_is_raised(self, mocker: MockerFixture) -> None:
+        disk_full = OSError(errno.ENOSPC, "No space left on device")
+        mocker.patch.object(shutil, "copy2", side_effect=disk_full)
+
+        with pytest.raises(OSError, match="No space left on device") as raised:
+            ConfigLoader().ensure_global_config_exists()
+
+        assert raised.value is disk_full
+
+    def test_an_inference_fill_cut_short_is_completed_by_the_next_boot(self, home: Path, mocker: MockerFixture) -> None:
+        """`backends.toml` is what marks the inference setup as there, so a fill that stops part-way must leave it out.
+
+        Written before the rest, it would make every later boot take the half-copied directory for a
+        complete one, and the home would fail on the missing routing profiles or deck forever.
+        """
+        real_copy2 = shutil.copy2
+
+        def copy2_failing_on_one_deck_file(src: Any, dst: Any, **kwargs: Any) -> Any:
+            if Path(src).name == "3_extract_deck.toml":
+                raise OSError(errno.ENOSPC, "No space left on device")
+            return real_copy2(src, dst, **kwargs)
+
+        copy2_patch = mocker.patch.object(shutil, "copy2", side_effect=copy2_failing_on_one_deck_file)
+        with pytest.raises(OSError, match="No space left on device"):
+            ConfigLoader().ensure_global_config_exists()
+        assert not (home / "inference" / "backends.toml").exists()
+        mocker.stop(copy2_patch)
+
+        ConfigLoader().ensure_global_config_exists()
+
+        installed = _files_under(home)
+        kit_files = _kit_files()
+        assert set(installed) == set(kit_files) | _MANIFESTS
+        assert {path: installed[path] for path in kit_files} == kit_files
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="creating a symbolic link takes a privilege Windows does not grant by default")
+    @pytest.mark.parametrize("kit_file", ["pipelex.toml", "inference/deck/1_llm_deck.toml", "inference/backends.toml"])
+    @pytest.mark.parametrize("link_target_dir_exists", [False, True])
+    def test_a_dangling_link_where_a_kit_file_goes_is_kept_and_never_written_through(
+        self, home: Path, tmp_path: Path, kit_file: str, link_target_dir_exists: bool
+    ) -> None:
+        """A link is the user's, even one whose target is gone: copying through it would fail every boot, or write elsewhere."""
+        link_target_dir = tmp_path / "link-target"
+        if link_target_dir_exists:
+            link_target_dir.mkdir()
+        link_target = link_target_dir / "gone.toml"
+        link = home / kit_file
+        link.parent.mkdir(parents=True)
+        link.symlink_to(link_target)
+
+        ConfigLoader().ensure_global_config_exists()
+
+        assert link.is_symlink()
+        assert link.readlink() == link_target
+        assert not link_target.exists()
+        assert link_target_dir.exists() == link_target_dir_exists
