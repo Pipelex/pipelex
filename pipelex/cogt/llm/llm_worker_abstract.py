@@ -13,6 +13,7 @@ from pipelex.cogt.exceptions import CogtError, LLMCapabilityError
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.inference.prompt_file_checks import check_prompt_documents_are_read, check_prompt_images_are_images
+from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.system.exceptions import JobMetadataError
@@ -56,6 +57,68 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         """
         InferenceWorkerAbstract.__init__(self, reporting_delegate=reporting_delegate)
         self.inference_model = inference_model
+
+    #########################################################
+    # Class methods
+    #########################################################
+
+    @classmethod
+    def check_request(cls, *, inference_model: InferenceModelSpec, job_params: LLMJobParams, is_structured: bool) -> None:  # ruff: ignore[unused-class-method-argument]
+        """Refuse a request this worker refuses before it calls its provider, from the model's spec and the job params alone.
+
+        The worker runs it before every call, and bundle validation runs the same check against the
+        model a pipe's setting resolves to, so a setting the model refuses is refused before a run
+        spends anything. It reads nothing but its arguments and the config, and builds no SDK client.
+        A worker that refuses more overrides it, from the same helpers its calls resolve the request
+        with, so validation and the call never disagree. This base check holds for every worker: a
+        model whose spec declares `thinking_mode = "none"` takes no reasoning setting.
+
+        Args:
+            inference_model: The spec of the model the request goes to.
+            job_params: The job params the request sends, with the model's constraints applied.
+            is_structured: Whether the request generates a structured output rather than text.
+
+        Raises:
+            LLMCapabilityError: When the worker refuses the request.
+
+        """
+        if inference_model.thinking_mode != ThinkingMode.NONE:
+            return
+        if job_params.reasoning_effort is not None or job_params.reasoning_budget is not None:
+            msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
+            raise LLMCapabilityError(msg)
+
+    @classmethod
+    def constrained_job_params(cls, *, inference_model: InferenceModelSpec, job_params: LLMJobParams) -> LLMJobParams | None:
+        """The job params a request to the model sends once its spec's constraints are applied, `None` when none changes them.
+
+        Args:
+            inference_model: The spec of the model the request goes to.
+            job_params: The job params the request was made with.
+
+        Returns:
+            A copy of the job params with the constraints applied, or None if no change was needed.
+
+        """
+        new_temperature = cls._scaled_temperature(inference_model=inference_model, temperature=job_params.temperature)
+        has_changes = ListedConstraint.TEMPERATURE_MUST_BE_MULTIPLIED_BY_2 in inference_model.listed_constraints
+        fixed_temperature = inference_model.valued_constraints.get(ValuedConstraint.FIXED_TEMPERATURE)
+        if fixed_temperature is not None and new_temperature != fixed_temperature:
+            new_temperature = fixed_temperature
+            has_changes = True
+
+        if not has_changes:
+            return None
+
+        max_tokens = job_params.max_tokens or inference_model.max_tokens
+        return job_params.model_copy(update={"temperature": new_temperature, "max_tokens": max_tokens})
+
+    @classmethod
+    def _scaled_temperature(cls, *, inference_model: InferenceModelSpec, temperature: float) -> float:
+        """The temperature a request asks for once the model's scale is applied, before a fixed temperature replaces it."""
+        if ListedConstraint.TEMPERATURE_MUST_BE_MULTIPLIED_BY_2 in inference_model.listed_constraints:
+            return temperature * 2
+        return temperature
 
     #########################################################
     # Instance methods
@@ -348,8 +411,13 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         llm_job.llm_job_before_start(inference_model=self.inference_model)
         llm_job.applied_job_params = self._apply_constraints(llm_job=llm_job)
 
+    @classmethod
+    def _sent_job_params(cls, *, llm_job: LLMJob) -> LLMJobParams:
+        """The job params the request sends: the constrained ones `_before_job` applied, else the job's own."""
+        return llm_job.applied_job_params or llm_job.job_params
+
     def _apply_constraints(self, llm_job: LLMJob) -> LLMJobParams | None:
-        """Apply constraints from the inference model to job params.
+        """Apply constraints from the inference model to job params, warning when a fixed temperature replaces the one asked for.
 
         Args:
             llm_job: The LLM job containing the original job params
@@ -358,29 +426,14 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             A copy of job_params with constraints applied, or None if no changes were needed
 
         """
-        original_params = llm_job.job_params
-        new_temperature = original_params.temperature
-        max_tokens = original_params.max_tokens or self.inference_model.max_tokens
-        new_max_tokens = max_tokens
-        has_changes = False
-
-        # Temperature constraints
-        if ListedConstraint.TEMPERATURE_MUST_BE_MULTIPLIED_BY_2 in self.inference_model.listed_constraints:
-            new_temperature *= 2
-            has_changes = True
         fixed_temperature = self.inference_model.valued_constraints.get(ValuedConstraint.FIXED_TEMPERATURE)
-        if fixed_temperature is not None and new_temperature != fixed_temperature:
+        requested_temperature = self._scaled_temperature(inference_model=self.inference_model, temperature=llm_job.job_params.temperature)
+        if fixed_temperature is not None and requested_temperature != fixed_temperature:
             log.warning(
-                f"Model {self.inference_model.desc} used with temperature {new_temperature}, "
+                f"Model {self.inference_model.desc} used with temperature {requested_temperature}, "
                 f"but it must be {fixed_temperature} for this model so we forced it to {fixed_temperature}"
             )
-            new_temperature = fixed_temperature
-            has_changes = True
-
-        if not has_changes:
-            return None
-
-        return original_params.model_copy(update={"temperature": new_temperature, "max_tokens": new_max_tokens})
+        return self.constrained_job_params(inference_model=self.inference_model, job_params=llm_job.job_params)
 
     async def _after_text_job(
         self,
@@ -416,11 +469,6 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # This can be overridden by subclasses for specific checks
         self._check_vision_support(llm_job=llm_job)
         self._check_document_support(llm_job=llm_job)
-
-    def _validate_no_reasoning_for_structured_gen(self, job_params: LLMJobParams):
-        if job_params.reasoning_effort is not None or job_params.reasoning_budget is not None:
-            msg = f"Model '{self.inference_model.desc}' does not support reasoning parameters for structured generation"
-            raise LLMCapabilityError(msg)
 
     def _check_vision_support(self, llm_job: LLMJob):
         if llm_job.llm_prompt.user_images:
@@ -470,6 +518,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # context is left alone, and it is what the line's standard trace fields name.
         with pipelex_span_active(span=span):
             try:
+                self.check_request(inference_model=self.inference_model, job_params=self._sent_job_params(llm_job=llm_job), is_structured=False)
                 text_result = await self._gen_text(llm_job=llm_job)
                 await self._after_text_job(span=span, llm_job=llm_job, result_text=text_result)
                 return text_result
@@ -513,6 +562,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # context is left alone, and it is what the line's standard trace fields name.
         with pipelex_span_active(span=span):
             try:
+                self.check_request(inference_model=self.inference_model, job_params=self._sent_job_params(llm_job=llm_job), is_structured=True)
                 object_result = await self._gen_object(llm_job=llm_job, schema=schema)
 
                 # Cleanup result

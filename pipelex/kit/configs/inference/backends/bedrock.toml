@@ -72,6 +72,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
+valued_constraints = { min_thinking_budget = 1024 }     # Anthropic refuses a smaller budget_tokens
 thinking_mode = "manual"
 
 [claude-4-opus]
@@ -82,6 +83,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
+valued_constraints = { min_thinking_budget = 1024 }   # Anthropic refuses a smaller budget_tokens
 thinking_mode = "manual"
 
 ["claude-4.1-opus"]
@@ -92,6 +94,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
+valued_constraints = { min_thinking_budget = 1024 }     # Anthropic refuses a smaller budget_tokens
 thinking_mode = "manual"
 
 ["claude-4.5-sonnet"]
@@ -102,6 +105,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
+valued_constraints = { min_thinking_budget = 1024 }       # Anthropic refuses a smaller budget_tokens
 thinking_mode = "manual"
 
 ["claude-4.5-haiku"]
@@ -112,6 +116,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 1.0, output = 5.0 }
+valued_constraints = { min_thinking_budget = 1024 }      # Anthropic refuses a smaller budget_tokens
 thinking_mode = "manual"
 
 ["claude-4.5-opus"]
@@ -122,6 +127,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 5.0, output = 25.0 }
+valued_constraints = { min_thinking_budget = 1024 }         # Anthropic refuses a smaller budget_tokens
 thinking_mode = "manual"
 
 ["claude-4.6-sonnet"]
@@ -132,6 +138,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
+valued_constraints = { min_thinking_budget = 1024 } # Anthropic refuses a smaller budget_tokens
 thinking_mode = "adaptive"
 
 ["claude-4.6-opus"]
@@ -142,6 +149,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 5.0, output = 25.0 }
+valued_constraints = { min_thinking_budget = 1024 } # Anthropic refuses a smaller budget_tokens
 thinking_mode = "adaptive"
 
 # --- Claude 4.7 Series --------------------------------------------------------
@@ -153,6 +161,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 5.0, output = 25.0 }
+valued_constraints = { min_thinking_budget = 1024 } # Anthropic refuses a smaller budget_tokens
 thinking_mode = "adaptive"
 listed_constraints = ["temperature_unsupported"]
 
@@ -165,5 +174,6 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 5.0, output = 25.0 }
+valued_constraints = { min_thinking_budget = 1024 } # Anthropic refuses a smaller budget_tokens
 thinking_mode = "adaptive"
 listed_constraints = ["temperature_unsupported"]

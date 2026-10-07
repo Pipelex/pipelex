@@ -88,17 +88,25 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
     # Reasoning helpers
     #########################################################
 
-    def _resolve_reasoning(self, job_params: LLMJobParams) -> Reasoning | None:
+    @classmethod
+    @override
+    def check_request(cls, *, inference_model: InferenceModelSpec, job_params: LLMJobParams, is_structured: bool) -> None:
+        """Refuse a reasoning setting the Responses API cannot carry for the model, on text and structured outputs alike."""
+        cls._resolve_reasoning(inference_model=inference_model, job_params=job_params)
+
+    @classmethod
+    def _resolve_reasoning(cls, *, inference_model: InferenceModelSpec, job_params: LLMJobParams) -> Reasoning | None:
         """Resolve reasoning parameters to an OpenAI Responses API reasoning dict.
 
         Args:
+            inference_model: The spec of the model the request goes to.
             job_params: The LLM job parameters containing reasoning_effort/reasoning_budget.
 
         Returns:
             A Reasoning dict for the OpenAI Responses API, or None if reasoning is not requested.
 
         """
-        thinking_mode = self.inference_model.thinking_mode
+        thinking_mode = inference_model.thinking_mode
 
         if job_params.reasoning_effort is not None:
             effort = job_params.reasoning_effort
@@ -110,22 +118,22 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
                     log.verbose(f"OpenAI Responses reasoning effort={openai_effort}")
                     return Reasoning(effort=openai_effort)
                 case ThinkingMode.ADAPTIVE:
-                    msg = f"Model '{self.inference_model.desc}' has thinking_mode=adaptive which is not supported by the OpenAI Responses API"
+                    msg = f"Model '{inference_model.desc}' has thinking_mode=adaptive which is not supported by the OpenAI Responses API"
                     raise LLMCapabilityError(msg)
                 case ThinkingMode.NONE:
-                    msg = f"Model '{self.inference_model.desc}' does not support reasoning (thinking_mode=none)"
+                    msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
                     raise LLMCapabilityError(msg)
 
         if job_params.reasoning_budget is not None:
             match thinking_mode:
                 case ThinkingMode.MANUAL:
-                    msg = f"Model '{self.inference_model.desc}' does not support reasoning_budget; OpenAI uses reasoning_effort instead"
+                    msg = f"Model '{inference_model.desc}' does not support reasoning_budget; OpenAI uses reasoning_effort instead"
                     raise LLMCapabilityError(msg)
                 case ThinkingMode.ADAPTIVE:
-                    msg = f"Model '{self.inference_model.desc}' has thinking_mode=adaptive which is not supported by the OpenAI Responses API"
+                    msg = f"Model '{inference_model.desc}' has thinking_mode=adaptive which is not supported by the OpenAI Responses API"
                     raise LLMCapabilityError(msg)
                 case ThinkingMode.NONE:
-                    msg = f"Model '{self.inference_model.desc}' does not support reasoning (thinking_mode=none)"
+                    msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
                     raise LLMCapabilityError(msg)
 
         return None
@@ -138,7 +146,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
         job_params = llm_job.applied_job_params or llm_job.job_params
         input_items = await self.openai_responses_factory.make_input_items(llm_job=llm_job)
 
-        openai_reasoning = self._resolve_reasoning(job_params=job_params)
+        openai_reasoning = self._resolve_reasoning(inference_model=self.inference_model, job_params=job_params)
 
         try:
             extra_headers, extra_body = self.openai_responses_factory.make_extras(
@@ -147,7 +155,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
             response = await self.openai_client_for_responses.responses.create(
                 model=self.inference_model.model_id,
                 instructions=llm_job.llm_prompt.system_text,
-                temperature=omit if openai_reasoning is not None else job_params.temperature,
+                temperature=omit if (openai_reasoning is not None or not self.inference_model.accepts_temperature) else job_params.temperature,
                 max_output_tokens=job_params.max_tokens or omit,
                 input=input_items,
                 reasoning=openai_reasoning if openai_reasoning is not None else omit,
@@ -189,7 +197,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
-        self._validate_no_reasoning_for_structured_gen(job_params=job_params)
+        openai_reasoning = self._resolve_reasoning(inference_model=self.inference_model, job_params=job_params)
         from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]
 
         if not hasattr(self.instructor_for_objects, "responses"):
@@ -225,8 +233,9 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
                 max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.schema_reask_max_attempts),
                 model=self.inference_model.model_id,
                 instructions=llm_job.llm_prompt.system_text,
-                temperature=job_params.temperature,
+                temperature=omit if (openai_reasoning is not None or not self.inference_model.accepts_temperature) else job_params.temperature,
                 max_output_tokens=job_params.max_tokens or NOT_GIVEN,
+                reasoning=openai_reasoning if openai_reasoning is not None else omit,
                 extra_headers=extra_headers,
                 extra_body=extra_body,
             )

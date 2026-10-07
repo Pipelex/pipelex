@@ -20,9 +20,12 @@ from typing import Any
 
 from pipelex import log
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
-from pipelex.cogt.exceptions import ModelChoiceNotFoundError
+from pipelex.cogt.exceptions import LLMCapabilityError, LLMSettingRefusedError, ModelChoiceNotFoundError, ModelNotFoundError
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting
+from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_reference import ModelReferenceKind, ensure_model_reference
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.config import get_config
@@ -33,7 +36,8 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.kernel.llm_prompt_content import LlmPromptContent, assemble_llm_prompt
 from pipelex.kernel.llm_results import LlmObjectResult, LlmTextResult, StructuringPath
 from pipelex.kernel.memory_ops import store_result
-from pipelex.runtime_hub import get_content_generator, get_model_deck
+from pipelex.runtime_hub import get_content_generator, get_inference_backend_registry, get_model_deck
+from pipelex.system.exceptions import MissingDependencyError
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.templating.templating_style import TemplatingStyle
@@ -58,6 +62,61 @@ def resolve_llm_setting_for_object(*, llm_choice: LLMModelChoice | None = None, 
     model_deck = get_model_deck()
     resolved_choice = llm_choice or llm_choice_for_text or model_deck.llm_choice_overrides.for_object or model_deck.llm_choice_defaults.for_object
     return model_deck.get_llm_setting(llm_choice=resolved_choice)
+
+
+def served_llm_model(*, model_handle: str) -> InferenceModelSpec | None:
+    """The spec of the LLM a handle resolves to on this boot, `None` when no backend serves one.
+
+    An alias resolves to its target, a waterfall to its first member the deck serves, exactly as a run
+    resolves them. The deck answers `None` for a handle it does not serve, but raises for a waterfall
+    none of whose models it serves, or whose fallbacks are disabled: here the two mean the same thing.
+    """
+    try:
+        return get_model_deck().get_optional_inference_model(model_handle=model_handle, model_type=ModelType.LLM)
+    except ModelNotFoundError:
+        return None
+
+
+def check_llm_setting_with_served_model(*, llm_setting: LLMSetting, is_structured: bool) -> None:
+    """Refuse an LLM setting the model it resolves to refuses, before a run spends anything.
+
+    The model's spec is checked by the request check its backend registered, which is the check its
+    worker runs before every call, with the job params the setting gives once the model's constraints
+    are applied: a reasoning setting the model's thinking mode refuses, a reasoning budget where it takes
+    only an effort, a thinking budget its max_tokens cannot hold, or a structured output its worker cannot
+    generate. A backend that registered no check is held to the rule every worker shares. A model no
+    backend serves on this boot, or whose backend's SDK is not installed, is left to the run, whose
+    refusal names it.
+
+    Args:
+        llm_setting: The setting a step generates with, its model a handle, an alias or a waterfall.
+        is_structured: Whether the step generates a structured output rather than text.
+
+    Raises:
+        LLMSettingRefusedError: A built-in worker's refusal, naming the model by its deck handle and what it refuses.
+        LLMCapabilityError: An external plugin's refusal, as the plugin raised it.
+
+    """
+    inference_model = served_llm_model(model_handle=llm_setting.model)
+    if inference_model is None:
+        return
+    job_params = llm_setting.make_llm_job_params()
+    job_params = LLMWorkerAbstract.constrained_job_params(inference_model=inference_model, job_params=job_params) or job_params
+    registered_check = get_inference_backend_registry().lookup_llm_request_check(sdk=inference_model.sdk)
+    check_request = registered_check.check if registered_check else LLMWorkerAbstract.check_request
+    try:
+        check_request(inference_model=inference_model, job_params=job_params, is_structured=is_structured)
+    except MissingDependencyError:
+        # The backend's SDK is not installed here, so no worker for the model can be built: the run says so
+        log.verbose(f"Model '{inference_model.desc}' was not checked: its backend's SDK is not installed")
+    except LLMCapabilityError as refusal:
+        if registered_check and not registered_check.is_builtin:
+            # An external plugin's text may carry what it keeps private: it reaches the caller only if the plugin vouched for it
+            raise
+        # A built-in worker names the model by its description, which carries the SDK, the backend and the
+        # provider's model id: the caller who wrote the setting knows the model by its deck handle alone.
+        msg = str(refusal).replace(inference_model.desc, inference_model.name)
+        raise LLMSettingRefusedError(msg) from refusal
 
 
 # A resolution chain is at most a handful of hops (preset -> alias -> handle); this only

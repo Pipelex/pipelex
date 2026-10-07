@@ -251,9 +251,11 @@ When `model` is specified as a table (inline LLM setting), it accepts the follow
 | `model` | string | Model name or alias (e.g., `"claude-4.5-sonnet"`, `"@default-premium"`) |
 | `temperature` | float | Sampling temperature (0.0 – 1.0) |
 | `max_tokens` | integer | Maximum output tokens |
-| `reasoning_effort` | string | Reasoning depth: `"none"`, `"minimal"`, `"low"`, `"medium"`, `"high"`, `"xhigh"`, `"max"`. Not supported for structured generation. |
+| `reasoning_effort` | string | Reasoning depth: `"none"`, `"minimal"`, `"low"`, `"medium"`, `"high"`, `"xhigh"`, `"max"`. Applies to structured outputs too, generated with this setting when no `model_to_structure` is named. |
 | `reasoning_budget` | integer | Explicit token budget for reasoning. Mutually exclusive with `reasoning_effort`. Supported by Anthropic and Google only. |
 | `description` | string | Human-readable description (for presets) |
+
+A setting the model it resolves to cannot take is refused when the method loads, before a run spends anything: validation runs the check the model's worker runs before every call, so a reasoning setting on a model that does not reason, a reasoning budget on a model taking only an effort, or a budget its `max_tokens` cannot hold is an `llm_setting_refused_by_model` error on the `model` or `model_to_structure` field holding the setting. The setting checked is the one the output is generated with: `model` for a single text, the structuring setting for anything else.
 
 !!! tip "More on Reasoning"
     For provider-specific behavior and model-specific examples, see [Reasoning Controls](../../../under-the-hood/reasoning-controls.md).

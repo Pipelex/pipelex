@@ -382,6 +382,16 @@ class LLMCapabilityError(CogtError):
     error_category = InferenceErrorCategory.CONFIGURATION
 
 
+class LLMSettingRefusedError(LLMCapabilityError):
+    """A worker's refusal of an LLM setting, worded for the caller who wrote the setting.
+
+    Its message names the model by its deck handle, never by the SDK, backend or provider model id a
+    worker's own refusal carries, so a validation verdict can show it under strict disclosure.
+    """
+
+    _authors_caller_facing_message = True
+
+
 class LLMCompletionError(CogtError):
     pass
 

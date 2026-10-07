@@ -1,4 +1,5 @@
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
+from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.contract import PLUGIN_API_VERSION
@@ -49,6 +50,14 @@ async def _list_bedrock_models(  # ruff: ignore[unused-async]
     list_bedrock_models(sdk=sdk, backend_name=backend_name, backend=backend, flat=flat, any_listed=any_listed)
 
 
+def _check_bedrock_request(*, inference_model: InferenceModelSpec, job_params: LLMJobParams, is_structured: bool) -> None:
+    require_sdk(spec=["boto3", "aiobotocore"], extra="bedrock", msg=_BEDROCK_MISSING_MSG)
+
+    from pipelex.providers.bedrock.bedrock_llm_worker import BedrockLLMWorker  # ruff: ignore[import-outside-top-level]
+
+    BedrockLLMWorker.check_request(inference_model=inference_model, job_params=job_params, is_structured=is_structured)
+
+
 class BedrockPlugin:
     """Built-in driver for Bedrock models via boto3/aiobotocore."""
 
@@ -56,7 +65,11 @@ class BedrockPlugin:
     targets_api = PLUGIN_API_VERSION
 
     def register(self, registrar: PluginRegistrar) -> None:
-        registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="bedrock_boto3", make_worker=_make_bedrock_worker)
-        registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="bedrock_aioboto", make_worker=_make_bedrock_worker)
+        registrar.add_inference_backend(
+            family=InferenceFamily.LLM, sdk="bedrock_boto3", make_worker=_make_bedrock_worker, check_llm_request=_check_bedrock_request
+        )
+        registrar.add_inference_backend(
+            family=InferenceFamily.LLM, sdk="bedrock_aioboto", make_worker=_make_bedrock_worker, check_llm_request=_check_bedrock_request
+        )
         registrar.add_model_lister(sdk="bedrock", lister=_list_bedrock_models)
         registrar.add_model_lister(sdk="bedrock_aioboto", lister=_list_bedrock_models)

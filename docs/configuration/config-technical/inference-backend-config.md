@@ -231,9 +231,50 @@ A file whose format the consuming model does not declare is refused with an inpu
 
 `structure_method` says how a model is asked for structured output. A structure method names a provider, but the SDK decides how the request is sent. Each method stands for one of `instructor`'s core modes: every `*_tools` method is tool calling, and so is `instructor/openai_structured_outputs`, which sends OpenAI a non-strict tool schema; `instructor/mistral_structured_outputs` or `instructor/openrouter_structured_outputs` is a JSON-schema response format. So a method named after another provider still works through an OpenAI-compatible SDK.
 
-One method keeps a behaviour of its own on the `anthropic` and `bedrock_anthropic` SDKs: tool calling forces the model to call the response tool, and `instructor/anthropic_reasoning_tools` leaves that choice to the model instead, steering it to the tool with a system line, for a model that refuses a forced tool choice.
+One method keeps a behaviour of its own on the `anthropic` and `bedrock_anthropic` SDKs: tool calling forces the model to call the response tool, and `instructor/anthropic_reasoning_tools` leaves that choice to the model instead, steering it to the tool with a system line, for a model that refuses a forced tool choice. A structured call with thinking on, manual or adaptive, makes that same request on any Anthropic tool method, since a forced choice cannot carry thinking; so `instructor/anthropic_reasoning_tools` is only needed for a model that refuses a forced choice even without thinking.
+
+On the `mistral` SDK, a reasoning setting on a structured output needs `instructor/mistral_tools`: a reasoning reply carries its answer beside a thinking chunk, which `instructor/mistral_structured_outputs` cannot parse, so that method refuses one.
 
 The `google` backend uses `instructor/genai_structured_outputs`, Gemini's native JSON output. `instructor/genai_tools` works on it too: Gemini returns the function-call arguments as plain values, so pipelex validates them in pydantic's lax mode, where a string reaches an enum field as its member.
+
+#### Temperature constraints
+
+A job's temperature runs from 0 to 1, and three constraints adapt it to what a model's provider takes:
+
+- `temperature_unsupported`, a listed constraint, is for a model whose provider refuses a temperature: no temperature is sent to it, on any SDK, and the model samples at its own default.
+- `fixed_temperature`, a valued constraint, is for a model that takes one value only: the job's temperature is replaced by it, with a warning when the two differ.
+- `temperature_must_be_multiplied_by_2`, a listed constraint, is for a provider whose scale runs from 0 to 2: the job's temperature is doubled.
+
+```toml
+# anthropic.toml
+["claude-4.7-opus"]
+model_id = "claude-opus-4-7"
+listed_constraints = ["temperature_unsupported"]
+```
+
+A reasoning setting drops the temperature too on some SDKs, whatever the constraints say: the OpenAI SDKs, chat completions and Responses, send no temperature beside a reasoning effort, and the Anthropic SDKs none while thinking is on.
+
+#### Thinking budget bounds
+
+A model that thinks on a token budget (`thinking_mode = "manual"` on the `anthropic`, `bedrock_anthropic` and `google` SDKs) may declare the range of budgets its provider accepts, as two valued constraints, both inclusive and both optional:
+
+```toml
+# google.toml
+["gemini-2.5-flash-lite"]
+model_id = "gemini-2.5-flash-lite"
+valued_constraints = { min_thinking_budget = 512, max_thinking_budget = 24576 }
+```
+
+A budget resolved from a reasoning effort, or set explicitly, is held within that range, and a `max_tokens` too small to hold the minimum beside the quarter kept for the answer is refused before the call is sent. The kit's Anthropic models declare Anthropic's minimum of 1,024 tokens, and its Gemini 2.5 models declare their ranges; a model that declares neither gets its budget fitted inside `max_tokens` alone.
+
+On the `google` SDK, a reasoning effort of `none` is sent as a thinking budget of 0, which turns thinking off. A Gemini model that always thinks refuses that budget, so it lists the `thinking_cannot_be_disabled` constraint, and `none` on it is refused before the call is sent. The kit declares it on Gemini 2.5 Pro, Gemini 3.1 Pro and the `-latest` aliases that currently resolve to a model that always thinks:
+
+```toml
+# google.toml
+["gemini-3.1-pro"]
+model_id = "gemini-3.1-pro-preview"
+listed_constraints = ["thinking_cannot_be_disabled"]
+```
 
 #### Sending extra request headers per model
 

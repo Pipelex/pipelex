@@ -60,8 +60,20 @@ registrar.add_inference_backend(
     family=InferenceFamily.LLM,  # LLM | IMG_GEN | EXTRACT | SEARCH | DOC_GEN | JUDGMENT
     sdk="acme",  # the model's `sdk` string
     make_worker=_make_acme_worker,  # a MakeWorkerFn (a plain callable)
+    check_llm_request=_check_acme_request,  # optional, LLM family only: a CheckLLMRequestFn
 )
 ```
+
+`check_llm_request` is how validation learns what the worker refuses. Every LLM worker runs a `check_request` classmethod before each provider call, which refuses, from the model's spec and the job params alone, a request it would refuse anyway: a reasoning setting the model's `thinking_mode` refuses, a reasoning budget where it takes only an effort, a thinking budget the call's `max_tokens` cannot hold, or a structured output it cannot generate. When a method loads, every `PipeLLM` and `PipeStructure` resolves its model setting to the model the deck serves and calls the check its backend registered, so such a step is refused as an `llm_setting_refused_by_model` item before a run spends anything. The item is shown to whoever wrote the setting, even under strict error disclosure, so the refusal's text must name nothing your plugin keeps private: raise it as caller-facing copy, `LLMCapabilityError(msg).as_caller_fault()`, to have it shown as written, and any other refusal your check raises is named on the item by its title alone. A built-in backend's refusal is shown with the model named by its deck handle. The registered check is import-light like `make_worker`, called with `inference_model`, `job_params` and `is_structured` as keyword arguments, and delegates to the worker class's own check, which builds no SDK client:
+
+```python
+def _check_acme_request(*, inference_model: InferenceModelSpec, job_params: LLMJobParams, is_structured: bool) -> None:
+    from acme_pipelex.acme_worker import AcmeLLMWorker
+
+    AcmeLLMWorker.check_request(inference_model=inference_model, job_params=job_params, is_structured=is_structured)
+```
+
+An LLM backend that registers no check is held to `LLMWorkerAbstract.check_request`, the rule every worker shares: a model whose spec declares `thinking_mode = "none"` takes no reasoning setting. A worker that refuses more overrides `check_request` from the same helpers its calls resolve the request with, so validation and the call never disagree. A check raising `MissingDependencyError`, because the backend's SDK is not installed, leaves the step to the run. A plugin that builds one of the built-in workers for its own `sdk` registers a check calling that worker's `check_request`, as the built-in plugins do.
 
 A registry key is `(family, sdk)`. The same `sdk` string may appear in two families (e.g. `google` serves both `LLM` and `IMG_GEN`); they are distinct keys. A duplicate `(family, sdk)` fails loud with `DuplicateInferenceBackendError` naming **both** contributing plugins.
 

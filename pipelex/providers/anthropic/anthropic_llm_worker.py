@@ -31,8 +31,8 @@ from pipelex.cogt.llm.llm_utils import (
 )
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
+from pipelex.cogt.llm.thinking_budget import fit_thinking_budget
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
-from pipelex.cogt.model_backends.constraints import ListedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
 from pipelex.plugins.backend_extras_factory import BackendExtrasFactory
@@ -120,28 +120,51 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
     # Instance methods
     #########################################################
 
-    def _build_thinking_params(self, job_params: LLMJobParams, *, max_tokens: int) -> _ThinkingParams:
+    @classmethod
+    @override
+    def check_request(cls, *, inference_model: InferenceModelSpec, job_params: LLMJobParams, is_structured: bool) -> None:
+        """Refuse a reasoning setting the model's thinking cannot take, or a thinking budget the call's max_tokens cannot hold."""
+        requested_max_tokens = job_params.max_tokens or inference_model.max_tokens
+        max_tokens = (
+            None if requested_max_tokens is None else cls._sent_max_tokens(requested_max_tokens=requested_max_tokens, is_structured=is_structured)
+        )
+        cls._build_thinking_params(inference_model=inference_model, job_params=job_params, max_tokens=max_tokens)
+
+    @classmethod
+    def _sent_max_tokens(cls, *, requested_max_tokens: int, is_structured: bool) -> int:
+        """The max_tokens a call sends: the one requested, capped on a structured output at what its timeout allows.
+
+        A structured call sets an explicit timeout, which disables the SDK's long-request protection, so its
+        max_tokens is held to what the SDK's own heuristic lets that timeout produce.
+        """
+        if not is_structured:
+            return requested_max_tokens
+        timeout_seconds = get_config().inference.llm.anthropic.structured_output_timeout_seconds
+        safe_max_tokens = AnthropicFactory.calculate_safe_max_tokens_for_timeout(timeout_seconds=timeout_seconds)
+        return min(requested_max_tokens, safe_max_tokens)
+
+    @classmethod
+    def _build_thinking_params(cls, *, inference_model: InferenceModelSpec, job_params: LLMJobParams, max_tokens: int | None) -> _ThinkingParams:
         """Build thinking-related SDK parameters from job params and model spec.
 
         Args:
+            inference_model: The spec of the model the request goes to.
             job_params: The LLM job parameters containing reasoning_effort/reasoning_budget.
-            max_tokens: The effective max_tokens for this request.
+            max_tokens: The max_tokens this request sends, or None when no worker for the model can be built without one.
 
         Returns:
             A _ThinkingParams container with thinking, output_config, and suppress_temperature.
 
         """
-        thinking_mode = self.inference_model.thinking_mode
-
         # Case 1: reasoning_effort is set
         if job_params.reasoning_effort is not None:
             effort = job_params.reasoning_effort
-            return self._build_thinking_params_for_effort(thinking_mode=thinking_mode, effort=effort, max_tokens=max_tokens)
+            return cls._build_thinking_params_for_effort(inference_model=inference_model, effort=effort, max_tokens=max_tokens)
 
         # Case 2: reasoning_budget is set
         if job_params.reasoning_budget is not None:
             budget = job_params.reasoning_budget
-            return self._build_thinking_params_for_budget(thinking_mode=thinking_mode, budget=budget, max_tokens=max_tokens)
+            return cls._build_thinking_params_for_budget(inference_model=inference_model, budget=budget, max_tokens=max_tokens)
 
         # Case 3: neither reasoning_effort nor reasoning_budget is set
         return _ThinkingParams(
@@ -150,15 +173,16 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
             suppress_temperature=False,
         )
 
+    @classmethod
     def _build_thinking_params_for_effort(
-        self,
-        thinking_mode: ThinkingMode,
+        cls,
         *,
+        inference_model: InferenceModelSpec,
         effort: ReasoningEffort,
-        max_tokens: int,
+        max_tokens: int | None,
     ) -> _ThinkingParams:
         """Build thinking params when reasoning_effort is specified."""
-        match thinking_mode:
+        match inference_model.thinking_mode:
             case ThinkingMode.ADAPTIVE:
                 anthropic_effort = get_config().inference.llm.anthropic.get_reasoning_level(effort=effort)
                 if anthropic_effort is None:
@@ -186,10 +210,16 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                         suppress_temperature=False,
                     )
                 budget = get_config().inference.llm.get_reasoning_budget(
-                    family=self.reasoning_budget_family,
+                    family=cls.reasoning_budget_family,
                     effort=effort,
                 )
-                safe_budget = min(budget, max_tokens - 1)
+                safe_budget = fit_thinking_budget(
+                    budget=budget,
+                    max_tokens=max_tokens,
+                    min_budget=inference_model.min_thinking_budget,
+                    max_budget=inference_model.max_thinking_budget,
+                    model_desc=inference_model.desc,
+                )
                 log.verbose(f"Anthropic manual thinking with budget_tokens={safe_budget} (from effort={effort})")
                 thinking_config = {"type": "enabled", "budget_tokens": safe_budget}
                 return _ThinkingParams(
@@ -198,26 +228,33 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                     suppress_temperature=True,
                 )
             case ThinkingMode.NONE:
-                msg = f"Model '{self.inference_model.desc}' does not support reasoning (thinking_mode=none)"
+                msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
                 raise LLMCapabilityError(msg)
 
+    @classmethod
     def _build_thinking_params_for_budget(
-        self,
-        thinking_mode: ThinkingMode,
+        cls,
         *,
+        inference_model: InferenceModelSpec,
         budget: int,
-        max_tokens: int,
+        max_tokens: int | None,
     ) -> _ThinkingParams:
         """Build thinking params when reasoning_budget is specified."""
-        match thinking_mode:
+        match inference_model.thinking_mode:
             case ThinkingMode.ADAPTIVE:
                 msg = (
-                    f"Model '{self.inference_model.desc}' uses adaptive thinking which does not support reasoning_budget. "
+                    f"Model '{inference_model.desc}' uses adaptive thinking which does not support reasoning_budget. "
                     f"Use reasoning_effort instead (e.g. reasoning_effort='high')"
                 )
                 raise LLMCapabilityError(msg)
             case ThinkingMode.MANUAL:
-                safe_budget = min(budget, max_tokens - 1)
+                safe_budget = fit_thinking_budget(
+                    budget=budget,
+                    max_tokens=max_tokens,
+                    min_budget=inference_model.min_thinking_budget,
+                    max_budget=inference_model.max_thinking_budget,
+                    model_desc=inference_model.desc,
+                )
                 log.verbose(f"Anthropic thinking with explicit budget_tokens={safe_budget}")
                 thinking_config: ThinkingConfigParam = {"type": "enabled", "budget_tokens": safe_budget}
                 return _ThinkingParams(
@@ -226,7 +263,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                     suppress_temperature=True,
                 )
             case ThinkingMode.NONE:
-                msg = f"Model '{self.inference_model.desc}' does not support reasoning (thinking_mode=none)"
+                msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
                 raise LLMCapabilityError(msg)
 
     @override
@@ -236,20 +273,20 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
     ) -> str:
         job_params = llm_job.applied_job_params or llm_job.job_params
         message = await AnthropicFactory.make_user_message(llm_job=llm_job)
-        max_tokens = job_params.max_tokens or self.default_max_tokens
+        max_tokens = self._sent_max_tokens(requested_max_tokens=job_params.max_tokens or self.default_max_tokens, is_structured=False)
 
-        thinking_params = self._build_thinking_params(job_params=job_params, max_tokens=max_tokens)
+        thinking_params = self._build_thinking_params(inference_model=self.inference_model, job_params=job_params, max_tokens=max_tokens)
         log.verbose(thinking_params, title="Thinking params")
         log.verbose(max_tokens, title="Max tokens")
+        sends_temperature = self.inference_model.accepts_temperature and not thinking_params.suppress_temperature
 
         try:
             # Use streaming internally to avoid SDK long-request protection
-            temperature_unsupported = ListedConstraint.TEMPERATURE_UNSUPPORTED in self.inference_model.listed_constraints
             async with self.anthropic_async_client.messages.stream(
                 messages=[message],
                 system=llm_job.llm_prompt.system_text or omit,
                 model=self.inference_model.model_id,
-                temperature=omit if (thinking_params.suppress_temperature or temperature_unsupported) else job_params.temperature,
+                temperature=job_params.temperature if sends_temperature else omit,
                 max_tokens=max_tokens,
                 thinking=thinking_params.thinking or omit,
                 output_config=thinking_params.output_config or omit,
@@ -329,19 +366,29 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
             kwargs["extra_body"] = extra_body
         return kwargs
 
-    def _structure_method_kwargs(self) -> dict[str, Any]:
-        """What the structured call sends, beyond what instructor's mode sets, for the model's structure method.
+    def _structure_method_kwargs(self, *, thinking_params: _ThinkingParams) -> dict[str, Any]:
+        """What the structured call sends, beyond what instructor's mode sets, for the model's structure method and thinking.
 
-        instructor resolves `anthropic_reasoning_tools` to its core tool mode, which forces `tool_choice` onto
-        the response tool unless thinking is on, and thinking never is for a structured call. A model that
-        refuses a forced tool choice, Fable 5.1 among them, names that method to get the request instructor used
-        to make for it: `tool_choice` left on auto, with a system line steering the model to the tool call.
-        instructor leaves a `tool_choice` it is given as it is, and sends a `system` it is given ahead of the prompt's.
+        instructor's tool mode forces `tool_choice` onto the response tool unless the request enables manual
+        thinking, and Anthropic refuses a forced choice beside thinking. instructor does not recognise adaptive
+        thinking, under which Anthropic accepts a forced choice and the model silently does not think. So whenever
+        thinking is on, manual or adaptive, the request leaves `tool_choice` on auto with a system line steering the
+        model to the tool call, the request instructor makes for manual thinking. A model that refuses a forced tool
+        choice even without thinking, Fable 5.1 among them, names `anthropic_reasoning_tools` to get the same request
+        always. instructor leaves a `tool_choice` it is given as it is, and sends a `system` it is given ahead of the
+        prompt's. An auto choice would let the model answer with several tool calls, which instructor's parser
+        refuses, so parallel tool use is disabled as instructor does on a forced choice. All of this concerns the
+        tool modes only: a JSON mode defines no tool, and its request is left as instructor makes it.
         """
-        if self.inference_model.structure_method != StructureMethod.INSTRUCTOR_ANTHROPIC_REASONING_TOOLS:
+        from instructor import Mode as InstructorMode  # ruff: ignore[import-outside-top-level]
+
+        if self.instructor_for_objects.mode != InstructorMode.TOOLS:
+            return {}
+        is_thinking = thinking_params.thinking is not None
+        if not is_thinking and self.inference_model.structure_method != StructureMethod.INSTRUCTOR_ANTHROPIC_REASONING_TOOLS:
             return {}
         return {
-            "tool_choice": {"type": "auto"},
+            "tool_choice": {"type": "auto", "disable_parallel_tool_use": True},
             "system": [{"type": "text", "text": "Return only the tool call and no additional text."}],
         }
 
@@ -353,24 +400,20 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
-        self._validate_no_reasoning_for_structured_gen(job_params=job_params)
         messages = await AnthropicFactory.make_simple_messages(llm_job=llm_job)
 
-        # Get Anthropic-specific config for structured output
-        anthropic_config = get_config().inference.llm.anthropic
-        timeout_seconds = anthropic_config.structured_output_timeout_seconds
+        # The structured call sets an explicit timeout, and its max_tokens is held to what that timeout allows
+        timeout_seconds = get_config().inference.llm.anthropic.structured_output_timeout_seconds
+        effective_max_tokens = self._sent_max_tokens(requested_max_tokens=job_params.max_tokens or self.default_max_tokens, is_structured=True)
 
-        # Calculate safe max_tokens based on timeout
-        safe_max_tokens = AnthropicFactory.calculate_safe_max_tokens_for_timeout(timeout_seconds=timeout_seconds)
-
-        # Use minimum of requested and safe limit
-        requested_max_tokens = job_params.max_tokens or self.default_max_tokens
-        effective_max_tokens = min(requested_max_tokens, safe_max_tokens)
+        # The thinking budget is fitted against the max_tokens this call actually sends
+        thinking_params = self._build_thinking_params(inference_model=self.inference_model, job_params=job_params, max_tokens=effective_max_tokens)
+        log.verbose(thinking_params, title="Thinking params")
+        sends_temperature = self.inference_model.accepts_temperature and not thinking_params.suppress_temperature
 
         # Deferred import: avoid pulling heavy SDK at module-load time
         from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]
 
-        temperature_unsupported = ListedConstraint.TEMPERATURE_UNSUPPORTED in self.inference_model.listed_constraints
         try:
             result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                 messages=messages,
@@ -381,10 +424,12 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                 # SDK client floor (Tier 1) alone.
                 max_retries=make_instructor_schema_retrying(max_attempts=llm_job.job_config.schema_reask_max_attempts),
                 model=self.inference_model.model_id,
-                temperature=omit if temperature_unsupported else job_params.temperature,
+                temperature=job_params.temperature if sends_temperature else omit,
                 max_tokens=effective_max_tokens,
+                thinking=thinking_params.thinking or omit,
+                output_config=thinking_params.output_config or omit,
                 timeout=float(timeout_seconds),  # Explicit timeout disables SDK's long-request protection
-                **self._structure_method_kwargs(),
+                **self._structure_method_kwargs(thinking_params=thinking_params),
                 **self._request_extras_kwargs(llm_job=llm_job, output_desc=schema.__name__),
             )
         except InstructorRetryException as instructor_exc:

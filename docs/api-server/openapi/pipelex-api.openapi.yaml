@@ -5540,6 +5540,7 @@ components:
       - inadequate_output_concept
       - inadequate_output_multiplicity
       - llm_output_cannot_be_image
+      - llm_setting_refused_by_model
       - invalid_pipe_code_syntax
       - invalid_input_name
       - unknown_pipe_type
