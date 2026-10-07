@@ -64,7 +64,7 @@ This command creates or resets a Pipelex config directory with:
 - **.gitignore** - Keeps Pipelex's own transient copies out of your `git status` — the timestamped `.bak` files [`pipelex migrate`](migrate.md) leaves beside each file it rewrites. Commit it so your teammates get the same. It is written only when the directory has no `.gitignore`; one already there is never modified.
 
 !!! warning "Init writes a fresh file — it does not update one"
-    Every `init` target replaces the file with the template, so whatever was in it is gone. If a configuration file has simply fallen behind the current schema, [`pipelex migrate`](migrate.md) is the command: it rewrites the file in place and keeps every setting — your PostHog key, your Langfuse credentials, your exporters. `pipelex doctor` tells you which of the two you have.
+    Every `init` target replaces the file with the template, so whatever was in it is gone. A configuration file that is a symbolic link is replaced as a link: the link becomes a regular file holding the template, and the file it pointed to is left as it was. If a configuration file has simply fallen behind the current schema, [`pipelex migrate`](migrate.md) is the command: it rewrites the file in place and keeps every setting — your PostHog key, your Langfuse credentials, your exporters. `pipelex doctor` tells you which of the two you have.
 
 ## Interactive Setup Flow
 

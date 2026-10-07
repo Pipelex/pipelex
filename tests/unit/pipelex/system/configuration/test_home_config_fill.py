@@ -11,7 +11,9 @@ import errno
 import json
 import os
 import shutil
+import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import sys
+import textwrap
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +26,18 @@ from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.system.environment import PIPELEX_HOME_ENV_KEY
 
 _MANIFESTS = frozenset(f"inference/{area}/{MANIFEST_FILENAME}" for area in KitManagedArea)
+
+#: Fill the home `PIPELEX_HOME` names, then say whether that loaded the manifest module.
+_PROBE_MANIFEST_MODULE_IMPORT = textwrap.dedent(
+    """
+    import sys
+
+    from pipelex.system.configuration.config_loader import ConfigLoader
+
+    ConfigLoader().ensure_global_config_exists()
+    print("pipelex.cogt.models.deck_manifest" in sys.modules)
+    """
+)
 
 
 def _kit_files() -> dict[str, bytes]:
@@ -230,12 +244,21 @@ class TestHomeConfigFill:
         assert {path: installed[path] for path in kit_files} == kit_files
 
     @pytest.mark.skipif(sys.platform == "win32", reason="creating a symbolic link takes a privilege Windows does not grant by default")
-    @pytest.mark.parametrize("kit_file", ["pipelex.toml", "inference/deck/1_llm_deck.toml", "inference/backends.toml"])
+    @pytest.mark.parametrize(
+        "kit_file",
+        [
+            "pipelex.toml",
+            "inference/deck/1_llm_deck.toml",
+            "inference/backends.toml",
+            f"inference/{KitManagedArea.DECK}/{MANIFEST_FILENAME}",
+            f"inference/{KitManagedArea.BACKENDS}/{MANIFEST_FILENAME}",
+        ],
+    )
     @pytest.mark.parametrize("link_target_dir_exists", [False, True])
     def test_a_dangling_link_where_a_kit_file_goes_is_kept_and_never_written_through(
         self, home: Path, tmp_path: Path, kit_file: str, link_target_dir_exists: bool
     ) -> None:
-        """A link is the user's, even one whose target is gone: copying through it would fail every boot, or write elsewhere."""
+        """A link is the user's, even one whose target is gone: copying or stamping through it would fail every boot, or write elsewhere."""
         link_target_dir = tmp_path / "link-target"
         if link_target_dir_exists:
             link_target_dir.mkdir()
@@ -250,3 +273,104 @@ class TestHomeConfigFill:
         assert link.readlink() == link_target
         assert not link_target.exists()
         assert link_target_dir.exists() == link_target_dir_exists
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="creating a symbolic link takes a privilege Windows does not grant by default")
+    @pytest.mark.parametrize("kit_directory", ["inference", "inference/deck", "inference/backends"])
+    @pytest.mark.parametrize("entry_kind", ["link_to_a_directory", "dangling_link", "regular_file"])
+    def test_whatever_stands_where_a_kit_directory_goes_is_left_alone_with_everything_under_it(
+        self, home: Path, tmp_path: Path, kit_directory: str, entry_kind: str
+    ) -> None:
+        """The fill never enters a link, valid or dangling, and never replaces a file standing where the kit has a directory.
+
+        Entering a valid link would copy the kit into wherever it points, and a dangling one or a file would
+        make creating the directory fail on every boot. What stands there is the user's, and the rest of the
+        home is still filled.
+        """
+        entry = home / kit_directory
+        entry.parent.mkdir(parents=True)
+        link_target = tmp_path / "elsewhere"
+        match entry_kind:
+            case "link_to_a_directory":
+                link_target.mkdir()
+                entry.symlink_to(link_target, target_is_directory=True)
+            case "dangling_link":
+                entry.symlink_to(link_target, target_is_directory=True)
+            case _:
+                entry.write_text("not a directory\n", encoding="utf-8")
+
+        ConfigLoader().ensure_global_config_exists()
+
+        match entry_kind:
+            case "link_to_a_directory":
+                assert entry.is_symlink()
+                assert entry.readlink() == link_target
+                assert not list(link_target.iterdir())
+            case "dangling_link":
+                assert entry.is_symlink()
+                assert entry.readlink() == link_target
+                assert not link_target.exists()
+            case _:
+                assert entry.read_text(encoding="utf-8") == "not a directory\n"
+        assert (home / "pipelex.toml").read_bytes() == _kit_files()["pipelex.toml"]
+
+    @pytest.mark.parametrize("kit_file", ["pipelex.toml", "inference/deck/3_extract_deck.toml", "inference/backends.toml"])
+    def test_a_copy_cut_off_mid_write_leaves_no_partial_file_and_the_next_boot_completes_it(
+        self, home: Path, mocker: MockerFixture, kit_file: str
+    ) -> None:
+        """A file appears whole or not at all: a truncated `backends.toml` above all would pass for a finished inference setup."""
+        real_copy2 = shutil.copy2
+
+        def copy2_cut_off_mid_write(src: Any, dst: Any, **kwargs: Any) -> Any:
+            if Path(src).as_posix().endswith(f"/configs/{kit_file}"):
+                Path(dst).write_bytes(Path(src).read_bytes()[:16])
+                raise OSError(errno.ENOSPC, "No space left on device")
+            return real_copy2(src, dst, **kwargs)
+
+        copy2_patch = mocker.patch.object(shutil, "copy2", side_effect=copy2_cut_off_mid_write)
+        with pytest.raises(OSError, match="No space left on device"):
+            ConfigLoader().ensure_global_config_exists()
+        # Every file left behind is a whole kit file or a manifest: no truncated copy, and no temporary one.
+        kit_files = _kit_files()
+        installed = _files_under(home)
+        assert kit_file not in installed
+        assert set(installed) <= set(kit_files) | _MANIFESTS
+        assert {path: content for path, content in installed.items() if path in kit_files} == {
+            path: kit_files[path] for path in installed if path in kit_files
+        }
+        mocker.stop(copy2_patch)
+
+        ConfigLoader().ensure_global_config_exists()
+
+        installed = _files_under(home)
+        assert set(installed) == set(kit_files) | _MANIFESTS
+        assert {path: installed[path] for path in kit_files} == kit_files
+
+    @pytest.mark.parametrize(
+        ("home_is_filled", "expects_manifest_module"),
+        [
+            pytest.param(True, False, id="filled_home_imports_nothing_more"),
+            pytest.param(False, True, id="control_empty_home_stamps_manifests"),
+        ],
+    )
+    def test_a_filled_home_does_not_import_the_manifest_module(self, home: Path, home_is_filled: bool, expects_manifest_module: bool) -> None:
+        """The manifest module pulls in the inference backend chain, and only a home being filled needs it.
+
+        Asked in a fresh interpreter, because this one imported it long ago. The empty-home control proves the
+        probe sees the import when it happens, so the filled case cannot pass for a probe that sees nothing.
+        """
+        if home_is_filled:
+            ConfigLoader().ensure_global_config_exists()
+        else:
+            home.mkdir()
+
+        result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
+            [sys.executable, "-c", _PROBE_MANIFEST_MODULE_IMPORT],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=120,
+            env={**os.environ, PIPELEX_HOME_ENV_KEY: str(home)},
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert result.stdout.strip().splitlines()[-1] == str(expects_manifest_module)

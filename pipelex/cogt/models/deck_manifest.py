@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from enum import StrEnum
 from pathlib import Path
 
@@ -28,6 +29,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.kit.paths import get_kit_configs_dir
+from pipelex.kit.template_copy import can_fill_directory
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.package_utils import get_package_version
 
@@ -194,12 +196,14 @@ def stamp_missing_kit_manifests(*, inference_dir: Path) -> None:
 
     For the first boot's fill of the home configuration directory, which copies only the kit files the home lacks:
     a manifest already there records the install the area's files came from, and it stays the baseline ``pipelex
-    update`` compares against.
+    update`` compares against. Nothing is written through a link, the fill's own rule: a manifest path holding a
+    link, even a dangling one, counts as recorded, and an area whose directory is a link or a file is skipped.
     """
     for area in KitManagedArea:
         installed_dir = inference_dir / area
-        if not manifest_path(installed_dir).exists():
-            write_manifest(compute_kit_manifest(area=area), installed_dir=installed_dir)
+        if not can_fill_directory(directory=installed_dir) or os.path.lexists(manifest_path(installed_dir)):
+            continue
+        write_manifest(compute_kit_manifest(area=area), installed_dir=installed_dir)
 
 
 def manifest_path(installed_dir: Path) -> Path:

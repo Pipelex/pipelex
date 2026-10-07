@@ -1,12 +1,11 @@
 import errno
 import os
-import shutil
 from pathlib import Path
 from typing import Any, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
-from pipelex.kit.template_copy import copy_kit_templates
+from pipelex.kit.template_copy import can_fill_directory, copy_file_atomically, copy_kit_templates
 from pipelex.system.configuration.config_surface import (
     PIPELEX_CONFIG_SURFACE_ID,
     replay_surface_files_in_memory,
@@ -301,7 +300,9 @@ class ConfigLoader:
         already has is never overwritten, which makes this a no-op on a home that holds every kit file.
 
         A file is "already there" when anything stands at its path, a symbolic link included even when it
-        dangles: nothing is ever written through a link.
+        dangles, and nothing is ever written through a link: where the kit has a directory, a link to one,
+        valid or dangling, or a file standing in its place is left alone with everything under it. Each
+        file is written under a temporary name and renamed into place, so it appears whole or not at all.
 
         The inference setup is one unit, as `pipelex init` sets it up: it is laid down only when the home
         has no `inference/backends.toml`, the file `pipelex init` reads as "inference not set up yet", and
@@ -317,7 +318,6 @@ class ConfigLoader:
         tolerated here: any other error that stops a copy is raised.
         """
         # Imported lazily to avoid a circular import: config_loader is loaded very early.
-        from pipelex.cogt.models.deck_manifest import MANIFEST_FILENAME, stamp_missing_kit_manifests  # ruff: ignore[import-outside-top-level]
         from pipelex.kit.paths import GIT_IGNORED_CONFIG_FILES, get_kit_configs_dir  # ruff: ignore[import-outside-top-level]
 
         global_dir = self.global_config_dir
@@ -333,9 +333,14 @@ class ConfigLoader:
                 skip_names=GIT_IGNORED_CONFIG_FILES | {INFERENCE_DIR_NAME},
                 overwrite=False,
             )
-            # A link counts as there even when it dangles, as it does in the copy itself.
-            if os.path.lexists(backends_file):
+            # A link counts as there even when it dangles, as it does in the copy itself, and an inference
+            # directory the fill may not enter, a link or a file, is the user's with everything under it.
+            if os.path.lexists(backends_file) or not can_fill_directory(directory=inference_dir):
                 return
+            # Past the return on purpose: the manifest module pulls in the inference backend chain, which
+            # only a home being filled needs. Lazy at all to avoid a circular import, as above.
+            from pipelex.cogt.models.deck_manifest import MANIFEST_FILENAME, stamp_missing_kit_manifests  # ruff: ignore[import-outside-top-level]
+
             # `backends.toml` is what marks the inference setup as there, so it is left out of the walk and
             # written last: a fill cut short by a full disk or a killed process leaves it absent, and the next
             # boot resumes the fill rather than taking a half-copied directory for a complete one. The kit's
@@ -348,7 +353,8 @@ class ConfigLoader:
                 overwrite=False,
             )
             stamp_missing_kit_manifests(inference_dir=inference_dir)
-            shutil.copy2(kit_inference_dir / BACKENDS_FILE_NAME, backends_file)
+            inference_dir.mkdir(parents=True, exist_ok=True)
+            copy_file_atomically(source=kit_inference_dir / BACKENDS_FILE_NAME, destination=backends_file)
         except OSError as exc:
             if not (isinstance(exc, PermissionError) or exc.errno == errno.EROFS):
                 raise
