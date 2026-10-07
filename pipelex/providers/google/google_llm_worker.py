@@ -1,5 +1,5 @@
 import asyncio
-from typing import TYPE_CHECKING, ClassVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 import httpx
 from google.genai import errors as genai_errors
@@ -22,7 +22,9 @@ from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
+from pipelex.cogt.llm.thinking_budget import fit_thinking_budget
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
+from pipelex.cogt.model_backends.constraints import ListedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
@@ -111,10 +113,20 @@ class GoogleLLMWorker(LLMWorkerAbstract):
     # Reasoning helpers
     #########################################################
 
-    def _build_thinking_config(self, job_params: LLMJobParams, *, max_tokens: int | None) -> genai_types.ThinkingConfig | None:
+    @classmethod
+    @override
+    def check_request(cls, *, inference_model: InferenceModelSpec, job_params: LLMJobParams, is_structured: bool) -> None:
+        """Refuse a reasoning setting the model's thinking cannot take, or a thinking budget the call's max_tokens cannot hold."""
+        cls._build_thinking_config(inference_model=inference_model, job_params=job_params, max_tokens=job_params.max_tokens)
+
+    @classmethod
+    def _build_thinking_config(
+        cls, *, inference_model: InferenceModelSpec, job_params: LLMJobParams, max_tokens: int | None
+    ) -> genai_types.ThinkingConfig | None:
         """Build thinking config from job params and model spec.
 
         Args:
+            inference_model: The spec of the model the request goes to.
             job_params: The LLM job parameters containing reasoning_effort/reasoning_budget.
             max_tokens: The effective max_tokens for this request, used to cap the thinking budget.
 
@@ -122,68 +134,89 @@ class GoogleLLMWorker(LLMWorkerAbstract):
             A ThinkingConfig for the Google GenAI SDK, or None if reasoning is not requested.
 
         """
-        thinking_mode = self.inference_model.thinking_mode
-
         # Case 1: reasoning_effort is set
         if job_params.reasoning_effort is not None:
-            return self._build_thinking_config_for_effort(thinking_mode=thinking_mode, effort=job_params.reasoning_effort, max_tokens=max_tokens)
+            return cls._build_thinking_config_for_effort(inference_model=inference_model, effort=job_params.reasoning_effort, max_tokens=max_tokens)
 
         # Case 2: reasoning_budget is set
         if job_params.reasoning_budget is not None:
-            return self._build_thinking_config_for_budget(thinking_mode=thinking_mode, budget=job_params.reasoning_budget, max_tokens=max_tokens)
+            return cls._build_thinking_config_for_budget(inference_model=inference_model, budget=job_params.reasoning_budget, max_tokens=max_tokens)
 
         # Case 3: neither reasoning_effort nor reasoning_budget is set
         return None
 
+    @classmethod
     def _build_thinking_config_for_effort(
-        self,
-        thinking_mode: ThinkingMode,
+        cls,
         *,
+        inference_model: InferenceModelSpec,
         effort: ReasoningEffort,
         max_tokens: int | None,
     ) -> genai_types.ThinkingConfig:
         """Build thinking config when reasoning_effort is specified."""
-        match thinking_mode:
+        match inference_model.thinking_mode:
             case ThinkingMode.MANUAL:
                 google_level = get_config().inference.llm.google.get_reasoning_level(effort=effort)
                 if google_level is None:
                     log.verbose("Google manual thinking disabled (effort mapped to disabled)")
-                    return genai_types.ThinkingConfig(thinking_budget=0)
+                    return cls._thinking_off_config(inference_model=inference_model)
                 budget = get_config().inference.llm.get_reasoning_budget(
-                    family=self.reasoning_budget_family,
+                    family=cls.reasoning_budget_family,
                     effort=effort,
                 )
-                if max_tokens is not None:
-                    budget = min(budget, max_tokens - 1)
+                budget = fit_thinking_budget(
+                    budget=budget,
+                    max_tokens=max_tokens,
+                    min_budget=inference_model.min_thinking_budget,
+                    max_budget=inference_model.max_thinking_budget,
+                    model_desc=inference_model.desc,
+                )
                 log.verbose(f"Google manual thinking with thinking_budget={budget} (from effort={effort})")
                 return genai_types.ThinkingConfig(thinking_budget=budget)
             case ThinkingMode.ADAPTIVE:
                 thinking_level = get_config().inference.llm.google.get_reasoning_level(effort=effort)
                 if thinking_level is None:
                     log.verbose("Google adaptive thinking disabled (effort=NONE)")
-                    return genai_types.ThinkingConfig(thinking_budget=0)
+                    return cls._thinking_off_config(inference_model=inference_model)
                 log.verbose(f"Google adaptive thinking with thinking_level={thinking_level}")
                 return genai_types.ThinkingConfig(thinking_level=thinking_level)
             case ThinkingMode.NONE:
-                msg = f"Model '{self.inference_model.desc}' does not support reasoning (thinking_mode=none)"
+                msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
                 raise LLMCapabilityError(msg)
 
+    @classmethod
+    def _thinking_off_config(cls, *, inference_model: InferenceModelSpec) -> genai_types.ThinkingConfig:
+        """Build the thinking config that turns thinking off, which a model that always thinks refuses with a 400."""
+        if ListedConstraint.THINKING_CANNOT_BE_DISABLED in inference_model.listed_constraints:
+            msg = (
+                f"Model '{inference_model.desc}' cannot turn thinking off, so it cannot take reasoning_effort 'none': "
+                f"set another reasoning effort, or remove the reasoning setting"
+            )
+            raise LLMCapabilityError(msg)
+        return genai_types.ThinkingConfig(thinking_budget=0)
+
+    @classmethod
     def _build_thinking_config_for_budget(
-        self,
-        thinking_mode: ThinkingMode,
+        cls,
         *,
+        inference_model: InferenceModelSpec,
         budget: int,
         max_tokens: int | None,
     ) -> genai_types.ThinkingConfig:
         """Build thinking config when reasoning_budget is specified."""
-        match thinking_mode:
+        match inference_model.thinking_mode:
             case ThinkingMode.MANUAL | ThinkingMode.ADAPTIVE:
-                if max_tokens is not None:
-                    budget = min(budget, max_tokens - 1)
+                budget = fit_thinking_budget(
+                    budget=budget,
+                    max_tokens=max_tokens,
+                    min_budget=inference_model.min_thinking_budget,
+                    max_budget=inference_model.max_thinking_budget,
+                    model_desc=inference_model.desc,
+                )
                 log.verbose(f"Google thinking with explicit thinking_budget={budget}")
                 return genai_types.ThinkingConfig(thinking_budget=budget)
             case ThinkingMode.NONE:
-                msg = f"Model '{self.inference_model.desc}' does not support reasoning (thinking_mode=none)"
+                msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
                 raise LLMCapabilityError(msg)
 
     #########################################################
@@ -198,11 +231,11 @@ class GoogleLLMWorker(LLMWorkerAbstract):
 
         contents = await GoogleFactory.prepare_user_contents(llm_prompt=llm_job.llm_prompt)
 
-        thinking_config = self._build_thinking_config(job_params=job_params, max_tokens=job_params.max_tokens)
+        thinking_config = self._build_thinking_config(inference_model=self.inference_model, job_params=job_params, max_tokens=job_params.max_tokens)
 
         # Build generation config
         generation_config = genai_types.GenerateContentConfig(
-            temperature=job_params.temperature,
+            temperature=job_params.temperature if self.inference_model.accepts_temperature else None,
             max_output_tokens=job_params.max_tokens,
             candidate_count=1,  # Generate one candidate
             thinking_config=thinking_config,
@@ -265,7 +298,10 @@ class GoogleLLMWorker(LLMWorkerAbstract):
     ) -> BaseModelTypeVar:
         """Generate structured output using Google Gemini API with instructor."""
         job_params = llm_job.applied_job_params or llm_job.job_params
-        self._validate_no_reasoning_for_structured_gen(job_params=job_params)
+        thinking_config = self._build_thinking_config(inference_model=self.inference_model, job_params=job_params, max_tokens=job_params.max_tokens)
+        # instructor's genai handlers read the system prompt only from `system`, and pop it only when it is not
+        # None: a `system=None` reaches `generate_content`, which refuses the unknown keyword
+        system_kwargs: dict[str, Any] = {"system": system_text} if (system_text := llm_job.llm_prompt.system_text) else {}
         contents = await GoogleFactory.prepare_user_contents(llm_job.llm_prompt)
 
         # Deferred import: avoid pulling heavy SDK at module-load time
@@ -283,12 +319,15 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 model=self.inference_model.model_id,
                 # instructor's genai handlers build the Google config themselves and read these as
                 # top-level OpenAI-style kwargs: a `GenerateContentConfig` passed as `generation_config`
-                # or `config` is dropped, and the system prompt is read only from `system`.
-                system=llm_job.llm_prompt.system_text,
-                temperature=job_params.temperature,
+                # or `config` is dropped.
+                **system_kwargs,
+                # None sets no temperature in the config the handlers build
+                temperature=job_params.temperature if self.inference_model.accepts_temperature else None,
                 max_tokens=job_params.max_tokens,
                 n=1,
                 strict=self._validates_structured_output_strictly(),
+                # Read into the config the handlers build, as the other kwargs above; None sets no thinking config
+                thinking_config=thinking_config,
             )
         except InstructorRetryException as instructor_exc:
             # instructor wraps SDK exceptions during retries; recover the underlying

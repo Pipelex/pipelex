@@ -559,7 +559,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # The orchestrator and bundle-validator registries are interpreter-contributed and therefore
         # empty on a kernel-only boot. That is fine and deliberate: nothing here resolves out of them,
         # they are looked up at run time by the interpreter.
-        self.runtime_hub.set_inference_backend_registry(InferenceBackendRegistry(plugin_registrar.inference_backends))
+        self.runtime_hub.set_inference_backend_registry(
+            InferenceBackendRegistry(plugin_registrar.inference_backends, llm_request_checks=plugin_registrar.llm_request_checks)
+        )
         self.runtime_hub.set_model_lister_registry(ModelListerRegistry(plugin_registrar.model_listers))
         self.runtime_hub.set_service_error_vocabulary(service_error_vocabulary=ServiceErrorVocabulary(plugin_registrar.service_error_codes))
         self.runtime_hub.set_orchestrator_registry(OrchestratorRegistry(plugin_registrar.orchestrators))

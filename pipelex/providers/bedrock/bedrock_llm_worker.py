@@ -43,14 +43,22 @@ class BedrockLLMWorker(LLMWorkerAbstract):
             raise BedrockWorkerConfigurationError(msg)
         self.bedrock_client_for_text = sdk_instance
 
-    def _validate_no_reasoning_params(self, job_params: LLMJobParams) -> None:
-        """Validate that no reasoning parameters are set for Bedrock native models."""
+    @classmethod
+    @override
+    def check_request(cls, *, inference_model: InferenceModelSpec, job_params: LLMJobParams, is_structured: bool) -> None:
+        """Refuse every reasoning setting, and every structured output: Bedrock native models take neither."""
         if job_params.reasoning_effort is not None or job_params.reasoning_budget is not None:
             msg = (
-                f"Model '{self.inference_model.desc}' does not support reasoning parameters; "
+                f"Model '{inference_model.desc}' does not support reasoning parameters; "
                 "Bedrock native models do not support reasoning_effort or reasoning_budget"
             )
             raise LLMCapabilityError(msg)
+        if is_structured:
+            raise LLMCapabilityError(cls._structured_output_refusal(inference_model=inference_model))
+
+    @classmethod
+    def _structured_output_refusal(cls, *, inference_model: InferenceModelSpec) -> str:
+        return f"Model '{inference_model.desc}' does not support structured outputs; Bedrock native models generate text only"
 
     @override
     async def _gen_text(
@@ -58,7 +66,6 @@ class BedrockLLMWorker(LLMWorkerAbstract):
         llm_job: LLMJob,
     ) -> str:
         job_params = llm_job.applied_job_params or llm_job.job_params
-        self._validate_no_reasoning_params(job_params=job_params)
         message = BedrockFactory.make_simple_message(llm_job=llm_job)
 
         log.verbose(self.inference_model.model_id)
@@ -68,7 +75,7 @@ class BedrockLLMWorker(LLMWorkerAbstract):
                 messages=message.to_dict_list(),
                 system_text=llm_job.llm_prompt.system_text,
                 model=self.inference_model.model_id,
-                temperature=job_params.temperature,
+                temperature=job_params.temperature if self.inference_model.accepts_temperature else None,
                 max_tokens=job_params.max_tokens or self.default_max_tokens,
             )
         except ClientError as exc:
@@ -93,6 +100,5 @@ class BedrockLLMWorker(LLMWorkerAbstract):
         *,
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
-        # TODO: try with the newest instructor release
-        msg = f"It is not possible to generate objects with a {self.__class__.__name__}."
-        raise LLMCapabilityError(msg)
+        # Refused by check_request before this is reached. TODO: try with the newest instructor release
+        raise LLMCapabilityError(self._structured_output_refusal(inference_model=self.inference_model))

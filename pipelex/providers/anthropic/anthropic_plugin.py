@@ -1,4 +1,5 @@
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
+from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.contract import PLUGIN_API_VERSION
@@ -40,6 +41,14 @@ def _make_anthropic_worker(
     )
 
 
+def _check_anthropic_request(*, inference_model: InferenceModelSpec, job_params: LLMJobParams, is_structured: bool) -> None:
+    require_sdk(spec="anthropic", extra="anthropic", msg=_ANTHROPIC_MISSING_MSG)
+
+    from pipelex.providers.anthropic.anthropic_llm_worker import AnthropicLLMWorker  # ruff: ignore[import-outside-top-level]
+
+    AnthropicLLMWorker.check_request(inference_model=inference_model, job_params=job_params, is_structured=is_structured)
+
+
 async def _list_anthropic_models(
     *,
     sdk: str,
@@ -67,6 +76,10 @@ class AnthropicPlugin:
     targets_api = PLUGIN_API_VERSION
 
     def register(self, registrar: PluginRegistrar) -> None:
-        registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="anthropic", make_worker=_make_anthropic_worker)
-        registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="bedrock_anthropic", make_worker=_make_anthropic_worker)
+        registrar.add_inference_backend(
+            family=InferenceFamily.LLM, sdk="anthropic", make_worker=_make_anthropic_worker, check_llm_request=_check_anthropic_request
+        )
+        registrar.add_inference_backend(
+            family=InferenceFamily.LLM, sdk="bedrock_anthropic", make_worker=_make_anthropic_worker, check_llm_request=_check_anthropic_request
+        )
         registrar.add_model_lister(sdk="anthropic", lister=_list_anthropic_models)

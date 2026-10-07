@@ -3,7 +3,7 @@ from typing import Any, Literal
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import LLMCompletionError
+from pipelex.cogt.exceptions import LLMCompletionError, ModelChoiceNotFoundError
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
@@ -22,6 +22,7 @@ from pipelex.kernel.llm_ops import concrete_llm_model_handle, derive_structure_p
 from pipelex.kernel.memory_ops import store_result
 from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_operators.pipe_operator import PipeOperator
+from pipelex.pipe_operators.shared.llm_setting_check import refuse_llm_setting_its_model_refuses
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.runtime_hub import get_class_registry
 from pipelex.system.job_metadata import JobMetadata
@@ -96,6 +97,21 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
             )
+
+        # A reference the deck does not define is refused when the pipe is built, so it is not looked up again here
+        try:
+            llm_setting_for_object = resolve_llm_setting_for_object(llm_choice=self.llm_choice)
+        except ModelChoiceNotFoundError:
+            return
+        refuse_llm_setting_its_model_refuses(
+            pipe_type=self.class_name,
+            pipe_code=self.code,
+            domain_code=self.domain_code,
+            llm_setting=llm_setting_for_object,
+            llm_choice=self.llm_choice,
+            field_name="model" if self.llm_choice is not None else None,
+            is_structured=True,
+        )
 
     @override
     async def _live_run_operator_pipe(

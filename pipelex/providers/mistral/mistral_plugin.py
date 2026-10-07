@@ -1,4 +1,5 @@
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
+from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.contract import PLUGIN_API_VERSION
@@ -39,6 +40,14 @@ def _make_mistral_worker(
         inference_model=inference_model,
         reporting_delegate=reporting_delegate,
     )
+
+
+def _check_mistral_request(*, inference_model: InferenceModelSpec, job_params: LLMJobParams, is_structured: bool) -> None:
+    require_sdk(spec="mistralai", extra="mistral", msg=_MISTRAL_MISSING_MSG)
+
+    from pipelex.providers.mistral.mistral_llm_worker import MistralLLMWorker  # ruff: ignore[import-outside-top-level]
+
+    MistralLLMWorker.check_request(inference_model=inference_model, job_params=job_params, is_structured=is_structured)
 
 
 def _make_mistral_extract_worker(
@@ -87,6 +96,8 @@ class MistralPlugin:
     targets_api = PLUGIN_API_VERSION
 
     def register(self, registrar: PluginRegistrar) -> None:
-        registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="mistral", make_worker=_make_mistral_worker)
+        registrar.add_inference_backend(
+            family=InferenceFamily.LLM, sdk="mistral", make_worker=_make_mistral_worker, check_llm_request=_check_mistral_request
+        )
         registrar.add_inference_backend(family=InferenceFamily.EXTRACT, sdk="mistral", make_worker=_make_mistral_extract_worker)
         registrar.add_model_lister(sdk="mistral", lister=_list_mistral_models)

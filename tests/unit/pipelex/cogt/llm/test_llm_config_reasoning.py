@@ -190,9 +190,9 @@ class TestLLMConfigReasoning:
         assert config.google.get_reasoning_level(ReasoningEffort.NONE) is None
 
     def test_get_reasoning_level_mistral_reasoning(self):
-        """Mistral HIGH maps to 'reasoning'."""
+        """Mistral HIGH maps to the 'reasoning' level, sent as Mistral's reasoning_effort 'high'."""
         config = _make_llm_config()
-        assert config.mistral.get_reasoning_level(ReasoningEffort.HIGH) == "reasoning"
+        assert config.mistral.get_reasoning_level(ReasoningEffort.HIGH) == "high"
 
     def test_get_reasoning_level_mistral_disabled(self):
         """Mistral NONE returns None (disabled)."""

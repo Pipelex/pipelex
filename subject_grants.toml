@@ -1932,10 +1932,6 @@ rationale = "Worker verb–object: processes the llm_job; single operand."
 param = "llm_job"
 rationale = "Operates on the llm_job; single operand (attached data keyword-only)."
 
-["pipelex/cogt/llm/llm_worker_abstract.py::LLMWorkerAbstract._validate_no_reasoning_for_structured_gen"]
-param = "job_params"
-rationale = "Validator: the job params are the single operand checked."
-
 ["pipelex/cogt/llm/llm_worker_abstract.py::LLMWorkerAbstract.gen_object"]
 param = "llm_job"
 rationale = "Worker verb–object: processes the llm_job; single operand."
@@ -4772,18 +4768,6 @@ rationale = "Verb–object: renders the model list; single operand."
 param = "models"
 rationale = "Verb–object: renders the model list; single operand."
 
-["pipelex/providers/anthropic/anthropic_llm_worker.py::AnthropicLLMWorker._build_thinking_params"]
-param = "job_params"
-rationale = "Builds provider thinking params from the job_params; single operand."
-
-["pipelex/providers/anthropic/anthropic_llm_worker.py::AnthropicLLMWorker._build_thinking_params_for_budget"]
-param = "thinking_mode"
-rationale = "Builds provider thinking params from the thinking_mode; single operand."
-
-["pipelex/providers/anthropic/anthropic_llm_worker.py::AnthropicLLMWorker._build_thinking_params_for_effort"]
-param = "thinking_mode"
-rationale = "Builds provider thinking params from the thinking_mode; single operand."
-
 ["pipelex/providers/anthropic/anthropic_llms.py::anthropic_list_available_models"]
 param = "model_handle"
 rationale = "Lists the available models for the model handle; single operand."
@@ -4819,10 +4803,6 @@ rationale = "Verb–object: renders the model list; single operand."
 ["pipelex/providers/bedrock/bedrock_list.py::_display_bedrock_models_table"]
 param = "models"
 rationale = "Verb–object: renders the model list; single operand."
-
-["pipelex/providers/bedrock/bedrock_llm_worker.py::BedrockLLMWorker._validate_no_reasoning_params"]
-param = "job_params"
-rationale = "Validates the job params carry no unsupported reasoning settings; single operand."
 
 ["pipelex/providers/bedrock/bedrock_llms.py::bedrock_list_available_models"]
 param = "model_handle"
@@ -4907,18 +4887,6 @@ rationale = "Verb–object: renders the model list; single operand."
 ["pipelex/providers/google/google_list.py::_display_google_models_table"]
 param = "models"
 rationale = "Verb–object: renders the model list; single operand."
-
-["pipelex/providers/google/google_llm_worker.py::GoogleLLMWorker._build_thinking_config"]
-param = "job_params"
-rationale = "Builds provider thinking params from the job_params; single operand."
-
-["pipelex/providers/google/google_llm_worker.py::GoogleLLMWorker._build_thinking_config_for_budget"]
-param = "thinking_mode"
-rationale = "Builds provider thinking params from the thinking_mode; single operand."
-
-["pipelex/providers/google/google_llm_worker.py::GoogleLLMWorker._build_thinking_config_for_effort"]
-param = "thinking_mode"
-rationale = "Builds provider thinking params from the thinking_mode; single operand."
 
 ["pipelex/providers/google/google_plugin.py::GooglePlugin.register"]
 param = "registrar"
@@ -5020,10 +4988,6 @@ rationale = "Verb–object: renders the model list; single operand."
 param = "models"
 rationale = "Verb–object: renders the model list; single operand."
 
-["pipelex/providers/mistral/mistral_llm_worker.py::MistralLLMWorker._resolve_prompt_mode"]
-param = "job_params"
-rationale = "Resolves the prompt mode from the job params; single operand."
-
 ["pipelex/providers/mistral/mistral_plugin.py::MistralPlugin.register"]
 param = "registrar"
 rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
@@ -5047,10 +5011,6 @@ rationale = "Factory from source: builds the result from the llm_job; single ope
 ["pipelex/providers/openai/openai_completions_img_gen_worker.py::OpenAICompletionsImgGenWorker._build_messages_with_images"]
 param = "img_gen_job"
 rationale = "Builds the messages payload from the img-gen job; single operand."
-
-["pipelex/providers/openai/openai_completions_llm_worker.py::OpenAICompletionsLLMWorker._resolve_reasoning_effort"]
-param = "job_params"
-rationale = "Resolves the reasoning effort from the job params; single operand."
 
 ["pipelex/providers/openai/openai_config.py::OpenAIConfig.get_reasoning_level"]
 param = "effort"
@@ -5087,10 +5047,6 @@ rationale = "Factory from source: builds the result from the llm_job; single ope
 ["pipelex/providers/openai/openai_responses_factory.py::OpenAIResponsesFactory.make_nb_tokens_by_category"]
 param = "usage"
 rationale = "Factory from source: builds the result from the usage; single operand."
-
-["pipelex/providers/openai/openai_responses_llm_worker.py::OpenAIResponsesLLMWorker._resolve_reasoning"]
-param = "job_params"
-rationale = "Resolves the reasoning config from the job params; single operand."
 
 ["pipelex/providers/openai/vertexai_factory.py::VertexAIFactory._make_api_key"]
 param = "gcp_credentials_file_path"

@@ -39,7 +39,8 @@
       "enum_members": [
         "max_tokens_must_be_high_enough",
         "temperature_must_be_multiplied_by_2",
-        "temperature_unsupported"
+        "temperature_unsupported",
+        "thinking_cannot_be_disabled"
       ],
       "open_node": false
     },
