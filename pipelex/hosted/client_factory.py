@@ -38,6 +38,11 @@ def redact_url_for_display(*, url: str) -> str:
         port = parts.port
     except ValueError:
         return "<a value that does not parse as a URL>"
+    if not parts.netloc and "@" in url:
+        # Without `//`, urlsplit reads userinfo as a scheme plus a path (`user:secret@host` is scheme `user`), so the
+        # credentials would pass through whole: show only what follows the last `@`, its query and fragment dropped.
+        after_userinfo = url.rsplit("@", 1)[1]
+        return "***@" + after_userinfo.split("?", 1)[0].split("#", 1)[0]
     host = parts.hostname or ""
     netloc = f"[{host}]" if ":" in host else host
     if port is not None:

@@ -170,14 +170,16 @@ async def _follow(*, client: PipelexAPIClient, run_id: str) -> RunResults:
     """Poll a started run to its result.
 
     A failure that names the run already (a run that failed, one past the wait, one that delivered no main output) is
-    raised as it is. Any other one, met after the start was acknowledged, is raised as a `HostedRunPollingError`
-    naming the run, which may still be going.
+    raised as it is. Any other one met after the start was acknowledged, the network, the hosted API or an answer that
+    does not parse, is raised as a `HostedRunPollingError` naming the run, which may still be going.
     """
     try:
         return await client.wait_for_result(run_id)
     except (RunFailedError, RunTimeoutError, MissingMainStuffError):
         raise
-    except (PipelineRequestError, httpx.HTTPError, ValidationError) as exc:
+    except (PipelineRequestError, httpx.HTTPError, ValueError) as exc:
+        # `ValueError` covers an answer that is not what the results route promises: a body that is not JSON
+        # (`json.JSONDecodeError`) or one that drifted from the SDK's model (pydantic's `ValidationError`).
         msg = f"The run {run_id} started on the hosted API, but following it to its result failed: {exc}"
         raise HostedRunPollingError(msg, pipeline_run_id=run_id) from exc
 

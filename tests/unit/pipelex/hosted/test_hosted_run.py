@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -257,6 +258,7 @@ class TestHostedRun:
                 "Could not reach Pipelex API at https://hosted.test (ConnectError)", api_url="https://hosted.test", code="ConnectError"
             ),
             httpx.RemoteProtocolError("server disconnected"),
+            json.JSONDecodeError("Expecting value", "<html>Bad gateway</html>", 0),
         ],
     )
     async def test_a_failure_while_following_a_started_run_keeps_its_id(self, mocker: MockerFixture, follow_error: Exception) -> None:

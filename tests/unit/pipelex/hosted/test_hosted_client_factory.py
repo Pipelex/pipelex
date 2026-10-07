@@ -87,6 +87,9 @@ class TestHostedClientFactory:
         [
             ("https://alice:s3cret-token@api.pipelex.com", None),
             (None, "https://alice:s3cret-token@api.pipelex.com/v1?key=s3cret-token#s3cret-token"),
+            ("alice:s3cret-token@api.pipelex.com", None),
+            ("https:alice:s3cret-token@api.pipelex.com", None),
+            (None, "alice:s3cret-token@api.pipelex.com"),
         ],
     )
     def test_a_refused_base_url_is_echoed_without_its_credentials(

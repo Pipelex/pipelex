@@ -30,7 +30,7 @@ from pipelex_sdk.errors import (
 from pipelex_sdk.validation_models import ValidationErrorItem
 
 from pipelex.base_exceptions import ErrorDomain
-from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
+from pipelex.hosted.client_factory import HOSTED_API_DEFAULT_BASE_URL, PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
 from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunError, HostedRunInterruptedError, HostedRunPollingError
 
 #: Where a hosted run takes its key from, and where a person gets one.
@@ -176,8 +176,16 @@ def describe_hosted_error(*, error: PipelineRequestError | HostedRunError) -> Ho
                 "app.pipelex.com, and report it with the run id"
             )
         case PipelineExecuteTimeoutError():
+            # A hosted run calls the blocking route only on a server that keeps no runs (its version handshake says so,
+            # or its start refused for a missing run store), so running again takes the same route and repeats a paid run.
             error_domain = ErrorDomain.RUNTIME
-            next_step = "The run outlived the hosted API's synchronous ceiling: run it again, it starts and polls the run instead"
+            retryable = False
+            next_step = (
+                "The server at the base URL keeps no runs to poll, so the run went through the blocking route and the connection "
+                "was cut before the result came back. The run may still be going there, and running the command again runs the "
+                "method again on the same route: raise the timeout of the proxy in front of that server, or point --base-url or "
+                f"{PIPELEX_BASE_URL_ENV_KEY} at a server that keeps runs, such as {HOSTED_API_DEFAULT_BASE_URL}"
+            )
         case ApiUnreachableError():
             error_domain = ErrorDomain.CONFIG
             next_step = HOSTED_UNREACHABLE_NEXT_STEP

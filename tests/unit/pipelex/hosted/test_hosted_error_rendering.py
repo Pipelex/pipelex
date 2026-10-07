@@ -11,6 +11,7 @@ from pipelex_sdk.errors import (
     ApiUnreachableError,
     InvalidLocalSourceError,
     MissingMainStuffError,
+    PipelineExecuteTimeoutError,
     RunFailedError,
     RunTimeoutError,
     UploadAuthenticationError,
@@ -259,3 +260,14 @@ class TestHostedErrorRendering:
 
         assert view.error_domain == "input"
         assert "https URL" in view.next_step
+
+    def test_a_blocking_route_timeout_warns_that_the_run_may_still_be_going(self) -> None:
+        """Only a server that keeps no runs is called on the blocking route, so running again takes the same route and repeats a paid run."""
+        error = PipelineExecuteTimeoutError("POST /v1/execute was cut off after 31s", elapsed_seconds=31.0)
+
+        view = describe_hosted_error(error=error)
+
+        assert "run it again" not in view.next_step
+        assert "may still be going" in view.next_step
+        assert PIPELEX_BASE_URL_ENV_KEY in view.next_step
+        assert view.retryable is False
