@@ -628,7 +628,35 @@ A run is often both at once, which is the ordinary shape on a machine that has d
 
 **Nothing inside a file is rendered here either.** The row reports paths and counts. It is the fourth channel the rendering rule covers, beside the command's output, its structured plan, and the block on a validation error.
 
+**The row reports the cleanup of a [former release](#a-former-releases-configuration) too**, since that is the command's first step: `former_release_files` names the files it would rewrite or remove, and `former_release_blocks_boot` says whether what they hold stops the boot. The finding is `pending` whenever there are such files, and `--fix` runs the cleanup before the migration, as the command does.
+
 **A failure inside the scan costs more here than anywhere else**, which is why it is caught rather than raised: an exception escaping this probe reaches the doctor's own outer handler, which prints one line and exits — so a broken packaged ledger would replace *every row the user came for* with "Unexpected error". The catch stays narrow (`MigrationError`, `OSError`), so a bug in our applier still surfaces as itself.
+
+## A former release's configuration
+
+Releases up to v0.72 ran models through the Pipelex Gateway and offered Pipelex Manifold as a private beta, and the configuration they set up still names both: a `pipelex_gateway` and a `pipelex_manifold` table in `inference/backends.toml`, a per-backend file for each in `inference/backends/`, routing profiles that send every model to one of them (`active = "all_pipelex_gateway"` above all), a `model_specs_section` key naming specs the remote configuration used to serve, the `pipelex_service.toml` that recorded the Gateway's terms acceptance, and the `pipelex_gateway_models*.md` model lists. None of that is a shape change of a surface — the files are valid; what they name is gone — so it is no ledger entry. It is a step of its own, which `pipelex migrate` runs first.
+
+**One reading of that state.** `detect_former_release(config_dir=)` (`pipelex/migration/former_release.py`) is a pure read of one configuration directory, and every consumer asks it: the boot, `pipelex doctor`, `pipelex init`'s inspect stage, and the cleanup. Each finding says which file it is in and whether it stops the boot. Only two shapes do, because only two are refused: a retired backend, or one still naming `model_specs_section`, left enabled; and an active routing profile that sends models to a retired backend, by its default or by a route it must honour (an optional route is inert while its backend is absent, and so is `fallback_order`). Whether a table is enabled and which profile is active are read off a base file merged with its override, as the boot reads them, and a base that names a retired active profile under an override that picked another is still found, as inert, since it is refused the day the override goes. A document that does not parse is skipped rather than raised: whether it parses is the boot's and the doctor's to say.
+
+**The boot refuses first, with one error.** `ModelManager.setup` runs `former_release_boot_blockers()` over exactly the sequences it is about to merge, across the home and project directories, before the backend library loads. On a blocker it raises `FormerReleaseConfigError`, which names each blocking finding with its file and both remedies, `pipelex migrate` and `pipelex init`, instead of whichever lower refusal would have come first: the Gateway's missing key, its backend file declaring no model, or `RoutingProfileDisabledBackendError` once the Gateway is switched off and `active` still names its profile. Reading the boot's own sequences is what keeps it from refusing a boot that would succeed: a project override that disables the Gateway lifts the home base's finding, as it lifts the boot's refusal.
+
+**The cleanup removes what was found, and nothing else.** `clean_former_release(config_dirs=, dry_run=)` (`pipelex/migration/former_release_cleanup.py`) turns each finding into one change on its file:
+
+| Finding | Change |
+|---|---|
+| a retired backend table, in `backends.toml` or its override | the table is deleted |
+| `model_specs_section` on another backend | the key is deleted; the backend stays |
+| a routing profile whose default is a retired backend | the profile is deleted |
+| a route to a retired backend in a profile that otherwise stays | the route is deleted, from the route table that holds it |
+| a retired active profile, in a base file | `active` moves to the profile the kit makes active (`all_enabled_backends`), which is added first among the profiles, as the kit ships it, when the file does not define it |
+| a retired active profile, in a personal override | `active` is deleted, so the base file decides |
+| a retired backend's file, a model list, `pipelex_service.toml` | the file is removed |
+
+The kit's profile goes in before the deletions so that the banner heading the profiles stays at the head of them rather than leaving with the first profile it introduced. Each operation is the applier's, so the comment introducing a deleted table or key goes with it, and the document is re-read between operations that applied. A rewritten file also loses the comment paragraphs at the head of the document that speak of the Gateway or Manifold, the instructions that came with that release; a comment anywhere else is the user's and stays.
+
+**Every file gets the replay's guarantees.** A rewrite goes through the same per-file transaction as a migrated file (`runner.write_file_with_backup`), and a removal through its twin (`runner.remove_file_with_backup`): one `.bak.<stamp>` copy, taken first and kept, older copies pruned, and a file changed or unwritable mid-run left exactly as it was and reported, with the copy taken for it taken back. A removal removes the path itself, so a symbolic link goes and the file it names stays where it lives. A dry run reports the same changes and writes nothing, not even the `.gitignore`. Running it twice is running it once: a cleaned directory has no findings, and a backup's name matches none of the patterns the detector looks for.
+
+**Goldens.** `tests/data/migration/former_release/v0_72/` is the v0.72 kit's own files, copied from its wheel; `v0_72_cleaned/` holds the two documents the cleanup rewrites, byte for byte as it must leave them. Both are `plxt`-stable, since `make agent-check` formats every TOML file in the repository.
 
 ## Applying
 

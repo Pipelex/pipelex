@@ -171,6 +171,8 @@ A variable may stand only in a value that a call sends: `api_key`, `endpoint` an
 
 An enabled backend must declare at least one model in its file under `backends/` (see [Model Specifications](#model-specifications)). Pipelex refuses to boot when one declares none, because routing would send models to a backend that cannot serve them: disable the backend, or list the models it serves. The `internal` backend is exempt, since plugins add its models at boot. A backend table also no longer accepts a `model_specs_section` key; an enabled backend that still carries one is refused, and the fix is to list its models in `backends/<name>.toml` and remove the key, or to disable the backend.
 
+The `pipelex_gateway` and `pipelex_manifold` backends that releases up to v0.72 shipped are gone. A configuration those releases set up, with one of them enabled, a routing profile such as `all_pipelex_gateway` active, or a `model_specs_section` key left behind, is refused with one error naming [`pipelex migrate`](../../tools/cli/migrate.md#a-configuration-a-former-release-set-up), which removes what they left, keeps a copy of each file it changes, and makes `all_enabled_backends` the active profile.
+
 Judgment models are served by their own backend alone, so the default routing profile sends them to their own backend through an optional route (`"jev-*" = "typesafe"`), which applies only while that backend is enabled. With a `TYPESAFE_API_KEY` set, `@default-judgment` works under the default profile with no routing edit.
 
 ### Model Specifications

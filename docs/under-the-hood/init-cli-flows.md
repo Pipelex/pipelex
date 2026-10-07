@@ -65,11 +65,19 @@ All commands except `credentials` perform a **full reset** (overwrite existing f
 
 `init_cmd()` runs every focus but `credentials` through three functions:
 
-1. **Inspect** — `inspect_initialization(focus=, local=)` resolves the target directory, reads what is on disk and returns an `InitInspection`: which steps are needed, whether this run asks where runs execute (`asks_setup_path`), and the `[run] execution` the target `pipelex.toml` sets now (`configured_execution`). It asks nothing and writes nothing, so a check of the existing configuration, such as one for a former release's files, belongs here.
-2. **Choose** — `choose_initialization(console=, inspection=, skip_confirmation=)` shows the confirmation panel, then, when `asks_setup_path`, the question `prompt_setup_path()` asks. It returns an `InitChoices`: the `SetupPath` (`HOSTED` or `LOCAL`, `None` when this run does not decide it) and whether anyone answers prompts. A remedy that must run before that question, such as cleaning up what the inspection found, belongs at the start of this stage.
+1. **Inspect** — `inspect_initialization(focus=, local=)` resolves the target directory, reads what is on disk and returns an `InitInspection`: which steps are needed, whether this run asks where runs execute (`asks_setup_path`), the `[run] execution` the target `pipelex.toml` sets now (`configured_execution`), and what a former release left (`former_release_findings`, see below). It asks nothing and writes nothing.
+2. **Choose** — `choose_initialization(console=, inspection=, skip_confirmation=)` first offers the cleanup of what a former release left, when the inspection found any. Then it shows the confirmation panel, then, when `asks_setup_path`, the question `prompt_setup_path()` asks. It returns an `InitChoices`: the `SetupPath` (`HOSTED` or `LOCAL`, `None` when this run does not decide it) and whether anyone answers prompts.
 3. **Execute** — `execute_initialization(console=, inspection=, choices=)` writes the files and runs the steps the choices call for.
 
 `asks_setup_path` is true when the run sets up inference and its focus is `all` or `config`: the full setup always, and a configuration reset only on a first setup. `inference` configures this machine's backends on purpose and never asks.
+
+### A Former Release's Configuration
+
+A machine set up by a release that ran models through the Pipelex Gateway or Pipelex Manifold still carries what that took: their backend tables, routing profiles that send every model to one of them, their per-backend files and model lists, `model_specs_section` keys and `pipelex_service.toml`. The boot refuses such a machine with `FormerReleaseConfigError`, naming `pipelex migrate` and `pipelex init`.
+
+The inspect stage runs `detect_former_release()` (`pipelex/migration/former_release.py`) over the target directory and every configuration directory a boot reads (`config_manager.existing_config_dirs`), and keeps the directories with findings in `former_release_findings`. The choose stage then calls `offer_former_release_cleanup()`, before the confirmation: it shows a panel naming what stops the boot and the files it is in, asks "Clean it up now?" (default yes), and on a yes runs `apply_former_release_cleanup()`, the write pass of `pipelex migrate`'s first step, with the same copies kept. A no leaves the files as they are and the setup goes on. Under `skip_confirmation` (`pipelex doctor --fix`) the cleanup runs unasked.
+
+The cleanup is needed even though a full reset rewrites the target's `backends.toml` and `routing_profiles.toml`: the reset copies the kit's backend files over the target's but removes none, so the retired backend files, the model lists and `pipelex_service.toml` would stay, and so would everything in the other directory and in the personal overrides.
 
 ### Overall Flow
 
@@ -80,8 +88,11 @@ flowchart TD
     FOCUS -- credentials --> CREDS_DIRECT["prompt_credentials<br/>Prompt for missing API keys"]
     CREDS_DIRECT --> DONE
 
-    FOCUS -- "all / config / inference / routing / telemetry" --> INSPECT["inspect_initialization<br/>determine_needs, first-time detection,<br/>current run execution"]
-    INSPECT --> SKIP{skip_confirmation?}
+    FOCUS -- "all / config / inference / routing / telemetry" --> INSPECT["inspect_initialization<br/>determine_needs, first-time detection,<br/>current run execution, former release"]
+    INSPECT --> FORMER{former release found?}
+    FORMER -- Yes --> CLEANUP["offer_former_release_cleanup<br/>clean up on yes (unasked for doctor --fix)"]
+    FORMER -- No --> SKIP
+    CLEANUP --> SKIP{skip_confirmation?}
     SKIP -- "Yes (doctor --fix)" --> DEFAULT["Setup path: the configured one, local for a<br/>pipelex.toml without it, hosted for a new home<br/>(when the run asks it)"]
     SKIP -- No --> CONFIRM{User confirms?}
     CONFIRM -- No --> CANCEL([Cancelled])
@@ -290,7 +301,8 @@ On the hosted path only, `ensure_pipelex_api_key()` runs last, so every file is 
 
 | Module | Purpose |
 |--------|---------|
-| `pipelex/cli/commands/init/command.py` | Orchestration: `init_cmd()`, the three stages `inspect_initialization()`, `choose_initialization()`, `execute_initialization()`, and `determine_needs()` |
+| `pipelex/cli/commands/init/command.py` | Orchestration: `init_cmd()`, the three stages `inspect_initialization()`, `choose_initialization()`, `execute_initialization()`, `determine_needs()`, and `offer_former_release_cleanup()` |
+| `pipelex/migration/former_release.py`, `pipelex/migration/former_release_cleanup.py` | What a former release left: `detect_former_release()`, and the cleanup `clean_former_release()` that `pipelex migrate` runs first |
 | `pipelex/cli/commands/init/setup_path.py` | Where runs execute: `SetupPath`, `write_run_execution()`, `read_run_execution()`, `ensure_pipelex_api_key()` |
 | `pipelex/cli/commands/init/ui/setup_path_ui.py` | The question: `prompt_setup_path()` |
 | `pipelex/cli/commands/login/` | `pipelex login`: the loopback listener, the key store, `login_with_browser()` and `login_with_paste()` |
@@ -449,7 +461,7 @@ Once the configuration files are healthy, `resolve_doctor_run_execution()` reads
 | `check_backend_files()` | `resolve_config_file()` for `inference/backends/`, `backends_file_paths()` for the enabled-backend list | Finds `inference/backends/` wherever it lives, and reads the merged backends document to decide which backends to probe |
 | `check_pending_migrations()` | none | **Both directories, always** — see below |
 
-`check_pending_migrations()` is the one check that takes no `config_dir` at all, and that is deliberate. Every other row reports on a *file* and is scoped to the directory the doctor was pointed at, `--global` included. That one reports on a *command* — it is `pipelex migrate`'s own dry run — and `pipelex migrate` has no `--global`: it walks the global `~/.pipelex/` and the project `.pipelex/` both. Scoping the row narrower would name a command that then rewrites a file the row never mentioned. Every file it reports is named with its full path, so the wider scope stays legible.
+`check_pending_migrations()` is the one check that takes no `config_dir` at all, and that is deliberate. It also reports the command's first step, the cleanup of what a former release left: `former_release_files` names the files the cleanup would rewrite or remove, and `former_release_blocks_boot` says whether what they hold stops the boot. While it does, `check_models()` does not load anything: the boot would stop on that before any backend, so the row says so and names `pipelex migrate` rather than quoting whichever refusal about one backend or one profile it would meet first. `check_backend_credentials()` skips a retired backend's table, since its key is no remedy. Every other row reports on a *file* and is scoped to the directory the doctor was pointed at, `--global` included. That one reports on a *command* — it is `pipelex migrate`'s own dry run — and `pipelex migrate` has no `--global`: it walks the global `~/.pipelex/` and the project `.pipelex/` both. Scoping the row narrower would name a command that then rewrites a file the row never mentioned. Every file it reports is named with its full path, so the wider scope stays legible.
 
 `check_backend_files()` loads the backend library once per enabled backend, and loads it without resolving credentials (`CredentialResolution.SKIP`, the keyless boot's mode). The row reports on file shape — an unknown key, a spec that is not a table, a missing per-backend file — so a backend's credentials are the Credentials row's finding, not this one's. Resolving them here would report an enabled backend whose key is not set yet as a backend-configuration error, and because the loader stops at the first backend it cannot load, a malformed file listed after that backend in `backends.toml` would go unreported. Skipping credentials skips nothing else: every enabled backend is loaded, a malformed file stays fatal, and so do the refusals of an enabled backend that declares no model or still carries `model_specs_section`. Every probe sees that same first failure, so a failure is charged to the backend the error declares (`backend_name`, stamped by the loader on every error about one backend) or, for an error that declares none, to the backend whose file it names — never to a backend whose name merely appears in the message's prose. `check_models()` attributes the same way and for the same reason: its own load resolves credentials, which the probe's does not, so it can be the first thing to name a broken backend, and it writes into the very reports this row produced.
 
@@ -466,7 +478,7 @@ replace_backend_file(backend_name, config_dir=resolved_config_dir)
 
 This ensures the fix targets the same directory where the issue was found — if the broken file was in the project `.pipelex/`, the replacement goes there too, not to `~/.pipelex/`.
 
-The migration fix is the exception that follows from the row above it: it calls `apply_pending_migrations(config_dirs=config_directories_to_migrate())` and so writes to both directories, because that is what the command it is running does. It calls that helper rather than `migrate_cmd` itself — the command exits the process when a run leaves something for a person, which would cut off the doctor's remaining fixes, its remaining rows and its own exit code.
+The migration fix is the exception that follows from the row above it: it calls `apply_former_release_cleanup()` first when the row lists files a former release left, then `apply_pending_migrations(config_dirs=config_directories_to_migrate())`, and so writes to both directories, because that is what the command it is running does. It calls that helper rather than `migrate_cmd` itself — the command exits the process when a run leaves something for a person, which would cut off the doctor's remaining fixes, its remaining rows and its own exit code.
 
 ---
 

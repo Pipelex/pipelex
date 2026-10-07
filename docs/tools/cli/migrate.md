@@ -24,7 +24,7 @@ Two directories, and only those:
 
 Within each, it looks at the configuration files themselves — `pipelex.toml` and its `pipelex_*.toml` tiers, `telemetry.toml` and its tiers — and at the inference backend definitions in `inference/backends/`.
 
-It goes one level deep, and only into a directory some configuration family owns. `inference/backends/` is such a directory, so every `*.toml` in it is repaired the same way a `pipelex.toml` is. `inference/deck/` is not one, and neither is `inference/backends.toml`, which sits beside the backends directory rather than in it — neither is ever entered or rewritten by this command, and the model deck has its own `pipelex update`.
+It goes one level deep, and only into a directory some configuration family owns. `inference/backends/` is such a directory, so every `*.toml` in it is repaired the same way a `pipelex.toml` is. `inference/deck/` is not one, and is never entered: the model deck has its own `pipelex update`. Neither is `inference/backends.toml`, which sits beside the backends directory rather than in it, nor `inference/routing_profiles.toml`: the one thing this command ever does to them is remove what a [former release](#a-configuration-a-former-release-set-up) left in them.
 
 Within a file it repairs, it only ever undoes a change *we* made. A key you added yourself — a misspelling, or a setting from a plugin — is reported rather than removed, because the migration history describes our renames and removals and has nothing to say about your keys.
 
@@ -35,6 +35,25 @@ Every file it changes is copied first, beside itself, as `<file>.bak.<UTC timest
 Those copies are ours, not part of your project, so the command keeps them out of your way: it writes a `.gitignore` inside the configuration directory itself, ignoring exactly the timestamped copies it makes. You will see the `.gitignore` — commit it, and your teammates get the same quiet. If you already have one there, it is left alone. You get it from any run that is allowed to write, including one that finds nothing to migrate — so a configuration directory that predates this picks the rule up on your next `pipelex migrate`, whether or not it has anything to carry forward. A `<file>.rescue.<timestamp>` copy is deliberately *not* ignored: one of those only exists because a write could not be vouched for, and seeing it is how you find out.
 
 Running it twice is the same as running it once. Nothing is skipped on the basis of a version record, because there is no version record; every run replays the whole history and leaves alone whatever is already current. A file that is already up to date comes back byte for byte identical.
+
+## A configuration a former release set up
+
+Releases up to v0.72 ran models through the Pipelex Gateway, and offered Pipelex Manifold as a private beta. Neither exists any more, and the files those releases wrote still name them. Pipelex refuses to start on two shapes of them, and says so with one error that names this command and [`pipelex init`](init.md#a-machine-a-former-release-set-up):
+
+- a `pipelex_gateway` or `pipelex_manifold` backend left enabled in `inference/backends.toml`, or another backend still naming `model_specs_section`, whose model specs are no longer downloaded;
+- an active routing profile that sends models to one of them: `all_pipelex_gateway`, which those releases made the default, or a profile routing some models there.
+
+The cleanup of what those releases left is this command's first step, before any file is migrated, in both directories:
+
+- the `pipelex_gateway` and `pipelex_manifold` tables are removed from `inference/backends.toml` and its personal override, and a `model_specs_section` key from any other backend, which stays;
+- a routing profile whose default is one of them is removed, and so is a route that sends a model to one of them, from a profile that otherwise stays;
+- an active routing profile of theirs moves to `all_enabled_backends`, the profile a fresh install makes active, which routes each model to the first enabled backend that serves it. When the file does not define that profile, it is added as the current release ships it. A personal override that names one stops naming any, so its base file decides;
+- `inference/backends/pipelex_gateway.toml`, `inference/backends/pipelex_manifold.toml`, the Gateway's model lists `inference/backends/pipelex_gateway_models*.md` and `pipelex_service.toml`, which recorded the Gateway's terms acceptance, are removed;
+- the comments at the head of a rewritten file that spoke of the Gateway or Manifold go with it; any other comment stays.
+
+Nothing else is touched: your other backends, your own profiles and routes, and your keys stay as they are. Each file the cleanup rewrites or removes is copied first, exactly as a migrated file is (below), so a removed file is one rename away from being back. The dry run shows each change, file by file, and the question that follows counts the files of both steps.
+
+`pipelex doctor` lists these files in its **Configuration Migrations** row, says when they stop Pipelex from starting, and `pipelex doctor --fix` runs the cleanup. `pipelex init` finds them too, and offers the same cleanup before it asks anything else.
 
 ## When it cannot do the whole job
 
@@ -60,7 +79,9 @@ Nothing that Pipelex tells you about an out-of-date file will ever suggest delet
 
 ## For agents
 
-`pipelex-agent migrate` is the machine-facing counterpart. It writes only when passed `--yes`, since it cannot ask, and answers with a structured plan — `--format json` for the contract, `--format markdown` to read. Branch on the `needs_attention` field, never on the exit code.
+`pipelex-agent migrate` is the machine-facing counterpart. It writes only when passed `--yes`, since it cannot ask, and answers with a structured plan — `--format json` for the contract, `--format markdown` to read. Branch on the `needs_attention` field, never on the exit code. The cleanup of a former release is under `former_release`: each file it rewrites or removes, with its `action` (`rewrite` or `remove`), its `changes` in words, the `backup_path` once applied, and why it was left when it could not be cleaned. It counts toward `needs_attention` and `is_clean` like the migration itself.
+
+An agent whose boot fails with `FormerReleaseConfigError` runs the same loop: `pipelex-agent migrate --dry-run --format json`, show the user what would be removed, then `--yes`.
 
 An agent usually meets this command through a failure rather than by choosing it. A configuration error carries a `migration` field when — and only when — a scan of the machine found something; its presence is the signal that the configuration is *old* rather than *wrong*. The loop from there is `pipelex-agent migrate --dry-run --format json`, show the user what would change, then `--yes` on confirmation. Never hand-edit a configuration file.
 
