@@ -25,6 +25,8 @@ from pipelex.cogt.models.model_deck import ModelDeck, ModelDeckBlueprint
 from pipelex.cogt.models.model_deck_loader import load_model_deck_blueprint
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config
+from pipelex.migration.exceptions import FormerReleaseConfigError
+from pipelex.migration.former_release import describe_former_release_boot_refusal, former_release_boot_blockers
 from pipelex.plugins.plugin_model_declarations import PluginModelDeclarations
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.tools.misc.file_utils import find_files_in_dir
@@ -81,9 +83,20 @@ class ModelManager(ModelManagerAbstract):
         # sequences — the base file, then the personal override files — see
         # `ConfigLoader.backends_file_paths`.
         resolved_backends_dir_path = backends_dir_path or str(config_manager.backends_dir_path)
+        resolved_backends_library_paths = backends_library_paths or config_manager.backends_file_paths()
+        resolved_routing_profile_library_paths = routing_profile_library_paths or config_manager.routing_profiles_file_paths()
+        # What a former release left for the Pipelex Gateway or Manifold is refused here, by one error naming the
+        # cleanup, ahead of the refusals below: the Gateway's unset key, its backend file declaring no model, or a
+        # routing profile sending models to a backend that is not enabled — none of which says why, or what to run.
+        if blockers := former_release_boot_blockers(
+            backends_library_paths=resolved_backends_library_paths,
+            routing_profile_library_paths=resolved_routing_profile_library_paths,
+        ):
+            msg = describe_former_release_boot_refusal(blockers=blockers)
+            raise FormerReleaseConfigError(msg)
         self.inference_backend_library.load(
             secrets_provider=secrets_provider,
-            backends_library_paths=backends_library_paths or config_manager.backends_file_paths(),
+            backends_library_paths=resolved_backends_library_paths,
             backends_dir_path=resolved_backends_dir_path,
             # A keyless boot knows every enabled backend's models and resolves no credential; the boot
             # that needs inference resolves every one and refuses to start without it.
@@ -103,7 +116,7 @@ class ModelManager(ModelManagerAbstract):
         )
         enabled_backends = self.inference_backend_library.all_enabled_backends()
         self._routing_profile = load_active_routing_profile(
-            routing_profile_library_paths=routing_profile_library_paths or config_manager.routing_profiles_file_paths(),
+            routing_profile_library_paths=resolved_routing_profile_library_paths,
             enabled_backends=enabled_backends,
         )
         model_deck_paths = ModelManager.get_model_deck_paths(deck_dir_path=deck_dir_path or str(config_manager.model_decks_dir_path))
