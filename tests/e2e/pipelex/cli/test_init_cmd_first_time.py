@@ -9,6 +9,7 @@ import typer
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.backends_ui import RECOMMENDED_INIT_BACKEND
 from pipelex.cli.commands.init.ui.types import InitFocus
+from pipelex.hosted.run_config import RunExecution
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit
 from tests.helpers.init_cmd_helpers import MockedInitEnvironment, get_backend_indices_helper
@@ -26,6 +27,7 @@ class TestFirstTimeInitialization:
 
         # User inputs: confirm init, recommended default backend
         env.add_confirm_input(True)  # Confirm initialization
+        env.choose_local()  # Where runs execute: this machine
         env.add_prompt_input("")  # Empty = the recommended default
 
         env.setup_mocks()
@@ -41,6 +43,8 @@ class TestFirstTimeInitialization:
         env.verify_backends_enabled([RECOMMENDED_INIT_BACKEND])
         env.verify_routing(f"all_{RECOMMENDED_INIT_BACKEND}")
         env.verify_telemetry("off")
+        env.verify_run_execution(RunExecution.LOCAL)
+        env.mock_login.assert_not_called()
 
     def test_init_with_multiple_backends_and_routing(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test Case 1.2: Initialization with multiple backends."""
@@ -55,6 +59,7 @@ class TestFirstTimeInitialization:
 
         # User inputs
         env.add_confirm_input(True)  # Confirm initialization
+        env.choose_local()  # Where runs execute: this machine
         env.add_prompt_input(indices_str)  # Select 3 backends
         env.add_prompt_input("1")  # Primary: first one (anthropic)
         env.add_prompt_input("2,1")  # Custom fallback order (mistral, anthropic)
@@ -81,6 +86,7 @@ class TestFirstTimeInitialization:
 
         # User inputs
         env.add_confirm_input(True)  # Confirm initialization
+        env.choose_local()  # Where runs execute: this machine
         env.add_prompt_input("all")  # Select all backends
         env.add_prompt_input("1")  # Primary backend: the first listed
         env.add_prompt_input("")  # Accept the default fallback order
@@ -108,6 +114,7 @@ class TestFirstTimeInitialization:
 
         # User inputs: confirm, then quit at backend selection
         env.add_confirm_input(True)  # Confirm initialization
+        env.choose_local()  # Where runs execute: this machine
         env.add_prompt_input("q")  # Quit at backend selection
 
         env.setup_mocks()

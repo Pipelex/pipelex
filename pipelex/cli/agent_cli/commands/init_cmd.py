@@ -16,8 +16,12 @@ from pipelex.cli.agent_cli.commands.agent_output import (
 )
 from pipelex.cli.commands.init.backends import get_selected_backend_keys, update_backends_in_toml
 from pipelex.cli.commands.init.config_files import init_config
+from pipelex.cli.commands.init.setup_path import write_run_execution
 from pipelex.cli.commands.init.ui.backends_ui import get_backend_options_from_toml
+from pipelex.cli.commands.login.api_key_store import find_pipelex_api_key
 from pipelex.cogt.models.deck_manifest import stamp_kit_manifests
+from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY
+from pipelex.hosted.run_config import RunExecution
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TELEMETRY_PROJECT_TEMPLATE_FILE_NAME
@@ -59,17 +63,62 @@ def _parse_config_arg(config_arg: str | None) -> dict[str, Any]:
 
 def _format_init_markdown(result: dict[str, Any]) -> str:
     """Render an init result dict as agent-readable markdown."""
-    backends_enabled: list[str] = result.get("backends_enabled") or []
     lines: list[str] = [
         "# Pipelex initialized",
         "",
         f"**Target directory:** `{result['target_dir']}`",
         "",
-        f"**Backends enabled:** {', '.join(backends_enabled) or 'none'}",
-        "",
-        f"**Routing profile:** `{result['routing_profile']}`",
+        f"**Execution:** `{result['execution']}`",
     ]
+    if result["execution"] == RunExecution.HOSTED:
+        key_line = (
+            f"set in `{PIPELEX_API_KEY_ENV_KEY}`"
+            if result.get("api_key_set")
+            else f"not set: set `{PIPELEX_API_KEY_ENV_KEY}` to a Pipelex API key (`plx_sk_…`) before a hosted run, "
+            "or have a person run `pipelex login`"
+        )
+        lines.extend(["", f"**Pipelex API key:** {key_line}"])
+        return "\n".join(lines)
+    backends_enabled: list[str] = result.get("backends_enabled") or []
+    lines.extend(
+        [
+            "",
+            f"**Backends enabled:** {', '.join(backends_enabled) or 'none'}",
+            "",
+            f"**Routing profile:** `{result['routing_profile']}`",
+        ]
+    )
     return "\n".join(lines)
+
+
+#: The `--config` keys that configure this machine's backends, which a hosted setup does not.
+_LOCAL_ONLY_CONFIG_KEYS = ("backends", "primary_backend")
+
+
+def _resolve_execution(*, config: dict[str, Any]) -> RunExecution:
+    """Where runs execute, from the config's `execution`: `hosted` or `local`, `local` when absent.
+
+    A hosted setup configures no backend, so it refuses the keys that only configure one.
+    """
+    requested: Any = config.get("execution")
+    if requested is None:
+        return RunExecution.LOCAL
+    try:
+        execution = RunExecution(requested)
+    except ValueError:
+        agent_error(
+            f"Unknown execution: {requested!r}. Available: {', '.join(RunExecution)}",
+            error_type="ArgumentError",
+        )
+    if execution is RunExecution.HOSTED:
+        local_only_keys = [key for key in _LOCAL_ONLY_CONFIG_KEYS if key in config]
+        if local_only_keys:
+            agent_error(
+                f"{', '.join(local_only_keys)} configure the backends of runs on this machine, which a hosted setup does not: "
+                'drop them, or set "execution": "local"',
+                error_type="ArgumentError",
+            )
+    return execution
 
 
 def _resolve_target_dir(*, global_: bool) -> Path:
@@ -300,8 +349,10 @@ def agent_init_cmd(
             "-c",
             help=(
                 "Inline JSON string or path to a JSON file. "
-                'Schema: {"backends": list[str], "primary_backend": str}. '
+                'Schema: {"execution": "hosted" | "local", "backends": list[str], "primary_backend": str}. '
                 "All fields are optional. "
+                "execution: where runs execute by default, written to [run] execution; 'hosted' runs on the hosted Pipelex API "
+                "with the key in PIPELEX_API_KEY and configures no backend; 'local' (the default) runs on this machine. "
                 "backends: backend keys to enable (e.g. 'openai', 'anthropic', 'openrouter'). Omit to keep template defaults "
                 "and the template's routing profile. "
                 "primary_backend: required when 2+ backends are named."
@@ -327,9 +378,10 @@ def agent_init_cmd(
 ) -> None:
     """Initialize Pipelex configuration (non-interactive).
 
-    Sets up config files, inference backends, routing profile, and telemetry.
+    Sets up config files, where runs execute, inference backends, routing profile, and telemetry.
     Credentials are NOT configured — use 'pipelex-agent doctor' to check credential
-    health, and 'pipelex init credentials' if needed.
+    health, and 'pipelex init credentials' if needed. A hosted setup reads its key from
+    PIPELEX_API_KEY, which a person gets with 'pipelex login'.
 
     Target directory: project .pipelex/ at detected project root by default.
     Use --global/-g to force the home configuration directory (~/.pipelex/, or PIPELEX_HOME).
@@ -337,10 +389,15 @@ def agent_init_cmd(
     Config JSON schema::
 
         {
+            "execution": "local",
             "backends": ["openrouter", "openai"],
             "primary_backend": "openai"
         }
 
+    - execution: where runs execute by default, written to `[run] execution` in the target
+      pipelex.toml. "hosted" runs on the hosted Pipelex API and configures no backend or
+      routing, so it refuses backends and primary_backend. "local", or no execution at all,
+      runs on this machine and configures the backends below.
     - backends: list of backend keys to enable. Omit to keep all template defaults and the
       template's routing profile, which routes among every backend it enables.
     - primary_backend: required when 2+ backends are named. Auto-derived when only
@@ -355,6 +412,7 @@ def agent_init_cmd(
     try:
         # Parse config
         parsed_config = _parse_config_arg(config)
+        execution = _resolve_execution(config=parsed_config)
 
         # Resolve target directory
         target_dir = _resolve_target_dir(global_=global_)
@@ -370,23 +428,33 @@ def agent_init_cmd(
         # the user's global telemetry settings during layered loading.
         _copy_telemetry_template(target_dir, for_project=not global_)
 
-        # Step 2: Configure backends
-        template_backends_path = Path(str(get_kit_configs_dir() / "inference" / "backends.toml"))
-        backends_toml_path = target_dir / "inference" / "backends.toml"
-        backends_enabled = _configure_backends(
-            config=parsed_config, backends_toml_path=backends_toml_path, template_backends_path=template_backends_path
-        )
-
-        # Step 3: Configure routing
-        routing_profile = _configure_routing(backends_enabled, config=parsed_config, target_dir=target_dir)
+        # Step 1.7: Write where runs execute
+        write_run_execution(pipelex_toml_path=target_dir / "pipelex.toml", execution=execution)
 
         result_payload: dict[str, Any] = {
             "success": True,
             "target_dir": str(target_dir),
             "config_files_copied": config_files_copied,
-            "backends_enabled": backends_enabled,
-            "routing_profile": routing_profile,
+            "execution": execution.value,
         }
+        match execution:
+            case RunExecution.HOSTED:
+                # Hosted runs use none of this machine's backends: the kit's inference files stay as written. The key
+                # comes from the environment, since an agent cannot sign in through a browser.
+                result_payload["api_key_set"] = find_pipelex_api_key() is not None
+            case RunExecution.LOCAL:
+                # Step 2: Configure backends
+                template_backends_path = Path(str(get_kit_configs_dir() / "inference" / "backends.toml"))
+                backends_toml_path = target_dir / "inference" / "backends.toml"
+                backends_enabled = _configure_backends(
+                    config=parsed_config, backends_toml_path=backends_toml_path, template_backends_path=template_backends_path
+                )
+
+                # Step 3: Configure routing
+                routing_profile = _configure_routing(backends_enabled, config=parsed_config, target_dir=target_dir)
+
+                result_payload["backends_enabled"] = backends_enabled
+                result_payload["routing_profile"] = routing_profile
 
         # Output result
         agent_success_formatted(result_payload, markdown_renderer=_format_init_markdown, output_format=output_format)

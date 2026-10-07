@@ -1,28 +1,57 @@
-"""Main command orchestration for the init command."""
+"""Main command orchestration for the init command.
+
+`init_cmd` runs in three stages:
+
+1. **Inspect** (`inspect_initialization`): read what is on disk and what the focus asks for, and decide which steps
+   are needed. It asks nothing and writes nothing, so a check of the existing configuration, such as one for a former
+   release's files, belongs here.
+2. **Choose** (`choose_initialization`): the confirmation, then where runs execute, the hosted Pipelex API or this
+   machine. A remedy that must run before that question, such as cleaning up what the inspection found, belongs at
+   the start of this stage.
+3. **Execute** (`execute_initialization`): write the files and run the steps the choices call for. Only the local
+   path's own steps (backends, routing, credentials) and the hosted path's sign-in ask anything more.
+"""
 
 import shutil
 from pathlib import Path
 
 import typer
+from pydantic import BaseModel, ConfigDict
 from rich.console import Console
 from rich.markup import escape
 from rich.prompt import Confirm
 
+from pipelex import log
 from pipelex.cli.commands.init.backends import (
     customize_backends_config,
     get_selected_backend_keys,
 )
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.credentials import prompt_credentials
+from pipelex.cli.commands.init.ide_extension import suggest_extension_install_if_needed
 from pipelex.cli.commands.init.routing import customize_routing_profile
+from pipelex.cli.commands.init.setup_path import (
+    DEFAULT_SETUP_PATH,
+    SetupPath,
+    apply_setup_path_setting,
+    ensure_pipelex_api_key,
+    read_run_execution,
+    write_run_execution,
+)
 from pipelex.cli.commands.init.telemetry import setup_telemetry
 from pipelex.cli.commands.init.ui.general_ui import build_initialization_panel
+from pipelex.cli.commands.init.ui.setup_path_ui import prompt_setup_path
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cogt.models.deck_manifest import stamp_kit_manifests
+from pipelex.hosted.run_config import RunExecution
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.runtime_hub import get_console
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
+
+#: The focuses whose run asks where runs execute when it sets up inference: the full setup, and a first setup reached
+#: through `config`. `inference` configures this machine's backends on purpose and leaves the setting as it is.
+SETUP_PATH_FOCUSES: frozenset[InitFocus] = frozenset({InitFocus.ALL, InitFocus.CONFIG})
 
 
 def determine_needs(
@@ -62,6 +91,128 @@ def determine_needs(
     return needs_config, needs_inference, needs_routing, needs_telemetry
 
 
+class InitInspection(BaseModel):
+    """What an init run found on disk and what it will do, decided before anything is asked or written."""
+
+    model_config = ConfigDict(frozen=True)
+
+    focus: InitFocus
+    target_config_dir: Path
+    for_project: bool
+    reset: bool
+    backends_toml_path: Path
+    routing_profiles_toml_path: Path
+    telemetry_config_path: Path
+    pipelex_toml_path: Path
+    is_first_time_backends_setup: bool
+    #: The `[run] execution` the target `pipelex.toml` sets now, kept across a reset that does not ask again.
+    configured_execution: RunExecution | None
+    check_credentials: bool
+    check_inference: bool
+    check_routing: bool
+    needs_config: bool
+    needs_inference: bool
+    needs_routing: bool
+    needs_telemetry: bool
+
+    @property
+    def asks_setup_path(self) -> bool:
+        """Whether this run decides where runs execute: when it sets up inference for the full setup, or for a first one."""
+        return self.needs_inference and self.focus in SETUP_PATH_FOCUSES
+
+    @property
+    def kept_execution(self) -> RunExecution | None:
+        """The setting to write back after the configuration files are reset without asking where runs execute."""
+        if self.needs_config and not self.asks_setup_path:
+            return self.configured_execution
+        return None
+
+
+class InitChoices(BaseModel):
+    """What the person chose, or what was taken for them when nobody was asked."""
+
+    model_config = ConfigDict(frozen=True)
+
+    #: Where runs execute, when this run decides it; `None` when it does not.
+    setup_path: SetupPath | None
+    #: Whether someone answers prompts: `False` for `pipelex doctor --fix`.
+    interactive: bool
+
+
+def inspect_initialization(*, focus: InitFocus, local: bool) -> InitInspection:
+    """Stage 1: find the target directory, read what is there, and decide which steps the focus needs.
+
+    Args:
+        focus: What to initialize.
+        local: Target the project's `.pipelex/` at the detected project root instead of the home configuration directory.
+
+    Returns:
+        The inspection the later stages work from. Nothing is asked or written.
+    """
+    # Config updates are not yet supported - always reset
+    reset = True
+
+    if local:
+        # --local: create at project root, fall back to CWD
+        project_root = config_manager.project_root
+        if project_root is not None:
+            target_config_dir = project_root / ".pipelex"
+        else:
+            target_config_dir = Path.cwd() / ".pipelex"
+    else:
+        # Default: create the global config in the home configuration directory
+        target_config_dir = config_manager.global_config_dir
+
+    telemetry_config_path = target_config_dir / TELEMETRY_CONFIG_FILE_NAME
+    backends_toml_path = target_config_dir / "inference" / "backends.toml"
+    routing_profiles_toml_path = target_config_dir / "inference" / "routing_profiles.toml"
+    pipelex_toml_path = target_config_dir / "pipelex.toml"
+
+    check_config = focus in {InitFocus.ALL, InitFocus.CONFIG}
+    check_credentials = focus in {InitFocus.ALL, InitFocus.CONFIG, InitFocus.INFERENCE}
+    check_inference = focus in {InitFocus.ALL, InitFocus.INFERENCE}
+    check_routing = focus == InitFocus.ROUTING
+    check_telemetry = focus in {InitFocus.ALL, InitFocus.TELEMETRY}
+
+    is_first_time_backends_setup = not backends_toml_path.exists()
+
+    needs_config, needs_inference, needs_routing, needs_telemetry = determine_needs(
+        reset=reset,
+        check_config=check_config,
+        check_inference=check_inference,
+        check_routing=check_routing,
+        check_telemetry=check_telemetry,
+        backends_toml_path=backends_toml_path,
+        routing_profiles_toml_path=routing_profiles_toml_path,
+        telemetry_config_path=telemetry_config_path,
+        target_config_dir=target_config_dir,
+    )
+    # `init_config` never copies `inference/`, so a configuration reset on a directory with no `backends.toml` is a
+    # first setup, and sets up inference too, whatever the focus.
+    if needs_config and is_first_time_backends_setup:
+        needs_inference = True
+
+    return InitInspection(
+        focus=focus,
+        target_config_dir=target_config_dir,
+        for_project=local,
+        reset=reset,
+        backends_toml_path=backends_toml_path,
+        routing_profiles_toml_path=routing_profiles_toml_path,
+        telemetry_config_path=telemetry_config_path,
+        pipelex_toml_path=pipelex_toml_path,
+        is_first_time_backends_setup=is_first_time_backends_setup,
+        configured_execution=read_run_execution(pipelex_toml_path=pipelex_toml_path),
+        check_credentials=check_credentials,
+        check_inference=check_inference,
+        check_routing=check_routing,
+        needs_config=needs_config,
+        needs_inference=needs_inference,
+        needs_routing=needs_routing,
+        needs_telemetry=needs_telemetry,
+    )
+
+
 def confirm_initialization(
     *,
     console: Console,
@@ -72,6 +223,7 @@ def confirm_initialization(
     check_credentials: bool,
     reset: bool,
     focus: InitFocus,
+    asks_setup_path: bool = False,
 ) -> bool:
     """Ask user to confirm initialization.
 
@@ -84,6 +236,7 @@ def confirm_initialization(
         check_credentials: Whether credential prompting will happen.
         reset: Whether this is a reset operation.
         focus: The initialization focus area.
+        asks_setup_path: Whether the run will ask where runs execute.
 
     Returns:
         True if user confirms, False otherwise.
@@ -100,6 +253,7 @@ def confirm_initialization(
             needs_telemetry=needs_telemetry,
             reset=reset,
             check_credentials=check_credentials,
+            asks_setup_path=asks_setup_path,
         )
     )
 
@@ -118,127 +272,158 @@ def confirm_initialization(
     return True
 
 
-def execute_initialization(
-    *,
-    console: Console,
-    needs_config: bool,
-    needs_inference: bool,
-    needs_routing: bool,
-    needs_telemetry: bool,
-    check_credentials: bool,
-    reset: bool,
-    check_inference: bool,
-    check_routing: bool,
-    backends_toml_path: Path,
-    telemetry_config_path: Path,
-    is_first_time_backends_setup: bool,
-    target_config_dir: Path | None = None,
-    for_project: bool = False,
-):
-    """Execute the initialization steps.
+def choose_initialization(*, console: Console, inspection: InitInspection, skip_confirmation: bool) -> InitChoices:
+    """Stage 2: confirm, then ask where runs execute when this run decides it.
+
+    Args:
+        console: Rich Console instance for user interaction.
+        inspection: What stage 1 found.
+        skip_confirmation: Ask nothing (`pipelex doctor --fix`): the confirmation is skipped and the default setup
+            path, the hosted Pipelex API, is taken.
+
+    Returns:
+        The choices stage 3 executes.
+
+    Raises:
+        typer.Exit: If the person cancels at the confirmation.
+    """
+    if skip_confirmation:
+        console.print()
+        return InitChoices(setup_path=DEFAULT_SETUP_PATH if inspection.asks_setup_path else None, interactive=False)
+
+    confirm_initialization(
+        console=console,
+        needs_config=inspection.needs_config,
+        needs_inference=inspection.needs_inference,
+        needs_routing=inspection.needs_routing,
+        needs_telemetry=inspection.needs_telemetry,
+        # A reset that keeps hosted runs asks for no provider key, as the execute stage skips that step.
+        check_credentials=inspection.check_credentials and inspection.kept_execution is not RunExecution.HOSTED,
+        reset=inspection.reset,
+        focus=inspection.focus,
+        asks_setup_path=inspection.asks_setup_path,
+    )
+    setup_path: SetupPath | None = None
+    if inspection.asks_setup_path:
+        console.print()
+        setup_path = prompt_setup_path(console=console, default=DEFAULT_SETUP_PATH)
+    return InitChoices(setup_path=setup_path, interactive=True)
+
+
+def _reset_inference_files(*, console: Console, inspection: InitInspection) -> None:
+    """Copy the kit's inference files over the target's (`init_config` skips `inference/`)."""
+    template_inference_dir = Path(str(get_kit_configs_dir())) / "inference"
+    target_inference_dir = inspection.target_config_dir / "inference"
+
+    # Reset backends.toml
+    template_backends_path = template_inference_dir / "backends.toml"
+    inspection.backends_toml_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(template_backends_path, inspection.backends_toml_path)
+
+    # Reset all individual backend files in backends/ directory
+    template_backends_dir = template_inference_dir / "backends"
+    target_backends_dir = target_inference_dir / "backends"
+    target_backends_dir.mkdir(parents=True, exist_ok=True)
+    for backend_file in template_backends_dir.iterdir():
+        if backend_file.suffix in {".toml", ".md"}:
+            dst_path = target_backends_dir / backend_file.name
+            shutil.copy2(backend_file, dst_path)
+
+    # Reset deck/ directory files (model deck configurations)
+    template_deck_dir = template_inference_dir / "deck"
+    target_deck_dir = target_inference_dir / "deck"
+    target_deck_dir.mkdir(parents=True, exist_ok=True)
+    for deck_file in template_deck_dir.iterdir():
+        if deck_file.suffix == ".toml":
+            dst_path = target_deck_dir / deck_file.name
+            shutil.copy2(deck_file, dst_path)
+
+    # Stamp the kit manifests of the deck and of backends/internal.toml so future updates can
+    # detect drift and `pipelex update` knows the exact kit version this install came from.
+    stamp_kit_manifests(inference_dir=target_inference_dir)
+
+    # Reset routing_profiles.toml
+    template_routing_path = template_inference_dir / "routing_profiles.toml"
+    target_routing_path = target_inference_dir / "routing_profiles.toml"
+    if template_routing_path.exists():
+        shutil.copy2(template_routing_path, target_routing_path)
+        console.print("✅ Reset routing_profiles.toml from template")
+
+
+def _suggest_extension(*, console: Console) -> None:
+    """Offer the IDE extension, as the local path's backend step does."""
+    try:
+        suggest_extension_install_if_needed(console=console)
+    except EOFError as exc:
+        # No stdin available for the install prompt — skip the optional IDE extension suggestion.
+        log.debug(f"IDE extension suggestion skipped: {exc}")
+
+
+def execute_initialization(*, console: Console, inspection: InitInspection, choices: InitChoices) -> None:
+    """Stage 3: write the files and run the steps the inspection and the choices call for.
+
+    The local path runs the backends, routing and credentials steps; the hosted path leaves the kit's inference files
+    as written, writes the hosted default, and, once every file is written, makes sure hosted runs have a key.
 
     Args:
         console: Rich Console instance for output.
-        needs_config: Whether to initialize config files.
-        needs_inference: Whether to set up inference backends.
-        needs_routing: Whether to set up routing profiles.
-        needs_telemetry: Whether to set up telemetry.
-        check_credentials: Whether to prompt for missing credentials.
-        reset: Whether this is a reset operation.
-        check_inference: Whether inference was in focus.
-        check_routing: Whether routing was in focus.
-        backends_toml_path: Path to backends.toml file.
-        telemetry_config_path: Path to telemetry config file.
-        is_first_time_backends_setup: Whether backends.toml didn't exist before this run.
-        target_config_dir: Explicit target .pipelex directory. If None, uses config_manager.pipelex_config_dir.
-        for_project: True when initializing a project's .pipelex/; False when initializing
-            the home configuration directory. Selects which telemetry template gets copied.
-
+        inspection: What stage 1 found.
+        choices: What stage 2 settled.
     """
-    # Step 1: Initialize config if needed
-    if needs_config:
-        # Check if backends.toml exists before copying
-        backends_existed_before = backends_toml_path.exists()
+    target_config_dir = inspection.target_config_dir
+    backends_toml_path = inspection.backends_toml_path
+    setup_path = choices.setup_path
+    kept_execution = inspection.kept_execution
 
+    # Step 1: Initialize config if needed (init_config skips inference/, which the inference step handles)
+    if inspection.needs_config:
         console.print()
-        init_config(reset=reset, target_dir=target_config_dir)
+        init_config(reset=inspection.reset, target_dir=target_config_dir)
+        if kept_execution is not None:
+            # The reset copied the kit's default over where runs execute, a choice this run did not ask about again.
+            write_run_execution(pipelex_toml_path=inspection.pipelex_toml_path, execution=kept_execution)
 
-        # init_config skips the inference/ directory (handled independently by the inference step).
-        # Detect first-time setup: if backends.toml didn't exist before, inference needs to be set up.
-        backends_exists_now = backends_toml_path.exists()
+    first_time_setup = inspection.is_first_time_backends_setup
 
-        if not backends_existed_before or (check_inference and backends_exists_now):
-            needs_inference = True
-
-    # Determine if this is truly a first-time setup
-    first_time_setup = is_first_time_backends_setup
-
-    # Step 2: Set up inference backends if needed
-    if needs_inference:
+    # Step 2: Set up inference if needed, and where runs execute when this run decides it
+    if inspection.needs_inference:
         console.print()
 
-        # Copy the inference template files when resetting (init_config skips inference/)
-        if reset:
-            template_inference_dir = Path(str(get_kit_configs_dir())) / "inference"
-            effective_config_dir = target_config_dir or config_manager.pipelex_config_dir
-            target_inference_dir = effective_config_dir / "inference"
-
-            # Reset backends.toml
-            template_backends_path = template_inference_dir / "backends.toml"
-            backends_toml_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(template_backends_path, backends_toml_path)
-
-            # Reset all individual backend files in backends/ directory
-            template_backends_dir = template_inference_dir / "backends"
-            target_backends_dir = target_inference_dir / "backends"
-            target_backends_dir.mkdir(parents=True, exist_ok=True)
-            for backend_file in template_backends_dir.iterdir():
-                if backend_file.suffix in {".toml", ".md"}:
-                    dst_path = target_backends_dir / backend_file.name
-                    shutil.copy2(backend_file, dst_path)
-
-            # Reset deck/ directory files (model deck configurations)
-            template_deck_dir = template_inference_dir / "deck"
-            target_deck_dir = target_inference_dir / "deck"
-            target_deck_dir.mkdir(parents=True, exist_ok=True)
-            for deck_file in template_deck_dir.iterdir():
-                if deck_file.suffix == ".toml":
-                    dst_path = target_deck_dir / deck_file.name
-                    shutil.copy2(deck_file, dst_path)
-
-            # Stamp the kit manifests of the deck and of backends/internal.toml so future updates can
-            # detect drift and `pipelex update` knows the exact kit version this install came from.
-            stamp_kit_manifests(inference_dir=target_inference_dir)
-
-            # Reset routing_profiles.toml
-            template_routing_path = template_inference_dir / "routing_profiles.toml"
-            target_routing_path = target_inference_dir / "routing_profiles.toml"
-            if template_routing_path.exists():
-                shutil.copy2(template_routing_path, target_routing_path)
-                console.print("✅ Reset routing_profiles.toml from template")
-
+        if inspection.reset:
+            _reset_inference_files(console=console, inspection=inspection)
             first_time_setup = True  # Treat as first-time setup since we just replaced the files
 
-        customize_backends_config(is_first_time_setup=first_time_setup, target_config_dir=target_config_dir)
+        match setup_path:
+            case SetupPath.HOSTED:
+                # Hosted runs use none of this machine's backends: the kit's inference files stay as written.
+                apply_setup_path_setting(console=console, setup_path=setup_path, pipelex_toml_path=inspection.pipelex_toml_path)
+                if choices.interactive:
+                    _suggest_extension(console=console)
+            case SetupPath.LOCAL | None:
+                customize_backends_config(is_first_time_setup=first_time_setup, target_config_dir=target_config_dir)
 
-        # Automatically set up routing after backends (unless routing is the specific focus)
-        if not check_routing:
-            selected_backend_keys = get_selected_backend_keys(backends_toml_path)
-            if selected_backend_keys:
-                customize_routing_profile(selected_backend_keys, target_config_dir=target_config_dir)
+                # Automatically set up routing after backends (unless routing is the specific focus)
+                if not inspection.check_routing:
+                    selected_backend_keys = get_selected_backend_keys(backends_toml_path)
+                    if selected_backend_keys:
+                        customize_routing_profile(selected_backend_keys, target_config_dir=target_config_dir)
 
-    # Step 2.5: Prompt for missing credentials
-    if check_credentials:
+                if setup_path is not None:
+                    console.print()
+                    apply_setup_path_setting(console=console, setup_path=setup_path, pipelex_toml_path=inspection.pipelex_toml_path)
+
+    # Step 2.5: Prompt for missing credentials, which only runs on this machine use
+    runs_hosted = setup_path is SetupPath.HOSTED or kept_execution is RunExecution.HOSTED
+    if inspection.check_credentials and not runs_hosted:
         prompt_credentials(console=console, backends_toml_path=backends_toml_path)
 
     # Step 3: Set up routing profile if specifically requested
-    if needs_routing:
+    if inspection.needs_routing:
         console.print()
 
         # If reset is True, copy the template file first
-        if reset:
-            effective_config_dir_for_routing = target_config_dir or config_manager.pipelex_config_dir
-            routing_profiles_toml_path = effective_config_dir_for_routing / "inference" / "routing_profiles.toml"
+        if inspection.reset:
+            routing_profiles_toml_path = inspection.routing_profiles_toml_path
             template_routing_path = Path(str(get_kit_configs_dir())) / "inference" / "routing_profiles.toml"
             routing_profiles_toml_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(template_routing_path, routing_profiles_toml_path)
@@ -251,8 +436,12 @@ def execute_initialization(
             console.print("[yellow]⚠ Warning: No backends enabled. Please run 'pipelex init inference' first.[/yellow]")
 
     # Step 4: Set up telemetry if needed
-    if needs_telemetry:
-        setup_telemetry(console=console, telemetry_config_path=telemetry_config_path, for_project=for_project)
+    if inspection.needs_telemetry:
+        setup_telemetry(console=console, telemetry_config_path=inspection.telemetry_config_path, for_project=inspection.for_project)
+
+    # Step 5: Hosted runs need a key. Last, so every file is written before a sign-in that can take minutes.
+    if setup_path is SetupPath.HOSTED:
+        ensure_pipelex_api_key(console=console, interactive=choices.interactive)
 
     console.print()
 
@@ -263,14 +452,15 @@ def init_cmd(
     skip_confirmation: bool = False,
     local: bool = False,
 ):
-    """Initialize Pipelex configuration, inference backends, credentials, routing, and telemetry.
+    """Initialize Pipelex: configuration files, where runs execute, inference backends, credentials, routing, and telemetry.
 
     Note: Config updates are not yet supported. This command always performs a full reset
     of the configuration, overwriting any existing files.
 
     Args:
         focus: What to initialize - 'all', 'config', 'credentials', 'inference', 'routing', or 'telemetry'
-        skip_confirmation: If True, skip the confirmation prompt (used when called from doctor --fix)
+        skip_confirmation: If True, ask nothing (used when called from doctor --fix): skip the confirmation, take the
+            hosted Pipelex API as where runs execute, and print `pipelex login` instead of opening a browser.
         local: If True, create project-level .pipelex/ at the detected project root.
             Otherwise, create the home configuration directory (~/.pipelex/, or PIPELEX_HOME).
     """
@@ -288,89 +478,17 @@ def init_cmd(
         console.print()
         return
 
-    # Config updates are not yet supported - always reset
-    reset = True
-
-    # Determine target directory
-    if local:
-        # --local: create at project root, fall back to CWD
-        project_root = config_manager.project_root
-        if project_root is not None:
-            target_config_dir = project_root / ".pipelex"
-        else:
-            target_config_dir = Path.cwd() / ".pipelex"
-    else:
-        # Default: create the global config in the home configuration directory
-        target_config_dir = config_manager.global_config_dir
-    console.print(f"[dim]Target directory: {escape(str(target_config_dir))}[/dim]")
-
-    pipelex_config_dir = target_config_dir
-    telemetry_config_path = pipelex_config_dir / TELEMETRY_CONFIG_FILE_NAME
-    backends_toml_path = pipelex_config_dir / "inference" / "backends.toml"
-    routing_profiles_toml_path = pipelex_config_dir / "inference" / "routing_profiles.toml"
-
-    # Determine what to check based on focus parameter
-    check_config = focus in {InitFocus.ALL, InitFocus.CONFIG}
-    check_credentials = focus in {InitFocus.ALL, InitFocus.CONFIG, InitFocus.INFERENCE}
-    check_inference = focus in {InitFocus.ALL, InitFocus.INFERENCE}
-    check_routing = focus == InitFocus.ROUTING
-    check_telemetry = focus in {InitFocus.ALL, InitFocus.TELEMETRY}
-
-    # Track if backends.toml existed before we start
-    is_first_time_backends_setup = not backends_toml_path.exists()
-
-    # Check what needs to be initialized
-    needs_config, needs_inference, needs_routing, needs_telemetry = determine_needs(
-        reset=reset,
-        check_config=check_config,
-        check_inference=check_inference,
-        check_routing=check_routing,
-        check_telemetry=check_telemetry,
-        backends_toml_path=backends_toml_path,
-        routing_profiles_toml_path=routing_profiles_toml_path,
-        telemetry_config_path=telemetry_config_path,
-        target_config_dir=pipelex_config_dir,
-    )
+    inspection = inspect_initialization(focus=focus, local=local)
+    console.print(f"[dim]Target directory: {escape(str(inspection.target_config_dir))}[/dim]")
 
     # Show info message if config already exists
-    if not is_first_time_backends_setup and not skip_confirmation:
+    if not inspection.is_first_time_backends_setup and not skip_confirmation:
         console.print()
         console.print("[dim]ℹ Config update requires running a full reset.[/dim]")
 
     try:
-        # Show unified initialization prompt (skip if skip_confirmation is True)
-        if not skip_confirmation:
-            confirm_initialization(
-                console=console,
-                needs_config=needs_config,
-                needs_inference=needs_inference,
-                needs_routing=needs_routing,
-                needs_telemetry=needs_telemetry,
-                check_credentials=check_credentials,
-                reset=reset,
-                focus=focus,
-            )
-        else:
-            # skip_confirmation is True, just add a blank line for spacing
-            console.print()
-
-        # Execute initialization steps
-        execute_initialization(
-            console=console,
-            needs_config=needs_config,
-            needs_inference=needs_inference,
-            needs_routing=needs_routing,
-            needs_telemetry=needs_telemetry,
-            check_credentials=check_credentials,
-            reset=reset,
-            check_inference=check_inference,
-            check_routing=check_routing,
-            backends_toml_path=backends_toml_path,
-            telemetry_config_path=telemetry_config_path,
-            is_first_time_backends_setup=is_first_time_backends_setup,
-            target_config_dir=pipelex_config_dir,
-            for_project=local,
-        )
+        choices = choose_initialization(console=console, inspection=inspection, skip_confirmation=skip_confirmation)
+        execute_initialization(console=console, inspection=inspection, choices=choices)
 
     except typer.Exit:
         # Re-raise Exit exceptions
@@ -378,6 +496,6 @@ def init_cmd(
     except Exception as exc:  # ruff: ignore[blind-except]
         # Command-level boundary: any unexpected init failure is reported as a warning and the command returns without crashing.
         console.print(f"\n[red]⚠ Warning: Initialization failed: {escape(str(exc))}[/red]", style="bold")
-        if needs_config:
+        if inspection.needs_config:
             console.print("[red]Please run 'pipelex init config' manually.[/red]")
         return

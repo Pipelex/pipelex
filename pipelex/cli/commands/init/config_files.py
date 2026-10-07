@@ -32,9 +32,8 @@ def init_config(*, reset: bool = False, dry_run: bool = False, target_dir: Path 
     config_template_dir = Path(str(get_kit_configs_dir()))
     target_config_dir = target_dir or config_manager.pipelex_config_dir
 
-    target_config_dir.mkdir(parents=True, exist_ok=True)
-
     if not dry_run:
+        target_config_dir.mkdir(parents=True, exist_ok=True)
         # Before anything is copied in, so the directory is never briefly a source of untracked
         # noise. `pipelex migrate` ensures the same rule for a directory that predates it.
         ensure_config_dir_gitignore(directory=target_config_dir)
