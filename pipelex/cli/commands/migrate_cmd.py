@@ -22,6 +22,13 @@ What the per-file transaction refuses over is narrower than that, and worth not 
 compares against the reading *that pass* took, so what it catches is a writer landing between this
 run's own read and its replace, and not an edit made while the confirmation was pending.
 
+**The first step is the cleanup of a former release.** A machine set up by a release that ran models
+through the Pipelex Gateway or Pipelex Manifold carries tables, profiles and files the runtime no
+longer has, and the boot refuses it with an error naming this command. That cleanup is no ledger
+entry — it removes what a release left rather than reshaping a file — so it runs beside the replay,
+first, under the same two passes, the same question and the same backups
+(`pipelex/migration/former_release_cleanup.py`).
+
 See `docs/migration-ledger.md`.
 """
 
@@ -34,6 +41,7 @@ from rich.markup import escape
 from rich.panel import Panel
 from rich.prompt import Confirm
 
+from pipelex.migration.former_release_cleanup import clean_former_release
 from pipelex.migration.run import config_directories_to_migrate, ensure_config_dir_gitignores, migrate_config_directories
 from pipelex.runtime_hub import get_console
 from pipelex.suggested_fix import WILDCARD_SEGMENT, DeleteKeyOp, DeleteTableOp, MoveKeyOp, RemapValueOp, RenameTableKeyOp
@@ -41,6 +49,7 @@ from pipelex.suggested_fix import WILDCARD_SEGMENT, DeleteKeyOp, DeleteTableOp, 
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from pipelex.migration.former_release_cleanup import FormerReleaseCleanup
     from pipelex.migration.plan import BlockedEntry, MigrationReport, UnexplainedPath
     from pipelex.suggested_fix import MigrationOp
 
@@ -71,10 +80,12 @@ def migrate_cmd(*, dry_run: bool = False, yes: bool = False) -> None:
     for directory in config_dirs:
         console.print(f"  [dim]{escape(str(directory))}[/dim]")
 
+    former_release = clean_former_release(config_dirs=config_dirs, dry_run=True)
+    print_former_release_cleanup(cleanup=former_release)
     rehearsal = migrate_config_directories(config_dirs=config_dirs, dry_run=True)
     _print_report(report=rehearsal, wrote=False)
 
-    if rehearsal.is_clean:
+    if rehearsal.is_clean and former_release.is_clean:
         if not dry_run:
             # The write pass is what normally leaves the config-directory `.gitignore` behind, and
             # this return means it is never going to run. A machine with nothing to carry forward
@@ -88,10 +99,10 @@ def migrate_cmd(*, dry_run: bool = False, yes: bool = False) -> None:
     if dry_run:
         console.print("[dim]Dry run — nothing was written.[/dim]")
         console.print()
-        _exit_on_attention(report=rehearsal)
+        _exit_on_attention(report=rehearsal, cleanup=former_release)
         return
 
-    if not rehearsal.changed_plans:
+    if not rehearsal.changed_plans and former_release.is_clean:
         # The clean return's twin, and it needs the rule for the same reason: `--dry-run` has
         # already returned above, so this run is authorized to write, and nothing was declined
         # because nothing was asked. Unguarded on purpose — the guard would be dead code, and it
@@ -101,29 +112,81 @@ def migrate_cmd(*, dry_run: bool = False, yes: bool = False) -> None:
         # when there are none to apply is a prompt with one honest answer.
         console.print(_panel(message="Nothing here can be migrated automatically — see the notes above.", style="yellow"))
         console.print()
-        _exit_on_attention(report=rehearsal)
+        _exit_on_attention(report=rehearsal, cleanup=former_release)
         return
 
-    if not yes and not Confirm.ask(f"[bold]Migrate {len(rehearsal.changed_plans)} file(s)?[/bold]", default=True):
+    question = _question(cleaned=len(former_release.files), migrated=len(rehearsal.changed_plans))
+    if not yes and not Confirm.ask(f"[bold]{question}[/bold]", default=True):
         console.print("[yellow]Migration cancelled — nothing was written.[/yellow]")
         console.print()
         # The "no" answered "shall I write?"; what the rehearsal left for a person is still there.
-        _exit_on_attention(report=rehearsal)
+        _exit_on_attention(report=rehearsal, cleanup=former_release)
         return
 
+    # The cleanup first: it removes files the replay would otherwise walk, and rewrites two it never claims.
+    cleaned = apply_former_release_cleanup(config_dirs=config_dirs)
     applied = apply_pending_migrations(config_dirs=config_dirs)
-    written = len(applied.written_plans)
-    unconfirmed = any(plan.blocked_reason is not None and plan.blocked_reason.leaves_the_write_unconfirmed for plan in applied.plans)
+    done = _done_in_words(cleaned=len(cleaned.applied_files), migrated=len(applied.written_plans))
+    unconfirmed = any(plan.blocked_reason is not None and plan.blocked_reason.leaves_the_write_unconfirmed for plan in applied.plans) or any(
+        file.blocked_reason is not None and file.blocked_reason.leaves_the_write_unconfirmed for file in cleaned.files
+    )
     if unconfirmed:
         # Tested first: a file in an unknown state is the verdict of the run, however many others landed.
-        lead = f"Migrated {written} file(s), but no write could be confirmed for every file" if written else "No write could be confirmed"
+        lead = f"{done}, but no write could be confirmed for every file" if done else "No write could be confirmed"
         console.print(_panel(message=f"{lead} — compare each file marked above against the rescue copy named there.", style="red"))
-    elif written:
-        console.print(_panel(message=f"Migrated {written} file(s); a copy of each original is beside it.", style="green"))
+    elif done:
+        console.print(_panel(message=f"{done}; a copy of each original is beside it.", style="green"))
     else:
         console.print(_panel(message="Nothing was written.", style="yellow"))
     console.print()
-    _exit_on_attention(report=applied)
+    _exit_on_attention(report=applied, cleanup=cleaned)
+
+
+def _question(*, cleaned: int, migrated: int) -> str:
+    """The confirmation, counting the files of each step the run is about to write."""
+    if not cleaned:
+        return f"Migrate {migrated} file(s)?"
+    if not migrated:
+        return f"Clean up {cleaned} file(s)?"
+    return f"Clean up {cleaned} file(s) and migrate {migrated}?"
+
+
+def _done_in_words(*, cleaned: int, migrated: int) -> str:
+    """What the write pass did, or the empty string when it wrote nothing."""
+    if cleaned and migrated:
+        return f"Cleaned up {cleaned} file(s) a former release left and migrated {migrated}"
+    if cleaned:
+        return f"Cleaned up {cleaned} file(s) a former release left"
+    if migrated:
+        return f"Migrated {migrated} file(s)"
+    return ""
+
+
+def apply_former_release_cleanup(*, config_dirs: list[Path]) -> FormerReleaseCleanup:
+    """Remove what a former release left, render what it did, and hand the report back.
+
+    The cleanup's write pass on its own, like `apply_pending_migrations` beside it, for the callers that have
+    already shown the findings and asked their own question: `pipelex doctor --fix` and `pipelex init`.
+    """
+    cleanup = clean_former_release(config_dirs=config_dirs, dry_run=False)
+    print_former_release_cleanup(cleanup=cleanup)
+    return cleanup
+
+
+def print_former_release_cleanup(*, cleanup: FormerReleaseCleanup) -> None:
+    """Each file the cleanup touches, with its changes: rehearsed (`→`) or made (`✓`), and the copy kept of it."""
+    console = get_console()
+    for file in cleanup.files:
+        console.print()
+        console.print(f"  [cyan]{escape(str(file.file_path))}[/cyan] [dim](left by a former release)[/dim]")
+        if file.blocked_reason is not None:
+            console.print(f"    [red]✗[/red] {file.blocked_reason}: {escape(file.blocked_detail or '')}")
+            continue
+        marker = "[green]✓[/green]" if file.was_applied else "[green]→[/green]"
+        for change in file.changes:
+            console.print(f"    {marker} {escape(change)}")
+        if file.backup_path is not None:
+            console.print(f"    [dim]backup: {escape(str(file.backup_path))}[/dim]")
 
 
 def apply_pending_migrations(*, config_dirs: list[Path]) -> MigrationReport:
@@ -141,14 +204,15 @@ def apply_pending_migrations(*, config_dirs: list[Path]) -> MigrationReport:
     return applied
 
 
-def _exit_on_attention(*, report: MigrationReport) -> None:
+def _exit_on_attention(*, report: MigrationReport, cleanup: FormerReleaseCleanup) -> None:
     """Leave a non-zero exit code behind when something needs a human.
 
     The exit code is presentation, not the verdict — `pipelex-agent migrate` carries the same
     verdict as a structured field. What it means here is narrow and worth keeping narrow: *this
-    run left something a person has to look at*, never *this run failed*.
+    run left something a person has to look at*, never *this run failed*. A file the cleanup could
+    not clean is one of those, as much as a file the replay could not migrate.
     """
-    if report.needs_attention:
+    if report.needs_attention or cleanup.needs_attention:
         sys.exit(1)
 
 

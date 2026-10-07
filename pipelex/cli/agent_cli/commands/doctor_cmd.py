@@ -61,18 +61,25 @@ def _pending_migrations_actions(*, check: PendingMigrationsCheck) -> list[str]:
     Two actions rather than one when a run both migrates some files and leaves others behind,
     which is the ordinary shape on a machine that has drifted: the command is worth running *and*
     something is still owed afterwards, and an agent that only heard the first would stop early.
+    The cleanup of what a former release left is the command's first step, and has its own action.
     """
     actions: list[str] = []
     match check.finding:
         case PendingMigrationsFinding.UP_TO_DATE:
             return actions
-        case PendingMigrationsFinding.PENDING:
-            migratable = ", ".join(check.migratable_files)
-            actions.append(f"Run '{MIGRATE_COMMAND}' to bring these configuration files up to date (it keeps the settings in them): {migratable}")
-        case PendingMigrationsFinding.NEEDS_ATTENTION:
+        case PendingMigrationsFinding.PENDING | PendingMigrationsFinding.NEEDS_ATTENTION:
             pass
         case PendingMigrationsFinding.UNAVAILABLE:
             actions.append(f"{check.message}. Run '{MIGRATE_COMMAND} --dry-run' to check by hand.")
+    if check.former_release_files:
+        stops = ", which stops every boot until it is gone" if check.former_release_blocks_boot else ""
+        actions.append(
+            f"Run '{MIGRATE_COMMAND}' to clean up what a former release left for the Pipelex Gateway or Pipelex Manifold{stops} "
+            f"(it keeps a copy of each file): {', '.join(check.former_release_files)}"
+        )
+    if check.migratable_files:
+        migratable = ", ".join(check.migratable_files)
+        actions.append(f"Run '{MIGRATE_COMMAND}' to bring these configuration files up to date (it keeps the settings in them): {migratable}")
     if check.attention_files:
         attention = ", ".join(check.attention_files)
         actions.append(
@@ -134,6 +141,8 @@ def _format_doctor_markdown(result: dict[str, Any]) -> str:
     migrations_check = checks["pending_migrations"]
     lines.append(f"\n## Configuration Migrations \u2014 {_status_icon(healthy=migrations_check['healthy'])}\n")
     lines.append(migrations_check["message"])
+    for file_path in migrations_check.get("former_release_files", []):
+        lines.append(f"- `{file_path}`: left by a former release")
     for file_path in migrations_check["migratable_files"]:
         lines.append(f"- `{file_path}`: out of date")
     for file_path in migrations_check["attention_files"]:
@@ -396,7 +405,7 @@ def _do_agent_doctor_cmd(*, global_: bool, output_format: CliOutputFormat, error
     recommended_telemetry_action = _telemetry_action(
         check=telemetry_check,
         config_location=config_location,
-        migration_already_recommended=pending_migrations_check.finding.is_repaired_by_migrating,
+        migration_already_recommended=bool(pending_migrations_check.migratable_files),
     )
     if recommended_telemetry_action is not None:
         recommended_actions.append(recommended_telemetry_action)
@@ -448,6 +457,8 @@ def _do_agent_doctor_cmd(*, global_: bool, output_format: CliOutputFormat, error
                 "message": pending_migrations_check.message,
                 "migratable_files": pending_migrations_check.migratable_files,
                 "attention_files": pending_migrations_check.attention_files,
+                "former_release_files": pending_migrations_check.former_release_files,
+                "former_release_blocks_boot": pending_migrations_check.former_release_blocks_boot,
             },
             "telemetry": {
                 "healthy": telemetry_check.is_healthy,

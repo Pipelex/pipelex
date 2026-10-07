@@ -1,4 +1,8 @@
-"""`pipelex init`'s inspect stage decides, before anything is asked, whether the run asks where runs execute."""
+"""`pipelex init`'s inspect stage decides, before anything is asked, whether the run asks where runs execute.
+
+It also finds what a former release that ran on the Pipelex Gateway or Pipelex Manifold left, which the choose stage
+offers to clean up before anything else is asked; the v0.72 kit, copied from that release's wheel, is the specimen.
+"""
 
 from __future__ import annotations
 
@@ -13,6 +17,7 @@ from pipelex.cli.commands.init.setup_path import SetupPath, write_run_execution
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.hosted.run_config import RunExecution
 from pipelex.kit.paths import get_kit_configs_dir
+from pipelex.migration.former_release import detect_former_release
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -28,6 +33,17 @@ def config_dir(tmp_path: Path, mocker: MockerFixture) -> Path:
     config_manager.global_config_dir = directory
     mocker.patch("pipelex.cli.commands.init.command.config_manager", config_manager)
     return directory
+
+
+V0_72_CONFIG_DIR = "tests/data/migration/former_release/v0_72"
+
+
+def _install_a_former_release(config_dir: Path) -> None:
+    shutil.copytree(V0_72_CONFIG_DIR, config_dir)
+
+
+def _snapshot(*, directory: Path) -> dict[str, bytes]:
+    return {path.relative_to(directory).as_posix(): path.read_bytes() for path in sorted(directory.rglob("*")) if path.is_file()}
 
 
 def _install_backends(config_dir: Path) -> None:
@@ -146,3 +162,63 @@ class TestInitStages:
 
         assert choices.setup_path is None
         prompt.assert_not_called()
+
+    def test_the_inspection_finds_what_a_former_release_left_and_writes_nothing(self, config_dir: Path) -> None:
+        _install_a_former_release(config_dir)
+        before = _snapshot(directory=config_dir)
+
+        inspection = _inspect(focus=InitFocus.ALL)
+
+        assert [findings.config_dir for findings in inspection.former_release_findings] == [config_dir]
+        assert inspection.former_release_findings[0].blocks_boot
+        assert _snapshot(directory=config_dir) == before
+
+    def test_a_clean_target_has_no_former_release_findings(self, config_dir: Path) -> None:
+        _install_backends(config_dir)
+        assert _inspect(focus=InitFocus.ALL).former_release_findings == []
+
+    def test_a_former_release_is_cleaned_up_on_yes_before_the_setup_question(self, config_dir: Path, mocker: MockerFixture) -> None:
+        _install_a_former_release(config_dir)
+        calls: list[str] = []
+
+        def confirm(prompt: str, **_kwargs: object) -> bool:
+            calls.append("clean_up" if "Clean it up" in prompt else "confirm")
+            return True
+
+        def ask_setup_path(**_kwargs: object) -> SetupPath:
+            calls.append("setup_path")
+            return SetupPath.LOCAL
+
+        mocker.patch("pipelex.cli.commands.init.command.Confirm.ask", side_effect=confirm)
+        mocker.patch("pipelex.cli.commands.init.command.prompt_setup_path", side_effect=ask_setup_path)
+        inspection = _inspect(focus=InitFocus.ALL)
+
+        choose_initialization(console=Console(quiet=True), inspection=inspection, skip_confirmation=False)
+
+        assert calls == ["clean_up", "confirm", "setup_path"]
+        assert detect_former_release(config_dir=config_dir).is_clean
+
+    def test_a_no_leaves_the_files_as_they_are_and_the_setup_goes_on(self, config_dir: Path, mocker: MockerFixture) -> None:
+        _install_a_former_release(config_dir)
+        before = _snapshot(directory=config_dir)
+
+        def decline_the_cleanup_only(prompt: str, **_kwargs: object) -> bool:
+            return "Clean it up" not in prompt
+
+        mocker.patch("pipelex.cli.commands.init.command.Confirm.ask", side_effect=decline_the_cleanup_only)
+        prompt = mocker.patch("pipelex.cli.commands.init.command.prompt_setup_path", return_value=SetupPath.LOCAL)
+
+        choices = choose_initialization(console=Console(quiet=True), inspection=_inspect(focus=InitFocus.ALL), skip_confirmation=False)
+
+        assert _snapshot(directory=config_dir) == before
+        prompt.assert_called_once()
+        assert choices.setup_path == SetupPath.LOCAL
+
+    def test_without_anyone_to_answer_the_cleanup_runs_unasked(self, config_dir: Path, mocker: MockerFixture) -> None:
+        _install_a_former_release(config_dir)
+        confirm = mocker.patch("pipelex.cli.commands.init.command.Confirm.ask")
+
+        choose_initialization(console=Console(quiet=True), inspection=_inspect(focus=InitFocus.CONFIG), skip_confirmation=True)
+
+        confirm.assert_not_called()
+        assert detect_former_release(config_dir=config_dir).is_clean

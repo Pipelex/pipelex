@@ -22,7 +22,7 @@ from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cli.commands.login.api_key_store import find_pipelex_api_key
 from pipelex.cli.commands.login.command import LOGIN_PASTE_COMMAND
-from pipelex.cli.commands.migrate_cmd import apply_pending_migrations
+from pipelex.cli.commands.migrate_cmd import apply_former_release_cleanup, apply_pending_migrations
 from pipelex.cli.commands.update_cmd import update_cmd
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.cogt.exceptions import (
@@ -59,7 +59,9 @@ from pipelex.hosted.execution import configured_run_execution
 from pipelex.hosted.run_config import RunExecution
 from pipelex.interpreter_plugins.builtins import BUILTIN_PLUGINS, CORE_UNCONDITIONAL_PLUGIN_NAMES, ENTRY_POINT_GROUPS
 from pipelex.kit.paths import get_kit_configs_dir
-from pipelex.migration.exceptions import MigrationError
+from pipelex.migration.exceptions import FormerReleaseConfigError, MigrationError
+from pipelex.migration.former_release import RETIRED_BACKEND_NAMES, detect_former_release, former_release_boot_blockers
+from pipelex.migration.former_release_cleanup import clean_former_release
 from pipelex.migration.run import config_directories_to_migrate, migrate_config_directories, scan_config_surface
 from pipelex.plugins.discovery import build_registrar
 from pipelex.plugins.exceptions import PluginError
@@ -347,6 +349,13 @@ class PendingMigrationsCheck(BaseModel):
     A file can be on both lists: an entry that conflicts partway through is blocked, and the
     operations of it that applied before the conflict are still written."""
 
+    former_release_files: list[str] = Field(default_factory=list[str])
+    """The files the command cleans up first: what a release that ran on the Pipelex Gateway or
+    Pipelex Manifold left, each rewritten without it or removed, a copy of each kept."""
+
+    former_release_blocks_boot: bool = False
+    """Whether what that release left stops every boot until it is cleaned up."""
+
     @property
     def is_healthy(self) -> bool:
         return self.finding.is_healthy
@@ -375,37 +384,57 @@ def check_pending_migrations() -> PendingMigrationsCheck:
     user's files and never as an exception — an exception here reaches `doctor_cmd`'s outer
     handler, which prints one line and exits, so a broken packaged ledger would replace every row
     the user came for. The catch stays narrow, so a bug in our applier still surfaces as itself.
+
+    **The command's first step is the cleanup of a former release**, and the row reports it too: the
+    files a release that ran on the Pipelex Gateway or Pipelex Manifold left, which the command
+    removes or rewrites, and whether what is in them stops the boot.
     """
+    config_dirs = config_directories_to_migrate()
     try:
-        report = migrate_config_directories(config_dirs=config_directories_to_migrate(), dry_run=True)
+        cleanup = clean_former_release(config_dirs=config_dirs, dry_run=True)
+        report = migrate_config_directories(config_dirs=config_dirs, dry_run=True)
     except (MigrationError, OSError) as exc:
         return PendingMigrationsCheck(
             finding=PendingMigrationsFinding.UNAVAILABLE,
             message=f"Could not check for pending migrations: {exc}",
         )
 
-    if report.is_clean:
+    if report.is_clean and cleanup.is_clean:
         return PendingMigrationsCheck(
             finding=PendingMigrationsFinding.UP_TO_DATE,
             message="Every configuration file is at the current schema",
         )
 
+    former_release_files = [str(file.file_path) for file in cleanup.files if not file.is_blocked]
+    former_release_blocks_boot = any(detect_former_release(config_dir=config_dir).blocks_boot for config_dir in config_dirs)
     migratable_files = [str(plan.file_path) for plan in report.changed_plans]
     # In the order the run visited them, and deduplicated: one file can be both blocked and
     # carrying a path the schema cannot explain.
     attention_paths = {plan.file_path for plan in report.blocked_plans} | {plan.file_path for plan in report.unexplained_plans}
-    attention_files = [str(plan.file_path) for plan in report.plans if plan.file_path in attention_paths]
+    attention_files = [str(file.file_path) for file in cleanup.blocked_files]
+    attention_files += [str(plan.file_path) for plan in report.plans if plan.file_path in attention_paths]
 
     sentences: list[str] = []
+    if former_release_files:
+        sentence = (
+            f"{len(former_release_files)} file(s) carry what a former release left for the Pipelex Gateway or Pipelex Manifold, "
+            f"which '{MIGRATE_COMMAND}' cleans up"
+        )
+        if former_release_blocks_boot:
+            sentence += " — Pipelex cannot start until it does"
+        sentences.append(sentence)
     if migratable_files:
         sentences.append(f"{len(migratable_files)} configuration file(s) can be brought up to date by '{MIGRATE_COMMAND}'")
     if attention_files:
         sentences.append(f"{len(attention_files)} configuration file(s) need a look — run '{MIGRATE_COMMAND} --dry-run' for the detail")
+    has_work = bool(migratable_files or former_release_files)
     return PendingMigrationsCheck(
-        finding=PendingMigrationsFinding.PENDING if migratable_files else PendingMigrationsFinding.NEEDS_ATTENTION,
+        finding=PendingMigrationsFinding.PENDING if has_work else PendingMigrationsFinding.NEEDS_ATTENTION,
         message="; ".join(sentences),
         migratable_files=migratable_files,
         attention_files=attention_files,
+        former_release_files=former_release_files,
+        former_release_blocks_boot=former_release_blocks_boot,
     )
 
 
@@ -501,8 +530,9 @@ def check_backend_credentials(*, config_dir: Path | None = None) -> tuple[bool, 
         all_backends_valid = True
 
         for backend_name, backend_dict in backends_dict.items():
-            # Skip internal backend
-            if backend_name == "internal":
+            # Skip internal backend, and a retired one: its table is what a former release left, which the migrations
+            # row names the cleanup for, and its key is no remedy, since this release has no such backend to reach.
+            if backend_name == "internal" or backend_name in RETIRED_BACKEND_NAMES:
                 continue
 
             # Only check enabled backends
@@ -991,7 +1021,8 @@ def display_health_report(
         # Check what can be auto-fixed
         can_auto_fix_config = not config_healthy and config_missing_count > 0
         can_auto_fix_telemetry = telemetry_check.finding.is_repaired_by_initializing
-        can_migrate = pending_migrations_check.finding.is_repaired_by_migrating
+        can_migrate = bool(pending_migrations_check.migratable_files)
+        can_clean_up_former_release = bool(pending_migrations_check.former_release_files)
         telemetry_is_out_of_date = telemetry_check.finding.is_out_of_date
         # The migration row names the same command and covers every surface, so the telemetry-only
         # bullet under it would be the same advice twice. It still appears on its own — a telemetry
@@ -1025,6 +1056,7 @@ def display_health_report(
             or not secrets_provider_healthy
             or can_auto_fix_telemetry
             or can_migrate
+            or can_clean_up_former_release
             or migrations_need_a_look
             or pending_migrations_check.finding.is_uncheckable
             or telemetry_is_out_of_date
@@ -1048,6 +1080,12 @@ def display_health_report(
                 console.print(
                     f"  • Run [cyan]{PIPELEX_LOGIN_COMMAND}[/cyan] to get a Pipelex API key for hosted runs "
                     f"([cyan]{LOGIN_PASTE_COMMAND}[/cyan] on a machine without a browser)"
+                )
+
+            if can_clean_up_former_release:
+                console.print(
+                    f"  • Run [cyan]{MIGRATE_COMMAND}[/cyan] to clean up "
+                    f"{len(pending_migrations_check.former_release_files)} file(s) a former release left"
                 )
 
             if can_migrate:
@@ -1170,6 +1208,8 @@ def _print_pending_migrations(*, check: PendingMigrationsCheck) -> None:
             console.print(f"  [green]✓[/green] {escape(check.message)}")
         case PendingMigrationsFinding.PENDING | PendingMigrationsFinding.NEEDS_ATTENTION:
             console.print(f"  [yellow]⚠[/yellow]  {escape(check.message)}")
+            for file_path in check.former_release_files:
+                console.print(f"    [dim]{escape(file_path)}[/dim] — left by a former release")
             for file_path in check.migratable_files:
                 console.print(f"    [dim]{escape(file_path)}[/dim] — out of date")
             for file_path in check.attention_files:
@@ -1534,6 +1574,22 @@ def setup_doctor_runtime(*, log_config_overrides: Mapping[str, Any] | None = Non
     return runtime_setup
 
 
+FORMER_RELEASE_STOPS_THE_MODELS_CHECK = (
+    f"Not checked: what a former release left for the Pipelex Gateway or Pipelex Manifold stops the boot — run '{MIGRATE_COMMAND}' to clean it up"
+)
+
+
+def _migration_fix_question(*, former_release_count: int, migratable_count: int) -> str:
+    """The `--fix` question for `pipelex migrate`'s write pass, counting the files of each of its two steps."""
+    migration = f"{migratable_count} configuration file(s) to the current schema"
+    if not former_release_count:
+        return f"Migrate {migration}?"
+    cleanup = f"Clean up {former_release_count} file(s) a former release left"
+    if not migratable_count:
+        return f"{cleanup}?"
+    return f"{cleanup} and migrate {migration}?"
+
+
 def check_models(
     *, secrets_provider: SecretsProviderAbstract | None, config_dir: Path | None = None
 ) -> tuple[bool, str, dict[str, BackendFileReport]]:
@@ -1552,6 +1608,14 @@ def check_models(
     Returns:
         Tuple of (is_healthy, message, backend_file_reports)
     """
+    # What a former release left stops the boot before any backend loads, so it is named here rather than whichever
+    # refusal about one backend or one profile the setup below would meet first. The migrations row lists the files.
+    if former_release_boot_blockers(
+        backends_library_paths=config_manager.backends_file_paths(config_dir=config_dir),
+        routing_profile_library_paths=config_manager.routing_profiles_file_paths(config_dir=config_dir),
+    ):
+        return False, FORMER_RELEASE_STOPS_THE_MODELS_CHECK, {}
+
     # The backends resolve their credentials through the configured provider, so without it no backend
     # loads the way boot would load it; the secrets provider row already says why it did not build.
     if secrets_provider is None:
@@ -1622,6 +1686,7 @@ def check_models(
         ModelDeckValidationError,
         InferenceBackendCredentialsError,
         PluginModelDeclarationError,
+        FormerReleaseConfigError,
     ) as exc:
         return False, f"Error checking models: {redacted_failure(exc=exc, log_config=log_config)}", backend_file_reports
     except Exception as exc:  # ruff: ignore[blind-except]
@@ -1831,12 +1896,20 @@ def do_doctor_cmd(
         # implementation of it, and it is offered before the rows that report on file *contents*
         # because migrating can be what resolves them.
         if can_fix_migrations:
+            former_release_count = len(pending_migrations_check.former_release_files)
             migratable_count = len(pending_migrations_check.migratable_files)
-            if Confirm.ask(f"[bold]Migrate {migratable_count} configuration file(s) to the current schema?[/bold]", default=True):
+            question = _migration_fix_question(former_release_count=former_release_count, migratable_count=migratable_count)
+            if Confirm.ask(f"[bold]{question}[/bold]", default=True):
                 try:
                     console.print()
-                    applied = apply_pending_migrations(config_dirs=config_directories_to_migrate())
-                    console.print(f"[green]✓[/green] Migrated {len(applied.written_plans)} configuration file(s)")
+                    config_dirs = config_directories_to_migrate()
+                    # The cleanup first, as `pipelex migrate` runs it: it removes files the replay would otherwise walk.
+                    if former_release_count:
+                        cleaned = apply_former_release_cleanup(config_dirs=config_dirs)
+                        console.print(f"[green]✓[/green] Cleaned up {len(cleaned.applied_files)} file(s) a former release left")
+                    if migratable_count:
+                        applied = apply_pending_migrations(config_dirs=config_dirs)
+                        console.print(f"[green]✓[/green] Migrated {len(applied.written_plans)} configuration file(s)")
                     # The rows below were measured before this ran, so a file this just repaired can
                     # still be reported as broken further down.
                     console.print("[dim]Re-run[/dim] [cyan]pipelex doctor[/cyan] [dim]for an updated report.[/dim]")

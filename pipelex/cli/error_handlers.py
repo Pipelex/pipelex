@@ -12,6 +12,7 @@ from rich.traceback import Traceback
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem, error_domain_is_input, iter_cause_chain
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
+from pipelex.migration.exceptions import FormerReleaseConfigError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validation_render import build_fix_command, count_applicable_fixes, suggested_fix_label, validation_item_title
@@ -431,5 +432,23 @@ def handle_telemetry_config_validation_error(exc: TelemetryConfigValidationError
         console.print("[dim]Or run [cyan]pipelex init telemetry[/cyan] to start the file over — this discards what is in it.[/dim]")
     console.print()
 
+    console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
+    raise typer.Exit(1) from exc
+
+
+def handle_former_release_config_error(*, exc: FormerReleaseConfigError) -> NoReturn:
+    """Handle the boot's refusal of a configuration a former release set up for the Pipelex Gateway or Pipelex Manifold.
+
+    The message is the whole answer: it names what stops the boot, file by file, and both remedies, `pipelex migrate`
+    and `pipelex init`. A traceback would bury it, and any advice added here would repeat it.
+
+    Args:
+        exc: The former release configuration error.
+    """
+    console = get_console()
+    print_traceback_if_requested(console=console)
+    console.print("\n[bold red]❌ Configuration left by a former release[/bold red]\n")
+    console.print(escape(exc.message))
+    console.print()
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
     raise typer.Exit(1) from exc

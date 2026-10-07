@@ -18,6 +18,10 @@ changing.
 **This command must run when nothing else does**, exactly as its human sibling: no boot, no model
 deck, no credentials, no network. A broken configuration is the reason to reach for it.
 
+**Its first step is the cleanup of a former release**, as in the human command: what a release that
+ran on the Pipelex Gateway or Pipelex Manifold left, reported under ``former_release`` and counted in
+the verdict, so a machine whose boot names this command ends the loop able to boot.
+
 See ``docs/migration-ledger.md``.
 """
 
@@ -33,6 +37,7 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     set_agent_cli_error_format,
 )
 from pipelex.cli.commands.migrate_cmd import describe_op
+from pipelex.migration.former_release_cleanup import FormerReleaseCleanup, FormerReleaseFileCleanup, clean_former_release
 from pipelex.migration.plan import MigrationPlan, MigrationReport
 from pipelex.migration.run import config_directories_to_migrate, migrate_config_directories
 
@@ -71,24 +76,27 @@ def agent_migrate_cmd(
         )
 
     config_dirs = config_directories_to_migrate()
+    # The cleanup first: it removes files the replay would otherwise walk.
+    cleanup = clean_former_release(config_dirs=config_dirs, dry_run=not yes)
     report = migrate_config_directories(config_dirs=config_dirs, dry_run=not yes)
-    result = _result_payload(report=report, config_dirs=[str(directory) for directory in config_dirs], applied=yes)
+    result = _result_payload(report=report, cleanup=cleanup, config_dirs=[str(directory) for directory in config_dirs], applied=yes)
     agent_success_formatted(result, markdown_renderer=_render_markdown, output_format=output_format)
-    if report.needs_attention:
+    if report.needs_attention or cleanup.needs_attention:
         raise typer.Exit(1)
 
 
-def _result_payload(*, report: MigrationReport, config_dirs: list[str], applied: bool) -> dict[str, Any]:
-    """The structured answer: the verdict, the arithmetic, and every plan the run produced.
+def _result_payload(*, report: MigrationReport, cleanup: FormerReleaseCleanup, config_dirs: list[str], applied: bool) -> dict[str, Any]:
+    """The structured answer: the verdict, the arithmetic, the cleanup, and every plan the run produced.
 
     Every file the walk visited is here, clean ones included. A report *is* the set of files this
     run looked at, and an agent deciding whether its configuration directory was even reached
-    needs the ones that had nothing to say as much as the ones that did.
+    needs the ones that had nothing to say as much as the ones that did. The cleanup lists only
+    the files it touches: a former release's leftovers are found, not walked.
     """
     return {
         "applied": applied,
-        "needs_attention": report.needs_attention,
-        "is_clean": report.is_clean,
+        "needs_attention": report.needs_attention or cleanup.needs_attention,
+        "is_clean": report.is_clean and cleanup.is_clean,
         "config_dirs": config_dirs,
         "summary": {
             "files_walked": len(report.plans),
@@ -97,6 +105,14 @@ def _result_payload(*, report: MigrationReport, config_dirs: list[str], applied:
             "files_blocked": len([plan for plan in report.plans if plan.blocked_reason is not None]),
             "entries_blocked": sum(len(plan.blocked) for plan in report.plans),
             "unexplained_paths": sum(len(plan.unexplained) for plan in report.plans),
+            "former_release_files": len(cleanup.files),
+            "former_release_files_cleaned": len(cleanup.applied_files),
+            "former_release_files_blocked": len(cleanup.blocked_files),
+        },
+        "former_release": {
+            "is_clean": cleanup.is_clean,
+            "needs_attention": cleanup.needs_attention,
+            "files": [file.model_dump(mode="json") for file in cleanup.files],
         },
         "plans": [plan.model_dump(mode="json") for plan in report.plans],
     }
@@ -118,10 +134,18 @@ def _render_markdown(result: dict[str, Any]) -> str:
     lines += [f"**Mode:** {mode}", f"**Verdict:** {verdict}", "", "**Directories walked:**"]
     lines += [f"- `{directory}`" for directory in config_dirs]
     lines += ["", f"**Files:** {summary['files_walked']} walked, {summary['files_changed']} changed, {summary['files_written']} written."]
+    if summary["former_release_files"]:
+        cleaned = f", {summary['former_release_files_cleaned']} cleaned up" if applied else ""
+        lines.append(f"**Left by a former release:** {summary['former_release_files']} file(s){cleaned}.")
 
     if result["is_clean"]:
         lines += ["", "Every configuration file walked is at the current schema."]
         return "\n".join(lines)
+
+    for file_dict in result["former_release"]["files"]:
+        file = FormerReleaseFileCleanup.model_validate(file_dict)
+        lines += ["", f"## `{file.file_path}`", "", "Left by a former release that ran on the Pipelex Gateway or Pipelex Manifold.", ""]
+        lines += _former_release_lines(file=file, applied=applied)
 
     for plan_dict in result["plans"]:
         plan = MigrationPlan.model_validate(plan_dict)
@@ -130,6 +154,16 @@ def _render_markdown(result: dict[str, Any]) -> str:
         lines += ["", f"## `{plan.file_path}`", "", f"Surface: `{plan.surface_id}`", ""]
         lines += _file_lines(plan=plan, applied=applied)
     return "\n".join(lines)
+
+
+def _former_release_lines(*, file: FormerReleaseFileCleanup, applied: bool) -> list[str]:
+    if file.blocked_reason is not None:
+        return [f"- **This file could not be cleaned up** (`{file.blocked_reason}`): {file.blocked_detail}"]
+    verb = "Done" if applied else "Would do"
+    lines = [f"- **{verb}:** {change}" for change in file.changes]
+    if file.backup_path is not None:
+        lines.append(f"- Backup of the original: `{file.backup_path}`")
+    return lines
 
 
 def _file_lines(*, plan: MigrationPlan, applied: bool) -> list[str]:
