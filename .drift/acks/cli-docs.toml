@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:b48cd9256da89788502648136e4b3a6a5a4be0b853d6790d4178ca8091fd21a9"
+digest = "sha256:53948a3218f1c549dcf8f415f355ecfbcbfef356c23ed6a6da29b056e0cc94a7"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-06T10:13:22Z"
-rationale = "clean-pass: installed_methods.py now validates the provenance sidecar from its bytes, so a sidecar that is not UTF-8 is read as no provenance like an unparsable one, instead of raising. Re-read docs/tools/cli/ (run-by-address.md prints the provenance of a fetch, which is unchanged) and pipelex/cli/agent_cli/CLAUDE.md; neither describes how discovery treats an unreadable sidecar, so nothing is stale."
+reviewed_at = "2026-10-07T12:54:38Z"
+rationale = "clean-pass: init_config now delegates its copy walk to the shared copy_kit_templates with the same skip lists, the same overwrite-on-reset rule and the same dry-run count, so pipelex init config behaves as before. Re-read docs/tools/cli/init.md (full reset, the .gitignore rule) and pipelex/cli/agent_cli/CLAUDE.md; neither describes anything this changes."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -84,7 +84,7 @@ rationale = "clean-pass: installed_methods.py now validates the provenance sidec
 "pipelex/cli/commands/init/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/init/backends.py" = "blob:04a1a06f1003ed0c7157ec4ca6c8659e4e09fe6b"
 "pipelex/cli/commands/init/command.py" = "blob:f17d58fe1813d4bb9552cc418914ea4aebae2d2a"
-"pipelex/cli/commands/init/config_files.py" = "blob:c13be6b8d2a8b211ce9ef0f4889ee131ffc3d2d8"
+"pipelex/cli/commands/init/config_files.py" = "blob:8d1ea8e03e8117de5264d4bc046e5bc259fb1342"
 "pipelex/cli/commands/init/credentials.py" = "blob:a9c3ee9e8bdcc5d0f3148f055ab6e2ff34a940fc"
 "pipelex/cli/commands/init/ide_extension.py" = "blob:9f0ec1494c07062246ecc906bc55b7f2cf95c715"
 "pipelex/cli/commands/init/routing.py" = "blob:c73927deb99804556cb545cdaa6eabf8d1fc3450"

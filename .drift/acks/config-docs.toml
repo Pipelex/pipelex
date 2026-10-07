@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:fe956b25829d41bf434d926476489cac06a8c37bb712451d5315f6fcb9bb3711"
-reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-10-05T16:08:21Z"
-rationale = "real-catch: ensure_global_config_exists now fills the home configuration directory from the kit when it exists but is empty, not only when it is missing; docs/configuration/index.md says so in the PIPELEX_HOME section, and the config_loader docstrings now name the home directory instead of crediting Path.home. No setting, default or load order moved."
+digest = "sha256:a2f2f8c8cbb9d87b7ddc99f5c092c6bf6aef7a12fe2b070821ec4f47bf63ff1b"
+reviewed_by = "Louis Choquel"
+reviewed_at = "2026-10-07T12:54:37Z"
+rationale = "real-catch: ensure_global_config_exists now copies each kit file a home configuration directory lacks, never overwriting one it holds, with the inference directory laid down as one unit only when inference/backends.toml is absent and an unwritable home read as it is. The PIPELEX_HOME section of docs/configuration/index.md said a directory with anything in it is left alone, and now describes the fill. No config model, default, validator or load order moved, so the migration ledgers, configs.py and config_cogt.py owe nothing."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:02f71cb4a6b01aebda59c2e31f262ef9c865e17b"
@@ -13,7 +13,7 @@ rationale = "real-catch: ensure_global_config_exists now fills the home configur
 "pipelex/pipelex.toml" = "blob:cb3431d9d8a3265121d730eaef34cfbe5e8c4cbf"
 "pipelex/system/configuration/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
 "pipelex/system/configuration/config_check.py" = "blob:2d5de29aba3d2ce205d3d82b4623f37b53108332"
-"pipelex/system/configuration/config_loader.py" = "blob:131f611530646e777ba705808ea164f088229fa5"
+"pipelex/system/configuration/config_loader.py" = "blob:db0677e498ddfcd08389cda609ca5f141ca02a17"
 "pipelex/system/configuration/config_model.py" = "blob:83b29dc6e93393c9b98c4353636caf0135c80339"
 "pipelex/system/configuration/config_root.py" = "blob:c7d43851270912d17413cfc6a511247d3c7cc160"
 "pipelex/system/configuration/config_surface.py" = "blob:dc6c877564254aa97ce0b20fd29118def31c957c"

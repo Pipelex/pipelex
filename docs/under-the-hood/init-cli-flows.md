@@ -264,6 +264,7 @@ Copies a telemetry template and prints instructions. No interactive prompts. Whi
 |--------|---------|
 | `pipelex/cli/commands/init/command.py` | Orchestration: `init_cmd()`, `execute_initialization()`, `determine_needs()` |
 | `pipelex/cli/commands/init/config_files.py` | Config file copying: `init_config()`, skip lists |
+| `pipelex/kit/template_copy.py` | The kit template walk `init_config()` shares with the first-boot fill: `copy_kit_templates()` |
 | `pipelex/cli/commands/init/backends.py` | Backend customization: `customize_backends_config()`, `get_selected_backend_keys()` |
 | `pipelex/cli/commands/init/routing.py` | Routing customization: `customize_routing_profile()` |
 | `pipelex/cli/commands/init/telemetry.py` | Telemetry setup: `setup_telemetry()` |
@@ -316,7 +317,13 @@ This means a project-level file **wins** over the global one, but only if it act
 
 ### Global Config Bootstrap
 
-`ensure_global_config_exists()` creates the home configuration directory (`~/.pipelex/`, or `PIPELEX_HOME`) with kit template files on first use, and fills it the same way when it exists but is empty (called automatically during `load_config()`). It skips all `GIT_IGNORED_CONFIG_FILES` (files like `pipelex_override.toml`) and `.DS_Store` — these are never part of the bootstrap copy.
+`ensure_global_config_exists()`, called automatically during `load_config()`, lays the kit's template files into the home configuration directory (`~/.pipelex/`, or `PIPELEX_HOME`) wherever they are missing. It creates the directory when it does not exist and copies each kit file the directory lacks, never overwriting one it holds, so a home holding only a retired `pipelex_service.toml`, a `.env` or a personal override boots like a fresh one, and a home holding every kit file is not written at all. It skips all `GIT_IGNORED_CONFIG_FILES` (files like `pipelex_override.toml`, and `.DS_Store`), which are never part of the bootstrap copy.
+
+The `inference/` directory is one unit, as the inference step of `pipelex init` treats it. It is filled only when `inference/backends.toml` is absent, the same signal `pipelex init` reads as a first-time backend setup, and the deck and backends kit manifests are then stamped for each area that has none; the kit's own `.kit_manifest.json` files are never copied. A home with a `backends.toml` of its own keeps its inference directory exactly as it is, because kit routing profiles, deck or backend files copied beside it could route to, or alias the models of, backends it disables.
+
+A home the process cannot write to, such as a read-only mount or a directory another user owns, is read as it is, and the boot then reports whatever configuration is missing. Any other error that stops a copy is raised.
+
+The copy is `copy_kit_templates()` in `pipelex/kit/template_copy.py`, the same walk `init_config()` copies the configuration files with, so the bootstrap and `pipelex init config` agree on which files a directory receives.
 
 ### Config Loading Chain
 

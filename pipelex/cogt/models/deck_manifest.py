@@ -182,11 +182,24 @@ def compute_kit_manifest(*, area: KitManagedArea) -> DeckManifest:
 def stamp_kit_manifests(*, inference_dir: Path) -> None:
     """Write both areas' manifests for an ``inference/`` directory whose managed files were just copied from the kit.
 
-    For the installers (``pipelex init``, the first-run materialization), so a later ``pipelex update`` tells a file
-    the user edited from one the kit moved on.
+    For the installers that replace every kit file (``pipelex init``, ``pipelex-agent init``), so a later ``pipelex
+    update`` tells a file the user edited from one the kit moved on.
     """
     for area in KitManagedArea:
         write_manifest(compute_kit_manifest(area=area), installed_dir=inference_dir / area)
+
+
+def stamp_missing_kit_manifests(*, inference_dir: Path) -> None:
+    """Write the manifest of each area of an ``inference/`` directory that has none, and leave a recorded one alone.
+
+    For the first boot's fill of the home configuration directory, which copies only the kit files the home lacks:
+    a manifest already there records the install the area's files came from, and it stays the baseline ``pipelex
+    update`` compares against.
+    """
+    for area in KitManagedArea:
+        installed_dir = inference_dir / area
+        if not manifest_path(installed_dir).exists():
+            write_manifest(compute_kit_manifest(area=area), installed_dir=installed_dir)
 
 
 def manifest_path(installed_dir: Path) -> Path:
