@@ -6,10 +6,6 @@
 
 - **Claude Opus 5.5 and Claude Sonnet 5.5 on the `anthropic` backend**: `claude-5.5-opus` (model id `claude-opus-5-5`, $4 / $20 per million tokens) and `claude-5.5-sonnet` (model id `claude-sonnet-5-5`, $2 / $10) take text, images and PDF, produce text and structured output, and reason with adaptive thinking, with up to 128K output tokens each. Both refuse `temperature` and a forced `tool_choice`, so structured output uses `instructor/anthropic_reasoning_tools`, as `claude-5.1-fable` does.
 
-### Changed
-
-- **`pipelex init` writes each configuration file whole and never through a link**: every file it lays down is written under a temporary name and renamed into place, so an interrupted run leaves no half-written file. A configuration file that is a symbolic link is now replaced as a link, becoming a regular file that holds the template, where it used to be written through, overwriting the file it pointed to.
-
 ### Fixed
 
 - **A reasoning setting reaches a structured output**: a pipe whose model setting carries `reasoning_effort` or `reasoning_budget`, the deck's `$deep-analysis`, `$quick-reasoning` and `$retrieval-premium` presets included, now generates its structured output with that setting on every provider, where every language-model worker refused it with `LLMCapabilityError` "does not support reasoning parameters for structured generation". A model refuses a reasoning setting on a structured output only where it refuses it on text, or on Mistral where its structure method is not `instructor/mistral_tools`, whose JSON parsing cannot read a reasoning reply; a structured call on an Anthropic tool method with thinking on leaves the tool choice to the model, since a forced tool choice cannot carry thinking.

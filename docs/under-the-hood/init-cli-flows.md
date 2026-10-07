@@ -323,7 +323,7 @@ The `inference/` directory is one unit, as the inference step of `pipelex init` 
 
 A home the process cannot write to, such as a read-only mount or a directory another user owns, is read as it is, and the boot then reports whatever configuration is missing. Any other error that stops a copy is raised.
 
-The copy is `copy_kit_templates()` in `pipelex/kit/template_copy.py`, the same walk `init_config()` copies the configuration files with, so the bootstrap and `pipelex init config` agree on which files a directory receives. Both write each file with `copy_file_atomically()`, which is also how the bootstrap writes `backends.toml`. Because the rename replaces whatever stands at the destination, `pipelex init`, which overwrites, replaces a configuration file that is a symbolic link with a regular file and leaves the file the link pointed to as it was.
+The copy is `copy_kit_templates()` in `pipelex/kit/template_copy.py`, the same walk `init_config()` copies the configuration files with, so the bootstrap and `pipelex init config` agree on which files a directory receives. Both write each file with `copy_file_atomically()`, which is also how the bootstrap writes `backends.toml`. Only the bootstrap refuses to follow a link: `pipelex init`, which overwrites, follows one as a plain copy does, so the template lands at a linked file's target, written beside it and renamed into place, and the link survives. A configuration file linked from a dotfiles repository, as chezmoi, stow or yadm lay them out, therefore stays linked.
 
 ### Config Loading Chain
 

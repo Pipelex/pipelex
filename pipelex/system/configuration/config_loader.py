@@ -354,6 +354,8 @@ class ConfigLoader:
             )
             stamp_missing_kit_manifests(inference_dir=inference_dir)
             inference_dir.mkdir(parents=True, exist_ok=True)
+            # Nothing stands at its path, a link included, as the return above made sure, so this cannot
+            # write through one.
             copy_file_atomically(source=kit_inference_dir / BACKENDS_FILE_NAME, destination=backends_file)
         except OSError as exc:
             if not (isinstance(exc, PermissionError) or exc.errno == errno.EROFS):

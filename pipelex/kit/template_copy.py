@@ -4,10 +4,13 @@
 directory with it, so the two agree on which files a directory receives and on what "already there"
 means. It imports nothing but the standard library, because the boot's configuration loader calls it.
 
-Two rules hold for every write. Nothing is ever written through a symbolic link: a link at a file's path is
-kept, or replaced as a link, and the walk never enters a link to a directory, valid or dangling. And a file
-appears whole or not at all: it is written under a temporary name beside its destination and renamed into
-place, so a copy cut short by a full disk or a killed process leaves no truncated file behind.
+A symbolic link is treated according to `overwrite`. Without it, the first boot's mode, a link is never
+followed: one at a file's path is kept, even when it dangles, and the walk never enters a link to a
+directory. With it, the mode of `pipelex init`, a link is followed as a plain copy follows it: a linked
+file's target receives the template and the link survives, so a configuration file linked from a dotfiles
+repository stays linked, and a linked directory is entered. Either way a file appears whole or not at all:
+it is written under a temporary name beside the place it lands and renamed into place, so a copy cut short
+by a full disk or a killed process leaves no truncated file behind.
 """
 
 import os
@@ -30,19 +33,24 @@ def can_fill_directory(*, directory: Path) -> bool:
 
 
 def copy_file_atomically(*, source: Path, destination: Path) -> None:
-    """Copy a file so that it appears at its destination whole or not at all.
+    """Copy a file so that it appears whole or not at all, at its destination or at the target of a link there.
 
-    The copy, with the metadata `shutil.copy2` carries, is written under a temporary name in the
-    destination's directory, which must exist, then renamed over the destination. A link at the destination
-    is replaced as a link, never written through. The temporary file is removed when the copy fails; only a
-    process killed between the two steps can leave one behind, under a name no reader looks for.
+    A destination that is a symbolic link is followed, as a plain copy follows it: the file lands at the
+    link's resolved target and the link survives. A dangling link's target is created when its directory
+    exists, and the copy raises `FileNotFoundError` when it does not. A caller that must never write through
+    a link, as the first boot's fill must not, checks for one before calling.
+
+    The copy, with the metadata `shutil.copy2` carries, is written under a temporary name in the directory it
+    lands in, which must exist, then renamed into place. The temporary file is removed when the copy fails;
+    only a process killed between the two steps can leave one behind, under a name no reader looks for.
     """
-    file_descriptor, temporary_name = tempfile.mkstemp(dir=destination.parent, prefix=f".{destination.name}.", suffix=".partial")
+    landing = Path(os.path.realpath(destination)) if destination.is_symlink() else destination
+    file_descriptor, temporary_name = tempfile.mkstemp(dir=landing.parent, prefix=f".{landing.name}.", suffix=".partial")
     os.close(file_descriptor)
     temporary = Path(temporary_name)
     try:
         shutil.copy2(source, temporary)
-        temporary.replace(destination)
+        temporary.replace(landing)
     finally:
         temporary.unlink(missing_ok=True)
 
@@ -59,11 +67,14 @@ def copy_kit_templates(
 
     Every file under `template_dir` is copied to the same relative path under `target_dir`, and the
     directories a copied file needs are created on the way. An entry whose name is in `skip_names`, a file
-    or a directory, is left out at any depth, with everything under it, and so is a kit directory whose
-    destination `can_fill_directory` refuses, such as a link or a file standing there. A file the target
-    already holds, a symbolic link included even when it dangles, is kept as it is unless `overwrite` is set,
-    so without it a directory that holds every file is not written at all. Each file is written with
-    `copy_file_atomically`. With `dry_run` nothing is written, and the result says what a real run would copy.
+    or a directory, is left out at any depth, with everything under it.
+
+    Without `overwrite`, a file the target already holds, a symbolic link included even when it dangles, is
+    kept as it is, and a kit directory whose destination `can_fill_directory` refuses, such as a link or a
+    file standing there, is left out with everything under it: a directory that holds every file is not
+    written at all, and nothing is written through a link. With `overwrite`, every file is written, through
+    a link to its target as `copy_file_atomically` does, and a linked directory is entered. With `dry_run`
+    nothing is written, and the result says what a real run would copy.
 
     Returns:
         The paths of the files copied, relative to `template_dir` and in POSIX form, in walk order.
@@ -77,7 +88,7 @@ def copy_kit_templates(
             relative_item = relative_dir / src_item.name
             dst_item = target_dir / relative_item
             if src_item.is_dir():
-                if can_fill_directory(directory=dst_item):
+                if overwrite or can_fill_directory(directory=dst_item):
                     mirror(src_dir=src_item, relative_dir=relative_item)
                 continue
             # `lexists` rather than `exists`: a link is there even when it dangles, and copying through it

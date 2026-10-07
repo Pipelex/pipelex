@@ -104,16 +104,18 @@ class TestKitTemplateCopy:
 
     @pytest.mark.skipif(sys.platform == "win32", reason="creating a symbolic link takes a privilege Windows does not grant by default")
     @pytest.mark.parametrize(
-        ("overwrite", "link_is_kept"),
+        ("overwrite", "expected_linked_content"),
         [
-            pytest.param(False, True, id="kept_without_overwrite"),
-            pytest.param(True, False, id="replaced_as_a_link_with_overwrite"),
+            pytest.param(False, "the user's own\n", id="kept_and_never_written_through_without_overwrite"),
+            pytest.param(True, "kit pipelex\n", id="written_through_to_its_target_with_overwrite"),
         ],
     )
-    def test_a_link_at_a_file_s_destination_is_never_written_through(
-        self, template_dir: Path, tmp_path: Path, overwrite: bool, link_is_kept: bool
-    ) -> None:
-        """Overwriting replaces the link itself, as `pipelex init` does, and the file it pointed to stays as it was."""
+    def test_a_link_at_a_file_s_destination_survives(self, template_dir: Path, tmp_path: Path, overwrite: bool, expected_linked_content: str) -> None:
+        """A configuration file linked from a dotfiles repository stays linked.
+
+        The fill, which never overwrites, leaves the link and the file it points to alone; `pipelex init`,
+        which overwrites, rewrites the file it points to, whole, and leaves nothing else beside it.
+        """
         target_dir = tmp_path / "target"
         target_dir.mkdir()
         linked_file = tmp_path / "dotfiles" / "pipelex.toml"
@@ -122,10 +124,62 @@ class TestKitTemplateCopy:
 
         copy_kit_templates(template_dir=template_dir, target_dir=target_dir, skip_names=_SKIP_NAMES, overwrite=overwrite)
 
-        assert linked_file.read_text(encoding="utf-8") == "the user's own\n"
-        assert (target_dir / "pipelex.toml").is_symlink() == link_is_kept
-        if not link_is_kept:
-            assert (target_dir / "pipelex.toml").read_text(encoding="utf-8") == "kit pipelex\n"
+        assert (target_dir / "pipelex.toml").is_symlink()
+        assert (target_dir / "pipelex.toml").readlink() == linked_file
+        assert linked_file.read_text(encoding="utf-8") == expected_linked_content
+        assert [path.name for path in linked_file.parent.iterdir()] == ["pipelex.toml"]
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="creating a symbolic link takes a privilege Windows does not grant by default")
+    def test_overwrite_through_a_dangling_link_writes_its_target_when_that_directory_exists(self, template_dir: Path, tmp_path: Path) -> None:
+        """What a plain copy did: the link's target is created, and the link now points at the template."""
+        target_dir = tmp_path / "target"
+        target_dir.mkdir()
+        linked_file = tmp_path / "dotfiles" / "pipelex.toml"
+        linked_file.parent.mkdir()
+        (target_dir / "pipelex.toml").symlink_to(linked_file)
+
+        copy_kit_templates(template_dir=template_dir, target_dir=target_dir, skip_names=_SKIP_NAMES, overwrite=True)
+
+        assert (target_dir / "pipelex.toml").is_symlink()
+        assert linked_file.read_text(encoding="utf-8") == "kit pipelex\n"
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="creating a symbolic link takes a privilege Windows does not grant by default")
+    def test_overwrite_through_a_dangling_link_whose_directory_is_gone_raises(self, template_dir: Path, tmp_path: Path) -> None:
+        """What a plain copy did as well: there is nowhere to write, and the caller is told so."""
+        target_dir = tmp_path / "target"
+        target_dir.mkdir()
+        linked_file = tmp_path / "gone" / "pipelex.toml"
+        (target_dir / "pipelex.toml").symlink_to(linked_file)
+
+        with pytest.raises(FileNotFoundError):
+            copy_kit_templates(template_dir=template_dir, target_dir=target_dir, skip_names=_SKIP_NAMES, overwrite=True)
+
+        assert (target_dir / "pipelex.toml").is_symlink()
+        assert not linked_file.parent.exists()
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="creating a symbolic link takes a privilege Windows does not grant by default")
+    @pytest.mark.parametrize(
+        ("overwrite", "expected_in_linked_directory"),
+        [
+            pytest.param(False, [], id="never_entered_without_overwrite"),
+            pytest.param(True, ["backends.toml", "deck/1_llm_deck.toml"], id="entered_with_overwrite"),
+        ],
+    )
+    def test_a_linked_directory_is_entered_only_with_overwrite(
+        self, template_dir: Path, tmp_path: Path, overwrite: bool, expected_in_linked_directory: list[str]
+    ) -> None:
+        target_dir = tmp_path / "target"
+        target_dir.mkdir()
+        linked_directory = tmp_path / "dotfiles" / "inference"
+        linked_directory.mkdir(parents=True)
+        (target_dir / "inference").symlink_to(linked_directory, target_is_directory=True)
+
+        copy_kit_templates(template_dir=template_dir, target_dir=target_dir, skip_names=_SKIP_NAMES, overwrite=overwrite)
+
+        assert (target_dir / "inference").is_symlink()
+        assert sorted(path.relative_to(linked_directory).as_posix() for path in linked_directory.rglob("*") if path.is_file()) == (
+            expected_in_linked_directory
+        )
 
     def test_a_copy_leaves_no_temporary_file_behind(self, template_dir: Path, tmp_path: Path) -> None:
         target_dir = tmp_path / "target"
