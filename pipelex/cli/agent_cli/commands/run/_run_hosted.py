@@ -25,9 +25,9 @@ from pipelex.cli.agent_cli.commands.agent_output import (
 from pipelex.cli.agent_cli.commands.run._output_helpers import build_run_output, format_run_markdown
 from pipelex.hosted.client_factory import make_hosted_client
 from pipelex.hosted.error_rendering import describe_hosted_error
-from pipelex.hosted.exceptions import HostedRunError
+from pipelex.hosted.exceptions import HostedRunError, HostedRunInterruptedError
 from pipelex.hosted.execution import resolve_run_execution
-from pipelex.hosted.hosted_run import HostedRunOutcome, HostedRunRequest, run_hosted
+from pipelex.hosted.hosted_run import HostedRunOutcome, HostedRunRequest, RunStartedCallback, run_hosted
 from pipelex.hosted.run_config import RunExecution
 
 if TYPE_CHECKING:
@@ -41,6 +41,8 @@ HOSTED_OPTION_HELP = "Run on the hosted Pipelex API (key in PIPELEX_API_KEY) or 
 BASE_URL_OPTION_HELP = (
     "Origin of the hosted API a hosted run calls, scheme://host[:port]. Overrides PIPELEX_BASE_URL; default https://api.pipelex.com."
 )
+#: The exit status of a command interrupted by Ctrl-C, the shell's 128 + SIGINT, which Typer gives one too.
+_INTERRUPTED_EXIT_CODE = 130
 
 
 def resolve_agent_run_execution(*, runner: RunExecution | None, hosted: bool | None, base_url: str | None) -> RunExecution:
@@ -79,15 +81,16 @@ def refuse_local_only_flags(*, dry_run: bool, mock_inputs: bool) -> None:
         )
 
 
-def agent_error_hosted(*, error: PipelineRequestError | HostedRunError) -> NoReturn:
-    """Report a hosted run's failure in the agent error envelope.
+def agent_error_hosted(*, error: PipelineRequestError | HostedRunError, exit_code: int = 1) -> NoReturn:
+    """Report a hosted run's failure in the agent error envelope, and exit with `exit_code`.
 
     A refusal the hosted API answered carries its problem document and goes through `agent_error_api_response`, whose
     envelope matches a local failure's. Every other failure is reported as `pipelex.hosted.error_rendering` reads it,
     the view the human CLI prints: its class, its reason, its next step and its domain, the run's `pipeline_run_id`
-    once the hosted API acknowledged the run (a run that failed, outlived the wait or was lost on the way), and the
-    `validation_errors` of a method that does not load. A run that started and failed adds its stored report's status,
-    category, model and provider.
+    once the hosted API acknowledged the run (a run that failed, outlived the wait, was lost on the way or was left
+    running by an interruption), and the `validation_errors` of a method that does not load. A run that started and
+    failed adds its stored report's status, category, model and provider. When the hosted API gave a `retryable`
+    verdict, the envelope carries it, `false` included, so the local table keyed on the runner's class never overrides it.
     """
     if isinstance(error, ApiResponseError):
         agent_error_api_response(error=error)
@@ -95,8 +98,8 @@ def agent_error_hosted(*, error: PipelineRequestError | HostedRunError) -> NoRet
     extra: dict[str, Any] = {"hint": view.next_step}
     if view.error_domain is not None:
         extra["error_domain"] = str(view.error_domain)
-    if view.retryable:
-        extra["retryable"] = True
+    if view.retryable is not None:
+        extra["retryable"] = view.retryable
     if view.pipeline_run_id is not None:
         extra["pipeline_run_id"] = view.pipeline_run_id
     if view.validation_errors:
@@ -107,7 +110,7 @@ def agent_error_hosted(*, error: PipelineRequestError | HostedRunError) -> NoRet
         if report is not None:
             reported = {"error_category": report.error_category, "model": report.model, "provider": report.provider}
             extra.update({field_name: value for field_name, value in reported.items() if value})
-    agent_error(view.message, error_type=view.error_type, cause=error, **extra)
+    agent_error(view.message, error_type=view.error_type, cause=error, exit_code=exit_code, **extra)
 
 
 def build_hosted_run_output(*, outcome: HostedRunOutcome, with_memory: bool) -> dict[str, Any]:
@@ -133,19 +136,32 @@ def build_hosted_run_output(*, outcome: HostedRunOutcome, with_memory: bool) -> 
     )
 
 
-async def _start_and_wait(*, client: PipelexAPIClient, request: HostedRunRequest) -> HostedRunOutcome:
+async def _start_and_wait(*, client: PipelexAPIClient, request: HostedRunRequest, on_started: RunStartedCallback) -> HostedRunOutcome:
     async with client:
-        return await run_hosted(client=client, request=request)
+        return await run_hosted(client=client, request=request, on_started=on_started)
 
 
 def run_hosted_for_agent(*, request: HostedRunRequest, base_url: str | None, with_memory: bool, output_format: CliOutputFormat) -> None:
-    """Run on the hosted API and print the run envelope, or the error envelope and exit 1."""
+    """Run on the hosted API and print the run envelope, or the error envelope and exit 1.
+
+    Interrupted by Ctrl-C, the error envelope is a `HostedRunInterruptedError` naming the run the hosted API had
+    acknowledged, which keeps going, and the exit status is 130.
+    """
     try:
         client = make_hosted_client(base_url=base_url)
     except PipelexError as exc:
         agent_error(exc.message, error_type=type(exc).__name__, cause=exc)
+    started_run_ids: list[str] = []
+
+    def _record_start(*, pipeline_run_id: str) -> None:
+        started_run_ids.append(pipeline_run_id)
+
     try:
-        outcome = asyncio.run(_start_and_wait(client=client, request=request))
+        outcome = asyncio.run(_start_and_wait(client=client, request=request, on_started=_record_start))
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        # Ctrl-C stops the wait, not the run: the envelope names the run that keeps going.
+        interrupted = HostedRunInterruptedError(pipeline_run_id=started_run_ids[-1] if started_run_ids else None)
+        agent_error_hosted(error=interrupted, exit_code=_INTERRUPTED_EXIT_CODE)
     except (PipelineRequestError, HostedRunError) as exc:
         agent_error_hosted(error=exc)
     except Exception as exc:  # ruff: ignore[blind-except]

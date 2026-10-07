@@ -66,16 +66,21 @@ results = await client.start_and_wait(
 )
 ```
 
-A relative path is read from the working directory. `http(s)://` URLs are passed through for the hosted API to fetch.
+A relative path is read from the working directory, and a `file://` URI is not decoded, so pass the path itself. `http(s)://` URLs are passed through for the hosted API to fetch. Call `prepare_inputs` only when the inputs name a local file: other inputs can go to the run as they are.
+
+Two cases where `pipelex run --hosted` goes further than `prepare_inputs`:
+
+- `prepare_inputs` refuses an explicit `None` at a document or image input. Leave an optional file out of the inputs rather than setting it to `None`. The CLI uploads the files itself and keeps the `null` for the run.
+- `prepare_inputs` reads the signature through a route that cannot load a method calling another method by its address (`github.com/…`), so it refuses such a method, which `start_and_wait` runs. Give its files as `https://` URLs and start the run without preparing the inputs.
 
 ## Errors
 
-Every failure is one of the SDK's typed errors, from `pipelex_sdk.errors`, all subclasses of the protocol's `PipelineRequestError`:
+A failure is one of the SDK's typed errors, from `pipelex_sdk.errors`, all subclasses of the protocol's `PipelineRequestError`, with one exception: `start` and `execute`, which the client inherits from the MTHDS protocol client, let httpx's transport errors through. A `ConnectError` or a `ConnectTimeout` means the request never left your machine. A `ReadError`, a `RemoteProtocolError` or a `ReadTimeout` can come after the hosted API received it, so a run may exist with no id returned: check the run history on app.pipelex.com before starting it again.
 
 - `ApiResponseError` is a refusal the hosted API answered: `status`, the reason in `server_message`, the next step in `user_action.detail` when the server advised one, and `validation_errors` locating the faults of a bundle it refused to load.
 - `RunFailedError` is a run that started and failed; `error` holds its stored report, with the runner's `error_type`, `message`, `error_domain` and `user_action`.
 - `RunTimeoutError` is a run that outlived the wait; it keeps running, and `run_id` reads its result later with `wait_for_result`.
-- `ApiUnreachableError` is a hosted API that could not be reached at all.
+- `ApiUnreachableError` is a hosted API that could not be reached at all, on the routes the SDK owns: the signature read, the uploads, and the polling of a started run.
 - `InputPreparationError` and its subclasses are a local file that could not be read or uploaded.
 
 ## Related Documentation

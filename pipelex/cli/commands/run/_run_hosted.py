@@ -22,9 +22,9 @@ from pipelex.cli.commands.run._run_core import load_run_inputs
 from pipelex.cli.error_handlers import handle_validate_bundle_error, print_traceback_if_requested
 from pipelex.hosted.client_factory import make_hosted_client
 from pipelex.hosted.error_rendering import describe_hosted_error
-from pipelex.hosted.exceptions import HostedRunError
+from pipelex.hosted.exceptions import HostedRunError, HostedRunInterruptedError
 from pipelex.hosted.execution import resolve_run_execution
-from pipelex.hosted.hosted_run import HostedRunOutcome, HostedRunRequest, run_hosted
+from pipelex.hosted.hosted_run import HostedRunOutcome, HostedRunRequest, RunStartedCallback, run_hosted
 from pipelex.hosted.run_config import RunExecution
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipeline.exceptions import ValidateBundleError
@@ -42,6 +42,9 @@ _NATIVE_TEXT_CONCEPT_REF = "native.Text"
 _MAIN_STUFF_NAME = "main_stuff"
 _WORKING_MEMORY_FILENAME = "working_memory.json"
 _GRAPHSPEC_FILENAME = "graphspec.json"
+_FAILURE_HEADING = "Failed to run on the hosted API"
+#: The exit status of a command interrupted by Ctrl-C, the shell's 128 + SIGINT, which Typer gives one too.
+_INTERRUPTED_EXIT_CODE = 130
 
 
 def _fail(*, message: str) -> typer.Exit:
@@ -104,16 +107,16 @@ def refuse_local_only_flags(
         raise _fail(message=msg)
 
 
-def _print_hosted_failure(*, error: PipelineRequestError | HostedRunError) -> None:
+def _print_hosted_failure(*, error: PipelineRequestError | HostedRunError, heading: str = _FAILURE_HEADING) -> None:
     """Print a hosted run's failure as `pipelex.hosted.error_rendering` reads it, the view the agent CLI's envelope carries.
 
     Its validation items name the file each fault is in when the hosted API was told it, and the run id is printed
-    once the hosted API acknowledged the run, so a run that failed, outlived the wait or was lost on the way can be
-    looked up.
+    once the hosted API acknowledged the run, so a run that failed, outlived the wait, was lost on the way or was left
+    running by an interruption can be looked up.
     """
     view = describe_hosted_error(error=error)
     console = get_console()
-    console.print("\n[bold red]Failed to run on the hosted API[/bold red]\n")
+    console.print(f"\n[bold red]{escape(heading)}[/bold red]\n")
     console.print(f"  {escape(view.message)}\n")
     if view.validation_errors:
         for item in view.validation_errors:
@@ -128,9 +131,9 @@ def _print_hosted_failure(*, error: PipelineRequestError | HostedRunError) -> No
         console.print(f"  Request id: {escape(error.request_id)}\n")
 
 
-async def _start_and_wait(*, client: PipelexAPIClient, request: HostedRunRequest) -> HostedRunOutcome:
+async def _start_and_wait(*, client: PipelexAPIClient, request: HostedRunRequest, on_started: RunStartedCallback) -> HostedRunOutcome:
     async with client:
-        return await run_hosted(client=client, request=request)
+        return await run_hosted(client=client, request=request, on_started=on_started)
 
 
 def _main_stuff_concept_ref(*, outcome: HostedRunOutcome) -> str | None:
@@ -202,9 +205,12 @@ def execute_hosted_run(
     output), `working_memory.json`, and `graphspec.json` when the hosted API returned the run's graph, which
     `pipelex graph render` turns into a viewer.
 
+    The run's id is printed as soon as the hosted API acknowledges the start. Interrupted by Ctrl-C, the command names
+    the run, which keeps going on the hosted API, and exits 130.
+
     Raises:
-        typer.Exit: If the base URL is not an origin, the inputs cannot be read, or the hosted run fails, after
-            printing why and what next.
+        typer.Exit: If the base URL is not an origin, the inputs cannot be read, or the hosted run fails or is
+            interrupted, after printing why and what next.
     """
     try:
         client = make_hosted_client(base_url=base_url)
@@ -224,8 +230,19 @@ def execute_hosted_run(
 
     console = get_console()
     console.print(f"Running on the hosted Pipelex API at [bold]{escape(client.base_url)}[/bold]")
+    started_run_ids: list[str] = []
+
+    def _announce_start(*, pipeline_run_id: str) -> None:
+        started_run_ids.append(pipeline_run_id)
+        console.print(f"Run {escape(pipeline_run_id)} started on the hosted API")
+
     try:
-        outcome = asyncio.run(_start_and_wait(client=client, request=request))
+        outcome = asyncio.run(_start_and_wait(client=client, request=request, on_started=_announce_start))
+    except (KeyboardInterrupt, asyncio.CancelledError) as exc:
+        # Ctrl-C stops the wait, not the run: name the run that keeps going, then exit as an interrupted command does.
+        interrupted = HostedRunInterruptedError(pipeline_run_id=started_run_ids[-1] if started_run_ids else None)
+        _print_hosted_failure(error=interrupted, heading="Interrupted")
+        raise typer.Exit(_INTERRUPTED_EXIT_CODE) from exc
     except (PipelineRequestError, HostedRunError) as exc:
         print_traceback_if_requested(console=console)
         _print_hosted_failure(error=exc)
@@ -233,7 +250,7 @@ def execute_hosted_run(
     except Exception as exc:
         # CLI command root: any unexpected failure is reported to the user and exits non-zero via typer.Exit.
         print_traceback_if_requested(console=console)
-        console.print("\n[bold red]Failed to run on the hosted API[/bold red]\n")
+        console.print(f"\n[bold red]{_FAILURE_HEADING}[/bold red]\n")
         console.print(f"  {escape(f'{type(exc).__name__}: {exc}')}\n")
         raise typer.Exit(1) from exc
 

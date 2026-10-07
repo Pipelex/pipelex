@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 from typing import TYPE_CHECKING, Any
@@ -148,6 +149,53 @@ class TestRunHostedEnvelope:
         envelope = json.loads(capsys.readouterr().err)
         assert envelope["error"] is True
         assert envelope["error_type"] == "ValidationError"
+
+    def test_a_hosted_verdict_that_the_failure_is_not_retryable_wins_over_the_local_table(
+        self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """The local table calls this class retryable; the hosted runner said it is not, and only it knows."""
+        report = RunErrorReport.model_validate(
+            {
+                "error_type": "PipeOperatorModelAvailabilityError",
+                "message": "no model available for the pipe",
+                "error_domain": "config",
+                "retryable": False,
+            }
+        )
+        failed = RunFailedError(
+            "Run finished with status FAILED: no model available for the pipe", run_id="run_f3", status=RunStatus.FAILED, error=report
+        )
+        mocker.patch(f"{AGENT_RUN_HOSTED_MODULE}.run_hosted", new=mocker.AsyncMock(side_effect=failed))
+
+        with pytest.raises(typer.Exit):
+            run_method_cmd(name=METHOD_REF, runner=RunExecution.HOSTED, output_format=CliOutputFormat.JSON)
+
+        envelope = json.loads(capsys.readouterr().err)
+        assert envelope["error_type"] == "PipeOperatorModelAvailabilityError"
+        assert envelope["retryable"] is False
+        assert envelope["error_domain"] == "config"
+
+    @pytest.mark.parametrize("interruption", [KeyboardInterrupt(), asyncio.CancelledError()])
+    def test_an_interrupted_run_is_an_envelope_naming_the_run_and_exits_130(
+        self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], interruption: BaseException
+    ) -> None:
+        def _started_then_interrupted(**kwargs: Any) -> HostedRunOutcome:
+            kwargs["on_started"](pipeline_run_id="run_77")
+            raise interruption
+
+        mocker.patch(f"{AGENT_RUN_HOSTED_MODULE}.run_hosted", new=mocker.AsyncMock(side_effect=_started_then_interrupted))
+
+        with pytest.raises(typer.Exit) as exc_info:
+            run_method_cmd(name=METHOD_REF, runner=RunExecution.HOSTED, output_format=CliOutputFormat.JSON)
+
+        assert exc_info.value.exit_code == 130
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        envelope = json.loads(captured.err)
+        assert envelope["error_type"] == "HostedRunInterruptedError"
+        assert envelope["pipeline_run_id"] == "run_77"
+        assert "keeps going on the hosted API" in envelope["message"]
+        assert "run_77" in envelope["hint"]
 
     @pytest.mark.parametrize(
         "error",

@@ -65,3 +65,17 @@ class HostedVersions:
         '{"protocol_version":"0.1.0","implementation":"pipelex-hosted","implementation_version":"0.30.0","runtime_version":null,'
         '"extensions":["runs","method_id","method_ref"]}'
     )
+
+
+class HostedPipeIoVerdicts:
+    """`POST /v1/pipe-io` invalid verdicts, as the runner's crate core builds them."""
+
+    # A method calling a published method by address: the crate core behind pipe-io loads no address-based dependency,
+    # which `/v1/start` fetches and runs. Built from `resolve_crate_from_contents`'s refusal on 2026-10-07.
+    ADDRESS_DEPENDENCY: ClassVar[str] = (
+        '{"is_valid": false, "validation_errors": [{"category": "blueprint_validation", "message": "In-memory resolve cannot load '
+        "address-based dependency 'github.com/mthds/scoring-lib/scoring' from the host filesystem; provide the dependency contents "
+        'in the request or use directory-based resolution."}], "message": "In-memory resolve cannot load address-based dependency '
+        "'github.com/mthds/scoring-lib/scoring' from the host filesystem; provide the dependency contents in the request or use "
+        'directory-based resolution."}'
+    )

@@ -31,7 +31,7 @@ from pipelex_sdk.validation_models import ValidationErrorItem
 
 from pipelex.base_exceptions import ErrorDomain
 from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
-from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunError, HostedRunPollingError
+from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunError, HostedRunInterruptedError, HostedRunPollingError
 
 #: Where a hosted run takes its key from, and where a person gets one.
 HOSTED_API_KEY_NEXT_STEP = (
@@ -80,8 +80,9 @@ class HostedErrorView(NamedTuple):
     `error_domain` says who acts (`input`: the caller's request; `config`: the key, the base URL or the network;
     `runtime`: the run itself), as the hosted API said it when it did; `retryable` is the hosted API's own verdict,
     `None` when it gave none. `pipeline_run_id` names the run once the hosted API acknowledged it, so a run that failed,
-    outlived the wait or was lost on the way can be looked up. `validation_errors` are the hosted API's items locating
-    the faults of a method it refused, each naming its file when the file was sent under a label.
+    outlived the wait, was lost on the way or was left running by an interruption can be looked up.
+    `validation_errors` are the hosted API's items locating the faults of a method it refused, each naming its file
+    when the file was sent under a label.
     """
 
     error_type: str
@@ -136,7 +137,7 @@ def describe_hosted_error(*, error: PipelineRequestError | HostedRunError) -> Ho
             message = error.message
             next_step = error.user_action.detail if error.user_action is not None else "Check the run request: the method, the pipe and the inputs"
             error_domain = error.error_domain
-            if isinstance(error, HostedRunPollingError):
+            if isinstance(error, (HostedRunPollingError, HostedRunInterruptedError)):
                 pipeline_run_id = error.pipeline_run_id
             if isinstance(error, HostedMethodInvalidError):
                 validation_errors = tuple(error.validation_errors)

@@ -7,12 +7,14 @@ catalog id (`method_id`, resolved by the platform). Local files named in the inp
 gateway's 30-second ceiling on a synchronous request.
 
 The lifecycle is the one the SDK's `start_and_wait` drives, taken step by step so that the run's id is in hand once
-the hosted API acknowledges the start: a failure while following the run then names the run, which may still be
-going and is paid for, instead of reading as a network failure before any run.
+the hosted API acknowledges the start: the caller is told it at once, and a failure while following the run names the
+run, which may still be going and is paid for, instead of reading as a network failure before any run. A connection
+lost after the request that runs the method was sent is not read as a network failure either, since the hosted API may
+have created the run before it.
 """
 
 from pathlib import Path
-from typing import Any, Self
+from typing import Any, Protocol, Self
 
 import httpx
 from mthds.protocol.exceptions import PipelineRequestError
@@ -24,12 +26,27 @@ from pipelex_sdk.runs import RunResults
 from pipelex_sdk.upload import UploadRecord
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
-from pipelex.hosted.exceptions import HostedRunPollingError
+from pipelex.hosted.exceptions import HostedRunOutcomeUnknownError, HostedRunPollingError
 from pipelex.hosted.hosted_inputs import prepare_hosted_inputs
 
 #: The `implementation` a bare runner names in its `GET /v1/version` handshake: an open-source pipelex-api, which
 #: keeps no runs to poll. The same value pipelex-sdk's `start_and_wait` tests to choose the blocking route.
 BARE_RUNNER_IMPLEMENTATION = "pipelex-api"
+#: The transport failures httpx raises before a request leaves this machine: no connection was made, so no run exists.
+#: Every other one (a read, a write, a protocol failure) may come after the hosted API received the request.
+_PRE_SEND_TRANSPORT_ERRORS: tuple[type[httpx.TransportError], ...] = (
+    httpx.ConnectError,
+    httpx.ConnectTimeout,
+    httpx.PoolTimeout,
+    httpx.UnsupportedProtocol,
+    httpx.ProxyError,
+)
+
+
+class RunStartedCallback(Protocol):
+    """Told the id of the run the hosted API acknowledged, before the run is followed to its result."""
+
+    def __call__(self, *, pipeline_run_id: str) -> None: ...
 
 
 class HostedRunRequest(BaseModel):
@@ -106,12 +123,7 @@ async def _execute_blocking(*, client: PipelexAPIClient, request: HostedRunReque
     return results_from_execute(result)
 
 
-async def _start_or_execute(*, client: PipelexAPIClient, request: HostedRunRequest, inputs: dict[str, Any] | None) -> str | RunResults:
-    """Start the run and hand back its id; on a server that keeps no runs, run it on the blocking route and hand back its results.
-
-    A start the server refuses for a missing run store created no run, so running the blocking route next cannot run
-    the method twice.
-    """
+async def _start_or_execute_unmapped(*, client: PipelexAPIClient, request: HostedRunRequest, inputs: dict[str, Any] | None) -> str | RunResults:
     if not await _serves_run_lifecycle(client=client):
         return await _execute_blocking(client=client, request=request, inputs=inputs)
     try:
@@ -126,6 +138,32 @@ async def _start_or_execute(*, client: PipelexAPIClient, request: HostedRunReque
     except RunLifecycleUnavailableError:
         return await _execute_blocking(client=client, request=request, inputs=inputs)
     return started.pipeline_run_id
+
+
+async def _start_or_execute(*, client: PipelexAPIClient, request: HostedRunRequest, inputs: dict[str, Any] | None) -> str | RunResults:
+    """Start the run and hand back its id; on a server that keeps no runs, run it on the blocking route and hand back its results.
+
+    A start the server refuses for a missing run store created no run, so running the blocking route next cannot run
+    the method twice.
+
+    The SDK maps a transport failure to `ApiUnreachableError` on the routes it owns, but `start` and `execute`, which
+    it inherits from mthds, let httpx's error through, and only some of them mean the hosted API was not reached. A
+    failure before the request left this machine is mapped as the SDK maps it. Any later one, a connection lost after
+    the request was sent, is a `HostedRunOutcomeUnknownError`: the hosted API may have created the run, and its id
+    never arrived.
+    """
+    try:
+        return await _start_or_execute_unmapped(client=client, request=request, inputs=inputs)
+    except _PRE_SEND_TRANSPORT_ERRORS as exc:
+        if isinstance(exc, httpx.TimeoutException):
+            msg = f"Could not reach Pipelex API at {client.base_url} (timeout)"
+            raise ApiUnreachableError(msg, api_url=client.base_url, code="ABORT_TIMEOUT") from exc
+        code = type(exc).__name__
+        msg = f"Could not reach Pipelex API at {client.base_url} ({code})"
+        raise ApiUnreachableError(msg, api_url=client.base_url, code=code) from exc
+    except httpx.TransportError as exc:
+        msg = f"The connection to the hosted API at {client.base_url} failed after the run request was sent ({type(exc).__name__}: {exc})"
+        raise HostedRunOutcomeUnknownError(msg) from exc
 
 
 async def _follow(*, client: PipelexAPIClient, run_id: str) -> RunResults:
@@ -144,18 +182,23 @@ async def _follow(*, client: PipelexAPIClient, run_id: str) -> RunResults:
         raise HostedRunPollingError(msg, pipeline_run_id=run_id) from exc
 
 
-async def run_hosted(*, client: PipelexAPIClient, request: HostedRunRequest) -> HostedRunOutcome:
+async def run_hosted(*, client: PipelexAPIClient, request: HostedRunRequest, on_started: RunStartedCallback | None = None) -> HostedRunOutcome:
     """Run a method on the hosted API and wait for its result.
 
     Args:
         client: A started client, from `pipelex.hosted.client_factory.make_hosted_client`.
         request: The run.
+        on_started: Told the run's id as soon as the hosted API acknowledges the start, before the run is followed, so
+            a caller interrupted while waiting can still name the run. Not called on a server with no run store, whose
+            blocking route answers with the results directly.
 
     Returns:
         The outcome, its `results` read the same way whatever the source: `results.main_stuff` is the main output's
         content, `results.working_memory` the whole working memory, `results.pipeline_run_id` the run's id.
 
     Raises:
+        HostedLocalFileUploadUnavailableError: If the inputs name a local file and the method calls another one by its
+            address, which the signature read cannot load.
         HostedMethodInvalidError: If the hosted API reads the method's signature and the method does not load.
         ApiResponseError: If the hosted API refuses the request: a key it does not accept, a method it cannot load
             (its `validation_errors` locate the fault), an input it rejects.
@@ -163,33 +206,25 @@ async def run_hosted(*, client: PipelexAPIClient, request: HostedRunRequest) -> 
         RunTimeoutError: If the run outlived the wait; it keeps running, and its id resumes it.
         MissingMainStuffError: If the run completed and delivered no main output.
         HostedRunPollingError: If following a started run failed any other way; it names the run.
-        ApiUnreachableError: If the hosted API cannot be reached before the run starts.
+        HostedRunOutcomeUnknownError: If the connection failed after the run request was sent, so a run may exist.
+        ApiUnreachableError: If the hosted API cannot be reached before the run request is sent.
         InputPreparationError: If a local file cannot be read or uploaded.
     """
-    # The SDK maps a transport failure to `ApiUnreachableError` on the routes it owns, but the protocol routes it
-    # inherits from mthds (`start` and `execute` among them) let httpx's error through. It is mapped here the same way,
-    # so every failure before the run starts reaches the CLIs as one of the SDK's typed errors.
-    try:
-        prepared = await prepare_hosted_inputs(
-            client=client,
-            mthds_files=request.mthds_files,
-            method_ref=request.method_ref,
-            method_id=request.method_id,
-            pipe_code=request.pipe_code,
-            inputs=request.inputs,
-            inputs_base_dir=request.inputs_base_dir,
-        )
-        run_id_or_results = await _start_or_execute(client=client, request=request, inputs=prepared.inputs)
-    except httpx.TimeoutException as exc:
-        msg = f"Could not reach Pipelex API at {client.base_url} (timeout)"
-        raise ApiUnreachableError(msg, api_url=client.base_url, code="ABORT_TIMEOUT") from exc
-    except httpx.TransportError as exc:
-        code = type(exc).__name__
-        msg = f"Could not reach Pipelex API at {client.base_url} ({code})"
-        raise ApiUnreachableError(msg, api_url=client.base_url, code=code) from exc
+    prepared = await prepare_hosted_inputs(
+        client=client,
+        mthds_files=request.mthds_files,
+        method_ref=request.method_ref,
+        method_id=request.method_id,
+        pipe_code=request.pipe_code,
+        inputs=request.inputs,
+        inputs_base_dir=request.inputs_base_dir,
+    )
+    run_id_or_results = await _start_or_execute(client=client, request=request, inputs=prepared.inputs)
 
     if isinstance(run_id_or_results, RunResults):
         results = run_id_or_results
     else:
+        if on_started is not None:
+            on_started(pipeline_run_id=run_id_or_results)
         results = await _follow(client=client, run_id=run_id_or_results)
     return HostedRunOutcome(results=results, uploads=prepared.uploads, pipe_ref=prepared.pipe_ref)

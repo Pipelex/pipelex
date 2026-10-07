@@ -81,3 +81,23 @@ class TestHostedClientFactory:
             make_hosted_client(base_url=base_url)
         assert named_source in exc_info.value.message
         assert "scheme://host[:port]" in exc_info.value.message
+
+    @pytest.mark.parametrize(
+        ("base_url", "env_base_url"),
+        [
+            ("https://alice:s3cret-token@api.pipelex.com", None),
+            (None, "https://alice:s3cret-token@api.pipelex.com/v1?key=s3cret-token#s3cret-token"),
+        ],
+    )
+    def test_a_refused_base_url_is_echoed_without_its_credentials(
+        self, monkeypatch: pytest.MonkeyPatch, base_url: str | None, env_base_url: str | None
+    ) -> None:
+        """The message is caller-facing and ends up in logs and agent transcripts: the userinfo, query and fragment never reach it."""
+        if env_base_url is not None:
+            monkeypatch.setenv(PIPELEX_BASE_URL_ENV_KEY, env_base_url)
+        with pytest.raises(HostedBaseUrlError) as exc_info:
+            make_hosted_client(base_url=base_url)
+        message = exc_info.value.message
+        assert "s3cret-token" not in message
+        assert "alice" not in message
+        assert "api.pipelex.com" in message

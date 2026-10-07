@@ -6,6 +6,7 @@ the environment as a real run builds it.
 
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 from typing import TYPE_CHECKING, Any
@@ -340,6 +341,57 @@ class TestRunHostedCli:
         printed = output.getvalue()
         for expected_line in expected_lines:
             assert expected_line in printed
+
+    def test_an_acknowledged_start_is_announced_with_its_run_id(self, mocker: MockerFixture, bundle_dir: Path, tmp_path: Path) -> None:
+        output = io.StringIO()
+        mocker.patch(f"{RUN_HOSTED_MODULE}.get_console", return_value=Console(file=output, width=250))
+        outcome = HostedRunOutcome(results=RunResults.model_validate(HOSTED_RESULTS))
+
+        def _started(**kwargs: Any) -> HostedRunOutcome:
+            kwargs["on_started"](pipeline_run_id="run_42")
+            return outcome
+
+        mocker.patch(f"{RUN_HOSTED_MODULE}.run_hosted", new=mocker.AsyncMock(side_effect=_started))
+
+        run_bundle_cmd(path=str(bundle_dir), hosted=True, output_dir=str(tmp_path / "results"), no_pretty_print=True)
+
+        assert "Run run_42 started on the hosted API" in output.getvalue()
+
+    @pytest.mark.parametrize("interruption", [KeyboardInterrupt(), asyncio.CancelledError()])
+    def test_an_interrupted_run_names_the_run_that_keeps_going_and_exits_130(
+        self, mocker: MockerFixture, bundle_dir: Path, interruption: BaseException
+    ) -> None:
+        """Ctrl-C stops the wait, not the run: the run id is what finds it again."""
+        output = io.StringIO()
+        mocker.patch(f"{RUN_HOSTED_MODULE}.get_console", return_value=Console(file=output, width=250))
+
+        def _started_then_interrupted(**kwargs: Any) -> HostedRunOutcome:
+            kwargs["on_started"](pipeline_run_id="run_77")
+            raise interruption
+
+        mocker.patch(f"{RUN_HOSTED_MODULE}.run_hosted", new=mocker.AsyncMock(side_effect=_started_then_interrupted))
+
+        with pytest.raises(typer.Exit) as exc_info:
+            run_bundle_cmd(path=str(bundle_dir), hosted=True)
+
+        assert exc_info.value.exit_code == 130
+        printed = output.getvalue()
+        assert "Run id: run_77" in printed
+        assert "keeps going on the hosted API" in printed
+        assert "Traceback" not in printed
+
+    def test_an_interruption_before_the_acknowledgement_points_at_the_run_history(self, mocker: MockerFixture, bundle_dir: Path) -> None:
+        output = io.StringIO()
+        mocker.patch(f"{RUN_HOSTED_MODULE}.get_console", return_value=Console(file=output, width=250))
+        mocker.patch(f"{RUN_HOSTED_MODULE}.run_hosted", new=mocker.AsyncMock(side_effect=KeyboardInterrupt()))
+
+        with pytest.raises(typer.Exit) as exc_info:
+            run_bundle_cmd(path=str(bundle_dir), hosted=True)
+
+        assert exc_info.value.exit_code == 130
+        printed = output.getvalue()
+        assert "run history" in printed
+        assert "Run id:" not in printed
 
     def test_a_hosted_run_prints_no_deck_notice_and_a_local_run_does(self, mocker: MockerFixture, run_hosted: AsyncMock, tmp_path: Path) -> None:
         """The deck notice is about this machine's inference, which a hosted run never boots."""

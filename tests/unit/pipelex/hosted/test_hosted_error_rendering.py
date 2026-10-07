@@ -27,7 +27,13 @@ from pipelex.hosted.error_rendering import (
     describe_hosted_error,
     hosted_refusal_next_step,
 )
-from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunPollingError
+from pipelex.hosted.exceptions import (
+    HostedLocalFileUploadUnavailableError,
+    HostedMethodInvalidError,
+    HostedRunInterruptedError,
+    HostedRunOutcomeUnknownError,
+    HostedRunPollingError,
+)
 from tests.unit.pipelex.hosted.test_data import HostedRefusals
 
 API_URL = "https://api.test"
@@ -216,3 +222,40 @@ class TestHostedErrorRendering:
         assert view.error_domain == "input"
         assert view.validation_errors == (LABELLED_ITEM,)
         assert view.pipeline_run_id is None
+
+    def test_an_interrupted_wait_names_the_run_that_keeps_going(self) -> None:
+        view = describe_hosted_error(error=HostedRunInterruptedError(pipeline_run_id="run_7"))
+
+        assert view.error_type == "HostedRunInterruptedError"
+        assert view.pipeline_run_id == "run_7"
+        assert "run_7" in view.message
+        assert "keeps going" in view.message
+        assert "run_7" in view.next_step
+
+    def test_an_interruption_before_the_acknowledgement_points_at_the_run_history(self) -> None:
+        view = describe_hosted_error(error=HostedRunInterruptedError(pipeline_run_id=None))
+
+        assert view.pipeline_run_id is None
+        assert "run history" in view.next_step
+
+    def test_a_start_lost_after_it_was_sent_points_at_the_run_history(self) -> None:
+        error = HostedRunOutcomeUnknownError("The connection to the hosted API failed after the run request was sent (ReadError: reset)")
+
+        view = describe_hosted_error(error=error)
+
+        assert view.error_type == "HostedRunOutcomeUnknownError"
+        assert view.error_domain == "runtime"
+        assert view.pipeline_run_id is None
+        assert "run history" in view.next_step
+        assert "network" not in view.next_step
+
+    def test_a_local_file_for_a_method_with_an_address_dependency_points_at_a_url(self) -> None:
+        error = HostedLocalFileUploadUnavailableError(
+            "Local file upload is not available yet for methods with address-based dependencies: the method depends on "
+            "github.com/mthds/scoring-lib/scoring"
+        )
+
+        view = describe_hosted_error(error=error)
+
+        assert view.error_domain == "input"
+        assert "https URL" in view.next_step
