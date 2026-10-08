@@ -36,6 +36,7 @@ from tests.unit.pipelex.providers.reportlab.reportlab_test_helpers import (
     image_count,
     page_texts,
     pdf_title,
+    png_bytes,
     png_data_url,
     render_layout,
 )
@@ -117,6 +118,12 @@ class TestReportlabPdfRenderer:
     def test_a_large_image_is_scaled_into_one_page(self) -> None:
         pdf_data = render_layout(blocks=[ImageBlock(url=png_data_url(width=4000, height=6000), caption="Huge")])
         assert len(page_texts(pdf_data=pdf_data)) == 1
+        assert image_count(pdf_data=pdf_data) == 1
+
+    def test_an_image_prints_whatever_type_its_source_declares(self) -> None:
+        """Pillow identifies an image from its bytes, so a misleading declared type does not stop it printing."""
+        resources = StubRenderResources(answer=png_bytes(width=64, height=32), answer_mime_type="text/plain")
+        pdf_data = render_layout(blocks=[ImageBlock(url="pipelex-storage://run/chart", caption=None)], resources=resources)
         assert image_count(pdf_data=pdf_data) == 1
 
     def test_a_file_that_is_not_an_image_is_refused_with_its_position(self) -> None:

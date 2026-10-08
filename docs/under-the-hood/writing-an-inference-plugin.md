@@ -110,7 +110,7 @@ class HelloInferencePlugin:
     name = "hello_inference"
     # The plugin API version this plugin was written against, as a literal: never import the
     # runtime's PLUGIN_API_VERSION here, or the check that catches a breaking runtime upgrade always passes.
-    targets_api = 5
+    targets_api = 6
 
     def register(self, registrar: PluginRegistrar) -> None:
         registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="hello", make_worker=_make_hello_llm_worker)

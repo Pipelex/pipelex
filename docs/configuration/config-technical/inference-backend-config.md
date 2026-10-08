@@ -235,7 +235,7 @@ costs = { input = 0.1, output = 0 }
 
 The table name `acme-one-judgment` names the table and nothing else: methods, the model deck and the routing profiles all use the handle `acme-one`, and the model id defaults to the handle too. Two tables may share a handle only when their model types differ, so a file declaring one handle twice as the same type fails to load, naming both tables. `handle` cannot go in `[defaults]`, which every model of the file inherits, and like every key that describes the model rather than a value a call sends, it cannot reference a variable.
 
-A routing profile routes a handle's name, so its route applies to every kind of model of that name. A model type the routed backend does not serve is looked for along the profile's `fallback_order`, or in the internal backend when it has none, when the name reached that backend by default, is left out when it reached it through a wildcard pattern, and is not served at all when the profile routes the name to that backend exactly: an exact route pins the name to one backend.
+A routing profile routes a handle's name, so its route applies to every kind of model of that name. A model type the routed backend does not serve is looked for along the profile's `fallback_order`, or in the internal backend when it has none, when the name reached that backend by default, is left out when it reached it through a wildcard pattern, and is not served at all when the profile routes the name to that backend exactly: an exact route pins the name to one backend. A name the profile sends to no enabled backend, because no route matches it and neither its `default` nor any backend of its `fallback_order` is enabled, is served by the internal backend for each model type that backend declares under it, and by no other backend.
 
 A method whose pipe names a handle the deck serves only as another kind of model is refused when it loads: a `PipeJudge` naming a handle served only as an LLM is told that the deck serves the handle, but not as a judgment model, and the suggestions list judgment models only.
 
@@ -425,7 +425,9 @@ Common scenarios for hybrid routing:
 
 The **internal backend** is a special backend containing software-only models that run locally without requiring AI services. These include models for PDF text extraction, local document parsing, and other processing tasks that don't need external API calls.
 
-Unlike other backends, internal backend models are **always available** regardless of which routing profile you select. This means you can use these models even when your routing profile is focused on a specific AI provider (e.g., `all_anthropic` or `all_openai`).
+Unlike other backends, internal backend models are **always available** regardless of which routing profile you select. This means you can use these models even when your routing profile is focused on a specific AI provider (e.g., `all_anthropic` or `all_openai`), and even when no backend your profile routes to is enabled: with the internal backend alone enabled, the shipped `all_enabled_backends` profile still serves every internal model.
+
+Two things withhold an internal model. A route that sends its name to another backend on purpose, whether an exact route or a wildcard pattern that catches it, decides where that name goes, as it does for any model. Disabling the internal backend turns off all of its models, including the ones a plugin adds.
 
 This behavior is automatic and requires no additional configuration. To see which models are available from the internal backend, check `.pipelex/inference/backends/internal.toml`.
 

@@ -11,7 +11,7 @@ from typing_extensions import override
 
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
 from pipelex.cogt.doc_gen.layout_tree import LayoutBlock, LayoutDocument, MarkdownBlock
-from pipelex.cogt.doc_gen.render_job import RenderJob, RenderResources
+from pipelex.cogt.doc_gen.render_job import LoadedResource, RenderJob, RenderResources
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
@@ -27,21 +27,26 @@ class ResourceRead(NamedTuple):
 
 
 class StubRenderResources(RenderResources):
-    """Decodes `data:` URLs, or answers every read with `answer` when set, and records each read."""
+    """Decodes `data:` URLs with the type each declares, or answers every read with `answer`, and records each read.
 
-    def __init__(self, *, answer: bytes | None = None):
+    `answer_mime_type` is the type an answer comes with.
+    """
+
+    def __init__(self, *, answer: bytes | None = None, answer_mime_type: str | None = None):
         self.reads: list[ResourceRead] = []
         self._answer = answer
+        self._answer_mime_type = answer_mime_type
 
     @override
-    def load(self, *, uri: str, position: str) -> bytes:
+    def load(self, *, uri: str, position: str) -> LoadedResource:
         self.reads.append(ResourceRead(uri=uri, position=position))
         if self._answer is not None:
-            return self._answer
+            return LoadedResource(data=self._answer, mime_type=self._answer_mime_type)
         header, _, payload = uri.partition(",")
         assert header.startswith("data:"), f"the stub reads data URLs only, not {uri[:40]}"
         assert header.endswith(";base64"), f"the stub reads base64 data URLs only, not {uri[:40]}"
-        return base64.b64decode(payload)
+        declared_type = header.removeprefix("data:").removesuffix(";base64")
+        return LoadedResource(data=base64.b64decode(payload), mime_type=declared_type or None)
 
 
 def reportlab_pdf_model() -> InferenceModelSpec:

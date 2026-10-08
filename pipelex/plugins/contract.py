@@ -31,10 +31,9 @@ if TYPE_CHECKING:
 # worker (``DocGenWorkerAbstract``), the render job with its resources and rendered document (``render_job``), the
 # formats and sources (``doc_gen_format``), ``DocGenRenderError``, the layout tree an engine writes (``layout_tree``),
 # and the template check request with its findings (``template_check``) and input shapes (``InputShape`` and
-# ``InputShapeKind``). Two modules joined it under v5 without a bump, since an addition breaks no plugin that targets
-# v5: the rules by which every engine shows the tree's values (``layout_display``: ``display_scalar``,
-# ``is_numeric_column``, ``markdown_as_html``) and the environment an engine fills a template of plain data in
-# (``template_environment``).
+# ``InputShapeKind``). Two modules joined it with v6, as additions that would have needed no bump of their own: the
+# rules by which every engine shows the tree's values (``layout_display``: ``display_scalar``, ``is_numeric_column``,
+# ``markdown_as_html``) and the environment an engine fills a template of plain data in (``template_environment``).
 #
 # ``add_internal_model`` and ``add_doc_gen_default`` — plain data a plugin declares for the model manager to merge at
 # boot: a model of the internal backend, as the table a backend file would hold, and the model deck's default engine for
@@ -44,7 +43,12 @@ if TYPE_CHECKING:
 # a ``LogSinkFactoryFn`` receives it as the ``secrets_provider`` keyword argument, so a sink's settings can
 # name a secret. A factory written against v4 would be called with a keyword it does not accept and fail at
 # boot with a bare ``TypeError``; the bump turns that into a discovery-time mismatch naming the plugin.
-PLUGIN_API_VERSION: int = 5
+#
+# v6 changed the document engine contract: ``RenderResources.load`` returns a ``LoadedResource``, a file's bytes with
+# the media type its source gives it, where it returned the bytes alone. An engine written against v5 would receive
+# the model where it expects bytes and fail in the middle of a print, with a ``TypeError`` raised deep inside its
+# rendering library; the bump turns that into a discovery-time mismatch naming the plugin.
+PLUGIN_API_VERSION: int = 6
 
 
 @runtime_checkable

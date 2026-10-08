@@ -201,8 +201,9 @@ class _RenderImages:
         loaded = self._images.get(number)
         if loaded is None or loaded.url != url:
             position = f"image {number} of the document"
-            data = self._resources.load(uri=url, position=position)
-            loaded = _decode_image(url=url, data=data, position=position)
+            # The media type goes unread: Pillow identifies the image from its bytes, whatever its source declared.
+            resource = self._resources.load(uri=url, position=position)
+            loaded = _decode_image(url=url, data=resource.data, position=position)
             self._images[number] = loaded
         return loaded
 

@@ -6880,6 +6880,10 @@ rationale = "Factory from source: builds the result from the uri; single operand
 param = "url"
 rationale = "Factory from source: builds the result from the url; single operand."
 
+["pipelex/tools/uri/uri_bytes.py::load_bytes_and_mime_type_from_any_uri"]
+param = "uri"
+rationale = "Loads the bytes and media type one URI names."
+
 ["pipelex/tools/uri/uri_bytes.py::load_bytes_from_any_uri"]
 param = "uri"
 rationale = "Loads the bytes one URI names."

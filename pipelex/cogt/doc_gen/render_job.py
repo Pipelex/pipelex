@@ -6,8 +6,9 @@ engine returns. An engine is the worker of a `doc_gen` model (`DocGenWorkerAbstr
 the plugin registrar's `add_inference_backend`, and the Pipelex document generation plugin registers its own
 from outside this repository, so this module and the worker are that plugin's contract with Pipelex:
 everything an engine needs arrives as plain data in the job, and the one thing it reads from outside the job,
-a file the document names (an image), it reads through the `RenderResources` it is handed, which applies the
-run's read scope. The job never carries a Pipelex object, so an ordinary Pipelex release does not break an
+a file the document names (an image, a stylesheet), it reads through the `RenderResources` it is handed, which
+applies the run's read scope and returns the file as a `LoadedResource`, its bytes with the media type its source
+gives it. The job never carries a Pipelex object, so an ordinary Pipelex release does not break an
 engine; changing this module is a change of the plugin contract, versioned by `PLUGIN_API_VERSION`.
 """
 
@@ -74,6 +75,29 @@ class RenderedDocument(BaseModel):
     data: bytes
 
 
+class LoadedResource(BaseModel):
+    """What `RenderResources.load` returns: a file's bytes, and the media type its source gives it.
+
+    `mime_type` is lowercased and without its parameters, such as `text/css`, and it is the source's word, never a
+    guess, so it is `None` when the source gives none:
+
+    - **`https://`**: the final response's `Content-Type`, after redirects; `None` when the response sends none.
+    - **`data:`**: the type the URL declares.
+    - **`pipelex-storage://`**: the type the storage provider has for the key. A cloud provider (S3, GCS) returns the
+      content type recorded when the file was stored; the local and in-memory providers identify binary formats from
+      the bytes and have none for a text format, such as a stylesheet or an SVG.
+    - **A local path**, which only an unscoped run reads: `None`, since a file system records no type.
+
+    A declared type is returned as declared, even a generic one such as `application/octet-stream`, and is not checked
+    against the bytes. An engine that needs a type, such as an HTML engine that keeps a stylesheet only when it is
+    `text/css`, falls back to its own guess from the URI or the bytes when the type is `None` or says nothing. A model
+    rather than a tuple, so the contract can grow an optional field without breaking an engine.
+    """
+
+    data: bytes
+    mime_type: str | None = None
+
+
 class RenderResources(Protocol):
     """How an engine reads a file its document names, such as the image of an image block.
 
@@ -83,8 +107,8 @@ class RenderResources(Protocol):
     may be called from the thread the engine prints in.
     """
 
-    def load(self, *, uri: str, position: str) -> bytes:
-        """Return the bytes a URI points at.
+    def load(self, *, uri: str, position: str) -> LoadedResource:
+        """Return the bytes a URI points at, with the media type its source gives them (`LoadedResource`).
 
         Args:
             uri: The URI the document names.
