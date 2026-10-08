@@ -1,6 +1,7 @@
 """This repo's own linter config, gated against the corpus's ``fails_at`` signal.
 
-Contract: ``docs/specs/mthds-test-corpus.md`` (workspace root), section "Tag vocabulary".
+Contract: ``conformance/specs/mthds-test-corpus.md`` (the cross-repo spec, kept in the ``conformance``
+repo), section "Tag vocabulary".
 
 `pipelex` is the first consumer of its own signal, and `.pipelex/plxt.toml` is where it consumes
 it. Every deliberately invalid corpus entry used to be excluded from `plxt lint` by one blanket
