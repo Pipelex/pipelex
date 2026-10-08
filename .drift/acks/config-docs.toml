@@ -1,8 +1,8 @@
 contract = "config-docs"
 digest = "sha256:46c31fd39394e47c2ae4442305c8ba645a976ff45dc44286f8f3416f73a3bf11"
-reviewed_by = "claude-opus-5-5"
-reviewed_at = "2026-10-07T20:24:27Z"
-rationale = "clean-pass: merge of the partial-home fill branch into the init-login stack. The one trigger change is config_loader.py, whose ensure_global_config_exists now fills each missing kit file into the home through copy_kit_templates, keeps the inference directory whole unless backends.toml is absent, writes atomically and never through a link. docs/configuration/index.md as merged carries both sides: the PIPELEX_HOME section describes this fill, and the sections list keeps the run section with its run-config page. No config model, default, validator or load order moved, so the migration ledgers owe nothing."
+reviewed_by = "Claude (Opus 5.5)"
+reviewed_at = "2026-10-08T12:44:52Z"
+rationale = "clean-pass: merged tree of origin/dev into this branch. The open trigger changes are this branch's own, the run section in pipelex/pipelex.toml and RunConfig in configs.py, already answered on the branch by run-config.md and the five-section list in docs/configuration/index.md; dev changed only the home fill in config_loader.py. The auto-merged index.md reads as one: dev's rewritten PIPELEX_HOME section and this branch's section list touch different paragraphs. A hosted run that reads the run setting goes through load_config and so now fills a home's missing kit files like any boot; run-config.md and run.md say a hosted run boots nothing locally and needs no inference configuration, which stays true, and no doc claims it leaves the home untouched. The run path is additive, so no migration ledger entry, and neither side touched the ledgers."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:02f71cb4a6b01aebda59c2e31f262ef9c865e17b"
