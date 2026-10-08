@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
     import pytest
@@ -11,41 +11,36 @@ if TYPE_CHECKING:
 
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.models_cmd import agent_models_cmd
+from pipelex.cogt.config_cogt import ModelDeckConfig
+from pipelex.cogt.extract.extract_setting import ExtractSetting
+from pipelex.cogt.img_gen.img_gen_job_components import Quality
+from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
+from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoicesDefaults
+from pipelex.cogt.llm.thinking_mode import ThinkingMode
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_spec_index import ModelSpecIndex
 from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.models.model_listing import ModelCategory
+from pipelex.cogt.usage.cost_category import CostCategory
+from pipelex.system.runtime import ProblemReaction
 
 CMD_MODULE_PATH = "pipelex.cli.agent_cli.commands.models_cmd"
 OPS_MODULE_PATH = "pipelex.cogt.models.model_listing"
 
 
-class _FakeSetting:
-    """Minimal stand-in for LLMSetting / ExtractSetting / ImgGenSetting."""
-
-    def __init__(self, model: str, description: str | None = None):
-        self.model = model
-        self.description = description
-
-
-class _FakeInferenceModelSpec:
-    """Minimal stand-in for InferenceModelSpec."""
-
-    def __init__(self, backend_name: str, model_type: ModelType):
-        self.backend_name = backend_name
-        self.model_type = model_type
-
-
 class TestData:
     """Shared test data constants."""
 
-    LLM_PRESETS: ClassVar[dict[str, _FakeSetting]] = {
-        "fast": _FakeSetting(model="gpt-4o-mini", description="Fast LLM"),
-        "smart": _FakeSetting(model="claude-sonnet", description="Smart LLM"),
+    LLM_PRESETS: ClassVar[dict[str, LLMSetting]] = {
+        "fast": LLMSetting(model="gpt-4o-mini", temperature=0.5, description="Fast LLM"),
+        "smart": LLMSetting(model="claude-sonnet", temperature=0.5, description="Smart LLM"),
     }
-    EXTRACT_PRESETS: ClassVar[dict[str, _FakeSetting]] = {
-        "doc-extract": _FakeSetting(model="textract-model", description="Doc extraction"),
+    EXTRACT_PRESETS: ClassVar[dict[str, ExtractSetting]] = {
+        "doc-extract": ExtractSetting(model="textract-model", description="Doc extraction"),
     }
-    IMG_GEN_PRESETS: ClassVar[dict[str, _FakeSetting]] = {
-        "hd-image": _FakeSetting(model="dall-e-3", description="HD images"),
+    IMG_GEN_PRESETS: ClassVar[dict[str, ImgGenSetting]] = {
+        "hd-image": ImgGenSetting(model="dall-e-3", description="HD images"),
     }
 
     LLM_ALIASES: ClassVar[dict[str, str]] = {"best-llm": "claude-sonnet"}
@@ -56,6 +51,7 @@ class TestData:
     EXTRACT_WATERFALLS: ClassVar[dict[str, list[str]]] = {"extract-wf": ["textract-model"]}
     IMG_GEN_WATERFALLS: ClassVar[dict[str, list[str]]] = {"img-wf": ["dall-e-3"]}
 
+    # The models the deck serves: handle -> (backend, model type).
     INFERENCE_MAP: ClassVar[dict[str, tuple[str, ModelType]]] = {
         "gpt-4o-mini": ("openai", ModelType.LLM),
         "claude-sonnet": ("anthropic", ModelType.LLM),
@@ -64,44 +60,60 @@ class TestData:
     }
 
 
-def _make_fake_model_deck() -> Any:
-    """Create a fake ModelDeck with all test data."""
-
-    class FakeModelDeck:
-        llm_presets = TestData.LLM_PRESETS
-        extract_presets = TestData.EXTRACT_PRESETS
-        img_gen_presets = TestData.IMG_GEN_PRESETS
-        search_presets: ClassVar[dict[str, Any]] = {}
-        judgment_presets: ClassVar[dict[str, Any]] = {}
-
-        llm_aliases = TestData.LLM_ALIASES
-        extract_aliases = TestData.EXTRACT_ALIASES
-        img_gen_aliases = TestData.IMG_GEN_ALIASES
-        search_aliases: ClassVar[dict[str, str]] = {}
-        judgment_aliases: ClassVar[dict[str, str]] = {}
-
-        llm_waterfalls = TestData.LLM_WATERFALLS
-        extract_waterfalls = TestData.EXTRACT_WATERFALLS
-        img_gen_waterfalls = TestData.IMG_GEN_WATERFALLS
-        search_waterfalls: ClassVar[dict[str, list[str]]] = {}
-        judgment_waterfalls: ClassVar[dict[str, list[str]]] = {}
-
-        def get_optional_inference_model(self, model_handle: str, model_type: ModelType) -> _FakeInferenceModelSpec | None:
-            entry = TestData.INFERENCE_MAP.get(model_handle)
-            if entry is None:
-                return None
-            backend_name, spec_model_type = entry
-            if spec_model_type != model_type:
-                return None
-            return _FakeInferenceModelSpec(backend_name=backend_name, model_type=spec_model_type)
-
-    return FakeModelDeck()
+def _model_spec(*, name: str, backend_name: str, model_type: ModelType) -> InferenceModelSpec:
+    return InferenceModelSpec(
+        backend_name=backend_name,
+        name=name,
+        sdk="test_sdk",
+        model_type=model_type,
+        model_id=name,
+        costs={CostCategory.INPUT: 0.001, CostCategory.OUTPUT: 0.002},
+        thinking_mode=ThinkingMode.NONE,
+        max_tokens=1000,
+        max_prompt_images=None,
+    )
 
 
-def _setup_mocks(mocker: MockerFixture) -> None:
+def _make_model_deck(
+    *,
+    llm_aliases: dict[str, str] | None = None,
+    llm_waterfalls: dict[str, list[str]] | None = None,
+) -> ModelDeck:
+    """A real model deck serving the test data's models, with its presets, aliases and waterfalls."""
+    return ModelDeck(
+        inference_models=ModelSpecIndex.make_from_specs(
+            model_specs=[
+                _model_spec(name=name, backend_name=backend_name, model_type=model_type)
+                for name, (backend_name, model_type) in TestData.INFERENCE_MAP.items()
+            ]
+        ),
+        llm_default_temperature=0.7,
+        llm_presets=TestData.LLM_PRESETS,
+        llm_aliases=TestData.LLM_ALIASES if llm_aliases is None else llm_aliases,
+        llm_waterfalls=TestData.LLM_WATERFALLS if llm_waterfalls is None else llm_waterfalls,
+        llm_choice_defaults=LLMSettingChoicesDefaults(
+            default_temperature=0.7,
+            for_text=LLMSetting(model="gpt-4o-mini", temperature=0.7),
+            for_object=LLMSetting(model="gpt-4o-mini", temperature=0.1),
+        ),
+        extract_presets=TestData.EXTRACT_PRESETS,
+        extract_aliases=TestData.EXTRACT_ALIASES,
+        extract_waterfalls=TestData.EXTRACT_WATERFALLS,
+        extract_choice_default="textract-model",
+        img_gen_default_quality=Quality.MEDIUM,
+        img_gen_presets=TestData.IMG_GEN_PRESETS,
+        img_gen_aliases=TestData.IMG_GEN_ALIASES,
+        img_gen_waterfalls=TestData.IMG_GEN_WATERFALLS,
+        img_gen_choice_default="dall-e-3",
+        search_choice_default="@default-search",
+        model_deck_config=ModelDeckConfig(is_model_fallback_enabled=True, missing_presets_reaction=ProblemReaction.NONE),
+    )
+
+
+def _setup_mocks(mocker: MockerFixture, *, model_deck: ModelDeck | None = None) -> None:
     """Patch the common dependencies for agent_models_cmd."""
     mocker.patch(f"{CMD_MODULE_PATH}.make_pipelex_for_agent_cli")
-    mocker.patch(f"{OPS_MODULE_PATH}.get_model_deck", return_value=_make_fake_model_deck())
+    mocker.patch(f"{OPS_MODULE_PATH}.get_model_deck", return_value=model_deck or _make_model_deck())
     mocker.patch(f"{CMD_MODULE_PATH}.Pipelex")
 
 
@@ -255,3 +267,17 @@ class TestAgentModelsCmd:
         assert "llm-wf" in parsed["waterfalls"]["llm"]
         assert len(parsed["waterfalls"]["img_gen"]) == 0
         assert len(parsed["waterfalls"]["extract"]) == 0
+
+    def test_backend_filter_skips_an_alias_whose_waterfall_no_backend_serves(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+        """An alias bound to a waterfall none of whose models is served resolves on no backend, rather than failing the listing."""
+        model_deck = _make_model_deck(
+            llm_aliases={"robust": "~unserved", "best-gpt": "gpt-4o-mini"},
+            llm_waterfalls={"unserved": ["gpt-9", "gpt-10"]},
+        )
+        _setup_mocks(mocker, model_deck=model_deck)
+
+        agent_models_cmd(backend="openai", output_format=CliOutputFormat.JSON)
+
+        parsed = json.loads(capsys.readouterr().out)
+        assert parsed["success"] is True
+        assert parsed["aliases"]["llm"] == {"best-gpt": "gpt-4o-mini"}

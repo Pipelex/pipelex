@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:f37d70276b464ff7d45400c3db49c3dbd7069118ed1f8dfc49e8cb95e32b2447"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-07T15:52:58Z"
-rationale = "real-catch: both hosted run modules changed what the CLI docs describe. run.md now says the run id prints as soon as the run is acknowledged, Ctrl-C names the run that keeps going and exits 130, a connection lost after the run request was sent points at the run history rather than the network, a file URI is read as its path, a null optional file reaches the run, and the signature is read only when the inputs name an existing local file, with the address-dependency refusal and its https URL route. agent-cli.md lists HostedRunOutcomeUnknownError, HostedLocalFileUploadUnavailableError and the HostedRunInterruptedError envelope with exit 130, and says retryable is the runner's verdict, false included. pipelex/cli/agent_cli/CLAUDE.md describes the on_started callback, the interrupt envelope, the pre-send transport split and the retryable rule. Nothing else under docs/tools/cli was stale."
+digest = "sha256:3cfdb2a2e22433ddfc17acde3931833f7069d06a909414d146327406c775cbbb"
+reviewed_by = "Claude (Opus 5.5)"
+reviewed_at = "2026-10-08T07:30:30Z"
+rationale = "clean-pass: merged tree of origin/dev into this branch. No trigger file changed on both sides: dev changed only check_model_cmd.py, which reads no runner option, and this branch changed the hosted run surface, whose docs it reviewed and updated in run.md, run-by-address.md, index.md, update.md, agent-cli.md and pipelex/cli/agent_cli/CLAUDE.md. The two review targets both sides edited merged without conflict: agent-cli.md keeps dev's check-model row, whose link to the api-server models page resolves, beside this branch's run options and hosted refusals, and CLAUDE.md keeps dev's check-model row beside the hosted-run notes. Nothing under docs/tools/cli is stale against the merged CLI."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -13,7 +13,7 @@ rationale = "real-catch: both hosted run modules changed what the CLI docs descr
 "pipelex/cli/agent_cli/commands/agent_cli_factory.py" = "blob:f96268c610cdd3b7328919768d1aef1b8ba4e084"
 "pipelex/cli/agent_cli/commands/agent_output.py" = "blob:a3651bb1023350e358d7865c3e9d401b3408b5c7"
 "pipelex/cli/agent_cli/commands/bundle_path_resolver.py" = "blob:a1904517c731afb72af7d49adf6d217dc50b2660"
-"pipelex/cli/agent_cli/commands/check_model_cmd.py" = "blob:42a6b8c02a1d103394e12243181af8ea1c16f31d"
+"pipelex/cli/agent_cli/commands/check_model_cmd.py" = "blob:3a9c93daecadf266b3eba466904b3d005d448d40"
 "pipelex/cli/agent_cli/commands/codegen/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/codegen/app.py" = "blob:56130b89fe9efec5ad3d014ed6bc16bef1bd1645"
 "pipelex/cli/agent_cli/commands/codegen/check_cmd.py" = "blob:9e8beb084a9f04f39e8acca9e6ae2554d40cb667"

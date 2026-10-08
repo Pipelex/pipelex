@@ -35,7 +35,7 @@ pipelex_api/
       codegen.py       # POST /v1/codegen (crate → typed artifacts)
       crate_ops.py     # Closure resolution, the pipe selection chain, and the invalid-arm envelope the crate routes share
       tools.py         # POST /v1/lint, /v1/format (editor tooling)
-      agent/           # GET /v1/models
+      agent/           # GET /v1/models, GET /v1/models/check (the model reference check)
 tests/
   unit/                # Unit tests
 scripts/
@@ -48,7 +48,7 @@ hatch_build.py             # The metadata hook that writes the dependencies and 
 
 This server is the reference implementation of the [MTHDS Protocol](https://mthds.ai): `POST /execute`, `POST /start`, `POST /validate`, `GET /models`, `GET /version` under the `/v1` base path, tagged `x-mthds-protocol: true` in the committed OpenAPI artifact (`docs/api-server/openapi/pipelex-api.openapi.yaml` at the repository root, regenerated via `make openapi-export`, drift-checked via `make openapi-check`). Contract nesting: MTHDS Protocol ⊂ Pipelex API ⊂ Pipelex hosted API.
 
-**Only those five operations carry `x-mthds-protocol`** — the flag is how a conformance suite or a third-party runner extracts the portable subset of the artifact, so tagging a Pipelex route would misrepresent the standard. Everything else this server serves is a Pipelex API extension: `/resolve` + `/codegen`, `/pipe-io`, and `/lint` + `/format`. Watch `/resolve` and `/codegen` in particular: they *look* protocol-shaped (they speak the `/validate` verdict discipline, and the crate `/resolve` emits is genuinely standard-owned — the MTHDS Library Crate Format, so its wire fields stay brand-neutral), but the routes are ours and the standard specifies no type projection at all. `tests/unit/test_openapi_contract.py` pins the tagged set exactly, in both directions.
+**Only the protocol's own operations carry `x-mthds-protocol`** — the flag is how a conformance suite or a third-party runner extracts the portable subset of the artifact, so tagging a Pipelex route would misrepresent the standard. Everything else this server serves is a Pipelex API extension: `/resolve` + `/codegen`, `/pipe-io`, `/models/check`, and `/lint` + `/format`. Watch `/resolve` and `/codegen` in particular: they *look* protocol-shaped (they speak the `/validate` verdict discipline, and the crate `/resolve` emits is genuinely standard-owned — the MTHDS Library Crate Format, so its wire fields stay brand-neutral), but the routes are ours and the standard specifies no type projection at all. `tests/unit/test_openapi_contract.py` pins the tagged set exactly, in both directions.
 
 pipelex's own models ride this wire (the run result, the bundle blueprint, the validation error vocabulary), so a library change can move the artifact with no change to the server's code. `openapi-check` is part of `make agent-check` for that reason: regenerate with `make openapi-export` and read the diff, which states what the change did to the server's callers.
 
