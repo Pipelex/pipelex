@@ -1,0 +1,29 @@
+# The hosted plane's inference backends: Pipelex Manifold and pipelex's internal backend, nothing else.
+#
+# Hand-maintained on purpose. `pipelex init inference` would write every provider the kit knows, and
+# the hosted plane uses none of them: every model call goes to Pipelex Manifold, the in-VPC inference
+# gateway, and a declared backend is one more thing that can demand a credential at boot. There is no
+# `backends_override.toml` beside this file; this is the whole document.
+#
+# `[pipelex_manifold]` is ours alone: pipelex's kit stopped shipping a block for it in 0.73.0, so this
+# declaration is the only one there is. pipelex reads its model specs from
+# `backends/pipelex_manifold.toml`, part of the model registry's runtime slice: the catalog
+# `models/catalog.toml` without the gateway's two keys, written beside this file by the image build
+# and by `make models` (models/README.md), and gitignored here. Those specs carry no `model_id`, so
+# the model the runtime sends is the handle, and Manifold maps it to the provider. The endpoint (the
+# gateway's origin, no `/v1`) and the service token arrive as the PIPELEX_MANIFOLD_ENDPOINT and
+# PIPELEX_MANIFOLD_API_KEY task env vars.
+#
+# `[internal]` is not an AI provider: it is pipelex's software-only backend, serving the PDF text
+# extractors (`pypdfium2-extract-pdf`, `docling-extract-text`) that the deck's `default-text-from-pdf`
+# and `default-no-inference` presets name. It needs no credential and makes no network call.
+
+[pipelex_manifold]
+display_name = "Pipelex Manifold"
+enabled = true
+endpoint = "${PIPELEX_MANIFOLD_ENDPOINT}"
+api_key = "${PIPELEX_MANIFOLD_API_KEY}"
+auth_header = "x-pipelex-api-key"
+
+[internal] # software-only backend, runs internally, without AI
+enabled = true

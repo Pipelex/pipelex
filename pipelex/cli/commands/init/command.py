@@ -3,11 +3,13 @@
 `init_cmd` runs in three stages:
 
 1. **Inspect** (`inspect_initialization`): read what is on disk and what the focus asks for, and decide which steps
-   are needed. It asks nothing and writes nothing, so a check of the existing configuration, such as one for a former
-   release's files, belongs here.
-2. **Choose** (`choose_initialization`): the confirmation, then where runs execute, the hosted Pipelex API or this
-   machine. A remedy that must run before that question, such as cleaning up what the inspection found, belongs at
-   the start of this stage.
+   are needed. It asks nothing and writes nothing. It also finds what a former release that ran on the Pipelex Gateway
+   left in the configuration directories a boot reads, read together as the boot merges them, and
+   whether it stops this machine's boot, which is the boot's own check over the files it merges.
+2. **Choose** (`choose_initialization`): first, when the inspection found what a former release left and someone is
+   there to answer, say so and offer the cleanup `pipelex migrate` runs, then run it on a yes; then the
+   confirmation, then where runs execute, the hosted Pipelex API or this machine. An unattended run (`pipelex doctor
+   --fix`) never runs the cleanup: the doctor asks about it itself.
 3. **Execute** (`execute_initialization`): write the files and run the steps the choices call for. Only the local
    path's own steps (backends, routing, credentials) and the hosted path's sign-in ask anything more.
 """
@@ -19,6 +21,7 @@ import typer
 from pydantic import BaseModel, ConfigDict
 from rich.console import Console
 from rich.markup import escape
+from rich.panel import Panel
 from rich.prompt import Confirm
 
 from pipelex import log
@@ -43,9 +46,18 @@ from pipelex.cli.commands.init.ui.general_ui import build_initialization_panel
 from pipelex.cli.commands.init.ui.setup_path_ui import prompt_setup_path
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cli.commands.login.command import LOGIN_PASTE_COMMAND
+from pipelex.cli.commands.migrate_cmd import apply_former_release_cleanup
 from pipelex.cogt.models.deck_manifest import stamp_kit_manifests
+from pipelex.core.validation import MIGRATE_COMMAND
 from pipelex.hosted.run_config import RunExecution
 from pipelex.kit.paths import get_kit_configs_dir
+from pipelex.migration.former_release import (
+    FormerReleaseFinding,
+    FormerReleaseFindings,
+    detect_former_release_across,
+    former_release_boot_blockers,
+    kit_default_routing_profile_name,
+)
 from pipelex.runtime_hub import get_console
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
@@ -117,6 +129,12 @@ class InitInspection(BaseModel):
     needs_inference: bool
     needs_routing: bool
     needs_telemetry: bool
+    #: The configuration directories a boot reads, the home's then the project's, which the former-release cleanup runs over.
+    former_release_config_dirs: list[Path]
+    #: What a former release left in each of them, read as the boot merges them; empty when nothing.
+    former_release_findings: list[FormerReleaseFindings]
+    #: What of it stops this machine's boot, read off the files that boot merges; empty when the boot starts.
+    former_release_boot_blockers: list[FormerReleaseFinding]
 
     @property
     def asks_setup_path(self) -> bool:
@@ -217,6 +235,15 @@ def inspect_initialization(*, focus: InitFocus, local: bool) -> InitInspection:
     if needs_config and is_first_time_backends_setup:
         needs_inference = True
 
+    # Every directory a boot reads, not only the target, read together: a profile one of them activates can be defined in the
+    # other, and a former release's files there stop the boot as surely.
+    former_release_config_dirs = list(config_manager.existing_config_dirs)
+    former_release_findings = [findings for findings in detect_former_release_across(config_dirs=former_release_config_dirs) if not findings.is_clean]
+    boot_blockers = former_release_boot_blockers(
+        backends_library_paths=config_manager.backends_file_paths(),
+        routing_profile_library_paths=config_manager.routing_profiles_file_paths(),
+    )
+
     return InitInspection(
         focus=focus,
         target_config_dir=target_config_dir,
@@ -236,7 +263,74 @@ def inspect_initialization(*, focus: InitFocus, local: bool) -> InitInspection:
         needs_inference=needs_inference,
         needs_routing=needs_routing,
         needs_telemetry=needs_telemetry,
+        former_release_config_dirs=former_release_config_dirs,
+        former_release_findings=former_release_findings,
+        former_release_boot_blockers=boot_blockers,
     )
+
+
+def describe_former_release_findings(*, findings: list[FormerReleaseFindings], blockers: list[FormerReleaseFinding]) -> str:
+    """What a former release left, in words: what of it stops the boot, the files it is in, and what the cleanup does.
+
+    The findings that stop the boot are spelled out; the rest are counted by file, since `pipelex migrate --dry-run`
+    lists every change for whoever wants each one.
+
+    Args:
+        findings: What the former release left, per directory.
+        blockers: What of it stops this machine's boot, as `former_release_boot_blockers` reads the files the boot merges.
+    """
+    lead = "This machine was set up by a former Pipelex release, which ran models through the Pipelex Gateway, and this release no longer has it."
+    if blockers:
+        lines = [f"{lead} Pipelex cannot start until what that release left is cleaned up:", *(f"• {finding.description}" for finding in blockers)]
+    else:
+        lines = [f"{lead} What that release left no longer stops Pipelex from starting, and is still worth removing."]
+    file_count = sum(len(directory_findings.file_paths) for directory_findings in findings)
+    lines += ["", f"It is in {file_count} file(s):"]
+    for directory_findings in findings:
+        relative_paths = [path.relative_to(directory_findings.config_dir).as_posix() for path in directory_findings.file_paths]
+        lines.append(f"• in '{directory_findings.config_dir}': {', '.join(relative_paths)}")
+    lines += [
+        "",
+        (
+            "The cleanup removes it and keeps a copy of each file it changes or removes; when the active routing profile is one of that "
+            f"release's, it moves it to '{kit_default_routing_profile_name()}'. Run `{MIGRATE_COMMAND} --dry-run` to see each change."
+        ),
+    ]
+    return "\n".join(lines)
+
+
+def offer_former_release_cleanup(*, console: Console, inspection: InitInspection) -> None:
+    """Say what a former release left, and clean it up on a yes.
+
+    The cleanup is `pipelex migrate`'s first step, the same write pass with the same copies kept. A no leaves the files
+    as they are and the setup goes on: what it writes into the target replaces that directory's inference files, but
+    not the files beside them nor the other directory's, which go on stopping the boot until the cleanup runs. Only
+    asked of a person: nothing removes or rewrites a user's files without a yes.
+    """
+    console.print()
+    console.print(
+        Panel(
+            escape(describe_former_release_findings(findings=inspection.former_release_findings, blockers=inspection.former_release_boot_blockers)),
+            title="[bold yellow]Left by a former release[/bold yellow]",
+            border_style="yellow",
+        )
+    )
+    if not Confirm.ask("[bold]Clean it up now?[/bold]", default=True):
+        until = " Pipelex will not start until then." if inspection.former_release_boot_blockers else ""
+        console.print(f"[yellow]Left as it is.[/yellow] [cyan]{MIGRATE_COMMAND}[/cyan] cleans it up whenever you are ready.{until}")
+        return
+    cleanup = apply_former_release_cleanup(config_dirs=inspection.former_release_config_dirs)
+    if cleanup.still_blocking:
+        console.print(
+            f"[yellow]⚠ Pipelex still cannot start after the cleanup, as marked above. Fix what is named there, then run "
+            f"[cyan]{MIGRATE_COMMAND}[/cyan] to check.[/yellow]"
+        )
+    elif cleanup.needs_attention:
+        console.print(
+            f"[yellow]⚠ Some files could not be cleaned up, as marked above. Run [cyan]{MIGRATE_COMMAND}[/cyan] once they can be written.[/yellow]"
+        )
+    else:
+        console.print(f"[green]✓[/green] Cleaned up {len(cleanup.applied_files)} file(s); a copy of each original is beside it.")
 
 
 def confirm_initialization(
@@ -299,13 +393,14 @@ def confirm_initialization(
 
 
 def choose_initialization(*, console: Console, inspection: InitInspection, skip_confirmation: bool) -> InitChoices:
-    """Stage 2: confirm, then ask where runs execute when this run decides it.
+    """Stage 2: offer the cleanup of what a former release left, confirm, then ask where runs execute when this run decides it.
 
     Args:
         console: Rich Console instance for user interaction.
         inspection: What stage 1 found.
-        skip_confirmation: Ask nothing (`pipelex doctor --fix`): the confirmation is skipped, and where runs execute
-            is the one the target's `[run] execution` already sets, local for a `pipelex.toml` that sets none, and the
+        skip_confirmation: Ask nothing (`pipelex doctor --fix`): what a former release left is not offered and not
+            cleaned up, since the doctor asks about it itself; the confirmation is skipped, and where runs execute is
+            the one the target's `[run] execution` already sets, local for a `pipelex.toml` that sets none, and the
             hosted Pipelex API only for a brand-new home with no `pipelex.toml` yet.
 
     Returns:
@@ -314,6 +409,9 @@ def choose_initialization(*, console: Console, inspection: InitInspection, skip_
     Raises:
         typer.Exit: If the person cancels at the confirmation.
     """
+    if inspection.former_release_findings and not skip_confirmation:
+        offer_former_release_cleanup(console=console, inspection=inspection)
+
     if skip_confirmation:
         console.print()
         return InitChoices(setup_path=inspection.unattended_setup_path, interactive=False)
@@ -501,9 +599,10 @@ def init_cmd(
 
     Args:
         focus: What to initialize - 'all', 'config', 'credentials', 'inference', 'routing', or 'telemetry'
-        skip_confirmation: If True, ask nothing (used when called from doctor --fix): skip the confirmation, keep the
-            `[run] execution` already set (local for a `pipelex.toml` that sets none), take the hosted Pipelex API only
-            for a brand-new home with no `pipelex.toml`, and print `pipelex login` instead of opening a browser.
+        skip_confirmation: If True, ask nothing (used when called from doctor --fix): leave what a former release left
+            to the doctor's own question, skip the confirmation, keep the `[run] execution` already set (local for a
+            `pipelex.toml` that sets none), take the hosted Pipelex API only for a brand-new home with no
+            `pipelex.toml`, and print `pipelex login` instead of opening a browser.
         local: If True, create project-level .pipelex/ at the detected project root.
             Otherwise, create the home configuration directory (~/.pipelex/, or PIPELEX_HOME).
     """

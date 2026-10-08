@@ -100,11 +100,13 @@ class TestEveryReaderFollows:
         assert (empty_home / "pipelex.toml").is_file()
         assert (empty_home / "inference" / "backends.toml").is_file()
 
-    def test_the_first_boot_leaves_a_relocated_home_with_files_alone(self, relocated: Path) -> None:
+    def test_the_first_boot_keeps_a_relocated_home_s_files_and_fills_in_the_missing_ones(self, relocated: Path) -> None:
+        """The home's own files are kept, a missing kit file is added, and an inference setup of its own stays whole."""
         ConfigLoader().ensure_global_config_exists()
 
         assert (relocated / "pipelex.toml").read_text(encoding="utf-8") == "[relocated_marker]\nseen = true\n"
-        assert not (relocated / "telemetry.toml").exists()
+        assert (relocated / "telemetry.toml").is_file()
+        assert sorted(path.name for path in (relocated / "inference").iterdir()) == ["backends.toml", "routing_profiles.toml"]
 
     def test_pipelex_init_says_where_it_will_save_the_credentials(self, relocated: Path) -> None:
         panel = build_initialization_panel(

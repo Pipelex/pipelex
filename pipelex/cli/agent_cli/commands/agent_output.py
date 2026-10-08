@@ -130,6 +130,13 @@ AGENT_ERROR_HINTS: dict[str, str] = {
         "False means the migration would write nothing and its 'plans' name what to correct by hand. "
         "Without a 'migration' field, correct the telemetry.toml settings named in the message."
     ),
+    # A configuration a former release set up for the Pipelex Gateway: the cleanup is the loop, and
+    # a reset would discard every other setting the cleanup keeps.
+    "FormerReleaseConfigError": (
+        "This configuration still carries what a former release left for the Pipelex Gateway. "
+        "Run 'pipelex-agent migrate --dry-run --format json' to see what the cleanup would remove (its 'former_release' key), "
+        "show the user, then run 'pipelex-agent migrate --yes'. It keeps a copy of each file it changes or removes."
+    ),
     "BinaryNotFoundError": "Install pipelex-tools: uv tool install pipelex-tools",
     # Graph errors
     "GraphSpecParseError": "Validate graphspec.json structure; ensure it matches the expected GraphSpec schema",

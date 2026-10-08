@@ -87,14 +87,29 @@ This command creates or resets a Pipelex config directory with:
 
 When you run `pipelex init`, Pipelex can guide you through:
 
-1. **Config reset** - Recreate the selected config files
-2. **Where your runs execute** - The hosted Pipelex API (the default) or this machine
-3. On the hosted Pipelex API: **sign-in** - [`pipelex login`](login.md) gets a Pipelex API key, unless one is already set. It runs last, once every file is written
-4. On this machine:
+1. **What a former release left** - On a machine set up by a release that ran models through the Pipelex Gateway, the cleanup that release's files need, offered first (see [below](#a-machine-a-former-release-set-up))
+2. **Config reset** - Recreate the selected config files
+3. **Where your runs execute** - The hosted Pipelex API (the default) or this machine
+4. On the hosted Pipelex API: **sign-in** - [`pipelex login`](login.md) gets a Pipelex API key, unless one is already set. It runs last, once every file is written
+5. On this machine:
     1. **Backend selection** - Choose which AI providers to enable. The prompt pre-selects OpenAI, whose one key serves every default language-model and image-generation tier of the shipped model deck
     2. **Routing configuration** - Set up how models are routed to backends
     3. **Credential prompts** - Fill in missing keys when relevant
-5. **Telemetry setup** - Configure observability and analytics
+6. **Telemetry setup** - Configure observability and analytics
+
+## A Machine a Former Release Set Up
+
+Releases up to v0.72 ran models through the Pipelex Gateway. It no longer exists, and Pipelex refuses to start on the files those releases wrote: a `pipelex_gateway` backend left enabled, or a routing profile such as `all_pipelex_gateway` left active.
+
+`pipelex init` looks for what such a release left, in the home configuration directory and in the project's `.pipelex/`, before it asks anything else, reading both together the way Pipelex merges them when it starts. When it finds some, it shows which files it is in and, when it stops Pipelex from starting here, what does: that is judged from the files Pipelex actually starts on in the current directory, so a project with configuration files of its own is told that what the home directory still carries no longer stops it, and is still offered the cleanup. Then it asks:
+
+```
+Clean it up now? [y/n] (y):
+```
+
+Yes runs the cleanup that [`pipelex migrate`](migrate.md#a-configuration-a-former-release-set-up) runs: the retired backends, routing profiles and files are removed, a copy of each file it changes or removes is kept beside it, and an active routing profile of that release's moves to `all_enabled_backends`, without switching Pipelex to another profile where it starts today as long as every file can be written. Then the setup goes on to the question of where your runs execute; if the cleanup leaves a file for you to edit by hand, or Pipelex still cannot start once it ran, `pipelex init` says so and names what to look at. No leaves the files as they are and goes on with the setup, which replaces the target directory's inference files but not the files beside them nor those of the other directory; `pipelex migrate` cleans them up whenever you are ready, and `pipelex init` adds that Pipelex will not start until then only when it would not.
+
+`pipelex doctor --fix` runs `pipelex init` with nobody there to answer, and that run never cleans up: the doctor asks about the cleanup itself, in its **Configuration Migrations** row, and only a yes there removes or rewrites anything.
 
 `pipelex init config` on an existing setup resets `pipelex.toml` without asking the question again, so it keeps the `[run] execution` it found, and asks for no provider key when that is `"hosted"`.
 
