@@ -34,7 +34,7 @@ The check covers the protocol's model categories, in the protocol's order (`llm`
 
 ### Resolution
 
-The reference is parsed as a method's `model` field is: a sigil first (`$` preset, `@` alias, `~` waterfall), then a spelled-out namespace, and otherwise a bare handle. `alias:best-gpt` and `@best-gpt` are the same reference.
+The reference is parsed as a method's `model` field is: a sigil first (`$` preset, `@` alias, `~` waterfall), then a spelled-out namespace, and otherwise a bare handle. `alias:best-gpt` and `@best-gpt` are the same reference. `handle:` names a handle literally: `handle:@best-gpt` is a handle spelled `@best-gpt`, not the alias, and a validation refuses it as the check finds it `not_found`.
 
 A reference **resolves in a category** when the runner holds its name there:
 
@@ -43,7 +43,7 @@ A reference **resolves in a category** when the runner holds its name there:
 
 The reference is `resolved` when it resolves in at least one category in scope, and `not_found` otherwise. Both values are definitive: a client that reads a value it does not know treats the reference as unresolved.
 
-Resolution is a matter of names, like a validation. A preset, an alias or a waterfall the deck defines resolves even when its binding reaches no model the runner can call (a target on a backend the runner has not enabled, a waterfall none of whose usable steps it serves, a binding that leads back to itself through aliases and waterfalls), and its match says so with a `resolves_to` of `null`. A sigiled reference resolves by its sigil, in the check and in a run alike: `~best-gpt` is the waterfall even where an alias or a model is also named `best-gpt`. A waterfall step that leads back to an alias or a waterfall being resolved is a step no model serves, so the waterfall goes on to its next step. The check reads the deck as a run would and leaves no trace: it logs nothing, and the one-time notice a run logs when a waterfall falls back is left to that run. A run through such a reference fails where a validation passes, so a client shows it as a warning rather than as an unknown name.
+Resolution is a matter of names, like a validation. A preset, an alias or a waterfall the deck defines resolves even when its binding reaches no model the runner can call (a target on a backend the runner has not enabled, a waterfall none of whose usable steps it serves, a binding that leads back to itself through aliases and waterfalls), and its match says so with a `resolves_to` of `null`. A sigiled reference resolves by its sigil, in the check and in a run alike: `~best-gpt` is the waterfall even where an alias or a model is also named `best-gpt`. A waterfall step that leads back to an alias or a waterfall being resolved is a step no model serves, and so is a step reaching another waterfall none of whose models the runner serves, so the waterfall goes on to its next step. The check reads the deck as a run would and leaves no trace: it logs nothing, and the one-time notice a run logs when a waterfall falls back is left to that run. A run through such a reference fails where a validation passes, so a client shows it as a warning rather than as an unknown name.
 
 ### The verdict
 
@@ -92,7 +92,7 @@ A preset, checked in its category:
 
 ### Suggestions
 
-On `not_found`, the three lists say what the caller may have meant. They follow the rule a validation follows when it refuses an unknown model, so the check offers what a failing validation of the same reference offers, applied in each category in scope and joined in category order, a name two categories give appearing once, at its first place:
+On `not_found`, `suggestions`, `other_kinds` and `other_categories` say what the caller may have meant. They follow the rule a validation follows when it refuses an unknown model, so the check offers what a failing validation of the same reference offers, applied in each category in scope and joined in category order, a name two categories give appearing once, at its first place:
 
 - `suggestions`: up to five names of the reference's own kind, nearest first, then, for each other kind under which the name does not exist exactly, up to three names of that kind, with a stricter threshold of nearness. For a handle, the candidates are every model the runner can call in the category.
 - `other_kinds`: the same name under each other kind the category defines it as (`best-gpt` asked as a preset, found as `@best-gpt`). It is the likeliest fault, so a client shows it first.

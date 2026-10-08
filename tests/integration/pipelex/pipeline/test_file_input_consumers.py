@@ -495,6 +495,6 @@ model = "~fic-mixed-extractors"
         consumers = _consumers(load_empty_library=load_empty_library, domain="fic_waterfall", pipes=pipes)
 
         (consumer,) = consumers["transcript"]
-        # Its members are two models, so the consumer names the waterfall as the pipe writes it, sigil included.
+        # Its members are different models, so the consumer names the waterfall as the pipe writes it, sigil included.
         assert consumer.model == "~fic-mixed-extractors"
         assert consumer.readable_formats == DOCLING_FORMATS

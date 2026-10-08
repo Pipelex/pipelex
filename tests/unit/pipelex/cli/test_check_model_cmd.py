@@ -19,8 +19,8 @@ from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
-from pipelex.cogt.models.model_listing import CATEGORY_TO_MODEL_TYPE, ModelCategory
 from pipelex.cogt.models.model_reference import ModelReference
+from pipelex.cogt.models.model_reference_check import ModelCheckCategory
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.system.runtime import ProblemReaction
 
@@ -42,7 +42,7 @@ def _model_spec(name: str, model_type: ModelType) -> InferenceModelSpec:
 
 
 def _make_model_deck(*, is_model_fallback_enabled: bool = True) -> ModelDeck:
-    """A deck with LLM presets, aliases and a waterfall, and one image-generation model."""
+    """A deck with LLM presets, aliases and a waterfall, one image-generation model and one document-generation engine."""
     return ModelDeck(
         inference_models={
             "claude-4.5-sonnet": _model_spec("claude-4.5-sonnet", ModelType.LLM),
@@ -51,6 +51,7 @@ def _make_model_deck(*, is_model_fallback_enabled: bool = True) -> ModelDeck:
             "gpt-4o": _model_spec("gpt-4o", ModelType.LLM),
             "gpt-4o-mini": _model_spec("gpt-4o-mini", ModelType.LLM),
             "img-painter": _model_spec("img-painter", ModelType.IMG_GEN),
+            "reportlab-pdf": _model_spec("reportlab-pdf", ModelType.DOC_GEN),
         },
         llm_default_temperature=0.7,
         llm_presets={
@@ -73,6 +74,7 @@ def _make_model_deck(*, is_model_fallback_enabled: bool = True) -> ModelDeck:
         img_gen_default_quality=Quality.MEDIUM,
         img_gen_choice_default="img-painter",
         search_choice_default="web-searcher",
+        doc_gen_aliases={"default-pdf": "reportlab-pdf"},
         model_deck_config=ModelDeckConfig(is_model_fallback_enabled=is_model_fallback_enabled, missing_presets_reaction=ProblemReaction.NONE),
     )
 
@@ -88,7 +90,7 @@ def _run_check(
     mocker: MockerFixture,
     capsys: pytest.CaptureFixture[str],
     name: str,
-    model_type: ModelCategory = ModelCategory.LLM,
+    model_type: ModelCheckCategory = ModelCheckCategory.LLM,
     *,
     model_deck: ModelDeck | None = None,
 ) -> dict[str, Any]:
@@ -151,9 +153,30 @@ class TestCheckModelCmd:
         result = _run_check(mocker, capsys, "robust-llm", model_deck=model_deck)
         assert result["valid"] is expected_valid
 
+    @pytest.mark.parametrize(
+        ("name", "expected_kind"),
+        [
+            ("@default-pdf", "alias"),
+            ("reportlab-pdf", "handle"),
+            ("default-pdf", "handle"),
+        ],
+    )
+    def test_a_doc_gen_reference_is_checked_in_its_category(
+        self,
+        mocker: MockerFixture,
+        capsys: pytest.CaptureFixture[str],
+        name: str,
+        expected_kind: str,
+    ) -> None:
+        """`doc_gen` is a category of the check, as `GET /v1/models/check` answers it, though the model listing leaves it out."""
+        result = _run_check(mocker, capsys, name, ModelCheckCategory.DOC_GEN)
+        assert result["valid"] is True
+        assert result["kind"] == expected_kind
+        assert result["model_type"] == "doc_gen"
+
     def test_handle_served_as_another_type_is_not_valid(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """A model the deck serves as an LLM is not a valid image-generation handle."""
-        result = _run_check(mocker, capsys, "gpt-4o", ModelCategory.IMG_GEN)
+        result = _run_check(mocker, capsys, "gpt-4o", ModelCheckCategory.IMG_GEN)
         assert result["valid"] is False
         assert result["model_type"] == "img_gen"
 
@@ -170,22 +193,25 @@ class TestCheckModelCmd:
             "writing-creative",
             "alias:best-gpt",
             "handle:gpt-4o",
+            "handle:@best-gpt",
             "$best-claude",
             "@held-nowhere",
+            "@default-pdf",
+            "reportlab-pdf",
         ],
     )
-    @pytest.mark.parametrize("model_type", list(ModelCategory))
+    @pytest.mark.parametrize("model_type", list(ModelCheckCategory))
     def test_verdict_agrees_with_the_deck(
         self,
         mocker: MockerFixture,
         capsys: pytest.CaptureFixture[str],
         name: str,
-        model_type: ModelCategory,
+        model_type: ModelCheckCategory,
     ) -> None:
         """The command answers as `ModelDeck.is_reference_defined`, the rule a validation and the reference check apply."""
         model_deck = _make_model_deck()
         result = _run_check(mocker, capsys, name, model_type, model_deck=model_deck)
-        expected = model_deck.is_reference_defined(reference=ModelReference.parse(name), model_type=CATEGORY_TO_MODEL_TYPE[model_type])
+        expected = model_deck.is_reference_defined(reference=ModelReference.parse(name), model_type=model_type.model_type)
         assert result["valid"] is expected
 
     def test_invalid_preset_with_fuzzy_suggestions(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
@@ -231,14 +257,14 @@ class TestCheckModelCmd:
     def test_markdown_valid_output(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """Markdown output for a valid reference should be a single confirmation line."""
         _setup_mocks(mocker, model_deck=_make_model_deck())
-        agent_check_model_cmd(name="$writing-creative", model_type=ModelCategory.LLM, output_format=CliOutputFormat.MARKDOWN)
+        agent_check_model_cmd(name="$writing-creative", model_type=ModelCheckCategory.LLM, output_format=CliOutputFormat.MARKDOWN)
         output = capsys.readouterr().out.strip()
         assert output == "$writing-creative is a valid llm preset."
 
     def test_markdown_invalid_output_has_suggestions(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """Markdown output for an invalid reference should include 'Did you mean' suggestions."""
         _setup_mocks(mocker, model_deck=_make_model_deck())
-        agent_check_model_cmd(name="$writting-creative", model_type=ModelCategory.LLM, output_format=CliOutputFormat.MARKDOWN)
+        agent_check_model_cmd(name="$writting-creative", model_type=ModelCheckCategory.LLM, output_format=CliOutputFormat.MARKDOWN)
         output = capsys.readouterr().out
         assert "is not a valid" in output
         assert "Did you mean:" in output

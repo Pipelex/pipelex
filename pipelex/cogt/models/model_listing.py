@@ -1,8 +1,9 @@
 """The model listing: the deck's presets, aliases and waterfalls, by category.
 
-Behind `pipelex-agent models`, `pipelex-agent check-model` and the runner's model listing.
+Behind `pipelex-agent models` and the runner's model listing.
 """
 
+from collections.abc import Mapping
 from enum import StrEnum
 from typing import Any
 
@@ -54,7 +55,7 @@ def _resolve_preset_backend(
 def _filter_presets_by_backend(
     presets_list: list[dict[str, Any]],
     *,
-    presets_dict: dict[str, Any],
+    presets_dict: Mapping[str, Any],
     model_deck: ModelDeck,
     model_type: ModelType,
     backend: str,
@@ -113,19 +114,8 @@ def _build_presets_for_category(
     backend: str | None,
 ) -> list[dict[str, Any]]:
     """Build the presets list for a given category, optionally filtered by backend."""
-    presets_dict: dict[str, Any]
     model_type = CATEGORY_TO_MODEL_TYPE[category]
-    match category:
-        case ModelCategory.LLM:
-            presets_dict = model_deck.llm_presets
-        case ModelCategory.EXTRACT:
-            presets_dict = model_deck.extract_presets
-        case ModelCategory.IMG_GEN:
-            presets_dict = model_deck.img_gen_presets
-        case ModelCategory.SEARCH:
-            presets_dict = model_deck.search_presets
-        case ModelCategory.JUDGMENT:
-            presets_dict = model_deck.judgment_presets
+    presets_dict = model_deck.get_presets_for_type(model_type=model_type)
 
     presets_list: list[dict[str, Any]] = []
     for preset_name, setting in presets_dict.items():
@@ -150,18 +140,7 @@ def _build_aliases_for_category(
 ) -> dict[str, str]:
     """Build the aliases dict for a given category, optionally filtered by backend."""
     model_type = CATEGORY_TO_MODEL_TYPE[category]
-    aliases: dict[str, str]
-    match category:
-        case ModelCategory.LLM:
-            aliases = model_deck.llm_aliases
-        case ModelCategory.EXTRACT:
-            aliases = model_deck.extract_aliases
-        case ModelCategory.IMG_GEN:
-            aliases = model_deck.img_gen_aliases
-        case ModelCategory.SEARCH:
-            aliases = model_deck.search_aliases
-        case ModelCategory.JUDGMENT:
-            aliases = model_deck.judgment_aliases
+    aliases, _ = model_deck.get_aliases_and_waterfalls_for_type(model_type)
 
     if backend is not None:
         aliases = _filter_aliases_by_backend(aliases, model_deck=model_deck, model_type=model_type, backend=backend)
@@ -177,18 +156,7 @@ def _build_waterfalls_for_category(
 ) -> dict[str, list[str]]:
     """Build the waterfalls dict for a given category, optionally filtered by backend."""
     model_type = CATEGORY_TO_MODEL_TYPE[category]
-    waterfalls: dict[str, list[str]]
-    match category:
-        case ModelCategory.LLM:
-            waterfalls = model_deck.llm_waterfalls
-        case ModelCategory.EXTRACT:
-            waterfalls = model_deck.extract_waterfalls
-        case ModelCategory.IMG_GEN:
-            waterfalls = model_deck.img_gen_waterfalls
-        case ModelCategory.SEARCH:
-            waterfalls = model_deck.search_waterfalls
-        case ModelCategory.JUDGMENT:
-            waterfalls = model_deck.judgment_waterfalls
+    _, waterfalls = model_deck.get_aliases_and_waterfalls_for_type(model_type)
 
     if backend is not None:
         waterfalls = _filter_waterfalls_by_backend(waterfalls, model_deck=model_deck, model_type=model_type, backend=backend)

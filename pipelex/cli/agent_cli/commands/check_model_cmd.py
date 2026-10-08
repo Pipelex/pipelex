@@ -7,8 +7,8 @@ import typer
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success, set_agent_cli_error_format
 from pipelex.cogt.models.exceptions import ModelReferenceParseError
-from pipelex.cogt.models.model_listing import CATEGORY_TO_MODEL_TYPE, ModelCategory
 from pipelex.cogt.models.model_reference import ModelReference
+from pipelex.cogt.models.model_reference_check import ModelCheckCategory
 from pipelex.cogt.models.model_suggestion import KIND_LABELS, suggest_model_alternatives
 from pipelex.pipelex import Pipelex
 from pipelex.runtime_hub import get_model_deck
@@ -53,8 +53,8 @@ def agent_check_model_cmd(
         typer.Argument(help="Model reference to check (e.g. $writing-creative, @best-gpt, gpt-4o)"),
     ],
     model_type: Annotated[
-        ModelCategory,
-        typer.Option("--type", "-t", help="Model category: llm, extract, img_gen, search, judgment"),
+        ModelCheckCategory,
+        typer.Option("--type", "-t", help="Model category: llm, extract, img_gen, search, judgment, doc_gen"),
     ],
     output_format: Annotated[
         CliOutputFormat,
@@ -77,7 +77,7 @@ def agent_check_model_cmd(
 
         model_deck = get_model_deck()
         ref = ModelReference.parse(name)
-        resolved_model_type = CATEGORY_TO_MODEL_TYPE[model_type]
+        resolved_model_type = model_type.model_type
 
         # The rule a validation and `GET /v1/models/check` apply: a bare name is a model of this type,
         # an alias of this type, or a waterfall of this type while model fallback is on.

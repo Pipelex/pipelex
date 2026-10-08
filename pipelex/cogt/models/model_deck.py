@@ -219,14 +219,18 @@ class ModelDeck(ConfigModel):
         return sorted(handle for handle, inference_model in self.inference_models.items() if inference_model.model_type == model_type)
 
     def is_bare_handle_resolvable(self, *, name: str, model_type: ModelType) -> bool:
-        """Whether a bare model name resolves for this model type, the way a run reads it.
+        """Whether a bare model name resolves for this model type, as a pipe's `model` field may name it.
 
         The name resolves when the runner can call a model of that name of this type, among every
         model it can call and not only those the deck names; failing that, when the deck defines an
         alias of that name for this type, or a waterfall of that name while model fallback is on.
-        That is the order `get_optional_inference_model` looks a bare name up in. A model of that
-        name served as another type does not make it resolve, so a pipe naming it is refused when
-        its bundle loads rather than when the run reaches it.
+        The order is the one the run's lookup (`get_optional_inference_model`) reads a bare name in.
+        The fallback gate is the validation's and the setting builders' (`get_*_setting`), which a
+        pipe's field passes through before the run's lookup: that lookup itself also resolves a bare
+        waterfall name while fallback is off, where a binding inside the deck names one. A model of
+        that name served as another type does not make it resolve, so a pipe naming it is refused
+        when its bundle loads rather than when the run reaches it. The name is taken literally, so a
+        `handle:` reference whose name starts with a sigil names no alias, waterfall or preset.
         """
         served_model = self.inference_models.get(name)
         if served_model is not None and served_model.model_type == model_type:
@@ -479,7 +483,7 @@ class ModelDeck(ConfigModel):
                 )
             case ModelReferenceKind.HANDLE:
                 self._warn_if_ambiguous_llm(ref.name)
-                if self.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.LLM):
+                if self.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.LLM):
                     return
                 msg = self.unresolved_handle_sentence(name=ref.name, model_type=ModelType.LLM)
                 raise ModelChoiceNotFoundError(
@@ -534,7 +538,7 @@ class ModelDeck(ConfigModel):
             case ModelReferenceKind.HANDLE:
                 # Strict: treat as direct model handle only
                 self._warn_if_ambiguous_llm(ref.name)
-                if self.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.LLM):
+                if self.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.LLM):
                     return LLMSetting(model=ref.name, temperature=self.llm_default_temperature)
                 # Error includes migration hint if name matches preset/waterfall
                 self._raise_handle_not_found_error(
@@ -584,7 +588,7 @@ class ModelDeck(ConfigModel):
                 )
             case ModelReferenceKind.HANDLE:
                 self._warn_if_ambiguous_extract(ref.name)
-                if self.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.TEXT_EXTRACTOR):
+                if self.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.TEXT_EXTRACTOR):
                     return ExtractSetting(model=ref.name)
                 self._raise_handle_not_found_error(
                     ref=ref,
@@ -633,7 +637,7 @@ class ModelDeck(ConfigModel):
                 )
             case ModelReferenceKind.HANDLE:
                 self._warn_if_ambiguous_search(ref.name)
-                if self.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.SEARCH):
+                if self.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.SEARCH):
                     return SearchSetting(model=ref.name)
                 self._raise_handle_not_found_error(
                     ref=ref,
@@ -686,7 +690,7 @@ class ModelDeck(ConfigModel):
                 )
             case ModelReferenceKind.HANDLE:
                 self._warn_if_ambiguous_doc_gen(ref.name)
-                if self.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.DOC_GEN):
+                if self.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.DOC_GEN):
                     return DocGenSetting(model=ref.name)
                 self._raise_handle_not_found_error(
                     ref=ref,
@@ -735,7 +739,7 @@ class ModelDeck(ConfigModel):
                 )
             case ModelReferenceKind.HANDLE:
                 self._warn_if_ambiguous_judgment(ref.name)
-                if self.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.JUDGMENT):
+                if self.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.JUDGMENT):
                     return JudgmentSetting(model=ref.name)
                 self._raise_handle_not_found_error(
                     ref=ref,
@@ -784,7 +788,7 @@ class ModelDeck(ConfigModel):
                 )
             case ModelReferenceKind.HANDLE:
                 self._warn_if_ambiguous_img_gen(ref.name)
-                if self.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.IMG_GEN):
+                if self.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.IMG_GEN):
                     return ImgGenSetting(model=ref.name, quality=self.img_gen_default_quality)
                 self._raise_handle_not_found_error(
                     ref=ref,
@@ -1023,8 +1027,9 @@ class ModelDeck(ConfigModel):
         """Resolve a waterfall to an inference model spec by trying each fallback in order.
 
         `visited` holds the aliases and waterfalls the lookup is already inside, so a step leading back
-        to one of them ends as no model rather than recursing. A quiet lookup logs nothing and leaves the
-        one-time fallback notice to the next lookup that falls back.
+        to one of them ends as no model rather than recursing, and so does a step reaching a waterfall that
+        runs out. A quiet lookup logs nothing and leaves the one-time fallback notice to the next lookup that
+        falls back.
         """
         waterfall_key = f"{NAMESPACE_WATERFALL}{waterfall_name}"
         if waterfall_key in visited:
@@ -1047,12 +1052,20 @@ class ModelDeck(ConfigModel):
                     f"or enable a backend that supports '{ideal_model_handle}'. "
                 )
                 raise ModelNotFoundError(message=msg, model_handle=waterfall_name)
-            inference_model = self._get_optional_inference_model(
-                model_handle=fallback,
-                model_type=model_type,
-                visited=step_visited,
-                is_quiet=is_quiet,
-            )
+            try:
+                inference_model = self._get_optional_inference_model(
+                    model_handle=fallback,
+                    model_type=model_type,
+                    visited=step_visited,
+                    is_quiet=is_quiet,
+                )
+            except ModelWaterfallError:
+                # The step is a waterfall of its own, or reaches one, none of whose steps is served: that step
+                # serves no model, and this waterfall goes on. Only the waterfall resolved at the top raises its
+                # own error. The refusal of a fallback while fallbacks are disabled is not caught: it holds here too.
+                if not is_quiet:
+                    log.verbose(f"Waterfall '{waterfall_name}': step '{fallback}' reaches a waterfall none of whose models is served")
+                inference_model = None
             if inference_model is not None:
                 # Only log if we haven't logged for this waterfall_name before, and never from a quiet lookup,
                 # which would otherwise use up the notice the next real fallback owes its run.

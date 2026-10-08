@@ -35,7 +35,7 @@ def _make_deck(
     img_gen_presets: dict[str, ImgGenSetting] | None = None,
     missing_presets_reaction: ProblemReaction = ProblemReaction.NONE,
 ) -> ModelDeck:
-    """A deck serving two LLMs and one image-generation model."""
+    """A deck serving LLMs and an image-generation model."""
     return ModelDeck(
         inference_models={
             "gpt-4o-mini": _model_spec("gpt-4o-mini", ModelType.LLM),

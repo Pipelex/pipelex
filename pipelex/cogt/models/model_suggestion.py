@@ -71,11 +71,11 @@ class ModelReferenceName(NamedTuple):
 class ModelAlternatives(NamedTuple):
     """What a caller who named a model the deck does not hold most likely meant, in one model type."""
 
-    # Up to five names of the reference's own kind, nearest first.
+    # The nearest names of the reference's own kind, nearest first, as many as `_SAME_KIND_MAX_MATCHES` allows.
     same_kind: list[ModelReferenceName]
     # The same name under each other kind the deck defines it as, which is the likeliest fault.
     other_kinds: list[ModelReferenceName]
-    # For each other kind the name does not exist under exactly, up to three names of that kind, nearest first.
+    # For each other kind the name does not exist under exactly, the nearest names of that kind, as many as `_CROSS_KIND_MAX_MATCHES` allows.
     cross_kind: list[ModelReferenceName]
 
 

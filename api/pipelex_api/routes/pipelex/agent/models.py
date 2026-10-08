@@ -57,7 +57,7 @@ async def get_models(
 
 
 # NOT tagged `x-mthds-protocol`: the check is a Pipelex API extension, and the flag marks the
-# standard's five operations alone. Its refusals are the composite router's shared problem+json 422.
+# standard's own operations alone. Its refusals are the composite router's shared problem+json 422.
 @router.get("/models/check")
 async def check_model(
     request: Request,

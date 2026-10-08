@@ -280,8 +280,12 @@ def _resolve_model_specs(*, model_reference: str, model_type: ModelType, visited
         case ModelReferenceKind.WATERFALL:
             waterfall_members = waterfalls.get(reference.name)
         case ModelReferenceKind.HANDLE:
-            if model_spec := model_deck.inference_models.get(reference.name):
-                return [model_spec] if model_spec.model_type == model_type else []
+            # A bare name is a model of this type, failing that an alias of this type, failing that a
+            # waterfall of this type, as the run's lookup reads it: a model of that name served as
+            # another type does not answer it.
+            model_spec = model_deck.inference_models.get(reference.name)
+            if model_spec is not None and model_spec.model_type == model_type:
+                return [model_spec]
             alias_target = aliases.get(reference.name)
             waterfall_members = None if alias_target else waterfalls.get(reference.name)
     if alias_target:

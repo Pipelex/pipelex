@@ -5,9 +5,10 @@ info:
   summary: The source-available Pipelex runner — implements MTHDS Protocol v0.7.0.
   description: 'This server implements the [MTHDS Protocol](https://mthds.ai) v0.7.0 (`POST /execute`, `POST /start`, `POST
     /validate`, `GET /models`, `GET /version` — marked `x-mthds-protocol: true`) plus the Pipelex API extensions: resolve
-    and codegen (`/resolve`, `/codegen`), the pipe I/O route (`/pipe-io`), and editor tooling (`/lint`, `/format`). Contract
-    layering: MTHDS Protocol ⊂ Pipelex API (this server) ⊂ Pipelex hosted API. All endpoints are served under the `/v1` base
-    path; every error is an RFC 7807 `application/problem+json` problem document, documented per operation as a `ProblemDocument`.'
+    and codegen (`/resolve`, `/codegen`), the pipe I/O route (`/pipe-io`), the model reference check (`/models/check`), and
+    editor tooling (`/lint`, `/format`). Contract layering: MTHDS Protocol ⊂ Pipelex API (this server) ⊂ Pipelex hosted API.
+    All endpoints are served under the `/v1` base path; every error is an RFC 7807 `application/problem+json` problem document,
+    documented per operation as a `ProblemDocument`.'
   license:
     name: Elastic License 2.0
     identifier: Elastic-2.0

@@ -6,7 +6,7 @@ from pytest_mock import MockerFixture
 
 from pipelex.cogt.config_cogt import ModelDeckConfig
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
-from pipelex.cogt.exceptions import ModelChoiceNotFoundError, ModelNotFoundError
+from pipelex.cogt.exceptions import ModelChoiceNotFoundError, ModelNotFoundError, ModelWaterfallError
 from pipelex.cogt.extract.extract_setting import ExtractSetting
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
@@ -486,3 +486,62 @@ class TestModelReferenceCheck:
             check_llm_choice_with_deck("small-llm")
         with pytest.raises(ModelChoiceNotFoundError):
             model_deck.get_llm_setting(llm_choice="small-llm")
+
+    @pytest.mark.parametrize(
+        ("waterfalls", "aliases"),
+        [
+            pytest.param({"outer": ["~inner", "gpt-4o-mini"], "inner": ["~outer"]}, {}, id="nested-waterfall-leading-back"),
+            pytest.param({"outer": ["~inner", "gpt-4o-mini"], "inner": ["unserved-model"]}, {}, id="nested-waterfall-unserved"),
+            pytest.param(
+                {"outer": ["@to-inner", "gpt-4o-mini"], "inner": ["unserved-model"]}, {"to-inner": "~inner"}, id="alias-to-an-unserved-waterfall"
+            ),
+        ],
+    )
+    def test_a_step_whose_waterfall_runs_out_lets_its_waterfall_go_on(self, waterfalls: dict[str, list[str]], aliases: dict[str, str]) -> None:
+        """A step reaching a waterfall none of whose steps is served serves no model, so the outer waterfall tries its next step."""
+        model_deck = _deck_with(
+            inference_models={"gpt-4o-mini": _model_spec("gpt-4o-mini", ModelType.LLM)},
+            llm_waterfalls=waterfalls,
+            llm_aliases=aliases,
+        )
+
+        verdict = check_model_reference(model_deck=model_deck, reference=ModelReference.parse("~outer"), category=ModelCheckCategory.LLM)
+
+        _assert_resolved(verdict)
+        assert verdict.matches == [WaterfallMatch(category=ModelCheckCategory.LLM, resolves_to="gpt-4o-mini", fallbacks=waterfalls["outer"])]
+        assert _model_the_run_calls(model_deck=model_deck, reference="~outer", model_type=ModelType.LLM) == "gpt-4o-mini"
+
+    def test_with_model_fallback_off_a_nested_waterfall_refusing_its_fallback_refuses_the_outer_one(self) -> None:
+        """The refusal of a fallback while fallbacks are disabled is not a waterfall running out: it holds through the outer waterfall."""
+        model_deck = _deck_with(
+            inference_models={
+                "gpt-4o-mini": _model_spec("gpt-4o-mini", ModelType.LLM),
+                "claude-x": _model_spec("claude-x", ModelType.LLM),
+            },
+            is_model_fallback_enabled=False,
+            llm_waterfalls={"outer": ["~inner", "claude-x"], "inner": ["unserved-model", "gpt-4o-mini"]},
+        )
+
+        verdict = check_model_reference(model_deck=model_deck, reference=ModelReference.parse("~outer"), category=ModelCheckCategory.LLM)
+
+        assert verdict.matches == [WaterfallMatch(category=ModelCheckCategory.LLM, resolves_to=None, fallbacks=["~inner", "claude-x"])]
+        with pytest.raises(ModelNotFoundError) as exc_info:
+            _model_the_run_calls(model_deck=model_deck, reference="~outer", model_type=ModelType.LLM)
+        assert not isinstance(exc_info.value, ModelWaterfallError)
+        assert "model fallbacks are disabled" in exc_info.value.message
+
+    def test_a_handle_reference_names_a_literal_handle(self, mocker: MockerFixture) -> None:
+        """`handle:@best-gpt` names a model handle spelled `@best-gpt`, not the alias: the check, the validation and the run refuse it alike."""
+        model_deck = _make_deck()
+        mocker.patch(_DECK_CHECK_GET_MODEL_DECK_TARGET, return_value=model_deck)
+
+        verdict = check_model_reference(model_deck=model_deck, reference=ModelReference.parse("handle:@best-gpt"), category=ModelCheckCategory.LLM)
+
+        _assert_not_found(verdict)
+        assert model_deck.is_reference_defined(reference=ModelReference.parse("handle:@best-gpt"), model_type=ModelType.LLM) is False
+        with pytest.raises(ModelChoiceNotFoundError):
+            check_llm_choice_with_deck("handle:@best-gpt")
+        with pytest.raises(ModelChoiceNotFoundError):
+            model_deck.get_llm_setting(llm_choice="handle:@best-gpt")
+        with pytest.raises(ModelChoiceNotFoundError):
+            model_deck.check_llm_choice(llm_choice="handle:@best-gpt")
