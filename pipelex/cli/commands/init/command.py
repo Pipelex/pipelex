@@ -6,9 +6,10 @@
    are needed. It asks nothing and writes nothing. It also finds what a former release that ran on the Pipelex Gateway
    or Pipelex Manifold left in the configuration directories a boot reads, read together as the boot merges them, and
    whether it stops this machine's boot, which is the boot's own check over the files it merges.
-2. **Choose** (`choose_initialization`): first, when the inspection found what a former release left, say so and
-   offer the cleanup `pipelex migrate` runs, then run it on a yes (unasked when nobody answers); then the
-   confirmation, then where runs execute, the hosted Pipelex API or this machine.
+2. **Choose** (`choose_initialization`): first, when the inspection found what a former release left and someone is
+   there to answer, say so and offer the cleanup `pipelex migrate` runs, then run it on a yes; then the
+   confirmation, then where runs execute, the hosted Pipelex API or this machine. An unattended run (`pipelex doctor
+   --fix`) never runs the cleanup: the doctor asks about it itself.
 3. **Execute** (`execute_initialization`): write the files and run the steps the choices call for. Only the local
    path's own steps (backends, routing, credentials) and the hosted path's sign-in ask anything more.
 """
@@ -301,12 +302,13 @@ def describe_former_release_findings(*, findings: list[FormerReleaseFindings], b
     return "\n".join(lines)
 
 
-def offer_former_release_cleanup(*, console: Console, inspection: InitInspection, interactive: bool) -> None:
-    """Say what a former release left, and clean it up on a yes, or unasked when nobody answers.
+def offer_former_release_cleanup(*, console: Console, inspection: InitInspection) -> None:
+    """Say what a former release left, and clean it up on a yes.
 
     The cleanup is `pipelex migrate`'s first step, the same write pass with the same copies kept. A no leaves the files
     as they are and the setup goes on: what it writes into the target replaces that directory's inference files, but
-    not the files beside them nor the other directory's, which go on stopping the boot until the cleanup runs.
+    not the files beside them nor the other directory's, which go on stopping the boot until the cleanup runs. Only
+    asked of a person: nothing removes or rewrites a user's files without a yes.
     """
     console.print()
     console.print(
@@ -316,7 +318,7 @@ def offer_former_release_cleanup(*, console: Console, inspection: InitInspection
             border_style="yellow",
         )
     )
-    if interactive and not Confirm.ask("[bold]Clean it up now?[/bold]", default=True):
+    if not Confirm.ask("[bold]Clean it up now?[/bold]", default=True):
         until = " Pipelex will not start until then." if inspection.former_release_boot_blockers else ""
         console.print(f"[yellow]Left as it is.[/yellow] [cyan]{MIGRATE_COMMAND}[/cyan] cleans it up whenever you are ready.{until}")
         return
@@ -399,10 +401,10 @@ def choose_initialization(*, console: Console, inspection: InitInspection, skip_
     Args:
         console: Rich Console instance for user interaction.
         inspection: What stage 1 found.
-        skip_confirmation: Ask nothing (`pipelex doctor --fix`): what a former release left is cleaned up unasked, the
-            confirmation is skipped, and where runs execute is the one the target's `[run] execution` already sets,
-            local for a `pipelex.toml` that sets none, and the hosted Pipelex API only for a brand-new home with no
-            `pipelex.toml` yet.
+        skip_confirmation: Ask nothing (`pipelex doctor --fix`): what a former release left is not offered and not
+            cleaned up, since the doctor asks about it itself; the confirmation is skipped, and where runs execute is
+            the one the target's `[run] execution` already sets, local for a `pipelex.toml` that sets none, and the
+            hosted Pipelex API only for a brand-new home with no `pipelex.toml` yet.
 
     Returns:
         The choices stage 3 executes.
@@ -410,8 +412,8 @@ def choose_initialization(*, console: Console, inspection: InitInspection, skip_
     Raises:
         typer.Exit: If the person cancels at the confirmation.
     """
-    if inspection.former_release_findings:
-        offer_former_release_cleanup(console=console, inspection=inspection, interactive=not skip_confirmation)
+    if inspection.former_release_findings and not skip_confirmation:
+        offer_former_release_cleanup(console=console, inspection=inspection)
 
     if skip_confirmation:
         console.print()
@@ -600,10 +602,10 @@ def init_cmd(
 
     Args:
         focus: What to initialize - 'all', 'config', 'credentials', 'inference', 'routing', or 'telemetry'
-        skip_confirmation: If True, ask nothing (used when called from doctor --fix): clean up what a former release
-            left, skip the confirmation, keep the `[run] execution` already set (local for a `pipelex.toml` that sets
-            none), take the hosted Pipelex API only for a brand-new home with no `pipelex.toml`, and print
-            `pipelex login` instead of opening a browser.
+        skip_confirmation: If True, ask nothing (used when called from doctor --fix): leave what a former release left
+            to the doctor's own question, skip the confirmation, keep the `[run] execution` already set (local for a
+            `pipelex.toml` that sets none), take the hosted Pipelex API only for a brand-new home with no
+            `pipelex.toml`, and print `pipelex login` instead of opening a browser.
         local: If True, create project-level .pipelex/ at the detected project root.
             Otherwise, create the home configuration directory (~/.pipelex/, or PIPELEX_HOME).
     """

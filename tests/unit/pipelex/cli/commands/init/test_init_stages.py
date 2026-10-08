@@ -244,14 +244,21 @@ class TestInitStages:
         prompt.assert_called_once()
         assert choices.setup_path == SetupPath.LOCAL
 
-    def test_without_anyone_to_answer_the_cleanup_runs_unasked(self, config_dir: Path, mocker: MockerFixture) -> None:
+    def test_without_anyone_to_answer_the_cleanup_never_runs(self, config_dir: Path, mocker: MockerFixture) -> None:
+        """Nobody answers when `pipelex doctor --fix` calls init, and a cleanup nobody agreed to is not init's to run.
+
+        The doctor asks its own question about the cleanup; whatever was answered there, init's unattended run leaves
+        every file a former release left exactly as it found it.
+        """
         _install_a_former_release(config_dir)
+        before = _snapshot(directory=config_dir)
         confirm = mocker.patch("pipelex.cli.commands.init.command.Confirm.ask")
 
         choose_initialization(console=Console(quiet=True), inspection=_inspect(focus=InitFocus.CONFIG), skip_confirmation=True)
 
         confirm.assert_not_called()
-        assert detect_former_release(config_dir=config_dir).is_clean
+        assert _snapshot(directory=config_dir) == before
+        assert not detect_former_release(config_dir=config_dir).is_clean
 
     @pytest.mark.parametrize("project_has_its_own_bases", [False, True])
     def test_a_no_says_pipelex_will_not_start_only_when_the_boot_would_refuse(
