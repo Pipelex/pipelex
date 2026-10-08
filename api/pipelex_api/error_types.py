@@ -52,6 +52,10 @@ class ErrorType(StrEnum):
     # the runtime's charset and entry cap (`pipelex.system.run_extras`).
     INVALID_ANALYTICS_GROUPS = "InvalidAnalyticsGroups"
     INVALID_MODEL_CATEGORY = "InvalidModelCategory"
+    # `GET /v1/models/check` was given a `reference` it cannot check: blank once trimmed, a sigil or a
+    # namespace with nothing after it, or longer than the route's bound. A reference that parses and
+    # resolves nowhere is never refused: it is the `not_found` verdict.
+    INVALID_MODEL_REFERENCE = "InvalidModelReference"
     INVALID_BASE64 = "InvalidBase64"
     PAYLOAD_TOO_LARGE = "PayloadTooLarge"
     # A run request carried a malformed method bundle (`bundle_b64` / `files`): a corrupt zip, an

@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:53948a3218f1c549dcf8f415f355ecfbcbfef356c23ed6a6da29b056e0cc94a7"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-07T12:54:38Z"
-rationale = "clean-pass: init_config now delegates its copy walk to the shared copy_kit_templates with the same skip lists, the same overwrite-on-reset rule and the same dry-run count, so pipelex init config behaves as before. Re-read docs/tools/cli/init.md (full reset, the .gitignore rule) and pipelex/cli/agent_cli/CLAUDE.md; neither describes anything this changes."
+digest = "sha256:67e74186129a0a063c16a4f36f412f61ede2624ab6201e489af587f58beed0de"
+reviewed_by = "Claude (Opus 5.5)"
+reviewed_at = "2026-10-08T07:21:15Z"
+rationale = "clean-pass: merged tree of origin/dev into this branch. Dev's check-model change keeps the review recorded on dev, whose doc edits in docs/tools/cli/agent-cli.md and pipelex/cli/agent_cli/CLAUDE.md came through the merge unchanged. This branch's only trigger change is init_config delegating its copy walk to the shared copy_kit_templates, with the same skip lists, overwrite on reset and the same dry-run count, so pipelex init config behaves as before. Re-read docs/tools/cli/init.md (full reset, every target replacing its file, the .gitignore rule) and the init rows of pipelex/cli/agent_cli/CLAUDE.md; none describes anything this changes."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -13,7 +13,7 @@ rationale = "clean-pass: init_config now delegates its copy walk to the shared c
 "pipelex/cli/agent_cli/commands/agent_cli_factory.py" = "blob:57b6a4d76b918626218633873273adbddfaac97d"
 "pipelex/cli/agent_cli/commands/agent_output.py" = "blob:506eabec37ab3b06644b6ae4c321a91780241161"
 "pipelex/cli/agent_cli/commands/bundle_path_resolver.py" = "blob:a1904517c731afb72af7d49adf6d217dc50b2660"
-"pipelex/cli/agent_cli/commands/check_model_cmd.py" = "blob:42a6b8c02a1d103394e12243181af8ea1c16f31d"
+"pipelex/cli/agent_cli/commands/check_model_cmd.py" = "blob:3a9c93daecadf266b3eba466904b3d005d448d40"
 "pipelex/cli/agent_cli/commands/codegen/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/codegen/app.py" = "blob:56130b89fe9efec5ad3d014ed6bc16bef1bd1645"
 "pipelex/cli/agent_cli/commands/codegen/check_cmd.py" = "blob:9e8beb084a9f04f39e8acca9e6ae2554d40cb667"
