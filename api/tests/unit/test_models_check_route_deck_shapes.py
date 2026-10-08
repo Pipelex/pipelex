@@ -9,6 +9,7 @@ from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoicesDefaults
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_spec_index import ModelSpecIndex
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.models.model_deck_config import ModelDeckConfig
@@ -42,10 +43,12 @@ def _make_deck() -> ModelDeck:
     and lists its own name first, and an alias and a waterfall share a name.
     """
     return ModelDeck(
-        inference_models={
-            "gpt-4o-mini": _model_spec("gpt-4o-mini", ModelType.LLM),
-            "claude-x": _model_spec("claude-x", ModelType.LLM),
-        },
+        inference_models=ModelSpecIndex.make_from_specs(
+            model_specs=[
+                _model_spec("gpt-4o-mini", ModelType.LLM),
+                _model_spec("claude-x", ModelType.LLM),
+            ]
+        ),
         llm_default_temperature=0.7,
         llm_aliases={"cycle-a": "~cycle-waterfall", "best-gpt": "gpt-4o-mini"},
         llm_waterfalls={"cycle-waterfall": ["@cycle-a"], "best-gpt": ["claude-x"]},

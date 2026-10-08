@@ -6,6 +6,7 @@ from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoicesDefaults
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_spec_index import ModelSpecIndex
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.usage.cost_category import CostCategory
@@ -28,13 +29,13 @@ class TestModelDeckGetOptionalInferenceModel:
 
     def _create_test_model_deck(
         self,
-        inference_models: dict[str, InferenceModelSpec] | None = None,
+        inference_models: list[InferenceModelSpec] | None = None,
         llm_aliases: dict[str, str] | None = None,
         llm_waterfalls: dict[str, list[str]] | None = None,
         is_model_fallback_enabled: bool = False,
     ) -> ModelDeck:
         return ModelDeck(
-            inference_models=inference_models or {},
+            inference_models=ModelSpecIndex.make_from_specs(model_specs=inference_models or []),
             # LLM-specific
             llm_default_temperature=0.7,
             llm_aliases=llm_aliases or {},
@@ -64,7 +65,7 @@ class TestModelDeckGetOptionalInferenceModel:
     def test_direct_model_lookup_success(self):
         # Arrange
         model_spec = self._create_test_model_spec("gpt-4")
-        model_deck = self._create_test_model_deck(inference_models={"gpt-4": model_spec})
+        model_deck = self._create_test_model_deck(inference_models=[model_spec])
 
         # Act
         result = model_deck.get_optional_inference_model("gpt-4", model_type=ModelType.LLM)
@@ -85,7 +86,7 @@ class TestModelDeckGetOptionalInferenceModel:
     def test_simple_string_alias_resolution_success(self):
         # Arrange
         model_spec = self._create_test_model_spec("gpt-4")
-        model_deck = self._create_test_model_deck(inference_models={"gpt-4": model_spec}, llm_aliases={"best-gpt": "gpt-4"})
+        model_deck = self._create_test_model_deck(inference_models=[model_spec], llm_aliases={"best-gpt": "gpt-4"})
 
         # Act
         result = model_deck.get_optional_inference_model("best-gpt", model_type=ModelType.LLM)
@@ -107,7 +108,7 @@ class TestModelDeckGetOptionalInferenceModel:
         # Arrange
         model_spec = self._create_test_model_spec("gpt-4")
         model_deck = self._create_test_model_deck(
-            inference_models={"gpt-4": model_spec},
+            inference_models=[model_spec],
             llm_waterfalls={"dummy-model-handle": ["gpt-4", "claude-3"]},
             is_model_fallback_enabled=True,
         )
@@ -122,7 +123,7 @@ class TestModelDeckGetOptionalInferenceModel:
         # Arrange
         model_spec = self._create_test_model_spec("claude-3")
         model_deck = self._create_test_model_deck(
-            inference_models={"claude-3": model_spec},
+            inference_models=[model_spec],
             llm_waterfalls={"dummy-model-handle": ["nonexistent-model", "claude-3"]},
             is_model_fallback_enabled=True,
         )
@@ -150,9 +151,7 @@ class TestModelDeckGetOptionalInferenceModel:
     def test_recursive_alias_resolution_success(self):
         # Arrange
         model_spec = self._create_test_model_spec("gpt-4")
-        model_deck = self._create_test_model_deck(
-            inference_models={"gpt-4": model_spec}, llm_aliases={"dummy-model-handle": "best-gpt", "best-gpt": "gpt-4"}
-        )
+        model_deck = self._create_test_model_deck(inference_models=[model_spec], llm_aliases={"dummy-model-handle": "best-gpt", "best-gpt": "gpt-4"})
 
         # Act
         result = model_deck.get_optional_inference_model("dummy-model-handle", model_type=ModelType.LLM)
@@ -164,7 +163,7 @@ class TestModelDeckGetOptionalInferenceModel:
         # Arrange
         model_spec = self._create_test_model_spec("gpt-4")
         model_deck = self._create_test_model_deck(
-            inference_models={"gpt-4": model_spec},
+            inference_models=[model_spec],
             llm_aliases={"best-gpt": "gpt-4"},
             llm_waterfalls={"dummy-model-handle": ["nonexistent", "best-gpt"]},
             is_model_fallback_enabled=True,
@@ -200,10 +199,8 @@ class TestModelDeckGetOptionalInferenceModel:
         # Assert - cycle detection returns None instead of causing RecursionError
         assert result is None
 
-    def test_model_type_mismatch_returns_none(self):
-        """Test that requesting a model with wrong model_type returns None."""
-        # Arrange - create a TEXT_EXTRACTOR model
-        extractor_spec = InferenceModelSpec(
+    def _create_extractor_spec(self) -> InferenceModelSpec:
+        return InferenceModelSpec(
             backend_name="test_backend",
             name="mistral-extractor",
             sdk="test_sdk",
@@ -214,46 +211,34 @@ class TestModelDeckGetOptionalInferenceModel:
             max_tokens=1000,
             max_prompt_images=None,
         )
-        model_deck = self._create_test_model_deck(inference_models={"mistral-extractor": extractor_spec})
 
-        # Act - request it as LLM
-        result = model_deck.get_optional_inference_model("mistral-extractor", model_type=ModelType.LLM)
+    def test_a_handle_served_as_another_type_only_is_not_served_as_this_one(self):
+        """A handle names one model per model type: an extractor is no LLM, whatever its name."""
+        model_deck = self._create_test_model_deck(inference_models=[self._create_extractor_spec()])
 
-        # Assert - should return None due to model_type mismatch
-        assert result is None
+        assert model_deck.get_optional_inference_model("mistral-extractor", model_type=ModelType.LLM) is None
+        assert model_deck.get_optional_inference_model("mistral-extractor", model_type=ModelType.TEXT_EXTRACTOR) is not None
         # The load-time check reads the bare name the same way: a model served only as another type does not define it.
         assert model_deck.is_model_handle_defined("mistral-extractor", model_type=ModelType.LLM) is False
         assert model_deck.is_model_handle_defined("mistral-extractor", model_type=ModelType.TEXT_EXTRACTOR) is True
 
-    def test_model_of_another_type_gives_way_to_an_alias_of_the_same_name(self):
-        """A bare name that is a model of another type and an alias of the requested type resolves through the alias."""
-        extractor_spec = InferenceModelSpec(
-            backend_name="test_backend",
-            name="shared-name",
-            sdk="test_sdk",
-            model_type=ModelType.TEXT_EXTRACTOR,
-            model_id="shared-name-id",
-            costs={CostCategory.INPUT: 0.001, CostCategory.OUTPUT: 0.002},
-            thinking_mode=ThinkingMode.NONE,
-            max_tokens=1000,
-            max_prompt_images=None,
-        )
-        llm_spec = self._create_test_model_spec("gpt-4")
+    def test_a_handle_served_as_another_type_does_not_shadow_this_types_alias(self):
+        """The LLM half of the deck may name an alias like a handle the deck serves as an extractor: the alias resolves."""
+        gpt_spec = self._create_test_model_spec("gpt-4")
         model_deck = self._create_test_model_deck(
-            inference_models={"shared-name": extractor_spec, "gpt-4": llm_spec},
-            llm_aliases={"shared-name": "gpt-4"},
+            inference_models=[self._create_extractor_spec(), gpt_spec],
+            llm_aliases={"mistral-extractor": "gpt-4"},
         )
 
-        result = model_deck.get_optional_inference_model("shared-name", model_type=ModelType.LLM)
-
-        assert result == llm_spec
-        assert model_deck.is_model_handle_defined("shared-name", model_type=ModelType.LLM) is True
+        assert model_deck.get_optional_inference_model("mistral-extractor", model_type=ModelType.LLM) == gpt_spec
+        # The load-time check agrees: the bare name is defined for the LLM half through its alias.
+        assert model_deck.is_model_handle_defined("mistral-extractor", model_type=ModelType.LLM) is True
 
     def test_complex_waterfall_scenario(self):
         # Arrange
         model_spec = self._create_test_model_spec("claude-3")
         model_deck = self._create_test_model_deck(
-            inference_models={"claude-3": model_spec},
+            inference_models=[model_spec],
             llm_aliases={"premium-claude": "claude-3"},
             llm_waterfalls={"dummy-model-handle": ["premium-gpt", "premium-claude"]},
             is_model_fallback_enabled=True,
@@ -270,7 +255,7 @@ class TestModelDeckGetOptionalInferenceModel:
         model_spec1 = self._create_test_model_spec("gpt-4")
         model_spec2 = self._create_test_model_spec("claude-3")
         model_deck = self._create_test_model_deck(
-            inference_models={"gpt-4": model_spec1, "claude-3": model_spec2},
+            inference_models=[model_spec1, model_spec2],
             llm_aliases={
                 "ai-model": "best-gpt",  # string alias
             },
@@ -331,14 +316,14 @@ class TestModelDeckPrefixedAliasReferences:
 
     def _create_test_model_deck(
         self,
-        inference_models: dict[str, InferenceModelSpec] | None = None,
+        inference_models: list[InferenceModelSpec] | None = None,
         llm_aliases: dict[str, str] | None = None,
         llm_waterfalls: dict[str, list[str]] | None = None,
         llm_presets: dict[str, LLMSetting] | None = None,
         is_model_fallback_enabled: bool = False,
     ) -> ModelDeck:
         return ModelDeck(
-            inference_models=inference_models or {},
+            inference_models=ModelSpecIndex.make_from_specs(model_specs=inference_models or []),
             # LLM-specific
             llm_default_temperature=0.7,
             llm_aliases=llm_aliases or {},
@@ -370,7 +355,7 @@ class TestModelDeckPrefixedAliasReferences:
         # Arrange
         model_spec = self._create_test_model_spec("gpt-4")
         model_deck = self._create_test_model_deck(
-            inference_models={"gpt-4": model_spec},
+            inference_models=[model_spec],
             llm_aliases={"best-gpt": "gpt-4"},
         )
 
@@ -385,7 +370,7 @@ class TestModelDeckPrefixedAliasReferences:
         # Arrange
         model_spec = self._create_test_model_spec("gpt-4")
         model_deck = self._create_test_model_deck(
-            inference_models={"gpt-4": model_spec},
+            inference_models=[model_spec],
             llm_aliases={"best-gpt": "gpt-4"},
         )
 
@@ -401,7 +386,7 @@ class TestModelDeckPrefixedAliasReferences:
         # Arrange
         model_spec = self._create_test_model_spec("gpt-4-mini")
         model_deck = self._create_test_model_deck(
-            inference_models={"gpt-4-mini": model_spec},
+            inference_models=[model_spec],
             llm_waterfalls={"small-llm": ["gpt-4-mini", "claude-instant"]},
             is_model_fallback_enabled=True,
         )
@@ -417,7 +402,7 @@ class TestModelDeckPrefixedAliasReferences:
         # Arrange
         model_spec = self._create_test_model_spec("gpt-4-mini")
         model_deck = self._create_test_model_deck(
-            inference_models={"gpt-4-mini": model_spec},
+            inference_models=[model_spec],
             llm_waterfalls={"small-llm": ["gpt-4-mini", "claude-instant"]},
             is_model_fallback_enabled=True,
         )
@@ -439,7 +424,7 @@ class TestModelDeckPrefixedAliasReferences:
         model_spec = self._create_test_model_spec("gpt-4")
         preset_with_alias = LLMSetting(model="@best-gpt", temperature=0.5)
         model_deck = self._create_test_model_deck(
-            inference_models={"gpt-4": model_spec},
+            inference_models=[model_spec],
             llm_aliases={"best-gpt": "gpt-4"},
             llm_presets={"my-preset": preset_with_alias},
         )
@@ -453,7 +438,7 @@ class TestModelDeckPrefixedAliasReferences:
         model_spec = self._create_test_model_spec("claude-4.5-opus")
         preset_with_alias = LLMSetting(model="@default-premium", temperature=0.1)
         model_deck = self._create_test_model_deck(
-            inference_models={"claude-4.5-opus": model_spec},
+            inference_models=[model_spec],
             llm_aliases={
                 "default-premium": "claude-4.5-opus",  # this is what @default-premium should resolve to
             },
@@ -486,12 +471,12 @@ class TestModelDeckGetLLMSettingWithPresets:
 
     def _create_test_model_deck(
         self,
-        inference_models: dict[str, InferenceModelSpec] | None = None,
+        inference_models: list[InferenceModelSpec] | None = None,
         llm_aliases: dict[str, str] | None = None,
         llm_presets: dict[str, LLMSetting] | None = None,
     ) -> ModelDeck:
         return ModelDeck(
-            inference_models=inference_models or {},
+            inference_models=ModelSpecIndex.make_from_specs(model_specs=inference_models or []),
             # LLM-specific
             llm_default_temperature=0.7,
             llm_aliases=llm_aliases or {},
@@ -524,7 +509,7 @@ class TestModelDeckGetLLMSettingWithPresets:
         model_spec = self._create_test_model_spec("gpt-4")
         preset = LLMSetting(model="gpt-4", temperature=0.5, max_tokens=500)
         model_deck = self._create_test_model_deck(
-            inference_models={"gpt-4": model_spec},
+            inference_models=[model_spec],
             llm_presets={"testing-text": preset},
         )
 
@@ -547,7 +532,7 @@ class TestModelDeckGetLLMSettingWithPresets:
         model_spec = self._create_test_model_spec("gpt-4")
         preset = LLMSetting(model="gpt-4", temperature=0.5, max_tokens=500)
         model_deck = self._create_test_model_deck(
-            inference_models={"gpt-4": model_spec},
+            inference_models=[model_spec],
             llm_presets={"testing-text": preset},
         )
 

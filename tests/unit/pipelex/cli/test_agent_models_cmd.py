@@ -18,6 +18,7 @@ from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoicesDefaults
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_spec_index import ModelSpecIndex
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.models.model_listing import ModelCategory
@@ -80,10 +81,12 @@ def _make_model_deck(
 ) -> ModelDeck:
     """A real model deck serving the test data's models, with its presets, aliases and waterfalls."""
     return ModelDeck(
-        inference_models={
-            name: _model_spec(name=name, backend_name=backend_name, model_type=model_type)
-            for name, (backend_name, model_type) in TestData.INFERENCE_MAP.items()
-        },
+        inference_models=ModelSpecIndex.make_from_specs(
+            model_specs=[
+                _model_spec(name=name, backend_name=backend_name, model_type=model_type)
+                for name, (backend_name, model_type) in TestData.INFERENCE_MAP.items()
+            ]
+        ),
         llm_default_temperature=0.7,
         llm_presets=TestData.LLM_PRESETS,
         llm_aliases=TestData.LLM_ALIASES if llm_aliases is None else llm_aliases,

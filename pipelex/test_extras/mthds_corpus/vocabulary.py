@@ -1,6 +1,7 @@
 """The MTHDS Test Corpus tag vocabulary — the closed set an entry's ``covers`` draws from.
 
-Contract: ``docs/specs/mthds-test-corpus.md`` (workspace root), section "Tag vocabulary".
+Contract: ``conformance/specs/mthds-test-corpus.md`` (the cross-repo spec, kept in the ``conformance``
+repo), section "Tag vocabulary".
 ``vocabulary.toml`` is generated in full by ``pipelex-dev generate-corpus-vocabulary`` and
 committed, so a consumer reading it needs neither the generator nor a registry walk. This
 module is the reader; the generator lives in the dev CLI, which the wheel excludes.

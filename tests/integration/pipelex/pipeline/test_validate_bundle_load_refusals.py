@@ -279,9 +279,8 @@ class TestValidateBundleLoadRefusals:
 
     async def test_a_model_served_as_another_type_is_one_unknown_model_item_naming_the_type_needed(self, tmp_path: Path) -> None:
         """An LLM the deck serves, named in an image-generation pipe, is refused when the bundle loads rather than when the run reaches it."""
-        served_model = get_model_deck().inference_models.get(_LLM_HANDLE_SERVED)
-        assert served_model is not None, f"the session deck no longer serves {_LLM_HANDLE_SERVED!r}: pick an LLM it serves"
-        assert served_model.model_type == ModelType.LLM
+        served_types = get_model_deck().inference_models.types_serving(handle=_LLM_HANDLE_SERVED)
+        assert served_types == [ModelType.LLM], f"the session deck must serve {_LLM_HANDLE_SERVED!r} as an LLM alone: pick an LLM it serves so"
         bundle_path = _write_bundle(directory=tmp_path, content=_LLM_IN_IMG_GEN_BUNDLE)
 
         item = await _single_item(bundle_path=bundle_path)

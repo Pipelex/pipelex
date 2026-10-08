@@ -211,3 +211,17 @@ thinking_mode = "adaptive"
 # Opus 5.5 refuses tool_choice "tool" and "any", like Sonnet 5.5 above.
 structure_method = "instructor/anthropic_reasoning_tools"
 listed_constraints = ["temperature_unsupported"]
+
+["claude-5.5-haiku"]
+model_id = "claude-haiku-5-5"
+max_tokens = 128000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+# The price of a prompt up to 100,000 tokens; a longer prompt pays $0.50 / $2.50.
+costs = { input = 0.10, output = 0.50 }
+thinking_mode = "adaptive"
+# Unlike Sonnet 5.5 and Opus 5.5, Haiku 5.5 accepts the forced tool_choice that
+# instructor/anthropic_tools sends; it then answers with the tool call and no thinking.
+structure_method = "instructor/anthropic_tools"
+listed_constraints = ["temperature_unsupported"]

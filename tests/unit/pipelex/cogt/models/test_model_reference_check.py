@@ -14,6 +14,7 @@ from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoicesDefaults
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_spec_index import ModelSpecIndex
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
@@ -53,15 +54,17 @@ def _model_spec(name: str, model_type: ModelType) -> InferenceModelSpec:
 def _make_deck(*, is_model_fallback_enabled: bool = True) -> ModelDeck:
     """A deck whose bindings cover every resolution: served, unserved, through a reference, cyclic, and names shared across types."""
     return ModelDeck(
-        inference_models={
-            "gpt-4o-mini": _model_spec("gpt-4o-mini", ModelType.LLM),
-            "claude-x": _model_spec("claude-x", ModelType.LLM),
-            "img-painter": _model_spec("img-painter", ModelType.IMG_GEN),
-            "extract-engine": _model_spec("extract-engine", ModelType.TEXT_EXTRACTOR),
-            "reportlab-pdf": _model_spec("reportlab-pdf", ModelType.DOC_GEN),
-            # An extraction model whose name is also an LLM alias.
-            "shared-name": _model_spec("shared-name", ModelType.TEXT_EXTRACTOR),
-        },
+        inference_models=ModelSpecIndex.make_from_specs(
+            model_specs=[
+                _model_spec("gpt-4o-mini", ModelType.LLM),
+                _model_spec("claude-x", ModelType.LLM),
+                _model_spec("img-painter", ModelType.IMG_GEN),
+                _model_spec("extract-engine", ModelType.TEXT_EXTRACTOR),
+                _model_spec("reportlab-pdf", ModelType.DOC_GEN),
+                # An extraction model whose name is also an LLM alias.
+                _model_spec("shared-name", ModelType.TEXT_EXTRACTOR),
+            ]
+        ),
         llm_default_temperature=0.7,
         llm_aliases={
             "best-gpt": "gpt-4o-mini",
@@ -109,13 +112,13 @@ def _check(reference: str, *, category: ModelCheckCategory | None = None, is_mod
 
 def _deck_with(
     *,
-    inference_models: dict[str, InferenceModelSpec],
+    inference_models: list[InferenceModelSpec],
     is_model_fallback_enabled: bool = True,
     **bindings: Any,
 ) -> ModelDeck:
     """A deck serving `inference_models` with the aliases, waterfalls and presets `bindings` names, by their deck field."""
     return ModelDeck(
-        inference_models=inference_models,
+        inference_models=ModelSpecIndex.make_from_specs(model_specs=inference_models),
         llm_default_temperature=0.7,
         llm_choice_defaults=LLMSettingChoicesDefaults(
             default_temperature=0.7,
@@ -171,10 +174,10 @@ def _make_collision_deck(*, model_type: ModelType) -> ModelDeck:
         f"{prefix}_presets": {"twin": _preset(model_type=model_type, model="~twin")},
     }
     return _deck_with(
-        inference_models={
-            "shared": _model_spec("shared", model_type),
-            "other": _model_spec("other", model_type),
-        },
+        inference_models=[
+            _model_spec("shared", model_type),
+            _model_spec("other", model_type),
+        ],
         **bindings,
     )
 
@@ -414,7 +417,7 @@ class TestModelReferenceCheck:
     def test_an_alias_and_a_waterfall_leading_to_each_other_end_as_no_model(self, reference: str) -> None:
         """A cycle through an alias and a waterfall resolves to nothing in the check, and a run refuses it cleanly."""
         model_deck = _deck_with(
-            inference_models={"gpt-4o-mini": _model_spec("gpt-4o-mini", ModelType.LLM)},
+            inference_models=[_model_spec("gpt-4o-mini", ModelType.LLM)],
             llm_aliases={"cycle-a": "~cycle-waterfall"},
             llm_waterfalls={"cycle-waterfall": ["@cycle-a"]},
         )
@@ -440,10 +443,10 @@ class TestModelReferenceCheck:
         The step ends as no model, as an unserved one does, so the waterfall goes on to its next step.
         """
         model_deck = _deck_with(
-            inference_models={
-                "gpt-4o-mini": _model_spec("gpt-4o-mini", ModelType.LLM),
-                "img-painter": _model_spec("img-painter", ModelType.IMG_GEN),
-            },
+            inference_models=[
+                _model_spec("gpt-4o-mini", ModelType.LLM),
+                _model_spec("img-painter", ModelType.IMG_GEN),
+            ],
             img_gen_waterfalls={"gpt-4o-mini": ["gpt-4o-mini", second_step]},
         )
 
@@ -500,7 +503,7 @@ class TestModelReferenceCheck:
     def test_a_step_whose_waterfall_runs_out_lets_its_waterfall_go_on(self, waterfalls: dict[str, list[str]], aliases: dict[str, str]) -> None:
         """A step reaching a waterfall none of whose steps is served serves no model, so the outer waterfall tries its next step."""
         model_deck = _deck_with(
-            inference_models={"gpt-4o-mini": _model_spec("gpt-4o-mini", ModelType.LLM)},
+            inference_models=[_model_spec("gpt-4o-mini", ModelType.LLM)],
             llm_waterfalls=waterfalls,
             llm_aliases=aliases,
         )
@@ -514,10 +517,10 @@ class TestModelReferenceCheck:
     def test_with_model_fallback_off_a_nested_waterfall_refusing_its_fallback_refuses_the_outer_one(self) -> None:
         """The refusal of a fallback while fallbacks are disabled is not a waterfall running out: it holds through the outer waterfall."""
         model_deck = _deck_with(
-            inference_models={
-                "gpt-4o-mini": _model_spec("gpt-4o-mini", ModelType.LLM),
-                "claude-x": _model_spec("claude-x", ModelType.LLM),
-            },
+            inference_models=[
+                _model_spec("gpt-4o-mini", ModelType.LLM),
+                _model_spec("claude-x", ModelType.LLM),
+            ],
             is_model_fallback_enabled=False,
             llm_waterfalls={"outer": ["~inner", "claude-x"], "inner": ["unserved-model", "gpt-4o-mini"]},
         )
@@ -559,10 +562,10 @@ class TestModelReferenceCheck:
     ) -> None:
         """`handle:@named` names the model served as `@named`: the validation, the run and the check all select it, not the alias."""
         model_deck = _deck_with(
-            inference_models={
-                literal_name: _model_spec(literal_name, ModelType.LLM),
-                "other": _model_spec("other", ModelType.LLM),
-            },
+            inference_models=[
+                _model_spec(literal_name, ModelType.LLM),
+                _model_spec("other", ModelType.LLM),
+            ],
             **bindings,
         )
         mocker.patch(_DECK_CHECK_GET_MODEL_DECK_TARGET, return_value=model_deck)
@@ -578,9 +581,34 @@ class TestModelReferenceCheck:
 
     def test_a_suggested_handle_spelled_like_a_reference_is_written_with_its_namespace(self) -> None:
         """A suggestion is a reference a caller may write back, so a handle spelled like an alias is offered as `handle:@named`."""
-        model_deck = _deck_with(inference_models={"@named": _model_spec("@named", ModelType.LLM)})
+        model_deck = _deck_with(inference_models=[_model_spec("@named", ModelType.LLM)])
 
         verdict = check_model_reference(model_deck=model_deck, reference=ModelReference.parse("handle:@namedd"), category=ModelCheckCategory.LLM)
 
         _assert_not_found(verdict)
         assert "handle:@named" in verdict.suggestions
+
+    def test_a_handle_served_as_two_types_resolves_in_each_and_is_named_as_served_elsewhere_in_others(self) -> None:
+        """One handle names one model per model type: the check finds it in every category serving it, and a refusal elsewhere says it is served."""
+        model_deck = _deck_with(
+            inference_models=[
+                _model_spec("gpt-6-luna", ModelType.LLM),
+                _model_spec("gpt-6-luna", ModelType.JUDGMENT),
+            ],
+        )
+
+        verdict = check_model_reference(model_deck=model_deck, reference=ModelReference.parse("gpt-6-luna"), category=None)
+
+        _assert_resolved(verdict)
+        assert verdict.matches == [
+            HandleMatch(category=ModelCheckCategory.LLM, resolves_to="gpt-6-luna", via=[]),
+            HandleMatch(category=ModelCheckCategory.JUDGMENT, resolves_to="gpt-6-luna", via=[]),
+        ]
+        img_gen_verdict = check_model_reference(
+            model_deck=model_deck, reference=ModelReference.parse("gpt-6-luna"), category=ModelCheckCategory.IMG_GEN
+        )
+        _assert_not_found(img_gen_verdict)
+        assert img_gen_verdict.other_categories == [ModelCheckCategory.LLM, ModelCheckCategory.JUDGMENT]
+        assert model_deck.unresolved_handle_sentence(name="gpt-6-luna", model_type=ModelType.IMG_GEN) == (
+            "Model handle 'gpt-6-luna' is served by the model deck, but not as an image-generation model"
+        )

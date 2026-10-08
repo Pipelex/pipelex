@@ -8,6 +8,7 @@ from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoicesDefaults
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_spec_index import ModelSpecIndex
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.usage.cost_category import CostCategory
@@ -34,11 +35,13 @@ def _model_spec(name: str, model_type: ModelType) -> InferenceModelSpec:
 def _make_deck() -> ModelDeck:
     """A deck where an LLM's name is also an extraction alias and an image-generation waterfall."""
     return ModelDeck(
-        inference_models={
-            "gpt-4o-mini": _model_spec("gpt-4o-mini", ModelType.LLM),
-            "extract-engine": _model_spec("extract-engine", ModelType.TEXT_EXTRACTOR),
-            "img-painter": _model_spec("img-painter", ModelType.IMG_GEN),
-        },
+        inference_models=ModelSpecIndex.make_from_specs(
+            model_specs=[
+                _model_spec("gpt-4o-mini", ModelType.LLM),
+                _model_spec("extract-engine", ModelType.TEXT_EXTRACTOR),
+                _model_spec("img-painter", ModelType.IMG_GEN),
+            ]
+        ),
         llm_default_temperature=0.7,
         llm_choice_defaults=LLMSettingChoicesDefaults(
             default_temperature=0.7,

@@ -6,7 +6,8 @@ from pipelex.runtime_hub import get_inference_manager, get_model_deck
 class TestSetupInferenceWorkers:
     def test_setup_inference_workers(self):
         inference_manager = get_inference_manager()
-        for model_handle, inference_model in get_model_deck().inference_models.items():
+        for inference_model in get_model_deck().inference_models.all_specs():
+            model_handle = inference_model.name
             match inference_model.model_type:
                 case ModelType.LLM:
                     llm_worker = inference_manager.get_llm_worker(llm_handle=model_handle)

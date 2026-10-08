@@ -1,9 +1,10 @@
 """Pin the D2 `build_input_form` deriver: the per-pipe input-form descriptor from authored facts.
 
-Contract: the workspace spec `docs/specs/mthds-input-form-descriptor.md`. The descriptor is derived
-from the loaded pipes (slot facts: order, presence, multiplicity) plus the authored blueprints
-(concept facts: descriptions, refinement chains, structure fields) — never from the emitted JSON
-Schema, so the facts the schema projection destroys (S1 findings E1-E10) survive here:
+Contract: `conformance/specs/mthds-input-form-descriptor.md`, in the `conformance` repo beside the
+tests that verify it. The descriptor is derived from the loaded pipes (slot facts: order, presence,
+multiplicity) plus the authored blueprints (concept facts: descriptions, refinement chains,
+structure fields) — never from the emitted JSON Schema, so the facts the schema projection destroys
+(S1 findings E1-E10) survive here:
 
 - concept identity on every concept-typed node (E1) and the refinement chain as a stated list (E2);
 - three-valued `presence` so `!` is not flattened (E5), and `gating` stated as its own fact;

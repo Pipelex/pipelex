@@ -462,8 +462,9 @@ prompt = "Compare these transcripts: $transcripts, given their summaries: $summa
         """Every input is material to judge, so a document input is sent as a file whether or not the question names it."""
         model_deck = get_model_deck()
         judgment_model = model_deck.judgment_aliases["default-judgment"]
-        booted_spec = model_deck.inference_models[judgment_model]
-        mocker.patch.dict(model_deck.inference_models, {judgment_model: booted_spec.model_copy(update={"inputs": ["text", "images", "pdf"]})})
+        judgment_specs = model_deck.inference_models.root[ModelType.JUDGMENT]
+        booted_spec = judgment_specs[judgment_model]
+        mocker.patch.dict(judgment_specs, {judgment_model: booted_spec.model_copy(update={"inputs": ["text", "images", "pdf"]})})
         pipes = """
 [pipe.main]
 type = "PipeJudge"

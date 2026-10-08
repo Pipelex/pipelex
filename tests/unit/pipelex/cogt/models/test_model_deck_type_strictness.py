@@ -9,6 +9,7 @@ from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoicesDefaults
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_spec_index import ModelSpecIndex
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.usage.cost_category import CostCategory
@@ -37,11 +38,13 @@ def _make_deck(
 ) -> ModelDeck:
     """A deck serving LLMs and an image-generation model."""
     return ModelDeck(
-        inference_models={
-            "gpt-4o-mini": _model_spec("gpt-4o-mini", ModelType.LLM),
-            "claude-x": _model_spec("claude-x", ModelType.LLM),
-            "img-painter": _model_spec("img-painter", ModelType.IMG_GEN),
-        },
+        inference_models=ModelSpecIndex.make_from_specs(
+            model_specs=[
+                _model_spec("gpt-4o-mini", ModelType.LLM),
+                _model_spec("claude-x", ModelType.LLM),
+                _model_spec("img-painter", ModelType.IMG_GEN),
+            ]
+        ),
         llm_default_temperature=0.7,
         llm_presets=llm_presets or {},
         llm_choice_defaults=LLMSettingChoicesDefaults(
@@ -146,4 +149,4 @@ class TestModelDeckTypeStrictness:
             _build_setting(model_deck=model_deck, model_type=model_type, model_choice="held-nowhere")
 
         assert exc_info.value.available_options == expected_options
-        assert model_deck.get_model_handles_for_type(model_type=model_type) == expected_options
+        assert model_deck.inference_models.handles_of_type(model_type=model_type) == expected_options

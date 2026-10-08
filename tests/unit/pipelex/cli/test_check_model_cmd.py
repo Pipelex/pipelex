@@ -17,6 +17,7 @@ from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoicesDefaults
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_spec_index import ModelSpecIndex
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.models.model_reference import ModelReference
@@ -44,15 +45,17 @@ def _model_spec(name: str, model_type: ModelType) -> InferenceModelSpec:
 def _make_model_deck(*, is_model_fallback_enabled: bool = True) -> ModelDeck:
     """A deck with LLM presets, aliases and a waterfall, one image-generation model and one document-generation engine."""
     return ModelDeck(
-        inference_models={
-            "claude-4.5-sonnet": _model_spec("claude-4.5-sonnet", ModelType.LLM),
-            "claude-4-sonnet": _model_spec("claude-4-sonnet", ModelType.LLM),
-            "claude-4.6-opus": _model_spec("claude-4.6-opus", ModelType.LLM),
-            "gpt-4o": _model_spec("gpt-4o", ModelType.LLM),
-            "gpt-4o-mini": _model_spec("gpt-4o-mini", ModelType.LLM),
-            "img-painter": _model_spec("img-painter", ModelType.IMG_GEN),
-            "reportlab-pdf": _model_spec("reportlab-pdf", ModelType.DOC_GEN),
-        },
+        inference_models=ModelSpecIndex.make_from_specs(
+            model_specs=[
+                _model_spec("claude-4.5-sonnet", ModelType.LLM),
+                _model_spec("claude-4-sonnet", ModelType.LLM),
+                _model_spec("claude-4.6-opus", ModelType.LLM),
+                _model_spec("gpt-4o", ModelType.LLM),
+                _model_spec("gpt-4o-mini", ModelType.LLM),
+                _model_spec("img-painter", ModelType.IMG_GEN),
+                _model_spec("reportlab-pdf", ModelType.DOC_GEN),
+            ]
+        ),
         llm_default_temperature=0.7,
         llm_presets={
             "writing-creative": LLMSetting(model="claude-4.5-sonnet", temperature=0.9, description="Creative writing"),

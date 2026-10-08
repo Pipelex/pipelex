@@ -49,7 +49,7 @@ def get_collection_keys(
             _, waterfalls = model_deck.get_aliases_and_waterfalls_for_type(model_type)
             return list(waterfalls)
         case ModelReferenceKind.HANDLE:
-            return model_deck.get_model_handles_for_type(model_type=model_type)
+            return model_deck.inference_models.handles_of_type(model_type=model_type)
 
 
 class ModelReferenceName(NamedTuple):
