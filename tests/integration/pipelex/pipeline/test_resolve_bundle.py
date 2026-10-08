@@ -13,6 +13,7 @@ from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
 from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import PipelexUnexpectedError
+from pipelex.hosted.hosted_inputs import ADDRESS_DEPENDENCY_REFUSAL_MARKER
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.resolve_bundle import resolve_crate_from_contents
@@ -143,7 +144,10 @@ class TestResolveCrateFromContents:
             side_effect=AssertionError("in-memory resolve must not discover installed methods or fetch by address"),
         )
 
-        with pytest.raises(ValidateBundleError, match="address-based dependency"):
+        with pytest.raises(ValidateBundleError, match=ADDRESS_DEPENDENCY_REFUSAL_MARKER) as exc_info:
             resolve_crate_from_contents(mthds_contents=[ADDRESS_DEPENDENCY_MTHDS], mthds_sources=["host.mthds"])
 
         discovery.assert_not_called()
+        # The items `/v1/pipe-io` sends in its invalid verdict carry the marker a hosted run tells this refusal apart by.
+        validation_errors = exc_info.value.to_error_report().validation_errors or []
+        assert any(ADDRESS_DEPENDENCY_REFUSAL_MARKER in item.message for item in validation_errors)

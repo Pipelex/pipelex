@@ -160,10 +160,6 @@ rationale = "Renders the result; single operand."
 param = "pipe_code"
 rationale = "Runs the pipe identified by pipe_code; single operand."
 
-["pipelex/cli/agent_cli/commands/run/_run_core_api.py::run_pipeline_core_api"]
-param = "pipe_code"
-rationale = "Runs the pipe identified by pipe_code via the API; single operand."
-
 ["pipelex/cli/agent_cli/commands/run/stdin_resolver.py::_extract_stuff_entry"]
 param = "stuff_data"
 rationale = "Extracts from the stuff_data; single operand."
@@ -295,6 +291,10 @@ rationale = "Derives from the remaining_backends; single operand."
 ["pipelex/cli/commands/init/ui/routing_ui.py::build_primary_backend_panel"]
 param = "backend_keys"
 rationale = "Derives from the backend_keys; single operand."
+
+["pipelex/cli/commands/run/_hosted_sources.py::looks_like_method_id"]
+param = "target"
+rationale = "Tests the target string; single operand, as looks_like_method_ref does."
 
 ["pipelex/cli/commands/run/_inputs_file_loader.py::_convert_temporal_inputs"]
 param = "inputs_dict"

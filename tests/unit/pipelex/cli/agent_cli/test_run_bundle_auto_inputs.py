@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 import typer
-from mthds.runners.types import RunnerType
 
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, set_agent_cli_error_format
 from pipelex.cli.agent_cli.commands.run.bundle_cmd import run_bundle_cmd
@@ -41,18 +40,13 @@ class TestAgentRunBundleAutoInputs:
         mocker.patch(f"{RUN_BUNDLE_MODULE}.Pipelex.teardown_if_needed")
         return mocker.patch(f"{RUN_BUNDLE_MODULE}.run_pipeline_core", new=mocker.AsyncMock(return_value=result))
 
-    def _make_ctx(self, mocker: MockerFixture) -> Any:
-        ctx = mocker.MagicMock()
-        ctx.obj = {"runner": RunnerType.PIPELEX}
-        return ctx
-
     @pytest.mark.usefixtures("tty_stdin")
     def test_auto_detects_inputs_toml(self, mocker: MockerFixture, bundle_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
         """With only inputs.toml in the directory, it is auto-detected and loaded through the TOML parser."""
         run_core_mock = self._patch_run(mocker, {"answer": "42"})
         (bundle_dir / "inputs.toml").write_text('topic = "cats"\n', encoding="utf-8")
 
-        run_bundle_cmd(ctx=self._make_ctx(mocker), path=str(bundle_dir), pipe="my_pipe", output_format=CliOutputFormat.JSON)
+        run_bundle_cmd(path=str(bundle_dir), pipe="my_pipe", output_format=CliOutputFormat.JSON)
 
         capsys.readouterr()
         assert run_core_mock.call_args.kwargs["inputs"] == {"topic": "cats"}
@@ -66,7 +60,7 @@ class TestAgentRunBundleAutoInputs:
         (bundle_dir / "inputs.toml").write_text('topic = "cats"\n', encoding="utf-8")
 
         with pytest.raises(typer.Exit) as exc_info:
-            run_bundle_cmd(ctx=self._make_ctx(mocker), path=str(bundle_dir), pipe="my_pipe", output_format=CliOutputFormat.JSON)
+            run_bundle_cmd(path=str(bundle_dir), pipe="my_pipe", output_format=CliOutputFormat.JSON)
 
         assert exc_info.value.exit_code == 1
         envelope = json.loads(capsys.readouterr().err)
@@ -87,7 +81,7 @@ class TestAgentRunBundleAutoInputs:
         piped_stdin.isatty = lambda: False  # type: ignore[assignment]
         monkeypatch.setattr("sys.stdin", piped_stdin)
 
-        run_bundle_cmd(ctx=self._make_ctx(mocker), path=str(bundle_dir), pipe="my_pipe", output_format=CliOutputFormat.JSON)
+        run_bundle_cmd(path=str(bundle_dir), pipe="my_pipe", output_format=CliOutputFormat.JSON)
 
         capsys.readouterr()
         assert run_core_mock.call_args.kwargs["inputs"] == {"topic": "fromstdin"}
@@ -100,7 +94,6 @@ class TestAgentRunBundleAutoInputs:
         (bundle_dir / "inputs.toml").write_text('topic = "toml"\n', encoding="utf-8")
 
         run_bundle_cmd(
-            ctx=self._make_ctx(mocker),
             path=str(bundle_dir),
             pipe="my_pipe",
             inputs=str(bundle_dir / "inputs.toml"),

@@ -157,8 +157,10 @@ def app_callback(
     # Check system readiness (dependencies and venv for dev installs)
     check_readiness()
 
-    # Warn if the model deck has fallen behind the installed pipelex version
-    warn_if_deck_stale()
+    # Warn if the model deck has fallen behind the installed pipelex version. `run` warns from its local branch
+    # instead, once it knows the run executes here: a hosted run reads no deck.
+    if ctx.invoked_subcommand != "run":
+        warn_if_deck_stale()
 
 
 @app.command(name="init", help="Initialize Pipelex configuration, backends, credentials, routing, and telemetry")

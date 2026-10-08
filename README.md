@@ -190,8 +190,8 @@ The same `.mthds` file runs from multiple execution targets:
 
 | Target | How |
 |--------|-----|
-| **CLI** | `pipelex run bundle method.mthds --inputs inputs.json` |
-| **Python** | `PipelexMTHDSProtocol().execute(...)` |
+| **CLI** | `pipelex run bundle method.mthds --inputs inputs.json`, on your machine, or with `--hosted` on the hosted API |
+| **Python** | `PipelexMTHDSProtocol().execute(...)` in your process, or [`pipelex-sdk`](https://pypi.org/project/pipelex-sdk/)'s `PipelexAPIClient` against the hosted API |
 | **TypeScript / Node** | [`@pipelex/sdk`](https://www.npmjs.com/package/@pipelex/sdk) against the hosted API, or [`mthds`](https://www.npmjs.com/package/mthds) against any MTHDS API |
 | **REST API** | Self-host the [`pipelex/pipelex-api`](https://hub.docker.com/r/pipelex/pipelex-api) image, built from this repository's [`api/`](https://github.com/Pipelex/pipelex/tree/main/api) directory; the hosted API is the one in the Quick start above |
 | **MCP** | The [Pipelex MCP](https://github.com/Pipelex/pipelex-mcp): your chatbot runs the methods saved in your account |

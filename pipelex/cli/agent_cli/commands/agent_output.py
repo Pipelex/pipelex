@@ -26,10 +26,11 @@ from pathlib import Path
 from typing import Any, NoReturn, cast
 
 import typer
-from mthds.runners.api.exceptions import ApiResponseError
+from pipelex_sdk.errors import ApiResponseError
 from pydantic import ValidationError
 
 from pipelex.base_exceptions import PipelexError, ValidationErrorItem, iter_cause_chain
+from pipelex.hosted.error_rendering import hosted_refusal_message, hosted_refusal_next_step
 from pipelex.pipe_run.located_failure import find_root_fault
 from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
 from pipelex.pipeline.validation_render import build_fix_command, count_applicable_fixes, format_validation_error_items_markdown
@@ -86,40 +87,9 @@ _UNKNOWN_MODEL_HINT = (
     "to validate or 'pipelex-agent models -t <type>' to list available models."
 )
 
-_API_CREDENTIALS_HINT = (
-    "Set MTHDS_API_KEY and MTHDS_BASE_URL (the runner's origin), or run 'mthds config set api-key <key>' and 'mthds config set base-url <url>'"
-)
-_API_RATE_LIMITED_HINT = "Too many requests: wait retry_after_seconds when the error carries it, otherwise a few seconds, then run again"
-# A 503 does not say whether the run happened: a hosted plane can answer it before forwarding the
-# request and also after the run completed, when it failed to record the result. So it is never
-# marked retryable, and its hint warns that running again can repeat a paid run.
-_API_UNAVAILABLE_HINT = (
-    "The runner or the service in front of it was unavailable. It may have failed before the run or after it, "
-    "so running again can repeat a paid run: wait retry_after_seconds when the error carries it, then run again "
-    "only if a repeated run is acceptable"
-)
-# The next step of a 4xx refusal that advised none and whose status has no hint of its own.
-API_REFUSAL_CALLER_HINT = (
-    "The runner refused the request: change what the message names (the method, the inputs or the configuration), then run again"
-)
-
-# The next step of a refusal whose answer advised none, by its HTTP status. These are the answers a
-# hosted plane authors itself, in front of the runner, and they carry no `user_action`: the gateway's
-# refusal of a key, an unknown route, the platform's rate limiter, a service it cannot reach.
-API_REFUSAL_HINTS_BY_STATUS: dict[int, str] = {
-    401: f"The runner refused the credentials. {_API_CREDENTIALS_HINT}",
-    403: (
-        "The runner refused the request: check that MTHDS_API_KEY is a valid key for the runner at MTHDS_BASE_URL; "
-        "when it is, the message says what this request may not do"
-    ),
-    404: "The runner has no such route: check that MTHDS_BASE_URL is the runner's origin, with no path such as /v1",
-    429: _API_RATE_LIMITED_HINT,
-    503: _API_UNAVAILABLE_HINT,
-}
-
 # Statuses that say the request was refused before anything ran, so the same request can succeed later
 # (RFC 6585): the envelope marks them retryable unless the answer said otherwise. A 503 is not one of
-# them, see _API_UNAVAILABLE_HINT.
+# them: the hosted plane can answer it after the run completed (see its next step in pipelex.hosted.error_rendering).
 _API_RETRYABLE_STATUSES: frozenset[int] = frozenset({429})
 
 AGENT_ERROR_HINTS: dict[str, str] = {
@@ -161,16 +131,6 @@ AGENT_ERROR_HINTS: dict[str, str] = {
         "Without a 'migration' field, correct the telemetry.toml settings named in the message."
     ),
     "BinaryNotFoundError": "Install pipelex-tools: uv tool install pipelex-tools",
-    # API runner errors
-    "ClientAuthenticationError": _API_CREDENTIALS_HINT,
-    "PipelineRequestError": "Check that pipe_code or mthds_contents is provided",
-    # The next step of a runner's server-side failure that advised none, when its status has none of its
-    # own in API_REFUSAL_HINTS_BY_STATUS (a 4xx gets API_REFUSAL_CALLER_HINT instead). It stands in for
-    # the hint keyed on the runner's own class, which names a local command (doctor, check-model) that
-    # cannot fix what a remote runner refused.
-    "ApiResponseError": (
-        "The API runner failed on its side: report it with the request_id, or with the http_status when the error carries no request_id"
-    ),
     # Graph errors
     "GraphSpecParseError": "Validate graphspec.json structure; ensure it matches the expected GraphSpec schema",
     # Input/type errors
@@ -211,14 +171,12 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     "ValidationError": "input",
     "ValueError": "input",
     "BundleError": "input",
-    "PipelineRequestError": "input",
     "GraphSpecParseError": "input",
     "UnknownCommandError": "input",
     "CodegenDriftError": "input",
     "CodegenLockNotFoundError": "input",
     "CodegenLockError": "input",
     # config = environment/config changes needed
-    "ClientAuthenticationError": "config",
     "PipeOperatorModelAvailabilityError": "config",
     "BinaryNotFoundError": "config",
     "InitConfigError": "config",
@@ -527,7 +485,7 @@ def _string_list(*, value: Any) -> list[str] | None:
 
 
 def api_response_error_payload(*, error: ApiResponseError) -> dict[str, Any]:
-    """The error envelope of a request the API runner answered non-2xx, read off the problem document it sent.
+    """The error envelope of a request the hosted API answered non-2xx, read off the problem document it sent.
 
     It has the shape of a local failure's envelope, so an agent reads a hosted refusal the way it reads a local one:
 
@@ -536,14 +494,14 @@ def api_response_error_payload(*, error: ApiResponseError) -> dict[str, Any]:
       for a run that failed, which a local run reports as ``cause_type`` under ``PipelineExecutionError``. There is
       no ``cause_type`` or ``cause_message`` on this path. ``ApiResponseError`` when the answer names no class, as a
       gateway's error page does not.
-    - ``message`` is ``API POST /v1/execute failed (422): <reason>``, the error's own message without the next step
+    - ``message`` is ``API POST /v1/start failed (422): <reason>``, the error's own message without the next step
       it appends, which ``hint`` carries. On a failed run the runner's reason is located at the failing pipe and its
       path, ``Pipe 'condense_article' failed (digest_article → condense_article): …``.
-    - ``hint`` is the runner's next step, ``user_action.detail``. An answer that advised none, such as the ones a
+    - ``hint`` is the runner's next step, ``user_action.detail``. An answer that advised none, such as the ones the
       hosted plane authors in front of the runner (a refused key, a rate limit, a runner it cannot reach), gets the
-      hint of its status from ``API_REFUSAL_HINTS_BY_STATUS``, else a hint by status class (a 4xx asks for a change to
-      the request, anything else for a report); never the hint keyed on the runner's class, which names a local
-      command that cannot fix a remote refusal.
+      next step of its status from ``pipelex.hosted.error_rendering``, the table the human CLI reads too, else one by
+      status class (a 4xx asks for a change to the request, anything else for a report); never the hint keyed on the
+      runner's class, which names a local command that cannot fix a remote refusal.
     - ``retryable`` (only when true, as on every envelope), ``error_domain`` and ``error_category`` are the answer's,
       with no local fallback, since only the runner knows whether the caller or its operator has to act. The one
       exception is ``retryable`` on a 429 that did not say, a refusal sent before anything ran. A 503 is never
@@ -556,21 +514,11 @@ def api_response_error_payload(*, error: ApiResponseError) -> dict[str, Any]:
     - ``error_source`` is the client-side trace, as on every JSON envelope.
     """
     problem: dict[str, Any] = error.problem or {}
-    message = str(error)
-    hint: str
-    if error.user_action is None:
-        hint = API_REFUSAL_HINTS_BY_STATUS.get(error.status) or (
-            API_REFUSAL_CALLER_HINT if 400 <= error.status < 500 else AGENT_ERROR_HINTS["ApiResponseError"]
-        )
-    else:
-        hint = error.user_action.detail
-        message = message.removesuffix(f"\nNext step: {hint}")
-
     payload: dict[str, Any] = {
         "error": True,
         "error_type": error.error_type or type(error).__name__,
-        "message": message,
-        "hint": hint,
+        "message": hosted_refusal_message(error=error),
+        "hint": hosted_refusal_next_step(error=error),
     }
     if error.retryable or (error.retryable is None and error.status in _API_RETRYABLE_STATUSES):
         payload["retryable"] = True
@@ -597,15 +545,15 @@ def api_response_error_payload(*, error: ApiResponseError) -> dict[str, Any]:
 
 
 def agent_error_api_response(*, error: ApiResponseError) -> NoReturn:
-    """Emit the envelope of a request the API runner refused to stderr, format-aware, and exit 1.
+    """Emit the envelope of a request the hosted API refused to stderr, format-aware, and exit 1.
 
-    The sibling of :func:`agent_error` for the one error an API runner's refusal arrives as. It builds its own
+    The sibling of :func:`agent_error` for the one error a hosted refusal arrives as. It builds its own
     payload rather than going through :func:`agent_error`'s lookups, whose fallbacks keyed on ``error_type`` are
     local advice (see :func:`api_response_error_payload`), and renders it with the same JSON dump and the same
     markdown renderer, so a hosted refusal reads like a local failure.
 
     Args:
-        error: The refusal the ``MthdsAPIClient`` raised.
+        error: The refusal pipelex-sdk's ``PipelexAPIClient`` raised.
     """
     payload = api_response_error_payload(error=error)
     match get_agent_cli_error_format():

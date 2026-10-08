@@ -1,5 +1,5 @@
 ---
-description: "Run Pipelex pipelines from the CLI, Python API, or Pipelex Client. Execute .mthds bundles and retrieve structured outputs programmatically."
+description: "Run Pipelex pipelines from the CLI or the Python API, locally or on the hosted Pipelex API. Execute .mthds bundles and retrieve structured outputs programmatically."
 ---
 
 # Executing Pipelines
@@ -216,7 +216,9 @@ pipe_output = response.pipe_output
 
 ## Using the Pipelex API
 
-The [Pipelex API server](../../api-server/index.md) runs pipelines over HTTP on infrastructure you host yourself: it is published as the `pipelex/pipelex-api` Docker image, and [Pipe Run](../../api-server/pipe-run.md) documents its `/v1/execute` and `/v1/start` routes.
+Everything above runs in your own process, with your own inference backends. To run on the hosted Pipelex API instead, with only a Pipelex API key, use pipelex-sdk's `PipelexAPIClient`, which is installed with `pipelex`: see [Running on the Hosted API from Python](running-on-the-hosted-api.md). From the CLI, the same runs take `--hosted`, see [Running on the Hosted API](../../tools/cli/run.md#running-on-the-hosted-api).
+
+The [Pipelex API server](../../api-server/index.md) runs pipelines over HTTP on infrastructure you host yourself: it is published as the `pipelex/pipelex-api` Docker image, and [Pipe Run](../../api-server/pipe-run.md) documents its `/v1/execute` and `/v1/start` routes. The same client reaches it when its base URL points there.
 
 ---
 

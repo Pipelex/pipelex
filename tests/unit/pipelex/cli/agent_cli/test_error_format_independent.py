@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 import typer
-from mthds.runners.types import RunnerType
 
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.run.pipe_cmd import run_pipe_cmd
@@ -18,22 +17,13 @@ RUN_PIPE_MODULE = "pipelex.cli.agent_cli.commands.run.pipe_cmd"
 
 
 class TestErrorFormatIndependent:
-    def _patch_success(self, mocker: MockerFixture, result: dict[str, Any]) -> Any:
+    def _patch_success(self, mocker: MockerFixture, result: dict[str, Any]) -> None:
         """Patch the run pipe command's dependencies for the success path."""
         mocker.patch(f"{RUN_PIPE_MODULE}.make_pipelex_for_agent_cli")
         mocker.patch(f"{RUN_PIPE_MODULE}.Pipelex.teardown_if_needed")
         mocker.patch(f"{RUN_PIPE_MODULE}.resolve_pipe_from_exports", return_value=[])
         mocker.patch(f"{RUN_PIPE_MODULE}.parse_cli_inputs", return_value=ParsedCliInputs(pipeline_inputs=None, inputs_base_dir=None))
         mocker.patch(f"{RUN_PIPE_MODULE}.run_pipeline_core", new=mocker.AsyncMock(return_value=result))
-        ctx = mocker.MagicMock()
-        ctx.obj = {"runner": RunnerType.PIPELEX}
-        return ctx
-
-    def _ctx_for_error_path(self, mocker: MockerFixture) -> Any:
-        """Mock typer.Context shaped for the error path (no Pipelex init needed)."""
-        ctx = mocker.MagicMock()
-        ctx.obj = {"runner": RunnerType.PIPELEX}
-        return ctx
 
     @pytest.mark.parametrize(
         ("output_format", "error_format", "expected_success_is_markdown"),
@@ -57,9 +47,9 @@ class TestErrorFormatIndependent:
         expected_success_is_markdown: bool,
     ) -> None:
         """Success output follows --format regardless of --error-format."""
-        ctx = self._patch_success(mocker, {"answer": "42"})
+        self._patch_success(mocker, {"answer": "42"})
 
-        run_pipe_cmd(ctx=ctx, pipe_code="my_pipe", output_format=output_format, error_format=error_format)
+        run_pipe_cmd(pipe_code="my_pipe", output_format=output_format, error_format=error_format)
 
         out = capsys.readouterr().out
         if expected_success_is_markdown:
@@ -84,18 +74,15 @@ class TestErrorFormatIndependent:
     )
     def test_error_path_follows_error_format(
         self,
-        mocker: MockerFixture,
         capsys: pytest.CaptureFixture[str],
         output_format: CliOutputFormat,
         error_format: CliOutputFormat | None,
         expected_error_is_markdown: bool,
     ) -> None:
         """Error output follows --error-format (or --format when --error-format is omitted)."""
-        ctx = self._ctx_for_error_path(mocker)
-
         # Passing a pipe_code that ends in .mthds triggers the ArgumentError branch in run_pipe_cmd.
         with pytest.raises(typer.Exit):
-            run_pipe_cmd(ctx=ctx, pipe_code="my_pipe.mthds", output_format=output_format, error_format=error_format)
+            run_pipe_cmd(pipe_code="my_pipe.mthds", output_format=output_format, error_format=error_format)
 
         err = capsys.readouterr().err
         if expected_error_is_markdown:

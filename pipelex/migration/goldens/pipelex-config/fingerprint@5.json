@@ -956,6 +956,21 @@
       ],
       "open_node": false
     },
+    "run": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "run.execution": {
+      "value_type": "enum",
+      "required": true,
+      "enum_members": [
+        "hosted",
+        "local"
+      ],
+      "default": "local",
+      "open_node": false
+    },
     "runtime": {
       "value_type": "table",
       "required": true,

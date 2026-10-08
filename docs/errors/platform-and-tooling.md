@@ -103,6 +103,17 @@ own page. Classes are grouped by subsystem.
 - [`FixTransactionError`](fix-transaction-error.md) — Fix transaction
 - [`FixWriteConflictError`](fix-write-conflict-error.md) — Fix write conflict
 
+## Hosted
+
+- [`HostedBaseUrlError`](hosted-base-url-error.md) — Hosted base url
+- [`HostedLocalFileUploadUnavailableError`](hosted-local-file-upload-unavailable-error.md) — Hosted local file upload unavailable
+- [`HostedMethodInvalidError`](hosted-method-invalid-error.md) — Hosted method invalid
+- [`HostedRunError`](hosted-run-error.md) — Hosted run error
+- [`HostedRunInterruptedError`](hosted-run-interrupted-error.md) — Hosted run interrupted
+- [`HostedRunOutcomeUnknownError`](hosted-run-outcome-unknown-error.md) — Hosted run outcome unknown
+- [`HostedRunPollingError`](hosted-run-polling-error.md) — Hosted run polling
+- [`HostedRunSourceError`](hosted-run-source-error.md) — Hosted run source
+
 ## Methods
 
 - [`MethodDependencyFetchError`](method-dependency-fetch-error.md) — Method dependency fetch

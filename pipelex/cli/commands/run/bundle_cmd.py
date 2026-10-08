@@ -5,9 +5,12 @@ from typing import Annotated
 
 import typer
 
+from pipelex.cli.commands.run._hosted_sources import collect_mthds_files, hosted_library_dirs
 from pipelex.cli.commands.run._inputs_file_loader import find_default_inputs_file
 from pipelex.cli.commands.run._run_core import COMMAND, execute_run, validate_run_flag_combination
+from pipelex.cli.commands.run._run_hosted import bundle_main_pipe_code, execute_hosted_run, refuse_local_only_flags, resolve_cli_run_execution
 from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError
+from pipelex.hosted.exceptions import HostedRunSourceError
 from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.pipeline.default_file_names import DEFAULT_BUNDLE_FILE_NAME
 
@@ -105,6 +108,20 @@ def run_bundle_cmd(
             help="Write the main stuff to this literal CSV path (not under --output-dir; absolute/~/relative ok). Requires a flat list output.",
         ),
     ] = None,
+    hosted: Annotated[
+        bool | None,
+        typer.Option(
+            "--hosted/--local",
+            help="Run on the hosted Pipelex API (key in PIPELEX_API_KEY) or on this machine. Default: [run] execution, else local.",
+        ),
+    ] = None,
+    base_url: Annotated[
+        str | None,
+        typer.Option(
+            "--base-url",
+            help="Origin of the hosted API a hosted run calls, scheme://host[:port]. Overrides PIPELEX_BASE_URL; default https://api.pipelex.com.",
+        ),
+    ] = None,
 ) -> None:
     """Run a pipeline from a bundle file (.mthds) or pipeline directory.
 
@@ -114,6 +131,7 @@ def run_bundle_cmd(
         pipelex run bundle my_bundle.mthds
         pipelex run bundle my_bundle.mthds --pipe my_pipe --inputs data.json
         pipelex run bundle pipeline_01/ --dry-run
+        pipelex run bundle pipeline_01/ --hosted
     """
     validate_run_flag_combination(dry_run=dry_run, mock_usage=mock_usage, mock_inputs=mock_inputs)
 
@@ -178,6 +196,40 @@ def run_bundle_cmd(
             err=True,
         )
         raise typer.Exit(1)
+
+    execution = resolve_cli_run_execution(hosted=hosted, base_url=base_url)
+    if execution.is_hosted:
+        refuse_local_only_flags(
+            dry_run=dry_run,
+            mock_usage=mock_usage,
+            mock_inputs=mock_inputs,
+            orchestrator=orchestrator,
+            save_csv=save_csv,
+            costs=costs,
+            graph_full_data=graph_full_data,
+        )
+        hosted_pipe_code = pipe_code or bundle_main_pipe_code(bundle_path=bundle_path, library_dirs=library_dir)
+        # The bundle goes first, then the rest of the library a local run would load with it: -L, else PIPELEXPATH.
+        try:
+            bundle_files = collect_mthds_files(primary=Path(bundle_path), library_dirs=hosted_library_dirs(library_dirs=library_dir))
+        except HostedRunSourceError as exc:
+            typer.secho(f"Failed to run: {exc.message}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1) from exc
+        execute_hosted_run(
+            mthds_files=bundle_files,
+            pipe_code=hosted_pipe_code,
+            inputs=inputs,
+            dynamic_output_concept_ref=dynamic_output_concept_ref,
+            base_url=base_url,
+            output_label=hosted_pipe_code,
+            output_dir=output_dir,
+            save_working_memory=save_working_memory,
+            working_memory_path=working_memory_path,
+            save_main_stuff=save_main_stuff,
+            no_pretty_print=no_pretty_print,
+            graph=graph,
+        )
+        return
 
     execute_run(
         pipe_code=pipe_code,

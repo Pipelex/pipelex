@@ -10,7 +10,8 @@
 # - All values below are set to their defaults - modify them as needed
 # - The values here will override the defaults from the Pipelex package
 #
-# The three top-level sections mirror the layers of the runtime:
+# The [run] section says where your runs execute. The three other top-level sections mirror the
+# layers of the runtime:
 # - [runtime]     process-scoped infrastructure: storage, secrets, logging, tracing, plugins
 # - [inference]   the model-calling seam: model deck, LLM, image generation, extraction
 # - [interpreter] library-scoped method machinery: parsing, pipe runs, pipeline execution
@@ -31,6 +32,16 @@
 # Support: https://go.pipelex.com/discord
 #
 ####################################################################################################
+
+####################################################################################################
+# Run Config
+####################################################################################################
+
+[run]
+# Where `pipelex run` and `pipelex-agent run` execute a method when the command passes neither
+# --hosted nor --local: "local" runs on this machine, on the backends in .pipelex/inference/ (your own
+# provider keys); "hosted" runs on the hosted Pipelex API, with the key in PIPELEX_API_KEY.
+execution = "local"
 
 ####################################################################################################
 # Storage Config
