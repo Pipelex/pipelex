@@ -1,11 +1,12 @@
 """Tests for `POST /v1/pipe-io` — a method's three I/O artifacts off the resolved crate, with no dry run.
 
-Pins `docs/specs/pipelex-codegen.md#the-pipe-io-route` (workspace root): the route resolves the
-closure through the crate routes' static core, selects a pipe with the per-pipe routes' chain, and
-returns `pipe_io_contracts`, `input_form` and `output_form` keyed by qualified `pipe_ref`, beside
-`pipe_ref`, `default_pipe_ref`, `pending_signatures`, `is_runnable` and, on request, the closure's
-files. The pinning cases hold each artifact equal to `/v1/validate`'s same-named view for the same
-closure and pipe; the teardown cases hold the loaded-on-success contract on every exit.
+Pins `conformance/specs/pipelex-codegen.md#the-pipe-io-route`, in the `conformance` repo beside the
+tests that verify it: the route resolves the closure through the crate routes' static core, selects a
+pipe with the per-pipe routes' chain, and returns `pipe_io_contracts`, `input_form` and `output_form`
+keyed by qualified `pipe_ref`, beside `pipe_ref`, `default_pipe_ref`, `pending_signatures`,
+`is_runnable` and, on request, the closure's files. The pinning cases hold each artifact equal to
+`/v1/validate`'s same-named view for the same closure and pipe; the teardown cases hold the
+loaded-on-success contract on every exit.
 """
 
 from collections.abc import Callable

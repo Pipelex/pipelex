@@ -1,9 +1,10 @@
 """Envelope tests for `POST /v1/codegen` — the typed-artifact projection route.
 
-Pins `docs/specs/pipelex-codegen.md#route-envelopes` (workspace root): the two explicit projection
-axes (`kind`, `target`); a produced verdict is a 200 discriminated on `is_valid` with the stamped
-artifacts + lock on the valid arm; an unknown `kind`/`target` is a request-shape 422 problem+json;
-the artifacts a client writes verbatim pass the offline `codegen check` byte-for-byte.
+Pins `conformance/specs/pipelex-codegen.md#route-envelopes`, in the `conformance` repo beside the tests
+that verify it: the two explicit projection axes (`kind`, `target`); a produced verdict is a 200
+discriminated on `is_valid` with the stamped artifacts + lock on the valid arm; an unknown
+`kind`/`target` is a request-shape 422 problem+json; the artifacts a client writes verbatim pass the
+offline `codegen check` byte-for-byte.
 """
 
 from pathlib import Path
