@@ -35,20 +35,20 @@ TEST_PROFILES_OVERRIDE_PATH = Path(ConfigPaths.DEV_CONFIG_DIR_PATH) / "test_prof
 MODEL_TYPES = ["llm", "img_gen", "text_extractor", "search", "judgment"]
 
 
-def _group_handles_by_model_type(*, specs: dict[str, Any]) -> dict[str, list[str]]:
+def _group_handles_by_model_type(*, document: dict[str, Any]) -> dict[str, list[str]]:
     """Group the models a backend TOML declares by model type, reading the file as the loader reads it.
 
     A handle names one model per model type, so a handle appears once under each type it is declared as.
 
     Args:
-        specs: The backend TOML document.
+        document: The backend TOML document.
 
     Returns:
         Dictionary mapping model_type to a sorted list of model handles.
     """
     models_by_type: dict[str, list[str]] = {model_type: [] for model_type in MODEL_TYPES}
 
-    for declared in list_declared_model_specs(document=specs):
+    for declared in list_declared_model_specs(document=document):
         if declared.model_type in models_by_type:
             models_by_type[declared.model_type].append(declared.handle)
 
@@ -73,7 +73,7 @@ def _extract_models_from_backend_toml(backend_path: Path) -> dict[str, list[str]
     except (TomlError, OSError):
         return {}
 
-    return _group_handles_by_model_type(specs=config)
+    return _group_handles_by_model_type(document=config)
 
 
 def _collect_all_model_availability() -> dict[str, Any]:

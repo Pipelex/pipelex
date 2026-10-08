@@ -25,6 +25,7 @@ from pipelex.cogt.model_backends.credential_resolution import CredentialResoluti
 from pipelex.cogt.model_backends.model_spec_document import (
     MODEL_SPEC_DEFAULTS_TABLE,
     MODEL_SPEC_HANDLE_FIELD,
+    describe_defaults_not_a_table,
     describe_duplicate_declared_model,
     describe_handle_in_defaults,
     find_duplicate_declared_model,
@@ -502,7 +503,11 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         because the caller may still need the original tables when this raises.
         """
         remaining_tables = dict(model_specs_dict)
-        defaults_dict: dict[str, Any] = remaining_tables.pop(MODEL_SPEC_DEFAULTS_TABLE, {})
+        defaults_value: Any = remaining_tables.pop(MODEL_SPEC_DEFAULTS_TABLE, {})
+        if not isinstance(defaults_value, dict):
+            msg = f"Invalid model specs for backend '{backend_name}' from {backend_config_source}: {describe_defaults_not_a_table()}"
+            raise InferenceBackendLibraryError(msg, backend_name=backend_name)
+        defaults_dict = cast("dict[str, Any]", defaults_value)
         if MODEL_SPEC_HANDLE_FIELD in defaults_dict:
             msg = f"Invalid model specs for backend '{backend_name}' from {backend_config_source}: {describe_handle_in_defaults()}"
             raise InferenceBackendLibraryError(msg, backend_name=backend_name)

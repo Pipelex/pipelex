@@ -15,6 +15,8 @@ from pipelex.cogt.model_backends.model_spec_document import (
     list_declared_model_specs,
 )
 from tests.unit.pipelex.cogt.model_backends.backend_file_handle_key_utils import (
+    DEFAULTS_A_NUMBER_FILE,
+    DEFAULTS_A_STRING_FILE,
     DUPLICATE_PAIR_FILE,
     EMPTY_HANDLES_FILE,
     HANDLE_IN_DEFAULTS_FILE,
@@ -44,6 +46,8 @@ class TestEveryReaderAgrees:
             pytest.param(TYPE_FROM_BLUEPRINT_FILE, True, id="type_from_blueprint"),
             pytest.param(HANDLE_IN_DEFAULTS_FILE, False, id="handle_in_defaults"),
             pytest.param(DUPLICATE_PAIR_FILE, False, id="duplicate_pair"),
+            pytest.param(DEFAULTS_A_STRING_FILE, False, id="defaults_a_string"),
+            pytest.param(DEFAULTS_A_NUMBER_FILE, False, id="defaults_a_number"),
         ],
     )
     def test_the_document_validator_agrees_with_the_loader(self, tmp_path: Path, model_specs_toml: str, is_accepted: bool) -> None:
@@ -77,3 +81,19 @@ class TestEveryReaderAgrees:
         assert "'gpt-6-luna'" in str(exc_info.value)
         assert "handle" in str(exc_info.value)
         assert "both declare" not in str(exc_info.value)
+
+    @pytest.mark.parametrize(
+        "model_specs_toml",
+        [
+            pytest.param(DEFAULTS_A_STRING_FILE, id="defaults_a_string"),
+            pytest.param(DEFAULTS_A_NUMBER_FILE, id="defaults_a_number"),
+        ],
+    )
+    def test_a_defaults_that_is_not_a_table_is_refused_as_such(self, tmp_path: Path, model_specs_toml: str) -> None:
+        """A string `defaults` holding the word "handle" is not a `[defaults]` setting `handle`, and a number is not iterable at all."""
+        rejection = describe_model_spec_document_rejection(document=read_backend_document(tmp_path, model_specs_toml=model_specs_toml))
+        with pytest.raises(InferenceBackendLibraryError) as exc_info:
+            load_backend_file(tmp_path, model_specs_toml=model_specs_toml)
+
+        assert rejection == "'defaults' is not a table"
+        assert "'defaults' is not a table" in str(exc_info.value)

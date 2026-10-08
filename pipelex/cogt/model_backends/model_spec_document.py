@@ -76,6 +76,11 @@ def list_declared_model_specs(*, document: Mapping[str, Any]) -> list[DeclaredMo
     return declared_model_specs
 
 
+def describe_defaults_not_a_table() -> str:
+    """Why a `defaults` that is not a table is refused, said once for the loader and the document validator."""
+    return f"'{MODEL_SPEC_DEFAULTS_TABLE}' is not a table"
+
+
 def describe_handle_in_defaults() -> str:
     """Why a `[defaults]` table may not set `handle`, said once for the loader and the document validator."""
     return (
@@ -147,7 +152,7 @@ def describe_model_spec_document_rejection(*, document: dict[str, Any]) -> str |
     """
     defaults = document.get(MODEL_SPEC_DEFAULTS_TABLE, {})
     if not isinstance(defaults, dict):
-        return f"'{MODEL_SPEC_DEFAULTS_TABLE}' is not a table"
+        return describe_defaults_not_a_table()
     typed_defaults = cast("dict[str, Any]", defaults)
     if MODEL_SPEC_HANDLE_FIELD in typed_defaults:
         return describe_handle_in_defaults()

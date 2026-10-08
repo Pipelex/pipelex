@@ -54,6 +54,21 @@ handle = "everything"
 ["gpt-6-luna"]
 """
 
+# A `defaults` holding a string or a number rather than a table, which no reader may read as a table.
+DEFAULTS_A_STRING_FILE = """
+defaults = "handle-everything"
+
+["gpt-6-luna"]
+sdk = "openai_responses"
+"""
+
+DEFAULTS_A_NUMBER_FILE = """
+defaults = 1
+
+["gpt-6-luna"]
+sdk = "openai_responses"
+"""
+
 DUPLICATE_PAIR_FILE = """
 [defaults]
 sdk = "openai_responses"

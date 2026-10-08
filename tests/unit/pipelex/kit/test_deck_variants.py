@@ -23,6 +23,7 @@ import pytest
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice, DocGenSetting
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting
+from pipelex.cogt.judgment.judgment_setting import JudgmentModelChoice, JudgmentSetting
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting
 from pipelex.cogt.model_backends.model_spec_document import list_declared_model_specs
 from pipelex.cogt.model_backends.model_type import ModelType
@@ -31,6 +32,7 @@ from pipelex.cogt.models.model_deck import (
     DocGenDeckBlueprint,
     ExtractDeckBlueprint,
     ImgGenDeckBlueprint,
+    JudgmentDeckBlueprint,
     LLMDeckBlueprint,
     ModelDeckBlueprint,
     SearchDeckBlueprint,
@@ -42,7 +44,9 @@ from pipelex.kit.paths import get_kit_configs_dir, get_kit_deck_variants_dir
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 # A vocabulary coordinate: the model family, then the kind of name within it.
-DeckFamilyBlueprint = LLMDeckBlueprint | ExtractDeckBlueprint | ImgGenDeckBlueprint | SearchDeckBlueprint | DocGenDeckBlueprint
+DeckFamilyBlueprint = (
+    LLMDeckBlueprint | ExtractDeckBlueprint | ImgGenDeckBlueprint | SearchDeckBlueprint | DocGenDeckBlueprint | JudgmentDeckBlueprint
+)
 # A model a deck names or a backend declares: a handle names one model per model type, so the pair is the identity.
 DeclaredModel = tuple[ModelType, str]
 
@@ -84,6 +88,7 @@ def extract_vocabulary(blueprint: ModelDeckBlueprint) -> Vocabulary:
         "img_gen": blueprint.img_gen,
         "search": blueprint.search,
         "doc_gen": blueprint.doc_gen,
+        "judgment": blueprint.judgment,
     }
     vocabulary: Vocabulary = {}
     for family, family_blueprint in family_blueprints.items():
@@ -131,7 +136,9 @@ def list_declared_backend_models() -> set[DeclaredModel]:
 
 def list_choice_default_references(blueprint: ModelDeckBlueprint) -> list[tuple[ModelType, str]]:
     """The reference each family's default choice names, with that family's model type: a setting's model, or the reference the deck wrote."""
-    choices: list[tuple[ModelType, LLMModelChoice | ExtractModelChoice | ImgGenModelChoice | SearchModelChoice | DocGenModelChoice]] = [
+    choices: list[
+        tuple[ModelType, LLMModelChoice | ExtractModelChoice | ImgGenModelChoice | SearchModelChoice | DocGenModelChoice | JudgmentModelChoice]
+    ] = [
         (ModelType.LLM, blueprint.llm.choice_defaults.for_text),
         (ModelType.LLM, blueprint.llm.choice_defaults.for_object),
         (ModelType.TEXT_EXTRACTOR, blueprint.extract.choice_default),
@@ -139,10 +146,13 @@ def list_choice_default_references(blueprint: ModelDeckBlueprint) -> list[tuple[
         (ModelType.SEARCH, blueprint.search.choice_default),
         *((ModelType.DOC_GEN, choice) for choice in blueprint.doc_gen.choice_defaults.values()),
     ]
+    # The judgment family alone may have no default, since no judgment model is served out of the box.
+    if blueprint.judgment.choice_default is not None:
+        choices.append((ModelType.JUDGMENT, blueprint.judgment.choice_default))
     references: list[tuple[ModelType, str]] = []
     for model_type, choice in choices:
         match choice:
-            case LLMSetting() | ExtractSetting() | ImgGenSetting() | SearchSetting() | DocGenSetting():
+            case LLMSetting() | ExtractSetting() | ImgGenSetting() | SearchSetting() | DocGenSetting() | JudgmentSetting():
                 references.append((model_type, choice.model))
             case ModelReference():
                 references.append((model_type, choice.raw))
@@ -166,6 +176,7 @@ def extract_named_models(blueprint: ModelDeckBlueprint) -> set[DeclaredModel]:
         (ModelType.IMG_GEN, blueprint.img_gen),
         (ModelType.SEARCH, blueprint.search),
         (ModelType.DOC_GEN, blueprint.doc_gen),
+        (ModelType.JUDGMENT, blueprint.judgment),
     ]
     references: list[tuple[ModelType, str]] = []
     for model_type, family_blueprint in family_blueprints:
@@ -259,6 +270,16 @@ class TestDeckVariants:
 
         blueprint.doc_gen.choice_defaults["xlsx.layout"] = ModelReference.parse(probe_model[1])
         assert probe_model in extract_named_models(blueprint), "A handle named as a default choice escaped the handle collection"
+
+    def test_handle_collection_reads_the_judgment_family(self):
+        """A handle a deck names only as a judgment alias must still reach the retirement check above, as a judgment model."""
+        blueprint = load_deck_from_dir(kit_deck_dir(), filenames=list(list_managed_kit_files(area=KitManagedArea.DECK)))
+        probe_model = (ModelType.JUDGMENT, "handle-named-only-by-a-judgment-alias")
+        assert probe_model not in extract_named_models(blueprint)
+
+        blueprint.judgment.aliases["judgment-parity-probe"] = probe_model[1]
+        assert probe_model in extract_named_models(blueprint), "A handle named by a judgment alias escaped the handle collection"
+        assert ("judgment", "aliases") in extract_vocabulary(blueprint)
 
     def test_comparator_reports_a_preset_the_variant_is_missing(self):
         differences = compare_vocabularies(
