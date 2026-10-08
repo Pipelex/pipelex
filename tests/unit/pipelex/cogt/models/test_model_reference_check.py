@@ -2,16 +2,21 @@ from typing import Any
 
 import pytest
 from mthds.protocol.models import ModelCategory as MthdsModelCategory
+from pytest_mock import MockerFixture
 
 from pipelex.cogt.config_cogt import ModelDeckConfig
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
+from pipelex.cogt.exceptions import ModelChoiceNotFoundError, ModelNotFoundError
+from pipelex.cogt.extract.extract_setting import ExtractSetting
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
+from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoicesDefaults
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
+from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
 from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind
 from pipelex.cogt.models.model_reference_check import (
     AliasMatch,
@@ -23,8 +28,12 @@ from pipelex.cogt.models.model_reference_check import (
     WaterfallMatch,
     check_model_reference,
 )
+from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.system.runtime import ProblemReaction
+
+_DECK_LOG_TARGET = "pipelex.cogt.models.model_deck.log"
+_DECK_CHECK_GET_MODEL_DECK_TARGET = "pipelex.cogt.models.model_deck_check.get_model_deck"
 
 
 def _model_spec(name: str, model_type: ModelType) -> InferenceModelSpec:
@@ -96,6 +105,101 @@ def _check(reference: str, *, category: ModelCheckCategory | None = None, is_mod
         reference=ModelReference.parse(reference),
         category=category,
     )
+
+
+def _deck_with(
+    *,
+    inference_models: dict[str, InferenceModelSpec],
+    is_model_fallback_enabled: bool = True,
+    **bindings: Any,
+) -> ModelDeck:
+    """A deck serving `inference_models` with the aliases, waterfalls and presets `bindings` names, by their deck field."""
+    return ModelDeck(
+        inference_models=inference_models,
+        llm_default_temperature=0.7,
+        llm_choice_defaults=LLMSettingChoicesDefaults(
+            default_temperature=0.7,
+            for_text=LLMSetting(model="gpt-4o-mini", temperature=0.7),
+            for_object=LLMSetting(model="gpt-4o-mini", temperature=0.1),
+        ),
+        extract_choice_default="extract-engine",
+        img_gen_default_quality=Quality.MEDIUM,
+        img_gen_choice_default="img-painter",
+        search_choice_default="@default-search",
+        model_deck_config=ModelDeckConfig(is_model_fallback_enabled=is_model_fallback_enabled, missing_presets_reaction=ProblemReaction.NONE),
+        **bindings,
+    )
+
+
+# The prefix of each model type's binding fields on the deck (`llm_aliases`, `extract_waterfalls`, ...).
+_BINDING_PREFIXES: dict[ModelType, str] = {
+    ModelType.LLM: "llm",
+    ModelType.TEXT_EXTRACTOR: "extract",
+    ModelType.IMG_GEN: "img_gen",
+    ModelType.SEARCH: "search",
+    ModelType.DOC_GEN: "doc_gen",
+    ModelType.JUDGMENT: "judgment",
+}
+
+
+def _preset(*, model_type: ModelType, model: str) -> LLMSetting | ExtractSetting | ImgGenSetting | SearchSetting | DocGenSetting | JudgmentSetting:
+    match model_type:
+        case ModelType.LLM:
+            return LLMSetting(model=model, temperature=0.5)
+        case ModelType.TEXT_EXTRACTOR:
+            return ExtractSetting(model=model)
+        case ModelType.IMG_GEN:
+            return ImgGenSetting(model=model)
+        case ModelType.SEARCH:
+            return SearchSetting(model=model)
+        case ModelType.DOC_GEN:
+            return DocGenSetting(model=model)
+        case ModelType.JUDGMENT:
+            return JudgmentSetting(model=model)
+
+
+def _make_collision_deck(*, model_type: ModelType) -> ModelDeck:
+    """A deck of one model type where models, aliases and waterfalls share names.
+
+    `shared` is a model, an alias to `other` and a waterfall to `other`; `twin` is no model, an alias to
+    `other`, a waterfall to `shared` and a preset bound to the waterfall `~twin`.
+    """
+    prefix = _BINDING_PREFIXES[model_type]
+    bindings: dict[str, Any] = {
+        f"{prefix}_aliases": {"shared": "other", "twin": "other"},
+        f"{prefix}_waterfalls": {"shared": ["other"], "twin": ["shared"]},
+        f"{prefix}_presets": {"twin": _preset(model_type=model_type, model="~twin")},
+    }
+    return _deck_with(
+        inference_models={
+            "shared": _model_spec("shared", model_type),
+            "other": _model_spec("other", model_type),
+        },
+        **bindings,
+    )
+
+
+def _model_the_run_calls(*, model_deck: ModelDeck, reference: str, model_type: ModelType) -> str:
+    """The model a pipe of this type naming `reference` calls: its setting, as a run builds it, then the deck's lookup of the setting's model."""
+    setting_model: str
+    match model_type:
+        case ModelType.LLM:
+            setting_model = model_deck.get_llm_setting(llm_choice=reference).model
+        case ModelType.TEXT_EXTRACTOR:
+            setting_model = model_deck.get_extract_setting(extract_choice=reference).model
+        case ModelType.IMG_GEN:
+            setting_model = model_deck.get_img_gen_setting(img_gen_choice=reference).model
+        case ModelType.SEARCH:
+            setting_model = model_deck.get_search_setting(search_choice=reference).model
+        case ModelType.DOC_GEN:
+            setting_model = model_deck.get_doc_gen_setting(doc_gen_choice=reference).model
+        case ModelType.JUDGMENT:
+            setting_model = model_deck.get_judgment_setting(judgment_choice=reference).model
+    return model_deck.get_required_inference_model(model_handle=setting_model, model_type=model_type).name
+
+
+def _category_of(model_type: ModelType) -> ModelCheckCategory:
+    return next(category for category in ModelCheckCategory if category.model_type == model_type)
 
 
 def _assert_resolved(verdict: ModelReferenceVerdict) -> None:
@@ -280,3 +384,105 @@ class TestModelReferenceCheck:
         assert set(dumped) == {"reference", "kind", "name", "category", "resolution", "matches", "suggestions", "other_kinds", "other_categories"}
         (match,) = dumped["matches"]
         assert set(match) == match_keys
+
+    @pytest.mark.parametrize(
+        ("reference", "expected_model"),
+        [
+            pytest.param("~twin", "shared", id="waterfall-named-like-an-alias"),
+            pytest.param("waterfall:twin", "shared", id="waterfall-namespace"),
+            pytest.param("@twin", "other", id="alias-named-like-a-waterfall"),
+            pytest.param("twin", "other", id="bare-name-of-an-alias-and-a-waterfall"),
+            pytest.param("~shared", "other", id="waterfall-named-like-a-model"),
+            pytest.param("@shared", "other", id="alias-named-like-a-model"),
+            pytest.param("shared", "shared", id="bare-name-of-a-model"),
+            pytest.param("$twin", "shared", id="preset-bound-to-a-waterfall"),
+        ],
+    )
+    @pytest.mark.parametrize("model_type", list(ModelType))
+    def test_the_verdict_names_the_model_a_run_calls_when_names_collide(self, reference: str, expected_model: str, model_type: ModelType) -> None:
+        """A sigiled reference resolves by its sigil in the check and in a run alike, whatever shares its name."""
+        model_deck = _make_collision_deck(model_type=model_type)
+
+        verdict = check_model_reference(model_deck=model_deck, reference=ModelReference.parse(reference), category=_category_of(model_type))
+
+        _assert_resolved(verdict)
+        (match,) = verdict.matches
+        assert match.resolves_to == expected_model
+        assert _model_the_run_calls(model_deck=model_deck, reference=reference, model_type=model_type) == expected_model
+
+    @pytest.mark.parametrize("reference", ["@cycle-a", "~cycle-waterfall"])
+    def test_an_alias_and_a_waterfall_leading_to_each_other_end_as_no_model(self, reference: str) -> None:
+        """A cycle through an alias and a waterfall resolves to nothing in the check, and a run refuses it cleanly."""
+        model_deck = _deck_with(
+            inference_models={"gpt-4o-mini": _model_spec("gpt-4o-mini", ModelType.LLM)},
+            llm_aliases={"cycle-a": "~cycle-waterfall"},
+            llm_waterfalls={"cycle-waterfall": ["@cycle-a"]},
+        )
+
+        verdict = check_model_reference(model_deck=model_deck, reference=ModelReference.parse(reference), category=ModelCheckCategory.LLM)
+
+        _assert_resolved(verdict)
+        (match,) = verdict.matches
+        assert match.resolves_to is None
+        with pytest.raises(ModelNotFoundError):
+            _model_the_run_calls(model_deck=model_deck, reference=reference, model_type=ModelType.LLM)
+
+    @pytest.mark.parametrize(
+        ("second_step", "expected_model"),
+        [
+            pytest.param("img-painter", "img-painter", id="next-step-served"),
+            pytest.param("img-unserved", None, id="next-step-unserved"),
+        ],
+    )
+    def test_a_waterfall_step_leading_back_to_its_waterfall_is_a_step_no_model_serves(self, second_step: str, expected_model: str | None) -> None:
+        """An image-generation waterfall named like an LLM, whose first step is its own name: that step leads back to the waterfall.
+
+        The step ends as no model, as an unserved one does, so the waterfall goes on to its next step.
+        """
+        model_deck = _deck_with(
+            inference_models={
+                "gpt-4o-mini": _model_spec("gpt-4o-mini", ModelType.LLM),
+                "img-painter": _model_spec("img-painter", ModelType.IMG_GEN),
+            },
+            img_gen_waterfalls={"gpt-4o-mini": ["gpt-4o-mini", second_step]},
+        )
+
+        verdict = check_model_reference(model_deck=model_deck, reference=ModelReference.parse("gpt-4o-mini"), category=ModelCheckCategory.IMG_GEN)
+
+        _assert_resolved(verdict)
+        assert verdict.matches == [HandleMatch(category=ModelCheckCategory.IMG_GEN, resolves_to=expected_model, via=["~gpt-4o-mini"])]
+        if expected_model is None:
+            with pytest.raises(ModelNotFoundError):
+                _model_the_run_calls(model_deck=model_deck, reference="gpt-4o-mini", model_type=ModelType.IMG_GEN)
+        else:
+            assert _model_the_run_calls(model_deck=model_deck, reference="gpt-4o-mini", model_type=ModelType.IMG_GEN) == expected_model
+
+    def test_the_check_logs_nothing_and_leaves_the_fallback_notice_to_the_run(self, mocker: MockerFixture) -> None:
+        """A check reads the run's lookup without its side effects; the run that follows still logs what it always logged."""
+        model_deck = _make_deck()
+        deck_log = mocker.patch(_DECK_LOG_TARGET)
+
+        for reference in ("~small-llm", "small-llm", "@cycle-a", "~none-served", "$premium", "gpt-9", "@unserved-alias"):
+            check_model_reference(model_deck=model_deck, reference=ModelReference.parse(reference), category=None)
+
+        assert deck_log.mock_calls == []
+        model_deck.get_optional_inference_model(model_handle="~small-llm", model_type=ModelType.LLM)
+        deck_log.info.assert_called_once()
+        model_deck.get_optional_inference_model(model_handle="@cycle-a", model_type=ModelType.LLM)
+        deck_log.warning.assert_called_once()
+
+    def test_with_model_fallback_off_a_bare_waterfall_name_is_refused_by_the_check_the_validation_and_the_run(self, mocker: MockerFixture) -> None:
+        """A pipe's bare name reaches the deck's lookup only through its setting, which refuses a waterfall name while fallback is off.
+
+        The deck's lookup alone would serve the waterfall's first step, but a pipe never reaches it with this name.
+        """
+        model_deck = _make_deck(is_model_fallback_enabled=False)
+        mocker.patch(_DECK_CHECK_GET_MODEL_DECK_TARGET, return_value=model_deck)
+
+        verdict = check_model_reference(model_deck=model_deck, reference=ModelReference.parse("small-llm"), category=ModelCheckCategory.LLM)
+
+        _assert_not_found(verdict)
+        with pytest.raises(ModelChoiceNotFoundError):
+            check_llm_choice_with_deck("small-llm")
+        with pytest.raises(ModelChoiceNotFoundError):
+            model_deck.get_llm_setting(llm_choice="small-llm")

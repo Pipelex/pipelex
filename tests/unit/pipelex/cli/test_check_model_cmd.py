@@ -1,98 +1,86 @@
-"""Unit tests for the agent CLI check-model command."""
+"""Unit tests for the agent CLI check-model command, against a real model deck."""
 
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any
+
+import pytest
 
 if TYPE_CHECKING:
-    import pytest
     from pytest_mock import MockerFixture
 
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.check_model_cmd import agent_check_model_cmd
+from pipelex.cogt.config_cogt import ModelDeckConfig
+from pipelex.cogt.img_gen.img_gen_job_components import Quality
+from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoicesDefaults
+from pipelex.cogt.llm.thinking_mode import ThinkingMode
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.cogt.models.model_listing import ModelCategory
+from pipelex.cogt.models.model_deck import ModelDeck
+from pipelex.cogt.models.model_listing import CATEGORY_TO_MODEL_TYPE, ModelCategory
+from pipelex.cogt.models.model_reference import ModelReference
+from pipelex.cogt.usage.cost_category import CostCategory
+from pipelex.system.runtime import ProblemReaction
 
 MODULE_PATH = "pipelex.cli.agent_cli.commands.check_model_cmd"
 
 
-class _FakeSetting:
-    """Minimal stand-in for LLMSetting / ExtractSetting."""
-
-    def __init__(self, model: str, description: str | None = None):
-        self.model = model
-        self.description = description
-
-
-class _FakeInferenceModelSpec:
-    """Minimal stand-in for InferenceModelSpec."""
-
-    def __init__(self, model_type: ModelType):
-        self.model_type = model_type
-
-
-class TestData:
-    """Shared test data constants."""
-
-    LLM_PRESETS: ClassVar[dict[str, _FakeSetting]] = {
-        "writing-creative": _FakeSetting(model="claude-sonnet", description="Creative writing"),
-        "writing-factual": _FakeSetting(model="claude-sonnet", description="Factual writing"),
-        "deep-analysis": _FakeSetting(model="claude-opus", description="Deep analysis"),
-    }
-    LLM_ALIASES: ClassVar[dict[str, str]] = {
-        "best-claude": "claude-sonnet",
-        "best-gpt": "gpt-4o",
-        "default-general": "claude-sonnet",
-    }
-    LLM_WATERFALLS: ClassVar[dict[str, list[str]]] = {
-        "robust-llm": ["claude-sonnet", "gpt-4o"],
-    }
-    INFERENCE_MODELS: ClassVar[dict[str, _FakeInferenceModelSpec]] = {
-        "claude-4.5-sonnet": _FakeInferenceModelSpec(model_type=ModelType.LLM),
-        "claude-4-sonnet": _FakeInferenceModelSpec(model_type=ModelType.LLM),
-        "claude-4.6-opus": _FakeInferenceModelSpec(model_type=ModelType.LLM),
-        "gpt-4o": _FakeInferenceModelSpec(model_type=ModelType.LLM),
-        "gpt-4o-mini": _FakeInferenceModelSpec(model_type=ModelType.LLM),
-    }
-
-    EXTRACT_PRESETS: ClassVar[dict[str, Any]] = {}
-    EXTRACT_ALIASES: ClassVar[dict[str, str]] = {}
-    EXTRACT_WATERFALLS: ClassVar[dict[str, list[str]]] = {}
-    IMG_GEN_PRESETS: ClassVar[dict[str, Any]] = {}
-    IMG_GEN_ALIASES: ClassVar[dict[str, str]] = {}
-    IMG_GEN_WATERFALLS: ClassVar[dict[str, list[str]]] = {}
-    SEARCH_PRESETS: ClassVar[dict[str, Any]] = {}
-    SEARCH_ALIASES: ClassVar[dict[str, str]] = {}
-    SEARCH_WATERFALLS: ClassVar[dict[str, list[str]]] = {}
+def _model_spec(name: str, model_type: ModelType) -> InferenceModelSpec:
+    return InferenceModelSpec(
+        backend_name="test_backend",
+        name=name,
+        sdk="test_sdk",
+        model_type=model_type,
+        model_id=f"test_model_{name}",
+        costs={CostCategory.INPUT: 0.001, CostCategory.OUTPUT: 0.002},
+        thinking_mode=ThinkingMode.NONE,
+        max_tokens=1000,
+        max_prompt_images=None,
+    )
 
 
-def _make_fake_model_deck() -> Any:
-    """Create a fake ModelDeck with LLM test data."""
+def _make_model_deck(*, is_model_fallback_enabled: bool = True) -> ModelDeck:
+    """A deck with LLM presets, aliases and a waterfall, and one image-generation model."""
+    return ModelDeck(
+        inference_models={
+            "claude-4.5-sonnet": _model_spec("claude-4.5-sonnet", ModelType.LLM),
+            "claude-4-sonnet": _model_spec("claude-4-sonnet", ModelType.LLM),
+            "claude-4.6-opus": _model_spec("claude-4.6-opus", ModelType.LLM),
+            "gpt-4o": _model_spec("gpt-4o", ModelType.LLM),
+            "gpt-4o-mini": _model_spec("gpt-4o-mini", ModelType.LLM),
+            "img-painter": _model_spec("img-painter", ModelType.IMG_GEN),
+        },
+        llm_default_temperature=0.7,
+        llm_presets={
+            "writing-creative": LLMSetting(model="claude-4.5-sonnet", temperature=0.9, description="Creative writing"),
+            "writing-factual": LLMSetting(model="claude-4.5-sonnet", temperature=0.1, description="Factual writing"),
+            "deep-analysis": LLMSetting(model="claude-4.6-opus", temperature=0.2, description="Deep analysis"),
+        },
+        llm_aliases={
+            "best-claude": "claude-4.5-sonnet",
+            "best-gpt": "gpt-4o",
+            "default-general": "claude-4.5-sonnet",
+        },
+        llm_waterfalls={"robust-llm": ["claude-4.5-sonnet", "gpt-4o"]},
+        llm_choice_defaults=LLMSettingChoicesDefaults(
+            default_temperature=0.7,
+            for_text=LLMSetting(model="claude-4.5-sonnet", temperature=0.7),
+            for_object=LLMSetting(model="claude-4.5-sonnet", temperature=0.1),
+        ),
+        extract_choice_default="extract-engine",
+        img_gen_default_quality=Quality.MEDIUM,
+        img_gen_choice_default="img-painter",
+        search_choice_default="web-searcher",
+        model_deck_config=ModelDeckConfig(is_model_fallback_enabled=is_model_fallback_enabled, missing_presets_reaction=ProblemReaction.NONE),
+    )
 
-    class FakeModelDeck:
-        llm_presets = TestData.LLM_PRESETS
-        llm_aliases = TestData.LLM_ALIASES
-        llm_waterfalls = TestData.LLM_WATERFALLS
-        inference_models = TestData.INFERENCE_MODELS
 
-        extract_presets = TestData.EXTRACT_PRESETS
-        extract_aliases = TestData.EXTRACT_ALIASES
-        extract_waterfalls = TestData.EXTRACT_WATERFALLS
-        img_gen_presets = TestData.IMG_GEN_PRESETS
-        img_gen_aliases = TestData.IMG_GEN_ALIASES
-        img_gen_waterfalls = TestData.IMG_GEN_WATERFALLS
-        search_presets = TestData.SEARCH_PRESETS
-        search_aliases = TestData.SEARCH_ALIASES
-        search_waterfalls = TestData.SEARCH_WATERFALLS
-
-    return FakeModelDeck()
-
-
-def _setup_mocks(mocker: MockerFixture) -> None:
-    """Patch the common dependencies for agent_check_model_cmd."""
+def _setup_mocks(mocker: MockerFixture, *, model_deck: ModelDeck) -> None:
+    """Patch the boot and the deck accessor of agent_check_model_cmd."""
     mocker.patch(f"{MODULE_PATH}.make_pipelex_for_agent_cli")
-    mocker.patch(f"{MODULE_PATH}.get_model_deck", return_value=_make_fake_model_deck())
+    mocker.patch(f"{MODULE_PATH}.get_model_deck", return_value=model_deck)
     mocker.patch(f"{MODULE_PATH}.Pipelex")
 
 
@@ -101,11 +89,12 @@ def _run_check(
     capsys: pytest.CaptureFixture[str],
     name: str,
     model_type: ModelCategory = ModelCategory.LLM,
-    output_format: CliOutputFormat = CliOutputFormat.JSON,
+    *,
+    model_deck: ModelDeck | None = None,
 ) -> dict[str, Any]:
-    """Run check-model and return parsed JSON output."""
-    _setup_mocks(mocker)
-    agent_check_model_cmd(name=name, model_type=model_type, output_format=output_format)
+    """Run check-model and return its parsed JSON output."""
+    _setup_mocks(mocker, model_deck=model_deck or _make_model_deck())
+    agent_check_model_cmd(name=name, model_type=model_type, output_format=CliOutputFormat.JSON)
     parsed: dict[str, Any] = json.loads(capsys.readouterr().out)
     return parsed
 
@@ -131,6 +120,74 @@ class TestCheckModelCmd:
         assert result["valid"] is True
         assert result["kind"] == "handle"
 
+    def test_valid_waterfall(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+        """A known waterfall name with ~ sigil should be valid."""
+        result = _run_check(mocker, capsys, "~robust-llm")
+        assert result["valid"] is True
+        assert result["kind"] == "waterfall"
+
+    def test_bare_alias_name_is_a_valid_handle(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+        """A bare name the type's aliases hold is a handle a pipe resolves, so it is valid, as a validation accepts it."""
+        result = _run_check(mocker, capsys, "best-claude")
+        assert result["valid"] is True
+        assert result["kind"] == "handle"
+
+    @pytest.mark.parametrize(
+        ("is_model_fallback_enabled", "expected_valid"),
+        [
+            (True, True),
+            (False, False),
+        ],
+    )
+    def test_bare_waterfall_name_is_valid_while_fallback_is_on(
+        self,
+        mocker: MockerFixture,
+        capsys: pytest.CaptureFixture[str],
+        is_model_fallback_enabled: bool,
+        expected_valid: bool,
+    ) -> None:
+        """A bare name the type's waterfalls hold is a handle while model fallback is on."""
+        model_deck = _make_model_deck(is_model_fallback_enabled=is_model_fallback_enabled)
+        result = _run_check(mocker, capsys, "robust-llm", model_deck=model_deck)
+        assert result["valid"] is expected_valid
+
+    def test_handle_served_as_another_type_is_not_valid(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+        """A model the deck serves as an LLM is not a valid image-generation handle."""
+        result = _run_check(mocker, capsys, "gpt-4o", ModelCategory.IMG_GEN)
+        assert result["valid"] is False
+        assert result["model_type"] == "img_gen"
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "$writing-creative",
+            "@best-gpt",
+            "~robust-llm",
+            "claude-4.5-sonnet",
+            "img-painter",
+            "best-claude",
+            "robust-llm",
+            "writing-creative",
+            "alias:best-gpt",
+            "handle:gpt-4o",
+            "$best-claude",
+            "@held-nowhere",
+        ],
+    )
+    @pytest.mark.parametrize("model_type", list(ModelCategory))
+    def test_verdict_agrees_with_the_deck(
+        self,
+        mocker: MockerFixture,
+        capsys: pytest.CaptureFixture[str],
+        name: str,
+        model_type: ModelCategory,
+    ) -> None:
+        """The command answers as `ModelDeck.is_reference_defined`, the rule a validation and the reference check apply."""
+        model_deck = _make_model_deck()
+        result = _run_check(mocker, capsys, name, model_type, model_deck=model_deck)
+        expected = model_deck.is_reference_defined(reference=ModelReference.parse(name), model_type=CATEGORY_TO_MODEL_TYPE[model_type])
+        assert result["valid"] is expected
+
     def test_invalid_preset_with_fuzzy_suggestions(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """A typo in a preset name should return fuzzy suggestions with $ prefix."""
         result = _run_check(mocker, capsys, "$writting-creative")
@@ -143,8 +200,8 @@ class TestCheckModelCmd:
         assert result["valid"] is False
         assert any("@best-claude" in hint for hint in result["wrong_sigil_hints"])
 
-    def test_invalid_handle_cross_collection_suggestions(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
-        """A bare name matching a preset should suggest the prefixed version."""
+    def test_bare_preset_name_is_not_a_handle(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+        """A bare name matching only a preset is not a handle, and the hint names the prefixed preset."""
         result = _run_check(mocker, capsys, "writing-creative")
         assert result["valid"] is False
         assert any("$writing-creative" in hint for hint in result["wrong_sigil_hints"])
@@ -173,21 +230,15 @@ class TestCheckModelCmd:
 
     def test_markdown_valid_output(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """Markdown output for a valid reference should be a single confirmation line."""
-        _setup_mocks(mocker)
+        _setup_mocks(mocker, model_deck=_make_model_deck())
         agent_check_model_cmd(name="$writing-creative", model_type=ModelCategory.LLM, output_format=CliOutputFormat.MARKDOWN)
         output = capsys.readouterr().out.strip()
         assert output == "$writing-creative is a valid llm preset."
 
     def test_markdown_invalid_output_has_suggestions(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """Markdown output for an invalid reference should include 'Did you mean' suggestions."""
-        _setup_mocks(mocker)
+        _setup_mocks(mocker, model_deck=_make_model_deck())
         agent_check_model_cmd(name="$writting-creative", model_type=ModelCategory.LLM, output_format=CliOutputFormat.MARKDOWN)
         output = capsys.readouterr().out
         assert "is not a valid" in output
         assert "Did you mean:" in output
-
-    def test_valid_waterfall(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
-        """A known waterfall name with ~ sigil should be valid."""
-        result = _run_check(mocker, capsys, "~robust-llm")
-        assert result["valid"] is True
-        assert result["kind"] == "waterfall"

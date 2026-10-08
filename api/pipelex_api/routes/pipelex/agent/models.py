@@ -3,7 +3,6 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import JSONResponse
 from mthds.protocol.models import ModelCategory
 from pipelex.cogt.models.exceptions import ModelReferenceParseError
 from pipelex.cogt.models.model_reference import ModelReference
@@ -57,12 +56,9 @@ async def get_models(
     return await ApiRunner().models(category=category)
 
 
-@router.get(
-    "/models/check",
-    response_model=ModelReferenceVerdict,
-    # NOT tagged `x-mthds-protocol`: the check is a Pipelex API extension, and the flag marks the
-    # standard's five operations alone. Its refusals are the composite router's shared problem+json 422.
-)
+# NOT tagged `x-mthds-protocol`: the check is a Pipelex API extension, and the flag marks the
+# standard's five operations alone. Its refusals are the composite router's shared problem+json 422.
+@router.get("/models/check")
 async def check_model(
     request: Request,
     reference: Annotated[
@@ -85,7 +81,7 @@ async def check_model(
             ),
         ),
     ] = None,
-) -> JSONResponse:
+) -> ModelReferenceVerdict:
     """Check whether one model reference resolves on this runner, as what, to which model (Pipelex API extension).
 
     Answers from pipelex's own reference parser and deck lookups, the ones a validation runs, so a
@@ -100,16 +96,16 @@ async def check_model(
         if len(request.query_params.getlist(parameter_name)) > 1:
             raise_validation_error(message=f"The `{parameter_name}` query parameter accepts a single value")
 
-    trimmed_reference = reference.strip()
-    if len(trimmed_reference) > MAX_MODEL_REFERENCE_LENGTH:
-        too_long_message = (
-            f"The model reference holds {len(trimmed_reference)} characters once trimmed, more than the {MAX_MODEL_REFERENCE_LENGTH} accepted"
-        )
-        raise_validation_error(message=too_long_message, error_type=ErrorType.INVALID_MODEL_REFERENCE)
+    # The parser trims the reference itself, and its `raw` is the trimmed text the length limit measures.
     try:
-        parsed_reference = ModelReference.parse(trimmed_reference)
+        parsed_reference = ModelReference.parse(reference)
     except ModelReferenceParseError as exc:
         raise_validation_error(message=exc.message, error_type=ErrorType.INVALID_MODEL_REFERENCE)
+    if len(parsed_reference.raw) > MAX_MODEL_REFERENCE_LENGTH:
+        too_long_message = (
+            f"The model reference holds {len(parsed_reference.raw)} characters once trimmed, more than the {MAX_MODEL_REFERENCE_LENGTH} accepted"
+        )
+        raise_validation_error(message=too_long_message, error_type=ErrorType.INVALID_MODEL_REFERENCE)
 
     category: ModelCheckCategory | None = None
     if model_type is not None:
@@ -122,5 +118,4 @@ async def check_model(
                 error_type=ErrorType.INVALID_MODEL_CATEGORY,
             )
 
-    verdict = check_model_reference(model_deck=get_model_deck(), reference=parsed_reference, category=category)
-    return JSONResponse(content=verdict.model_dump(mode="json"))
+    return check_model_reference(model_deck=get_model_deck(), reference=parsed_reference, category=category)

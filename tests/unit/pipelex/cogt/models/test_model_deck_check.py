@@ -293,7 +293,10 @@ class TestModelDeckCheck:
         expected_model_type: ModelType,
         options_attr: str,
     ) -> None:
-        """A missing name raises ModelChoiceNotFoundError carrying the sigil-form choice, kind, type and the right deck collection."""
+        """A missing name raises ModelChoiceNotFoundError carrying the sigil-form choice, kind, type and the right deck collection.
+
+        A handle's options are the deck's models of the pipe's type alone, the ones its field may name.
+        """
         model_deck = self._create_test_model_deck()
         mocker.patch(GET_MODEL_DECK_TARGET, return_value=model_deck)
 
@@ -304,8 +307,17 @@ class TestModelDeckCheck:
         assert error.model_choice == model_choice
         assert error.reference_kind == expected_kind
         assert error.model_type == expected_model_type
-        expected_options: dict[str, Any] = getattr(model_deck, options_attr)
-        assert error.available_options == list(expected_options.keys())
+        expected_collection: dict[str, Any] = getattr(model_deck, options_attr)
+        expected_options: list[str]
+        match expected_kind:
+            case ModelReferenceKind.HANDLE:
+                expected_options = sorted(
+                    handle for handle, inference_model in expected_collection.items() if inference_model.model_type == expected_model_type
+                )
+                assert expected_options, "the test deck serves a model of every type it checks"
+            case ModelReferenceKind.PRESET | ModelReferenceKind.ALIAS | ModelReferenceKind.WATERFALL:
+                expected_options = list(expected_collection.keys())
+        assert error.available_options == expected_options
 
     def test_near_miss_handle_yields_fuzzy_suggestion(self, mocker: MockerFixture) -> None:
         """A typo'd handle gets a fuzzy suggestion pointing at the close-by real handle."""

@@ -37,52 +37,18 @@ def get_collection_keys(
     model_type: ModelType,
     kind: ModelReferenceKind,
 ) -> list[str]:
-    """Return known names for a given reference kind and model type."""
+    """Return known names for a given reference kind and model type, read through the deck's own per-type accessors."""
     match kind:
         case ModelReferenceKind.PRESET:
-            match model_type:
-                case ModelType.LLM:
-                    return list(model_deck.llm_presets.keys())
-                case ModelType.TEXT_EXTRACTOR:
-                    return list(model_deck.extract_presets.keys())
-                case ModelType.IMG_GEN:
-                    return list(model_deck.img_gen_presets.keys())
-                case ModelType.SEARCH:
-                    return list(model_deck.search_presets.keys())
-                case ModelType.DOC_GEN:
-                    return list(model_deck.doc_gen_presets.keys())
-                case ModelType.JUDGMENT:
-                    return list(model_deck.judgment_presets.keys())
+            return list(model_deck.get_presets_for_type(model_type=model_type))
         case ModelReferenceKind.ALIAS:
-            match model_type:
-                case ModelType.LLM:
-                    return list(model_deck.llm_aliases.keys())
-                case ModelType.TEXT_EXTRACTOR:
-                    return list(model_deck.extract_aliases.keys())
-                case ModelType.IMG_GEN:
-                    return list(model_deck.img_gen_aliases.keys())
-                case ModelType.SEARCH:
-                    return list(model_deck.search_aliases.keys())
-                case ModelType.DOC_GEN:
-                    return list(model_deck.doc_gen_aliases.keys())
-                case ModelType.JUDGMENT:
-                    return list(model_deck.judgment_aliases.keys())
+            aliases, _ = model_deck.get_aliases_and_waterfalls_for_type(model_type)
+            return list(aliases)
         case ModelReferenceKind.WATERFALL:
-            match model_type:
-                case ModelType.LLM:
-                    return list(model_deck.llm_waterfalls.keys())
-                case ModelType.TEXT_EXTRACTOR:
-                    return list(model_deck.extract_waterfalls.keys())
-                case ModelType.IMG_GEN:
-                    return list(model_deck.img_gen_waterfalls.keys())
-                case ModelType.SEARCH:
-                    return list(model_deck.search_waterfalls.keys())
-                case ModelType.DOC_GEN:
-                    return list(model_deck.doc_gen_waterfalls.keys())
-                case ModelType.JUDGMENT:
-                    return list(model_deck.judgment_waterfalls.keys())
+            _, waterfalls = model_deck.get_aliases_and_waterfalls_for_type(model_type)
+            return list(waterfalls)
         case ModelReferenceKind.HANDLE:
-            return sorted(handle for handle, spec in model_deck.inference_models.items() if spec.model_type == model_type)
+            return model_deck.get_model_handles_for_type(model_type=model_type)
 
 
 class ModelReferenceName(NamedTuple):

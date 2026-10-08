@@ -44,8 +44,11 @@ def _resolve_preset_backend(
     model_handle: str,
     model_type: ModelType,
 ) -> InferenceModelSpec | None:
-    """Resolve a preset's model handle to an InferenceModelSpec, returning None if unresolvable."""
-    return model_deck.get_optional_inference_model(model_handle=model_handle, model_type=model_type)
+    """Resolve a preset's model handle to an InferenceModelSpec, returning None if unresolvable.
+
+    A listing reads the deck without a run's side effects, and a waterfall that would raise in a run is unresolvable here.
+    """
+    return model_deck.peek_inference_model(model_handle=model_handle, model_type=model_type)
 
 
 def _filter_presets_by_backend(
@@ -79,7 +82,7 @@ def _filter_aliases_by_backend(
     """Filter aliases to only include those whose target resolves to the given backend."""
     filtered: dict[str, str] = {}
     for alias_name, alias_target in aliases.items():
-        spec = model_deck.get_optional_inference_model(model_handle=alias_target, model_type=model_type)
+        spec = model_deck.peek_inference_model(model_handle=alias_target, model_type=model_type)
         if spec is not None and spec.backend_name == backend:
             filtered[alias_name] = alias_target
     return filtered
@@ -96,7 +99,7 @@ def _filter_waterfalls_by_backend(
     filtered: dict[str, list[str]] = {}
     for waterfall_name, fallback_list in waterfalls.items():
         for fallback in fallback_list:
-            spec = model_deck.get_optional_inference_model(model_handle=fallback, model_type=model_type)
+            spec = model_deck.peek_inference_model(model_handle=fallback, model_type=model_type)
             if spec is not None and spec.backend_name == backend:
                 filtered[waterfall_name] = fallback_list
                 break

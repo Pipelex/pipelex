@@ -11,7 +11,6 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from pipelex.cogt.exceptions import ModelNotFoundError
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.exceptions import ModelReferenceParseError
 from pipelex.cogt.models.model_deck import ModelDeck
@@ -238,13 +237,11 @@ def _match_in_category(*, model_deck: ModelDeck, reference: ModelReference, cate
 
 
 def _model_a_run_calls(*, model_deck: ModelDeck, model_handle: str, model_type: ModelType) -> str | None:
-    """The handle of the model a run through `model_handle` would call now, or None when it would find none."""
-    try:
-        inference_model = model_deck.get_optional_inference_model(model_handle=model_handle, model_type=model_type)
-    except ModelNotFoundError:
-        # A waterfall none of whose usable steps the runner serves (`ModelWaterfallError`), or whose first
-        # step it does not serve while model fallback is off.
-        return None
+    """The handle of the model a run through `model_handle` would call now, or None when it would find none.
+
+    The deck is read without side effects: a check logs nothing and leaves the fallback notice to the run.
+    """
+    inference_model = model_deck.peek_inference_model(model_handle=model_handle, model_type=model_type)
     if inference_model is None:
         return None
     return inference_model.name

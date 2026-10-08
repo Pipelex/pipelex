@@ -9,11 +9,7 @@ from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_e
 from pipelex.cogt.models.exceptions import ModelReferenceParseError
 from pipelex.cogt.models.model_listing import CATEGORY_TO_MODEL_TYPE, ModelCategory
 from pipelex.cogt.models.model_reference import ModelReference
-from pipelex.cogt.models.model_suggestion import (
-    KIND_LABELS,
-    get_collection_keys,
-    suggest_model_alternatives,
-)
+from pipelex.cogt.models.model_suggestion import KIND_LABELS, suggest_model_alternatives
 from pipelex.pipelex import Pipelex
 from pipelex.runtime_hub import get_model_deck
 
@@ -72,7 +68,8 @@ def agent_check_model_cmd(
     """Check if a model reference is valid and suggest alternatives if not.
 
     Parses the reference (with sigil prefix if present), validates it against the
-    model deck, and on failure provides fuzzy suggestions and wrong-sigil hints.
+    model deck by the rule a validation applies, and on failure provides fuzzy
+    suggestions and wrong-sigil hints.
     """
     set_agent_cli_error_format(error_format or output_format)
     try:
@@ -82,8 +79,9 @@ def agent_check_model_cmd(
         ref = ModelReference.parse(name)
         resolved_model_type = CATEGORY_TO_MODEL_TYPE[model_type]
 
-        candidates = get_collection_keys(model_deck, model_type=resolved_model_type, kind=ref.kind)
-        is_valid = ref.name in candidates
+        # The rule a validation and `GET /v1/models/check` apply: a bare name is a model of this type,
+        # an alias of this type, or a waterfall of this type while model fallback is on.
+        is_valid = model_deck.is_reference_defined(reference=ref, model_type=resolved_model_type)
 
         result: dict[str, Any] = {
             "success": True,

@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:b48cd9256da89788502648136e4b3a6a5a4be0b853d6790d4178ca8091fd21a9"
+digest = "sha256:9cf5fd2c6aecd0d55ad0e8f00a2ca75209d4e5000cca5769558c23a8ead22774"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-06T10:13:22Z"
-rationale = "clean-pass: installed_methods.py now validates the provenance sidecar from its bytes, so a sidecar that is not UTF-8 is read as no provenance like an unparsable one, instead of raising. Re-read docs/tools/cli/ (run-by-address.md prints the provenance of a fetch, which is unchanged) and pipelex/cli/agent_cli/CLAUDE.md; neither describes how discovery treats an unreadable sidecar, so nothing is stale."
+reviewed_at = "2026-10-08T01:02:41Z"
+rationale = "real-catch: check_model_cmd.py now validates a reference with ModelDeck.is_reference_defined, the rule a validation and GET /v1/models/check apply, so a bare alias name and a bare waterfall name while fallback is on are valid and a handle served only as another model type is not. docs/tools/cli/agent-cli.md had no check-model row: added it with the rule; pipelex/cli/agent_cli/CLAUDE.md's check-model row now names is_reference_defined. docs/tools/cli/validate.md's pointer to check-model is unchanged and still true."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -13,7 +13,7 @@ rationale = "clean-pass: installed_methods.py now validates the provenance sidec
 "pipelex/cli/agent_cli/commands/agent_cli_factory.py" = "blob:57b6a4d76b918626218633873273adbddfaac97d"
 "pipelex/cli/agent_cli/commands/agent_output.py" = "blob:506eabec37ab3b06644b6ae4c321a91780241161"
 "pipelex/cli/agent_cli/commands/bundle_path_resolver.py" = "blob:a1904517c731afb72af7d49adf6d217dc50b2660"
-"pipelex/cli/agent_cli/commands/check_model_cmd.py" = "blob:42a6b8c02a1d103394e12243181af8ea1c16f31d"
+"pipelex/cli/agent_cli/commands/check_model_cmd.py" = "blob:1aa31eac23d8063d3817a71a11278b55f8f86ce0"
 "pipelex/cli/agent_cli/commands/codegen/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/codegen/app.py" = "blob:56130b89fe9efec5ad3d014ed6bc16bef1bd1645"
 "pipelex/cli/agent_cli/commands/codegen/check_cmd.py" = "blob:9e8beb084a9f04f39e8acca9e6ae2554d40cb667"

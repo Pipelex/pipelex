@@ -11,8 +11,16 @@ if TYPE_CHECKING:
 
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.models_cmd import agent_models_cmd
+from pipelex.cogt.config_cogt import ModelDeckConfig
+from pipelex.cogt.img_gen.img_gen_job_components import Quality
+from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoicesDefaults
+from pipelex.cogt.llm.thinking_mode import ThinkingMode
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.models.model_listing import ModelCategory
+from pipelex.cogt.usage.cost_category import CostCategory
+from pipelex.system.runtime import ProblemReaction
 
 CMD_MODULE_PATH = "pipelex.cli.agent_cli.commands.models_cmd"
 OPS_MODULE_PATH = "pipelex.cogt.models.model_listing"
@@ -86,7 +94,7 @@ def _make_fake_model_deck() -> Any:
         search_waterfalls: ClassVar[dict[str, list[str]]] = {}
         judgment_waterfalls: ClassVar[dict[str, list[str]]] = {}
 
-        def get_optional_inference_model(self, model_handle: str, model_type: ModelType) -> _FakeInferenceModelSpec | None:
+        def peek_inference_model(self, model_handle: str, model_type: ModelType) -> _FakeInferenceModelSpec | None:
             entry = TestData.INFERENCE_MAP.get(model_handle)
             if entry is None:
                 return None
@@ -255,3 +263,43 @@ class TestAgentModelsCmd:
         assert "llm-wf" in parsed["waterfalls"]["llm"]
         assert len(parsed["waterfalls"]["img_gen"]) == 0
         assert len(parsed["waterfalls"]["extract"]) == 0
+
+    def test_backend_filter_skips_an_alias_whose_waterfall_no_backend_serves(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+        """An alias bound to a waterfall none of whose models is served resolves on no backend, rather than failing the listing."""
+        model_deck = ModelDeck(
+            inference_models={
+                "gpt-4o-mini": InferenceModelSpec(
+                    backend_name="openai",
+                    name="gpt-4o-mini",
+                    sdk="test_sdk",
+                    model_type=ModelType.LLM,
+                    model_id="gpt-4o-mini",
+                    costs={CostCategory.INPUT: 0.001, CostCategory.OUTPUT: 0.002},
+                    thinking_mode=ThinkingMode.NONE,
+                    max_tokens=1000,
+                    max_prompt_images=None,
+                ),
+            },
+            llm_default_temperature=0.7,
+            llm_aliases={"robust": "~unserved", "best-gpt": "gpt-4o-mini"},
+            llm_waterfalls={"unserved": ["gpt-9", "gpt-10"]},
+            llm_choice_defaults=LLMSettingChoicesDefaults(
+                default_temperature=0.7,
+                for_text=LLMSetting(model="gpt-4o-mini", temperature=0.7),
+                for_object=LLMSetting(model="gpt-4o-mini", temperature=0.1),
+            ),
+            extract_choice_default="extract-engine",
+            img_gen_default_quality=Quality.MEDIUM,
+            img_gen_choice_default="img-painter",
+            search_choice_default="@default-search",
+            model_deck_config=ModelDeckConfig(is_model_fallback_enabled=True, missing_presets_reaction=ProblemReaction.NONE),
+        )
+        mocker.patch(f"{CMD_MODULE_PATH}.make_pipelex_for_agent_cli")
+        mocker.patch(f"{OPS_MODULE_PATH}.get_model_deck", return_value=model_deck)
+        mocker.patch(f"{CMD_MODULE_PATH}.Pipelex")
+
+        agent_models_cmd(backend="openai", output_format=CliOutputFormat.JSON)
+
+        parsed = json.loads(capsys.readouterr().out)
+        assert parsed["success"] is True
+        assert parsed["aliases"]["llm"] == {"best-gpt": "gpt-4o-mini"}
