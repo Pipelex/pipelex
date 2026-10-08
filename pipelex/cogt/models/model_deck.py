@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from typing import NoReturn, Self
 
 from pydantic import Field, PrivateAttr, field_validator, model_validator
@@ -33,7 +34,15 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_spec_index import ModelSpecIndex
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.exceptions import ModelReferenceParseError
-from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind, ensure_model_reference
+from pipelex.cogt.models.model_reference import (
+    NAMESPACE_ALIAS,
+    NAMESPACE_WATERFALL,
+    SIGIL_WATERFALL,
+    ModelReference,
+    ModelReferenceKind,
+    ensure_model_reference,
+    write_model_handle,
+)
 from pipelex.cogt.search.search_setting import SearchModelChoice, SearchSetting
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.exceptions import ConfigValidationError
@@ -190,11 +199,103 @@ class ModelDeck(ConfigModel):
             case ModelType.JUDGMENT:
                 return self.judgment_aliases, self.judgment_waterfalls
 
+    def get_presets_for_type(
+        self, *, model_type: ModelType
+    ) -> Mapping[str, LLMSetting | ExtractSetting | ImgGenSetting | SearchSetting | DocGenSetting | JudgmentSetting]:
+        """Return the type-specific presets dictionary."""
+        match model_type:
+            case ModelType.LLM:
+                return self.llm_presets
+            case ModelType.TEXT_EXTRACTOR:
+                return self.extract_presets
+            case ModelType.IMG_GEN:
+                return self.img_gen_presets
+            case ModelType.SEARCH:
+                return self.search_presets
+            case ModelType.DOC_GEN:
+                return self.doc_gen_presets
+            case ModelType.JUDGMENT:
+                return self.judgment_presets
+
+    def is_bare_handle_resolvable(self, *, name: str, model_type: ModelType) -> bool:
+        """Whether a bare model name resolves for this model type, as a pipe's `model` field may name it.
+
+        The name resolves when the runner can call a model of that name of this type, among every
+        model it can call and not only those the deck names; failing that, when the deck defines an
+        alias of that name for this type, or a waterfall of that name while model fallback is on.
+        The order is the one the run's lookup (`get_optional_inference_model`) reads a bare name in.
+        The fallback gate is the validation's and the setting builders' (`get_*_setting`), which a
+        pipe's field passes through before the run's lookup: that lookup itself also resolves a bare
+        waterfall name while fallback is off, where a binding inside the deck names one. A model of
+        that name served only as another type does not make it resolve, so a pipe naming it is refused
+        when its bundle loads rather than when the run reaches it. The name's sigil is not read: a
+        `handle:` reference whose name starts with a sigil is that bare name, `@x` and not the alias `x`.
+        """
+        if self.inference_models.get(model_type=model_type, handle=name) is not None:
+            return True
+        aliases, waterfalls = self.get_aliases_and_waterfalls_for_type(model_type)
+        if name in aliases:
+            return True
+        return self.model_deck_config.is_model_fallback_enabled and name in waterfalls
+
+    def is_reference_defined(self, *, reference: ModelReference, model_type: ModelType) -> bool:
+        """Whether a pipe of this model type may name this reference in its `model` field.
+
+        This is the test a validation applies to the field: a preset, an alias or a waterfall is
+        defined when the deck defines that name for the type, and a bare handle when it resolves
+        by `is_bare_handle_resolvable`. It is a matter of names: a preset, an alias or a waterfall
+        whose binding reaches no model the runner can call is still defined.
+        """
+        match reference.kind:
+            case ModelReferenceKind.PRESET:
+                return reference.name in self.get_presets_for_type(model_type=model_type)
+            case ModelReferenceKind.ALIAS:
+                aliases, _ = self.get_aliases_and_waterfalls_for_type(model_type)
+                return reference.name in aliases
+            case ModelReferenceKind.WATERFALL:
+                _, waterfalls = self.get_aliases_and_waterfalls_for_type(model_type)
+                return reference.name in waterfalls
+            case ModelReferenceKind.HANDLE:
+                return self.is_bare_handle_resolvable(name=reference.name, model_type=model_type)
+
+    def unresolved_handle_sentence(self, *, name: str, model_type: ModelType) -> str:
+        """The sentence refusing a bare handle that does not resolve for this model type.
+
+        It names the handle and the type the field needs. When the deck serves a model of that name
+        only as other types, it says so rather than calling the handle missing, without naming them.
+        """
+        served_types = self.inference_models.types_serving(handle=name)
+        if served_types and model_type not in served_types:
+            return f"Model handle '{name}' is served by the model deck, but not as {model_type.indefinite_description}"
+        return f"Model handle '{name}' was not found in the model deck"
+
+    def _unresolved_preset_model_sentence(self, *, preset_label: str, preset_id: str, model_reference: str, model_type: ModelType) -> str:
+        """The sentence refusing a deck preset whose model does not resolve for the preset's type, naming the preset.
+
+        A bare handle gets `unresolved_handle_sentence`, so a model the deck serves only as another type
+        is named as such rather than as missing.
+        """
+        sentence = f"Model reference '{model_reference}' was not found in the model deck"
+        ref: ModelReference | None
+        try:
+            ref = ModelReference.parse(model_reference)
+        except ModelReferenceParseError:
+            ref = None
+        if ref is not None:
+            match ref.kind:
+                case ModelReferenceKind.HANDLE:
+                    sentence = self.unresolved_handle_sentence(name=ref.name, model_type=model_type)
+                case ModelReferenceKind.PRESET | ModelReferenceKind.ALIAS | ModelReferenceKind.WATERFALL:
+                    pass
+        return f"{preset_label} preset '{preset_id}': {sentence}"
+
     def is_model_handle_defined(self, model_handle: str, *, model_type: ModelType) -> bool:
-        """Check if a model handle is defined in the model deck.
+        """Check if a model handle is defined in the model deck for this model type.
 
         Handles prefixed references (e.g., @alias_name, ~waterfall_name) by parsing
-        them and looking up the appropriate dictionary.
+        them and looking up the appropriate dictionary. A bare handle is defined when it
+        resolves for this model type (`is_bare_handle_resolvable`): a model the deck serves
+        only as another type does not define it.
         """
         ref = ModelReference.parse(model_handle)
         aliases, waterfalls = self.get_aliases_and_waterfalls_for_type(model_type)
@@ -210,12 +311,7 @@ class ModelDeck(ConfigModel):
                 # Presets are handled separately, not as direct handles
                 return False
             case ModelReferenceKind.HANDLE:
-                # Direct handle lookup - check the models served as this type, aliases, and waterfalls
-                if self.inference_models.get(model_type=model_type, handle=ref.name) is not None:
-                    return True
-                if ref.name in aliases:
-                    return True
-                return self.model_deck_config.is_model_fallback_enabled and ref.name in waterfalls
+                return self.is_bare_handle_resolvable(name=ref.name, model_type=model_type)
 
     def _warn_if_ambiguous_llm(self, name: str) -> None:
         """Log a warning if a bare string handle matches presets/aliases/waterfalls."""
@@ -314,7 +410,7 @@ class ModelDeck(ConfigModel):
         | dict[str, JudgmentSetting],
     ) -> NoReturn:
         """Raise ModelChoiceNotFoundError with migration hints if applicable."""
-        msg = f"Model handle '{ref.name}' was not found in the model deck"
+        msg = self.unresolved_handle_sentence(name=ref.name, model_type=model_type)
 
         # Add migration hints if the name matches a preset, alias, or waterfall
         aliases, waterfalls = self.get_aliases_and_waterfalls_for_type(model_type)
@@ -385,9 +481,9 @@ class ModelDeck(ConfigModel):
                 )
             case ModelReferenceKind.HANDLE:
                 self._warn_if_ambiguous_llm(ref.name)
-                if self.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.LLM):
+                if self.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.LLM):
                     return
-                msg = f"Model handle '{ref.name}' was not found in the model deck"
+                msg = self.unresolved_handle_sentence(name=ref.name, model_type=ModelType.LLM)
                 raise ModelChoiceNotFoundError(
                     message=msg,
                     model_type=ModelType.LLM,
@@ -427,8 +523,8 @@ class ModelDeck(ConfigModel):
                 )
             case ModelReferenceKind.WATERFALL:
                 if ref.name in self.llm_waterfalls:
-                    # Use the waterfall name as the model handle (it will resolve via get_optional_inference_model)
-                    return LLMSetting(model=ref.name, temperature=self.llm_default_temperature)
+                    # Keep the sigil, so the run resolves the waterfall itself and not a model or an alias sharing its name
+                    return LLMSetting(model=f"{SIGIL_WATERFALL}{ref.name}", temperature=self.llm_default_temperature)
                 msg = f"Waterfall '{ref.name}' was not found in the model deck"
                 raise ModelChoiceNotFoundError(
                     message=msg,
@@ -440,8 +536,8 @@ class ModelDeck(ConfigModel):
             case ModelReferenceKind.HANDLE:
                 # Strict: treat as direct model handle only
                 self._warn_if_ambiguous_llm(ref.name)
-                if self.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.LLM):
-                    return LLMSetting(model=ref.name, temperature=self.llm_default_temperature)
+                if self.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.LLM):
+                    return LLMSetting(model=write_model_handle(name=ref.name), temperature=self.llm_default_temperature)
                 # Error includes migration hint if name matches preset/waterfall
                 self._raise_handle_not_found_error(
                     ref=ref,
@@ -479,7 +575,7 @@ class ModelDeck(ConfigModel):
                 )
             case ModelReferenceKind.WATERFALL:
                 if ref.name in self.extract_waterfalls:
-                    return ExtractSetting(model=ref.name)
+                    return ExtractSetting(model=f"{SIGIL_WATERFALL}{ref.name}")
                 msg = f"Waterfall '{ref.name}' was not found in the model deck"
                 raise ModelChoiceNotFoundError(
                     message=msg,
@@ -490,8 +586,8 @@ class ModelDeck(ConfigModel):
                 )
             case ModelReferenceKind.HANDLE:
                 self._warn_if_ambiguous_extract(ref.name)
-                if self.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.TEXT_EXTRACTOR):
-                    return ExtractSetting(model=ref.name)
+                if self.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.TEXT_EXTRACTOR):
+                    return ExtractSetting(model=write_model_handle(name=ref.name))
                 self._raise_handle_not_found_error(
                     ref=ref,
                     model_type=ModelType.TEXT_EXTRACTOR,
@@ -528,7 +624,7 @@ class ModelDeck(ConfigModel):
                 )
             case ModelReferenceKind.WATERFALL:
                 if ref.name in self.search_waterfalls:
-                    return SearchSetting(model=ref.name)
+                    return SearchSetting(model=f"{SIGIL_WATERFALL}{ref.name}")
                 msg = f"Waterfall '{ref.name}' was not found in the model deck"
                 raise ModelChoiceNotFoundError(
                     message=msg,
@@ -539,8 +635,8 @@ class ModelDeck(ConfigModel):
                 )
             case ModelReferenceKind.HANDLE:
                 self._warn_if_ambiguous_search(ref.name)
-                if self.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.SEARCH):
-                    return SearchSetting(model=ref.name)
+                if self.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.SEARCH):
+                    return SearchSetting(model=write_model_handle(name=ref.name))
                 self._raise_handle_not_found_error(
                     ref=ref,
                     model_type=ModelType.SEARCH,
@@ -581,7 +677,7 @@ class ModelDeck(ConfigModel):
                 )
             case ModelReferenceKind.WATERFALL:
                 if ref.name in self.doc_gen_waterfalls:
-                    return DocGenSetting(model=ref.name)
+                    return DocGenSetting(model=f"{SIGIL_WATERFALL}{ref.name}")
                 msg = f"Waterfall '{ref.name}' was not found in the model deck"
                 raise ModelChoiceNotFoundError(
                     message=msg,
@@ -592,8 +688,8 @@ class ModelDeck(ConfigModel):
                 )
             case ModelReferenceKind.HANDLE:
                 self._warn_if_ambiguous_doc_gen(ref.name)
-                if self.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.DOC_GEN):
-                    return DocGenSetting(model=ref.name)
+                if self.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.DOC_GEN):
+                    return DocGenSetting(model=write_model_handle(name=ref.name))
                 self._raise_handle_not_found_error(
                     ref=ref,
                     model_type=ModelType.DOC_GEN,
@@ -630,7 +726,7 @@ class ModelDeck(ConfigModel):
                 )
             case ModelReferenceKind.WATERFALL:
                 if ref.name in self.judgment_waterfalls:
-                    return JudgmentSetting(model=ref.name)
+                    return JudgmentSetting(model=f"{SIGIL_WATERFALL}{ref.name}")
                 msg = f"Waterfall '{ref.name}' was not found in the model deck"
                 raise ModelChoiceNotFoundError(
                     message=msg,
@@ -641,8 +737,8 @@ class ModelDeck(ConfigModel):
                 )
             case ModelReferenceKind.HANDLE:
                 self._warn_if_ambiguous_judgment(ref.name)
-                if self.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.JUDGMENT):
-                    return JudgmentSetting(model=ref.name)
+                if self.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.JUDGMENT):
+                    return JudgmentSetting(model=write_model_handle(name=ref.name))
                 self._raise_handle_not_found_error(
                     ref=ref,
                     model_type=ModelType.JUDGMENT,
@@ -679,7 +775,7 @@ class ModelDeck(ConfigModel):
                 )
             case ModelReferenceKind.WATERFALL:
                 if ref.name in self.img_gen_waterfalls:
-                    return ImgGenSetting(model=ref.name, quality=self.img_gen_default_quality)
+                    return ImgGenSetting(model=f"{SIGIL_WATERFALL}{ref.name}", quality=self.img_gen_default_quality)
                 msg = f"Waterfall '{ref.name}' was not found in the model deck"
                 raise ModelChoiceNotFoundError(
                     message=msg,
@@ -690,8 +786,8 @@ class ModelDeck(ConfigModel):
                 )
             case ModelReferenceKind.HANDLE:
                 self._warn_if_ambiguous_img_gen(ref.name)
-                if self.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.IMG_GEN):
-                    return ImgGenSetting(model=ref.name, quality=self.img_gen_default_quality)
+                if self.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.IMG_GEN):
+                    return ImgGenSetting(model=write_model_handle(name=ref.name), quality=self.img_gen_default_quality)
                 self._raise_handle_not_found_error(
                     ref=ref,
                     model_type=ModelType.IMG_GEN,
@@ -733,7 +829,9 @@ class ModelDeck(ConfigModel):
         for llm_preset_id, llm_setting in self.llm_presets.items():
             if not self.is_model_handle_defined(model_handle=llm_setting.model, model_type=ModelType.LLM):
                 enabled_backends = self._get_enabled_backends()
-                msg = f"LLM handle '{llm_setting.model}' for llm preset '{llm_preset_id}' was not found in the model deck"
+                msg = self._unresolved_preset_model_sentence(
+                    preset_label="LLM", preset_id=llm_preset_id, model_reference=llm_setting.model, model_type=ModelType.LLM
+                )
                 raise LLMHandleNotFoundError(
                     message=msg,
                     preset_id=llm_preset_id,
@@ -745,7 +843,9 @@ class ModelDeck(ConfigModel):
     def validate_img_gen_presets(self) -> Self:
         for img_gen_preset_id, img_gen_setting in self.img_gen_presets.items():
             if not self.is_model_handle_defined(model_handle=img_gen_setting.model, model_type=ModelType.IMG_GEN):
-                msg = f"Image generation handle '{img_gen_setting.model}' for preset '{img_gen_preset_id}' was not found in the model deck"
+                msg = self._unresolved_preset_model_sentence(
+                    preset_label="Image generation", preset_id=img_gen_preset_id, model_reference=img_gen_setting.model, model_type=ModelType.IMG_GEN
+                )
                 raise ImgGenHandleNotFoundError(
                     message=msg,
                     preset_id=img_gen_preset_id,
@@ -756,7 +856,9 @@ class ModelDeck(ConfigModel):
     def validate_extract_presets(self) -> Self:
         for extract_preset_id, extract_setting in self.extract_presets.items():
             if not self.is_model_handle_defined(model_handle=extract_setting.model, model_type=ModelType.TEXT_EXTRACTOR):
-                msg = f"Extract handle '{extract_setting.model}' for extract preset '{extract_preset_id}' was not found in the model deck"
+                msg = self._unresolved_preset_model_sentence(
+                    preset_label="Extract", preset_id=extract_preset_id, model_reference=extract_setting.model, model_type=ModelType.TEXT_EXTRACTOR
+                )
                 raise ExtractHandleNotFoundError(
                     message=msg,
                     preset_id=extract_preset_id,
@@ -767,7 +869,9 @@ class ModelDeck(ConfigModel):
     def validate_search_presets(self) -> Self:
         for search_preset_id, search_setting in self.search_presets.items():
             if not self.is_model_handle_defined(model_handle=search_setting.model, model_type=ModelType.SEARCH):
-                msg = f"Search handle '{search_setting.model}' for search preset '{search_preset_id}' was not found in the model deck"
+                msg = self._unresolved_preset_model_sentence(
+                    preset_label="Search", preset_id=search_preset_id, model_reference=search_setting.model, model_type=ModelType.SEARCH
+                )
                 raise SearchHandleNotFoundError(
                     message=msg,
                     preset_id=search_preset_id,
@@ -778,7 +882,9 @@ class ModelDeck(ConfigModel):
     def validate_doc_gen_presets(self) -> Self:
         for doc_gen_preset_id, doc_gen_setting in self.doc_gen_presets.items():
             if not self.is_model_handle_defined(model_handle=doc_gen_setting.model, model_type=ModelType.DOC_GEN):
-                msg = f"Doc gen handle '{doc_gen_setting.model}' for doc gen preset '{doc_gen_preset_id}' was not found in the model deck"
+                msg = self._unresolved_preset_model_sentence(
+                    preset_label="Doc gen", preset_id=doc_gen_preset_id, model_reference=doc_gen_setting.model, model_type=ModelType.DOC_GEN
+                )
                 raise DocGenHandleNotFoundError(
                     message=msg,
                     preset_id=doc_gen_preset_id,
@@ -789,7 +895,9 @@ class ModelDeck(ConfigModel):
     def validate_judgment_presets(self) -> Self:
         for judgment_preset_id, judgment_setting in self.judgment_presets.items():
             if not self.is_model_handle_defined(model_handle=judgment_setting.model, model_type=ModelType.JUDGMENT):
-                msg = f"Judgment handle '{judgment_setting.model}' for judgment preset '{judgment_preset_id}' was not found in the model deck"
+                msg = self._unresolved_preset_model_sentence(
+                    preset_label="Judgment", preset_id=judgment_preset_id, model_reference=judgment_setting.model, model_type=ModelType.JUDGMENT
+                )
                 raise JudgmentHandleNotFoundError(
                     message=msg,
                     preset_id=judgment_preset_id,
@@ -899,7 +1007,7 @@ class ModelDeck(ConfigModel):
 
     def validate_inference_models(self):
         for model_spec in self.inference_models.all_specs():
-            self.get_required_inference_model(model_handle=model_spec.name, model_type=model_spec.model_type)
+            self.get_required_inference_model(model_handle=write_model_handle(name=model_spec.name), model_type=model_spec.model_type)
 
     def _get_enabled_backends(self) -> set[str]:
         """Return the set of backend names that have at least one model enabled."""
@@ -911,10 +1019,25 @@ class ModelDeck(ConfigModel):
         *,
         fallback_list: list[str],
         model_type: ModelType,
+        visited: frozenset[str],
+        is_quiet: bool,
     ) -> InferenceModelSpec | None:
-        """Resolve a waterfall to an inference model spec by trying each fallback in order."""
+        """Resolve a waterfall to an inference model spec by trying each fallback in order.
+
+        `visited` holds the aliases and waterfalls the lookup is already inside, so a step leading back
+        to one of them ends as no model rather than recursing, and so does a step reaching a waterfall that
+        runs out. A quiet lookup logs nothing and leaves the one-time fallback notice to the next lookup that
+        falls back.
+        """
+        waterfall_key = f"{NAMESPACE_WATERFALL}{waterfall_name}"
+        if waterfall_key in visited:
+            if not is_quiet:
+                log.warning(f"Circular model reference detected: waterfall '{waterfall_name}' leads back to itself")
+            return None
+        step_visited = visited | {waterfall_key}
         ideal_model_handle = fallback_list[0]
-        log.verbose(f"Fallback list for '{waterfall_name}': {fallback_list}")
+        if not is_quiet:
+            log.verbose(f"Fallback list for '{waterfall_name}': {fallback_list}")
         for fallback_index, fallback in enumerate(fallback_list):
             if fallback_index > 0 and not self.model_deck_config.is_model_fallback_enabled:
                 # Waterfall disabled, so we raise an error
@@ -927,28 +1050,66 @@ class ModelDeck(ConfigModel):
                     f"or enable a backend that supports '{ideal_model_handle}'. "
                 )
                 raise ModelNotFoundError(message=msg, model_handle=waterfall_name)
-            if inference_model := self.get_optional_inference_model(model_handle=fallback, model_type=model_type):
-                if fallback_index > 0:
-                    # Only log if we haven't logged for this waterfall_name before
-                    if waterfall_name not in self._logged_fallback_warnings:
-                        # Waterfall success: we explain what happened in the logs
-                        msg = (
-                            f"Inference model fallback: '{ideal_model_handle}' was not found in the model deck, "
-                            f"so it was replaced by '{fallback}'. "
-                            f"As a consequence, the results of the method may not have the expected quality, "
-                            f"and the method might fail due to feature limitations such as context window size, etc. "
-                            f"Consider getting access to '{ideal_model_handle}'."
-                        )
-                        msg += f" Please see our docs for more details about setting up inference backends:\n{URLs.backend_provider_docs}"
-                        log.info(msg)
-                        # Mark this warning as logged for this waterfall_name
-                        self._logged_fallback_warnings.add(waterfall_name)
+            try:
+                inference_model = self._get_optional_inference_model(
+                    model_handle=fallback,
+                    model_type=model_type,
+                    visited=step_visited,
+                    is_quiet=is_quiet,
+                )
+            except ModelWaterfallError:
+                # The step is a waterfall of its own, or reaches one, none of whose steps is served: that step
+                # serves no model, and this waterfall goes on. Only the waterfall resolved at the top raises its
+                # own error. The refusal of a fallback while fallbacks are disabled is not caught: it holds here too.
+                if not is_quiet:
+                    log.verbose(f"Waterfall '{waterfall_name}': step '{fallback}' reaches a waterfall none of whose models is served")
+                inference_model = None
+            if inference_model is not None:
+                # Only log if we haven't logged for this waterfall_name before, and never from a quiet lookup,
+                # which would otherwise use up the notice the next real fallback owes its run.
+                if fallback_index > 0 and not is_quiet and waterfall_name not in self._logged_fallback_warnings:
+                    # Waterfall success: we explain what happened in the logs
+                    msg = (
+                        f"Inference model fallback: '{ideal_model_handle}' was not found in the model deck, "
+                        f"so it was replaced by '{fallback}'. "
+                        f"As a consequence, the results of the method may not have the expected quality, "
+                        f"and the method might fail due to feature limitations such as context window size, etc. "
+                        f"Consider getting access to '{ideal_model_handle}'."
+                    )
+                    msg += f" Please see our docs for more details about setting up inference backends:\n{URLs.backend_provider_docs}"
+                    log.info(msg)
+                    # Mark this warning as logged for this waterfall_name
+                    self._logged_fallback_warnings.add(waterfall_name)
                 return inference_model
         msg = (
             f"Model handle '{waterfall_name}' is a waterfall (i.e. a list of models to try in order) "
             "but none of the fallback models were found in the model deck"
         )
         raise ModelWaterfallError(message=msg, model_handle=waterfall_name, fallback_list=fallback_list)
+
+    def _resolve_alias(
+        self,
+        *,
+        alias_name: str,
+        alias_target: str,
+        model_type: ModelType,
+        visited: frozenset[str],
+        is_quiet: bool,
+    ) -> InferenceModelSpec | None:
+        """Resolve an alias through its target, ending as no model when the target leads back to an alias or a waterfall being resolved."""
+        alias_key = f"{NAMESPACE_ALIAS}{alias_name}"
+        if alias_key in visited:
+            if not is_quiet:
+                log.warning(f"Circular model reference detected: alias '{alias_name}' leads back to itself")
+            return None
+        if not is_quiet:
+            log.verbose(f"Alias '{alias_name}' -> '{alias_target}'")
+        return self._get_optional_inference_model(
+            model_handle=alias_target,
+            model_type=model_type,
+            visited=visited | {alias_key},
+            is_quiet=is_quiet,
+        )
 
     def get_optional_inference_model(self, model_handle: str, *, model_type: ModelType) -> InferenceModelSpec | None:
         """Get an inference model spec, resolving aliases and waterfalls as needed.
@@ -959,17 +1120,42 @@ class ModelDeck(ConfigModel):
         return self._get_optional_inference_model(
             model_handle=model_handle,
             model_type=model_type,
-            _visited=frozenset(),
+            visited=frozenset(),
+            is_quiet=False,
         )
+
+    def peek_inference_model(self, *, model_handle: str, model_type: ModelType) -> InferenceModelSpec | None:
+        """The model a run through `model_handle` would call now, or None when it would find none, looked up without side effects.
+
+        It follows the lookup `get_optional_inference_model` makes, but logs nothing, leaves the one-time
+        fallback notice to the next run that falls back, and answers None where that lookup raises for a
+        waterfall none of whose usable steps the deck serves. The model reference check reads a run this way.
+        """
+        try:
+            return self._get_optional_inference_model(
+                model_handle=model_handle,
+                model_type=model_type,
+                visited=frozenset(),
+                is_quiet=True,
+            )
+        except ModelNotFoundError:
+            return None
 
     def _get_optional_inference_model(
         self,
         model_handle: str,
         *,
         model_type: ModelType,
-        _visited: frozenset[str],
+        visited: frozenset[str],
+        is_quiet: bool,
     ) -> InferenceModelSpec | None:
-        """Internal implementation with cycle detection for alias resolution."""
+        """Internal implementation, with cycle detection across aliases and waterfalls.
+
+        A reference is resolved by its kind: `@name` as the alias, `~name` as the waterfall, and a bare
+        name as a model of this type, failing that as an alias of that name, failing that as a waterfall.
+        `visited` holds the aliases and waterfalls the lookup is already inside, so a binding leading back
+        to one of them ends as no model.
+        """
         # Parse the model_handle to handle prefixed references
         try:
             ref = ModelReference.parse(model_handle)
@@ -978,53 +1164,53 @@ class ModelDeck(ConfigModel):
             return None
         aliases, waterfalls = self.get_aliases_and_waterfalls_for_type(model_type)
 
-        # Handle prefixed alias reference (e.g., @best-gpt)
         match ref.kind:
             case ModelReferenceKind.ALIAS:
                 if alias_target := aliases.get(ref.name):
-                    log.verbose(f"Prefixed alias '{model_handle}' -> '{alias_target}'")
-                    if alias_target in _visited:
-                        log.error(f"Circular alias detected: '{model_handle}' -> '{alias_target}'")
-                        return None
-                    return self._get_optional_inference_model(
-                        model_handle=alias_target,
+                    return self._resolve_alias(
+                        alias_name=ref.name,
+                        alias_target=alias_target,
                         model_type=model_type,
-                        _visited=_visited | {model_handle},
+                        visited=visited,
+                        is_quiet=is_quiet,
                     )
-                log.verbose(f"Prefixed alias '{model_handle}' not found in aliases")
+                if not is_quiet:
+                    log.verbose(f"Prefixed alias '{model_handle}' not found in aliases")
                 return None
             case ModelReferenceKind.WATERFALL:
                 if fallback_list := waterfalls.get(ref.name):
-                    log.verbose(f"Prefixed waterfall '{model_handle}' -> {fallback_list}")
                     return self._resolve_waterfall(
                         waterfall_name=ref.name,
                         fallback_list=fallback_list,
                         model_type=model_type,
+                        visited=visited,
+                        is_quiet=is_quiet,
                     )
-                log.verbose(f"Prefixed waterfall '{model_handle}' not found in waterfalls")
+                if not is_quiet:
+                    log.verbose(f"Prefixed waterfall '{model_handle}' not found in waterfalls")
                 return None
             case ModelReferenceKind.PRESET:
                 # Presets should not be resolved here - they should be looked up in presets directly
-                log.verbose(f"Preset reference '{model_handle}' cannot be resolved as an inference model")
+                if not is_quiet:
+                    log.verbose(f"Preset reference '{model_handle}' cannot be resolved as an inference model")
                 return None
             case ModelReferenceKind.HANDLE:
                 # Direct handle - proceed with normal lookup
                 pass
 
-        # For direct handles (HANDLE kind), try the models served as this type first: a handle served as
-        # another type only does not stop the lookup, since this type may have an alias or a waterfall of that name
+        # For direct handles (HANDLE kind), try the model served as this type first. A model of that name served
+        # only as another type does not answer this lookup, which goes on to this type's aliases and waterfalls,
+        # as the load-time check (`is_bare_handle_resolvable`) reads the same name.
         if inference_model := self.inference_models.get(model_type=model_type, handle=ref.name):
             return inference_model
         # Then try aliases (without prefix)
-        if alias := aliases.get(ref.name):
-            log.verbose(f"Alias for '{model_handle}': {alias}")
-            if alias in _visited:
-                log.warning(f"Circular alias detected: '{model_handle}' -> '{alias}'")
-                return None
-            return self._get_optional_inference_model(
-                model_handle=alias,
+        if alias_target := aliases.get(ref.name):
+            return self._resolve_alias(
+                alias_name=ref.name,
+                alias_target=alias_target,
                 model_type=model_type,
-                _visited=_visited | {model_handle},
+                visited=visited,
+                is_quiet=is_quiet,
             )
         # Finally try waterfalls (without prefix)
         if fallback_list := waterfalls.get(ref.name):
@@ -1032,7 +1218,11 @@ class ModelDeck(ConfigModel):
                 waterfall_name=ref.name,
                 fallback_list=fallback_list,
                 model_type=model_type,
+                visited=visited,
+                is_quiet=is_quiet,
             )
+        if is_quiet:
+            return None
         if served_types := self.inference_models.types_serving(handle=ref.name):
             served_types_description = ", ".join(f"'{served_type}'" for served_type in served_types)
             log.warning(f"Model handle '{ref.name}' is served as {served_types_description} but was requested as '{model_type}'. Skipping.")

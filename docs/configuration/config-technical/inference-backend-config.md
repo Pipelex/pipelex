@@ -235,7 +235,7 @@ The table name `acme-one-judgment` names the table and nothing else: methods, th
 
 A routing profile routes a handle's name, so its route applies to every kind of model of that name. A model type the routed backend does not serve is looked for along the profile's `fallback_order`, or in the internal backend when it has none, when the name reached that backend by default, is left out when it reached it through a wildcard pattern, and is not served at all when the profile routes the name to that backend exactly: an exact route pins the name to one backend.
 
-A method whose pipe names a handle the deck serves only as another kind of model is refused when it loads: a `PipeJudge` naming a handle served only as an LLM is told that no judgment model of that name exists, and the suggestions list judgment models only.
+A method whose pipe names a handle the deck serves only as another kind of model is refused when it loads: a `PipeJudge` naming a handle served only as an LLM is told that the deck serves the handle, but not as a judgment model, and the suggestions list judgment models only.
 
 #### Input formats
 
