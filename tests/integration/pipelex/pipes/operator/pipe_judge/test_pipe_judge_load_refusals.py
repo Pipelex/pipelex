@@ -43,6 +43,7 @@ class TestPipeJudgeLoadRefusals:
 
         assert llm_only_handle in report
         assert "field 'model'" in report
+        assert "'unknown_model'" in report
         assert "'model_type': 'judgment'" in report
 
     @pytest.mark.parametrize(

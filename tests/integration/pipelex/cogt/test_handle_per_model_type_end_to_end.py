@@ -164,4 +164,5 @@ class TestHandlePerModelTypeEndToEnd:
 
         report = str(exc_info.value.to_error_report().model_dump())
         assert LLM_ONLY_HANDLE in report
+        assert "'unknown_model'" in report
         assert "'model_type': 'judgment'" in report
