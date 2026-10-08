@@ -193,6 +193,10 @@
          <lastmod>2026-10-08</lastmod>
     </url>
     <url>
+         <loc>https://docs.pipelex.com/latest/building-methods/pipes/running-on-the-hosted-api/</loc>
+         <lastmod>2026-10-08</lastmod>
+    </url>
+    <url>
          <loc>https://docs.pipelex.com/latest/building-methods/pipes/signature-pipes/</loc>
          <lastmod>2026-10-08</lastmod>
     </url>
@@ -290,6 +294,10 @@
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/configuration/config-practical/reporting-config/</loc>
+         <lastmod>2026-10-08</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/configuration/config-practical/run-config/</loc>
          <lastmod>2026-10-08</lastmod>
     </url>
     <url>
@@ -777,6 +785,10 @@
          <lastmod>2026-10-08</lastmod>
     </url>
     <url>
+         <loc>https://docs.pipelex.com/latest/errors/former-release-config-error/</loc>
+         <lastmod>2026-10-08</lastmod>
+    </url>
+    <url>
          <loc>https://docs.pipelex.com/latest/errors/func-registry-error/</loc>
          <lastmod>2026-10-08</lastmod>
     </url>
@@ -802,6 +814,38 @@
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/graph-spec-validation-error/</loc>
+         <lastmod>2026-10-08</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/hosted-base-url-error/</loc>
+         <lastmod>2026-10-08</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/hosted-local-file-upload-unavailable-error/</loc>
+         <lastmod>2026-10-08</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/hosted-method-invalid-error/</loc>
+         <lastmod>2026-10-08</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/hosted-run-error/</loc>
+         <lastmod>2026-10-08</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/hosted-run-interrupted-error/</loc>
+         <lastmod>2026-10-08</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/hosted-run-outcome-unknown-error/</loc>
+         <lastmod>2026-10-08</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/hosted-run-polling-error/</loc>
+         <lastmod>2026-10-08</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/hosted-run-source-error/</loc>
          <lastmod>2026-10-08</lastmod>
     </url>
     <url>
@@ -1922,6 +1966,10 @@
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/tools/cli/init/</loc>
+         <lastmod>2026-10-08</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/tools/cli/login/</loc>
          <lastmod>2026-10-08</lastmod>
     </url>
     <url>

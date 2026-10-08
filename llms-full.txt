@@ -28,7 +28,7 @@ Describe how the work gets done in plain English, and your coding agent builds i
 
 -   :material-laptop: **[Run It Yourself](./get-started/run-it-yourself.md)**
 
-    Install the Pipelex runtime and run methods on your own machine, against the model providers you choose.
+    Install the Pipelex runtime and run methods from your terminal: on the hosted Pipelex API with one sign-in, or on your own machine against the model providers you choose.
 
 -   :material-school: **[MTHDS Language Tutorial](./get-started/mthds-language-tutorial.md)**
 
@@ -321,7 +321,7 @@ The Pipelex runtime runs your methods on your own machine, against the model pro
 
 # Run It Yourself
 
-The Pipelex runtime is the Python package that reads a `.mthds` file and runs it. Install it and everything happens on your own machine, against the model providers you choose. If you would rather not run anything yourself, the [Quick Start](./quick-start.md) builds methods with your coding agent and runs them on the hosted API.
+The Pipelex runtime is the Python package that reads a `.mthds` file and runs it. Install it and run methods from your terminal, either on the hosted Pipelex API, with no provider account of your own, or on your own machine, against the model providers you choose. If you would rather not install anything, the [Quick Start](./quick-start.md) builds methods with your coding agent and runs them on the hosted API.
 
 ## Install
 
@@ -331,7 +331,12 @@ pipelex init
 pipelex doctor
 ```
 
-`pipelex init` writes your `~/.pipelex` configuration and offers to install the editor extension; `pipelex doctor` reports what is configured and what is missing. The `cli` extra installs Rich, which the `pipelex` and `pipelex-agent` commands render their output through.
+`pipelex init` writes your `~/.pipelex` configuration, offers to install the editor extension, and asks where your runs execute:
+
+- **On the hosted Pipelex API**, the default that Enter takes: no provider account is needed. `pipelex init` signs you in through your browser and saves a Pipelex API key to `~/.pipelex/.env`. [`pipelex login`](../tools/cli/login.md) does that again on its own, and `pipelex login --paste` takes a key on a machine without a browser.
+- **On this machine, with your own provider keys**: you choose your AI providers and enter their keys, or point Pipelex at a local model.
+
+`pipelex doctor` reports what is configured and what is missing. The `cli` extra installs Rich, which the `pipelex` and `pipelex-agent` commands render their output through.
 
 Some providers and features need an extra:
 
@@ -353,8 +358,11 @@ uv tool install "pipelex[cli,anthropic,google,google-genai,mistralai,bedrock,fal
 
 ## Configure AI access
 
+- **The hosted API** — Choose it in `pipelex init`, which writes `[run] execution = "hosted"` and signs you in, to run on the hosted Pipelex API with no provider key on this machine. On a machine set up for local runs, `pipelex login` and `--hosted` send one run there. See [Running on the Hosted API](../tools/cli/run.md#running-on-the-hosted-api).
 - **Bring Your Own Keys** — Use existing API keys from OpenAI, Anthropic, Google, Mistral, etc. See [Configure AI Providers](./configure-ai-providers.md).
 - **Local AI** — Ollama, vLLM, LM Studio, or llama.cpp — no API keys required. See [Configure AI Providers](./configure-ai-providers.md).
+
+A single run can always go the other way: `--hosted` sends it to the hosted API, `--local` keeps it on this machine.
 
 ## Run a method
 
@@ -381,14 +389,14 @@ Save its inputs as `inputs.json`:
 }
 ```
 
-The method names no model, so it runs on the deck's `default-general` alias, which `pipelex init` points at an OpenAI model. With a provider other than OpenAI or Azure OpenAI, point that alias at one of your provider's models first, by adding it to `~/.pipelex/inference/deck/x_custom_llm_deck.toml` — the models each provider serves are listed under `~/.pipelex/inference/backends/`:
+On the hosted Pipelex API, it runs as it is. On this machine, the method names no model, so it runs on the deck's `default-general` alias, which `pipelex init` points at an OpenAI model. With a provider other than OpenAI or Azure OpenAI, point that alias at one of your provider's models first, by adding it to `~/.pipelex/inference/deck/x_custom_llm_deck.toml` — the models each provider serves are listed under `~/.pipelex/inference/backends/`:
 
 ```toml
 [llm.aliases]
 default-general = "claude-5-sonnet"     # an Anthropic model, for example
 ```
 
-Then run it:
+Then run it, where `pipelex init` set your runs to execute:
 
 ```bash
 pipelex run bundle summarize.mthds --inputs inputs.json
@@ -416,7 +424,7 @@ pipelex init
 
 The `cli` extra installs Rich, which the `pipelex` command renders its output through.
 
-`pipelex init` creates your project configuration. To run your methods, add your own provider keys to `~/.pipelex/.env`, or point Pipelex at a local model: see [Configure AI Providers](./configure-ai-providers.md).
+`pipelex init` creates your configuration and asks where your runs execute. Press Enter to run them on the hosted Pipelex API: it signs you in through your browser and saves a Pipelex API key, so you need no provider key of your own. To run them on this machine instead, answer `2`, then add your own provider keys or point Pipelex at a local model: see [Configure AI Providers](./configure-ai-providers.md).
 
 !!! tip "VS Code Extension"
     We **highly** recommend installing the Pipelex extension for `.mthds` syntax highlighting and flowchart visualization:
@@ -636,7 +644,7 @@ You now understand the building blocks: pipes, sequences, inputs, and structured
 
 ## Configure API Access
 
-To run pipelines on your own machine, Pipelex needs access to AI models. **You have two options**: your own provider keys, or models running locally. Nothing reports to Pipelex either way. If you would rather hold no provider keys at all, the [Quick Start](./quick-start.md) runs methods on the hosted Pipelex API instead.
+To run pipelines on your own machine, Pipelex needs access to AI models. **You have two options**: your own provider keys, or models running locally. Nothing reports to Pipelex either way. This is the setup `pipelex init` runs when you answer **On this machine, with your own provider keys** to its question "Where should your runs execute?". If you would rather hold no provider keys at all, take its default answer, the hosted Pipelex API, which signs you in for a Pipelex API key instead (see [Run It Yourself](./run-it-yourself.md) and [`pipelex login`](../tools/cli/login.md)).
 
 ### Option 1: Bring Your Own API Keys
 
@@ -689,11 +697,13 @@ You only need to add keys for the providers you plan to use. A single OpenRouter
 
 When using your own keys, enable the corresponding backends:
 
-1. Initialize configuration:
+1. Initialize configuration, and answer **2) On this machine, with your own provider keys** when it asks where your runs execute. It then asks which backends you have access to and prompts for their keys, saved to `~/.pipelex/.env`:
 
     ```bash
     pipelex init
     ```
+
+    On a machine already set up, `pipelex init inference` reruns the backend selection alone, without changing where your runs execute.
 
 2. Edit `~/.pipelex/inference/backends.toml` (or `.pipelex/inference/backends.toml` in your project root if you have a project-local config — the project file fully overrides the global one). To run on a backend of your own choosing without touching a tracked file, write the same keys in a git-ignored `backends_override.toml` beside it instead: see [Personal overrides](../configuration/config-technical/inference-backend-config.md#personal-overrides).
 
@@ -744,11 +754,11 @@ To set up Pipelex configuration files, run:
 pipelex init
 ```
 
-By default, this creates the global `~/.pipelex/` directory with:
+By default, this creates the global `~/.pipelex/` directory, with the same files whichever answer you give to where your runs execute; the `inference/` files are what runs on this machine use:
 
 ```
 ~/.pipelex/
-├── pipelex.toml              # Feature flags, logging, cost reporting
+├── pipelex.toml              # Feature flags, logging, cost reporting, where runs execute
 ├── plxt.toml                 # MTHDS/TOML formatting and linting configuration
 ├── telemetry.toml            # AI trace destinations (PostHog, Langfuse, OTLP)
 └── inference/                # LLM configuration and model presets
@@ -1874,9 +1884,10 @@ The `pipelex` CLI is the primary tool for working with Pipelex methods. It cover
 
 | Command | Description |
 |---------|-------------|
-| **`pipelex init`** | Initialize configuration, backends, credentials, routing, and telemetry |
+| **`pipelex init`** | Initialize configuration, choose where runs execute (the hosted Pipelex API or this machine), and set up backends, credentials, routing, and telemetry |
+| **`pipelex login`** | Get a Pipelex API key through your browser, or paste one with `--paste`, and save it for runs on the hosted Pipelex API |
 | **`pipelex update`** | Refresh the model deck and `backends/internal.toml` to match the installed pipelex version |
-| **`pipelex doctor`** | Check configuration health and suggest fixes |
+| **`pipelex doctor`** | Check configuration health and suggest fixes; a setup whose runs execute on the hosted Pipelex API needs its Pipelex API key and no provider key |
 | **`pipelex build`** | Generate the structures of your concepts and example inputs and outputs for a pipe |
 | **`pipelex validate`** | Check pipeline syntax, structure, and run dry-run validation |
 | **`pipelex fix`** | Apply deterministic safe fixes to a bundle and re-validate (with `--diff` preview) |
@@ -1905,7 +1916,7 @@ The `pipelex-agent` CLI is a machine-first interface designed for automated envi
 
 | Command | Description |
 |---------|-------------|
-| `init` | Non-interactive configuration setup (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
+| `init` | Non-interactive configuration setup; `"execution": "hosted"` in `--config` sets up hosted runs (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
 | `run` | Execute a pipeline (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
 | `validate` | Validate pipes, bundles, or methods (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
 | `fix` | Apply deterministic safe fixes to a bundle in place and re-validate (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
@@ -5581,7 +5592,9 @@ pipe_output = response.pipe_output
 
 ## Using the Pipelex API
 
-The [Pipelex API server](../../api-server/index.md) runs pipelines over HTTP on infrastructure you host yourself: it is published as the `pipelex/pipelex-api` Docker image, and [Pipe Run](../../api-server/pipe-run.md) documents its `/v1/execute` and `/v1/start` routes.
+Everything above runs in your own process, with your own inference backends. To run on the hosted Pipelex API instead, with only a Pipelex API key, use pipelex-sdk's `PipelexAPIClient`, which is installed with `pipelex`: see [Running on the Hosted API from Python](running-on-the-hosted-api.md). From the CLI, the same runs take `--hosted`, see [Running on the Hosted API](../../tools/cli/run.md#running-on-the-hosted-api).
+
+The [Pipelex API server](../../api-server/index.md) runs pipelines over HTTP on infrastructure you host yourself: it is published as the `pipelex/pipelex-api` Docker image, and [Pipe Run](../../api-server/pipe-run.md) documents its `/v1/execute` and `/v1/start` routes. The same client reaches it when its base URL points there.
 
 ---
 
@@ -5596,6 +5609,96 @@ The public Python entry point is `PipelexMTHDSProtocol.execute()`. The older sta
 ## Run Modes & Backends
 
 Every execution method above accepts a run mode (live or dry run) and a backend (in-process or Temporal). See [Run Modes & Backends](run-modes-and-backends.md) for the full matrix and when to use each combination.
+
+
+## Running on the Hosted API
+
+# Running on the Hosted API from Python
+
+The Pipelex Python API has two halves. `PipelexMTHDSProtocol`, shown in [Executing Pipelines](executing-pipelines.md), runs a method in your own process, with your own inference backends and provider keys. **`PipelexAPIClient`**, from the `pipelex-sdk` package, runs it on the hosted Pipelex API, with only a Pipelex API key. `pipelex-sdk` is a dependency of `pipelex`, so it is installed with it, and it is the client `pipelex run --hosted` uses under the hood.
+
+Use the client directly: it has no Pipelex wrapper, and it needs no `Pipelex.make()`, since nothing runs locally. Its requests identify themselves in their `User-Agent` as pipelex-sdk's, while the CLI's lead with `pipelex-cli/<version>`; to put your own application's name in front, pass pipelex-sdk's `app_info` to the constructor.
+
+## The Key and the Origin
+
+The client reads its key from `PIPELEX_API_KEY` and its origin from `PIPELEX_BASE_URL`, falling back to `https://api.pipelex.com`. Both can also be passed to the constructor, as `api_key=` and `base_url=`. The client reads the process environment only. To use a key saved in `~/.pipelex/.env`, as `pipelex run --hosted` does, import `pipelex.system.environment` before creating the client: importing it loads `~/.pipelex/.env` (or the one in `PIPELEX_HOME`), then a `.env` in the working directory.
+
+## Running a Method
+
+The client runs the same three sources the CLI does: a published method by its address (`method_ref`), a method stored on the hosted platform by its catalog id (`method_id`), or your own bundle by its contents (`mthds_contents`). `start_and_wait` starts the run and polls it until it ends, so a long run is not cut short by a synchronous request's timeout.
+
+```python
+import asyncio
+
+from pipelex_sdk.client import PipelexAPIClient
+
+
+async def main() -> None:
+    async with PipelexAPIClient() as client:
+        results = await client.start_and_wait(
+            method_ref="github.com/Pipelex/methods/text_stats@v0.1.7",
+            inputs={"text": "Hello world. Second sentence."},
+        )
+    print(results.pipeline_run_id)
+    print(results.main_stuff["text"])
+
+
+asyncio.run(main())
+```
+
+`results.main_stuff` is the main output's content, as JSON. `results.working_memory` holds every stuff of the run, each naming its concept by ref, and `results.graph_spec` the run's execution graph.
+
+To run your own bundle, send its contents and name the pipe, or leave `pipe_code` out to run the bundle's `main_pipe`:
+
+```python
+from pathlib import Path
+
+results = await client.start_and_wait(
+    pipe_code="summarize",
+    mthds_contents=[Path("my_bundle.mthds").read_text(encoding="utf-8")],
+    inputs={"text": "…"},
+)
+```
+
+## Inputs That Name Local Files
+
+The hosted API cannot read your machine's files, so a document or an image given as a local path is uploaded first. `prepare_inputs` reads the pipe's signature from the hosted API, uploads each local file found at a document or image input, and returns the inputs with each one replaced by its storage URI. It takes the method the same way the run does, and the pipe as its qualified ref, `domain.pipe_code`:
+
+```python
+prepared = await client.prepare_inputs(
+    method_ref="github.com/Pipelex/methods/documents@v0.1.7",
+    pipe_ref="documents.extract_document_text",
+    inputs={"document": "invoices/march.pdf"},
+)
+results = await client.start_and_wait(
+    method_ref="github.com/Pipelex/methods/documents@v0.1.7",
+    pipe_code="extract_document_text",
+    inputs=prepared.inputs,
+)
+```
+
+A relative path is read from the working directory, and a `file://` URI is not decoded, so pass the path itself. `http(s)://` URLs are passed through for the hosted API to fetch. Call `prepare_inputs` only when the inputs name a local file: other inputs can go to the run as they are.
+
+Two cases where `pipelex run --hosted` goes further than `prepare_inputs`:
+
+- `prepare_inputs` refuses an explicit `None` at a document or image input. Leave an optional file out of the inputs rather than setting it to `None`. The CLI uploads the files itself and keeps the `null` for the run.
+- `prepare_inputs` reads the signature through a route that cannot load a method calling another method by its address (`github.com/…`), so it refuses such a method, which `start_and_wait` runs. Give its files as `https://` URLs and start the run without preparing the inputs.
+
+## Errors
+
+A failure is one of the SDK's typed errors, from `pipelex_sdk.errors`, all subclasses of the protocol's `PipelineRequestError`, with one exception: `start` and `execute`, which the client inherits from the MTHDS protocol client, let httpx's transport errors through. A `ConnectError` or a `ConnectTimeout` means the request never left your machine. A `ReadError`, a `RemoteProtocolError` or a `ReadTimeout` can come after the hosted API received it, so a run may exist with no id returned: check the run history on app.pipelex.com before starting it again.
+
+- `ApiResponseError` is a refusal the hosted API answered: `status`, the reason in `server_message`, the next step in `user_action.detail` when the server advised one, and `validation_errors` locating the faults of a bundle it refused to load.
+- `RunFailedError` is a run that started and failed; `error` holds its stored report, with the runner's `error_type`, `message`, `error_domain` and `user_action`.
+- `RunTimeoutError` is a run that outlived the wait; it keeps running, and `run_id` reads its result later with `wait_for_result`.
+- `ApiUnreachableError` is a hosted API that could not be reached at all, on the routes the SDK owns: the signature read, the uploads, and the polling of a started run.
+- `InputPreparationError` and its subclasses are a local file that could not be read or uploaded.
+
+## Related Documentation
+
+- [Running on the Hosted API](../../tools/cli/run.md#running-on-the-hosted-api) — The same runs from `pipelex run --hosted`
+- [Run Configuration](../../configuration/config-practical/run-config.md) — Making hosted runs the CLI's default
+- [Executing Pipelines](executing-pipelines.md) — The local half of the Python API
 
 
 ## Run Modes & Backends
@@ -9836,13 +9939,14 @@ The Pipelex CLI is organized into several command groups:
 
 | Command | Description |
 |---------|-------------|
-| [**init**](init.md) | Initialize Pipelex configuration |
+| [**init**](init.md) | Initialize Pipelex configuration and choose where your runs execute: the hosted Pipelex API or this machine |
+| [**login**](login.md) | Get a Pipelex API key through your browser, or paste one, and save it for runs on the hosted Pipelex API |
 | [**update**](update.md) | Refresh the model deck and `backends/internal.toml` to match the installed pipelex version |
 | [**migrate**](migrate.md) | Bring your configuration files up to the schema the installed version expects |
 | [**validate**](validate.md) | Validate configuration and pipelines |
 | [**fix**](fix.md) | Apply deterministic safe fixes to a bundle and re-validate |
 | [**show**](show.md) | Inspect configuration, pipes, and AI models |
-| [**run**](run.md) | Execute pipelines |
+| [**run**](run.md) | Execute pipelines, on this machine or on the hosted Pipelex API |
 | [**run method by address**](run-by-address.md) | Fetch and run a method straight from a public GitHub repository |
 | [**build**](build/index.md) | Generate concept structures and example inputs and outputs for a pipe |
 
@@ -9883,8 +9987,9 @@ Package manifest management currently lives in the `mthds` CLI:
 
 1. **Initial Setup**
 
-    - Run `pipelex init` to create configuration files and select your backends
-    - Configure your AI providers in `.pipelex/inference/backends.toml`
+    - Run `pipelex init` to create configuration files and choose where your runs execute
+    - On the hosted Pipelex API, `pipelex init` signs you in for a Pipelex API key; `pipelex login` does it again on its own
+    - On this machine, it asks for your backends and their keys; configure them further in `.pipelex/inference/backends.toml`
 
 2. **Development Workflow**
 
@@ -9917,7 +10022,7 @@ Package manifest management currently lives in the `mthds` CLI:
 
 # Init Commands
 
-Initialize Pipelex configuration files and related setup flows.
+Initialize Pipelex configuration files and choose where your methods run: on the hosted Pipelex API, with a Pipelex API key, or on this machine, with your own provider keys.
 
 ## Initialize Configuration
 
@@ -9934,10 +10039,10 @@ By default, `pipelex init` writes to the home configuration directory (`~/.pipel
 **Arguments:**
 
 - `FOCUS` - What to initialize (optional):
-    - `all` (default) - Initialize everything
-    - `config` - Only configuration files
+    - `all` (default) - Initialize everything, asking where your runs execute
+    - `config` - Only configuration files; on a first setup, where no `inference/backends.toml` exists yet, it also asks where your runs execute and sets that up
     - `credentials` - Prompt for missing credentials only
-    - `inference` - Only inference backend setup
+    - `inference` - Only the inference backends of runs on this machine; where runs execute is left as it is
     - `routing` - Only routing profile setup
     - `telemetry` - Only telemetry configuration
 
@@ -9963,11 +10068,28 @@ pipelex init inference
 pipelex init telemetry
 ```
 
+## Where Your Runs Execute
+
+After you confirm, `pipelex init` asks one question:
+
+```
+Where should your runs execute?
+  [1]  On the hosted Pipelex API, with a Pipelex API key    default
+  [2]  On this machine, with your own provider keys
+```
+
+Enter takes the hosted Pipelex API. Your answer is written to `[run] execution` in the target `pipelex.toml`, the default every `pipelex run` and `pipelex-agent run` takes when the command passes neither `--hosted` nor `--local` (see [Run Configuration](../../configuration/config-practical/run-config.md)). A single run can always go the other way with one of those flags.
+
+- **The hosted Pipelex API** writes `execution = "hosted"` and then gets you a key: it runs [`pipelex login`](login.md), which opens the Pipelex app in your browser and saves the key it returns to `~/.pipelex/.env`. When a Pipelex API key is already set, in `PIPELEX_API_KEY` or saved in that file, it is kept and nothing opens; run `pipelex login` to replace it. An empty `PIPELEX_API_KEY=` counts as no key, and a `.env` in the working directory that sets another value is named, since Pipelex loads it after the home one. No provider key is asked for, since a hosted run uses none, and the inference files are the kit's defaults: like every reset, a re-init copies the kit's backends, model deck and routing over customised ones, and on this path nothing reconfigures them afterwards. Run `pipelex init inference` to set up this machine's backends again for `--local` runs. If the login does not complete, or its key cannot be saved, the rest of the setup is kept, and `pipelex login` (or `pipelex login --paste`) gets the key later.
+- **This machine** writes `execution = "local"` and runs the backend selection, routing and credential prompts described below.
+
+`pipelex init inference` configures the backends of runs on this machine and never asks this question, so it does not change where your runs execute. To switch, run `pipelex init` again, or set `[run] execution` yourself.
+
 ## What Gets Initialized
 
 This command creates or resets a Pipelex config directory with:
 
-- **pipelex.toml** - Main configuration file for logging, reporting, etc.
+- **pipelex.toml** - Main configuration file for logging, reporting, where runs execute, etc.
 - **inference/** - AI backend and routing configuration
     - `backends.toml` - Backend provider settings
     - `routing_profiles.toml` - Model routing rules
@@ -9983,11 +10105,35 @@ This command creates or resets a Pipelex config directory with:
 
 When you run `pipelex init`, Pipelex can guide you through:
 
-1. **Config reset** - Recreate the selected config files
-2. **Backend selection** - Choose which AI providers to enable. The prompt pre-selects OpenAI, whose one key serves every default language-model and image-generation tier of the shipped model deck
-3. **Credential prompts** - Fill in missing keys when relevant
-4. **Routing configuration** - Set up how models are routed to backends
-5. **Telemetry setup** - Configure observability and analytics
+1. **What a former release left** - On a machine set up by a release that ran models through the Pipelex Gateway, the cleanup that release's files need, offered first (see [below](#a-machine-a-former-release-set-up))
+2. **Config reset** - Recreate the selected config files
+3. **Where your runs execute** - The hosted Pipelex API (the default) or this machine
+4. On the hosted Pipelex API: **sign-in** - [`pipelex login`](login.md) gets a Pipelex API key, unless one is already set. It runs last, once every file is written
+5. On this machine:
+    1. **Backend selection** - Choose which AI providers to enable. The prompt pre-selects OpenAI, whose one key serves every default language-model and image-generation tier of the shipped model deck
+    2. **Routing configuration** - Set up how models are routed to backends
+    3. **Credential prompts** - Fill in missing keys when relevant
+6. **Telemetry setup** - Configure observability and analytics
+
+## A Machine a Former Release Set Up
+
+Releases up to v0.72 ran models through the Pipelex Gateway. It no longer exists, and Pipelex refuses to start on the files those releases wrote: a `pipelex_gateway` backend left enabled, or a routing profile such as `all_pipelex_gateway` left active.
+
+`pipelex init` looks for what such a release left, in the home configuration directory and in the project's `.pipelex/`, before it asks anything else, reading both together the way Pipelex merges them when it starts. When it finds some, it shows which files it is in and, when it stops Pipelex from starting here, what does: that is judged from the files Pipelex actually starts on in the current directory, so a project with configuration files of its own is told that what the home directory still carries no longer stops it, and is still offered the cleanup. Then it asks:
+
+```
+Clean it up now? [y/n] (y):
+```
+
+Yes runs the cleanup that [`pipelex migrate`](migrate.md#a-configuration-a-former-release-set-up) runs: the retired backends, routing profiles and files are removed, a copy of each file it changes or removes is kept beside it, and an active routing profile of that release's moves to `all_enabled_backends`, without switching Pipelex to another profile where it starts today as long as every file can be written. Then the setup goes on to the question of where your runs execute; if the cleanup leaves a file for you to edit by hand, or Pipelex still cannot start once it ran, `pipelex init` says so and names what to look at. No leaves the files as they are and goes on with the setup, which replaces the target directory's inference files but not the files beside them nor those of the other directory; `pipelex migrate` cleans them up whenever you are ready, and `pipelex init` adds that Pipelex will not start until then only when it would not.
+
+`pipelex doctor --fix` runs `pipelex init` with nobody there to answer, and that run never cleans up: the doctor asks about the cleanup itself, in its **Configuration Migrations** row, and only a yes there removes or rewrites anything.
+
+`pipelex init config` on an existing setup resets `pipelex.toml` without asking the question again, so it keeps the `[run] execution` it found, and asks for no provider key when that is `"hosted"`.
+
+`pipelex doctor --fix` installs missing configuration files with nobody there to answer, and never moves runs off this machine. On a first setup it keeps the `[run] execution` the target `pipelex.toml` already sets; a `pipelex.toml` that sets none, such as one written before the setting existed, runs on this machine, as the package default says, and stays there. Only a brand-new home, with no `pipelex.toml` yet, takes the hosted Pipelex API, writing `execution = "hosted"` and printing `pipelex login` instead of opening a browser.
+
+**A project can override the global choice.** A project's `.pipelex/pipelex.toml` wins over the one in `~/.pipelex/`, and the one `pipelex init --local` copies sets `execution = "local"`. When you set up the home configuration from inside a project whose own file sets the other value, `pipelex init` warns you, naming that file: runs started in that project execute where it says, until you change it there or pass `--hosted` or `--local` on a run.
 
 ## Non-Interactive Init (`pipelex-agent init`)
 
@@ -9996,6 +10142,8 @@ For automated or agent-driven setups, use the `pipelex-agent` CLI:
 ```bash
 pipelex-agent init [--config/-c JSON] [--global/-g]
 ```
+
+It never opens a browser: a hosted setup reads its key from `PIPELEX_API_KEY`, which a person gets with `pipelex login`.
 
 **Target directory:**
 
@@ -10006,6 +10154,7 @@ pipelex-agent init [--config/-c JSON] [--global/-g]
 
 ```json
 {
+  "execution": "local",
   "backends": ["openai", "anthropic"],
   "primary_backend": "openai"
 }
@@ -10015,8 +10164,11 @@ All fields are optional:
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `execution` | `"hosted"` or `"local"` | Where runs execute by default, written to `[run] execution`. `"hosted"` configures no backend or routing, leaves the kit's inference files as written, and cannot be combined with `backends` or `primary_backend`. `"local"`, or no `execution` at all, configures the backends below. |
 | `backends` | `list[str]` | Backend keys to enable (e.g. `openai`, `anthropic`, `openrouter`). Omit to keep the template's enabled backends and its routing profile, which sends each model to the first of them that serves it. |
 | `primary_backend` | `str` | Required when 2+ backends are named. Named without `backends`, it routes the template's backends to it first. |
+
+**Output:** `success`, `target_dir`, `config_files_copied` and `execution`. A local setup adds `backends_enabled` and `routing_profile`; a hosted one adds `api_key_set`, whether a Pipelex API key is set in `PIPELEX_API_KEY` or saved in `~/.pipelex/.env`, never the key itself. A `warnings` list is added when the project around the working directory sets another `[run] execution` in its own `.pipelex/pipelex.toml`, which wins over the one just written.
 
 Telemetry is not configured via `--config`: init seeds a `telemetry.toml` from a template (a global init writes an active one; a project init drops a commented-out one).
 
@@ -10028,14 +10180,91 @@ pipelex-agent init --config '{"backends": ["openai"]}'
 
 # Initialize globally with OpenAI, whose one key serves every default language-model and image-generation tier of the model deck
 pipelex-agent init -g --config '{"backends": ["openai"]}'
+
+# Run on the hosted Pipelex API by default, with the key in PIPELEX_API_KEY
+pipelex-agent init -g --config '{"execution": "hosted"}'
 ```
 
 ## Related Configuration
 
+- [Login](login.md)
+- [Run Configuration](../../configuration/config-practical/run-config.md)
 - [Configure AI Providers](../../get-started/configure-ai-providers.md)
 - [Inference Backend Configuration](../../configuration/config-technical/inference-backend-config.md)
 - [Telemetry Configuration](../../configuration/config-practical/telemetry-config.md)
 
+
+
+## Login
+
+# Login Command
+
+`pipelex login` gets a Pipelex API key (`plx_sk_…`) and saves it where a hosted run reads it, so `pipelex run … --hosted`, and every run when [`[run] execution = "hosted"`](../../configuration/config-practical/run-config.md), works with nothing exported in your shell.
+
+```bash
+pipelex login
+pipelex login --paste
+```
+
+[`pipelex init`](init.md) runs the same login when you choose to run on the hosted Pipelex API, so you only need this command to sign in on its own, to replace a key, or on a machine without a browser.
+
+## What It Does
+
+1. It opens the Pipelex app in your browser, on a page that creates a key for the command line, and prints the same link in case the browser does not open. When no browser can be opened at all, it says so at once: open the link in a browser on this machine, or press Ctrl-C and run `pipelex login --paste`. Sign in, or create an account, on that page.
+2. The app hands the new key back to `pipelex login`, which waits for it on a port of `127.0.0.1` it opened for this one login. It waits up to five minutes.
+3. It checks the key: the key must start with `plx_sk_`, and the hosted API must accept it, which it asks by reading the account the key belongs to.
+4. It saves the key as `PIPELEX_API_KEY` in `~/.pipelex/.env` (or in the `.env` of the directory `PIPELEX_HOME` names), the file Pipelex loads into its environment at startup.
+
+The key is never printed. The `.env` file is readable and writable by you only (mode `0600`), and every other line in it, your provider keys and comments included, is kept as it was. A `PIPELEX_API_KEY` already in the file is replaced.
+
+**The check decides what is saved:**
+
+- When the hosted API accepts the key, it is saved, and the command says which account it belongs to.
+- When the hosted API refuses it (HTTP 401 or 403), nothing is saved and the command exits with code `1`, naming the status.
+- When the key cannot be checked, because the hosted API cannot be reached or answers anything else, it is saved anyway, with a warning saying why it was not checked.
+- A value that does not start with `plx_sk_` is refused before any check.
+
+**A `.env` in the working directory wins.** Pipelex loads the `.env` of the directory a command runs in after `~/.pipelex/.env`, so a `PIPELEX_API_KEY` line there, even an empty one, is what commands run in that directory send. When that file sets another value than the key just saved, `pipelex login` names it, without printing either value: remove the line from it.
+
+**The handover is protected.** Each login sends the app a random `state` value along with the port, and the app sends it back with the key. A request to the port that does not carry this login's `state` is refused and its key discarded: any page open in your browser can send a request to a local port, so a key that arrives without it did not come from the page this login opened. The command says so in the terminal and keeps waiting.
+
+When no key arrives in time, the command exits with code `1` and names `pipelex login --paste`.
+
+## Paste a Key Instead
+
+```bash
+pipelex login --paste
+```
+
+On a machine where no browser can reach a local port, such as a remote server over SSH or a CI job, create a key in the Pipelex app on any machine, then paste it at the prompt. The key is not shown as you type. It goes through the same check and is saved the same way.
+
+In CI, you can also skip the file entirely and set `PIPELEX_API_KEY` as a secret of the job.
+
+## Other Apps and APIs
+
+| Variable | What it changes | Default |
+| --- | --- | --- |
+| `PIPELEX_APP_URL` | The Pipelex app the browser opens, given as an origin (`scheme://host[:port]`, no path) | `https://app.pipelex.com` |
+| `PIPELEX_BASE_URL` | The hosted API the key is checked against, and that hosted runs go to | `https://api.pipelex.com` |
+
+A value that is not an origin is refused before anything opens. Most people never set either; they point the command at a development or staging plane, for instance:
+
+```bash
+PIPELEX_APP_URL=https://app-dev.pipelex.com PIPELEX_BASE_URL=https://api-dev.pipelex.com pipelex login
+```
+
+Set them in `~/.pipelex/.env` to keep them for every command.
+
+## Exit Codes
+
+- `0`: a key was saved, checked or not.
+- `1`: nothing was saved: no key arrived in time, none was pasted, the value was not a Pipelex API key, the hosted API refused it, `PIPELEX_APP_URL` is not an origin, or the `.env` could not be written. In that last case the command names the file and the error; the key it received went unused, so revoke it in the Pipelex app and run `pipelex login` again once the file can be written.
+
+## Related
+
+- [Init](init.md): the first-run setup, which asks where your runs execute and runs this login for the hosted Pipelex API
+- [Running on the Hosted API](run.md#running-on-the-hosted-api): what a hosted run sends, uploads and saves
+- [Run Configuration](../../configuration/config-practical/run-config.md): the `[run] execution` default
 
 
 ## Update
@@ -10053,7 +10282,7 @@ When a new `pipelex` release ships changes to the model deck — new models, new
 
 ## When to run it
 
-Pipelex prints a one-line yellow advisory on most CLI invocations when it detects that the installed deck is older than the running package, or when no deck manifest is present yet (it is suppressed for `init`, `doctor`, `update`, `migrate`, and `which`):
+Pipelex prints a one-line yellow advisory on most CLI invocations when it detects that the installed deck is older than the running package, or when no deck manifest is present yet. It is suppressed for `init`, `doctor`, `update`, `migrate`, and `which`, and `pipelex run` prints it only for a run that executes on this machine, since a run on the hosted API reads no local deck:
 
 ```text
 ⚠ Pipelex model deck may be out of date — run pipelex update to refresh
@@ -10168,7 +10397,7 @@ Two directories, and only those:
 
 Within each, it looks at the configuration files themselves — `pipelex.toml` and its `pipelex_*.toml` tiers, `telemetry.toml` and its tiers — and at the inference backend definitions in `inference/backends/`.
 
-It goes one level deep, and only into a directory some configuration family owns. `inference/backends/` is such a directory, so every `*.toml` in it is repaired the same way a `pipelex.toml` is. `inference/deck/` is not one, and neither is `inference/backends.toml`, which sits beside the backends directory rather than in it — neither is ever entered or rewritten by this command, and the model deck has its own `pipelex update`.
+It goes one level deep, and only into a directory some configuration family owns. `inference/backends/` is such a directory, so every `*.toml` in it is repaired the same way a `pipelex.toml` is. `inference/deck/` is not one, and is never entered: the model deck has its own `pipelex update`. Neither is `inference/backends.toml`, which sits beside the backends directory rather than in it, nor `inference/routing_profiles.toml`: the one thing this command ever does to them is remove what a [former release](#a-configuration-a-former-release-set-up) left in them.
 
 Within a file it repairs, it only ever undoes a change *we* made. A key you added yourself — a misspelling, or a setting from a plugin — is reported rather than removed, because the migration history describes our renames and removals and has nothing to say about your keys.
 
@@ -10179,6 +10408,29 @@ Every file it changes is copied first, beside itself, as `<file>.bak.<UTC timest
 Those copies are ours, not part of your project, so the command keeps them out of your way: it writes a `.gitignore` inside the configuration directory itself, ignoring exactly the timestamped copies it makes. You will see the `.gitignore` — commit it, and your teammates get the same quiet. If you already have one there, it is left alone. You get it from any run that is allowed to write, including one that finds nothing to migrate — so a configuration directory that predates this picks the rule up on your next `pipelex migrate`, whether or not it has anything to carry forward. A `<file>.rescue.<timestamp>` copy is deliberately *not* ignored: one of those only exists because a write could not be vouched for, and seeing it is how you find out.
 
 Running it twice is the same as running it once. Nothing is skipped on the basis of a version record, because there is no version record; every run replays the whole history and leaves alone whatever is already current. A file that is already up to date comes back byte for byte identical.
+
+## A configuration a former release set up
+
+Releases up to v0.72 ran models through the Pipelex Gateway. It no longer exists, and the files those releases wrote still name it. Pipelex refuses to start on some of them, and says so with one error that names this command and [`pipelex init`](init.md#a-machine-a-former-release-set-up):
+
+- a `pipelex_gateway` backend left enabled in `inference/backends.toml`, or another backend still naming `model_specs_section`, whose model specs are no longer downloaded;
+- an active routing profile that sends models to it: `all_pipelex_gateway`, which those releases made the default, or a profile routing some models there.
+
+The cleanup of what those releases left is this command's first step, before any file is migrated. It reads the home directory and the project's together, the way Pipelex merges them when it starts, so a profile defined in one and made active from the other is cleaned up as one:
+
+- the `pipelex_gateway` table is removed from `inference/backends.toml` and its personal override, and a `model_specs_section` key from any other backend, which stays;
+- a routing profile whose default is the Gateway is removed, and so is a route that sends a model to it, from a profile that otherwise stays, a catch-all `"*"` route included;
+- when a profile of your own is only pointed at the Gateway by a personal override, only that `default` is removed from the override, so your profile and its routes stay as you wrote them;
+- an active routing profile that is removed, or left with nothing to route models by, is replaced in the files that name it, in either directory. In a base file it moves to `all_enabled_backends`, the profile a fresh install makes active, which routes each model to the first enabled backend that serves it; when the file does not define that profile, it is added as the current release ships it. A personal override that names it stops naming any, so the file read before it decides;
+- Pipelex starting outside any project and Pipelex starting in your project read some files in common, your home's override above all, and the cleanup plans its changes so that none of them switches the other to another routing profile or stops it from starting. When your project needs a different `active` from the one outside it, your project's personal override is given one of its own. That holds when every file can be written: the files are written one by one, so if one fails after others were written, the report names it, and until you make its change by hand Pipelex may start on another profile where that file is read;
+- `inference/backends/pipelex_gateway.toml`, the Gateway's model lists `inference/backends/pipelex_gateway_models*.md` and `pipelex_service.toml`, which recorded the Gateway's terms acceptance, are removed;
+- the paragraph of instructions about the Pipelex Gateway those releases wrote at the head of `routing_profiles.toml` goes with them; every other comment stays, including a note of yours that mentions the Gateway.
+
+Nothing else is touched: your other backends, your own profiles and routes, and your keys stay as they are. Pipelex Manifold, which those releases offered as a private beta, is not retired, so what they left for it — a `pipelex_manifold` table shipped disabled, `inference/backends/pipelex_manifold.toml` and the `all_pipelex_manifold` profile — stays too. Each file the cleanup rewrites or removes is copied first, exactly as a migrated file is (below), so a removed file is one rename away from being back. The dry run shows each change, file by file, and the question that follows counts the files of both steps. A file the cleanup removes is never also counted among the files to migrate, nor reported as needing a look.
+
+Some cases end with something for you to do, and the command exits non-zero for each. A file the cleanup cannot rewrite safely is left as it is, and the report says what to change by hand, then run the command again: a routing profiles file written as one inline `profiles = { … }` table, which the cleanup cannot add a profile to without restructuring it, and a file read both outside your project and in it whose `active` would have to change for one and not the other, when your project has no personal override to hold its own. And on every run, a dry run and a run with nothing left to clean included, the command reads the files Pipelex starts on as the cleanup leaves them: if they still stop it — an active routing profile that no file defines, for instance, left by a cleanup run from another project — it says so under **Pipelex cannot start** or **After the cleanup, Pipelex still cannot start** instead of reporting success or that there is nothing to do.
+
+`pipelex doctor` lists these files in its **Configuration Migrations** row and says when they stop Pipelex from starting, and `pipelex doctor --fix` runs the cleanup on a yes. When Pipelex would still not start once the cleanup has run, the row says so and recommends `pipelex migrate --dry-run`, which says why: that is left for you to fix, so `--fix` has nothing to write for it. Both judge that from the files Pipelex actually starts on in the current directory: a project with configuration files of its own is not told it cannot start because of what your home directory still carries, though the files are listed and the cleanup is offered. `pipelex init` finds them too, and offers the same cleanup before it asks anything else.
 
 ## When it cannot do the whole job
 
@@ -10204,7 +10456,9 @@ Nothing that Pipelex tells you about an out-of-date file will ever suggest delet
 
 ## For agents
 
-`pipelex-agent migrate` is the machine-facing counterpart. It writes only when passed `--yes`, since it cannot ask, and answers with a structured plan — `--format json` for the contract, `--format markdown` to read. Branch on the `needs_attention` field, never on the exit code.
+`pipelex-agent migrate` is the machine-facing counterpart. It writes only when passed `--yes`, since it cannot ask, and answers with a structured plan — `--format json` for the contract, `--format markdown` to read. Branch on the `needs_attention` field, never on the exit code. The cleanup of a former release is under `former_release`: each file it rewrites or removes, with its `action` (`rewrite` or `remove`), its `changes` in words, the `backup_path` once applied, and why it was left when it could not be cleaned (`needs_a_hand_edit` for an inline profiles table, a file both boots read that no change suits, or a change the cleanup cannot express, with what to change in `blocked_detail`). `former_release.still_blocking` lists what would still stop Pipelex from starting once the cleanup is done, one sentence each, on every run: after `--yes`, read off the files written, and in a dry run, off the files as they would be written; it is empty when the machine can start. Both count toward `needs_attention` and `is_clean` like the migration itself. The files the cleanup removes are never among the `plans`.
+
+An agent whose boot fails with `FormerReleaseConfigError` runs the same loop: `pipelex-agent migrate --dry-run --format json`, show the user what would be removed, then `--yes`.
 
 An agent usually meets this command through a failure rather than by choosing it. A configuration error carries a `migration` field when — and only when — a scan of the machine found something; its presence is the signal that the configuration is *old* rather than *wrong*. The loop from there is `pipelex-agent migrate --dry-run --format json`, show the user what would change, then `--yes` on confirmation. Never hand-edit a configuration file.
 
@@ -10504,6 +10758,8 @@ Runs a pipe by code from your project's pipe library.
 - `--dry-run` - Dry-run the pipeline without calling AI providers; no inference credentials are needed
 - `--mock-inputs` - Use mock inputs for the pipeline (requires `--dry-run`)
 - `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
+- `--hosted` / `--local` - Run on the hosted Pipelex API or on this machine. Defaults to `[run] execution` (see [Running on the Hosted API](#running-on-the-hosted-api)), else local
+- `--base-url` - The origin a hosted run calls, `scheme://host[:port]`. Overrides `PIPELEX_BASE_URL`, which overrides `https://api.pipelex.com`
 
 **Examples:**
 
@@ -10528,6 +10784,9 @@ pipelex run pipe my_pipe --dry-run
 
 # Run with custom library directories
 pipelex run pipe my_pipe -L ./pipelines -L ./shared_pipes
+
+# Run on the hosted Pipelex API, sending the library
+pipelex run pipe my_pipe -L ./pipelines --hosted --inputs data.json
 ```
 
 ## Run Bundle
@@ -10557,6 +10816,8 @@ Runs a pipeline from a bundle file (`.mthds`) or a pipeline directory. When a di
 - `--dry-run` - Dry-run the pipeline without calling AI providers; no inference credentials are needed
 - `--mock-inputs` - Use mock inputs for the pipeline (requires `--dry-run`)
 - `--library-dir`, `-L` - Directory to search for additional pipe definitions. Can be specified multiple times.
+- `--hosted` / `--local` - Run on the hosted Pipelex API or on this machine. Defaults to `[run] execution` (see [Running on the Hosted API](#running-on-the-hosted-api)), else local
+- `--base-url` - The origin a hosted run calls, `scheme://host[:port]`. Overrides `PIPELEX_BASE_URL`, which overrides `https://api.pipelex.com`
 
 **Examples:**
 
@@ -10575,6 +10836,9 @@ pipelex run bundle my_bundle.mthds --inputs invoice_data.json
 
 # Run with execution graph
 pipelex run bundle my_bundle.mthds --graph
+
+# Run on the hosted Pipelex API
+pipelex run bundle my_bundle.mthds --hosted
 ```
 
 ## Run Method
@@ -10587,7 +10851,7 @@ Runs a pipeline from an installed method package.
 
 **Arguments:**
 
-- `NAME` - The name of the installed method to run, a method address (`github.com/owner/repo[/name][@tag]`), or a GitHub URL — see [Run a Method by Address](run-by-address.md)
+- `NAME` - The name of the installed method to run, a method address (`github.com/owner/repo[/name][@tag]`), or a GitHub URL — see [Run a Method by Address](run-by-address.md). On a hosted run, also a stored method's catalog id (`mt_…`)
 
 **Options:**
 
@@ -10604,6 +10868,8 @@ Runs a pipeline from an installed method package.
 - `--dry-run` - Dry-run the pipeline without calling AI providers; no inference credentials are needed
 - `--mock-inputs` - Use mock inputs for the pipeline (requires `--dry-run`)
 - `--library-dir`, `-L` - Directory to search for additional pipe definitions. Can be specified multiple times.
+- `--hosted` / `--local` - Run on the hosted Pipelex API or on this machine. Defaults to `[run] execution` (see [Running on the Hosted API](#running-on-the-hosted-api)), else local
+- `--base-url` - The origin a hosted run calls, `scheme://host[:port]`. Overrides `PIPELEX_BASE_URL`, which overrides `https://api.pipelex.com`
 
 **Examples:**
 
@@ -10619,7 +10885,43 @@ pipelex run method invoice_extractor --inputs invoice_data.json
 
 # Run a method fetched by address from a public GitHub repository, pinned at a tag
 pipelex run method github.com/Pipelex/methods/documents@v0.1.0 --pipe extract_document_text
+
+# Run a published method on the hosted Pipelex API, which resolves the address itself
+pipelex run method github.com/Pipelex/methods/text_stats@v0.1.7 --hosted --inputs '{"text": "Hello world."}'
+
+# Run a method stored on the hosted platform, by its catalog id
+pipelex run method mt_abc123 --hosted --inputs data.json
 ```
+
+## Running on the Hosted API
+
+A run executes on this machine by default, with the inference backends configured in `.pipelex/inference/` and your own provider keys. It can execute on the hosted Pipelex API instead, which needs only a Pipelex API key: no provider key and no inference configuration on this machine, since a hosted run boots nothing locally.
+
+Where a run executes is decided in this order:
+
+1. `--hosted` or `--local` on the command.
+2. `[run] execution` in `.pipelex/pipelex.toml` (`"local"` or `"hosted"`; the project's file over the one in `~/.pipelex/`), which [`pipelex init`](init.md#where-your-runs-execute) writes from your answer, see [Run Configuration](../../configuration/config-practical/run-config.md).
+3. Local.
+
+The key is read from `PIPELEX_API_KEY`, exported in your shell or saved in `~/.pipelex/.env` (or a `.env` in the working directory), which Pipelex loads at startup. [`pipelex login`](login.md) gets a key through your browser and saves it there. The run goes to `--base-url` when given, else to `PIPELEX_BASE_URL`, else to `https://api.pipelex.com`. Either value must be an origin, `scheme://host[:port]` with `http` or `https` and no path such as `/v1`; anything else is refused before a request is sent, naming the setting it came from. A self-hosted Pipelex API server is reached the same way, by pointing the base URL at it. Every request a hosted run sends names its client in its `User-Agent` as `pipelex-cli/<version>`, followed by the versions of the pipelex-sdk and mthds clients it runs on, so the hosted API counts it as a CLI run; the header carries no key and nothing that identifies you.
+
+**What a hosted run sends** is what a local run would load:
+
+- `run bundle` sends the bundle, then every `.mthds` file of its library directories (the bundle's own directory for `run bundle <dir>`, then `-L`; for a bundle file with no `-L`, `PIPELEXPATH`), each once. Without `--pipe`, the bundle's `main_pipe` is read from the bundle here, as a local run reads it.
+- `run pipe` sends every `.mthds` file of its library directories: the installed method exporting the pipe and `-L`, else `PIPELEXPATH`. With none of them, the run is refused and asks for `-L`.
+- `run method` sends an installed or local method's files. A published address goes as a reference and a catalog id (`mt_…`) as an id, both resolved by the hosted API: nothing is fetched or read locally, `-L` is refused with them, and a relative `--inputs` path resolves against the working directory rather than the method's. A method installed under a name spelled like a catalog id, such as `mt_reports`, is that installed method, not an id.
+
+**Local files in the inputs** are uploaded before the run. A path at a document or image input (compact, as `"invoice.pdf"`, or as the `url` of a document or image object, in a list or nested in a structure) is uploaded, and the run receives its storage URI instead. A relative path written in an inputs file resolves against that file's directory, as on a local run, and a `file://` URI is read as the path it names. A text that reads like a file name at any other input is left as text, `http(s)://` URLs, whatever the case of the scheme, are passed through for the hosted API to fetch, and an explicit `null`, such as an optional image left out, reaches the run as `null`.
+
+The method's signature, which says where a file sits, is read from the hosted API only when some value of the inputs, at any depth, names an existing file on this machine (from the inputs file's directory or the working directory). Inputs naming none go straight to the run. When the signature is read, a method that does not load is refused there, before any run starts, with validation errors that name the file each fault is in. A method that calls another method by its address (`github.com/…`) cannot have its signature read yet, so a local file cannot be uploaded for it: the run is refused before it starts, and the file has to be given as an `https://` URL instead. The same method runs with inputs that name no local file.
+
+**What it saves** goes where a local run saves its outputs, in `<output-dir>/<pipe>_output_NN/`: `main_stuff.json` (and `main_stuff.md` when the main output is text), `working_memory.json`, and `graphspec.json` when the hosted API returned the run's graph, which [`pipelex graph render`](../../features/execution-graph.md) turns into a viewer. The run id is printed as soon as the hosted API acknowledges the run, as `Run <id> started on the hosted API`, and again with the recap.
+
+**When you interrupt it** with Ctrl-C, the command stops waiting, but a run the hosted API acknowledged keeps going and is paid for: the command prints its run id, so you can look it up on app.pipelex.com, and exits with `130`. Interrupted before the acknowledgement, it says that a run may have started if the request had reached the hosted API, and to check the run history before running again.
+
+**What it refuses**: `--dry-run`, `--mock-inputs`, `--mock-usage`, `--orchestrator`, `--save-csv`, `--costs` / `--no-costs` and `--graph-full-data` / `--graph-no-data` steer this machine's runtime, which a hosted run never boots, so each is refused with a message pointing at `--local`. `--base-url` on a run that executes locally is refused too.
+
+**When it fails**, the message gives the hosted API's reason and a next step: the one the server advised when it gave one, else one that follows the status (a refused key points at `PIPELEX_API_KEY` and `pipelex login`, an unknown method or route at the method's address and the base URL, a rate limit says to wait). A bundle the hosted API refuses lists its validation errors, and so does a run that started and failed on them. Once the hosted API has acknowledged the run, the failure also prints the run id: a run that failed, one that outlived the wait, one that completed without a main output, and one whose result could not be read, because the network or the hosted API failed while the run was being followed. That last one may still be running and is paid for, so look it up by its id on app.pipelex.com rather than running the command again. A connection lost after the request that runs the method was sent is not reported as a network failure either: the hosted API may have created the run before the connection failed, and its id never arrived, so check the run history before running again. Only a failure before the request left this machine, a connection that could not be made, points at the network and the base URL. A server that keeps no runs to poll, such as a self-hosted runner, is run on the blocking route, and when the connection is cut before its result comes back, the run may still be going there: running the command again runs the method again, so raise the timeout of the proxy in front of that server, or point the base URL at a server that keeps runs. The exit code is `1`.
 
 ## Input File Formats
 
@@ -10751,6 +11053,14 @@ The pipe to run defaults to the manifest's `main_pipe`; `--pipe <code>` override
 ## Where outputs land
 
 The fetched clone is temporary: it lives in a system temp directory and is deleted when the CLI process exits. Default outputs therefore anchor in **your current working directory** — `pipelex run method <ref>` writes into `./results/`, and the `pipelex build` method commands write their generated files there too, so nothing you produced disappears with the clone. An explicit `--output-dir` / `--output` is honored verbatim. For an installed method or a local path, defaults stay inside the method's own directory, as before.
+
+## Running by address on the hosted API
+
+With `--hosted` (or `[run] execution = "hosted"`), `pipelex run method <ref>` fetches nothing: the address goes to the hosted Pipelex API as a method reference, and the hosted runner locates and fetches the package itself, under the same grammar and the same manifest-identity rule. The entry pipe is still the manifest's `main_pipe` unless `--pipe` names another, outputs still land in `./results/` under your working directory, and a relative `--inputs` path resolves against the working directory, since there is no local clone to anchor it to. `-L` is refused, because the hosted API loads no local library alongside an address. See [Running on the Hosted API](run.md#running-on-the-hosted-api).
+
+```bash
+pipelex run method github.com/Pipelex/methods/text_stats@v0.1.7 --hosted --inputs '{"text": "Hello world."}'
+```
 
 ## Python in fetched methods: the hosted rule
 
@@ -11583,10 +11893,12 @@ It ships in the same `cli` extra as the main CLI, `uv tool install "pipelex[cli]
 
 | Option | Description |
 |--------|-------------|
-| `--runner` | Select the runner backend to use (`pipelex` or `api`) |
 | `--version` | Print the version handshake — the runtime version, the MTHDS Protocol version and the MTHDS standard version — and exit. Same three lines as `pipelex --version`; see the [CLI reference](index.md#the-version-handshake) |
 
 There is no `--log-level` flag: `pipelex-agent` is machine-consumed, so logging is cut off process-wide by design.
+
+!!! warning "`--runner api` is gone"
+    The global `--runner pipelex|api` option and its MTHDS API runner path are removed. Where a run executes is now a `run` subcommand option, `--runner local|hosted`, and the hosted value runs on the hosted Pipelex API through pipelex-sdk, with the key in `PIPELEX_API_KEY` rather than `MTHDS_API_KEY`. A self-hosted runner is reached with `--runner hosted --base-url <origin>`. To target an arbitrary MTHDS runner, use the vendor-neutral `mthds-agent` CLI.
 
 ## Commands Overview
 
@@ -11612,8 +11924,17 @@ pipelex-agent run method <NAME> [OPTIONS]
 - `--with-memory` - Include full working memory in output, each stuff naming its concept by ref (`"concept": "<domain>.<Code>"`); piped back into another `run` on stdin, the envelope's stuffs become that run's inputs, provided the receiving method declares the same `<domain>.<Code>` — the ref carries its domain, and a method declaring another one refuses it rather than guessing
 - `--format` - Success output format: `markdown` (default) or `json`
 - `--error-format` - Error output format: `markdown` or `json` (defaults to `--format`'s value)
+- `--runner local|hosted` - Where the run executes: on this machine, or on the hosted Pipelex API. Defaults to `[run] execution` in `.pipelex/pipelex.toml` (see [Run Configuration](../../configuration/config-practical/run-config.md)), else `local`
+- `--hosted` / `--local` - The same choice as `--runner`, spelled as the main CLI spells it. Given together, they must agree
+- `--base-url <scheme://host[:port]>` - The origin a hosted run calls. Overrides `PIPELEX_BASE_URL`, which overrides `https://api.pipelex.com`; refused on a run that executes locally
 
 For `bundle` and `method`, use `--pipe` to target a specific pipe.
+
+#### Running on the hosted API
+
+With `--runner hosted` (or `--hosted`, or `[run] execution = "hosted"`), the run executes on the hosted Pipelex API and nothing local is booted: no provider key or inference configuration is needed on this machine, only a Pipelex API key in `PIPELEX_API_KEY` (in the shell, or in `~/.pipelex/.env`). What the run sends is what a local run would load. `run bundle` sends the bundle, then every `.mthds` file of its library directories. `run pipe` sends its library directories' files (the installed method exporting the pipe and `-L`, else `PIPELEXPATH`) and is refused when it has none. `run method` sends an installed or local method's files, but a published address (`github.com/owner/repo[/name][@tag]`) goes as a `method_ref` and a stored method's catalog id (`mt_…`) as a `method_id`, both resolved by the hosted API, so nothing is fetched or read locally and `-L` is refused with them. A local file named at a document or image input is uploaded first (a relative path in an inputs file resolves against that file's directory, and a `file://` URI is read as its path), and the run's inputs carry its storage URI; an explicit `null`, such as an optional image left out, reaches the run as `null`. The method's signature is read only when some value of the inputs names an existing file on this machine, so inputs naming none go straight to the run, a method calling another one by its address included. Such a method cannot have a local file uploaded yet: give the file as an `https://` URL. `run bundle` on a bundle file with no `-L` sends `PIPELEXPATH`'s files too, as a local run loads them, and `run method` takes a method installed under a name spelled like a catalog id (`mt_reports`) as that method. `--dry-run` and `--mock-inputs` are refused on a hosted run. Its requests name their client in the `User-Agent` as `pipelex-cli/<version>`, as `pipelex run --hosted` does, so the hosted API counts them as CLI runs.
+
+The success envelope has the shape of a local run's. Compact, it is the main output's content. With `--with-memory`, `main_stuff.json` is that content (the hosted API renders no Markdown, so the markdown output shows the JSON), `working_memory` is the whole working memory, `pipeline_run_id` names the run on the hosted API, and `uploads` lists the files uploaded for it. A hosted run writes nothing to disk.
 
 A run refuses an invalid bundle while loading it, before any pipe runs, with exit code `1` and an error envelope whose `error_type` is `ValidateBundleError` and whose `validation_errors` array holds the items `validate` gives for that bundle, each with its pipe, its field and its suggested fix when it has one. A refusal found while loading a library directory you pass with `-L` (or the bundle's own directory) is reported the same way, its items naming their file in `source`; a bundle file run on its own is loaded from its text, so the items of a refusal found while loading it carry no `source`, while a bundle that does not parse when `run bundle` looks for its `main_pipe` (no `--pipe`) names its file. In markdown, the items render as the same grouped prose `validate` prints.
 
@@ -11718,11 +12039,12 @@ These commands do not have subcommands:
 
 | Command | Description |
 |---------|-------------|
+| `init` | Initialize configuration non-interactively from `--config`: `execution` (`hosted` or `local`), `backends`, `primary_backend`; see [Non-Interactive Init](init.md#non-interactive-init-pipelex-agent-init) (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
 | `fmt` | Format a `.mthds`/`.toml`/`.plx` file in-place (delegates to `plxt`) |
 | `lint` | Lint a `.mthds`/`.toml`/`.plx` file for errors (delegates to `plxt`) |
 | `models` | List available model presets, aliases, and waterfalls (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
 | `check-model` | Check a model reference for a model category (`check-model <reference> --type <category>`, the category being `llm`, `extract`, `img_gen`, `search`, `judgment` or `doc_gen`) and suggest alternatives when it is not valid. It applies the rule a validation applies, as [`GET /v1/models/check`](../../api-server/models.md#check-a-model-reference) does: a sigiled reference names that kind of binding, and a bare name is valid when it is a model of the category, an alias of the category, or a waterfall of the category while model fallback is on; a `handle:` reference writes a bare name without reading a sigil, so `handle:@best-gpt` is the bare name `@best-gpt`, not the alias `best-gpt`. `--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value |
-| `doctor` | Check config, credentials, and model health (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
+| `doctor` | Check config, credentials, and model health; a hosted setup (`[run] execution = "hosted"`) is judged by its Pipelex API key, reported in `checks.pipelex_api_key`, with `execution` at the top level and the provider credentials and models rows marked `informational` (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
 
 ## Output Contract
 
@@ -11761,13 +12083,17 @@ For the structured commands, exactly one such object is written to stderr per fa
 
 **A failed run** (`run pipe`, `run bundle`, `run method`) reports `"error_type": "PipelineExecutionError"` and adds four fields: `pipe_code` and `pipe_stack` name the pipe that failed and its path from the entry pipe, and `cause_type` and `cause_message` give the class and own message of the root fault, the innermost Pipelex error behind the failure. The `message` is that root fault's message prefixed with the failing pipe and its path (`Pipe 'summarize' failed (two_steps → summarize): …`), and the classification fields are the root fault's, so branch on `cause_type` to tell, say, a model that is not available from a failure to combine a parallel's results.
 
-**A run the API runner refuses** (`--runner api`, when the runner answers `/v1/execute` with a non-2xx status) reports what the runner's problem document says, in the same envelope and the same markdown. `error_type` is the runner's error class: `ValidateBundleError` for a bundle refused before any pipe ran, as a local run reports it, or the root fault of a run that failed, such as `ModelNotFoundError` or `StuffFactoryError`, which a local run reports as `cause_type` under the `error_type` `PipelineExecutionError`. There is no `cause_type` on this path, so a consumer of a refused API run branches on `error_type`, which is `ApiResponseError` when the answer names no class, as a gateway's error page does not. The `message` quotes the request, the status and the runner's reason (`API POST /v1/execute failed (422): Pipe 'condense_article' failed (digest_article → condense_article): …`), so on a failed run it names the failing pipe and its path. The `hint` is the runner's next step; `error_domain`, `error_category` and `retryable` are the runner's own; `validation_errors` holds the runner's items whole, rendered in markdown as the same grouped prose `validate` prints; `pipe_code` and `pipe_stack` appear when the problem document carries them; `error_code` is the problem's `code`, the stable code a hosted plane gives the refusals it authors itself (`rate_limited`, `unauthorized`); `retry_after_seconds` is the delay of a `Retry-After` header; and `http_status` and `request_id` are what to quote when the fault is the runner's. When the answer advised no next step, the `hint` follows its status, never the local advice kept for the runner's class: a 401 or a 403 points at the API key; a 404 points at `MTHDS_BASE_URL`, which must be the runner's origin with no path such as `/v1`; a 429 says to wait and run again and marks the error `retryable` unless the answer said otherwise; a 503 says to wait too but warns that running again can repeat a paid run, because the service in front of the runner can answer it after the run completed, so it is `retryable` only when the answer says so; any other 4xx says to change what the message names; and any other status says to report the `request_id`, or the `http_status` when there is none. The API runner takes its key and its origin from `MTHDS_API_KEY` and `MTHDS_BASE_URL` (or `mthds config set api-key` and `base-url`), and a missing one is a `ClientAuthenticationError`.
+**A run the hosted API refuses** (`--runner hosted`, when the hosted API answers with a non-2xx status) reports what its problem document says, in the same envelope and the same markdown. `error_type` is the runner's error class: `ValidateBundleError` for a bundle refused before any pipe ran, as a local run reports it, or the root fault of a run that failed, such as `ModelNotFoundError` or `StuffFactoryError`, which a local run reports as `cause_type` under the `error_type` `PipelineExecutionError`. There is no `cause_type` on this path, so a consumer of a refused hosted run branches on `error_type`, which is `ApiResponseError` when the answer names no class, as a gateway's error page does not. The `message` quotes the request, the status and the runner's reason (`API POST /v1/start failed (422): Pipe 'condense_article' failed (digest_article → condense_article): …`), so on a failed run it names the failing pipe and its path. The `hint` is the runner's next step; `error_domain`, `error_category` and `retryable` are the runner's own; `validation_errors` holds the runner's items, rendered in markdown as the same grouped prose `validate` prints; `pipe_code` and `pipe_stack` appear when the problem document carries them; `error_code` is the problem's `code`, the stable code the hosted plane gives the refusals it authors itself (`rate_limited`, `unauthorized`); `retry_after_seconds` is the delay of a `Retry-After` header; and `http_status` and `request_id` are what to quote when the fault is the runner's. When the answer advised no next step, the `hint` follows its status, never the local advice kept for the runner's class: a 401 or a 403 points at `PIPELEX_API_KEY` and `pipelex login`; a 404 points at the method's address or id and at the origin (`--base-url`, else `PIPELEX_BASE_URL`, else `https://api.pipelex.com`, with no path such as `/v1`); a 429 says to wait and run again and marks the error `retryable` unless the answer said otherwise; a 503 says to wait too but warns that running again can repeat a paid run, because the service in front of the runner can answer it after the run completed, so it is `retryable` only when the answer says so; any other 4xx says to change what the message names; and any other status says to report the `request_id`, or the `http_status` when there is none.
+
+**A hosted run that started and failed** reports its stored error report: `error_type` is the runner's class, `message` says the run's final status and reason, `hint` is the runner's next step, `error_domain`, `error_category`, `retryable`, `model`, `provider` and `validation_errors` are the report's when it carries them, and `pipeline_run_id` and `run_status` name the run. `retryable` is the runner's verdict whenever it gave one, `false` included, never the local default for its class. **A hosted run that failed on the way** carries its own class as `error_type`, with a next step for each: `ApiUnreachableError` (the network or the origin, `"error_domain": "config"`, only for a failure before the run request left this machine), `HostedRunOutcomeUnknownError` (the connection failed after the run request was sent, so a run may exist with no id returned: check the run history before running again), `RunTimeoutError` (the run keeps going on the hosted API past the wait), `PipelineExecuteTimeoutError` (a server that keeps no runs cut the blocking route before the result came back; the run may still be going, so it is `"retryable": false` and its hint points at the proxy's timeout or a base URL that keeps runs), `MissingMainStuffError` (the run completed and delivered no main output), `HostedRunPollingError` (the run started, then reading its result failed; it may still be running and is paid for, so look it up rather than run again), `HostedMethodInvalidError` (the method does not load, refused before any run starts when the inputs name a local file, its `validation_errors` naming each faulty file in `source`), `HostedLocalFileUploadUnavailableError` (the inputs name a local file and the method calls another one by its address: give the file as an `https://` URL), `InvalidLocalSourceError` (a local file in the inputs cannot be read), `UploadTransportError` (`config` when the upload never reached the hosted API, `runtime` when the hosted API failed it), `UploadAuthenticationError`, `RejectedAssetError` and the other upload failures, and `HostedBaseUrlError` for a base URL that is not an origin, refused before anything is sent. Every failure met once the hosted API acknowledged the run carries its `pipeline_run_id`. **An interrupted hosted run** (Ctrl-C) exits with `130` and the envelope `HostedRunInterruptedError`, whose `pipeline_run_id` names the run the hosted API had acknowledged: the run keeps going and is paid for. Interrupted before the acknowledgement, the envelope has no `pipeline_run_id` and its hint says to check the run history before running again. A configuration that cannot be read while deciding where the run executes gives the hint a failed local boot gives, and any other failure still leaves as this envelope, with the exception's class as `error_type`.
 
 **`migration`** — a configuration error (`"error_domain": "config"`) carries an extra `migration` object when, and only when, a scan of this machine's configuration directories found something. Its presence says the migration history has something to report about these files; **`would_write` says whether a command repairs them.** The object holds `remedy` (the command that fixes what can be fixed), `would_write` (whether running it would rewrite any of these files), `needs_attention` (whether something there is a person's decision rather than the tool's), and `plans` — one per file, in the same shape [`pipelex-agent migrate`](migrate.md) emits under its own `plans` key. On `would_write: true` the loop is `pipelex-agent migrate --dry-run --format json`, show the user what would change, then `--yes`. On `would_write: false` there is nothing to run: the plans carry a path no ledger entry explains, or an entry blocked before anything applied, and the command would visit the files, write nothing and leave the same error standing — so read the plans and correct what they name. Never answer either one by re-initializing a configuration file — that discards every setting the migration would have kept.
 
 `TelemetryConfigValidationError` carries it too, on the same terms: absent means the `telemetry.toml` is wrong and the fields the message names are what to correct, present with `would_write: true` means it is old, and present with `would_write: false` means it is both reported on and unrepairable by the command.
 
-**A failure is not the only way to learn this, and for an agent it is not even the reliable one.** A configuration the migration history explains boots with a warning rather than an error — and `pipelex-agent` silences logging process-wide before anything can emit one, so no error arrives and the machine is still stale. `pipelex-agent doctor` is the channel that always answers: its `checks.pending_migrations` row carries a `finding` (`up_to_date`, `pending`, `needs_attention`, `unavailable`), the `migratable_files` a migration would rewrite, and the `attention_files` it will not repair on its own. Branch on `finding`; `unavailable` means the check could not run and is not a claim that the machine is current. The row answers for both configuration directories even under `--global`, because it describes `pipelex migrate`, which has no such flag.
+**`FormerReleaseConfigError`** — a boot on a configuration set up by a release that ran on the Pipelex Gateway, with its backend enabled or one of its routing profiles active, is refused with this error, which names what stops it with its file and carries no `migration` object: what is there is no stale shape but what that release left. The loop is the same, `pipelex-agent migrate --dry-run --format json`, whose `former_release` key lists each file the cleanup rewrites or removes and its changes, show the user, then `--yes`. On every run, `former_release.still_blocking` lists, one sentence each, whatever would still stop the boot once the cleanup is done: after `--yes`, read off the files written, and in a dry run, off the files as they would be written, so the plan already says when the cleanup alone will not be enough. When it is not empty, `needs_attention` is true and `is_clean` false, even with no file left to clean, and the machine is not fixed yet.
+
+**A failure is not the only way to learn this, and for an agent it is not even the reliable one.** A configuration the migration history explains boots with a warning rather than an error — and `pipelex-agent` silences logging process-wide before anything can emit one, so no error arrives and the machine is still stale. `pipelex-agent doctor` is the channel that always answers: its `checks.pending_migrations` row carries a `finding` (`up_to_date`, `pending`, `needs_attention`, `unavailable`), the `migratable_files` a migration would rewrite, the `attention_files` it will not repair on its own, and the `former_release_files` its first step cleans up, with `former_release_blocks_boot` saying whether they stop this machine's boot, read off the files the boot merges in the current directory rather than off each directory alone. When the cleanup's own check finds that a boot would still not start once it has run, the row says so in its `message` and `recommended_actions` names `pipelex migrate --dry-run`, which says why; with nothing left to clean its `finding` is `needs_attention`, and that action is the row's only one. Branch on `finding`; `unavailable` means the check could not run and is not a claim that the machine is current. The row answers for both configuration directories even under `--global`, because it describes `pipelex migrate`, which has no such flag.
 
 `fmt` and `lint` are raw passthroughs to the `plxt` binary and bypass the JSON output contract, producing native `plxt` output instead.
 
@@ -11812,7 +12138,9 @@ The global layer lives in `~/.pipelex/` unless the `PIPELEX_HOME` environment va
 export PIPELEX_HOME=/path/to/ci/pipelex-home
 ```
 
-Everything that reads or writes the global layer follows it: its `pipelex.toml` and override files, the inference files and their personal overrides, the credentials in its `.env`, the telemetry configuration, `pipelex init`, `pipelex doctor`, `pipelex update`, `pipelex migrate`, and the agent CLI's `--global` flag. The first boot fills the directory from the kit's templates when it does not exist or is empty, as it does for `~/.pipelex/`, so a fresh `mktemp -d` or an empty volume mount works as it is; a directory with anything in it is left alone. A `~` is expanded, a relative path resolves against the working directory at the moment Pipelex is imported, and an empty value counts as unset.
+Everything that reads or writes the global layer follows it: its `pipelex.toml` and override files, the inference files and their personal overrides, the credentials in its `.env`, the telemetry configuration, `pipelex init`, `pipelex doctor`, `pipelex update`, `pipelex migrate`, and the agent CLI's `--global` flag. A `~` is expanded, a relative path resolves against the working directory at the moment Pipelex is imported, and an empty value counts as unset.
+
+Every boot fills the directory from the kit's templates, as it does `~/.pipelex/`: it creates the directory when it does not exist and copies in each kit file the directory lacks, never overwriting a file that is there or writing through a symbolic link, and leaving a link or a file that stands where the kit has a directory alone with everything under it. Each file is written whole or not at all, so a copy cut short leaves nothing half-written. A fresh `mktemp -d`, an empty volume mount, or a directory holding only a `.env` or a personal override therefore works as it is, and a directory that already holds every kit file is not written at all. The inference files are the one exception: they are copied as a whole, and only when the directory has no `inference/backends.toml`, so a directory with an inference setup of its own keeps it exactly as it is, and `pipelex init` or `pipelex update` is what changes it; `backends.toml` is written last, so a fill cut short part-way is completed by the next boot. A directory Pipelex cannot write to, such as a read-only mount, is read as it is.
 
 It is meant for any process that should not share the machine's settings: a test run or a CI job that commits a configuration of its own, a container, or a checkout that must not read the developer's personal backends. A project's own `.pipelex/` keeps winning over it, exactly as it wins over `~/.pipelex/`.
 
@@ -11842,12 +12170,13 @@ In addition to the base `pipelex.toml`, Pipelex applies override files from **in
 
 ## Configuration Structure
 
-The configuration is organized into four main sections, which mirror the layers of the runtime:
+The configuration is organized into five main sections. The first three mirror the layers of the runtime:
 
 1. `[runtime]` - process-scoped infrastructure: storage, secrets, logging, cloud credentials, outbound network posture, reporting, tracing, observation, and the plugin denylist
 2. `[inference]` - the model-calling seam: the model deck, LLM, image generation, extraction, the default templating style, and dry-run mocks
 3. `[interpreter]` - library-scoped method machinery: MTHDS parsing, pipe runs, pipe functions, pipeline execution, source scanning, and the builder
-4. `[kit]` - settings for the `pipelex-dev` kit tooling
+4. `[run]` - where `pipelex run` and `pipelex-agent run` execute a method by default: on this machine or on the hosted Pipelex API, see [Run Configuration](config-practical/run-config.md)
+5. `[kit]` - settings for the `pipelex-dev` kit tooling
 
 Each section contains multiple subsections for specific features and functionalities. A setting's address tells you which layer owns it: `[runtime.*]` applies to any process, whatever it loads; `[interpreter.*]` only means something once a method is loaded.
 
@@ -12540,6 +12869,57 @@ cost_report_unit_scale = 1000.0
 
 - [Cost Tracking](../../features/cost-tracking.md) - Track and monitor AI usage costs
 - [Reporting Delegate Injection](../../advanced/reporting-delegate-injection.md) - Customize reporting behavior with dependency injection
+
+
+## Run
+
+# Run Configuration
+
+The `[run]` section says where `pipelex run` and `pipelex-agent run` execute a method when the command does not say.
+
+## Configuration Options
+
+```python
+class RunExecution(StrEnum):
+    LOCAL = "local"
+    HOSTED = "hosted"
+
+
+class RunConfig(ConfigModel):
+    execution: RunExecution
+```
+
+### Fields
+
+- `execution`: where a run executes when the command passes neither `--hosted` nor `--local` (nor `--runner` on the agent CLI).
+    - `"local"` (the default) runs on this machine, with the inference backends configured in `.pipelex/inference/` and your own provider keys.
+    - `"hosted"` runs on the hosted Pipelex API, with the Pipelex API key in `PIPELEX_API_KEY`, at the origin in `PIPELEX_BASE_URL` (`https://api.pipelex.com` when unset). Nothing is booted locally, so no provider key or inference configuration is needed on this machine.
+
+A flag on the command always wins: with `execution = "hosted"`, `pipelex run … --local` still runs on this machine, and with `"local"`, `--hosted` sends that one run to the hosted API.
+
+[`pipelex init`](../../tools/cli/init.md#where-your-runs-execute) writes this setting from your answer to "Where should your runs execute?", and `pipelex-agent init` from the `execution` of its `--config`.
+
+## Example Configuration
+
+```toml
+[run]
+execution = "hosted"
+```
+
+Put it in your project's `.pipelex/pipelex.toml` to make hosted runs the default for one project, or in `~/.pipelex/pipelex.toml` for every project on the machine; the project's file wins over the global one.
+
+## The Key and the Origin
+
+A hosted run reads its key and its origin from the environment, never from this file:
+
+- `PIPELEX_API_KEY` holds the Pipelex API key (`plx_sk_…`). [`pipelex login`](../../tools/cli/login.md) gets one through your browser and saves it in `~/.pipelex/.env`, which Pipelex loads at startup; you can also export it in your shell.
+- `PIPELEX_BASE_URL` overrides the origin, for a staging plane or a self-hosted Pipelex API server. `--base-url` on the command overrides it in turn. Either must be `scheme://host[:port]`, with no path such as `/v1`.
+
+## Related Documentation
+
+- [Running on the Hosted API](../../tools/cli/run.md#running-on-the-hosted-api) — What a hosted run sends, uploads, saves and refuses
+- [Running on the Hosted API from Python](../../building-methods/pipes/running-on-the-hosted-api.md) — The pipelex-sdk client, the hosted half of the Python API
+- [Agent CLI](../../tools/cli/agent-cli.md) — `pipelex-agent run --runner local|hosted`
 
 
 ## Telemetry
@@ -13306,6 +13686,8 @@ A variable may stand only in a value that a call sends: `api_key`, `endpoint` an
 
 An enabled backend must declare at least one model in its file under `backends/` (see [Model Specifications](#model-specifications)). Pipelex refuses to boot when one declares none, because routing would send models to a backend that cannot serve them: disable the backend, or list the models it serves. The `internal` backend is exempt, since plugins add its models at boot. A backend table also no longer accepts a `model_specs_section` key; an enabled backend that still carries one is refused, and the fix is to list its models in `backends/<name>.toml` and remove the key, or to disable the backend.
 
+The `pipelex_gateway` backend that releases up to v0.72 shipped is gone. A configuration those releases set up, with it enabled, a routing profile such as `all_pipelex_gateway` active, or a `model_specs_section` key left behind, is refused with one error naming [`pipelex migrate`](../../tools/cli/migrate.md#a-configuration-a-former-release-set-up), which removes what they left, keeps a copy of each file it changes, and makes `all_enabled_backends` the active profile. The `pipelex_manifold` backend is not retired: what those releases left for it, a table they shipped disabled, its file under `backends/` and the `all_pipelex_manifold` profile, stays as it is.
+
 Judgment models are served by their own backend alone, so the default routing profile sends them to their own backend through an optional route (`"jev-*" = "typesafe"`), which applies only while that backend is enabled. With a `TYPESAFE_API_KEY` set, `@default-judgment` works under the default profile with no routing edit.
 
 ### Model Specifications
@@ -13368,7 +13750,7 @@ costs = { input = 0.1, output = 0 }
 
 The table name `acme-one-judgment` names the table and nothing else: methods, the model deck and the routing profiles all use the handle `acme-one`, and the model id defaults to the handle too. Two tables may share a handle only when their model types differ, so a file declaring one handle twice as the same type fails to load, naming both tables. `handle` cannot go in `[defaults]`, which every model of the file inherits, and like every key that describes the model rather than a value a call sends, it cannot reference a variable.
 
-A routing profile routes a handle's name, so its route applies to every kind of model of that name. A model type the routed backend does not serve is looked for along the profile's `fallback_order`, or in the internal backend when it has none, when the name reached that backend by default, is left out when it reached it through a wildcard pattern, and is not served at all when the profile routes the name to that backend exactly: an exact route pins the name to one backend.
+A routing profile routes a handle's name, so its route applies to every kind of model of that name. A model type the routed backend does not serve is looked for along the profile's `fallback_order`, or in the internal backend when it has none, when the name reached that backend by default, is left out when it reached it through a wildcard pattern, and is not served at all when the profile routes the name to that backend exactly: an exact route pins the name to one backend. A name the profile sends to no enabled backend, because no route matches it and neither its `default` nor any backend of its `fallback_order` is enabled, is served by the internal backend for each model type that backend declares under it, and by no other backend.
 
 A method whose pipe names a handle the deck serves only as another kind of model is refused when it loads: a `PipeJudge` naming a handle served only as an LLM is told that the deck serves the handle, but not as a judgment model, and the suggestions list judgment models only.
 
@@ -13558,7 +13940,9 @@ Common scenarios for hybrid routing:
 
 The **internal backend** is a special backend containing software-only models that run locally without requiring AI services. These include models for PDF text extraction, local document parsing, and other processing tasks that don't need external API calls.
 
-Unlike other backends, internal backend models are **always available** regardless of which routing profile you select. This means you can use these models even when your routing profile is focused on a specific AI provider (e.g., `all_anthropic` or `all_openai`).
+Unlike other backends, internal backend models are **always available** regardless of which routing profile you select. This means you can use these models even when your routing profile is focused on a specific AI provider (e.g., `all_anthropic` or `all_openai`), and even when no backend your profile routes to is enabled: with the internal backend alone enabled, the shipped `all_enabled_backends` profile still serves every internal model.
+
+Two things withhold an internal model. A route that sends its name to another backend on purpose, whether an exact route or a wildcard pattern that catches it, decides where that name goes, as it does for any model. Disabling the internal backend turns off all of its models, including the ones a plugin adds.
 
 This behavior is automatic and requires no additional configuration. To see which models are available from the internal backend, check `.pipelex/inference/backends/internal.toml`.
 
@@ -19168,7 +19552,7 @@ Glob patterns use `fnmatch` syntax:
 
 # Init CLI Flows
 
-`pipelex init` sets up the `.pipelex/` configuration directory. It handles four independent concerns — config files, inference backends, routing profiles, and telemetry — through a focus-based dispatch system. Each concern owns its own file-copying and customization logic, so they can be run together or individually without interference.
+`pipelex init` sets up the `.pipelex/` configuration directory and decides where runs execute: on the hosted Pipelex API, with a Pipelex API key, or on this machine, with the user's own provider keys. It handles four independent concerns — config files, inference backends, routing profiles, and telemetry — through a focus-based dispatch system, in three stages: inspect, choose, execute. Each concern owns its own file-copying and customization logic, so they can be run together or individually without interference.
 
 ---
 
@@ -19189,9 +19573,9 @@ These two categories are managed by separate steps. `init_config()` copies only 
 
 | Command | Focus | What It Does |
 |---------|-------|--------------|
-| `pipelex init` | `all` | Full setup: config + inference + routing + telemetry |
-| `pipelex init config` | `config` | Copy config templates, then trigger inference if first-time |
-| `pipelex init inference` | `inference` | Interactive backend selection + routing |
+| `pipelex init` | `all` | Full setup: config, where runs execute, then inference + routing + credentials (this machine) or sign-in (hosted), then telemetry |
+| `pipelex init config` | `config` | Copy config templates, then ask where runs execute and set it up if first-time |
+| `pipelex init inference` | `inference` | Interactive backend selection + routing for runs on this machine; never asks where runs execute |
 | `pipelex init routing` | `routing` | Routing profile customization only |
 | `pipelex init telemetry` | `telemetry` | Telemetry config template copy |
 | `pipelex init credentials` | `credentials` | Credential setup for enabled backends |
@@ -19201,21 +19585,21 @@ All commands except `credentials` perform a **full reset** (overwrite existing f
 ### Inputs
 
 - **`focus`** (`InitFocus` enum): Determines which steps run. Derived from the CLI subcommand.
-- **`skip_confirmation`** (`bool`): When `True`, skips the interactive confirmation prompt. Used when called from `pipelex doctor --fix`.
+- **`skip_confirmation`** (`bool`): When `True`, asks nothing: skips the confirmation, keeps the `[run] execution` the target already sets (local for a `pipelex.toml` that sets none), takes the hosted Pipelex API only for a brand-new home with no `pipelex.toml`, and prints `pipelex login` instead of opening a browser. Used when called from `pipelex doctor --fix`.
 - **`local`** (`bool`): When `True`, targets the project-level `.pipelex/` directory instead of the global `~/.pipelex/`. Maps to the `--local` CLI flag.
 
 ### Outputs / Side Effects
 
 | Artifact | Produced By | Target Dir | Path |
 |----------|-------------|------------|------|
-| `pipelex.toml` | `init_config()` | Project or global | `.pipelex/pipelex.toml` |
+| `pipelex.toml` | `init_config()`, then the setup path writes `[run] execution` | Project or global | `.pipelex/pipelex.toml` |
 | `plxt.toml` | `init_config()` | Project or global | `.pipelex/plxt.toml` |
 | `backends.toml` | Inference step | Project or global | `.pipelex/inference/backends.toml` |
 | `backends/*.toml` | Inference step | Project or global | `.pipelex/inference/backends/` |
 | `deck/*.toml` | Inference step | Project or global | `.pipelex/inference/deck/` |
 | `routing_profiles.toml` | Inference step | Project or global | `.pipelex/inference/routing_profiles.toml` |
 | `telemetry.toml` | Telemetry step | Project or global | `.pipelex/telemetry.toml` |
-| `.env` | Credentials step | **Always global** | `~/.pipelex/.env`, or `.env` under `PIPELEX_HOME` (mode 0600) |
+| `.env` | Credentials step, or the sign-in (`PIPELEX_API_KEY`) | **Always global** | `~/.pipelex/.env`, or `.env` under `PIPELEX_HOME` (mode 0600) |
 
 !!! info "Project vs global"
     Most files are written to the target directory chosen at init time (project `.pipelex/` or global `~/.pipelex/`). The exception is `.env` (credentials), which is **always** written to and read from the global directory. Wherever this page says `~/.pipelex/`, the `PIPELEX_HOME` environment variable relocates it ([Configuration](../configuration/index.md#the-home-configuration-directory-pipelex_home)).
@@ -19223,6 +19607,24 @@ All commands except `credentials` perform a **full reset** (overwrite existing f
 ---
 
 ## Architecture
+
+### Three Stages
+
+`init_cmd()` runs every focus but `credentials` through three functions:
+
+1. **Inspect** — `inspect_initialization(focus=, local=)` resolves the target directory, reads what is on disk and returns an `InitInspection`: which steps are needed, whether this run asks where runs execute (`asks_setup_path`), the `[run] execution` the target `pipelex.toml` sets now (`configured_execution`), and what a former release left (`former_release_findings` and `former_release_boot_blockers`, see below). It asks nothing and writes nothing.
+2. **Choose** — `choose_initialization(console=, inspection=, skip_confirmation=)` first offers the cleanup of what a former release left, when the inspection found any and `skip_confirmation` is false. Then it shows the confirmation panel, then, when `asks_setup_path`, the question `prompt_setup_path()` asks. It returns an `InitChoices`: the `SetupPath` (`HOSTED` or `LOCAL`, `None` when this run does not decide it) and whether anyone answers prompts.
+3. **Execute** — `execute_initialization(console=, inspection=, choices=)` writes the files and runs the steps the choices call for.
+
+`asks_setup_path` is true when the run sets up inference and its focus is `all` or `config`: the full setup always, and a configuration reset only on a first setup. `inference` configures this machine's backends on purpose and never asks.
+
+### A Former Release's Configuration
+
+A machine set up by a release that ran models through the Pipelex Gateway still carries what that took: its backend table, routing profiles that send models to it, its per-backend file and model lists, `model_specs_section` keys and `pipelex_service.toml`. What those releases left for Pipelex Manifold, which is not retired, stays as it is. The boot refuses such a machine with `FormerReleaseConfigError`, naming `pipelex migrate` and `pipelex init`.
+
+The inspect stage runs `detect_former_release_across()` (`pipelex/migration/former_release.py`) over the configuration directories a boot reads (`config_manager.existing_config_dirs`, the home's then the project's, kept in `former_release_config_dirs`), reading them together as the boot merges them, and keeps the directories with findings in `former_release_findings`. Whether what they hold stops this machine's boot is a separate reading, `former_release_boot_blockers()` over `config_manager.backends_file_paths()` and `routing_profiles_file_paths()`, the files the boot itself merges, kept in `former_release_boot_blockers`: a project booting on bases of its own is not told it cannot start because of the home's, and a profile one directory activates from the other is not missed. The choose stage then calls `offer_former_release_cleanup()`, before the confirmation: it shows a panel naming what stops the boot, when anything does, and the files it is in, asks "Clean it up now?" (default yes), and on a yes runs `apply_former_release_cleanup()` over `former_release_config_dirs`, the write pass of `pipelex migrate`'s first step, with the same copies kept. When that pass leaves a file for a hand edit, or its check after writing finds that the boot still cannot start, init says so and the setup goes on. A no leaves the files as they are and the setup goes on, with "Pipelex will not start until then" added only when `former_release_boot_blockers` is not empty. Under `skip_confirmation` (`pipelex doctor --fix`) the offer is skipped and the cleanup never runs: nobody is there to answer, and the doctor asks about the cleanup in its own migrations row.
+
+The cleanup is needed even though a full reset rewrites the target's `backends.toml` and `routing_profiles.toml`: the reset copies the kit's backend files over the target's but removes none, so the retired backend files, the model lists and `pipelex_service.toml` would stay, and so would everything in the other directory and in the personal overrides.
 
 ### Overall Flow
 
@@ -19233,34 +19635,40 @@ flowchart TD
     FOCUS -- credentials --> CREDS_DIRECT["prompt_credentials<br/>Prompt for missing API keys"]
     CREDS_DIRECT --> DONE
 
-    FOCUS -- "all / config / inference / routing / telemetry" --> NEEDS[determine_needs]
-    NEEDS --> CONFIRM{User confirms?}
+    FOCUS -- "all / config / inference / routing / telemetry" --> INSPECT["inspect_initialization<br/>determine_needs, first-time detection,<br/>current run execution, former release"]
+    INSPECT --> FORMER{"former release found<br/>and someone to answer?"}
+    FORMER -- Yes --> CLEANUP["offer_former_release_cleanup<br/>clean up on yes"]
+    FORMER -- No --> SKIP
+    CLEANUP --> SKIP{skip_confirmation?}
+    SKIP -- "Yes (doctor --fix)" --> DEFAULT["Setup path: the configured one, local for a<br/>pipelex.toml without it, hosted for a new home<br/>(when the run asks it)"]
+    SKIP -- No --> CONFIRM{User confirms?}
     CONFIRM -- No --> CANCEL([Cancelled])
-    CONFIRM -- Yes --> EXEC[execute_initialization]
+    CONFIRM -- Yes --> ASKS{asks_setup_path?}
+    ASKS -- Yes --> QUESTION["prompt_setup_path<br/>1 hosted (Enter) / 2 this machine"]
+    ASKS -- No --> EXEC
+    QUESTION --> EXEC
+    DEFAULT --> EXEC[execute_initialization]
 
     EXEC --> S1{needs_config?}
-    S1 -- Yes --> INITCFG["init_config()<br/>Copies non-inference files"]
-    INITCFG --> DETECT{backends.toml<br/>existed before?}
-    DETECT -- "No (first time)" --> FORCE_INF[Force needs_inference = True]
-    DETECT -- Yes --> CHK_INF{check_inference<br/>in focus?}
-    CHK_INF -- Yes --> FORCE_INF
-    CHK_INF -- No --> S2
-
+    S1 -- Yes --> INITCFG["init_config()<br/>Copies non-inference files<br/>(writes back a kept run execution)"]
     S1 -- No --> S2
-
-    FORCE_INF --> S2
+    INITCFG --> S2
 
     S2{needs_inference?}
     S2 -- Yes --> COPY_INF["Copy inference templates<br/>(backends, deck, routing)"]
-    COPY_INF --> CUST_BE[customize_backends_config<br/>Interactive backend selection]
+    COPY_INF --> PATH{setup path?}
+    PATH -- hosted --> HOSTED["Write execution = hosted<br/>Suggest IDE extension"]
+    PATH -- "local / none" --> CUST_BE[customize_backends_config<br/>Interactive backend selection]
     CUST_BE --> CHK_RT{check_routing?}
     CHK_RT -- "No (auto-route)" --> CUST_RT[customize_routing_profile<br/>Auto-routing based on selection]
-    CUST_RT --> S25
-    CHK_RT -- "Yes (focus=routing)" --> S25
+    CHK_RT -- "Yes (focus=routing)" --> LOCAL_SET
+    CUST_RT --> LOCAL_SET["Write execution = local<br/>(when the run asked)"]
+    HOSTED --> S25
+    LOCAL_SET --> S25
 
     S2 -- No --> S25
 
-    S25{check_credentials?}
+    S25{check_credentials<br/>and not hosted?}
     S25 -- Yes --> CREDS["prompt_credentials<br/>Prompt for missing API keys"]
     S25 -- No --> S3
     CREDS --> S3
@@ -19273,9 +19681,13 @@ flowchart TD
 
     S4{needs_telemetry?}
     S4 -- Yes --> TELEM[setup_telemetry<br/>Copy telemetry template]
-    S4 -- No --> DONE2([Done])
+    S4 -- No --> S5
+    TELEM --> S5
 
-    TELEM --> DONE2
+    S5{setup path hosted?}
+    S5 -- Yes --> KEY["ensure_pipelex_api_key<br/>key set: keep it / interactive: pipelex login /<br/>doctor --fix: print pipelex login"]
+    S5 -- No --> DONE2([Done])
+    KEY --> DONE2
 ```
 
 ---
@@ -19284,7 +19696,7 @@ flowchart TD
 
 ### Determine Needs
 
-`determine_needs()` evaluates the current state of `.pipelex/` to decide which steps are required:
+`determine_needs()`, called by the inspect stage, evaluates the current state of `.pipelex/` to decide which steps are required:
 
 ```python
 nb_missing_config_files = init_config(reset=False, dry_run=True) if check_config else 0
@@ -19307,6 +19719,29 @@ The `check_*` flags are derived from the `focus` parameter:
 !!! info "Routing is separate from inference"
     `check_routing` is only `True` for `focus=routing`. When `focus=all`, routing is handled automatically as part of the inference step (Step 2), not as a standalone step.
 
+### First-Time Inference Detection
+
+`init_config()` never copies `inference/`, so a configuration reset on a directory with no `inference/backends.toml` is a first setup. The inspect stage sets up inference too in that case, whatever the focus:
+
+```python
+if needs_config and is_first_time_backends_setup:
+    needs_inference = True
+```
+
+| Condition | Meaning | Action |
+|-----------|---------|--------|
+| `needs_config` and no `backends.toml` | First-time setup (no inference yet) | Force the inference step, and ask where runs execute |
+| `check_inference` | Inference in focus | Re-run inference (reset) |
+
+### Where Runs Execute
+
+`pipelex/cli/commands/init/setup_path.py` holds the choice: `SetupPath` (`HOSTED`, `LOCAL`), `DEFAULT_SETUP_PATH` (hosted, the answer Enter takes, and the one `doctor --fix` takes for a brand-new home with no `pipelex.toml`; otherwise `InitInspection.unattended_setup_path` keeps the configured `[run] execution`, and local for a `pipelex.toml` that sets none), and the tomlkit edit of `[run] execution`, `write_run_execution()` and `read_run_execution()`, which keep every other line of `pipelex.toml`, comments included. The question itself is `prompt_setup_path()` in `ui/setup_path_ui.py`.
+
+- **Hosted** writes `execution = "hosted"` in Step 2 and reconfigures nothing after the reset, so the inference files are the kit's defaults, any customised backends and routing included, until `pipelex init inference` reconfigures them; it skips the credentials step, and, once every file is written (Step 5), calls `ensure_pipelex_api_key()`: a key already in `PIPELEX_API_KEY` or saved in the home `.env` is kept with no login and no network call; otherwise an interactive run calls `login_with_browser()` from `pipelex/cli/commands/login/` (see [`pipelex login`](../tools/cli/login.md)), and a run with nobody to answer prints `pipelex login`. An `OSError` in that step, such as a loopback listener that cannot bind, is reported as a saved setup with no key, naming `pipelex login` and `pipelex login --paste`, since every file is already written.
+- **Local** runs the backend and routing steps unchanged, writes `execution = "local"`, and runs the credentials step.
+
+A configuration reset that does not ask the question (`pipelex init config` on an existing setup) copies the kit's `pipelex.toml`, whose `execution` is `"local"`, so the execute stage writes back the `configured_execution` the inspection read, and skips the credentials step when that is `"hosted"`.
+
 ### Step 1: Config Step — `init_config()`
 
 Copies the config template tree from `kit/configs/` to `.pipelex/`, with two skip mechanisms:
@@ -19327,26 +19762,6 @@ if os.path.isdir(src_item):
     # recurse...
 ```
 
-### First-Time Inference Detection
-
-After `init_config()` runs, `execute_initialization` decides whether inference setup is needed — even if inference was not in the original focus:
-
-```python
-backends_existed_before = path_exists(backends_toml_path)
-init_config(reset=reset)
-backends_exists_now = path_exists(backends_toml_path)
-
-if not backends_existed_before or (check_inference and backends_exists_now):
-    needs_inference = True
-```
-
-This handles two scenarios:
-
-| Condition | Meaning | Action |
-|-----------|---------|--------|
-| `not backends_existed_before` | First-time setup (no inference yet) | Force inference step regardless of focus |
-| `check_inference and backends_exists_now` | Inference in focus + existing config | Re-run inference (reset) |
-
 ### Step 2: Inference Step
 
 When `needs_inference` is `True` and `reset` is `True`, the inference step copies its own template files independently:
@@ -19356,16 +19771,17 @@ When `needs_inference` is `True` and `reset` is `True`, the inference step copie
 3. `deck/*.toml` — model deck configurations
 4. `routing_profiles.toml` — routing profile definitions
 
-Then runs interactive customization:
+A reset therefore puts customised backends and routing back to the kit's defaults, which the confirmation panel says. Then, on the hosted path, it writes `execution = "hosted"` and offers the IDE extension, customizing nothing, so the defaults stay until `pipelex init inference`. On the local path, or when the run does not decide where runs execute (`focus=inference`), it runs interactive customization:
 
 1. `customize_backends_config()` — prompts user to select backends and suggests IDE extension installation via `suggest_extension_install_if_needed()`
 2. `customize_routing_profile()` — auto-configures routing based on selected backends (**only when `check_routing` is `False`**, i.e. when routing is not the specific focus)
+3. On the local path, `execution = "local"` is written
 
 When `focus=routing`, the inference step skips routing entirely because Step 3 handles it as a standalone operation.
 
 ### Step 2.5: Credentials Step
 
-When `check_credentials` is `True` (for `focus` in `all`, `config`, `inference`), `prompt_credentials()` checks which backends are enabled and prompts the user for any missing API keys. Credentials are stored in `~/.pipelex/.env` with mode 0600.
+When `check_credentials` is `True` (for `focus` in `all`, `config`, `inference`) and runs do not execute on the hosted Pipelex API, `prompt_credentials()` checks which backends are enabled and prompts the user for any missing API keys. Credentials are stored in `~/.pipelex/.env` with mode 0600.
 
 ### Step 3: Routing Step
 
@@ -19380,16 +19796,23 @@ Copies a telemetry template and prints instructions. No interactive prompts. Whi
 
 `setup_telemetry()` selects the template via a `for_project: bool` arg passed down from the `--local` flag on `pipelex init`.
 
+### Step 5: Pipelex API Key
+
+On the hosted path only, `ensure_pipelex_api_key()` runs last, so every file is written before a sign-in that can take minutes. A login that saves nothing leaves the setup as written and names `pipelex login`.
+
 ---
 
 ## Scenario Matrix
 
 | Scenario | Focus | Config Step | Inference Step | Credentials | Routing Step | Telemetry Step |
 |----------|-------|:-----------:|:--------------:|:-----------:|:------------:|:--------------:|
-| Fresh project, full init | `all` | Copies config files | Copies templates + interactive selection | Prompted | Auto (part of inference) | Copies template |
-| Fresh project, config only | `config` | Copies config files | Forced (first-time detected) | Prompted | Auto (part of inference) | Skipped |
-| Existing project, full re-init | `all` | Overwrites config files | Resets templates + interactive selection | Prompted | Auto (part of inference) | Overwrites template |
-| Existing project, config only | `config` | Overwrites config files | Skipped (backends already exist) | Prompted | Skipped | Skipped |
+| Fresh project, full init, hosted | `all` | Copies config files | Copies templates, writes `execution = "hosted"` | Skipped (sign-in instead) | Skipped | Copies template |
+| Fresh project, full init, this machine | `all` | Copies config files | Copies templates + interactive selection, writes `execution = "local"` | Prompted | Auto (part of inference) | Copies template |
+| Fresh project, config only | `config` | Copies config files | Forced (first-time detected), asks where runs execute | Prompted on this machine | Auto on this machine | Skipped |
+| `doctor --fix`, brand-new home, no `pipelex.toml` | `config` | Copies config files | Forced, hosted taken without asking | Skipped (prints `pipelex login`) | Skipped | Skipped |
+| `doctor --fix`, no `backends.toml`, `pipelex.toml` present | `config` | Copies config files | Forced, the configured setting kept without asking, local when it sets none | Prompted on this machine | Auto on this machine | Skipped |
+| Existing project, full re-init | `all` | Overwrites config files | Resets templates, asks where runs execute again | Prompted on this machine | Auto on this machine | Overwrites template |
+| Existing project, config only | `config` | Overwrites config files, keeps `[run] execution` | Skipped (backends already exist) | Prompted unless hosted | Skipped | Skipped |
 | Existing project, inference only | `inference` | Skipped | Resets templates + interactive selection | Prompted | Auto (part of inference) | Skipped |
 | Existing project, routing only | `routing` | Skipped | Skipped | Skipped | Resets template + interactive selection | Skipped |
 | Existing project, credentials only | `credentials` | Skipped | Skipped | Prompted | Skipped | Skipped |
@@ -19425,12 +19848,17 @@ Copies a telemetry template and prints instructions. No interactive prompts. Whi
 
 | Module | Purpose |
 |--------|---------|
-| `pipelex/cli/commands/init/command.py` | Orchestration: `init_cmd()`, `execute_initialization()`, `determine_needs()` |
+| `pipelex/cli/commands/init/command.py` | Orchestration: `init_cmd()`, the three stages `inspect_initialization()`, `choose_initialization()`, `execute_initialization()`, `determine_needs()`, and `offer_former_release_cleanup()` |
+| `pipelex/migration/former_release.py`, `pipelex/migration/former_release_cleanup.py` | What a former release left: `detect_former_release_across()`, the boot's verdict `former_release_boot_blockers()`, and the cleanup `clean_former_release()` that `pipelex migrate` runs first, with its check after writing, `what_stops_the_boot()` |
+| `pipelex/cli/commands/init/setup_path.py` | Where runs execute: `SetupPath`, `write_run_execution()`, `read_run_execution()`, `ensure_pipelex_api_key()` |
+| `pipelex/cli/commands/init/ui/setup_path_ui.py` | The question: `prompt_setup_path()` |
+| `pipelex/cli/commands/login/` | `pipelex login`: the loopback listener, the key store, `login_with_browser()` and `login_with_paste()` |
 | `pipelex/cli/commands/init/config_files.py` | Config file copying: `init_config()`, skip lists |
+| `pipelex/kit/template_copy.py` | The kit template walk `init_config()` shares with the first-boot fill, `copy_kit_templates()`, and the atomic writes `copy_file_atomically()` and `write_text_atomically()` |
 | `pipelex/cli/commands/init/backends.py` | Backend customization: `customize_backends_config()`, `get_selected_backend_keys()` |
 | `pipelex/cli/commands/init/routing.py` | Routing customization: `customize_routing_profile()` |
 | `pipelex/cli/commands/init/telemetry.py` | Telemetry setup: `setup_telemetry()` |
-| `pipelex/cli/commands/init/credentials.py` | Credential prompting: `prompt_credentials()`, `write_env_file()`, `read_env_file()` |
+| `pipelex/cli/commands/init/credentials.py` | Credential prompting: `prompt_credentials()`, `write_env_file()`, `read_env_file()`, and the single-entry `set_env_file_entry()` the sign-in saves its key with |
 | `pipelex/cli/commands/init/ide_extension.py` | IDE extension suggestion: `suggest_extension_install_if_needed()` |
 | `pipelex/cli/commands/init/ui/types.py` | `InitFocus` enum definition |
 
@@ -19479,7 +19907,13 @@ This means a project-level file **wins** over the global one, but only if it act
 
 ### Global Config Bootstrap
 
-`ensure_global_config_exists()` creates the home configuration directory (`~/.pipelex/`, or `PIPELEX_HOME`) with kit template files on first use, and fills it the same way when it exists but is empty (called automatically during `load_config()`). It skips all `GIT_IGNORED_CONFIG_FILES` (files like `pipelex_override.toml`) and `.DS_Store` — these are never part of the bootstrap copy.
+`ensure_global_config_exists()`, called automatically during `load_config()`, lays the kit's template files into the home configuration directory (`~/.pipelex/`, or `PIPELEX_HOME`) wherever they are missing. It creates the directory when it does not exist and copies each kit file the directory lacks, never overwriting one it holds, so a home holding only a retired `pipelex_service.toml`, a `.env` or a personal override boots like a fresh one, and a home holding every kit file is not written at all. A file counts as there when anything stands at its path, a symbolic link included even when its target is gone, and nothing is ever written through a link: where the kit has a directory, a link standing in its place, valid or dangling, or a regular file, is left alone with everything under it, the manifests included. Each file is written under a temporary name beside its destination and renamed into place, so it appears whole or not at all and a copy cut off mid-write leaves no truncated file for later boots to keep. It skips all `GIT_IGNORED_CONFIG_FILES` (files like `pipelex_override.toml`, and `.DS_Store`), which are never part of the bootstrap copy.
+
+The `inference/` directory is one unit, as the inference step of `pipelex init` treats it. It is filled only when `inference/backends.toml` is absent, the same signal `pipelex init` reads as a first-time backend setup, and the deck and backends kit manifests are then stamped for each area that has none; the kit's own `.kit_manifest.json` files are never copied. Because `backends.toml` is that signal, it is written last, after every other inference file and the manifests: a fill cut short part-way, by a full disk or a killed process, leaves it absent, and the next boot completes the fill instead of taking a half-copied directory for a complete one. A home with a `backends.toml` of its own keeps its inference directory exactly as it is, because kit routing profiles, deck or backend files copied beside it could route to, or alias the models of, backends it disables.
+
+A home the process cannot write to, such as a read-only mount or a directory another user owns, is read as it is, and the boot then reports whatever configuration is missing. Any other error that stops a copy is raised.
+
+The copy is `copy_kit_templates()` in `pipelex/kit/template_copy.py`, the same walk `init_config()` copies the configuration files with, so the bootstrap and `pipelex init config` agree on which files a directory receives. Both write each file with `copy_file_atomically()`, which is also how the bootstrap writes `backends.toml`, and the kit manifests are written the same way, through `write_text_atomically()` in the same module, so a manifest cut short leaves no truncated `.kit_manifest.json` for the next boot to keep. The two differ on what already stands at a destination. The bootstrap copies without overwriting, so it keeps every file there and never follows a link. `init_config()` copies with `overwrite=reset`, and every `pipelex init` or `pipelex init config` run passes `reset=True`, as `pipelex-agent init` does, because configuration updates are not supported and there is no flag that keeps the existing files; only the dry run that counts missing files for `pipelex init` and `pipelex doctor` passes `reset=False`, and it writes nothing. Overwriting follows a link as a plain copy does, so the template lands at a linked file's target, written beside it and renamed into place, and the link survives. A configuration file linked from a dotfiles repository, as chezmoi, stow or yadm lay them out, therefore stays linked through a reset.
 
 ### Config Loading Chain
 
@@ -19494,7 +19928,7 @@ This means a project-level file **wins** over the global one, but only if it act
 
 ## Agent CLI Init
 
-`pipelex-agent init` is the non-interactive counterpart to `pipelex init`. It runs the same steps but takes all inputs from a JSON config argument instead of interactive prompts.
+`pipelex-agent init` is the non-interactive counterpart to `pipelex init`. It runs the same steps but takes all inputs from a JSON config argument instead of interactive prompts, and never signs in: a hosted setup reads its key from `PIPELEX_API_KEY`.
 
 **Source:** `pipelex/cli/agent_cli/commands/init_cmd.py`
 
@@ -19515,6 +19949,7 @@ If no project root is found and `--global` is not set, the command fails with an
 
 | Field | Type | Purpose |
 |-------|------|---------|
+| `execution` | `"hosted"` or `"local"` | Written to `[run] execution`. `"hosted"` skips the backend and routing steps and refuses `backends` and `primary_backend`; absent means `"local"` |
 | `backends` | `list[str]` | Backend keys to enable (e.g. `"openai"`, `"anthropic"`, `"openrouter"`). Omitted, the template's enabled set and its routing profile are kept |
 | `primary_backend` | `str` | Required when 2+ backends are named. Named without `backends`, it routes the template's enabled set to it first |
 
@@ -19527,9 +19962,13 @@ flowchart TD
     RESOLVE --> STEP1["Step 1: init_config()<br/>Copy config templates (skips inference/)"]
     STEP1 --> STEP15["Step 1.5: Copy inference templates<br/>(backends.toml, backends/*, deck/*, routing_profiles.toml)"]
     STEP15 --> STEP16["Step 1.6: Copy telemetry template<br/>(global: active defaults; project: commented-out)"]
-    STEP16 --> STEP2["Step 2: Configure backends<br/>Enable requested backends in backends.toml"]
+    STEP16 --> STEP17["Step 1.7: Write [run] execution"]
+    STEP17 --> EXECUTION{execution?}
+    EXECUTION -- hosted --> HOSTED_OUT["Report execution and api_key_set"]
+    EXECUTION -- "local (or absent)" --> STEP2["Step 2: Configure backends<br/>Enable requested backends in backends.toml"]
     STEP2 --> STEP3["Step 3: Configure routing<br/>Auto-derive routing profile<br/>(the template's, when the config names neither field)"]
     STEP3 --> OUTPUT["Output result<br/>(Markdown, or JSON via --format json)"]
+    HOSTED_OUT --> OUTPUT
 ```
 
 !!! note "No credentials step"
@@ -19542,6 +19981,8 @@ flowchart TD
 | Prompts | Interactive (Rich prompts) | None — all input from `--config` JSON |
 | Output | Rich console output | Markdown by default (`agent_success_formatted()` / `agent_error()`), structured JSON via `--format json` |
 | Credentials | Prompted interactively | Not configured — use `pipelex-agent doctor` or `pipelex init credentials` |
+| Where runs execute | Asked, hosted by default | `execution` in `--config`, local by default |
+| Pipelex API key | `pipelex login` through the browser, unless one is set | Read from `PIPELEX_API_KEY`; reported as `api_key_set` |
 | Focus dispatch | Supports individual focus (`config`, `inference`, etc.) | Runs config, inference, routing, telemetry (no credentials) |
 | Target dir default | Global (`~/.pipelex/`), use `--local` for project | Project (`{project_root}/.pipelex/`), use `--global` for global |
 
@@ -19550,6 +19991,10 @@ flowchart TD
 ## Doctor Fix: Config Dir Handling
 
 `pipelex doctor` and `pipelex doctor --fix` use the config directory resolution to find and fix configuration issues wherever they live.
+
+### Where Runs Execute
+
+Once the configuration files are healthy, `resolve_doctor_run_execution()` reads the effective `[run] execution`, local when the configuration does not load. A hosted run boots nothing on this machine, so under `"hosted"` the backend credentials and models rows, which load this machine's backends, are shown as information, needed only for `--local` runs: they count toward neither the overall status nor the exit code, and no provider key is asked for. A Pipelex API Key row counts instead: `check_pipelex_api_key_set()` finds the key where a run reads it, `PIPELEX_API_KEY` and then the home `.env`, healthy when it is set and starts with `plx_sk_`, otherwise naming `pipelex login`. It makes no network call and never prints the key. `pipelex-agent doctor` reports the same: `execution` at the top level, `checks.pipelex_api_key` with a `finding` of `set`, `not_a_pipelex_key` or `missing`, and `informational: true` on the two rows it does not count.
 
 **Source:** `pipelex/cli/commands/doctor_cmd.py`
 
@@ -19563,7 +20008,7 @@ flowchart TD
 | `check_backend_files()` | `resolve_config_file()` for `inference/backends/`, `backends_file_paths()` for the enabled-backend list | Finds `inference/backends/` wherever it lives, and reads the merged backends document to decide which backends to probe |
 | `check_pending_migrations()` | none | **Both directories, always** — see below |
 
-`check_pending_migrations()` is the one check that takes no `config_dir` at all, and that is deliberate. Every other row reports on a *file* and is scoped to the directory the doctor was pointed at, `--global` included. That one reports on a *command* — it is `pipelex migrate`'s own dry run — and `pipelex migrate` has no `--global`: it walks the global `~/.pipelex/` and the project `.pipelex/` both. Scoping the row narrower would name a command that then rewrites a file the row never mentioned. Every file it reports is named with its full path, so the wider scope stays legible.
+`check_pending_migrations()` is the one check that takes no `config_dir` at all, and that is deliberate. It also reports the command's first step, the cleanup of what a former release left: `former_release_files` names the files the cleanup would rewrite or remove, and `former_release_blocks_boot` says whether what they hold stops this machine's boot, read by `former_release_boot_blockers()` over `config_manager.backends_file_paths()` and `routing_profiles_file_paths()` inside the row's own error handling, so a failure reading them leaves the row unchecked rather than escaping. The dry run of the replay leaves out the files the cleanup removes, as `pipelex migrate` does. While what a former release left stops the boot, `check_models()` does not load anything: the boot would stop on that before any backend, so the row says so and names `pipelex migrate` rather than quoting whichever refusal about one backend or one profile it would meet first. `check_backend_credentials()` skips a retired backend's table, since its key is no remedy. Every other row reports on a *file* and is scoped to the directory the doctor was pointed at, `--global` included. That one reports on a *command* — it is `pipelex migrate`'s own dry run — and `pipelex migrate` has no `--global`: it walks the global `~/.pipelex/` and the project `.pipelex/` both. Scoping the row narrower would name a command that then rewrites a file the row never mentioned. Every file it reports is named with its full path, so the wider scope stays legible.
 
 `check_backend_files()` loads the backend library once per enabled backend, and loads it without resolving credentials (`CredentialResolution.SKIP`, the keyless boot's mode). The row reports on file shape — an unknown key, a spec that is not a table, a missing per-backend file — so a backend's credentials are the Credentials row's finding, not this one's. Resolving them here would report an enabled backend whose key is not set yet as a backend-configuration error, and because the loader stops at the first backend it cannot load, a malformed file listed after that backend in `backends.toml` would go unreported. Skipping credentials skips nothing else: every enabled backend is loaded, a malformed file stays fatal, and so do the refusals of an enabled backend that declares no model or still carries `model_specs_section`. Every probe sees that same first failure, so a failure is charged to the backend the error declares (`backend_name`, stamped by the loader on every error about one backend) or, for an error that declares none, to the backend whose file it names — never to a backend whose name merely appears in the message's prose. `check_models()` attributes the same way and for the same reason: its own load resolves credentials, which the probe's does not, so it can be the first thing to name a broken backend, and it writes into the very reports this row produced.
 
@@ -19580,7 +20025,7 @@ replace_backend_file(backend_name, config_dir=resolved_config_dir)
 
 This ensures the fix targets the same directory where the issue was found — if the broken file was in the project `.pipelex/`, the replacement goes there too, not to `~/.pipelex/`.
 
-The migration fix is the exception that follows from the row above it: it calls `apply_pending_migrations(config_dirs=config_directories_to_migrate())` and so writes to both directories, because that is what the command it is running does. It calls that helper rather than `migrate_cmd` itself — the command exits the process when a run leaves something for a person, which would cut off the doctor's remaining fixes, its remaining rows and its own exit code.
+The migration fix is the exception that follows from the row above it: it calls `apply_former_release_cleanup()` first when the row lists files a former release left, then `apply_pending_migrations(config_dirs=config_directories_to_migrate(), skipped_paths=...)` with the files the cleanup removed left out, and so writes to both directories, because that is what the command it is running does. When the cleanup leaves something for a person — a file it could not clean, or a boot its check after writing finds still refused — the fix says so rather than printing a plain success. It calls that helper rather than `migrate_cmd` itself — the command exits the process when a run leaves something for a person, which would cut off the doctor's remaining fixes, its remaining rows and its own exit code.
 
 ---
 
@@ -20186,6 +20631,7 @@ What an out-of-tree backend plugin imports *is* the contract. The published surf
 | `DocumentContent` | `pipelex.core.stuffs.document_content` | a source document a search result cites |
 | `JudgmentWorkerAbstract` | `pipelex.cogt.judgment.judgment_worker_abstract` | the judgment worker contract |
 | `DocGenWorkerAbstract` | `pipelex.cogt.doc_gen.doc_gen_worker_abstract` | the document-generation worker contract |
+| `RenderJob`, `RenderedDocument`, `RenderResources`, `LoadedResource` | `pipelex.cogt.doc_gen.render_job` | the job a document engine prints, the file it returns, and how it reads a file the document names, with that file's media type |
 | `NbTokensByCategoryDict`, `TokenCategory` | `pipelex.cogt.usage.token_category` | the token usage a worker reports |
 | `BaseModelTypeVar` | `pipelex.tools.typing.pydantic_utils` | the schema type variable of a structured-output signature |
 | `CogtError`, `SdkTypeError`, `ImgGenGenerationError`, `ImgGenParameterError`, `InferenceErrorCategory` | `pipelex.cogt.exceptions` | the inference error bases and categories a worker raises with |
@@ -20377,7 +20823,7 @@ class HelloInferencePlugin:
     name = "hello_inference"
     # The plugin API version this plugin was written against, as a literal: never import the
     # runtime's PLUGIN_API_VERSION here, or the check that catches a breaking runtime upgrade always passes.
-    targets_api = 5
+    targets_api = 6
 
     def register(self, registrar: PluginRegistrar) -> None:
         registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="hello", make_worker=_make_hello_llm_worker)
@@ -21588,10 +22034,40 @@ def render(self, *, job: RenderJob, resources: RenderResources) -> RenderedDocum
 ```
 
 - **`RenderJob`** is plain data, which Pipelex builds in the print stage from the step's composition and hands to the worker in the same process. It has a JSON round trip for an engine that prints in another process, in which the template's bytes are URL-safe base64 and a date or a time is its ISO text. It holds the format and source, the file's name with its suffix, the document's title, and exactly the payload its source names, `layout` (a `LayoutDocument` from `layout_tree.py`), `html`, or `template` with `data`, the inputs as plain data by input name. It carries no Pipelex object, so an ordinary Pipelex release does not break an engine; a change to it, or to the worker, is a change of the plugin contract.
-- **`RenderResources.load(uri=…, position=…)`** is how an engine reads a file its document names, such as an image. It resolves `pipelex-storage://` keys through the run's storage provider, decodes `data:` URLs, fetches `https://` through the SSRF guard, and refuses what the run's read scope does not allow, a local path included, with `UriReadRefusedError`. An engine reads nothing any other way.
+- **`RenderResources.load(uri=…, position=…)`** is how an engine reads a file its document names, such as an image or a stylesheet. It resolves `pipelex-storage://` keys through the run's storage provider, decodes `data:` URLs, fetches `https://` through the SSRF guard, and refuses what the run's read scope does not allow, a local path included, with `UriReadRefusedError`. An engine reads nothing any other way. It returns a **`LoadedResource`**: the file's bytes as `data`, and as `mime_type` the media type the file's source gives it, described below.
 - **`RenderedDocument`** holds the bytes. Their MIME type and suffix are the format's.
 
 `render` is synchronous and runs on a thread of a print pool of its own, never on the event loop's default executor, which the engine's reads need, while `RenderResources.load` hands each read back to the event loop the print started from. An engine keeps no state from one print into the next. It signals a document it cannot print by raising `DocGenRenderError`, which passes through; anything else it raises, beyond a Pipelex error, is reported as a `DocGenRenderError` naming the engine and the file.
+
+The contract is what an engine uses in `pipelex.cogt.doc_gen`: the worker; the render job, its resources, the `LoadedResource` they return and the rendered document (`render_job.py`); the formats and sources (`doc_gen_format.py`); `DocGenRenderError`, the one error of `exceptions.py` an engine raises; the layout tree (`layout_tree.py`); the template check request and the findings a checker returns (`template_check.py`), with the input shapes the request carries (`InputShape` and `InputShapeKind` in `input_shape.py`); and the two modules of the next section. The rest of the package is Pipelex's own side of the print. An engine reaches Pipelex only through the contract and the registration seam every plugin uses, which also hands a worker its model spec, its backend, its SDK clients and its reporting delegate: anything else in Pipelex may move or change in an ordinary release, while a breaking change to the contract moves `PLUGIN_API_VERSION`. A piece an engine is missing is added to the contract, rather than imported from elsewhere in Pipelex.
+
+### The media type of a file an engine reads
+
+`LoadedResource.mime_type` is the type the file's source gives it, lowercased and without its parameters, such as `text/css`. Pipelex never guesses it, so it is `None` when the source gives none:
+
+| Source | `mime_type` |
+| --- | --- |
+| `https://` | The final response's `Content-Type`, after redirects; `None` when the response sends none. |
+| `data:` | The type the URL declares. |
+| `pipelex-storage://` on S3 or GCS | The content type recorded when the file was stored. |
+| `pipelex-storage://` on the local or in-memory provider | The type identified from the bytes, which covers binary formats only: a stylesheet or an SVG has none. |
+| A local path, read only by an unscoped run | `None`: a file system records no type. |
+
+A declared type is returned as declared, even a generic one such as `application/octet-stream`, and is not checked against the bytes. An engine that needs a type keeps its own guess, from the URI's extension or from the bytes, for a file whose source gives none or gives one that says nothing. An HTML engine is the case in point, since a print library such as WeasyPrint keeps a linked stylesheet only when its type is `text/css`, and a stylesheet served from a URL with no extension, as a web font service serves one, can be typed only by what its server declared. The built-in PDF engine reads images only and never looks at the type, because Pillow identifies an image from its bytes.
+
+---
+
+## What an engine shares with the built-in one
+
+A document should read the same whichever engine printed it, and a template should be held to the same rules whichever engine fills it, so an engine takes these from the contract rather than writing its own. None of them imports ReportLab, so an engine can use them without loading the built-in engine's library.
+
+`pipelex.cogt.doc_gen.layout_display` holds the rules by which every engine shows a layout tree's values, the built-in engine included:
+
+- **`display_scalar(value=…)`** writes a scalar as text: blank for nothing, `Yes` or `No` for a boolean, a whole float without its decimals, a date as `2026-09-29`, a datetime as `2026-09-29 14:05`, and a time of day as `09:07`, each followed by the UTC offset it states (` UTC`, ` +02:00`), if any.
+- **`is_numeric_column(values=…)`** says whether a table's column holds numbers only, blanks aside, and at least one, a boolean not counting as a number: such a column is aligned right.
+- **`markdown_as_html(markdown=…)`** converts a `MarkdownBlock` to an HTML fragment for an engine that writes HTML, with the one parser Pipelex reads Markdown with, as the `markdown` filter and the `Markdown` concept's HTML view do: CommonMark with tables and strikethrough, raw HTML shown as text, and only a URL with a scheme turned into a link, so `README.md` stays text. Called from an engine's own code, outside a template render, it is charged to no render budget, so an engine bounds what it converts itself.
+
+`pipelex.cogt.doc_gen.template_environment` holds **`make_plain_data_template_environment()`**, the Jinja environment an engine fills a template file's tags in when it fills them itself, as a Word template's tags are filled through docxtpl. It is synchronous; sandboxed as every Pipelex template is, each render spending from a budget of its own (see [Template Sandbox](template-sandbox.md)); strict, so a missing value fails the render instead of printing as empty text; and it registers only Jinja's built-in filters, since the plain data it reads holds no stuff for Pipelex's filters to work on.
 
 ---
 
@@ -23229,9 +23705,9 @@ make check-hub-layering   # alias: make chl
 
 An AST guard (`pipelex-dev check-hub-layering`, core in `pipelex/cli/dev_cli/commands/hub_layering_guard.py`) that runs in `make agent-check`, in the `make check` aggregate, and in CI. It checks three rules over `pipelex/` and `tests/`:
 
-1. **The layer rule.** A module in the declared kernel layer — `pipelex.cogt`, `pipelex.core`, `pipelex.errors`, `pipelex.fix_ops`, `pipelex.graph`, `pipelex.kernel`, `pipelex.migration`, `pipelex.observer`, `pipelex.plugins`, `pipelex.providers`, `pipelex.reporting`, `pipelex.system`, `pipelex.test_extras`, `pipelex.tools`, `pipelex.tracing`, plus the `pipelex.runtime_hub` and `pipelex.runtime_boot` modules themselves — may not import `pipelex.interpreter_hub`. The declaration is compliant with an empty exception list, so the guard hard-blocks on **any** violation. Entries are matched exact-or-dotted-prefix, which is why a bare *module* is a legal entry beside the packages: without `pipelex.runtime_hub` spelled out, the module at the centre of the rule would be exempt from it, and without `pipelex.runtime_boot` the kernel layer's own composition root would be — see [Where the boot splits](#where-the-boot-splits). `pipelex.core` was six entries until its interpreter tenants moved out — see [Where core splits](#where-core-splits) for what that enumeration was working around.
+1. **The layer rule.** A module in the declared kernel layer — `pipelex.cogt`, `pipelex.core`, `pipelex.errors`, `pipelex.fix_ops`, `pipelex.graph`, `pipelex.hosted`, `pipelex.kernel`, `pipelex.migration`, `pipelex.observer`, `pipelex.plugins`, `pipelex.providers`, `pipelex.reporting`, `pipelex.system`, `pipelex.test_extras`, `pipelex.tools`, `pipelex.tracing`, plus the `pipelex.runtime_hub` and `pipelex.runtime_boot` modules themselves — may not import `pipelex.interpreter_hub`. The declaration is compliant with an empty exception list, so the guard hard-blocks on **any** violation. Entries are matched exact-or-dotted-prefix, which is why a bare *module* is a legal entry beside the packages: without `pipelex.runtime_hub` spelled out, the module at the centre of the rule would be exempt from it, and without `pipelex.runtime_boot` the kernel layer's own composition root would be — see [Where the boot splits](#where-the-boot-splits). `pipelex.core` was six entries until its interpreter tenants moved out — see [Where core splits](#where-core-splits) for what that enumeration was working around.
 
-    `graph`, `tracing`, `observer` and `errors` joined the list late, and the delay cost something — see [Known inversions](#known-inversions). They are the run-graph data model with its tracer and renderers, the trace-event assembler feeding it, the run-observation hooks, and the error taxonomy: machinery present at execution time whatever is loaded, which is the kernel layer's own definition. `pipelex.test_extras` is on the list for the same reason: it ships, `runtime_boot.py` imports it at boot, and it measures clean. `pipelex.kernel` is the same rule applied *ahead* of a breach instead of behind one: it was declared in the commit that created the package, because it holds the operator-execution semantics the interpreter's operator classes call into, and a single `interpreter_hub` reach anywhere in it would put the interpreter back into every programmatic caller — the property the package exists to provide. `pipelex.kit` is data files with no module to police; `pipelex.language`, `pipelex.runtime_bridge` and `pipelex.cli` all measure dirty and are interpreter-side by construction. `pipelex.methods` measures dirty as well, without reaching `interpreter_hub`: its structures check reads the stamp the code generator writes, and `pipelex.codegen` is an interpreter package. `pipelex.migration` and `pipelex.fix_ops` are declared because a kernel-layer boot *runs* them: a configuration file that fails validation is replayed through the migration engine in memory before the boot gives up, so the engine is part of every kernel-layer boot that meets a stale file. `fix_ops` holds the applier and the file transaction the engine shares with the `.mthds` fix loop, one applier and one set of transaction primitives for both; it sits below the interpreter layer so that sharing them costs the kernel nothing — see [Known inversions](#known-inversions) for what it cost while they lived under `pipelex.pipeline`. `system/configuration/config_surface.py` still defers the engine import into the boot-tolerance retry, but only so that a healthy boot never loads it, not to keep the layering. That is every top-level package accounted for — which is the point, because the rule of thumb is that a measured-clean package should be *declared*, not left undeclared: **an undeclared package is not neutral, it is unpoliced.**
+    `graph`, `tracing`, `observer` and `errors` joined the list late, and the delay cost something — see [Known inversions](#known-inversions). They are the run-graph data model with its tracer and renderers, the trace-event assembler feeding it, the run-observation hooks, and the error taxonomy: machinery present at execution time whatever is loaded, which is the kernel layer's own definition. `pipelex.test_extras` is on the list for the same reason: it ships, `runtime_boot.py` imports it at boot, and it measures clean. `pipelex.kernel` is the same rule applied *ahead* of a breach instead of behind one: it was declared in the commit that created the package, because it holds the operator-execution semantics the interpreter's operator classes call into, and a single `interpreter_hub` reach anywhere in it would put the interpreter back into every programmatic caller — the property the package exists to provide. `pipelex.hosted` was declared in its first commit for the same reason: a hosted run boots nothing and must work on a machine with no inference configured, so it reads the configuration files, builds pipelex-sdk's client and maps a run onto it without loading a single interpreter module; what needs a bundle parsed stays in `pipelex.cli`. `pipelex.kit` is data files with no module to police; `pipelex.language`, `pipelex.runtime_bridge` and `pipelex.cli` all measure dirty and are interpreter-side by construction. `pipelex.methods` measures dirty as well, without reaching `interpreter_hub`: its structures check reads the stamp the code generator writes, and `pipelex.codegen` is an interpreter package. `pipelex.migration` and `pipelex.fix_ops` are declared because a kernel-layer boot *runs* them: a configuration file that fails validation is replayed through the migration engine in memory before the boot gives up, so the engine is part of every kernel-layer boot that meets a stale file. `fix_ops` holds the applier and the file transaction the engine shares with the `.mthds` fix loop, one applier and one set of transaction primitives for both; it sits below the interpreter layer so that sharing them costs the kernel nothing — see [Known inversions](#known-inversions) for what it cost while they lived under `pipelex.pipeline`. `system/configuration/config_surface.py` still defers the engine import into the boot-tolerance retry, but only so that a healthy boot never loads it, not to keep the layering. That is every top-level package accounted for — which is the point, because the rule of thumb is that a measured-clean package should be *declared*, not left undeclared: **an undeclared package is not neutral, it is unpoliced.**
 2. **The dead-module rule.** *No* scanned module may reference `pipelex.hub`. It was deleted rather than aliased so a stale import fails loudly; this closes the one hole in that guarantee.
 3. **The transitive rule.** No kernel-layer module may *reach* `pipelex.interpreter_hub` either, through any chain of module-level imports. Rules 1 and 2 are per-file and see one hop; this one resolves the whole module-level import graph of `pipelex/` and does reachability over it, reporting the shortest chain and the line of its first hop. It exists because the one-hop rules missed a live breach for a whole release: four modules of the declared kernel-layer `pipelex.plugins` package reached the interpreter hub through `runtime_bridge`, `pipeline` and `pipe_operators`, and both gates stayed green (see [Known inversions](#known-inversions)). A *direct* import is left to rule 1, which names the more specific remedy, rather than reported twice.
 
@@ -24646,6 +25122,7 @@ There is one file-blocked reason per **state the file is in**, rather than one p
 | `unsupported_schema_version` | It declares a `[meta] schema_version` below its ledger's floor, so the entries that would carry it forward are no longer there. Nothing was written. |
 | `unwritable` | It needed a change and the run could not make it — the backup would not go down, or the replacement would not. The file is exactly as it was found. |
 | `changed_during_run` | It was removed or edited between the read and the write, so the run refused to write over work it had not seen. |
+| `needs_a_hand_edit` | It is valid, and holds a shape the run will not rewrite on its own, since doing it safely would restructure what the user wrote — routing profiles written as one inline table, which the former-release cleanup cannot add a profile to. Nothing was written; the detail says what to change by hand. |
 | `state_uncertain` | The write could not be confirmed: the transaction could not describe what it left behind, and the file does not hold what the run wrote. |
 
 `state_uncertain` is the only one that cannot promise the file is as it was found, which is why it is not folded into `unwritable`: the next move is to compare the file against the rescue copy the plan names, not to fix a permission and run again. It is also, for the single-file commit a migration performs, the only transaction failure that reaches a plan at all — a replacement that fails re-raises its own error, because rolling back nothing is trivially complete.
@@ -24788,7 +25265,50 @@ A run is often both at once, which is the ordinary shape on a machine that has d
 
 **Nothing inside a file is rendered here either.** The row reports paths and counts. It is the fourth channel the rendering rule covers, beside the command's output, its structured plan, and the block on a validation error.
 
+**The row reports the cleanup of a [former release](#a-former-releases-configuration) too**, since that is the command's first step: `former_release_files` names the files it would rewrite or remove, and `former_release_blocks_boot` says whether what they hold stops this machine's boot. That verdict is the boot's own check, `former_release_boot_blockers()` over the files the boot merges, never a reading of one directory: a project that boots on bases of its own is not told it cannot start because of what the home still carries, and an `active` in one directory naming a retired profile the other defines is not missed. A failure reading those files leaves the row unchecked, like any failure inside the scan. The finding is `pending` whenever there are such files, and `--fix` runs the cleanup before the migration, as the command does. When the cleanup's own check finds that a boot would still not start once it has run, the row says so and recommends `pipelex migrate --dry-run`, which says why, and with nothing left to clean it needs attention rather than reading as up to date. `--fix` has nothing to write for it.
+
 **A failure inside the scan costs more here than anywhere else**, which is why it is caught rather than raised: an exception escaping this probe reaches the doctor's own outer handler, which prints one line and exits — so a broken packaged ledger would replace *every row the user came for* with "Unexpected error". The catch stays narrow (`MigrationError`, `OSError`), so a bug in our applier still surfaces as itself.
+
+## A former release's configuration
+
+Releases up to v0.72 ran models through the Pipelex Gateway, and the configuration they set up still names it: a `pipelex_gateway` table in `inference/backends.toml`, its per-backend file in `inference/backends/`, routing profiles that send models to it (`active = "all_pipelex_gateway"` above all), a `model_specs_section` key naming specs the remote configuration used to serve, the `pipelex_service.toml` that recorded the Gateway's terms acceptance, and the `pipelex_gateway_models*.md` model lists. None of that is a shape change of a surface — the files are valid; what they name is gone — so it is no ledger entry. It is a step of its own, which `pipelex migrate` runs first.
+
+**Pipelex Manifold is not retired.** Those releases also offered it as a private beta, with a `pipelex_manifold` table shipped disabled and still naming `model_specs_section`, its per-backend file, and an `all_pipelex_manifold` profile. The hosted plane runs every model through it, with a plugin of its own, and declares that backend and profile itself, enabled and active. So nothing here reads the `pipelex_manifold` table, its file, its profile or a route to it (`MANIFOLD_BACKEND_NAME`): on a user's machine what the release left for it is inert while the table is disabled, and the hosted plane's configuration is never refused, reported or rewritten. An enabled table still naming `model_specs_section` is refused by the backend library's own load, whose message says what to change. `tests/data/migration/former_release/hosted_manifold/` holds the hosted plane's inference trees, which every command here must find clean.
+
+**One reading of that state, across directories.** `detect_former_release_across(config_dirs=)` (`pipelex/migration/former_release.py`) is a pure read of the home and project configuration directories together, and every consumer asks it or `former_release_boot_blockers()`, which reads the same way: the boot, `pipelex doctor`, `pipelex init`'s inspect stage, and the cleanup. It reads the documents as the boot merges them. A boot reads one base `backends.toml` and one base `routing_profiles.toml` — the project's when it has one, the home's otherwise — then the home's override, then the project's; a boot started outside any project reads the home's base and override alone. `inference_merge_sequences()` derives those sequences from the directories, and a test holds it to the loader's own. A finding is decided over every sequence its file is read in, never over its own directory alone, because a profile one directory defines can be made active by a file in the other.
+
+Each finding says which file it is in and whether it stops a boot reading it. The shapes that do are the ones the boot refuses: a retired backend, or one still naming `model_specs_section`, left enabled; and an active routing profile that sends models to a retired backend, by its default or by a route it must honour (an optional route is inert while its backend is absent, and so is `fallback_order`), or a retired profile that no file defines. A base that names a retired active profile under an override that picked another is still found, as inert, since it is refused the day the override goes. Whether a given machine's boot is refused is `former_release_boot_blockers()` over the exact files that boot merges, which is the verdict the doctor and `pipelex init` report. A document that does not parse is skipped rather than raised: whether it parses is the boot's and the doctor's to say.
+
+**The boot refuses first, with one error.** `ModelManager.setup` runs `former_release_boot_blockers()` over exactly the sequences it is about to merge, across the home and project directories, before the backend library loads. On a blocker it raises `FormerReleaseConfigError`, which names each blocking finding with its file and both remedies, `pipelex migrate` and `pipelex init`, instead of whichever lower refusal would have come first: the Gateway's missing key, its backend file declaring no model, or `RoutingProfileDisabledBackendError` once the Gateway is switched off and `active` still names its profile. Reading the boot's own sequences is what keeps it from refusing a boot that would succeed: a project override that disables the Gateway lifts the home base's finding, as it lifts the boot's refusal.
+
+**The cleanup removes what was found, and nothing else.** `clean_former_release(config_dirs=, dry_run=)` (`pipelex/migration/former_release_cleanup.py`) takes the home directory and the project's, in that order, and turns each finding into one change on its file:
+
+| Finding | Change |
+|---|---|
+| a retired backend table, in `backends.toml` or its override | the table is deleted |
+| `model_specs_section` on another backend, `pipelex_manifold` aside | the key is deleted; the backend stays |
+| a profile table whose own default is a retired backend, which nothing else keeps alive | the profile is deleted from that file |
+| a profile table whose own default is a retired backend, while a file read before it keeps the profile or a file read after it gives it a live default | only the `default` key is deleted, so the user's routes stay; a table left empty goes with it |
+| the part of a profile an override holds, with no default and no description of its own, when every definition before it goes | that part is deleted too, since on its own it is a profile the boot refuses |
+| a route to a retired backend in a profile that otherwise stays, a catch-all `"*"` route included | the route is deleted, from the route table that holds it |
+| an `active` in a base file the plan moves | `active` moves to the profile the kit makes active (`all_enabled_backends`), which is added first among the profiles, as the kit ships it, when the file does not define it |
+| an `active` in a personal override the plan moves | `active` is deleted, so the file read before it decides |
+| the project's override, when the file the project's boot reads `active` from has to change for the boot outside the project alone | it is given an `active` of its own, naming the profile the project's boot starts on |
+| a retired backend's file, a model list, `pipelex_service.toml` | the file is removed |
+
+**The routing profiles are planned per boot, and checked before anything is written.** A machine has two boots, the one outside any project and the project's, and some files are read by both: the home's override always, and the home's base when the project has none of its own. Each profile table's fate is decided in each sequence that reads its file, and a file both boots read keeps whatever either needs: a profile one boot still uses is never deleted from under it, and a table one boot keeps is never left without its description in the other, whose own definition then keeps its description and loses only the retired `default`. Then every way of moving the `active` keys is tried on each boot's library as the cleanup would leave it. An `active` may move when it names what a former release left, or a profile the cleanup removes or leaves with nothing to route by — no `default`, no route and no `fallback_order` — which counts as gone; in a boot the release stops, so may an earlier `active` that the boot would read next, when it names a profile that is missing or routes nothing. No plan may stop a boot that starts today, change the profile it starts on, or leave its profile with nothing to route by; of the rest, the plan leaving the most boots with a profile that routes something wins, then the one leaving no `active` naming a profile that is gone, then the one without the project's own `active`, then the one moving the fewest. So when the home's base has to move off a profile that the project's override keeps alive by retargeting it, the project's override is given that profile as its own `active`, and the project goes on starting on it.
+
+**A file no change can suit both boots with is left for a hand edit.** When a boot the release stops could only be fixed by changing a file the other boot reads, and that change would switch the other boot's profile, and the project's override cannot make up the difference because there is none, the shared file is left exactly as it was, reported `needs_a_hand_edit` with the conflict and the edit that settles it: give the project an `active` of its own in its override, then make the shared file's suit the boot outside the project. The plan is then made again without touching that file. A last check reads the texts the cleanup is about to write as each boot would, and a rewrite that would still stop a boot that starts today, whatever produced it, is left for a hand edit too. `tests/unit/pipelex/migration/test_former_release_invariants.py` holds the cleanup to these rules over seeded random layouts of a home and a project.
+
+The kit's profile goes in before the deletions so that the banner heading the profiles stays at the head of them rather than leaving with the first profile it introduced. When it cannot go in, because the file writes its profiles as one inline table, the file is left exactly as it was and reported `needs_a_hand_edit`, with what to change: moving `active` to a profile the file lacks would stop the boot as surely as the retired one. Each key and table is deleted where the document spells it, through the applier's `delete_literally()`, so the comment introducing it goes with it, and a route or a profile spelled `"*"` is that one key, never the "every key" a migration op reads `*` as; the document is re-read between edits that applied. A change the cleanup cannot express on a file leaves that file as it was, reported `needs_a_hand_edit`, and never stops the run, the other files or the doctor's row. A rewritten file also loses the comment paragraphs at the head of the document that are, line for line, the ones the former release shipped there — the Gateway's instructions above the routing profiles; every other comment, a user's note naming the Gateway included, stays.
+
+**The cleanup checks its own work, on every run.** `what_stops_the_boot()` reads the files every boot of the machine merges, the home's alone and the project's, as the cleanup leaves them — after a write pass, the files on disk; in a dry run, the texts it would write — and reports what still stops one: what a former release left that a boot refuses, or a routing profile library the boot cannot load, above all an `active` naming a profile no file defines. It runs when there is nothing to clean too, so a cleanup left half done, by a run from another project or a file it could not write, is never reported as a machine with nothing to do. Anything it finds goes into the report's `still_blocking`, which makes the report need attention and never clean, so the command exits non-zero rather than calling the machine fixed.
+
+**The replay never walks a file the cleanup removes.** The ledger replay that follows the cleanup leaves those files out, in the rehearsal and in the write pass alike, in both commands, the doctor's row and its `--fix`: a retired backend's file carrying a key the ledger would migrate, or one it cannot explain, is neither counted among the files to migrate nor reported as needing a look, since it is about to go.
+
+**Every file gets the replay's guarantees.** A rewrite goes through the same per-file transaction as a migrated file (`runner.write_file_with_backup`), and a removal through its twin (`runner.remove_file_with_backup`): one `.bak.<stamp>` copy, taken first and kept, older copies pruned, and a file changed or unwritable mid-run left exactly as it was and reported, with the copy taken for it taken back — except the copy of a file that is gone by then, which stays, since a concurrent run of the same second may have removed the file after adopting that very copy as its own. A removal removes the path itself, so a symbolic link goes and the file it names stays where it lives. The transaction is per file, not across the files: a write that fails after others went through leaves those written, so a boot the plan kept on its profile through a change in another file, such as the project's own `active`, can start on another profile until that file is edited, and the report names it as blocked. A dry run reports the same changes and writes nothing, not even the `.gitignore`. Running it twice is running it once: a cleaned directory has no findings, and a backup's name matches none of the patterns the detector looks for.
+
+**Goldens.** `tests/data/migration/former_release/v0_72/` is the v0.72 kit's own files, copied from its wheel; `v0_72_cleaned/` holds the two documents the cleanup rewrites, byte for byte as it must leave them. Both are `plxt`-stable, since `make agent-check` formats every TOML file in the repository.
 
 ## Applying
 
