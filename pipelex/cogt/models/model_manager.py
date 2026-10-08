@@ -26,6 +26,8 @@ from pipelex.cogt.models.model_deck import ModelDeck, ModelDeckBlueprint
 from pipelex.cogt.models.model_deck_loader import load_model_deck_blueprint
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config
+from pipelex.migration.exceptions import FormerReleaseConfigError
+from pipelex.migration.former_release import describe_former_release_boot_refusal, former_release_boot_blockers
 from pipelex.plugins.plugin_model_declarations import PluginModelDeclarations
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.tools.misc.file_utils import find_files_in_dir
@@ -82,9 +84,20 @@ class ModelManager(ModelManagerAbstract):
         # sequences — the base file, then the personal override files — see
         # `ConfigLoader.backends_file_paths`.
         resolved_backends_dir_path = backends_dir_path or str(config_manager.backends_dir_path)
+        resolved_backends_library_paths = backends_library_paths or config_manager.backends_file_paths()
+        resolved_routing_profile_library_paths = routing_profile_library_paths or config_manager.routing_profiles_file_paths()
+        # What a former release left for the Pipelex Gateway is refused here, by one error naming the
+        # cleanup, ahead of the refusals below: the Gateway's unset key, its backend file declaring no model, or a
+        # routing profile sending models to a backend that is not enabled — none of which says why, or what to run.
+        if blockers := former_release_boot_blockers(
+            backends_library_paths=resolved_backends_library_paths,
+            routing_profile_library_paths=resolved_routing_profile_library_paths,
+        ):
+            msg = describe_former_release_boot_refusal(blockers=blockers)
+            raise FormerReleaseConfigError(msg)
         self.inference_backend_library.load(
             secrets_provider=secrets_provider,
-            backends_library_paths=backends_library_paths or config_manager.backends_file_paths(),
+            backends_library_paths=resolved_backends_library_paths,
             backends_dir_path=resolved_backends_dir_path,
             # A keyless boot knows every enabled backend's models and resolves no credential; the boot
             # that needs inference resolves every one and refuses to start without it.
@@ -104,7 +117,7 @@ class ModelManager(ModelManagerAbstract):
         )
         enabled_backends = self.inference_backend_library.all_enabled_backends()
         self._routing_profile = load_active_routing_profile(
-            routing_profile_library_paths=routing_profile_library_paths or config_manager.routing_profiles_file_paths(),
+            routing_profile_library_paths=resolved_routing_profile_library_paths,
             enabled_backends=enabled_backends,
         )
         model_deck_paths = ModelManager.get_model_deck_paths(deck_dir_path=deck_dir_path or str(config_manager.model_decks_dir_path))
@@ -156,7 +169,8 @@ class ModelManager(ModelManagerAbstract):
         backend is then asked for the spec of each type the name is declared as. Each matching method
         keeps its meaning per pair: a pattern match skips a pair its backend lacks, a default match
         looks for it along the fallback order, and an exact match pins the name to its backend, so a
-        type that backend does not serve is not served at all.
+        type that backend does not serve is not served at all. A name the profile sends to no enabled
+        backend is served by the internal backend, for each type that backend declares under it.
 
         Raises:
             ModelManagerError: A routed backend is not loaded, or a handle routed exactly to a backend
@@ -170,6 +184,12 @@ class ModelManager(ModelManagerAbstract):
                 model_name=model_name,
             )
             if backend_match_for_model is None:
+                # The profile sends the name nowhere, as a profile routing only to providers does when none of
+                # them is enabled. The internal backend's models need no provider, so they are served all the same:
+                # only a route sending their name elsewhere, or disabling the internal backend, withholds them.
+                for model_type in declared_model_types:
+                    if model_spec := self._find_internal_model_spec(model_name=model_name, model_type=model_type, enabled_backends=enabled_backends):
+                        inference_models.add(model_spec)
                 continue
             matched_backend_name = backend_match_for_model.backend_name
             matched_backend = self.inference_backend_library.get_inference_backend(backend_name=matched_backend_name)
@@ -245,7 +265,7 @@ class ModelManager(ModelManagerAbstract):
         """The spec serving one pair, found by the routing match of its name, or `None` when the pair is not served.
 
         Raises:
-            ModelManagerError: A backend of the fallback order is not loaded.
+            ModelManagerError: A backend of the fallback order, or the enabled internal backend, is not loaded.
         """
         if model_spec := matched_backend.get_model_spec(model_type=model_type, handle=model_name):
             return model_spec
@@ -267,18 +287,16 @@ class ModelManager(ModelManagerAbstract):
             case BackendMatchingMethod.DEFAULT:
                 # We could not find the pair, but it was a default match,
                 # so we can look for it in the other available backends
-                # Use fallback_order if specified, otherwise only try internal backend
-                if backend_match_for_model.fallback_order:
-                    # Try fallback_order first, then any enabled backends not in fallback_order
-                    backends_to_try = backend_match_for_model.fallback_order + [
-                        b for b in enabled_backends if b not in backend_match_for_model.fallback_order
-                    ]
-                else:
-                    # No fallback_order specified - only try the internal backend as a special case
-                    # Internal backend contains software-only models that should always be available
-                    # regardless of which AI provider routing profile is selected
-                    backends_to_try = [PipelexBackend.INTERNAL] if PipelexBackend.INTERNAL in enabled_backends else []
-
+                if not backend_match_for_model.fallback_order:
+                    # No fallback_order specified - only try the internal backend, whose software-only models
+                    # are served whatever the routing profile, unless it is the matched backend we just checked
+                    if matched_backend.name == PipelexBackend.INTERNAL:
+                        return None
+                    return self._find_internal_model_spec(model_name=model_name, model_type=model_type, enabled_backends=enabled_backends)
+                # Try fallback_order first, then any enabled backends not in fallback_order
+                backends_to_try = backend_match_for_model.fallback_order + [
+                    b for b in enabled_backends if b not in backend_match_for_model.fallback_order
+                ]
                 for available_backend in backends_to_try:
                     if available_backend == matched_backend.name:
                         # we've already checked the matched backend and it didn't have the pair, that's why we're here
@@ -292,6 +310,23 @@ class ModelManager(ModelManagerAbstract):
                 # Pair not available in any of the searched backends - skip it
                 # Not all models need to be available in the configured backends
                 return None
+
+    def _find_internal_model_spec(self, *, model_name: str, model_type: ModelType, enabled_backends: list[str]) -> InferenceModelSpec | None:
+        """The internal backend's spec for one pair, or `None` when the internal backend is not enabled or does not declare it.
+
+        The internal backend runs software-only models, with no provider behind them, so whatever the active profile
+        it is looked in for a name the profile sends to no enabled backend, and for a default match with no fallback order.
+
+        Raises:
+            ModelManagerError: The internal backend is enabled but not loaded.
+        """
+        if PipelexBackend.INTERNAL not in enabled_backends:
+            return None
+        internal_backend = self.inference_backend_library.get_inference_backend(backend_name=PipelexBackend.INTERNAL)
+        if internal_backend is None:
+            msg = f"Backend '{PipelexBackend.INTERNAL}' not found for model '{model_name}'"
+            raise ModelManagerError(msg)
+        return internal_backend.get_model_spec(model_type=model_type, handle=model_name)
 
     @override
     def get_inference_model(self, model_handle: str, *, model_type: ModelType) -> InferenceModelSpec:

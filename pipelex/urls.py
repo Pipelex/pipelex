@@ -12,7 +12,7 @@ class URLs:
     pipe_func_docs = "https://docs.pipelex.com/latest/building-methods/pipes/pipe-operators/PipeFunc/"
     backend_provider_docs = "https://docs.pipelex.com/latest/setup/configure-ai-providers/"
     native_concepts_docs = "https://docs.pipelex.com/latest/building-methods/concepts/native-concepts/"
-    app_cli_auth = "https://app.pipelex.com/auth/cli"
+    app = "https://app.pipelex.com"
 
     # Base for the RFC 7807 ``type`` URI of every PipelexError class. A stable
     # identifier by spec — kept as a constant so PipelexError.type_uri() stays

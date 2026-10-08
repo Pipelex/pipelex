@@ -5,6 +5,9 @@ from rich.panel import Panel
 
 from pipelex.cli.commands.init.credentials import get_global_env_path
 
+#: A reset copies the kit's inference files over the target's, so customised backends and routing are lost.
+_INFERENCE_RESET_LINE = "• [yellow]Reset[/yellow] inference backends, model deck and routing to the kit's defaults"
+
 
 def build_initialization_panel(
     *,
@@ -14,6 +17,7 @@ def build_initialization_panel(
     needs_telemetry: bool,
     reset: bool,
     check_credentials: bool = False,
+    asks_setup_path: bool = False,
 ) -> Panel:
     """Build the initialization confirmation panel.
 
@@ -24,6 +28,8 @@ def build_initialization_panel(
         needs_telemetry: Whether telemetry setup is needed.
         reset: Whether this is a reset operation.
         check_credentials: Whether credential prompting will happen.
+        asks_setup_path: Whether the run asks where runs execute, the hosted Pipelex API or this machine, whose
+            answer decides the inference and credential steps.
 
     Returns:
         A Panel containing the initialization confirmation message.
@@ -31,11 +37,29 @@ def build_initialization_panel(
     # Build message based on what's being initialized
     message_parts: list[str] = []
     credentials_file = escape(str(get_global_env_path()))
-    if reset:
+    if asks_setup_path:
+        if needs_config:
+            verb = "[yellow]Reset and reconfigure[/yellow]" if reset else "Create"
+            message_parts.append(f"• {verb} configuration files in [cyan].pipelex/[/cyan]")
+        if reset and needs_inference:
+            message_parts.append(_INFERENCE_RESET_LINE)
+        message_parts.append("• Ask where your runs execute:")
+        message_parts.append(
+            "    on the hosted Pipelex API: sign in to get a Pipelex API key (default); "
+            "[cyan]pipelex init inference[/cyan] reconfigures the backends later"
+        )
+        message_parts.append(
+            f"    on this machine: choose your inference backends and enter their API keys (saved to [cyan]{credentials_file}[/cyan])"
+        )
+        message_parts.append("• Suggest IDE extension for [cyan].mthds[/cyan] syntax highlighting")
+        if needs_telemetry:
+            verb = "[yellow]Reset and reconfigure[/yellow]" if reset else "Choose"
+            message_parts.append(f"• {verb} telemetry preferences")
+    elif reset:
         if needs_config:
             message_parts.append("• [yellow]Reset and reconfigure[/yellow] configuration files in [cyan].pipelex/[/cyan]")
         if needs_inference:
-            message_parts.append("• [yellow]Reset and reconfigure[/yellow] inference backends")
+            message_parts.append(f"{_INFERENCE_RESET_LINE}, then ask you to choose your inference backends")
             message_parts.append("• Suggest IDE extension for [cyan].mthds[/cyan] syntax highlighting")
         if check_credentials:
             message_parts.append(f"• Prompt for missing API keys (saved to [cyan]{credentials_file}[/cyan])")

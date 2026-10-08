@@ -263,6 +263,7 @@ plugins:
         - building-methods/libraries.md: "Libraries"
         - building-methods/packages.md: "Packages"
         - building-methods/pipes/executing-pipelines.md: "Executing Pipelines"
+        - building-methods/pipes/running-on-the-hosted-api.md: "Running on the Hosted API from Python"
         - building-methods/pipes/run-modes-and-backends.md: "Run Modes & Backends"
         - building-methods/pipes/provide-inputs.md: "Providing Inputs to Pipelines"
         - building-methods/pipes/working-memory.md: "Working Memory"
@@ -290,6 +291,7 @@ plugins:
         Reference:
         - tools/cli/index.md: "CLI Reference Overview"
         - tools/cli/init.md: "CLI Init"
+        - tools/cli/login.md: "CLI Login"
         - tools/cli/update.md: "CLI Update"
         - tools/cli/migrate.md: "CLI Migrate"
         - tools/cli/validate.md: "CLI Validate"
@@ -309,6 +311,7 @@ plugins:
         - configuration/config-practical/methods-config.md: "Methods Configuration"
         - configuration/config-practical/pipe-run-config.md: "Pipe Run Configuration"
         - configuration/config-practical/reporting-config.md: "Reporting Configuration"
+        - configuration/config-practical/run-config.md: "Run Configuration"
         - configuration/config-practical/telemetry-config.md: "Telemetry Configuration"
         - configuration/config-technical/aws-config.md: "AWS Configuration"
         - configuration/config-technical/inference-config.md: "Inference Configuration"
@@ -492,6 +495,7 @@ nav:
         - Libraries: building-methods/libraries.md
         - Packages: building-methods/packages.md
         - Executing Pipelines: building-methods/pipes/executing-pipelines.md
+        - Running on the Hosted API: building-methods/pipes/running-on-the-hosted-api.md
         - Run Modes & Backends: building-methods/pipes/run-modes-and-backends.md
         - Providing Inputs to Pipelines: building-methods/pipes/provide-inputs.md
         - Working Memory: building-methods/pipes/working-memory.md
@@ -529,6 +533,7 @@ nav:
     - CLI Reference:
       - Overview: tools/cli/index.md
       - Init: tools/cli/init.md
+      - Login: tools/cli/login.md
       - Update: tools/cli/update.md
       - Migrate: tools/cli/migrate.md
       - Validate: tools/cli/validate.md
@@ -565,6 +570,7 @@ nav:
         - Methods: configuration/config-practical/methods-config.md
         - Pipe Run: configuration/config-practical/pipe-run-config.md
         - Reporting: configuration/config-practical/reporting-config.md
+        - Run: configuration/config-practical/run-config.md
         - Telemetry: configuration/config-practical/telemetry-config.md
       - Technical Configuration:
         - AWS: configuration/config-technical/aws-config.md

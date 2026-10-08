@@ -1,10 +1,11 @@
 """The layout tree: what the auto-layout of a step's inputs is, before any engine writes it.
 
 A `PipeDocGen` step with no template lays its inputs out by itself, and every format's engine writes the
-same tree: the built-in PDF engine on ReportLab, and the Excel and Word engines of the Pipelex document
-generation plugin. The tree is plain data with a JSON round trip, and it is part of the engines' contract
+same tree: the built-in PDF engine on ReportLab, and the engines of the Pipelex document generation
+plugin. The tree is plain data with a JSON round trip, and it is part of the engines' contract
 (`render_job.py`). Every print today hands it to an engine in the same process; across a JSON boundary a
-date, a time or a datetime comes back as its ISO text, since nothing in the wire format tags it. It shows:
+date, a time or a datetime comes back as its ISO text, since nothing in the wire format tags it. Every
+engine shows its values by the same rules, in `layout_display.py`. It shows:
 
 - the scalar fields of a structure make a **field grid**, labelled from the field titles;
 - a list of flat structures makes a **table**;

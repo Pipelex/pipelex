@@ -15,9 +15,10 @@ The `pipelex` CLI is the primary tool for working with Pipelex methods. It cover
 
 | Command | Description |
 |---------|-------------|
-| **`pipelex init`** | Initialize configuration, backends, credentials, routing, and telemetry |
+| **`pipelex init`** | Initialize configuration, choose where runs execute (the hosted Pipelex API or this machine), and set up backends, credentials, routing, and telemetry |
+| **`pipelex login`** | Get a Pipelex API key through your browser, or paste one with `--paste`, and save it for runs on the hosted Pipelex API |
 | **`pipelex update`** | Refresh the model deck and `backends/internal.toml` to match the installed pipelex version |
-| **`pipelex doctor`** | Check configuration health and suggest fixes |
+| **`pipelex doctor`** | Check configuration health and suggest fixes; a setup whose runs execute on the hosted Pipelex API needs its Pipelex API key and no provider key |
 | **`pipelex build`** | Generate the structures of your concepts and example inputs and outputs for a pipe |
 | **`pipelex validate`** | Check pipeline syntax, structure, and run dry-run validation |
 | **`pipelex fix`** | Apply deterministic safe fixes to a bundle and re-validate (with `--diff` preview) |
@@ -46,7 +47,7 @@ The `pipelex-agent` CLI is a machine-first interface designed for automated envi
 
 | Command | Description |
 |---------|-------------|
-| `init` | Non-interactive configuration setup (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
+| `init` | Non-interactive configuration setup; `"execution": "hosted"` in `--config` sets up hosted runs (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
 | `run` | Execute a pipeline (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
 | `validate` | Validate pipes, bundles, or methods (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
 | `fix` | Apply deterministic safe fixes to a bundle in place and re-validate (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |

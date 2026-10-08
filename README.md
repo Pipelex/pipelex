@@ -86,7 +86,7 @@ Prefer to run it yourself? This repository is the Pipelex runtime — its own in
 
 ## Run it yourself
 
-This repository is the Pipelex runtime: the Python package that reads a `.mthds` file and runs it. Install it and everything happens on your own machine, against the model providers you choose.
+This repository is the Pipelex runtime: the Python package that reads a `.mthds` file and runs it. Install it and run methods from your terminal, either on the hosted Pipelex API, with no provider account of your own, or on your own machine, against the model providers you choose.
 
 ### Install
 
@@ -96,7 +96,12 @@ pipelex init
 pipelex doctor
 ```
 
-`pipelex init` writes your `~/.pipelex` configuration and offers to install the editor extension; `pipelex doctor` reports what is configured and what is missing. The `cli` extra installs Rich, which the `pipelex` and `pipelex-agent` commands render their output through.
+`pipelex init` writes your `~/.pipelex` configuration, offers to install the editor extension, and asks where your runs execute:
+
+- **On the hosted Pipelex API**, the default that Enter takes: no provider account is needed. `pipelex init` signs you in through your browser and saves a Pipelex API key to `~/.pipelex/.env`. `pipelex login` does that again on its own, and `pipelex login --paste` takes a key on a machine without a browser.
+- **On this machine, with your own provider keys**: you choose your AI providers and enter their keys, or point Pipelex at a local model.
+
+`pipelex doctor` reports what is configured and what is missing. The `cli` extra installs Rich, which the `pipelex` and `pipelex-agent` commands render their output through.
 
 Some providers and features need an extra:
 
@@ -118,6 +123,7 @@ uv tool install "pipelex[cli,anthropic,google,google-genai,mistralai,bedrock,fal
 
 ### Configure AI Access
 
+- **The hosted API** — Choose it in `pipelex init`, which signs you in and makes it the default, to run with no provider key on this machine. On a machine set up for local runs, `pipelex login` and `--hosted` send one run there.
 - **Bring Your Own Keys** — Use existing API keys from OpenAI, Anthropic, Google, Mistral, etc. See [Configure AI Providers](https://docs.pipelex.com/latest/setup/configure-ai-providers/).
 - **Local AI** — Ollama, vLLM, LM Studio, or llama.cpp — no API keys required. See [Configure AI Providers](https://docs.pipelex.com/latest/setup/configure-ai-providers/).
 
@@ -132,14 +138,14 @@ Save the method shown under [What a method looks like](#what-a-method-looks-like
 }
 ```
 
-The method names no model, so it runs on the deck's `default-general` alias, which `pipelex init` points at an OpenAI model. With a provider other than OpenAI or Azure OpenAI, point that alias at one of your provider's models first, by adding it to `~/.pipelex/inference/deck/x_custom_llm_deck.toml` — the models each provider serves are listed under `~/.pipelex/inference/backends/`:
+On the hosted Pipelex API, it runs as it is. On this machine, the method names no model, so it runs on the deck's `default-general` alias, which `pipelex init` points at an OpenAI model. With a provider other than OpenAI or Azure OpenAI, point that alias at one of your provider's models first, by adding it to `~/.pipelex/inference/deck/x_custom_llm_deck.toml` — the models each provider serves are listed under `~/.pipelex/inference/backends/`:
 
 ```toml
 [llm.aliases]
 default-general = "claude-5-sonnet"     # an Anthropic model, for example
 ```
 
-Then run it:
+Then run it, where `pipelex init` set your runs to execute:
 
 ```bash
 pipelex run bundle summarize.mthds --inputs inputs.json
@@ -190,8 +196,8 @@ The same `.mthds` file runs from multiple execution targets:
 
 | Target | How |
 |--------|-----|
-| **CLI** | `pipelex run bundle method.mthds --inputs inputs.json` |
-| **Python** | `PipelexMTHDSProtocol().execute(...)` |
+| **CLI** | `pipelex run bundle method.mthds --inputs inputs.json`, on your machine, or with `--hosted` on the hosted API |
+| **Python** | `PipelexMTHDSProtocol().execute(...)` in your process, or [`pipelex-sdk`](https://pypi.org/project/pipelex-sdk/)'s `PipelexAPIClient` against the hosted API |
 | **TypeScript / Node** | [`@pipelex/sdk`](https://www.npmjs.com/package/@pipelex/sdk) against the hosted API, or [`mthds`](https://www.npmjs.com/package/mthds) against any MTHDS API |
 | **REST API** | Self-host the [`pipelex/pipelex-api`](https://hub.docker.com/r/pipelex/pipelex-api) image, built from this repository's [`api/`](https://github.com/Pipelex/pipelex/tree/main/api) directory; the hosted API is the one in the Quick start above |
 | **MCP** | The [Pipelex MCP](https://github.com/Pipelex/pipelex-mcp): your chatbot runs the methods saved in your account |

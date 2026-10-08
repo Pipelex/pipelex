@@ -1,5 +1,29 @@
 # Changelog
 
+## [v0.79.0] - 2026-10-09
+
+### Highlights
+
+**Run any method on the hosted Pipelex API with nothing but a Pipelex API key.** `pipelex run --hosted` sends your bundle, a published address or a catalog id (`mt_…`) to the hosted API and saves the outputs where a local run would, with no provider key and no inference configuration on your machine. `pipelex login` gets the key through your browser, `pipelex init` offers the hosted API as its default, and Python code runs there directly with pipelex-sdk's `PipelexAPIClient`, which now ships with pipelex.
+
+### Added
+
+- **Hosted runs with `--hosted`, `--local` and `[run] execution` (Breaking)**: `pipelex run method|pipe|bundle` and `pipelex-agent run` run on the hosted Pipelex API under `--hosted` and on this machine under `--local`, the new `[run] execution` setting (default `local`) choosing when neither is given, and `--base-url` or `PIPELEX_BASE_URL` naming another server. A hosted run boots nothing locally, uploads the local files its inputs name, prints the run id as soon as the run is acknowledged and names it in any later failure, Ctrl-C included. The agent CLI's `--runner pipelex|api` becomes `--runner local|hosted`, on pipelex-sdk's `PipelexAPIClient`, which `pipelex` now pins exactly.
+- **`pipelex login`**: gets a Pipelex API key through the browser, or from a hidden prompt with `--paste`, checks it against the hosted API and saves it to `~/.pipelex/.env` as `PIPELEX_API_KEY` without ever printing it. It warns when a working-directory `.env` would override the saved key, and `PIPELEX_APP_URL` aims it at another Pipelex app.
+- **`pipelex init` asks where runs execute**: Enter takes the hosted Pipelex API, which signs you in and needs no provider key, while the other answer sets up local backends and credentials as before; the answer is saved as `[run] execution`. `pipelex doctor` and `pipelex-agent doctor` judge a hosted setup by its API key, `pipelex doctor --fix` takes the hosted default only for a brand-new home, and `pipelex-agent init` accepts `"execution": "hosted"` in `--config`.
+- **`pipelex migrate` removes what a former release left for the Pipelex Gateway**: a configuration written for the Pipelex Gateway is refused at boot with the new `FormerReleaseConfigError`, which points at `pipelex migrate`. That command, `pipelex-agent migrate` (under `former_release`), `pipelex init` and `pipelex doctor --fix` remove the Gateway's backend, routing profiles, routes and files, keeping Pipelex Manifold's and a copy of every file they change.
+- **Shared helpers in the document engine contract**: `pipelex.cogt.doc_gen.layout_display` (`display_scalar`, `is_numeric_column`, `markdown_as_html`) and `pipelex.cogt.doc_gen.template_environment` (`make_plain_data_template_environment()`) give a plugin's engines the value display, Markdown conversion and sandboxed, strict Jinja environment of the built-in PDF engine, without importing ReportLab or Pipelex's internals.
+
+### Changed
+
+- **`RenderResources.load` returns the media type with the bytes (Breaking)**: a document engine's `load` returns a `LoadedResource` holding `data` and the `mime_type` its source declares (an `https://` response's `Content-Type`, a `data:` URL's type, or the storage provider's type for a `pipelex-storage://` key), else `None`. `PLUGIN_API_VERSION` moves to 6, so a plugin declaring `targets_api = 5` is refused at discovery until it is rebuilt to read `.data`.
+
+### Fixed
+
+- **A partial home configuration directory gets the kit's missing files**: every boot copies into `~/.pipelex/` (or `PIPELEX_HOME`) each kit file it lacks, never overwriting a file or writing through a symbolic link, the inference files as one unit only when `inference/backends.toml` is absent. A directory holding anything at all, such as an earlier release's `pipelex_service.toml`, was left as it was, and every boot then failed with "Config files are missing for the inference backend library".
+- **The internal backend's models are served whatever the routing profile**: a profile routing a model's name to no enabled backend left the internal models (`reportlab-pdf`, `pypdfium2-extract-pdf`, `docling-extract-text` and those plugins add) unserved, so local extraction and document steps were refused at load, as under the default `all_enabled_backends` profile with only the internal backend enabled. The internal backend now serves such a name, while a route sending it elsewhere still decides and disabling the backend still withholds its models.
+- **`pipelex-agent init --help` prints `list[str]`**: the `--config` help showed the schema's `"backends": list[str]` as `list`, because Rich read `[str]` as markup.
+
 ## [v0.78.0] - 2026-10-08
 
 ### Highlights

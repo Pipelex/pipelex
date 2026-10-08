@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -7,8 +8,16 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
+    from pipelex.hosted.run_config import RunExecution
+
+from pipelex.cli.commands.init.setup_path import SetupPath, read_run_execution
+from pipelex.cli.commands.login.command import LoginOutcome
+from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit
+
+#: What a person types at "Where should your runs execute?" to pick each path.
+SETUP_PATH_ANSWERS: dict[SetupPath, str] = {SetupPath.HOSTED: "1", SetupPath.LOCAL: "2"}
 
 
 def get_backend_indices_helper(backends_toml_path: str, backend_names: list[str]) -> list[int]:
@@ -122,6 +131,8 @@ class MockedInitEnvironment:
         self.mock_prompt_ask: Any = None
         self.mock_confirm_ask: Any = None
         self.mock_config_manager: Any = None
+        self.mock_login: Any = None
+        self.mock_browser_open: Any = None
 
         # Input sequences
         self.prompt_inputs: list[str] = []
@@ -194,6 +205,8 @@ class MockedInitEnvironment:
         self.mocker.patch("pipelex.cli.commands.init.backends.config_manager", self.mock_config_manager)
         self.mocker.patch("pipelex.cli.commands.init.routing.config_manager", self.mock_config_manager)
         self.mocker.patch("pipelex.cli.commands.init.config_files.config_manager", self.mock_config_manager)
+        # The credentials file, where `pipelex login` saves its key, lives in the home directory this test stands in
+        self.mocker.patch("pipelex.cli.commands.init.credentials.config_manager", self.mock_config_manager)
 
     def mock_console_outputs(self) -> None:
         """Mock Console handling to suppress output."""
@@ -216,6 +229,18 @@ class MockedInitEnvironment:
             value: The input value to simulate.
         """
         self.prompt_inputs.append(value)
+
+    def choose_setup_path(self, setup_path: SetupPath) -> None:
+        """Answer "Where should your runs execute?" with this path.
+
+        Args:
+            setup_path: The path to pick; Enter would take the hosted Pipelex API.
+        """
+        self.prompt_inputs.append(SETUP_PATH_ANSWERS[setup_path])
+
+    def choose_local(self) -> None:
+        """Answer "Where should your runs execute?" with this machine, the path every backend test walks."""
+        self.choose_setup_path(SetupPath.LOCAL)
 
     def add_confirm_input(self, value: bool) -> None:
         """Add a confirm input to the sequence.
@@ -256,6 +281,17 @@ class MockedInitEnvironment:
         # The IDE extension suggestion asks to install into the editor it finds on this machine, so it would
         # consume a queued answer and install into the real editor wherever the extension is missing
         self.mocker.patch("pipelex.cli.commands.init.backends.suggest_extension_install_if_needed")
+        self.mocker.patch("pipelex.cli.commands.init.command.suggest_extension_install_if_needed")
+
+        # The hosted path signs in through the browser: no test opens one or reaches the hosted API. The login
+        # reports a saved key by default; a test sets `mock_login.return_value` for another outcome.
+        self.mock_login = self.mocker.patch("pipelex.cli.commands.init.setup_path.login_with_browser", return_value=LoginOutcome.SAVED)
+        self.mock_browser_open = self.mocker.patch("pipelex.cli.commands.login.command.webbrowser.open")
+
+        # Start with no Pipelex API key, whatever the developer's shell exports, and restore the environment
+        # afterwards, since a login sets the key in it directly
+        self.mocker.patch.dict(os.environ)
+        os.environ.pop(PIPELEX_API_KEY_ENV_KEY, None)
 
     def get_backend_indices(self, backend_names: list[str]) -> list[int]:
         """Get 1-based indices for backend names.
@@ -293,6 +329,15 @@ class MockedInitEnvironment:
         """
         routing_path = str(self.inference_dir / "routing_profiles.toml")
         verify_routing_profile(routing_path, expected_active, expected_default, expected_fallback_order)
+
+    def verify_run_execution(self, expected: RunExecution | None) -> None:
+        """Verify where runs execute, as pipelex.toml sets it.
+
+        Args:
+            expected: The expected `[run] execution`, or None when the file should set none.
+        """
+        actual = read_run_execution(pipelex_toml_path=self.pipelex_dir / "pipelex.toml")
+        assert actual == expected, f"Expected [run] execution {expected!r}, got {actual!r}"
 
     def verify_telemetry(self, expected_mode: str) -> None:
         """Verify telemetry configuration.

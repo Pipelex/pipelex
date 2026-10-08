@@ -215,6 +215,19 @@ class TestHubLayeringGuard:
             "layer it belongs to."
         )
 
+    def test_the_hosted_run_package_stays_declared(self) -> None:
+        """`pipelex.hosted` must stay declared: a hosted run boots nothing and must load no interpreter module.
+
+        Its contract is that `pipelex run --hosted` works on a machine with no inference configured, which
+        holds only while nothing in it reaches the interpreter. Deleting the entry takes it out of the layer
+        rule, the transitive rule and the exceptions aggregate gate at once, with every one still passing.
+        """
+        assert "pipelex.hosted" in KERNEL_LAYER_PACKAGES, (
+            "pipelex.hosted runs methods on the hosted API without booting, and it is no longer declared "
+            "kernel-layer. Undeclared means unchecked, not flagged — restore the entry, or move whatever "
+            "made it dirty to the layer it belongs to."
+        )
+
     def test_kernel_layer_may_import_runtime_hub(self) -> None:
         """The permitted direction is never flagged — the kernel layer lives on `runtime_hub`."""
         violations = _violate(

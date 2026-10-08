@@ -1,9 +1,11 @@
-import shutil
+import errno
+import os
 from pathlib import Path
 from typing import Any, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
+from pipelex.kit.template_copy import can_fill_directory, copy_file_atomically, copy_kit_templates
 from pipelex.system.configuration.config_surface import (
     PIPELEX_CONFIG_SURFACE_ID,
     replay_surface_files_in_memory,
@@ -290,40 +292,74 @@ class ConfigLoader:
         return self.resolve_config_file(f"{INFERENCE_DIR_NAME}/{MODEL_DECKS_DIR_NAME}")
 
     def ensure_global_config_exists(self) -> None:
-        """Create the home configuration directory with kit template files if it doesn't exist or is empty.
+        """Lay the kit's template files into the home configuration directory wherever they are missing.
 
-        An empty directory is what `mktemp -d` or a fresh volume mount gives for `PIPELEX_HOME`, and it
-        holds nothing to keep. A directory with anything in it is left exactly as it is.
+        Every boot that loads the layered configuration calls this. The directory is created when it does
+        not exist, and each kit file it lacks is copied in, so a home holding only some files (a retired
+        `pipelex_service.toml`, a `.env`, a personal override) boots like a fresh one. A file the home
+        already has is never overwritten, which makes this a no-op on a home that holds every kit file.
+
+        A file is "already there" when anything stands at its path, a symbolic link included even when it
+        dangles, and nothing is ever written through a link: where the kit has a directory, a link to one,
+        valid or dangling, or a file standing in its place is left alone with everything under it. Each
+        file is written under a temporary name and renamed into place, so it appears whole or not at all.
+
+        The inference setup is one unit, as `pipelex init` sets it up: it is laid down only when the home
+        has no `inference/backends.toml`, the file `pipelex init` reads as "inference not set up yet", and
+        each area's kit manifest is then stamped unless one is already there. `backends.toml` is written
+        last, after the other inference files and the manifests, so a fill cut short part-way leaves it
+        absent and the next boot completes the fill. A home that has its own
+        `backends.toml` keeps its inference directory exactly as it is, because the kit's routing profiles,
+        deck and backend files copied beside it could route to, or alias the models of, backends it
+        disables; `pipelex init` and `pipelex update` are what change that directory.
+
+        An existing home this process cannot write to, a read-only mount or a directory another user owns,
+        is read as it is, and the boot names whatever its configuration then lacks. That is the one failure
+        tolerated here: any other error that stops a copy is raised.
         """
-        global_dir = self.global_config_dir
-        if global_dir.is_dir() and any(global_dir.iterdir()):
-            return
-
+        # Imported lazily to avoid a circular import: config_loader is loaded very early.
         from pipelex.kit.paths import GIT_IGNORED_CONFIG_FILES, get_kit_configs_dir  # ruff: ignore[import-outside-top-level]
 
-        config_template_dir = Path(str(get_kit_configs_dir()))
+        global_dir = self.global_config_dir
         global_dir.mkdir(parents=True, exist_ok=True)
+        kit_configs_dir = Path(str(get_kit_configs_dir()))
+        kit_inference_dir = kit_configs_dir / INFERENCE_DIR_NAME
+        inference_dir = global_dir / INFERENCE_DIR_NAME
+        backends_file = inference_dir / BACKENDS_FILE_NAME
+        try:
+            copy_kit_templates(
+                template_dir=kit_configs_dir,
+                target_dir=global_dir,
+                skip_names=GIT_IGNORED_CONFIG_FILES | {INFERENCE_DIR_NAME},
+                overwrite=False,
+            )
+            # A link counts as there even when it dangles, as it does in the copy itself, and an inference
+            # directory the fill may not enter, a link or a file, is the user's with everything under it.
+            if os.path.lexists(backends_file) or not can_fill_directory(directory=inference_dir):
+                return
+            # Past the return on purpose: the manifest module pulls in the inference backend chain, which
+            # only a home being filled needs. Lazy at all to avoid a circular import, as above.
+            from pipelex.cogt.models.deck_manifest import MANIFEST_FILENAME, stamp_missing_kit_manifests  # ruff: ignore[import-outside-top-level]
 
-        def copy_directory_structure(*, src_dir: Path, dst_dir: Path) -> None:
-            """Recursively copy directory structure from kit templates."""
-            for item in src_dir.iterdir():
-                if item.name in GIT_IGNORED_CONFIG_FILES or item.name == ".DS_Store":
-                    continue
-                dst_item = dst_dir / item.name
-                if item.is_dir():
-                    dst_item.mkdir(parents=True, exist_ok=True)
-                    copy_directory_structure(src_dir=item, dst_dir=dst_item)
-                else:
-                    shutil.copy2(item, dst_item)
-
-        copy_directory_structure(src_dir=config_template_dir, dst_dir=global_dir)
-
-        # Stamp the kit manifests of the deck and of backends/internal.toml so the boot-time staleness
-        # check and `pipelex update` have a baseline.
-        # Imported lazily to avoid a circular import — config_loader is loaded very early.
-        from pipelex.cogt.models.deck_manifest import stamp_kit_manifests  # ruff: ignore[import-outside-top-level]
-
-        stamp_kit_manifests(inference_dir=global_dir / "inference")
+            # `backends.toml` is what marks the inference setup as there, so it is left out of the walk and
+            # written last: a fill cut short by a full disk or a killed process leaves it absent, and the next
+            # boot resumes the fill rather than taking a half-copied directory for a complete one. The kit's
+            # own manifests are not templates either: a manifest records one install, so the home's are
+            # written for it rather than copied from whatever the kit's say.
+            copy_kit_templates(
+                template_dir=kit_inference_dir,
+                target_dir=inference_dir,
+                skip_names=GIT_IGNORED_CONFIG_FILES | {MANIFEST_FILENAME, BACKENDS_FILE_NAME},
+                overwrite=False,
+            )
+            stamp_missing_kit_manifests(inference_dir=inference_dir)
+            inference_dir.mkdir(parents=True, exist_ok=True)
+            # Nothing stands at its path, a link included, as the return above made sure, so this cannot
+            # write through one.
+            copy_file_atomically(source=kit_inference_dir / BACKENDS_FILE_NAME, destination=backends_file)
+        except OSError as exc:
+            if not (isinstance(exc, PermissionError) or exc.errno == errno.EROFS):
+                raise
 
     @classmethod
     def _override_files_for_dir(cls, config_dir: Path, *, include_run_mode: bool) -> list[Path]:

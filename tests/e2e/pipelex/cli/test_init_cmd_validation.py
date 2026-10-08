@@ -22,6 +22,7 @@ class TestInputValidation:
 
         # User inputs: invalid index, then valid
         env.add_confirm_input(True)  # Confirm initialization
+        env.choose_local()  # Where runs execute: this machine
         env.add_prompt_input("99")  # Invalid index
         env.add_prompt_input("")  # Valid: the recommended default
 
@@ -41,6 +42,7 @@ class TestInputValidation:
 
         # User inputs
         env.add_confirm_input(True)  # Confirm initialization
+        env.choose_local()  # Where runs execute: this machine
         env.add_prompt_input("abc")  # Invalid non-numeric
         env.add_prompt_input("")  # Valid: the recommended default
 
@@ -65,6 +67,7 @@ class TestInputValidation:
 
         # User inputs
         env.add_confirm_input(True)  # Confirm initialization
+        env.choose_local()  # Where runs execute: this machine
         env.add_prompt_input(indices_str)  # Space-separated indices
         env.add_prompt_input("1")  # Primary backend
         env.add_prompt_input("")  # Accept default fallback order
@@ -85,6 +88,7 @@ class TestInputValidation:
 
         # User inputs: empty string for default
         env.add_confirm_input(True)  # Confirm initialization
+        env.choose_local()  # Where runs execute: this machine
         env.add_prompt_input("")  # Empty = the recommended default
 
         env.setup_mocks()
@@ -108,6 +112,7 @@ class TestInputValidation:
 
         # User inputs
         env.add_confirm_input(True)  # Confirm initialization
+        env.choose_local()  # Where runs execute: this machine
         env.add_prompt_input(indices_str)  # Select 3 backends
         env.add_prompt_input("1")  # Primary backend
         env.add_prompt_input("1")  # Invalid: only 1 index instead of 2
@@ -134,6 +139,7 @@ class TestInputValidation:
 
         # User inputs
         env.add_confirm_input(True)  # Confirm initialization
+        env.choose_local()  # Where runs execute: this machine
         env.add_prompt_input(indices_str)  # Select 3 backends
         env.add_prompt_input("1")  # Primary backend
         env.add_prompt_input("1,1")  # Invalid: duplicate indices

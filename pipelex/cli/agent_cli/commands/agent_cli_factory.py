@@ -9,6 +9,7 @@ from typing import Any
 
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
+from pipelex.migration.exceptions import FormerReleaseConfigError
 from pipelex.pipelex import Pipelex
 from pipelex.runtime_hub import RuntimeHub
 from pipelex.system.console_target import ConsoleTarget
@@ -127,6 +128,10 @@ AGENT_CLI_CONFIG_OVERRIDES: Mapping[str, Any] = MappingProxyType(
 )
 
 
+#: The next step of a boot that failed, and of any other failure to read this machine's configuration.
+AGENT_INIT_FAILURE_HINT = "Initialization failed. Run 'pipelex-agent doctor' to diagnose, or 'pipelex init config' to reset configuration"
+
+
 def apply_agent_cli_output_discipline() -> None:
     """Reaffirm the agent CLI output contract on the Rich/hub channels post-init.
 
@@ -202,6 +207,10 @@ def make_pipelex_for_agent_cli(*, library_dirs: list[str] | list[Path] | None = 
         )
     except TelemetryConfigValidationError as exc:
         agent_error(exc.message, error_type="TelemetryConfigValidationError", cause=exc)
+    except FormerReleaseConfigError as exc:
+        # Its own hint rather than the generic one, which offers a reset: the cleanup keeps everything but what a former
+        # release left, and an agent can run it.
+        agent_error(exc.message, error_type="FormerReleaseConfigError", cause=exc)
     except ModelDeckPresetValidatonError as exc:
         agent_error(
             exc.message,
@@ -218,7 +227,7 @@ def make_pipelex_for_agent_cli(*, library_dirs: list[str] | list[Path] | None = 
             f"Pipelex initialization failed: {exc}",
             error_type=type(exc).__name__,
             cause=exc,
-            hint="Initialization failed. Run 'pipelex-agent doctor' to diagnose, or 'pipelex init config' to reset configuration",
+            hint=AGENT_INIT_FAILURE_HINT,
         )
 
     # Silence pipelex logs and Rich pretty-printing so the agent CLI emits only the

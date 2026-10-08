@@ -1,6 +1,6 @@
 ---
 title: "Document Engine Plugins"
-description: "How a PipeDocGen step finds the engine that prints it, a model of the doc_gen family, how a plugin declares its engines and their defaults, the render job an engine receives, the template checker it may offer, and how a runtime refuses at load what it cannot print."
+description: "How a PipeDocGen step finds the engine that prints it, a model of the doc_gen family, how a plugin declares its engines and their defaults, the render job an engine receives, what it shares with the built-in engine, the template checker it may offer, and how a runtime refuses at load what it cannot print."
 ---
 
 # Document Engine Plugins
@@ -119,10 +119,40 @@ def render(self, *, job: RenderJob, resources: RenderResources) -> RenderedDocum
 ```
 
 - **`RenderJob`** is plain data, which Pipelex builds in the print stage from the step's composition and hands to the worker in the same process. It has a JSON round trip for an engine that prints in another process, in which the template's bytes are URL-safe base64 and a date or a time is its ISO text. It holds the format and source, the file's name with its suffix, the document's title, and exactly the payload its source names, `layout` (a `LayoutDocument` from `layout_tree.py`), `html`, or `template` with `data`, the inputs as plain data by input name. It carries no Pipelex object, so an ordinary Pipelex release does not break an engine; a change to it, or to the worker, is a change of the plugin contract.
-- **`RenderResources.load(uri=…, position=…)`** is how an engine reads a file its document names, such as an image. It resolves `pipelex-storage://` keys through the run's storage provider, decodes `data:` URLs, fetches `https://` through the SSRF guard, and refuses what the run's read scope does not allow, a local path included, with `UriReadRefusedError`. An engine reads nothing any other way.
+- **`RenderResources.load(uri=…, position=…)`** is how an engine reads a file its document names, such as an image or a stylesheet. It resolves `pipelex-storage://` keys through the run's storage provider, decodes `data:` URLs, fetches `https://` through the SSRF guard, and refuses what the run's read scope does not allow, a local path included, with `UriReadRefusedError`. An engine reads nothing any other way. It returns a **`LoadedResource`**: the file's bytes as `data`, and as `mime_type` the media type the file's source gives it, described below.
 - **`RenderedDocument`** holds the bytes. Their MIME type and suffix are the format's.
 
 `render` is synchronous and runs on a thread of a print pool of its own, never on the event loop's default executor, which the engine's reads need, while `RenderResources.load` hands each read back to the event loop the print started from. An engine keeps no state from one print into the next. It signals a document it cannot print by raising `DocGenRenderError`, which passes through; anything else it raises, beyond a Pipelex error, is reported as a `DocGenRenderError` naming the engine and the file.
+
+The contract is what an engine uses in `pipelex.cogt.doc_gen`: the worker; the render job, its resources, the `LoadedResource` they return and the rendered document (`render_job.py`); the formats and sources (`doc_gen_format.py`); `DocGenRenderError`, the one error of `exceptions.py` an engine raises; the layout tree (`layout_tree.py`); the template check request and the findings a checker returns (`template_check.py`), with the input shapes the request carries (`InputShape` and `InputShapeKind` in `input_shape.py`); and the two modules of the next section. The rest of the package is Pipelex's own side of the print. An engine reaches Pipelex only through the contract and the registration seam every plugin uses, which also hands a worker its model spec, its backend, its SDK clients and its reporting delegate: anything else in Pipelex may move or change in an ordinary release, while a breaking change to the contract moves `PLUGIN_API_VERSION`. A piece an engine is missing is added to the contract, rather than imported from elsewhere in Pipelex.
+
+### The media type of a file an engine reads
+
+`LoadedResource.mime_type` is the type the file's source gives it, lowercased and without its parameters, such as `text/css`. Pipelex never guesses it, so it is `None` when the source gives none:
+
+| Source | `mime_type` |
+| --- | --- |
+| `https://` | The final response's `Content-Type`, after redirects; `None` when the response sends none. |
+| `data:` | The type the URL declares. |
+| `pipelex-storage://` on S3 or GCS | The content type recorded when the file was stored. |
+| `pipelex-storage://` on the local or in-memory provider | The type identified from the bytes, which covers binary formats only: a stylesheet or an SVG has none. |
+| A local path, read only by an unscoped run | `None`: a file system records no type. |
+
+A declared type is returned as declared, even a generic one such as `application/octet-stream`, and is not checked against the bytes. An engine that needs a type keeps its own guess, from the URI's extension or from the bytes, for a file whose source gives none or gives one that says nothing. An HTML engine is the case in point, since a print library such as WeasyPrint keeps a linked stylesheet only when its type is `text/css`, and a stylesheet served from a URL with no extension, as a web font service serves one, can be typed only by what its server declared. The built-in PDF engine reads images only and never looks at the type, because Pillow identifies an image from its bytes.
+
+---
+
+## What an engine shares with the built-in one
+
+A document should read the same whichever engine printed it, and a template should be held to the same rules whichever engine fills it, so an engine takes these from the contract rather than writing its own. None of them imports ReportLab, so an engine can use them without loading the built-in engine's library.
+
+`pipelex.cogt.doc_gen.layout_display` holds the rules by which every engine shows a layout tree's values, the built-in engine included:
+
+- **`display_scalar(value=…)`** writes a scalar as text: blank for nothing, `Yes` or `No` for a boolean, a whole float without its decimals, a date as `2026-09-29`, a datetime as `2026-09-29 14:05`, and a time of day as `09:07`, each followed by the UTC offset it states (` UTC`, ` +02:00`), if any.
+- **`is_numeric_column(values=…)`** says whether a table's column holds numbers only, blanks aside, and at least one, a boolean not counting as a number: such a column is aligned right.
+- **`markdown_as_html(markdown=…)`** converts a `MarkdownBlock` to an HTML fragment for an engine that writes HTML, with the one parser Pipelex reads Markdown with, as the `markdown` filter and the `Markdown` concept's HTML view do: CommonMark with tables and strikethrough, raw HTML shown as text, and only a URL with a scheme turned into a link, so `README.md` stays text. Called from an engine's own code, outside a template render, it is charged to no render budget, so an engine bounds what it converts itself.
+
+`pipelex.cogt.doc_gen.template_environment` holds **`make_plain_data_template_environment()`**, the Jinja environment an engine fills a template file's tags in when it fills them itself, as a Word template's tags are filled through docxtpl. It is synchronous; sandboxed as every Pipelex template is, each render spending from a budget of its own (see [Template Sandbox](template-sandbox.md)); strict, so a missing value fails the render instead of printing as empty text; and it registers only Jinja's built-in filters, since the plain data it reads holds no stuff for Pipelex's filters to work on.
 
 ---
 

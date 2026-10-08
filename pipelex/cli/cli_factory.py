@@ -4,10 +4,12 @@ from pathlib import Path
 
 from pipelex.cli.error_handlers import (
     ErrorContext,
+    handle_former_release_config_error,
     handle_model_deck_preset_error,
     handle_telemetry_config_validation_error,
 )
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
+from pipelex.migration.exceptions import FormerReleaseConfigError
 from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
@@ -49,3 +51,5 @@ def make_pipelex_for_cli(
         handle_telemetry_config_validation_error(exc)
     except ModelDeckPresetValidatonError as exc:
         handle_model_deck_preset_error(exc, context=context)
+    except FormerReleaseConfigError as exc:
+        handle_former_release_config_error(exc=exc)

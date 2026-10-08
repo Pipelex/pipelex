@@ -14,10 +14,10 @@ from pathlib import Path
 from pytest_mock import MockerFixture
 
 from pipelex.fix_ops.exceptions import FixTransactionError, FixWriteConflictError
-from pipelex.fix_ops.file_transaction import FileSnapshot, PendingFileUpdate, commit_file_updates
+from pipelex.fix_ops.file_transaction import FileSnapshot, PendingFileUpdate, assert_snapshot_unchanged, commit_file_updates, read_file_snapshot
 from pipelex.migration.backup import WrittenBackup, existing_backups_of, write_backup
 from pipelex.migration.plan import FileBlockedReason
-from pipelex.migration.runner import migrate_directories, migrate_file
+from pipelex.migration.runner import FileWriteOutcome, migrate_directories, migrate_file, remove_file_with_backup
 from pipelex.migration.surfaces import SurfaceRegistry
 from pipelex.suggested_fix import RenameTableKeyOp
 from tests.unit.pipelex.migration.conftest import EXAMPLE_SURFACE_ID, EntryBuilder, LedgerBuilder, SurfaceBuilder
@@ -758,6 +758,58 @@ class TestMigrationRunner:
         assert plan.was_written
         assert not stale_backup.exists()
         assert rescued.read_text(encoding="utf-8") == "the original, from a run that could not vouch for its write\n"
+
+    def test_two_removals_of_one_file_in_the_same_second_keep_the_only_copy(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """The removal's twin of the same-second collision: the run that loses keeps the copy the winner adopted.
+
+        Run A backs the file up; run B, in the same second, finds that backup's name taken, adopts it, and removes the
+        file. Run A then finds the file gone and gives up. Its copy is the one run B's report names, and the only copy
+        of the file anywhere: deleting it as an unneeded backup of a removal that did not happen would lose the file.
+        """
+        target = tmp_path / "pipelex_service.toml"
+        target.write_text("[terms]\naccepted = true\n", encoding="utf-8")
+        snapshot_of_run_a = read_file_snapshot(target)
+        snapshot_of_run_b = read_file_snapshot(target)
+        real_check = assert_snapshot_unchanged
+        checks: list[FileSnapshot] = []
+        outcomes_of_run_b: list[FileWriteOutcome] = []
+
+        def _run_b_runs_whole_first(snapshot: FileSnapshot) -> None:
+            checks.append(snapshot)
+            if len(checks) == 1:
+                outcomes_of_run_b.append(remove_file_with_backup(snapshot=snapshot_of_run_b, moment=MOMENT))
+            real_check(snapshot)
+
+        mocker.patch("pipelex.migration.runner.assert_snapshot_unchanged", side_effect=_run_b_runs_whole_first)
+
+        outcome_of_run_a = remove_file_with_backup(snapshot=snapshot_of_run_a, moment=MOMENT)
+
+        assert outcomes_of_run_b[0].was_written
+        assert outcome_of_run_a.blocked_reason is FileBlockedReason.CHANGED_DURING_RUN
+        assert not target.exists()
+        backups = existing_backups_of(path=target)
+        assert [backup.read_text(encoding="utf-8") for backup in backups] == ["[terms]\naccepted = true\n"]
+        assert outcome_of_run_a.backup_path == backups[0]
+
+    def test_a_removal_refused_over_a_users_edit_takes_its_copy_back(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """A file still there with other content is the user's edit: nothing was removed, and no copy is left beside it."""
+        target = tmp_path / "pipelex_service.toml"
+        target.write_text("[terms]\naccepted = true\n", encoding="utf-8")
+        snapshot = read_file_snapshot(target)
+        real_check = assert_snapshot_unchanged
+
+        def _the_user_edits_it_first(checked: FileSnapshot) -> None:
+            target.write_text("[terms]\naccepted = false\n", encoding="utf-8")
+            real_check(checked)
+
+        mocker.patch("pipelex.migration.runner.assert_snapshot_unchanged", side_effect=_the_user_edits_it_first)
+
+        outcome = remove_file_with_backup(snapshot=snapshot, moment=MOMENT)
+
+        assert outcome.blocked_reason is FileBlockedReason.CHANGED_DURING_RUN
+        assert outcome.backup_path is None
+        assert target.read_text(encoding="utf-8") == "[terms]\naccepted = false\n"
+        assert not existing_backups_of(path=target)
 
     def test_a_missing_configuration_directory_is_skipped_rather_than_refused(
         self,

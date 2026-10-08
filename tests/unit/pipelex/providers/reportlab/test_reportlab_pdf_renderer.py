@@ -19,14 +19,12 @@ from pipelex.cogt.doc_gen.layout_tree import (
     LayoutColumn,
     LayoutDocument,
     LayoutField,
-    LayoutScalar,
     MarkdownBlock,
     ParagraphsBlock,
     SectionBlock,
     TableBlock,
 )
 from pipelex.cogt.doc_gen.render_job import RenderJob
-from pipelex.providers.reportlab.reportlab_pdf_renderer import display_scalar
 from tests.unit.pipelex.providers.reportlab.reportlab_test_helpers import (
     TEST_FILENAME,
     TEST_TITLE,
@@ -38,6 +36,7 @@ from tests.unit.pipelex.providers.reportlab.reportlab_test_helpers import (
     image_count,
     page_texts,
     pdf_title,
+    png_bytes,
     png_data_url,
     render_layout,
 )
@@ -121,6 +120,12 @@ class TestReportlabPdfRenderer:
         assert len(page_texts(pdf_data=pdf_data)) == 1
         assert image_count(pdf_data=pdf_data) == 1
 
+    def test_an_image_prints_whatever_type_its_source_declares(self) -> None:
+        """Pillow identifies an image from its bytes, so a misleading declared type does not stop it printing."""
+        resources = StubRenderResources(answer=png_bytes(width=64, height=32), answer_mime_type="text/plain")
+        pdf_data = render_layout(blocks=[ImageBlock(url="pipelex-storage://run/chart", caption=None)], resources=resources)
+        assert image_count(pdf_data=pdf_data) == 1
+
     def test_a_file_that_is_not_an_image_is_refused_with_its_position(self) -> None:
         resources = StubRenderResources(answer=b"<svg xmlns='http://www.w3.org/2000/svg'/>")
         with pytest.raises(DocGenRenderError, match="image 1 of the document") as exc_info:
@@ -155,10 +160,6 @@ class TestReportlabPdfRenderer:
             "as part of it is taller than a page and cannot be split across pages."
         )
         assert exc_info.value.error_domain == ErrorDomain.INPUT
-
-    @pytest.mark.parametrize(("value", "expected"), ReportlabRendererTestData.SCALAR_CASES)
-    def test_a_scalar_prints_plainly(self, value: LayoutScalar, expected: str) -> None:
-        assert display_scalar(value=value) == expected
 
     def test_table_cells_print_their_scalars(self) -> None:
         table = TableBlock(

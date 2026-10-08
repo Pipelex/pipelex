@@ -4,12 +4,11 @@ from typing import Annotated
 
 import typer
 from click import Command, Context
-from mthds.runners.types import RunnerType
 from typer.core import TyperGroup
 from typing_extensions import override
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import silence_logging_for_agent_cli
-from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, set_agent_cli_error_format
+from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, set_agent_cli_error_format
 from pipelex.cli.agent_cli.commands.check_model_cmd import agent_check_model_cmd
 from pipelex.cli.agent_cli.commands.codegen.app import codegen_app
 from pipelex.cli.agent_cli.commands.doctor_cmd import agent_doctor_cmd
@@ -80,7 +79,6 @@ def version_callback(value: bool) -> None:  # kw-only: ignore — click invokes 
 
 @app.callback(invoke_without_command=True)
 def app_callback(
-    ctx: typer.Context,
     version: Annotated[  # ruff: ignore[unused-function-argument]
         bool,
         typer.Option(
@@ -91,10 +89,6 @@ def app_callback(
             is_eager=True,
         ),
     ] = False,
-    runner: Annotated[
-        str,
-        typer.Option("--runner", help="Runner to use: 'pipelex' (local) or 'api' (remote MTHDS API)."),
-    ] = "pipelex",
 ) -> None:
     """Agent CLI callback - no logo, minimal output.
 
@@ -109,7 +103,7 @@ def app_callback(
     touches no log path. For verbose debugging, use the human ``pipelex`` CLI instead.
     """
     # Process-global logging cutoff, armed BEFORE any command body runs and BEFORE any
-    # error-format / runner-validation code below can route through ``log.*``. This is the
+    # error-format code below can route through ``log.*``. This is the
     # primary armor for the stdout/stderr discipline; the per-call invocations inside
     # ``make_pipelex_for_agent_cli`` and ``agent_doctor_cmd`` are kept as defense-in-depth
     # for direct library callers that bypass this Typer entry point.
@@ -118,16 +112,6 @@ def app_callback(
     # a markdown command cannot leak markdown into a later JSON-only command in the same process.
     # --format / --error-format commands override this afterwards; JSON-only commands keep the JSON default.
     set_agent_cli_error_format(CliOutputFormat.JSON)
-
-    ctx.ensure_object(dict)
-    try:
-        ctx.obj["runner"] = RunnerType(runner)
-    except ValueError:
-        valid_values = ", ".join(runner_type.value for runner_type in RunnerType)
-        agent_error(
-            f"Invalid runner '{runner}'. Valid values: {valid_values}",
-            error_type="ArgumentError",
-        )
 
 
 app.command(name="init", help="Initialize Pipelex configuration (non-interactive)")(agent_init_cmd)

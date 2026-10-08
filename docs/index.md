@@ -25,7 +25,7 @@ Describe how the work gets done in plain English, and your coding agent builds i
 
 -   :material-laptop: **[Run It Yourself](./get-started/run-it-yourself.md)**
 
-    Install the Pipelex runtime and run methods on your own machine, against the model providers you choose.
+    Install the Pipelex runtime and run methods from your terminal: on the hosted Pipelex API with one sign-in, or on your own machine against the model providers you choose.
 
 -   :material-school: **[MTHDS Language Tutorial](./get-started/mthds-language-tutorial.md)**
 
