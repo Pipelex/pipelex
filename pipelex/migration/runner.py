@@ -12,6 +12,7 @@ engine replays the whole ledger over every file and the applier skips whatever i
 See `docs/migration-ledger.md` → "Applying" and "Per-file transactions".
 """
 
+import os
 from collections.abc import Collection
 from datetime import UTC, datetime
 from pathlib import Path
@@ -158,7 +159,7 @@ def _refuse_a_file_below_the_floor(*, surface: Surface, ledger: MigrationLedger,
 class FileWriteOutcome(NamedTuple):
     """What a backed-up write or removal of one file did: where the copy is, whether it landed, and why not.
 
-    The four fields a migration plan carries for the file, so a caller reports a write the same way whatever it wrote.
+    The fields a migration plan carries for the file, so a caller reports a write the same way whatever it wrote.
     """
 
     backup_path: Path | None = None
@@ -242,8 +243,9 @@ def remove_file_with_backup(*, snapshot: FileSnapshot, moment: datetime) -> File
 
     The copy is taken first and kept, so a removed file is one rename away from being back. The file is removed only
     if it is still exactly what was read: a file changed or removed in between is someone else's work, reported and
-    left alone, and the copy this run took of it is taken back. The path itself is removed, so a symbolic link goes and
-    the file it names, someone's dotfiles, stays.
+    left alone. The copy this run took of a file still on disk is taken back; the copy of a file that is gone stays,
+    since a concurrent run may have removed it after adopting that copy as its own (`_discard_created_backup`). The
+    path itself is removed, so a symbolic link goes and the file it names, someone's dotfiles, stays.
 
     Like the write, nothing raised here crosses the per-file boundary.
     """
@@ -256,16 +258,20 @@ def remove_file_with_backup(*, snapshot: FileSnapshot, moment: datetime) -> File
         assert_snapshot_unchanged(snapshot)
         snapshot.path.unlink()
     except FixWriteConflictError as exc:
-        _discard_created_backup(backup=backup)
-        return FileWriteOutcome(blocked_reason=FileBlockedReason.CHANGED_DURING_RUN, blocked_detail=str(exc))
+        kept = _discard_created_backup(backup=backup, snapshot=snapshot)
+        return FileWriteOutcome(blocked_reason=FileBlockedReason.CHANGED_DURING_RUN, blocked_detail=str(exc), backup_path=kept)
     except FileNotFoundError:
-        _discard_created_backup(backup=backup)
+        kept = _discard_created_backup(backup=backup, snapshot=snapshot)
         return FileWriteOutcome(
-            blocked_reason=FileBlockedReason.CHANGED_DURING_RUN, blocked_detail="the file was removed while the cleanup was running"
+            blocked_reason=FileBlockedReason.CHANGED_DURING_RUN,
+            blocked_detail="the file was removed while the cleanup was running",
+            backup_path=kept,
         )
     except OSError as exc:
-        _discard_created_backup(backup=backup)
-        return FileWriteOutcome(blocked_reason=FileBlockedReason.UNWRITABLE, blocked_detail=f"the file could not be removed: {exc.strerror or exc}")
+        kept = _discard_created_backup(backup=backup, snapshot=snapshot)
+        return FileWriteOutcome(
+            blocked_reason=FileBlockedReason.UNWRITABLE, blocked_detail=f"the file could not be removed: {exc.strerror or exc}", backup_path=kept
+        )
 
     _prune_older_backups(snapshot=snapshot, backup=backup)
     return FileWriteOutcome(backup_path=backup.path, was_written=True)
@@ -282,14 +288,27 @@ def _prune_older_backups(*, snapshot: FileSnapshot, backup: WrittenBackup) -> No
         )
 
 
-def _discard_created_backup(*, backup: WrittenBackup) -> None:
-    """Remove the copy this run made of a file it then did not remove; another run's copy is that run's."""
+def _discard_created_backup(*, backup: WrittenBackup, snapshot: FileSnapshot) -> Path | None:
+    """Remove the copy this run made of a file it then did not remove, unless it may be the last copy of that file.
+
+    The removal's `_discard_backup`, asking the file the same question. Another run's copy is that run's, and stays. A
+    file still on disk was not removed by anyone — a user edited it, or it would not go — so this run's copy backs
+    up nothing and goes. A file no longer on disk may have been removed by a concurrent run of the same second, which
+    found this copy's name taken and adopted it as its own: that copy is then the only one of the file anywhere, named
+    by a report that is already out, so it stays.
+
+    Returns:
+        The copy that stays and is worth naming, or `None` when there is none.
+    """
     if not backup.was_created:
-        return
+        return None
+    if not os.path.lexists(snapshot.path):
+        return backup.path
     try:
         backup.path.unlink(missing_ok=True)
     except OSError as exc:
         log.warning(f"the backup '{backup.path}' was made for a removal that did not happen and could not be removed: {exc.strerror or exc}")
+    return None
 
 
 def _keep_the_original(*, backup: WrittenBackup, path: Path, moment: datetime) -> RescuedBackup:
