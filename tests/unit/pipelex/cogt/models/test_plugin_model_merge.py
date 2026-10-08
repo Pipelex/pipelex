@@ -138,6 +138,13 @@ class TestPluginModelMerge:
         assert model_deck.get_required_inference_model(model_handle="reportlab-pdf", model_type=ModelType.TEXT_EXTRACTOR).model_id == "read-pdf"
         assert model_deck.get_required_inference_model(model_handle="reportlab-pdf", model_type=ModelType.DOC_GEN).model_id == "print-pdf"
 
+    def test_a_plugin_table_may_not_set_handle(self, inference_dir: Path) -> None:
+        """A plugin names its model when it declares it, so a `handle` key in its table could only contradict that name."""
+        declarations = _declarations(internal_models={"pipelex-xlsx": {**PIPELEX_XLSX_SPEC, "handle": "other-name"}}, doc_gen_defaults={})
+
+        with pytest.raises(PluginModelDeclarationError, match="Plugin 'doc-gen' declares the internal model 'pipelex-xlsx' with a 'handle' key"):
+            self._setup(inference_dir=inference_dir, plugin_model_declarations=declarations)
+
     def test_a_plugin_table_takes_no_file_defaults(self, inference_dir: Path) -> None:
         """The plugin's table is complete on its own: `internal.toml`'s `[defaults]` reaches the file's models only."""
         internal_toml_path = inference_dir / "backends" / "internal.toml"

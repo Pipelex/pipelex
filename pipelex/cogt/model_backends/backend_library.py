@@ -22,7 +22,14 @@ from pipelex.cogt.model_backends.backend_factory import (
 )
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.model_backends.credential_resolution import CredentialResolution
-from pipelex.cogt.model_backends.model_spec_document import MODEL_SPEC_DEFAULTS_TABLE
+from pipelex.cogt.model_backends.model_spec_document import (
+    MODEL_SPEC_DEFAULTS_TABLE,
+    MODEL_SPEC_HANDLE_FIELD,
+    describe_duplicate_declared_model,
+    describe_handle_in_defaults,
+    find_duplicate_declared_model,
+    list_declared_model_specs,
+)
 from pipelex.cogt.model_backends.model_spec_factory import (
     BackendModelSpecs,
     InferenceModelSpecBlueprint,
@@ -493,6 +500,19 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         """
         remaining_tables = dict(model_specs_dict)
         defaults_dict: dict[str, Any] = remaining_tables.pop(MODEL_SPEC_DEFAULTS_TABLE, {})
+        if MODEL_SPEC_HANDLE_FIELD in defaults_dict:
+            msg = f"Invalid model specs for backend '{backend_name}' from {backend_config_source}: {describe_handle_in_defaults()}"
+            raise InferenceBackendLibraryError(msg, backend_name=backend_name)
+        # The handle each table serves and the type it declares, read as every other reader of the file reads them.
+        declared_model_specs = list_declared_model_specs(document=model_specs_dict)
+        if duplicate := find_duplicate_declared_model(declared_model_specs=declared_model_specs):
+            first, second = duplicate
+            msg = (
+                f"Invalid model specs for backend '{backend_name}' from {backend_config_source}: "
+                f"{describe_duplicate_declared_model(first=first, second=second)}"
+            )
+            raise InferenceBackendLibraryError(msg, backend_name=backend_name)
+        handles_by_table = {declared.table_name: declared.handle for declared in declared_model_specs}
         backend_model_specs = ModelSpecIndex.make_empty()
         for model_spec_name, value in remaining_tables.items():
             if not isinstance(value, dict):
@@ -518,7 +538,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 model_spec_blueprint = InferenceModelSpecBlueprint.model_validate(model_spec_blueprint_dict)
                 model_spec = InferenceModelSpecFactory.make_inference_model_spec(
                     backend_name=backend_name,
-                    name=model_spec_name,
+                    name=handles_by_table[model_spec_name],
                     blueprint=model_spec_blueprint,
                     backend_listed_constraints=backend_listed_constraints,
                     backend_valued_constraints=backend_valued_constraints,
@@ -711,6 +731,12 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 msg = (
                     f"Plugin '{plugin_model.plugin}' declares an internal model named '{model_name}', which is the name of a backend "
                     "file's table of defaults, so it cannot name a model."
+                )
+                raise PluginModelDeclarationError(msg, plugin=plugin_model.plugin)
+            if MODEL_SPEC_HANDLE_FIELD in plugin_model.spec:
+                msg = (
+                    f"Plugin '{plugin_model.plugin}' declares the internal model '{model_name}' with a '{MODEL_SPEC_HANDLE_FIELD}' key. "
+                    "A plugin names its model when it declares it, and may declare one name once per model type: leave the key out."
                 )
                 raise PluginModelDeclarationError(msg, plugin=plugin_model.plugin)
             try:

@@ -17,6 +17,10 @@ BackendModelSpecs = dict[str, Any]
 
 class InferenceModelSpecBlueprint(ConfigModel):
     enabled: bool = True
+    # The handle this table serves when it is not the table's own name: how one backend file declares a
+    # second model of one handle, of another model type, since TOML forbids declaring a table twice.
+    # Never in `[defaults]`, which every table of the file inherits.
+    handle: str | None = Field(default=None, min_length=1)
     sdk: str
     variant: str | None = None
     model_type: ModelType = Field(default=DEFAULT_MODEL_TYPE, strict=False)
@@ -86,6 +90,11 @@ class InferenceModelSpecFactory(BaseModel):
         backend_valued_constraints: dict[ValuedConstraint, Any],
         extra_headers: dict[str, str] | None = None,
     ) -> InferenceModelSpec:
+        """Build a model spec from its validated blueprint.
+
+        `name` is the handle the spec serves: the table's `handle` key when it sets one, else the table's
+        own name. The model id defaults to it.
+        """
         # Merge constraints: backend as base, model-level adds/overrides
         # Listed constraints: union of backend + model (model can add, not remove)
         merged_listed_constraints = list(set(backend_listed_constraints + blueprint.listed_constraints))
