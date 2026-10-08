@@ -1,0 +1,34 @@
+################################################################################
+# GENERATED FROM pipelex-server's models/ BY model-registry. DO NOT EDIT.
+#
+# Pipelex Manifold's model specs: the catalog without the gateway's and the registry's keys.
+# Registry version 40a5dcbb3d810817, built from a working tree.
+# Edit models/ and run `make models` at the repository root.
+################################################################################
+
+[defaults]
+model_type = "llm"
+sdk = "manifold_completions"
+structure_method = "instructor/openai_tools"
+
+[gpt-4o-mini]
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+sdk = "manifold_responses"
+structure_method = "instructor/openai_responses_tools"
+thinking_mode = "none"
+
+[gpt-4o-mini.costs]
+input = 0.15
+output = 0.6
+
+[gpt-4o]
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+sdk = "manifold_responses"
+structure_method = "instructor/openai_responses_tools"
+thinking_mode = "none"
+
+[gpt-4o.costs]
+input = 2.5
+output = 10.0

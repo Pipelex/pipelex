@@ -130,6 +130,7 @@ own page. Classes are grouped by subsystem.
 
 ## Migration
 
+- [`FormerReleaseConfigError`](former-release-config-error.md) — Configuration left by a former release
 - [`MigrationError`](migration-error.md) — Migration error
 - [`MigrationGoldenError`](migration-golden-error.md) — Migration golden error
 - [`MigrationLedgerError`](migration-ledger-error.md) — Migration ledger error

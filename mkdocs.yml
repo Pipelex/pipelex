@@ -291,6 +291,7 @@ plugins:
         Reference:
         - tools/cli/index.md: "CLI Reference Overview"
         - tools/cli/init.md: "CLI Init"
+        - tools/cli/login.md: "CLI Login"
         - tools/cli/update.md: "CLI Update"
         - tools/cli/migrate.md: "CLI Migrate"
         - tools/cli/validate.md: "CLI Validate"
@@ -532,6 +533,7 @@ nav:
     - CLI Reference:
       - Overview: tools/cli/index.md
       - Init: tools/cli/init.md
+      - Login: tools/cli/login.md
       - Update: tools/cli/update.md
       - Migrate: tools/cli/migrate.md
       - Validate: tools/cli/validate.md

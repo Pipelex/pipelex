@@ -33,9 +33,12 @@ from pipelex.base_exceptions import ErrorDomain
 from pipelex.hosted.client_factory import HOSTED_API_DEFAULT_BASE_URL, PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
 from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunError, HostedRunInterruptedError, HostedRunPollingError
 
-#: Where a hosted run takes its key from, and where a person gets one.
+#: The command that gets a Pipelex API key and saves it where a hosted run reads it.
+PIPELEX_LOGIN_COMMAND = "pipelex login"
+#: Where a hosted run takes its key from, and how a person gets one.
 HOSTED_API_KEY_NEXT_STEP = (
-    f"Set {PIPELEX_API_KEY_ENV_KEY} to a Pipelex API key (plx_sk_…) in your shell or in ~/.pipelex/.env; create one on app.pipelex.com"
+    f"Run {PIPELEX_LOGIN_COMMAND} to get a Pipelex API key (plx_sk_…) and save it to ~/.pipelex/.env as {PIPELEX_API_KEY_ENV_KEY}, "
+    f"or set {PIPELEX_API_KEY_ENV_KEY} to one in your shell"
 )
 #: Where a hosted run takes its origin from.
 HOSTED_BASE_URL_NEXT_STEP = (
@@ -56,7 +59,8 @@ HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS: dict[int, str] = {
     401: f"The hosted API refused the credentials. {HOSTED_API_KEY_NEXT_STEP}",
     403: (
         f"The hosted API refused the request: check that {PIPELEX_API_KEY_ENV_KEY} is a valid key for the API at "
-        f"{PIPELEX_BASE_URL_ENV_KEY} (or --base-url); when it is, the message says what this request may not do"
+        f"{PIPELEX_BASE_URL_ENV_KEY} (or --base-url), and run {PIPELEX_LOGIN_COMMAND} to replace it when it is not; "
+        "when it is, the message says what this request may not do"
     ),
     404: f"The hosted API has no such method or route: check the method's address or catalog id. {HOSTED_BASE_URL_NEXT_STEP}",
     429: _RATE_LIMITED_NEXT_STEP,

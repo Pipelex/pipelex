@@ -12,6 +12,7 @@ from pipelex.cli.agent_cli.commands.agent_cli_factory import (
 )
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success, set_agent_cli_error_format
 from pipelex.cli.commands.doctor_cmd import (
+    LOCAL_RUNS_ONLY_NOTE,
     BackendFileReport,
     ConfigLocationInfo,
     LogSinkCheck,
@@ -25,11 +26,15 @@ from pipelex.cli.commands.doctor_cmd import (
     check_config_files,
     check_models,
     check_pending_migrations,
+    check_pipelex_api_key_set,
     check_telemetry_config,
     gather_config_location,
+    resolve_doctor_run_execution,
     setup_doctor_runtime,
 )
 from pipelex.core.validation import MIGRATE_COMMAND
+from pipelex.hosted.error_rendering import PIPELEX_LOGIN_COMMAND
+from pipelex.hosted.run_config import RunExecution
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.tools.log.log import log
 
@@ -39,8 +44,15 @@ def _status_icon(*, healthy: bool) -> str:
     return "\u2705" if healthy else "\u26a0\ufe0f"
 
 
+def _informational_or_status_icon(*, check: dict[str, Any]) -> str:
+    """The row's status icon, or an information sign for a row a hosted setup reports without counting it."""
+    if check.get("informational") and not check["healthy"]:
+        return "\u2139\ufe0f"
+    return _status_icon(healthy=check["healthy"])
+
+
 def _pending_migrations_actions(*, check: PendingMigrationsCheck) -> list[str]:
-    """What to tell an agent about the pending-migrations row — none, one move, or two.
+    """What to tell an agent about the pending-migrations row: nothing when it is up to date, else one action per thing it found.
 
     A machine consumer never learns of a pending migration from a boot: a stale configuration the
     ledger can explain boots with a warning, and the agent CLI silences its own logging before one
@@ -49,22 +61,34 @@ def _pending_migrations_actions(*, check: PendingMigrationsCheck) -> list[str]:
     Two actions rather than one when a run both migrates some files and leaves others behind,
     which is the ordinary shape on a machine that has drifted: the command is worth running *and*
     something is still owed afterwards, and an agent that only heard the first would stop early.
+    The cleanup of what a former release left is the command's first step, and has its own action. A boot the command
+    would leave refused has one too, and it can be the only one: with nothing left to clean, the row lists no file.
     """
     actions: list[str] = []
     match check.finding:
         case PendingMigrationsFinding.UP_TO_DATE:
             return actions
-        case PendingMigrationsFinding.PENDING:
-            migratable = ", ".join(check.migratable_files)
-            actions.append(f"Run '{MIGRATE_COMMAND}' to bring these configuration files up to date (it keeps the settings in them): {migratable}")
-        case PendingMigrationsFinding.NEEDS_ATTENTION:
+        case PendingMigrationsFinding.PENDING | PendingMigrationsFinding.NEEDS_ATTENTION:
             pass
         case PendingMigrationsFinding.UNAVAILABLE:
             actions.append(f"{check.message}. Run '{MIGRATE_COMMAND} --dry-run' to check by hand.")
+    if check.former_release_files:
+        stops = ", which stops every boot until it is gone" if check.former_release_blocks_boot else ""
+        actions.append(
+            f"Run '{MIGRATE_COMMAND}' to clean up what a former release left for the Pipelex Gateway{stops} "
+            f"(it keeps a copy of each file): {', '.join(check.former_release_files)}"
+        )
+    if check.migratable_files:
+        migratable = ", ".join(check.migratable_files)
+        actions.append(f"Run '{MIGRATE_COMMAND}' to bring these configuration files up to date (it keeps the settings in them): {migratable}")
     if check.attention_files:
         attention = ", ".join(check.attention_files)
         actions.append(
             f"Run '{MIGRATE_COMMAND} --dry-run' to see what these configuration files carry that the migration will not do on its own: {attention}"
+        )
+    if check.boot_still_blocked:
+        actions.append(
+            f"Run '{MIGRATE_COMMAND} --dry-run' to see what still stops Pipelex from starting, which the command leaves for a person to fix"
         )
     return actions
 
@@ -109,6 +133,9 @@ def _format_doctor_markdown(result: dict[str, Any]) -> str:
         f"**Status:** {status_text}",
         f"**Config location:** {config_location['config_dir']} ({location_type})",
     ]
+    execution = result.get("execution")
+    if execution is not None:
+        lines.append(f"**Execution:** `{execution}`")
 
     # Config Files
     config_check = checks["config_files"]
@@ -119,6 +146,8 @@ def _format_doctor_markdown(result: dict[str, Any]) -> str:
     migrations_check = checks["pending_migrations"]
     lines.append(f"\n## Configuration Migrations \u2014 {_status_icon(healthy=migrations_check['healthy'])}\n")
     lines.append(migrations_check["message"])
+    for file_path in migrations_check.get("former_release_files", []):
+        lines.append(f"- `{file_path}`: left by a former release")
     for file_path in migrations_check["migratable_files"]:
         lines.append(f"- `{file_path}`: out of date")
     for file_path in migrations_check["attention_files"]:
@@ -147,10 +176,18 @@ def _format_doctor_markdown(result: dict[str, Any]) -> str:
         lines.append(f"\n## Log Sink \u2014 {_status_icon(healthy=log_sink_check['healthy'])}\n")
         lines.append(log_sink_check["message"])
 
+    # Pipelex API Key, present only when runs execute on the hosted Pipelex API
+    api_key_check = checks.get("pipelex_api_key")
+    if api_key_check is not None:
+        lines.append(f"\n## Pipelex API Key \u2014 {_status_icon(healthy=api_key_check['healthy'])}\n")
+        lines.append(api_key_check["message"])
+
     # Backend Credentials
     creds_check = checks["backend_credentials"]
-    lines.append(f"\n## Backend Credentials \u2014 {_status_icon(healthy=creds_check['healthy'])}\n")
+    lines.append(f"\n## Backend Credentials \u2014 {_informational_or_status_icon(check=creds_check)}\n")
     lines.append(creds_check["message"])
+    if creds_check.get("informational"):
+        lines.append(LOCAL_RUNS_ONLY_NOTE + ".")
     for backend_entry in creds_check.get("backends", []):
         name = backend_entry["backend_name"]
         if backend_entry["all_credentials_valid"]:
@@ -170,9 +207,11 @@ def _format_doctor_markdown(result: dict[str, Any]) -> str:
     models_skipped_flag = models_check.get("skipped", False)
     # Skipped state renders with the warn icon so consumers don't confuse "deferred until
     # config is fixed" with a genuine models failure.
-    models_icon = "\u26a0\ufe0f" if models_skipped_flag else _status_icon(healthy=models_check["healthy"])
+    models_icon = "\u26a0\ufe0f" if models_skipped_flag else _informational_or_status_icon(check=models_check)
     lines.append(f"\n## Models \u2014 {models_icon}\n")
     lines.append(models_check["message"])
+    if models_check.get("informational"):
+        lines.append(LOCAL_RUNS_ONLY_NOTE + ".")
     for file_entry in models_check.get("backend_files", []):
         name = file_entry["backend_name"]
         if file_entry["is_valid"]:
@@ -316,12 +355,19 @@ def _do_agent_doctor_cmd(*, global_: bool, output_format: CliOutputFormat, error
     # installed a hub or configured log — the helper guards both internally).
     apply_agent_cli_output_discipline()
 
+    # Where runs execute decides what the setup needs: a hosted run boots nothing here, so it needs a Pipelex API key
+    # and none of the provider keys or local models the rows above check, which then count only for --local runs.
+    run_execution = resolve_doctor_run_execution() if config_healthy else RunExecution.LOCAL
+    local_inference_counts = not run_execution.is_hosted
+    pipelex_api_key_check = None if local_inference_counts else check_pipelex_api_key_set()
+
     all_healthy = (
         config_healthy
         and pending_migrations_check.is_healthy
         and telemetry_check.is_healthy
-        and backends_healthy
-        and models_healthy
+        and (backends_healthy or not local_inference_counts)
+        and (models_healthy or not local_inference_counts)
+        and (pipelex_api_key_check is None or pipelex_api_key_check.is_healthy)
         and (log_sink_check is None or log_sink_check.is_healthy)
         and (plugins_check is None or plugins_check.is_healthy)
         and (secrets_provider_check is None or secrets_provider_check.is_healthy)
@@ -364,11 +410,15 @@ def _do_agent_doctor_cmd(*, global_: bool, output_format: CliOutputFormat, error
     recommended_telemetry_action = _telemetry_action(
         check=telemetry_check,
         config_location=config_location,
-        migration_already_recommended=pending_migrations_check.finding.is_repaired_by_migrating,
+        migration_already_recommended=bool(pending_migrations_check.migratable_files),
     )
     if recommended_telemetry_action is not None:
         recommended_actions.append(recommended_telemetry_action)
-    if not backends_healthy:
+    if pipelex_api_key_check is not None and not pipelex_api_key_check.is_healthy:
+        recommended_actions.append(
+            f"Have a person run '{PIPELEX_LOGIN_COMMAND}' to get a Pipelex API key for hosted runs, or set PIPELEX_API_KEY to one"
+        )
+    if not backends_healthy and local_inference_counts:
         for report in backend_credential_reports.values():
             if report.missing_vars:
                 for var_name in report.missing_vars:
@@ -376,7 +426,7 @@ def _do_agent_doctor_cmd(*, global_: bool, output_format: CliOutputFormat, error
             if report.placeholder_vars:
                 for var_name in report.placeholder_vars:
                     recommended_actions.append(f"Replace placeholder value for environment variable: {var_name}")
-    if not models_healthy:
+    if not models_healthy and local_inference_counts:
         for file_report in backend_file_reports.values():
             if not file_report.is_valid and file_report.has_kit_template:
                 recommended_actions.append(f"Run 'pipelex doctor --fix' to replace outdated backend config: {file_report.backend_name}")
@@ -398,6 +448,7 @@ def _do_agent_doctor_cmd(*, global_: bool, output_format: CliOutputFormat, error
     result: dict[str, Any] = {
         "success": True,
         "all_healthy": all_healthy,
+        "execution": run_execution.value,
         "config_location": config_location.model_dump(),
         "checks": {
             "config_files": {
@@ -411,6 +462,8 @@ def _do_agent_doctor_cmd(*, global_: bool, output_format: CliOutputFormat, error
                 "message": pending_migrations_check.message,
                 "migratable_files": pending_migrations_check.migratable_files,
                 "attention_files": pending_migrations_check.attention_files,
+                "former_release_files": pending_migrations_check.former_release_files,
+                "former_release_blocks_boot": pending_migrations_check.former_release_blocks_boot,
             },
             "telemetry": {
                 "healthy": telemetry_check.is_healthy,
@@ -430,6 +483,15 @@ def _do_agent_doctor_cmd(*, global_: bool, output_format: CliOutputFormat, error
             },
         },
     }
+    if pipelex_api_key_check is not None:
+        # A hosted run boots nothing here: the provider keys and the local models are reported, not counted.
+        result["checks"]["backend_credentials"]["informational"] = True
+        result["checks"]["models"]["informational"] = True
+        result["checks"]["pipelex_api_key"] = {
+            "healthy": pipelex_api_key_check.is_healthy,
+            "finding": pipelex_api_key_check.finding.value,
+            "message": pipelex_api_key_check.message,
+        }
     if plugins_check is not None:
         result["checks"]["plugins"] = {"healthy": plugins_check.is_healthy, "message": plugins_check.message}
     if secrets_provider_check is not None:

@@ -826,6 +826,24 @@ class _OpResult(NamedTuple):
     detail: str | None = None
 
 
+def delete_literally(*, toml_doc: TOMLDocument, table_path: Sequence[str], key: str) -> bool:
+    """Delete one key or table, at a path read literally, taking its comments as ``delete_key`` does.
+
+    The ops read a ``*`` segment as "every key of this table" and refuse it as a key, which is what a ledger means
+    by it. A document can still spell a key ``*`` — a catch-all route ``"*" = "..."`` above all — and a caller that
+    read the key off the document and means that one key deletes it here: no segment is expanded, and a ``*`` is
+    looked up as the key it is.
+
+    Returns:
+        Whether the key was there and went; a path or key the document lacks changes nothing.
+    """
+    parent_table = _resolve_table(toml_doc=toml_doc, table_path=list(table_path))
+    if parent_table is None or key not in parent_table:
+        return False
+    _lift_out(toml_doc=toml_doc, parent_table=parent_table, table_path=list(table_path), key=key)
+    return True
+
+
 def _expand_table_paths(*, toml_doc: TOMLDocument, table_path: list[str]) -> list[list[str]]:
     """Resolve ``table_path`` into the concrete paths it addresses in this document.
 

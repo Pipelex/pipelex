@@ -5,6 +5,7 @@ import stat
 from pathlib import Path
 from typing import Any, cast
 
+from dotenv import dotenv_values, set_key
 from rich.console import Console
 from rich.markup import escape
 from rich.prompt import Prompt
@@ -56,7 +57,7 @@ def write_env_file(env_path: Path, *, entries: dict[str, str]) -> None:
     env_path.parent.mkdir(parents=True, exist_ok=True)
 
     lines: list[str] = [
-        "# Pipelex credentials — managed by 'pipelex init'",
+        "# Pipelex credentials — managed by 'pipelex init' and 'pipelex login'",
         "# You can also edit this file manually.",
         "",
     ]
@@ -66,6 +67,36 @@ def write_env_file(env_path: Path, *, entries: dict[str, str]) -> None:
 
     env_path.write_text("\n".join(lines), encoding="utf-8")
     env_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+
+
+def set_env_file_entry(*, env_path: Path, key: str, value: str) -> None:
+    """Set one entry of a .env file, keeping every other line as it is, comments included.
+
+    Creates the file and its parent directories when missing. Every assignment of `key` already in the file, an
+    `export` one included, is replaced by `key=value`, so no later line can shadow it. The file is readable and
+    writable by its owner only (mode 0600), before and after the write, so the value never sits in a file others can read.
+    A `.env` that is a symlink, as a dotfiles setup makes it, stays one: the write goes to the file it points to.
+
+    Args:
+        env_path: Path to the .env file.
+        key: The variable to set.
+        value: Its value, written unquoted: the caller passes a value with no whitespace, quote, `#` or backslash.
+    """
+    env_path.parent.mkdir(parents=True, exist_ok=True)
+    owner_only = stat.S_IRUSR | stat.S_IWUSR
+    if env_path.is_file():
+        # The rewrite keeps the mode it finds, so tighten it first rather than after.
+        env_path.chmod(owner_only)
+    set_key(env_path, key, value, quote_mode="never", follow_symlinks=True)
+    env_path.chmod(owner_only)
+
+
+def read_env_file_value(*, env_path: Path, key: str) -> str | None:
+    """The value a .env file gives `key`, read as the runtime's own `.env` loading reads it, or `None` when it gives none."""
+    if not env_path.is_file():
+        return None
+    value = dotenv_values(env_path).get(key)
+    return value or None
 
 
 def get_required_vars_for_enabled_backends(backends_toml_path: Path) -> dict[str, list[str]]:

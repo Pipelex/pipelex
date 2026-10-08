@@ -26,6 +26,8 @@ class RunConfig(ConfigModel):
 
 A flag on the command always wins: with `execution = "hosted"`, `pipelex run … --local` still runs on this machine, and with `"local"`, `--hosted` sends that one run to the hosted API.
 
+[`pipelex init`](../../tools/cli/init.md#where-your-runs-execute) writes this setting from your answer to "Where should your runs execute?", and `pipelex-agent init` from the `execution` of its `--config`.
+
 ## Example Configuration
 
 ```toml
@@ -39,7 +41,7 @@ Put it in your project's `.pipelex/pipelex.toml` to make hosted runs the default
 
 A hosted run reads its key and its origin from the environment, never from this file:
 
-- `PIPELEX_API_KEY` holds the Pipelex API key (`plx_sk_…`). Export it in your shell, or save it in `~/.pipelex/.env`, which Pipelex loads at startup.
+- `PIPELEX_API_KEY` holds the Pipelex API key (`plx_sk_…`). [`pipelex login`](../../tools/cli/login.md) gets one through your browser and saves it in `~/.pipelex/.env`, which Pipelex loads at startup; you can also export it in your shell.
 - `PIPELEX_BASE_URL` overrides the origin, for a staging plane or a self-hosted Pipelex API server. `--base-url` on the command overrides it in turn. Either must be `scheme://host[:port]`, with no path such as `/v1`.
 
 ## Related Documentation

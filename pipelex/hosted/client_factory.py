@@ -57,12 +57,14 @@ def redact_url_for_display(*, url: str) -> str:
     return shown
 
 
-def make_hosted_client(*, base_url: str | None = None) -> PipelexAPIClient:
+def make_hosted_client(*, base_url: str | None = None, api_key: str | None = None) -> PipelexAPIClient:
     """Build a hosted API client, the key and the base URL left to the SDK's own resolution.
 
     Args:
         base_url: The origin to call, `scheme://host[:port]`, as `--base-url` gives it. `None` lets the SDK read
             `PIPELEX_BASE_URL`, then fall back to the hosted API.
+        api_key: The key to send instead of `PIPELEX_API_KEY`, for `pipelex login` checking a key it has not saved
+            yet. `None` lets the SDK read `PIPELEX_API_KEY`.
 
     Returns:
         A client not yet started: use it as an async context manager.
@@ -71,7 +73,7 @@ def make_hosted_client(*, base_url: str | None = None) -> PipelexAPIClient:
         HostedBaseUrlError: If the base URL is not host-only, naming the setting it came from.
     """
     try:
-        return PipelexAPIClient(base_url=base_url, app_info=AppInfo(name=_APP_NAME, version=get_package_version()))
+        return PipelexAPIClient(api_key=api_key, base_url=base_url, app_info=AppInfo(name=_APP_NAME, version=get_package_version()))
     except PipelineRequestError:
         # The SDK's constructor raises this for one reason only: a base URL that is not an origin.
         source = "--base-url" if base_url is not None else PIPELEX_BASE_URL_ENV_KEY

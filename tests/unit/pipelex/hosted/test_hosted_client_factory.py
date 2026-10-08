@@ -49,6 +49,11 @@ class TestHostedClientFactory:
         monkeypatch.setenv(PIPELEX_API_KEY_ENV_KEY, "plx_sk_test_not_a_secret")
         assert make_hosted_client().api_key == "plx_sk_test_not_a_secret"
 
+    def test_a_key_given_wins_over_the_environment(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """`pipelex login` checks a key it has not saved yet, whatever `PIPELEX_API_KEY` holds."""
+        monkeypatch.setenv(PIPELEX_API_KEY_ENV_KEY, "plx_sk_the_environment_key")
+        assert make_hosted_client(api_key="plx_sk_the_key_to_check").api_key == "plx_sk_the_key_to_check"
+
     def test_no_key_is_anonymous(self) -> None:
         """No key is not refused here: a self-hosted runner answers its protocol routes without one."""
         assert make_hosted_client().api_key == ""

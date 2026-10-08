@@ -23,6 +23,7 @@ class TestInitCommandIntegration:
 
         # User inputs: confirm init, select all backends
         env.add_confirm_input(True)  # Confirm initialization
+        env.choose_local()  # Where runs execute: this machine
         env.add_prompt_input("all")  # Select all backends
         env.add_prompt_input("1")  # Primary backend: the first listed
         env.add_prompt_input("")  # Accept the default fallback order
@@ -58,6 +59,7 @@ class TestInitCommandIntegration:
 
         # User inputs
         env.add_confirm_input(True)  # Confirm initialization
+        env.choose_local()  # Where runs execute: this machine
         env.add_prompt_input(indices_str)  # Select anthropic, mistral, openai
         env.add_prompt_input("1")  # Primary backend: first one (anthropic)
         env.add_prompt_input("")  # Accept default fallback order
@@ -88,6 +90,7 @@ class TestInitCommandIntegration:
 
         # User inputs
         env.add_confirm_input(True)  # Confirm initialization
+        env.choose_local()  # Where runs execute: this machine
         env.add_prompt_input(str(indices[0]))  # Select only openai
         env.add_confirm_input(True)  # Confirm creating profile if needed
 
@@ -113,6 +116,7 @@ class TestInitCommandIntegration:
 
         # User inputs - CONFIG focus still runs full init on first time
         env.add_confirm_input(True)  # Confirm initialization
+        env.choose_local()  # Where runs execute: this machine
         env.add_prompt_input("")  # Backend selection: the recommended default
 
         env.setup_mocks()
@@ -223,6 +227,7 @@ class TestInitCommandIntegration:
 
         # User inputs
         env.add_confirm_input(True)  # Confirm reset
+        env.choose_local()  # Where runs execute: this machine
         env.add_prompt_input(str(indices[0]))  # Select mistral only
         env.add_confirm_input(True)  # Confirm creating profile if needed
 
@@ -282,6 +287,7 @@ class TestInitCommandIntegration:
 
         # User inputs - note: no fallback order prompt for 2 backends
         env.add_confirm_input(True)  # Confirm initialization
+        env.choose_local()  # Where runs execute: this machine
         env.add_prompt_input(indices_str)  # Select anthropic, openai
         env.add_prompt_input("1")  # Primary backend: anthropic (first in selection)
 

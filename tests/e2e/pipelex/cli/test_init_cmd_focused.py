@@ -22,6 +22,7 @@ class TestFocusedInitialization:
 
         # User inputs
         env.add_confirm_input(True)  # Confirm initialization
+        env.choose_local()  # Where runs execute: this machine
         env.add_prompt_input("")  # Backend selection: the recommended default
 
         env.setup_mocks()

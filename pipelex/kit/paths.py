@@ -1,6 +1,11 @@
 from importlib.resources import files
 from importlib.resources.abc import Traversable
 
+#: The file releases up to v0.72 wrote into a configuration directory to record the Pipelex Gateway's terms
+#: acceptance. Nothing reads it any more; this is the one spelling of its name, which the migration's surfaces and the
+#: former-release cleanup derive theirs from.
+RETIRED_SERVICE_FILE_NAME = "pipelex_service.toml"
+
 # Git-ignored config files that should not be synced between .pipelex and kit/configs.
 # These are personal override files that differ per developer/environment:
 # - pipelex_service.toml: retired, written by earlier releases; a developer's checkout may still hold one
@@ -18,7 +23,7 @@ from importlib.resources.abc import Traversable
 GIT_IGNORED_CONFIG_FILES: frozenset[str] = frozenset(
     {
         ".DS_Store",
-        "pipelex_service.toml",
+        RETIRED_SERVICE_FILE_NAME,
         "pipelex_override.toml",
         "telemetry_override.toml",
         "backends_override.toml",

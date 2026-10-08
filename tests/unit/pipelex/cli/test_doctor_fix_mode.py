@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path as PurePath
 from typing import TYPE_CHECKING, Any
+from unittest import mock
 
 import pytest
 from rich.console import Console
@@ -20,6 +21,7 @@ from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsReport
 from pipelex.cogt.models.deck_manifest import DeckFileStatus, DeckSyncReport
 from pipelex.core.validation import MIGRATE_COMMAND
+from pipelex.migration.former_release_cleanup import FormerReleaseCleanup, FormerReleaseFileAction, FormerReleaseFileCleanup
 from pipelex.migration.plan import MigrationPlan, MigrationReport
 
 if TYPE_CHECKING:
@@ -40,6 +42,23 @@ ONE_MIGRATION_PENDING = PendingMigrationsCheck(
     migratable_files=[STALE_TELEMETRY_FILE],
 )
 ONE_FILE_MIGRATED = MigrationReport(plans=[MigrationPlan(surface_id="telemetry-config", file_path=PurePath(STALE_TELEMETRY_FILE), was_written=True)])
+TWO_FILES_CLEANED_UP = FormerReleaseCleanup(
+    dry_run=False,
+    files=[
+        FormerReleaseFileCleanup(
+            file_path=PurePath("/home/user/.pipelex/inference/backends.toml"),
+            action=FormerReleaseFileAction.REWRITE,
+            changes=["removed the 'pipelex_gateway' backend"],
+            was_applied=True,
+        ),
+        FormerReleaseFileCleanup(
+            file_path=PurePath("/home/user/.pipelex/pipelex_service.toml"),
+            action=FormerReleaseFileAction.REMOVE,
+            changes=["removed the record of the Pipelex Gateway's terms acceptance"],
+            was_applied=True,
+        ),
+    ],
+)
 
 
 class TestDoctorFixMode:
@@ -54,6 +73,7 @@ class TestDoctorFixMode:
             # machine's own configuration directories, and no unit test should depend on those.
             "migrations": mocker.patch("pipelex.cli.commands.doctor_cmd.check_pending_migrations", return_value=NO_PENDING_MIGRATIONS),
             "migrate": mocker.patch("pipelex.cli.commands.doctor_cmd.apply_pending_migrations"),
+            "clean_up": mocker.patch("pipelex.cli.commands.doctor_cmd.apply_former_release_cleanup"),
             "backends": mocker.patch("pipelex.cli.commands.doctor_cmd.check_backend_credentials", return_value=(True, {}, "OK")),
             "models": mocker.patch("pipelex.cli.commands.doctor_cmd.check_models", return_value=(True, "OK", {})),
             "deck": mocker.patch("pipelex.cli.commands.doctor_cmd.check_deck_sync", return_value=(True, CLEAN_DECK, "OK")),
@@ -149,6 +169,43 @@ class TestDoctorFixMode:
         output = doctor_mocks["console"].export_text()
         assert "Migrated 1 configuration file(s)" in output
         assert "Re-run" in output, "the rows below were measured before the migration ran"
+
+    def test_fix_cleans_up_what_a_former_release_left_before_it_migrates(self, doctor_mocks: dict[str, Any]) -> None:
+        """The cleanup is `pipelex migrate`'s first step, so the fix that runs the command's write pass runs it first."""
+        doctor_mocks["migrations"].return_value = PendingMigrationsCheck(
+            finding=PendingMigrationsFinding.PENDING,
+            message="1 configuration file(s) can be brought up to date; 2 file(s) carry what a former release left",
+            migratable_files=[STALE_TELEMETRY_FILE],
+            former_release_files=["/home/user/.pipelex/inference/backends.toml", "/home/user/.pipelex/pipelex_service.toml"],
+            former_release_blocks_boot=True,
+        )
+        doctor_mocks["clean_up"].return_value = TWO_FILES_CLEANED_UP
+        doctor_mocks["migrate"].return_value = ONE_FILE_MIGRATED
+        calls = mock.Mock()
+        calls.attach_mock(doctor_mocks["clean_up"], "clean_up")
+        calls.attach_mock(doctor_mocks["migrate"], "migrate")
+
+        self._run_doctor_expecting_exit_one()
+
+        assert [name for name, _, _ in calls.mock_calls] == ["clean_up", "migrate"]
+        prompts = [call.args[0] for call in doctor_mocks["confirm"].call_args_list]
+        assert any("Clean up 2 file(s) a former release left and migrate 1 configuration file(s)" in prompt for prompt in prompts)
+        output = doctor_mocks["console"].export_text()
+        assert "Cleaned up 2 file(s) a former release left" in output
+        assert "Migrated 1 configuration file(s)" in output
+
+    def test_fix_with_only_a_former_release_to_clean_runs_no_migration(self, doctor_mocks: dict[str, Any]) -> None:
+        doctor_mocks["migrations"].return_value = PendingMigrationsCheck(
+            finding=PendingMigrationsFinding.PENDING,
+            message="2 file(s) carry what a former release left",
+            former_release_files=["/home/user/.pipelex/inference/backends.toml", "/home/user/.pipelex/pipelex_service.toml"],
+        )
+        doctor_mocks["clean_up"].return_value = TWO_FILES_CLEANED_UP
+
+        self._run_doctor_expecting_exit_one()
+
+        doctor_mocks["clean_up"].assert_called_once()
+        doctor_mocks["migrate"].assert_not_called()
 
     def test_declining_the_migration_writes_nothing(self, doctor_mocks: dict[str, Any]) -> None:
         """The prompt is a real question — a no leaves the machine exactly as it was."""
