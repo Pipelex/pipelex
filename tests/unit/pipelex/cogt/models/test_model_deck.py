@@ -218,6 +218,9 @@ class TestModelDeckGetOptionalInferenceModel:
 
         assert model_deck.get_optional_inference_model("mistral-extractor", model_type=ModelType.LLM) is None
         assert model_deck.get_optional_inference_model("mistral-extractor", model_type=ModelType.TEXT_EXTRACTOR) is not None
+        # The load-time check reads the bare name the same way: a model served only as another type does not define it.
+        assert model_deck.is_model_handle_defined("mistral-extractor", model_type=ModelType.LLM) is False
+        assert model_deck.is_model_handle_defined("mistral-extractor", model_type=ModelType.TEXT_EXTRACTOR) is True
 
     def test_a_handle_served_as_another_type_does_not_shadow_this_types_alias(self):
         """The LLM half of the deck may name an alias like a handle the deck serves as an extractor: the alias resolves."""
@@ -228,6 +231,8 @@ class TestModelDeckGetOptionalInferenceModel:
         )
 
         assert model_deck.get_optional_inference_model("mistral-extractor", model_type=ModelType.LLM) == gpt_spec
+        # The load-time check agrees: the bare name is defined for the LLM half through its alias.
+        assert model_deck.is_model_handle_defined("mistral-extractor", model_type=ModelType.LLM) is True
 
     def test_complex_waterfall_scenario(self):
         # Arrange

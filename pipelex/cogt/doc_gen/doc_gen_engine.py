@@ -18,7 +18,7 @@ from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice, DocGenSettin
 from pipelex.cogt.doc_gen.exceptions import KNOWN_DOC_GEN_MODEL_NAMES, DocGenEngineGap, DocGenEngineMissingError, DocGenModelCapabilityError
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.cogt.models.model_reference import ModelReferenceKind, ensure_model_reference
+from pipelex.cogt.models.model_reference import ModelReferenceKind, ensure_model_reference, write_model_handle
 from pipelex.plugins.inference_backend_registry import InferenceFamily
 from pipelex.runtime_hub import get_inference_backend_registry, get_model_deck
 
@@ -156,6 +156,8 @@ def resolve_doc_gen_setting(
     if not prints_document(inference_model=inference_model, doc_gen_format=doc_gen_format, source=source):
         raise DocGenModelCapabilityError(doc_gen_format=doc_gen_format, source=source, model=inference_model.name, pipe_code=pipe_code)
     require_doc_gen_engine_installed(inference_model=inference_model, doc_gen_format=doc_gen_format, source=source, pipe_code=pipe_code)
-    if inference_model.name != doc_gen_setting.model:
-        doc_gen_setting = doc_gen_setting.model_copy(update={"model": inference_model.name})
+    # Pinned as a reference that parses back to the resolved handle, whatever its spelling, since every lookup reads it again.
+    resolved_handle = write_model_handle(name=inference_model.name)
+    if resolved_handle != doc_gen_setting.model:
+        doc_gen_setting = doc_gen_setting.model_copy(update={"model": resolved_handle})
     return doc_gen_setting

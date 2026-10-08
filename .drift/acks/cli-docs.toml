@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:1958a63da9d1648418c804fd17fec6b278ebe37b278a638d53645a107a0cb825"
-reviewed_by = "claude-opus-5-5"
-reviewed_at = "2026-10-08T02:44:06Z"
-rationale = "real-catch: Pipelex Manifold is no longer treated as retired, since the hosted plane runs on it, so the CLI messages now name the Pipelex Gateway alone. migrate.md, init.md and agent-cli.md still said the Gateway and Manifold were both gone and that the cleanup removed the Manifold table, file and profile, and the agent CLI guide named both; all four now say only the Gateway is cleaned up and that what a former release left for Manifold stays."
+digest = "sha256:1753075a19fa8a93ee26f9bb162c2f085ebb07d90d565e0690a8c9f356bb026f"
+reviewed_by = "Claude (Opus 5.5)"
+reviewed_at = "2026-10-08T08:57:52Z"
+rationale = "clean-pass: merged tree of feature/Init-login-byok-or-hosted, now carrying v0.78.0, into this branch. The two sides changed disjoint trigger files: the base brought only check_model_cmd.py, whose check-model takes a ModelCheckCategory with doc_gen and applies the validation rule, and this branch changed the former-release cleanup across migrate, doctor, init, the CLI factories, agent_output and error_handlers, whose docs it already reviewed in migrate.md, init.md, agent-cli.md and the agent CLI CLAUDE.md. The one conflict, the CLAUDE.md command table, keeps the base check-model row beside this branch migrate and doctor rows, each side having changed only its own rows. agent-cli.md merged cleanly with the base check-model row, whose link to the api-server models page anchor resolves, beside this branch FormerReleaseConfigError paragraph. Nothing under docs/tools/cli is stale against the merged CLI."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -13,7 +13,7 @@ rationale = "real-catch: Pipelex Manifold is no longer treated as retired, since
 "pipelex/cli/agent_cli/commands/agent_cli_factory.py" = "blob:947ac4b789f2800811d653dc30a63419336c1b5d"
 "pipelex/cli/agent_cli/commands/agent_output.py" = "blob:e37898df47cfbb5b6d0ec42468be31463f82bff1"
 "pipelex/cli/agent_cli/commands/bundle_path_resolver.py" = "blob:a1904517c731afb72af7d49adf6d217dc50b2660"
-"pipelex/cli/agent_cli/commands/check_model_cmd.py" = "blob:42a6b8c02a1d103394e12243181af8ea1c16f31d"
+"pipelex/cli/agent_cli/commands/check_model_cmd.py" = "blob:3a9c93daecadf266b3eba466904b3d005d448d40"
 "pipelex/cli/agent_cli/commands/codegen/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/codegen/app.py" = "blob:56130b89fe9efec5ad3d014ed6bc16bef1bd1645"
 "pipelex/cli/agent_cli/commands/codegen/check_cmd.py" = "blob:9e8beb084a9f04f39e8acca9e6ae2554d40cb667"

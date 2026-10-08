@@ -20,7 +20,7 @@ MTHDS Protocol  ⊂  Pipelex API (this server)  ⊂  Pipelex hosted API
 ```
 
 - **MTHDS Protocol** — five routes: `POST /execute`, `POST /start`, `POST /validate`, `GET /models`, `GET /version`. Tagged `x-mthds-protocol: true` in the [committed OpenAPI artifact](openapi/pipelex-api.openapi.yaml), and **only** those five — the flag is how a conformance suite or a third-party runner extracts the portable subset.
-- **Pipelex API (this server)** — the protocol verbatim, plus the Pipelex extensions: resolve and codegen (`/resolve`, `/codegen`), pipe I/O (`/pipe-io`), and editor tooling (`/lint`, `/format`). `/upload` and `/resolve-storage-url` were non-contract convenience routes and have been **removed** — see [Storage Transport](storage-transport.md) for where they went and why.
+- **Pipelex API (this server)** — the protocol verbatim, plus the Pipelex extensions: resolve and codegen (`/resolve`, `/codegen`), pipe I/O (`/pipe-io`), the model reference check (`/models/check`), and editor tooling (`/lint`, `/format`). `/upload` and `/resolve-storage-url` were non-contract convenience routes and have been **removed** — see [Storage Transport](storage-transport.md) for where they went and why.
 - **Pipelex hosted API** (`api.pipelex.com/v1`) — everything here, same shapes, plus durable runs, the method catalog, and account management.
 
 All routes are served under the `/v1` base path (clients compose `{base}/v1/{endpoint}`).
@@ -34,7 +34,7 @@ The API currently allows you to:
 3. **Resolve** a library closure into its normalized crate, and **codegen** typed artifacts from it (TypeScript/Zod, Pydantic, Pipelex structures)
 4. **Describe** a method's inputs and output — its pipe I/O contracts, input form and output form, from which a client projects an inputs template
 5. **Lint and format** single `.mthds` files for editor workflows
-6. **List** available model presets and configurations
+6. **List** available model presets and configurations, and **check** whether one model reference resolves, as what, to which model
 
 ## Deployment
 
@@ -181,9 +181,12 @@ Lint and format single `.mthds` files without loading or executing a pipeline.
 [Learn more →](mthds-tools.md)
 
 ### Models
-List the models this runner can route to.
+List the models this runner can route to, and check one model reference against them.
 
 - `GET /v1/models` — The protocol model deck this runner routes to (flat `models` list, plus category-keyed `aliases`/`waterfalls` routing extensions); optional single `?type=` category filter
+- `GET /v1/models/check` — Whether one model reference (`?reference=`, optionally in one `?type=` category, `doc_gen` included) resolves on this runner, as what kind of reference and to which model, with suggestions when it does not; answered from pipelex's own parser and the deck lookups a validation runs (Pipelex API extension)
+
+[Learn more →](models.md)
 
 ### Uploader (removed)
 

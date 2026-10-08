@@ -90,9 +90,9 @@ def check_llm_choice_with_deck(llm_choice: LLMModelChoice) -> None:
                 available_options=list(model_deck.llm_waterfalls.keys()),
             )
         case ModelReferenceKind.HANDLE:
-            if model_deck.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.LLM):
+            if model_deck.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.LLM):
                 return
-            msg = f"Model handle '{ref.name}' was not found in the model deck"
+            msg = model_deck.unresolved_handle_sentence(name=ref.name, model_type=ModelType.LLM)
             _raise_model_choice_not_found(
                 msg,
                 model_deck=model_deck,
@@ -152,9 +152,9 @@ def check_extract_choice_with_deck(extract_choice: ExtractModelChoice) -> None:
                 available_options=list(model_deck.extract_waterfalls.keys()),
             )
         case ModelReferenceKind.HANDLE:
-            if model_deck.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.TEXT_EXTRACTOR):
+            if model_deck.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.TEXT_EXTRACTOR):
                 return
-            msg = f"Model handle '{ref.name}' was not found in the model deck"
+            msg = model_deck.unresolved_handle_sentence(name=ref.name, model_type=ModelType.TEXT_EXTRACTOR)
             _raise_model_choice_not_found(
                 msg,
                 model_deck=model_deck,
@@ -214,9 +214,9 @@ def check_search_choice_with_deck(search_choice: SearchModelChoice) -> None:
                 available_options=list(model_deck.search_waterfalls.keys()),
             )
         case ModelReferenceKind.HANDLE:
-            if model_deck.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.SEARCH):
+            if model_deck.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.SEARCH):
                 return
-            msg = f"Model handle '{ref.name}' was not found in the model deck"
+            msg = model_deck.unresolved_handle_sentence(name=ref.name, model_type=ModelType.SEARCH)
             _raise_model_choice_not_found(
                 msg,
                 model_deck=model_deck,
@@ -276,9 +276,9 @@ def check_doc_gen_choice_with_deck(*, doc_gen_choice: DocGenModelChoice) -> None
                 available_options=list(model_deck.doc_gen_waterfalls.keys()),
             )
         case ModelReferenceKind.HANDLE:
-            if model_deck.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.DOC_GEN):
+            if model_deck.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.DOC_GEN):
                 return
-            msg = f"Model handle '{ref.name}' was not found in the model deck"
+            msg = model_deck.unresolved_handle_sentence(name=ref.name, model_type=ModelType.DOC_GEN)
             _raise_model_choice_not_found(
                 msg,
                 model_deck=model_deck,
@@ -338,9 +338,9 @@ def check_judgment_choice_with_deck(judgment_choice: JudgmentModelChoice) -> Non
                 available_options=list(model_deck.judgment_waterfalls.keys()),
             )
         case ModelReferenceKind.HANDLE:
-            if model_deck.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.JUDGMENT):
+            if model_deck.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.JUDGMENT):
                 return
-            msg = f"Model handle '{ref.name}' was not found in the model deck"
+            msg = model_deck.unresolved_handle_sentence(name=ref.name, model_type=ModelType.JUDGMENT)
             _raise_model_choice_not_found(
                 msg,
                 model_deck=model_deck,
@@ -400,9 +400,9 @@ def check_img_gen_choice_with_deck(img_gen_choice: ImgGenModelChoice) -> None:
                 available_options=list(model_deck.img_gen_waterfalls.keys()),
             )
         case ModelReferenceKind.HANDLE:
-            if model_deck.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.IMG_GEN):
+            if model_deck.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.IMG_GEN):
                 return
-            msg = f"Model handle '{ref.name}' was not found in the model deck"
+            msg = model_deck.unresolved_handle_sentence(name=ref.name, model_type=ModelType.IMG_GEN)
             _raise_model_choice_not_found(
                 msg,
                 model_deck=model_deck,
