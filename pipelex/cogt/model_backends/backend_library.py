@@ -1,7 +1,7 @@
 from collections.abc import Callable, Iterable, Sequence
 from functools import partial
 from pathlib import Path
-from typing import Any, NamedTuple, Self, cast
+from typing import TYPE_CHECKING, Any, NamedTuple, Self, cast
 
 from pydantic import Field, PrivateAttr, RootModel, ValidationError
 
@@ -61,6 +61,9 @@ from pipelex.tools.secrets.exceptions import UnknownVarPrefixError, VarFallbackP
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.secrets.secrets_utils import placeholder_var_names, substitute_vars
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+
+if TYPE_CHECKING:
+    from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 
 InferenceBackendLibraryRoot = dict[str, InferenceBackend]
 
@@ -505,15 +508,8 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             raise InferenceBackendLibraryError(msg, backend_name=backend_name)
         # The handle each table serves and the type it declares, read as every other reader of the file reads them.
         declared_model_specs = list_declared_model_specs(document=model_specs_dict)
-        if duplicate := find_duplicate_declared_model(declared_model_specs=declared_model_specs):
-            first, second = duplicate
-            msg = (
-                f"Invalid model specs for backend '{backend_name}' from {backend_config_source}: "
-                f"{describe_duplicate_declared_model(first=first, second=second)}"
-            )
-            raise InferenceBackendLibraryError(msg, backend_name=backend_name)
         handles_by_table = {declared.table_name: declared.handle for declared in declared_model_specs}
-        backend_model_specs = ModelSpecIndex.make_empty()
+        model_specs: list[InferenceModelSpec] = []
         for model_spec_name, value in remaining_tables.items():
             if not isinstance(value, dict):
                 msg = f"Model spec '{model_spec_name}' for backend '{backend_name}' from {backend_config_source} is not a dictionary"
@@ -544,7 +540,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     backend_valued_constraints=backend_valued_constraints,
                     extra_headers=key_split.headers,
                 )
-                backend_model_specs.add(model_spec)
+                model_specs.append(model_spec)
             except ValidationError as validation_error:
                 validation_error_msg = format_pydantic_validation_error(validation_error)
                 msg = (
@@ -555,7 +551,16 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             except InferenceModelSpecError as exc:
                 msg = f"Failed to load inference model spec '{model_spec_name}' for backend '{backend_name}' from {backend_config_source}"
                 raise InferenceBackendLibraryError(msg, backend_name=backend_name) from exc
-        return backend_model_specs
+        # Last, as the document validator checks it: once every table is valid, a duplicate is one the file declares
+        # and never one a value the validation refuses would make.
+        if duplicate := find_duplicate_declared_model(declared_model_specs=declared_model_specs):
+            first, second = duplicate
+            msg = (
+                f"Invalid model specs for backend '{backend_name}' from {backend_config_source}: "
+                f"{describe_duplicate_declared_model(first=first, second=second)}"
+            )
+            raise InferenceBackendLibraryError(msg, backend_name=backend_name)
+        return ModelSpecIndex.make_from_specs(model_specs=model_specs)
 
     def _local_model_specs_the_ledger_can_explain(
         self,
@@ -759,13 +764,8 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                         "that ships with its engine."
                     )
                     raise PluginModelDeclarationError(msg, plugin=plugin_model.plugin)
-                try:
-                    merged_model_specs.add(plugin_model_spec)
-                except InferenceModelSpecError as exc:
-                    # The registrar refuses two plugins declaring one pair, so this is a declaration that
-                    # reached the boot by another road: still the plugin's to answer for.
-                    msg = f"Plugin '{plugin_model.plugin}' declares the internal model '{model_name}' twice: {exc}"
-                    raise PluginModelDeclarationError(msg, plugin=plugin_model.plugin) from exc
+                # The registrar has already refused two plugins declaring one pair.
+                merged_model_specs.add(plugin_model_spec)
         self.root[PipelexBackend.INTERNAL] = internal_backend.model_copy(update={"model_specs": merged_model_specs})
         return True
 
