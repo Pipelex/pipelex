@@ -11,7 +11,7 @@ info:
   license:
     name: Elastic License 2.0
     identifier: Elastic-2.0
-  version: 0.76.0
+  version: 0.77.0
 paths:
   /health:
     get:

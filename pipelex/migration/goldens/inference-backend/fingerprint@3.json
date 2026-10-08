@@ -28,6 +28,14 @@
       "required": false,
       "open_node": false
     },
+    "*.handle": {
+      "value_type": "str",
+      "required": false,
+      "open_node": false,
+      "constraints": {
+        "min_length": 1
+      }
+    },
     "*.inputs": {
       "value_type": "list[str]",
       "required": false,

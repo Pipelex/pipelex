@@ -45,8 +45,8 @@ class TestPluginModelDeclarations:
 
         registrar.add_internal_model(name="pipelex-xlsx", spec=PIPELEX_XLSX_SPEC)
 
-        assert registrar.internal_models == {"pipelex-xlsx": PIPELEX_XLSX_SPEC}
-        assert "internal model pipelex-xlsx" in discovery.contributions
+        assert registrar.internal_models == {("pipelex-xlsx", "doc_gen"): PIPELEX_XLSX_SPEC}
+        assert "internal model pipelex-xlsx (doc_gen)" in discovery.contributions
 
     def test_a_doc_gen_default_is_stored_and_recorded_as_a_contribution(self) -> None:
         registrar = _make_registrar()
@@ -66,10 +66,39 @@ class TestPluginModelDeclarations:
         with pytest.raises(DuplicateInternalModelError) as exc_info:
             registrar.add_internal_model(name="pipelex-xlsx", spec=PIPELEX_XLSX_SPEC)
 
+        assert exc_info.value.model_type == "doc_gen"
         assert exc_info.value.first_plugin == "alpha"
         assert exc_info.value.second_plugin == "beta"
         assert "'alpha'" in str(exc_info.value)
         assert "'beta'" in str(exc_info.value)
+
+    def test_one_name_may_be_declared_once_per_model_type(self) -> None:
+        """A handle names one model per model type, so two plugins may declare two kinds of one name."""
+        registrar = _make_registrar()
+        registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION, group=PluginGroup.KERNEL)
+        registrar.add_internal_model(name="pipelex-xlsx", spec=PIPELEX_XLSX_SPEC)
+        registrar.begin_plugin(name="beta", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION, group=PluginGroup.KERNEL)
+        registrar.add_internal_model(name="pipelex-xlsx", spec=dict(PIPELEX_XLSX_SPEC, model_type="text_extractor"))
+
+        declarations = registrar.make_model_declarations()
+
+        assert [(model.name, model.spec["model_type"], model.plugin) for model in declarations.internal_models] == [
+            ("pipelex-xlsx", "doc_gen", "alpha"),
+            ("pipelex-xlsx", "text_extractor", "beta"),
+        ]
+
+    def test_a_table_without_a_model_type_is_keyed_by_the_default_type(self) -> None:
+        """Two tables that both leave the type out declare the same pair, as their specs would."""
+        registrar = _make_registrar()
+        spec_without_type = {key: value for key, value in PIPELEX_XLSX_SPEC.items() if key != "model_type"}
+        registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION, group=PluginGroup.KERNEL)
+        registrar.add_internal_model(name="shared", spec=spec_without_type)
+        registrar.begin_plugin(name="beta", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION, group=PluginGroup.KERNEL)
+
+        with pytest.raises(DuplicateInternalModelError) as exc_info:
+            registrar.add_internal_model(name="shared", spec=dict(spec_without_type, model_type="llm"))
+
+        assert exc_info.value.model_type == "llm"
 
     def test_a_doc_gen_default_declared_twice_names_both_plugins(self) -> None:
         registrar = _make_registrar()
@@ -100,7 +129,7 @@ class TestPluginModelDeclarations:
         registrar.add_internal_model(name="broken", spec={"not_a_field": True})
         registrar.add_doc_gen_default(doc_gen_format=DocGenFormat.PPTX, source=DocGenSource.LAYOUT, model="pipelex-pptx")
 
-        assert "broken" in registrar.internal_models
+        assert ("broken", "llm") in registrar.internal_models
         assert (DocGenFormat.PPTX, DocGenSource.LAYOUT) in registrar.doc_gen_defaults
 
     def test_the_declarations_carry_each_entry_and_the_plugin_that_declared_it(self) -> None:
@@ -111,8 +140,10 @@ class TestPluginModelDeclarations:
 
         declarations = registrar.make_model_declarations()
 
-        assert declarations.internal_models["pipelex-xlsx"].spec == PIPELEX_XLSX_SPEC
-        assert declarations.internal_models["pipelex-xlsx"].plugin == "doc-gen"
+        (internal_model,) = declarations.internal_models
+        assert internal_model.name == "pipelex-xlsx"
+        assert internal_model.spec == PIPELEX_XLSX_SPEC
+        assert internal_model.plugin == "doc-gen"
         (doc_gen_default,) = declarations.doc_gen_defaults
         assert doc_gen_default.choice_key == "xlsx.layout"
         assert doc_gen_default.model == "pipelex-xlsx"
@@ -128,9 +159,9 @@ class TestPluginModelDeclarations:
 
         spec["sdk"] = "changed"
         spec["inputs"].append("html")
-        declarations.internal_models["pipelex-xlsx"].spec["inputs"].append("html")
+        declarations.internal_models[0].spec["inputs"].append("html")
 
-        recorded_spec = registrar.make_model_declarations().internal_models["pipelex-xlsx"].spec
+        recorded_spec = registrar.make_model_declarations().internal_models[0].spec
         assert recorded_spec["sdk"] == "openpyxl"
         assert recorded_spec["inputs"] == ["layout", "template_file"]
 

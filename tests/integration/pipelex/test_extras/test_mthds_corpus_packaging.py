@@ -1,6 +1,7 @@
 """The corpus ships in the wheel — asserted against a wheel that is actually built.
 
-Contract: ``docs/specs/mthds-test-corpus.md`` (workspace root), section "Distribution".
+Contract: ``conformance/specs/mthds-test-corpus.md`` (the cross-repo spec, kept in the ``conformance``
+repo), section "Distribution".
 
 Wheel consumers reach the corpus through ``importlib.resources``, so a corpus that stopped being
 packaged would be invisible in this repo and would break every consumer at once, on the release.

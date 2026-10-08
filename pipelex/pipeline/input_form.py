@@ -1,11 +1,11 @@
 """Per-pipe input-form descriptors (`input_form`) for the validate surfaces.
 
-This is the reference derivation of the MTHDS input-form descriptor (workspace spec
-`docs/specs/mthds-input-form-descriptor.md`): for each loaded pipe, an ordered list of field
-descriptors a renderer can turn into a fill-in form with no schema heuristics, no hardcoded
-concept tables, and no description matching. It is keyed by the same namespaced `pipe_ref` set as
-`pipe_io_contracts` — both are built from the same loaded pipes, so the key spaces are equal by
-construction.
+This is the reference derivation of the MTHDS input-form descriptor (spec:
+`conformance/specs/mthds-input-form-descriptor.md`, in the `conformance` repo beside the tests that
+verify it): for each loaded pipe, an ordered list of field descriptors a renderer can turn into a
+fill-in form with no schema heuristics, no hardcoded concept tables, and no description matching.
+It is keyed by the same namespaced `pipe_ref` set as `pipe_io_contracts` — both are built from the
+same loaded pipes, so the key spaces are equal by construction.
 
 **The wire shapes belong to the standard, not to this engine.** `FieldKind`, the per-kind field
 models, their two unions and `PipeInputFormDescriptor` are the models of

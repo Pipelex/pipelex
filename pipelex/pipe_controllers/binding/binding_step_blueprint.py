@@ -115,6 +115,15 @@ class BindingStepBlueprint(BaseModel):
         dumped: dict[str, Any] = handler(self)
         return {(BINDING_FROM_KEY if key == "from_path" else key): value for key, value in dumped.items()}
 
+    def __json_encode__(self) -> dict[str, Any]:  # ruff: ignore[bad-dunder-method-name] — kajson encoder hook, name fixed by kajson's protocol
+        """Kajson encoding hook: write the path under `from`, as every other dump does.
+
+        kajson encodes a model through its `__dict__`, under its field names, and never calls the serializer above,
+        so the library crate a run carries across a process boundary would hold `from_path`, which the decoder's
+        validation refuses as an extra field. A Temporal worker then cannot decode the run it was handed.
+        """
+        return self.model_dump()
+
     @property
     def root_name(self) -> str:
         return self.from_path.split(".", maxsplit=1)[0]
