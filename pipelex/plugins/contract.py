@@ -38,7 +38,12 @@ if TYPE_CHECKING:
 # a ``LogSinkFactoryFn`` receives it as the ``secrets_provider`` keyword argument, so a sink's settings can
 # name a secret. A factory written against v4 would be called with a keyword it does not accept and fail at
 # boot with a bare ``TypeError``; the bump turns that into a discovery-time mismatch naming the plugin.
-PLUGIN_API_VERSION: int = 5
+#
+# v6 changed the document engine contract: ``RenderResources.load`` returns a ``LoadedResource``, a file's bytes with
+# the media type its source gives it, where it returned the bytes alone. An engine written against v5 would receive
+# the model where it expects bytes and fail in the middle of a print, with a ``TypeError`` raised deep inside its
+# rendering library; the bump turns that into a discovery-time mismatch naming the plugin.
+PLUGIN_API_VERSION: int = 6
 
 
 @runtime_checkable

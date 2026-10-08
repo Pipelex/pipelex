@@ -119,10 +119,24 @@ def render(self, *, job: RenderJob, resources: RenderResources) -> RenderedDocum
 ```
 
 - **`RenderJob`** is plain data, which Pipelex builds in the print stage from the step's composition and hands to the worker in the same process. It has a JSON round trip for an engine that prints in another process, in which the template's bytes are URL-safe base64 and a date or a time is its ISO text. It holds the format and source, the file's name with its suffix, the document's title, and exactly the payload its source names, `layout` (a `LayoutDocument` from `layout_tree.py`), `html`, or `template` with `data`, the inputs as plain data by input name. It carries no Pipelex object, so an ordinary Pipelex release does not break an engine; a change to it, or to the worker, is a change of the plugin contract.
-- **`RenderResources.load(uri=…, position=…)`** is how an engine reads a file its document names, such as an image. It resolves `pipelex-storage://` keys through the run's storage provider, decodes `data:` URLs, fetches `https://` through the SSRF guard, and refuses what the run's read scope does not allow, a local path included, with `UriReadRefusedError`. An engine reads nothing any other way.
+- **`RenderResources.load(uri=…, position=…)`** is how an engine reads a file its document names, such as an image or a stylesheet. It resolves `pipelex-storage://` keys through the run's storage provider, decodes `data:` URLs, fetches `https://` through the SSRF guard, and refuses what the run's read scope does not allow, a local path included, with `UriReadRefusedError`. An engine reads nothing any other way. It returns a **`LoadedResource`**: the file's bytes as `data`, and as `mime_type` the media type the file's source gives it, described below.
 - **`RenderedDocument`** holds the bytes. Their MIME type and suffix are the format's.
 
 `render` is synchronous and runs on a thread of a print pool of its own, never on the event loop's default executor, which the engine's reads need, while `RenderResources.load` hands each read back to the event loop the print started from. An engine keeps no state from one print into the next. It signals a document it cannot print by raising `DocGenRenderError`, which passes through; anything else it raises, beyond a Pipelex error, is reported as a `DocGenRenderError` naming the engine and the file.
+
+### The media type of a file an engine reads
+
+`LoadedResource.mime_type` is the type the file's source gives it, lowercased and without its parameters, such as `text/css`. Pipelex never guesses it, so it is `None` when the source gives none:
+
+| Source | `mime_type` |
+| --- | --- |
+| `https://` | The final response's `Content-Type`, after redirects; `None` when the response sends none. |
+| `data:` | The type the URL declares. |
+| `pipelex-storage://` on S3 or GCS | The content type recorded when the file was stored. |
+| `pipelex-storage://` on the local or in-memory provider | The type identified from the bytes, which covers binary formats only: a stylesheet or an SVG has none. |
+| A local path, read only by an unscoped run | `None`: a file system records no type. |
+
+A declared type is returned as declared, even a generic one such as `application/octet-stream`, and is not checked against the bytes. An engine that needs a type keeps its own guess, from the URI's extension or from the bytes, for a file whose source gives none or gives one that says nothing. An HTML engine is the case in point, since a print library such as WeasyPrint keeps a linked stylesheet only when its type is `text/css`, and a stylesheet served from a URL with no extension, as a web font service serves one, can be typed only by what its server declared. The built-in PDF engine reads images only and never looks at the type, because Pillow identifies an image from its bytes.
 
 ---
 
