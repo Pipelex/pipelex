@@ -545,3 +545,42 @@ class TestModelReferenceCheck:
             model_deck.get_llm_setting(llm_choice="handle:@best-gpt")
         with pytest.raises(ModelChoiceNotFoundError):
             model_deck.check_llm_choice(llm_choice="handle:@best-gpt")
+
+    @pytest.mark.parametrize("literal_name", ["@named", "~named", "$named", "alias:named"])
+    @pytest.mark.parametrize(
+        "bindings",
+        [
+            pytest.param({}, id="no-colliding-binding"),
+            pytest.param({"llm_aliases": {"named": "other"}, "llm_waterfalls": {"named": ["other"]}}, id="colliding-alias-and-waterfall"),
+        ],
+    )
+    def test_a_served_handle_spelled_like_a_reference_is_called_literally(
+        self, mocker: MockerFixture, literal_name: str, bindings: dict[str, Any]
+    ) -> None:
+        """`handle:@named` names the model served as `@named`: the validation, the run and the check all select it, not the alias."""
+        model_deck = _deck_with(
+            inference_models={
+                literal_name: _model_spec(literal_name, ModelType.LLM),
+                "other": _model_spec("other", ModelType.LLM),
+            },
+            **bindings,
+        )
+        mocker.patch(_DECK_CHECK_GET_MODEL_DECK_TARGET, return_value=model_deck)
+        reference = f"handle:{literal_name}"
+
+        check_llm_choice_with_deck(reference)
+        model_deck.validate_inference_models()
+        assert _model_the_run_calls(model_deck=model_deck, reference=reference, model_type=ModelType.LLM) == literal_name
+        verdict = check_model_reference(model_deck=model_deck, reference=ModelReference.parse(reference), category=ModelCheckCategory.LLM)
+        _assert_resolved(verdict)
+        (match,) = verdict.matches
+        assert match.resolves_to == literal_name
+
+    def test_a_suggested_handle_spelled_like_a_reference_is_written_with_its_namespace(self) -> None:
+        """A suggestion is a reference a caller may write back, so a handle spelled like an alias is offered as `handle:@named`."""
+        model_deck = _deck_with(inference_models={"@named": _model_spec("@named", ModelType.LLM)})
+
+        verdict = check_model_reference(model_deck=model_deck, reference=ModelReference.parse("handle:@namedd"), category=ModelCheckCategory.LLM)
+
+        _assert_not_found(verdict)
+        assert "handle:@named" in verdict.suggestions

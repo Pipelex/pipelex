@@ -14,6 +14,7 @@ from pipelex.cogt.models.model_reference import (
     SIGIL_PRESET,
     SIGIL_WATERFALL,
     ModelReferenceKind,
+    write_model_handle,
 )
 
 KIND_SIGILS: dict[ModelReferenceKind, str] = {
@@ -59,8 +60,15 @@ class ModelReferenceName(NamedTuple):
 
     @property
     def written(self) -> str:
-        """The name as a method writes it: a sigil for a preset, an alias or a waterfall, and the bare name for a handle."""
-        return f"{KIND_SIGILS[self.kind]}{self.name}"
+        """The name as a method writes it: a sigil for a preset, an alias or a waterfall, and the bare name for a handle.
+
+        A handle whose bare name would read as another kind of reference is written `handle:<name>` (`write_model_handle`).
+        """
+        match self.kind:
+            case ModelReferenceKind.HANDLE:
+                return write_model_handle(name=self.name)
+            case ModelReferenceKind.PRESET | ModelReferenceKind.ALIAS | ModelReferenceKind.WATERFALL:
+                return f"{KIND_SIGILS[self.kind]}{self.name}"
 
     @property
     def labelled(self) -> str:

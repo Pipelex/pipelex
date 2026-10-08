@@ -34,7 +34,7 @@ The check covers the protocol's model categories, in the protocol's order (`llm`
 
 ### Resolution
 
-The reference is parsed as a method's `model` field is: a sigil first (`$` preset, `@` alias, `~` waterfall), then a spelled-out namespace, and otherwise a bare handle. `alias:best-gpt` and `@best-gpt` are the same reference. `handle:` names a handle literally: `handle:@best-gpt` is a handle spelled `@best-gpt`, not the alias, and a validation refuses it as the check finds it `not_found`.
+The reference is parsed as a method's `model` field is: a sigil first (`$` preset, `@` alias, `~` waterfall), then a spelled-out namespace, and otherwise a bare handle. `alias:best-gpt` and `@best-gpt` are the same reference. `handle:` names a handle literally: `handle:@best-gpt` is a handle spelled `@best-gpt`, not the alias. Where the runner serves a model of that name, the check resolves to it and a run calls it; otherwise a validation refuses it as the check finds it `not_found`. A suggestion naming such a handle writes it with the namespace, `handle:@best-gpt`, so it can be written back as it is.
 
 A reference **resolves in a category** when the runner holds its name there:
 

@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.exceptions import ModelReferenceParseError
 from pipelex.cogt.models.model_deck import ModelDeck
-from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind
+from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind, write_model_handle
 from pipelex.cogt.models.model_suggestion import ModelReferenceName, find_model_alternatives
 
 
@@ -231,7 +231,7 @@ def _match_in_category(*, model_deck: ModelDeck, reference: ModelReference, cate
         case ModelReferenceKind.HANDLE:
             return HandleMatch(
                 category=category,
-                resolves_to=_model_a_run_calls(model_deck=model_deck, model_handle=reference.name, model_type=model_type),
+                resolves_to=_model_a_run_calls(model_deck=model_deck, model_handle=write_model_handle(name=reference.name), model_type=model_type),
                 via=_deck_names_binding_the_handle(model_deck=model_deck, handle=reference.name, model_type=model_type),
             )
 

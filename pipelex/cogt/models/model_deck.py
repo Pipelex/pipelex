@@ -40,6 +40,7 @@ from pipelex.cogt.models.model_reference import (
     ModelReference,
     ModelReferenceKind,
     ensure_model_reference,
+    write_model_handle,
 )
 from pipelex.cogt.search.search_setting import SearchModelChoice, SearchSetting
 from pipelex.system.configuration.config_model import ConfigModel
@@ -539,7 +540,7 @@ class ModelDeck(ConfigModel):
                 # Strict: treat as direct model handle only
                 self._warn_if_ambiguous_llm(ref.name)
                 if self.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.LLM):
-                    return LLMSetting(model=ref.name, temperature=self.llm_default_temperature)
+                    return LLMSetting(model=write_model_handle(name=ref.name), temperature=self.llm_default_temperature)
                 # Error includes migration hint if name matches preset/waterfall
                 self._raise_handle_not_found_error(
                     ref=ref,
@@ -589,7 +590,7 @@ class ModelDeck(ConfigModel):
             case ModelReferenceKind.HANDLE:
                 self._warn_if_ambiguous_extract(ref.name)
                 if self.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.TEXT_EXTRACTOR):
-                    return ExtractSetting(model=ref.name)
+                    return ExtractSetting(model=write_model_handle(name=ref.name))
                 self._raise_handle_not_found_error(
                     ref=ref,
                     model_type=ModelType.TEXT_EXTRACTOR,
@@ -638,7 +639,7 @@ class ModelDeck(ConfigModel):
             case ModelReferenceKind.HANDLE:
                 self._warn_if_ambiguous_search(ref.name)
                 if self.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.SEARCH):
-                    return SearchSetting(model=ref.name)
+                    return SearchSetting(model=write_model_handle(name=ref.name))
                 self._raise_handle_not_found_error(
                     ref=ref,
                     model_type=ModelType.SEARCH,
@@ -691,7 +692,7 @@ class ModelDeck(ConfigModel):
             case ModelReferenceKind.HANDLE:
                 self._warn_if_ambiguous_doc_gen(ref.name)
                 if self.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.DOC_GEN):
-                    return DocGenSetting(model=ref.name)
+                    return DocGenSetting(model=write_model_handle(name=ref.name))
                 self._raise_handle_not_found_error(
                     ref=ref,
                     model_type=ModelType.DOC_GEN,
@@ -740,7 +741,7 @@ class ModelDeck(ConfigModel):
             case ModelReferenceKind.HANDLE:
                 self._warn_if_ambiguous_judgment(ref.name)
                 if self.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.JUDGMENT):
-                    return JudgmentSetting(model=ref.name)
+                    return JudgmentSetting(model=write_model_handle(name=ref.name))
                 self._raise_handle_not_found_error(
                     ref=ref,
                     model_type=ModelType.JUDGMENT,
@@ -789,7 +790,7 @@ class ModelDeck(ConfigModel):
             case ModelReferenceKind.HANDLE:
                 self._warn_if_ambiguous_img_gen(ref.name)
                 if self.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.IMG_GEN):
-                    return ImgGenSetting(model=ref.name, quality=self.img_gen_default_quality)
+                    return ImgGenSetting(model=write_model_handle(name=ref.name), quality=self.img_gen_default_quality)
                 self._raise_handle_not_found_error(
                     ref=ref,
                     model_type=ModelType.IMG_GEN,
@@ -1009,7 +1010,7 @@ class ModelDeck(ConfigModel):
 
     def validate_inference_models(self):
         for model_handle, model_spec in self.inference_models.items():
-            self.get_required_inference_model(model_handle=model_handle, model_type=model_spec.model_type)
+            self.get_required_inference_model(model_handle=write_model_handle(name=model_handle), model_type=model_spec.model_type)
 
     def _get_enabled_backends(self) -> set[str]:
         """Return the set of backend names that have at least one model enabled."""

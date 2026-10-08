@@ -162,6 +162,23 @@ class ModelReference(BaseModel):
         return self.raw
 
 
+def write_model_handle(*, name: str) -> str:
+    """Write a model handle's name as a reference that parses back to that same handle.
+
+    A name a bare reference reads as the same handle is written bare, as a method writes it, so
+    `gpt-4o` stays `gpt-4o`. A name a bare reference would read as something else, such as `@named`
+    (an alias) or `alias:x` (a namespaced alias), is written `handle:<name>`, so a lookup that parses
+    the written reference reads the literal handle.
+    """
+    try:
+        reference = ModelReference.parse(name)
+    except ModelReferenceParseError:
+        return f"{NAMESPACE_HANDLE}{name}"
+    if reference.kind == ModelReferenceKind.HANDLE and reference.name == name:
+        return name
+    return f"{NAMESPACE_HANDLE}{name}"
+
+
 def ensure_model_reference(value: str | ModelReference) -> ModelReference:
     """Ensure we have a ModelReference, parsing string if needed.
 
