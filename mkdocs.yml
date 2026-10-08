@@ -383,6 +383,7 @@ plugins:
         - api-server/pipe-io.md: "API Server Pipe I/O"
         - api-server/codegen.md: "API Server Resolve & Codegen"
         - api-server/mthds-tools.md: "API Server MTHDS Tools"
+        - api-server/models.md: "API Server Models"
         - api-server/error-responses.md: "API Server Error Responses"
         - api-server/logging.md: "API Server Logging"
 
@@ -638,6 +639,7 @@ nav:
     - Pipe I/O: api-server/pipe-io.md
     - Resolve & Codegen: api-server/codegen.md
     - MTHDS Tools: api-server/mthds-tools.md
+    - Models: api-server/models.md
     - Error Responses: api-server/error-responses.md
     - Logging: api-server/logging.md
     - Storage Transport (Removed): api-server/storage-transport.md

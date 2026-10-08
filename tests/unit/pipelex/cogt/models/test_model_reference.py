@@ -12,6 +12,7 @@ from pipelex.cogt.models.model_reference import (
     ModelReferenceKind,
     ModelReferenceParseError,
     parse_model_reference,
+    write_model_handle,
 )
 
 
@@ -203,6 +204,27 @@ class TestModelReferenceHelpers:
 
         assert handle_ref.is_handle() is True
         assert preset_ref.is_handle() is False
+
+    @pytest.mark.parametrize(
+        ("name", "expected_written"),
+        [
+            ("gpt-4o-mini", "gpt-4o-mini"),
+            ("claude-4.5-sonnet", "claude-4.5-sonnet"),
+            ("@named", "handle:@named"),
+            ("~named", "handle:~named"),
+            ("$named", "handle:$named"),
+            ("alias:named", "handle:alias:named"),
+            ("handle:named", "handle:handle:named"),
+        ],
+    )
+    def test_write_model_handle_parses_back_to_the_same_handle(self, name: str, expected_written: str):
+        """A handle is written bare unless its bare name would read as another reference, then with the `handle:` namespace."""
+        written = write_model_handle(name=name)
+
+        assert written == expected_written
+        parsed = ModelReference.parse(written)
+        assert parsed.kind == ModelReferenceKind.HANDLE
+        assert parsed.name == name
 
 
 class TestParseModelReference:
