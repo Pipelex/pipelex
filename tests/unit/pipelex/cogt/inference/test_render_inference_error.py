@@ -142,6 +142,8 @@ class TestRenderInferenceError:
         [
             pytest.param(None, "Transient provider error — wait a moment, then run it again.", id="no_retry_after"),
             pytest.param(12.0, "Transient provider error — wait at least 12s, then run it again.", id="retry_after"),
+            pytest.param(12.4, "Transient provider error — wait at least 13s, then run it again.", id="retry_after_rounded_up"),
+            pytest.param(0.0, "Transient provider error — wait a moment, then run it again.", id="retry_after_zero"),
         ],
     )
     def test_failed_run_report_says_to_wait_then_run_again(self, retry_after_seconds: float | None, expected_detail: str) -> None:

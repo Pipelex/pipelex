@@ -7,6 +7,7 @@ worker's error family, with a human-readable message and a structured
 ``UserAction``.
 """
 
+import math
 from enum import StrEnum
 
 from pipelex.cogt.exceptions import (
@@ -96,8 +97,11 @@ def _render_detail(metadata: SDKErrorEnvelope, *, classification: Classification
         case UserActionKind.WAIT_AND_RETRY:
             # The advice is read on a failed run's report, once every automatic retry is spent, so
             # it says what the reader can do next and never promises another attempt by the system.
+            # "At least" is a lower bound, so the provider's delay is rounded up, never down.
             if metadata.retry_after_seconds is not None:
-                return f"Transient provider error — wait at least {metadata.retry_after_seconds:.0f}s, then run it again."
+                wait_seconds = math.ceil(metadata.retry_after_seconds)
+                if wait_seconds > 0:
+                    return f"Transient provider error — wait at least {wait_seconds}s, then run it again."
             return "Transient provider error — wait a moment, then run it again."
         case UserActionKind.CHECK_BILLING:
             return "Your account quota or credits are exhausted — check your billing dashboard."
