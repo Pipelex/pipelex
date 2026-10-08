@@ -58,10 +58,12 @@ class TestHostedClientFactory:
         """No key is not refused here: a self-hosted runner answers its protocol routes without one."""
         assert make_hosted_client().api_key == ""
 
-    def test_the_user_agent_names_pipelex(self) -> None:
-        """Every request says it comes from this runtime, so the hosted plane can tell its callers apart."""
+    def test_the_user_agent_names_the_cli(self) -> None:
+        """Every request leads with `pipelex-cli`, the registry's token for these CLIs, so the hosted plane counts it on
+        its `cli` surface: an unregistered first token would be read as an integrator app on the `sdk` surface.
+        """
         client = make_hosted_client()
-        assert client.user_agent.startswith(f"pipelex/{get_package_version()} ")
+        assert client.user_agent.startswith(f"pipelex-cli/{get_package_version()} pipelex-sdk-python/")
 
     @pytest.mark.parametrize(
         ("base_url", "env_base_url", "named_source"),

@@ -6,7 +6,7 @@ description: "Run methods on the hosted Pipelex API from Python with pipelex-sdk
 
 The Pipelex Python API has two halves. `PipelexMTHDSProtocol`, shown in [Executing Pipelines](executing-pipelines.md), runs a method in your own process, with your own inference backends and provider keys. **`PipelexAPIClient`**, from the `pipelex-sdk` package, runs it on the hosted Pipelex API, with only a Pipelex API key. `pipelex-sdk` is a dependency of `pipelex`, so it is installed with it, and it is the client `pipelex run --hosted` uses under the hood.
 
-Use the client directly: it has no Pipelex wrapper, and it needs no `Pipelex.make()`, since nothing runs locally.
+Use the client directly: it has no Pipelex wrapper, and it needs no `Pipelex.make()`, since nothing runs locally. Its requests identify themselves in their `User-Agent` as pipelex-sdk's, while the CLI's lead with `pipelex-cli/<version>`; to put your own application's name in front, pass pipelex-sdk's `app_info` to the constructor.
 
 ## The Key and the Origin
 
