@@ -62,12 +62,13 @@ def make_deck_blueprint(*, extract_choice_default: ExtractModelChoice = "extract
     )
 
 
-def build_deck_manager(*backends: InferenceBackend, routing_profile: RoutingProfile) -> ModelManager:
+def build_deck_manager(*backends: InferenceBackend, routing_profile: RoutingProfile, enabled_backends: list[str] | None = None) -> ModelManager:
+    """A manager whose deck is built over these backends, every one of them enabled unless `enabled_backends` names a subset."""
     manager = ModelManager()
     manager.inference_backend_library.root = {backend.name: backend for backend in backends}
     manager._routing_profile = routing_profile  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
     manager.model_deck = manager.build_deck(
         model_deck_blueprint=make_deck_blueprint(),
-        enabled_backends=[backend.name for backend in backends],
+        enabled_backends=enabled_backends if enabled_backends is not None else [backend.name for backend in backends],
     )
     return manager
