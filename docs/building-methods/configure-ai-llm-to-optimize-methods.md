@@ -32,7 +32,7 @@ default-general = "gpt-5.6-terra"
 default-small = "gpt-5.6-luna"
 ```
 
-The system first looks for direct model names, then checks aliases if no direct match is found. The system handles model routing through backends automatically.
+A bare name in a pipe's `model` field is first looked up among the models the enabled backends serve as the pipe's model type, then among the aliases of that type, then among its waterfalls while model fallback is on. A model served as another type does not count: an LLM named in a `PipeImgGen` is refused when the bundle is validated or loaded, with an `unknown_model` item naming the pipe, the handle and the type the pipe needs. The system handles model routing through backends automatically.
 
 !!! tip "Alias Naming Convention"
     Defining an alias is always meant to describe what model it is. Never define an alias to describe what it is for or what it's good at. LLM Presets are for that.

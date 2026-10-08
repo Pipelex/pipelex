@@ -1148,6 +1148,93 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
       x-mthds-protocol: true
+  /v1/models/check:
+    get:
+      tags:
+      - agent
+      summary: Check Model
+      description: 'Check whether one model reference resolves on this runner, as what, to which model (Pipelex API extension).
+
+
+        Answers from pipelex''s own reference parser and deck lookups, the ones a validation runs, so a
+
+        reference found `resolved` in a category is one a pipe of that category may name, and one found
+
+        `not_found` is one a validation refuses. A verdict is a `200` whatever the resolution, and on
+
+        `not_found` it carries the suggestions a failing validation of the same reference offers. A
+
+        request that cannot produce a verdict is an input `422`: `ValidationError` for a missing or
+
+        repeated `reference` or a repeated `type`, `InvalidModelReference` for a reference that is blank,
+
+        a sigil or a namespace alone, or too long, and `InvalidModelCategory` for an unknown `type`.'
+      operationId: check_model_v1_models_check_get
+      parameters:
+      - name: reference
+        in: query
+        required: true
+        schema:
+          type: string
+          description: 'The model reference as a method''s `model` field writes it: `$preset`, `@alias`, `~waterfall`, a bare
+            model handle, or one of the namespaces `preset:`, `alias:`, `waterfall:` and `handle:`. Surrounding whitespace
+            is ignored, and the trimmed reference holds at most 199 characters. Single value.'
+          title: Reference
+        description: 'The model reference as a method''s `model` field writes it: `$preset`, `@alias`, `~waterfall`, a bare
+          model handle, or one of the namespaces `preset:`, `alias:`, `waterfall:` and `handle:`. Surrounding whitespace is
+          ignored, and the trimmed reference holds at most 199 characters. Single value.'
+      - name: type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: 'The category to check in: llm, extract, img_gen, search, judgment or doc_gen. When absent, the check
+            is made in every one of them. Single value.'
+          title: Type
+        description: 'The category to check in: llm, extract, img_gen, search, judgment or doc_gen. When absent, the check
+          is made in every one of them. Single value.'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelReferenceVerdict'
+        '401':
+          description: Missing or invalid bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key`
+            or `AUTH_MODE=jwt`).
+          headers:
+            WWW-Authenticate:
+              description: Authentication challenge — always `Bearer`.
+              schema:
+                type: string
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
+        '413':
+          description: Request body exceeds the deployment's size limit (`MAX_REQUEST_BODY_MIB`, 100 MiB by default).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
+        '422':
+          description: 'The request could not be processed: a malformed body, a field failing validation, or an `input`-domain
+            pipelex error (a `.mthds` bundle the caller must fix). Note that on the diagnostic routes an *invalid bundle*
+            is a **200** verdict, not a 422 — see each route''s response contract.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
+        '500':
+          description: A `config`-domain or `runtime`-domain failure the caller cannot fix (a missing env var, a bad TOML
+            override, a backend fault), or an unclassified error sanitized by the catch-all handler. Report the `request_id`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
   /:
     get:
       tags:
@@ -1217,6 +1304,31 @@ components:
         fact: who produced it, why, and which upstream absence it chains to. Provenance is captured
 
         at the moment absence is produced, not reconstructed at failure time.'
+    AliasMatch:
+      properties:
+        category:
+          $ref: '#/components/schemas/ModelCheckCategory'
+          description: The category this entry is about.
+        resolves_to:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Resolves To
+          description: The model handle a run through the reference would call now in this category, or null when it would
+            find none (a target on a backend the runner has not enabled, a waterfall none of whose usable steps the runner
+            serves, an alias cycle).
+        target:
+          type: string
+          title: Target
+          description: The model the deck binds the alias to, as the deck writes it, which may itself be a reference.
+      additionalProperties: false
+      type: object
+      required:
+      - category
+      - resolves_to
+      - target
+      title: AliasMatch
+      description: What an alias reference is in one category.
     AspectRatio:
       type: string
       enum:
@@ -2609,6 +2721,34 @@ components:
         Both reuse ``NodeUsageSpec`` — one usage shape in the contract, not two. Neither has
 
         a subtree distinct from itself, so their ``subtree_*`` fields repeat their own.'
+    HandleMatch:
+      properties:
+        category:
+          $ref: '#/components/schemas/ModelCheckCategory'
+          description: The category this entry is about.
+        resolves_to:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Resolves To
+          description: The model handle a run through the reference would call now in this category, or null when it would
+            find none (a target on a backend the runner has not enabled, a waterfall none of whose usable steps the runner
+            serves, an alias cycle).
+        via:
+          items:
+            type: string
+          type: array
+          title: Via
+          description: The presets, aliases and waterfalls of this category whose binding names the handle directly, each
+            written as a reference.
+      additionalProperties: false
+      type: object
+      required:
+      - category
+      - resolves_to
+      - via
+      title: HandleMatch
+      description: What a bare handle reference is in one category.
     HealthResponse:
       properties:
         status:
@@ -3402,6 +3542,24 @@ components:
         `PipeSearch`) and `judgment` (`JudgmentSetting`, `PipeJudge`). A settings
 
         family the standard adds brings a category in the next protocol minor.'
+    ModelCheckCategory:
+      type: string
+      enum:
+      - llm
+      - extract
+      - img_gen
+      - search
+      - judgment
+      - doc_gen
+      title: ModelCheckCategory
+      description: 'The categories the model reference check covers, in the order every list it returns follows.
+
+
+        These are the MTHDS Protocol''s model categories, in the protocol''s order, then `doc_gen`, the family
+
+        of `PipeDocGen`. The protocol defines no category for `doc_gen`, so the model listing leaves it out,
+
+        but a method names a `doc_gen` model in its `model` field like any other, so the check covers it.'
     ModelInfo:
       properties:
         name:
@@ -3449,6 +3607,77 @@ components:
       - handle
       title: ModelReferenceKind
       description: The kind of model reference.
+    ModelReferenceResolution:
+      type: string
+      enum:
+      - resolved
+      - not_found
+      title: ModelReferenceResolution
+      description: Whether a reference resolves in a category in scope. Both values are definitive.
+    ModelReferenceVerdict:
+      properties:
+        reference:
+          type: string
+          title: Reference
+          description: The caller's reference, trimmed.
+        kind:
+          $ref: '#/components/schemas/ModelReferenceKind'
+          description: What the reference names, from its parsing.
+        name:
+          type: string
+          title: Name
+          description: The reference without its sigil or namespace.
+        category:
+          anyOf:
+          - $ref: '#/components/schemas/ModelCheckCategory'
+          - type: 'null'
+          description: The `type` asked, or null when none was.
+        resolution:
+          $ref: '#/components/schemas/ModelReferenceResolution'
+          description: Whether the reference resolves in a category in scope.
+        matches:
+          items:
+            anyOf:
+            - $ref: '#/components/schemas/PresetMatch'
+            - $ref: '#/components/schemas/AliasMatch'
+            - $ref: '#/components/schemas/WaterfallMatch'
+            - $ref: '#/components/schemas/HandleMatch'
+          type: array
+          title: Matches
+          description: One entry per category in scope where the reference resolves, in the order of the categories the check
+            covers.
+        suggestions:
+          items:
+            type: string
+          type: array
+          title: Suggestions
+          description: On `not_found`, the nearest names the caller may have meant; empty when it is `resolved`.
+        other_kinds:
+          items:
+            type: string
+          type: array
+          title: Other Kinds
+          description: On `not_found`, the same name under another kind, in the categories in scope; empty when it is `resolved`.
+        other_categories:
+          items:
+            $ref: '#/components/schemas/ModelCheckCategory'
+          type: array
+          title: Other Categories
+          description: On `not_found` with a `type`, the categories outside it where the same reference resolves; empty otherwise.
+      additionalProperties: false
+      type: object
+      required:
+      - reference
+      - kind
+      - name
+      - category
+      - resolution
+      - matches
+      - suggestions
+      - other_kinds
+      - other_categories
+      title: ModelReferenceVerdict
+      description: The verdict of the model reference check, discriminated on `resolution`.
     ModelUsageSpec:
       properties:
         inference_model_name:
@@ -5846,6 +6075,38 @@ components:
         would destroy it for every consumer at once. A consumer that only needs "may this be absent?"
 
         answers it as `is_optional`, in exactly one place.'
+    PresetMatch:
+      properties:
+        category:
+          $ref: '#/components/schemas/ModelCheckCategory'
+          description: The category this entry is about.
+        resolves_to:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Resolves To
+          description: The model handle a run through the reference would call now in this category, or null when it would
+            find none (a target on a backend the runner has not enabled, a waterfall none of whose usable steps the runner
+            serves, an alias cycle).
+        target:
+          type: string
+          title: Target
+          description: The model the deck binds the preset to, as the deck writes it, which may itself be a reference.
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+          description: The preset's description, or null when the deck gives it none.
+      additionalProperties: false
+      type: object
+      required:
+      - category
+      - resolves_to
+      - target
+      - description
+      title: PresetMatch
+      description: What a preset reference is in one category.
     ProblemDocument:
       properties:
         type:
@@ -7512,6 +7773,33 @@ components:
         of them would tell a consumer it knows which fault occurred when it does not. Their message is the
 
         authoritative diagnostic.'
+    WaterfallMatch:
+      properties:
+        category:
+          $ref: '#/components/schemas/ModelCheckCategory'
+          description: The category this entry is about.
+        resolves_to:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Resolves To
+          description: The model handle a run through the reference would call now in this category, or null when it would
+            find none (a target on a backend the runner has not enabled, a waterfall none of whose usable steps the runner
+            serves, an alias cycle).
+        fallbacks:
+          items:
+            type: string
+          type: array
+          title: Fallbacks
+          description: The waterfall's steps, in order.
+      additionalProperties: false
+      type: object
+      required:
+      - category
+      - resolves_to
+      - fallbacks
+      title: WaterfallMatch
+      description: What a waterfall reference is in one category.
     WorkingMemory:
       properties:
         root:

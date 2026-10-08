@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from typing import NoReturn, Self
 
 from pydantic import Field, PrivateAttr, field_validator, model_validator
@@ -188,11 +189,80 @@ class ModelDeck(ConfigModel):
             case ModelType.JUDGMENT:
                 return self.judgment_aliases, self.judgment_waterfalls
 
+    def get_presets_for_type(
+        self, *, model_type: ModelType
+    ) -> Mapping[str, LLMSetting | ExtractSetting | ImgGenSetting | SearchSetting | DocGenSetting | JudgmentSetting]:
+        """Return the type-specific presets dictionary."""
+        match model_type:
+            case ModelType.LLM:
+                return self.llm_presets
+            case ModelType.TEXT_EXTRACTOR:
+                return self.extract_presets
+            case ModelType.IMG_GEN:
+                return self.img_gen_presets
+            case ModelType.SEARCH:
+                return self.search_presets
+            case ModelType.DOC_GEN:
+                return self.doc_gen_presets
+            case ModelType.JUDGMENT:
+                return self.judgment_presets
+
+    def is_bare_handle_resolvable(self, *, name: str, model_type: ModelType) -> bool:
+        """Whether a bare model name resolves for this model type, the way a run reads it.
+
+        The name resolves when the runner can call a model of that name of this type, among every
+        model it can call and not only those the deck names; failing that, when the deck defines an
+        alias of that name for this type, or a waterfall of that name while model fallback is on.
+        That is the order `get_optional_inference_model` looks a bare name up in. A model of that
+        name served as another type does not make it resolve, so a pipe naming it is refused when
+        its bundle loads rather than when the run reaches it.
+        """
+        served_model = self.inference_models.get(name)
+        if served_model is not None and served_model.model_type == model_type:
+            return True
+        aliases, waterfalls = self.get_aliases_and_waterfalls_for_type(model_type)
+        if name in aliases:
+            return True
+        return self.model_deck_config.is_model_fallback_enabled and name in waterfalls
+
+    def is_reference_defined(self, *, reference: ModelReference, model_type: ModelType) -> bool:
+        """Whether a pipe of this model type may name this reference in its `model` field.
+
+        This is the test a validation applies to the field: a preset, an alias or a waterfall is
+        defined when the deck defines that name for the type, and a bare handle when it resolves
+        by `is_bare_handle_resolvable`. It is a matter of names: a preset, an alias or a waterfall
+        whose binding reaches no model the runner can call is still defined.
+        """
+        match reference.kind:
+            case ModelReferenceKind.PRESET:
+                return reference.name in self.get_presets_for_type(model_type=model_type)
+            case ModelReferenceKind.ALIAS:
+                aliases, _ = self.get_aliases_and_waterfalls_for_type(model_type)
+                return reference.name in aliases
+            case ModelReferenceKind.WATERFALL:
+                _, waterfalls = self.get_aliases_and_waterfalls_for_type(model_type)
+                return reference.name in waterfalls
+            case ModelReferenceKind.HANDLE:
+                return self.is_bare_handle_resolvable(name=reference.name, model_type=model_type)
+
+    def unresolved_handle_sentence(self, *, name: str, model_type: ModelType) -> str:
+        """The sentence refusing a bare handle that does not resolve for this model type.
+
+        It names the handle and the type the field needs. When the deck serves a model of that name
+        as another type, it says so rather than calling the handle missing, without naming that type.
+        """
+        served_model = self.inference_models.get(name)
+        if served_model is not None and served_model.model_type != model_type:
+            return f"Model handle '{name}' is served by the model deck, but not as {model_type.indefinite_description}"
+        return f"Model handle '{name}' was not found in the model deck"
+
     def is_model_handle_defined(self, model_handle: str, *, model_type: ModelType) -> bool:
-        """Check if a model handle is defined in the model deck.
+        """Check if a model handle is defined in the model deck for this model type.
 
         Handles prefixed references (e.g., @alias_name, ~waterfall_name) by parsing
-        them and looking up the appropriate dictionary.
+        them and looking up the appropriate dictionary. A bare handle is defined when it
+        resolves for this model type (`is_bare_handle_resolvable`): a model the deck serves
+        only as another type does not define it.
         """
         ref = ModelReference.parse(model_handle)
         aliases, waterfalls = self.get_aliases_and_waterfalls_for_type(model_type)
@@ -208,13 +278,7 @@ class ModelDeck(ConfigModel):
                 # Presets are handled separately, not as direct handles
                 return False
             case ModelReferenceKind.HANDLE:
-                # Direct handle lookup - check inference_models, aliases, and waterfalls
-                all_handles: set[str] = set()
-                all_handles.update(self.inference_models.keys())
-                all_handles.update(aliases.keys())
-                if self.model_deck_config.is_model_fallback_enabled:
-                    all_handles.update(waterfalls.keys())
-                return ref.name in all_handles
+                return self.is_bare_handle_resolvable(name=ref.name, model_type=model_type)
 
     def _warn_if_ambiguous_llm(self, name: str) -> None:
         """Log a warning if a bare string handle matches presets/aliases/waterfalls."""
@@ -313,7 +377,7 @@ class ModelDeck(ConfigModel):
         | dict[str, JudgmentSetting],
     ) -> NoReturn:
         """Raise ModelChoiceNotFoundError with migration hints if applicable."""
-        msg = f"Model handle '{ref.name}' was not found in the model deck"
+        msg = self.unresolved_handle_sentence(name=ref.name, model_type=model_type)
 
         # Add migration hints if the name matches a preset, alias, or waterfall
         aliases, waterfalls = self.get_aliases_and_waterfalls_for_type(model_type)
@@ -386,7 +450,7 @@ class ModelDeck(ConfigModel):
                 self._warn_if_ambiguous_llm(ref.name)
                 if self.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.LLM):
                     return
-                msg = f"Model handle '{ref.name}' was not found in the model deck"
+                msg = self.unresolved_handle_sentence(name=ref.name, model_type=ModelType.LLM)
                 raise ModelChoiceNotFoundError(
                     message=msg,
                     model_type=ModelType.LLM,
@@ -1010,12 +1074,14 @@ class ModelDeck(ConfigModel):
                 # Direct handle - proceed with normal lookup
                 pass
 
-        # For direct handles (HANDLE kind), try inference_models first
-        if inference_model := self.inference_models.get(ref.name):
-            if inference_model.model_type != model_type:
-                log.warning(f"Model handle '{ref.name}' has type '{inference_model.model_type}' but was requested as '{model_type}'. Skipping.")
-                return None
-            return inference_model
+        # For direct handles (HANDLE kind), try inference_models first. A model of that name served as
+        # another type does not answer this lookup, which goes on to this type's aliases and waterfalls,
+        # as the load-time check (`is_bare_handle_resolvable`) reads the same name.
+        inference_model = self.inference_models.get(ref.name)
+        if inference_model is not None:
+            if inference_model.model_type == model_type:
+                return inference_model
+            log.verbose(f"Model handle '{ref.name}' has type '{inference_model.model_type}' but was requested as '{model_type}'.")
         # Then try aliases (without prefix)
         if alias := aliases.get(ref.name):
             log.verbose(f"Alias for '{model_handle}': {alias}")
@@ -1135,8 +1201,8 @@ class ModelDeck(ConfigModel):
             if not self._is_deck_model_reference(model_handle=model_handle, model_type=model_type):
                 # The deck neither defines this reference for this type nor names it anywhere, so the
                 # method being run named it, in an inline model setting the load-time check does not
-                # look into, or as a model the deck serves as another type, which that check does not
-                # tell apart: the caller's fault, which that check reports as
+                # look into, a model the deck serves as another type among them (that check refuses one
+                # only when the field names it as a reference): the caller's fault, which that check reports as
                 # `ModelChoiceNotFoundError` for a reference it sees. The message and the next step
                 # name nothing but the caller's own reference, as the method wrote it, and the type
                 # its pipe asked for, never the type the deck serves it as. A reference the deck

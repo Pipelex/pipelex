@@ -221,6 +221,33 @@ class TestModelDeckGetOptionalInferenceModel:
 
         # Assert - should return None due to model_type mismatch
         assert result is None
+        # The load-time check reads the bare name the same way: a model served only as another type does not define it.
+        assert model_deck.is_model_handle_defined("mistral-extractor", model_type=ModelType.LLM) is False
+        assert model_deck.is_model_handle_defined("mistral-extractor", model_type=ModelType.TEXT_EXTRACTOR) is True
+
+    def test_model_of_another_type_gives_way_to_an_alias_of_the_same_name(self):
+        """A bare name that is a model of another type and an alias of the requested type resolves through the alias."""
+        extractor_spec = InferenceModelSpec(
+            backend_name="test_backend",
+            name="shared-name",
+            sdk="test_sdk",
+            model_type=ModelType.TEXT_EXTRACTOR,
+            model_id="shared-name-id",
+            costs={CostCategory.INPUT: 0.001, CostCategory.OUTPUT: 0.002},
+            thinking_mode=ThinkingMode.NONE,
+            max_tokens=1000,
+            max_prompt_images=None,
+        )
+        llm_spec = self._create_test_model_spec("gpt-4")
+        model_deck = self._create_test_model_deck(
+            inference_models={"shared-name": extractor_spec, "gpt-4": llm_spec},
+            llm_aliases={"shared-name": "gpt-4"},
+        )
+
+        result = model_deck.get_optional_inference_model("shared-name", model_type=ModelType.LLM)
+
+        assert result == llm_spec
+        assert model_deck.is_model_handle_defined("shared-name", model_type=ModelType.LLM) is True
 
     def test_complex_waterfall_scenario(self):
         # Arrange

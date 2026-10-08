@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`GET /v1/models/check`, the model reference check**: the server answers whether one model reference (`?reference=`, optionally in one `?type=` category, `doc_gen` included) resolves on this runner, as a `200` verdict discriminated on `resolution` (`resolved` or `not_found`) that carries the reference's `kind` and `name`, one match per category where it resolves with the model a run would call (`resolves_to`, `null` where its binding reaches no model the runner can call) and its `target`, `description`, `fallbacks` or `via`, and, on `not_found`, the `suggestions`, `other_kinds` and `other_categories` a failing validation of the same reference offers, written as references. It answers from pipelex's own parser and the deck lookups a validation runs, so a client no longer keeps its own grammar of model references, and it is a Pipelex API extension, not tagged `x-mthds-protocol`. A missing or repeated `reference` or a repeated `type` is a `422` `ValidationError`, a reference that is blank, a sigil or a namespace alone, or longer than 199 characters once trimmed is a `422` of the new `error_type` `InvalidModelReference`, and an unknown or empty `type` is a `422` `InvalidModelCategory`. The library serves the same check as `check_model_reference` in `pipelex.cogt.models.model_reference_check`, and the suggestion rule as `find_model_alternatives` in `pipelex.cogt.models.model_suggestion`.
+
+### Changed
+
+- **A bare model handle must be a model of its pipe's type (Breaking)**: a pipe's `model` field naming a bare handle the model deck serves only as another model type, such as an LLM named in a `PipeImgGen`, is refused by `pipelex validate`, `POST /v1/validate` and a run's load as an `unknown_model` item whose message says the deck serves the handle but not as the type the pipe needs, where it validated and failed only when the run reached the pipe. A bare name resolves when the runner can call a model of that name of the pipe's type, then when that type defines an alias of that name, then a waterfall of that name while model fallback is on, and a run now reads it in that order too, so a bare name that is a model of another type and an alias of the pipe's type resolves through the alias where the run found no model. `ModelDeck.is_model_handle_defined` holds a bare handle to the type it is asked for, and `ModelDeck` gains `is_bare_handle_resolvable`, `is_reference_defined` and `get_presets_for_type`.
+
 ## [v0.77.0] - 2026-10-07
 
 ### Added

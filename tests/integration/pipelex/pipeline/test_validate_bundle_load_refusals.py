@@ -11,6 +11,8 @@ bundles through ``validate_bundle`` and pin the verdict each refusal produces:
   when the deck offers exactly one suggestion. Every pipe type that names a model gives the same item
   (``PipeExtract`` and ``PipeSearch`` used to turn it into an ``unknown_validation_error`` whose message
   was a Python repr).
+- **A model served as another type.** A pipe naming a handle the deck serves only as another model type, such as an
+  LLM in an image-generation pipe, gets the same ``unknown_model`` item, whose message names the type the pipe needs.
 - **The general arm.** Any other ``input``-domained refusal raised while building a pipe validates to one
   item located on the pipe and its file, keeping its message only when it is caller-facing; a
   ``config``-domained fault raised at the same place still propagates as no verdict.
@@ -28,12 +30,14 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import DisclosureMode, ErrorDomain, PipelexError, ValidationErrorCategory, ValidationErrorItem
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.config import get_config
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.fixes.planner import RENAME_MODEL_FIX_CODE
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.runtime_hub import get_model_deck
 from pipelex.suggested_fix import RemapValueOp
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.validation_error_types import PipeValidationErrorType
@@ -67,6 +71,22 @@ type        = "PipeImgGen"
 description = "Draw the painted board announcing the tide times"
 output      = "Image"
 model       = "nano-banana-9"
+prompt      = "A painted wooden harbour board announcing the tide times, morning light"
+"""
+
+# An LLM the session deck serves, named in an image-generation pipe.
+_LLM_HANDLE_SERVED = "gpt-5.6-luna"
+
+_LLM_IN_IMG_GEN_BUNDLE = f"""
+domain      = "{_DOMAIN}"
+description = "Draw the board announcing the tide times"
+main_pipe   = "draw_tide_board"
+
+[pipe.draw_tide_board]
+type        = "PipeImgGen"
+description = "Draw the painted board announcing the tide times"
+output      = "Image"
+model       = "{_LLM_HANDLE_SERVED}"
 prompt      = "A painted wooden harbour board announcing the tide times, morning light"
 """
 
@@ -256,6 +276,29 @@ class TestValidateBundleLoadRefusals:
         assert item.suggestions, f"the deck offers no close match for {case.model_reference!r}"
         for suggestion in item.suggestions:
             assert suggestion in item.message
+
+    async def test_a_model_served_as_another_type_is_one_unknown_model_item_naming_the_type_needed(self, tmp_path: Path) -> None:
+        """An LLM the deck serves, named in an image-generation pipe, is refused when the bundle loads rather than when the run reaches it."""
+        served_model = get_model_deck().inference_models.get(_LLM_HANDLE_SERVED)
+        assert served_model is not None, f"the session deck no longer serves {_LLM_HANDLE_SERVED!r}: pick an LLM it serves"
+        assert served_model.model_type == ModelType.LLM
+        bundle_path = _write_bundle(directory=tmp_path, content=_LLM_IN_IMG_GEN_BUNDLE)
+
+        item = await _single_item(bundle_path=bundle_path)
+
+        assert item.category == ValidationErrorCategory.PIPE_VALIDATION
+        assert item.error_type == PipeValidationErrorType.UNKNOWN_MODEL
+        assert item.pipe_code == "draw_tide_board"
+        assert item.domain_code == _DOMAIN
+        assert item.source == str(bundle_path)
+        assert item.field_path == "pipe.draw_tide_board.model"
+        assert item.model_reference == _LLM_HANDLE_SERVED
+        assert item.model_type == "img_gen"
+        assert item.message.startswith(
+            f"Pipe 'draw_tide_board' (PipeImgGen), field 'model': "
+            f"Model handle '{_LLM_HANDLE_SERVED}' is served by the model deck, but not as an image-generation model"
+        )
+        assert "was not found" not in item.message
 
     async def test_one_suggestion_carries_a_rename_fix(self, tmp_path: Path) -> None:
         bundle_path = _write_bundle(directory=tmp_path, content=_llm_bundle(model_line='model       = "@best-sonet"'))
