@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
 import typer
 from posthog import tag
@@ -15,6 +15,7 @@ from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.commands.run._inputs_file_loader import load_inputs_dict_from_path
 from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths
 from pipelex.cli.commands.run._main_stuff_file import save_main_stuff_file
+from pipelex.cli.deck_notice import warn_if_deck_stale
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_dedicated_failure_panel,
@@ -80,6 +81,65 @@ def validate_run_flag_combination(*, dry_run: bool, mock_usage: bool, mock_input
     if mock_usage and not dry_run:
         typer.secho("Failed to run: --mock-usage requires --dry-run", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
+
+
+class LoadedRunInputs(NamedTuple):
+    """A run's inputs as `--inputs` gave them, and the directory their relative file paths resolve against."""
+
+    pipeline_inputs: dict[str, Any] | None
+    #: The inputs file's directory, `None` for inline JSON, which has no file to anchor to.
+    inputs_base_dir: Path | None
+
+
+def load_run_inputs(*, inputs: str | None) -> LoadedRunInputs:
+    """Load `--inputs`: inline JSON (a `{` prefix) or a JSON or TOML file, its relative `url` paths resolved against its directory.
+
+    Shared by local and hosted runs, so both read the same inputs the same way.
+
+    Raises:
+        typer.Exit: If the inputs cannot be read or parsed, after printing why.
+    """
+    pipeline_inputs: dict[str, Any] | None = None
+    # Directory bare relative file paths resolve against (Smart Inputs D3). Set only when inputs are
+    # file-loaded (its parent); None for inline JSON — an inline caller has no file to anchor to.
+    inputs_base_dir: Path | None = None
+    if inputs:
+        if inputs.startswith("{"):
+            try:
+                pipeline_inputs = json.loads(inputs)
+            except json.JSONDecodeError as json_decode_exc:
+                print_traceback_if_requested(console=get_console())
+                typer.secho(f"Failed to parse inline JSON inputs: {json_decode_exc}", fg=typer.colors.RED, err=True)
+                raise typer.Exit(1) from json_decode_exc
+        else:
+            try:
+                # expanduser so a quoted / `=`-form `~/inputs.json` resolves to the home dir, not a
+                # literal `~` component (unquoted `~` is shell-expanded, but the quoted/`=` forms are not).
+                inputs_path = Path(inputs).expanduser()
+                pipeline_inputs = load_inputs_dict_from_path(inputs_path)
+                # Resolve relative url paths against the inputs file's parent directory. The same
+                # directory is threaded to the runner as inputs_base_dir so the shaper can resolve
+                # bare relative file-ish / CSV strings (whose declared concept the CLI cannot see).
+                inputs_base_dir = inputs_path.parent.resolve()
+                pipeline_inputs = resolve_inputs_paths(pipeline_inputs, base_dir=inputs_base_dir)
+                typer.echo(f"Loaded inputs from: {inputs}")
+            except FileNotFoundError as file_not_found_exc:
+                print_traceback_if_requested(console=get_console())
+                typer.secho(f"Failed to load input file '{inputs}': file not found", fg=typer.colors.RED, err=True)
+                raise typer.Exit(1) from file_not_found_exc
+            except json.JSONDecodeError as json_decode_exc:
+                print_traceback_if_requested(console=get_console())
+                typer.secho(f"Failed to parse input file '{inputs}': invalid JSON: {json_decode_exc}", fg=typer.colors.RED, err=True)
+                raise typer.Exit(1) from json_decode_exc
+            except JsonTypeError as json_type_error_exc:
+                print_traceback_if_requested(console=get_console())
+                typer.secho(f"Failed to parse input file '{inputs}': must be a valid JSON dictionary", fg=typer.colors.RED, err=True)
+                raise typer.Exit(1) from json_type_error_exc
+            except TomlError as toml_error_exc:
+                print_traceback_if_requested(console=get_console())
+                typer.secho(f"Failed to parse input file: {toml_error_exc.message}", fg=typer.colors.RED, err=True)
+                raise typer.Exit(1) from toml_error_exc
+    return LoadedRunInputs(pipeline_inputs=pipeline_inputs, inputs_base_dir=inputs_base_dir)
 
 
 def _resolve_row_model_for_empty_result(
@@ -181,47 +241,7 @@ async def _execute_run(
         typer.secho("Failed to run: no pipe code specified", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
 
-    # Load inputs if provided
-    pipeline_inputs = None
-    # Directory bare relative file paths resolve against (Smart Inputs D3). Set only when inputs are
-    # file-loaded (its parent); None for inline JSON — an inline caller has no file to anchor to.
-    inputs_base_dir: Path | None = None
-    if inputs:
-        if inputs.startswith("{"):
-            try:
-                pipeline_inputs = json.loads(inputs)
-            except json.JSONDecodeError as json_decode_exc:
-                print_traceback_if_requested(console=get_console())
-                typer.secho(f"Failed to parse inline JSON inputs: {json_decode_exc}", fg=typer.colors.RED, err=True)
-                raise typer.Exit(1) from json_decode_exc
-        else:
-            try:
-                # expanduser so a quoted / `=`-form `~/inputs.json` resolves to the home dir, not a
-                # literal `~` component (unquoted `~` is shell-expanded, but the quoted/`=` forms are not).
-                inputs_path = Path(inputs).expanduser()
-                pipeline_inputs = load_inputs_dict_from_path(inputs_path)
-                # Resolve relative url paths against the inputs file's parent directory. The same
-                # directory is threaded to the runner as inputs_base_dir so the shaper can resolve
-                # bare relative file-ish / CSV strings (whose declared concept the CLI cannot see).
-                inputs_base_dir = inputs_path.parent.resolve()
-                pipeline_inputs = resolve_inputs_paths(pipeline_inputs, base_dir=inputs_base_dir)
-                typer.echo(f"Loaded inputs from: {inputs}")
-            except FileNotFoundError as file_not_found_exc:
-                print_traceback_if_requested(console=get_console())
-                typer.secho(f"Failed to load input file '{inputs}': file not found", fg=typer.colors.RED, err=True)
-                raise typer.Exit(1) from file_not_found_exc
-            except json.JSONDecodeError as json_decode_exc:
-                print_traceback_if_requested(console=get_console())
-                typer.secho(f"Failed to parse input file '{inputs}': invalid JSON: {json_decode_exc}", fg=typer.colors.RED, err=True)
-                raise typer.Exit(1) from json_decode_exc
-            except JsonTypeError as json_type_error_exc:
-                print_traceback_if_requested(console=get_console())
-                typer.secho(f"Failed to parse input file '{inputs}': must be a valid JSON dictionary", fg=typer.colors.RED, err=True)
-                raise typer.Exit(1) from json_type_error_exc
-            except TomlError as toml_error_exc:
-                print_traceback_if_requested(console=get_console())
-                typer.secho(f"Failed to parse input file: {toml_error_exc.message}", fg=typer.colors.RED, err=True)
-                raise typer.Exit(1) from toml_error_exc
+    pipeline_inputs, inputs_base_dir = load_run_inputs(inputs=inputs)
 
     # Determine pipe run mode
     pipe_run_mode = PipeRunMode.DRY if dry_run else None
@@ -492,8 +512,10 @@ def execute_run(
 ) -> None:
     """Synchronous entry point that wraps the async execution with Pipelex setup/teardown.
 
-    Shared between the ``method`` and ``pipe`` subcommands.
+    Shared between the ``method``, ``pipe`` and ``bundle`` subcommands, for a run that executes on this machine. It
+    prints the deck staleness notice, which the root callback leaves to it: only a local run reads the deck.
     """
+    warn_if_deck_stale()
     # A dry run makes no inference call, so it must not demand credentials: `needs_inference=False`
     # forces every run to DRY and resolves no backend's credentials, yet keeps every enabled backend
     # with its models, so a dry run resolves model handles exactly as a live run would, whichever keys

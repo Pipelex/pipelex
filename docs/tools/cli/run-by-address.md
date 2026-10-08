@@ -48,6 +48,14 @@ The pipe to run defaults to the manifest's `main_pipe`; `--pipe <code>` override
 
 The fetched clone is temporary: it lives in a system temp directory and is deleted when the CLI process exits. Default outputs therefore anchor in **your current working directory** — `pipelex run method <ref>` writes into `./results/`, and the `pipelex build` method commands write their generated files there too, so nothing you produced disappears with the clone. An explicit `--output-dir` / `--output` is honored verbatim. For an installed method or a local path, defaults stay inside the method's own directory, as before.
 
+## Running by address on the hosted API
+
+With `--hosted` (or `[run] execution = "hosted"`), `pipelex run method <ref>` fetches nothing: the address goes to the hosted Pipelex API as a method reference, and the hosted runner locates and fetches the package itself, under the same grammar and the same manifest-identity rule. The entry pipe is still the manifest's `main_pipe` unless `--pipe` names another, outputs still land in `./results/` under your working directory, and a relative `--inputs` path resolves against the working directory, since there is no local clone to anchor it to. `-L` is refused, because the hosted API loads no local library alongside an address. See [Running on the Hosted API](run.md#running-on-the-hosted-api).
+
+```bash
+pipelex run method github.com/Pipelex/methods/text_stats@v0.1.7 --hosted --inputs '{"text": "Hello world."}'
+```
+
 ## Python in fetched methods: the hosted rule
 
 What decides whether Python in a method is acceptable is **where it would execute**:

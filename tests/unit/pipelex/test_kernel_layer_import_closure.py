@@ -94,6 +94,10 @@ KERNEL_LAYER_ENTRY_POINTS = [
     # The boot-tolerance replay imports the engine; `pipelex migrate` drives the runner.
     "pipelex.migration.engine",
     "pipelex.migration.runner",
+    # A hosted run boots nothing: the run mapping and the execution resolution carry the whole package.
+    "pipelex.hosted.hosted_run",
+    "pipelex.hosted.execution",
+    "pipelex.hosted.error_rendering",
 ]
 
 #: The negative control, and the reason it is needed: the detector below is a `textwrap.dedent`

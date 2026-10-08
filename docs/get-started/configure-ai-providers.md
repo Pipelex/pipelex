@@ -6,7 +6,7 @@ description: "Set up API keys for OpenAI, Anthropic, Mistral, OpenRouter and oth
 
 ## Configure API Access
 
-To run pipelines on your own machine, Pipelex needs access to AI models. **You have two options**: your own provider keys, or models running locally. Nothing reports to Pipelex either way. If you would rather hold no provider keys at all, the [Quick Start](./quick-start.md) runs methods on the hosted Pipelex API instead.
+To run pipelines on your own machine, Pipelex needs access to AI models. **You have two options**: your own provider keys, or models running locally. Nothing reports to Pipelex either way. This is the setup `pipelex init` runs when you answer **On this machine, with your own provider keys** to its question "Where should your runs execute?". If you would rather hold no provider keys at all, take its default answer, the hosted Pipelex API, which signs you in for a Pipelex API key instead (see [Run It Yourself](./run-it-yourself.md) and [`pipelex login`](../tools/cli/login.md)).
 
 ### Option 1: Bring Your Own API Keys
 
@@ -59,11 +59,13 @@ You only need to add keys for the providers you plan to use. A single OpenRouter
 
 When using your own keys, enable the corresponding backends:
 
-1. Initialize configuration:
+1. Initialize configuration, and answer **2) On this machine, with your own provider keys** when it asks where your runs execute. It then asks which backends you have access to and prompts for their keys, saved to `~/.pipelex/.env`:
 
     ```bash
     pipelex init
     ```
+
+    On a machine already set up, `pipelex init inference` reruns the backend selection alone, without changing where your runs execute.
 
 2. Edit `~/.pipelex/inference/backends.toml` (or `.pipelex/inference/backends.toml` in your project root if you have a project-local config — the project file fully overrides the global one). To run on a backend of your own choosing without touching a tracked file, write the same keys in a git-ignored `backends_override.toml` beside it instead: see [Personal overrides](../configuration/config-technical/inference-backend-config.md#personal-overrides).
 
@@ -114,11 +116,11 @@ To set up Pipelex configuration files, run:
 pipelex init
 ```
 
-By default, this creates the global `~/.pipelex/` directory with:
+By default, this creates the global `~/.pipelex/` directory, with the same files whichever answer you give to where your runs execute; the `inference/` files are what runs on this machine use:
 
 ```
 ~/.pipelex/
-├── pipelex.toml              # Feature flags, logging, cost reporting
+├── pipelex.toml              # Feature flags, logging, cost reporting, where runs execute
 ├── plxt.toml                 # MTHDS/TOML formatting and linting configuration
 ├── telemetry.toml            # AI trace destinations (PostHog, Langfuse, OTLP)
 └── inference/                # LLM configuration and model presets

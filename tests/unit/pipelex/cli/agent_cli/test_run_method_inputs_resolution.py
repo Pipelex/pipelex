@@ -6,7 +6,6 @@ import io
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from mthds.runners.types import RunnerType
 
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.run.method_cmd import run_method_cmd
@@ -40,18 +39,13 @@ class TestAgentRunMethodInputsResolution:
         mocker.patch(f"{RUN_METHOD_MODULE}.Pipelex.teardown_if_needed")
         return mocker.patch(f"{RUN_METHOD_MODULE}.run_pipeline_core", new=mocker.AsyncMock(return_value=result))
 
-    def _make_ctx(self, mocker: MockerFixture) -> Any:
-        ctx = mocker.MagicMock()
-        ctx.obj = {"runner": RunnerType.PIPELEX}
-        return ctx
-
     @pytest.mark.usefixtures("tty_stdin")
     def test_relative_inputs_resolved_against_method_dir(self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         """A relative --inputs path loads from the method's directory, not the CWD (same rule as the main CLI)."""
         (tmp_path / "inputs.toml").write_text('topic = "cats"\n', encoding="utf-8")
         run_core_mock = self._patch_method_run(mocker, method_dir=tmp_path, result={"answer": "42"})
 
-        run_method_cmd(ctx=self._make_ctx(mocker), name="my-method", inputs="inputs.toml", output_format=CliOutputFormat.JSON)
+        run_method_cmd(name="my-method", inputs="inputs.toml", output_format=CliOutputFormat.JSON)
 
         capsys.readouterr()
         assert run_core_mock.call_args.kwargs["inputs"] == {"topic": "cats"}
@@ -61,7 +55,7 @@ class TestAgentRunMethodInputsResolution:
         """Inline JSON --inputs is parsed as-is, never treated as a path."""
         run_core_mock = self._patch_method_run(mocker, method_dir=tmp_path, result={"answer": "42"})
 
-        run_method_cmd(ctx=self._make_ctx(mocker), name="my-method", inputs='{"topic": "inline"}', output_format=CliOutputFormat.JSON)
+        run_method_cmd(name="my-method", inputs='{"topic": "inline"}', output_format=CliOutputFormat.JSON)
 
         capsys.readouterr()
         assert run_core_mock.call_args.kwargs["inputs"] == {"topic": "inline"}

@@ -59,6 +59,7 @@ class TestCliEntrypointStarts:
             ["run", "--help"],
             ["validate", "--help"],
             ["init", "--help"],
+            ["login", "--help"],
         ],
     )
     def test_subcommand_starts_and_exits_zero(self, args: list[str]) -> None:

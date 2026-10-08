@@ -129,19 +129,20 @@ STALE_TELEMETRY_OVERRIDE = 'telemetry_mode = "off"\n'
 def _run_booted_runtime(
     *,
     interpreter_packages: "tuple[str, ...]",
-    stale_home: Path | None = None,
+    home: Path,
+    expects_replay: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     """Boot the kernel layer in a fresh interpreter and return the sweep's verdict.
 
-    With `stale_home`, the subprocess runs with that directory as its home (both spellings, so
-    `Path.home()` resolves to it on every platform), and the script additionally requires that the
+    The subprocess runs with `home` as its home directory (both spellings, so `Path.home()` resolves
+    to it on every platform), and every case passes a directory of its own under `tmp_path`. A boot
+    copies into the home configuration directory each kit file it lacks, so a subprocess left on the
+    developer's home would write into their real `~/.pipelex`; `PIPELEX_HOME` cannot move it, since
+    this module unsets the variable. With `expects_replay`, the script additionally requires that the
     boot went through the migration replay.
     """
-    env: dict[str, str] | None = None
-    mode = "healthy"
-    if stale_home is not None:
-        env = {**os.environ, "HOME": str(stale_home), "USERPROFILE": str(stale_home)}
-        mode = "expect-replay"
+    env = {**os.environ, "HOME": str(home), "USERPROFILE": str(home)}
+    mode = "expect-replay" if expects_replay else "healthy"
     try:
         return subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
             [sys.executable, "-c", _BOOTED_RUNTIME_SCRIPT, mode, *interpreter_packages],
@@ -157,9 +158,9 @@ def _run_booted_runtime(
 
 
 class TestBootedKernelLayer:
-    def test_the_sweep_still_detects_a_package_the_runtime_boot_really_loads(self) -> None:
+    def test_the_sweep_still_detects_a_package_the_runtime_boot_really_loads(self, tmp_path: Path) -> None:
         """The control: same script, opposite verdict. Without this, every other case is vacuous."""
-        result = _run_booted_runtime(interpreter_packages=(CONTROL_PACKAGE_THE_RUNTIME_ALWAYS_LOADS,))
+        result = _run_booted_runtime(interpreter_packages=(CONTROL_PACKAGE_THE_RUNTIME_ALWAYS_LOADS,), home=tmp_path)
 
         assert result.returncode == 1, (
             f"treating {CONTROL_PACKAGE_THE_RUNTIME_ALWAYS_LOADS!r} as an interpreter package must fail — "
@@ -170,8 +171,9 @@ class TestBootedKernelLayer:
         assert "interpreter module(s)" in result.stdout
         assert "runtime boot OK" not in result.stdout
 
-    def test_booting_the_kernel_layer_loads_no_interpreter_module_and_installs_no_interpreter_hub(self) -> None:
-        result = _run_booted_runtime(interpreter_packages=INTERPRETER_PACKAGES)
+    def test_booting_the_kernel_layer_loads_no_interpreter_module_and_installs_no_interpreter_hub(self, tmp_path: Path) -> None:
+        """Booted from an empty home, as on a clean machine, so the developer's own configuration cannot steer it."""
+        result = _run_booted_runtime(interpreter_packages=INTERPRETER_PACKAGES, home=tmp_path)
         assert result.returncode == 0, (
             "booting the kernel layer must load zero interpreter modules and install no InterpreterHub.\n"
             "This is the boot-time half of the hub-layering property — see docs/contribute/hub-layering.md "
@@ -186,7 +188,7 @@ class TestBootedKernelLayer:
         global_config_dir.mkdir()
         (global_config_dir / "telemetry_override.toml").write_text(STALE_TELEMETRY_OVERRIDE, encoding="utf-8")
 
-        result = _run_booted_runtime(interpreter_packages=INTERPRETER_PACKAGES, stale_home=tmp_path)
+        result = _run_booted_runtime(interpreter_packages=INTERPRETER_PACKAGES, home=tmp_path, expects_replay=True)
         assert result.returncode == 0, (
             "a kernel-layer boot that replays the migration ledger over a stale file must load zero interpreter "
             "modules. Exit 3 means the boot never reached the replay, so the fixture has stopped being stale.\n"

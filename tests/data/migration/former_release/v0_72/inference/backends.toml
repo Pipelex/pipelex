@@ -1,0 +1,132 @@
+####################################################################################################
+# Pipelex Inference Backends Configuration
+####################################################################################################
+#
+# This file configures the inference backends available to Pipelex.
+# Each backend connects to a different AI service provider (OpenAI, Anthropic, Google, etc.).
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+####################################################################################################
+
+[pipelex_gateway]
+display_name = "⭐ Pipelex Gateway"
+enabled = true                         # Enable after accepting terms via `pipelex init config`
+api_key = "${PIPELEX_GATEWAY_API_KEY}"
+
+# Pipelex Manifold is a closed private beta: leave it off unless you have been invited.
+[pipelex_manifold]
+display_name = "Pipelex Manifold (private beta)"
+enabled = false
+endpoint = "${PIPELEX_MANIFOLD_ENDPOINT}"
+api_key = "${PIPELEX_MANIFOLD_API_KEY}"
+model_specs_section = "manifold_model_specs"
+auth_header = "x-pipelex-api-key"
+
+[anthropic]
+enabled = true
+api_key = "${ANTHROPIC_API_KEY}"
+
+[azure_openai]
+display_name = "Azure OpenAI"
+enabled = true
+endpoint = "${AZURE_API_BASE}"
+api_key = "${AZURE_API_KEY}"
+api_version = "${AZURE_API_VERSION}"
+
+[bedrock]
+display_name = "Amazon Bedrock"
+enabled = true
+aws_region = "${AWS_REGION}"
+
+[blackboxai]
+display_name = "BlackBox AI"
+enabled = true
+endpoint = "https://api.blackbox.ai/v1"
+api_key = "${BLACKBOX_API_KEY}"
+
+[fal]
+display_name = "FAL"
+enabled = true
+api_key = "${FAL_API_KEY}"
+
+[google]
+display_name = "Google AI"
+enabled = true
+api_key = "${GOOGLE_API_KEY}"
+
+[groq]
+display_name = "Groq"
+enabled = true
+endpoint = "https://api.groq.com/openai/v1"
+api_key = "${GROQ_API_KEY}"
+
+[huggingface]
+display_name = "Hugging Face"
+enabled = true
+api_key = "${HF_TOKEN}"
+
+[linkup]
+display_name = "Linkup"
+enabled = true
+api_key = "${LINKUP_API_KEY}"
+
+[minimax]
+display_name = "MiniMax"
+enabled = true
+endpoint = "https://api.minimax.io/anthropic"
+api_key = "${MINIMAX_API_KEY}"
+
+[mistral]
+display_name = "Mistral AI"
+enabled = true
+api_key = "${MISTRAL_API_KEY}"
+
+[ollama]
+enabled = true
+endpoint = "http://localhost:11434/v1"
+
+[openai]
+display_name = "OpenAI"
+enabled = true
+api_key = "${OPENAI_API_KEY}"
+
+[openrouter]
+display_name = "OpenRouter"
+enabled = true
+endpoint = "https://openrouter.ai/api/v1"
+api_key = "${OPENROUTER_API_KEY}"
+
+[portkey]
+display_name = "Portkey"
+enabled = true
+endpoint = "https://api.portkey.ai/v1"
+api_key = "${PORTKEY_API_KEY}"
+
+[scaleway]
+display_name = "Scaleway"
+enabled = true
+endpoint = "${SCALEWAY_ENDPOINT}"
+api_key = "${SCALEWAY_API_KEY}"
+
+[typesafe]
+display_name = "TypeSafe"
+enabled = true
+api_key = "${TYPESAFE_API_KEY}"
+
+[vertexai]
+display_name = "Google Vertex AI"
+enabled = false                                            # This is the only one we disable because setting it up requires internet access just to get credentials so it fails in CI sandboxes
+gcp_project_id = "${GCP_PROJECT_ID}"
+gcp_location = "${GCP_LOCATION}"
+gcp_credentials_file_path = "${GCP_CREDENTIALS_FILE_PATH}"
+
+[xai]
+display_name = "xAI"
+enabled = true
+endpoint = "https://api.x.ai/v1"
+api_key = "${XAI_API_KEY}"
+
+[internal] # software-only backend, runs internally, without AI
+enabled = true

@@ -20,7 +20,9 @@ from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.ui.types import InitFocus
-from pipelex.cli.commands.migrate_cmd import apply_pending_migrations
+from pipelex.cli.commands.login.api_key_store import find_pipelex_api_key
+from pipelex.cli.commands.login.command import LOGIN_PASTE_COMMAND
+from pipelex.cli.commands.migrate_cmd import apply_former_release_cleanup, apply_pending_migrations
 from pipelex.cli.commands.update_cmd import update_cmd
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.cogt.exceptions import (
@@ -50,9 +52,16 @@ from pipelex.cogt.models.deck_manifest import (
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.config import get_config
 from pipelex.core.validation import MIGRATE_COMMAND, raise_config_setup_error, report_validation_error
+from pipelex.hosted.api_key_check import PIPELEX_API_KEY_PREFIX, is_well_formed_pipelex_api_key
+from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY
+from pipelex.hosted.error_rendering import PIPELEX_LOGIN_COMMAND
+from pipelex.hosted.execution import configured_run_execution
+from pipelex.hosted.run_config import RunExecution
 from pipelex.interpreter_plugins.builtins import BUILTIN_PLUGINS, CORE_UNCONDITIONAL_PLUGIN_NAMES, ENTRY_POINT_GROUPS
 from pipelex.kit.paths import get_kit_configs_dir
-from pipelex.migration.exceptions import MigrationError
+from pipelex.migration.exceptions import FormerReleaseConfigError, MigrationError
+from pipelex.migration.former_release import RETIRED_BACKEND_NAMES, former_release_boot_blockers
+from pipelex.migration.former_release_cleanup import clean_former_release
 from pipelex.migration.run import config_directories_to_migrate, migrate_config_directories, scan_config_surface
 from pipelex.plugins.discovery import build_registrar
 from pipelex.plugins.exceptions import PluginError
@@ -340,6 +349,18 @@ class PendingMigrationsCheck(BaseModel):
     A file can be on both lists: an entry that conflicts partway through is blocked, and the
     operations of it that applied before the conflict are still written."""
 
+    former_release_files: list[str] = Field(default_factory=list[str])
+    """The files the command cleans up first: what a release that ran on the Pipelex Gateway left, each
+    rewritten without it or removed, a copy of each kept."""
+
+    former_release_blocks_boot: bool = False
+    """Whether what that release left stops this machine's boot until it is cleaned up: read off the files that boot
+    merges, the project's own bases included, never off one directory alone."""
+
+    boot_still_blocked: bool = False
+    """Whether a boot of this machine would still be refused once the command has run: the cleanup's own check, on the
+    files as it would leave them. The command cannot fix this, so its dry run, which says why, is the remedy."""
+
     @property
     def is_healthy(self) -> bool:
         return self.finding.is_healthy
@@ -368,38 +389,142 @@ def check_pending_migrations() -> PendingMigrationsCheck:
     user's files and never as an exception — an exception here reaches `doctor_cmd`'s outer
     handler, which prints one line and exits, so a broken packaged ledger would replace every row
     the user came for. The catch stays narrow, so a bug in our applier still surfaces as itself.
+
+    **The command's first step is the cleanup of a former release**, and the row reports it too: the
+    files a release that ran on the Pipelex Gateway left, which the command
+    removes or rewrites, and whether what is in them stops the boot. That verdict is the boot's own
+    check over the files it merges, home and project together: a project booting on bases of its own
+    is not told it cannot start because of the home's, and a profile one directory activates from
+    the other is not missed. The replay leaves the files the cleanup removes out of its walk, as the
+    command does.
     """
+    config_dirs = config_directories_to_migrate()
     try:
-        report = migrate_config_directories(config_dirs=config_directories_to_migrate(), dry_run=True)
+        cleanup = clean_former_release(config_dirs=config_dirs, dry_run=True)
+        report = migrate_config_directories(config_dirs=config_dirs, dry_run=True, skipped_paths=cleanup.removed_paths)
+        former_release_blocks_boot = bool(
+            former_release_boot_blockers(
+                backends_library_paths=config_manager.backends_file_paths(),
+                routing_profile_library_paths=config_manager.routing_profiles_file_paths(),
+            )
+        )
     except (MigrationError, OSError) as exc:
         return PendingMigrationsCheck(
             finding=PendingMigrationsFinding.UNAVAILABLE,
             message=f"Could not check for pending migrations: {exc}",
         )
 
-    if report.is_clean:
+    if report.is_clean and cleanup.is_clean:
         return PendingMigrationsCheck(
             finding=PendingMigrationsFinding.UP_TO_DATE,
             message="Every configuration file is at the current schema",
         )
 
+    former_release_files = [str(file.file_path) for file in cleanup.files if not file.is_blocked]
     migratable_files = [str(plan.file_path) for plan in report.changed_plans]
     # In the order the run visited them, and deduplicated: one file can be both blocked and
     # carrying a path the schema cannot explain.
     attention_paths = {plan.file_path for plan in report.blocked_plans} | {plan.file_path for plan in report.unexplained_plans}
-    attention_files = [str(plan.file_path) for plan in report.plans if plan.file_path in attention_paths]
+    attention_files = [str(file.file_path) for file in cleanup.blocked_files]
+    attention_files += [str(plan.file_path) for plan in report.plans if plan.file_path in attention_paths]
 
     sentences: list[str] = []
+    if former_release_files:
+        sentence = (
+            f"{len(former_release_files)} file(s) carry what a former release left for the Pipelex Gateway, which '{MIGRATE_COMMAND}' cleans up"
+        )
+        if former_release_blocks_boot:
+            sentence += " — Pipelex cannot start until it does"
+        sentences.append(sentence)
     if migratable_files:
         sentences.append(f"{len(migratable_files)} configuration file(s) can be brought up to date by '{MIGRATE_COMMAND}'")
     if attention_files:
         sentences.append(f"{len(attention_files)} configuration file(s) need a look — run '{MIGRATE_COMMAND} --dry-run' for the detail")
+    if cleanup.still_blocking:
+        # The cleanup's own check, run on the files as it would leave them: what a cleanup run from another project
+        # left half done, above all, which no file here carries any more.
+        sentences.append(f"Pipelex would still not start once '{MIGRATE_COMMAND}' has run — '{MIGRATE_COMMAND} --dry-run' says why")
+    has_work = bool(migratable_files or former_release_files)
     return PendingMigrationsCheck(
-        finding=PendingMigrationsFinding.PENDING if migratable_files else PendingMigrationsFinding.NEEDS_ATTENTION,
+        finding=PendingMigrationsFinding.PENDING if has_work else PendingMigrationsFinding.NEEDS_ATTENTION,
         message="; ".join(sentences),
         migratable_files=migratable_files,
         attention_files=attention_files,
+        former_release_files=former_release_files,
+        former_release_blocks_boot=former_release_blocks_boot,
+        boot_still_blocked=bool(cleanup.still_blocking),
     )
+
+
+class PipelexApiKeyFinding(StrEnum):
+    """What the Pipelex API key row found, for a setup whose runs execute on the hosted Pipelex API."""
+
+    SET = "set"
+    NOT_A_PIPELEX_KEY = "not_a_pipelex_key"
+    MISSING = "missing"
+
+    @property
+    def is_healthy(self) -> bool:
+        match self:
+            case PipelexApiKeyFinding.SET:
+                return True
+            case PipelexApiKeyFinding.NOT_A_PIPELEX_KEY | PipelexApiKeyFinding.MISSING:
+                return False
+
+
+class PipelexApiKeyCheck(BaseModel):
+    """The Pipelex API key row of the health report: whether hosted runs have a key to send, never the key itself."""
+
+    model_config = ConfigDict(frozen=True)
+
+    finding: PipelexApiKeyFinding
+    message: str
+
+    @property
+    def is_healthy(self) -> bool:
+        return self.finding.is_healthy
+
+
+def check_pipelex_api_key_set() -> PipelexApiKeyCheck:
+    """Whether a Pipelex API key is set where a hosted run reads it: `PIPELEX_API_KEY`, else the one saved in the home `.env`.
+
+    Only its presence and its shape are checked, with no call to the hosted API, and the key is never quoted.
+    """
+    api_key = find_pipelex_api_key()
+    if api_key is None:
+        return PipelexApiKeyCheck(
+            finding=PipelexApiKeyFinding.MISSING,
+            message=f"No Pipelex API key is set ({PIPELEX_API_KEY_ENV_KEY}): run '{PIPELEX_LOGIN_COMMAND}' to get one",
+        )
+    if not is_well_formed_pipelex_api_key(api_key=api_key):
+        return PipelexApiKeyCheck(
+            finding=PipelexApiKeyFinding.NOT_A_PIPELEX_KEY,
+            message=(
+                f"{PIPELEX_API_KEY_ENV_KEY} does not look like a Pipelex API key, which starts with {PIPELEX_API_KEY_PREFIX}: "
+                f"run '{PIPELEX_LOGIN_COMMAND}' to replace it"
+            ),
+        )
+    return PipelexApiKeyCheck(
+        finding=PipelexApiKeyFinding.SET,
+        message=f"A Pipelex API key is set ({PIPELEX_API_KEY_ENV_KEY}); the hosted API checks it when a run sends it",
+    )
+
+
+def resolve_doctor_run_execution() -> RunExecution:
+    """Where runs execute by default, which decides what this setup needs; local when the configuration does not load.
+
+    A hosted run boots nothing on this machine, so a hosted setup needs a Pipelex API key and no provider key.
+    """
+    try:
+        return configured_run_execution()
+    except PipelexConfigError:
+        return RunExecution.LOCAL
+
+
+#: The setting that makes runs execute on the hosted Pipelex API, as the report quotes it.
+HOSTED_EXECUTION_SETTING = '[run] execution = "hosted"'
+#: How the report says that a row only matters for runs on this machine.
+LOCAL_RUNS_ONLY_NOTE = "Needed only for --local runs: runs execute on the hosted Pipelex API by default"
 
 
 def check_backend_credentials(*, config_dir: Path | None = None) -> tuple[bool, dict[str, BackendCredentialsReport], str]:
@@ -423,8 +548,9 @@ def check_backend_credentials(*, config_dir: Path | None = None) -> tuple[bool, 
         all_backends_valid = True
 
         for backend_name, backend_dict in backends_dict.items():
-            # Skip internal backend
-            if backend_name == "internal":
+            # Skip internal backend, and a retired one: its table is what a former release left, which the migrations
+            # row names the cleanup for, and its key is no remedy, since this release has no such backend to reach.
+            if backend_name == "internal" or backend_name in RETIRED_BACKEND_NAMES:
                 continue
 
             # Only check enabled backends
@@ -687,6 +813,8 @@ def display_health_report(
     log_sink_check: LogSinkCheck | None = None,
     plugins_check: PluginsCheck | None = None,
     secrets_provider_check: SecretsProviderCheck | None = None,
+    run_execution: RunExecution = RunExecution.LOCAL,
+    pipelex_api_key_check: PipelexApiKeyCheck | None = None,
 ) -> None:
     """Display a comprehensive health report.
 
@@ -719,16 +847,23 @@ def display_health_report(
             never did, in which case the row is not rendered.
         secrets_provider_check: What the runtime setup found when it built the secrets provider;
             None when it never did, in which case the row is not rendered.
+        run_execution: Where runs execute by default. On the hosted Pipelex API, the backend credentials and the
+            models rows are reported as needed only for `--local` runs, and the Pipelex API key row counts instead.
+        pipelex_api_key_check: What the Pipelex API key row found; None when runs execute on this machine, in which
+            case the row is not rendered.
     """
     log_sink_healthy = log_sink_check is None or log_sink_check.is_healthy
     plugins_healthy = plugins_check is None or plugins_check.is_healthy
     secrets_provider_healthy = secrets_provider_check is None or secrets_provider_check.is_healthy
+    local_inference_counts = not run_execution.is_hosted
+    pipelex_api_key_healthy = pipelex_api_key_check is None or pipelex_api_key_check.is_healthy
     all_healthy = (
         config_healthy
         and pending_migrations_check.is_healthy
         and telemetry_check.is_healthy
-        and backends_healthy
-        and models_healthy
+        and (backends_healthy or not local_inference_counts)
+        and (models_healthy or not local_inference_counts)
+        and pipelex_api_key_healthy
         and deck_healthy
         and internal_backend_healthy
         and log_sink_healthy
@@ -816,10 +951,24 @@ def display_health_report(
             console.print(f"  [red]✗[/red] {escape(log_sink_check.message)}")
         console.print()
 
+    # Pipelex API Key section: what a hosted run sends, and the only credential a hosted setup needs
+    if pipelex_api_key_check is not None:
+        console.print("[bold]Pipelex API Key[/bold]")
+        if pipelex_api_key_check.is_healthy:
+            console.print(f"  [green]✓[/green] {escape(pipelex_api_key_check.message)}")
+        else:
+            console.print(f"  [red]✗[/red] {escape(pipelex_api_key_check.message)}")
+        console.print(f"  [dim]Runs execute on the hosted Pipelex API by default ({escape(HOSTED_EXECUTION_SETTING)})[/dim]")
+        console.print()
+
     # Backend Credentials section
     console.print("[bold]Backend Credentials[/bold]")
     if backends_healthy:
         console.print(f"  [green]✓[/green] {escape(backends_message)}")
+    elif not local_inference_counts:
+        # A hosted run boots nothing here, so the provider keys it lacks are information, not a fault.
+        console.print(f"  [dim]ℹ {escape(backends_message)}[/dim]")
+        console.print(f"  [dim]{LOCAL_RUNS_ONLY_NOTE}.[/dim]")
     elif not backend_credential_reports:
         # No backends were checked (e.g., file not found)
         console.print(f"  [red]✗[/red] {escape(backends_message)}")
@@ -853,6 +1002,10 @@ def display_health_report(
         # Skipped reads as advisory, not failure — the Config Files row is the real issue.
         console.print(f"  [yellow]⚠[/yellow]  {escape(models_message)}")
         console.print("    [dim]Models check deferred until config errors are fixed.[/dim]")
+    elif not local_inference_counts:
+        # The models row loads this machine's backends, which a hosted run never boots.
+        console.print(f"  [dim]ℹ {escape(models_message.splitlines()[0] if models_message else models_message)}[/dim]")
+        console.print(f"  [dim]{LOCAL_RUNS_ONLY_NOTE}.[/dim]")
     else:
         console.print(f"  [red]✗[/red] {escape(models_message)}")
 
@@ -886,7 +1039,8 @@ def display_health_report(
         # Check what can be auto-fixed
         can_auto_fix_config = not config_healthy and config_missing_count > 0
         can_auto_fix_telemetry = telemetry_check.finding.is_repaired_by_initializing
-        can_migrate = pending_migrations_check.finding.is_repaired_by_migrating
+        can_migrate = bool(pending_migrations_check.migratable_files)
+        can_clean_up_former_release = bool(pending_migrations_check.former_release_files)
         telemetry_is_out_of_date = telemetry_check.finding.is_out_of_date
         # The migration row names the same command and covers every surface, so the telemetry-only
         # bullet under it would be the same advice twice. It still appears on its own — a telemetry
@@ -895,13 +1049,16 @@ def display_health_report(
         # Read off the list rather than off the finding: a run can both migrate some files and
         # leave others for a person, and that combination is the ordinary one on a stale machine.
         migrations_need_a_look = bool(pending_migrations_check.attention_files)
+        # Its own bullet, since it can be the row's only one: with nothing left to clean the row lists no file.
+        boot_stays_stopped = pending_migrations_check.boot_still_blocked
         has_telemetry_validation_error = not telemetry_check.is_healthy and not can_auto_fix_telemetry and not telemetry_is_out_of_date
 
-        # Check for backend file issues
+        # Check for backend file issues, which only runs on this machine meet
         has_backend_file_issues = False
         can_auto_fix_backends = False
         has_custom_backend_issues = False
-        if backend_file_reports:
+        has_backend_credential_issues = local_inference_counts and not backends_healthy and bool(backend_credential_reports)
+        if backend_file_reports and local_inference_counts:
             invalid_backends = {name: report for name, report in backend_file_reports.items() if not report.is_valid}
             if invalid_backends:
                 has_backend_file_issues = True
@@ -919,13 +1076,16 @@ def display_health_report(
             or not secrets_provider_healthy
             or can_auto_fix_telemetry
             or can_migrate
+            or can_clean_up_former_release
             or migrations_need_a_look
+            or boot_stays_stopped
             or pending_migrations_check.finding.is_uncheckable
             or telemetry_is_out_of_date
             or has_telemetry_validation_error
-            or (not backends_healthy and backend_credential_reports)
+            or has_backend_credential_issues
             or has_backend_file_issues
             or has_deck_drift
+            or not pipelex_api_key_healthy
         )
 
         if has_recommendations:
@@ -937,6 +1097,18 @@ def display_health_report(
             if can_auto_fix_telemetry:
                 console.print("  • Run [cyan]pipelex init telemetry[/cyan] to configure telemetry preferences")
 
+            if not pipelex_api_key_healthy:
+                console.print(
+                    f"  • Run [cyan]{PIPELEX_LOGIN_COMMAND}[/cyan] to get a Pipelex API key for hosted runs "
+                    f"([cyan]{LOGIN_PASTE_COMMAND}[/cyan] on a machine without a browser)"
+                )
+
+            if can_clean_up_former_release:
+                console.print(
+                    f"  • Run [cyan]{MIGRATE_COMMAND}[/cyan] to clean up "
+                    f"{len(pending_migrations_check.former_release_files)} file(s) a former release left"
+                )
+
             if can_migrate:
                 console.print(
                     f"  • Run [cyan]{MIGRATE_COMMAND}[/cyan] to bring "
@@ -947,6 +1119,12 @@ def display_health_report(
                 console.print(
                     f"  • Run [cyan]{MIGRATE_COMMAND} --dry-run[/cyan] to see what "
                     f"{len(pending_migrations_check.attention_files)} configuration file(s) carry that the migration will not do on its own"
+                )
+
+            if boot_stays_stopped:
+                console.print(
+                    f"  • Run [cyan]{MIGRATE_COMMAND} --dry-run[/cyan] to see what still stops Pipelex from starting, "
+                    "which the command leaves for you to fix"
                 )
 
             if pending_migrations_check.finding.is_uncheckable:
@@ -996,7 +1174,7 @@ def display_health_report(
                     backend_file = f"{escape(config_location.config_dir)}/inference/backends/{escape(backend_name)}.toml"
                     console.print(f"  • Manually fix backend configuration in [cyan]{backend_file}[/cyan]")
 
-            if not backends_healthy and backend_credential_reports:
+            if has_backend_credential_issues:
                 # Collect all missing and placeholder vars
                 all_missing_vars: set[str] = set()
                 all_placeholder_vars: set[str] = set()
@@ -1025,7 +1203,6 @@ def display_health_report(
 
         # Show Discord support for manual-fix issues (regardless of --fix flag)
         has_config_validation_error = not config_healthy and config_missing_count == 0
-        has_backend_credential_issues = not backends_healthy and backend_credential_reports
         if has_config_validation_error or has_backend_credential_issues or has_telemetry_validation_error:
             console.print("[dim]If you need help with manual fixes:[/dim]")
             console.print("  [cyan]https://docs.pipelex.com[/cyan] - Documentation")
@@ -1058,6 +1235,8 @@ def _print_pending_migrations(*, check: PendingMigrationsCheck) -> None:
             console.print(f"  [green]✓[/green] {escape(check.message)}")
         case PendingMigrationsFinding.PENDING | PendingMigrationsFinding.NEEDS_ATTENTION:
             console.print(f"  [yellow]⚠[/yellow]  {escape(check.message)}")
+            for file_path in check.former_release_files:
+                console.print(f"    [dim]{escape(file_path)}[/dim] — left by a former release")
             for file_path in check.migratable_files:
                 console.print(f"    [dim]{escape(file_path)}[/dim] — out of date")
             for file_path in check.attention_files:
@@ -1422,6 +1601,22 @@ def setup_doctor_runtime(*, log_config_overrides: Mapping[str, Any] | None = Non
     return runtime_setup
 
 
+FORMER_RELEASE_STOPS_THE_MODELS_CHECK = (
+    f"Not checked: what a former release left for the Pipelex Gateway stops the boot — run '{MIGRATE_COMMAND}' to clean it up"
+)
+
+
+def _migration_fix_question(*, former_release_count: int, migratable_count: int) -> str:
+    """The `--fix` question for `pipelex migrate`'s write pass, counting the files of each of its steps: the cleanup, then the migration."""
+    migration = f"{migratable_count} configuration file(s) to the current schema"
+    if not former_release_count:
+        return f"Migrate {migration}?"
+    cleanup = f"Clean up {former_release_count} file(s) a former release left"
+    if not migratable_count:
+        return f"{cleanup}?"
+    return f"{cleanup} and migrate {migration}?"
+
+
 def check_models(
     *, secrets_provider: SecretsProviderAbstract | None, config_dir: Path | None = None
 ) -> tuple[bool, str, dict[str, BackendFileReport]]:
@@ -1440,6 +1635,14 @@ def check_models(
     Returns:
         Tuple of (is_healthy, message, backend_file_reports)
     """
+    # What a former release left stops the boot before any backend loads, so it is named here rather than whichever
+    # refusal about one backend or one profile the setup below would meet first. The migrations row lists the files.
+    if former_release_boot_blockers(
+        backends_library_paths=config_manager.backends_file_paths(config_dir=config_dir),
+        routing_profile_library_paths=config_manager.routing_profiles_file_paths(config_dir=config_dir),
+    ):
+        return False, FORMER_RELEASE_STOPS_THE_MODELS_CHECK, {}
+
     # The backends resolve their credentials through the configured provider, so without it no backend
     # loads the way boot would load it; the secrets provider row already says why it did not build.
     if secrets_provider is None:
@@ -1510,6 +1713,7 @@ def check_models(
         ModelDeckValidationError,
         InferenceBackendCredentialsError,
         PluginModelDeclarationError,
+        FormerReleaseConfigError,
     ) as exc:
         return False, f"Error checking models: {redacted_failure(exc=exc, log_config=log_config)}", backend_file_reports
     except Exception as exc:  # ruff: ignore[blind-except]
@@ -1614,6 +1818,13 @@ def do_doctor_cmd(
     deck_healthy, deck_report, deck_message = check_deck_sync()
     internal_backend_healthy, internal_backend_report, internal_backend_message = check_internal_backend_sync()
 
+    # Where runs execute decides what the setup needs: a hosted run boots nothing here, so it needs a Pipelex API key
+    # and none of the provider keys or local models the rows above check, which then count only for --local runs.
+    run_execution = resolve_doctor_run_execution() if config_healthy else RunExecution.LOCAL
+    local_inference_counts = not run_execution.is_hosted
+    pipelex_api_key_check = None if local_inference_counts else check_pipelex_api_key_set()
+    pipelex_api_key_healthy = pipelex_api_key_check is None or pipelex_api_key_check.is_healthy
+
     # Display report
     display_health_report(
         config_healthy=config_healthy,
@@ -1639,14 +1850,17 @@ def do_doctor_cmd(
         log_sink_check=log_sink_check,
         plugins_check=plugins_check,
         secrets_provider_check=secrets_provider_check,
+        run_execution=run_execution,
+        pipelex_api_key_check=pipelex_api_key_check,
     )
 
     all_healthy = (
         config_healthy
         and pending_migrations_check.is_healthy
         and telemetry_check.is_healthy
-        and backends_healthy
-        and models_healthy
+        and (backends_healthy or not local_inference_counts)
+        and (models_healthy or not local_inference_counts)
+        and pipelex_api_key_healthy
         and deck_healthy
         and internal_backend_healthy
         and (log_sink_check is None or log_sink_check.is_healthy)
@@ -1668,7 +1882,7 @@ def do_doctor_cmd(
     # Check for backend file issues that can be auto-fixed
     can_fix_backends = False
     fixable_backends: list[tuple[str, BackendFileReport]] = []
-    if backend_file_reports:
+    if backend_file_reports and local_inference_counts:
         invalid_backends = [(name, report) for name, report in backend_file_reports.items() if not report.is_valid]
         fixable_backends = [(name, report) for name, report in invalid_backends if report.has_kit_template]
         can_fix_backends = len(fixable_backends) > 0
@@ -1684,7 +1898,7 @@ def do_doctor_cmd(
     has_config_validation_error = not config_healthy and config_missing_count == 0
     # A telemetry finding a person has to resolve: neither a fresh file nor a migration gets there.
     has_telemetry_validation_error = not telemetry_check.is_healthy and not can_fix_telemetry and not telemetry_check.finding.is_out_of_date
-    has_backend_credential_issues = not backends_healthy and backend_credential_reports
+    has_backend_credential_issues = local_inference_counts and not backends_healthy and bool(backend_credential_reports)
 
     # If --fix flag is provided, offer to fix auto-fixable issues
     if fix and has_auto_fixable_issues:
@@ -1709,12 +1923,28 @@ def do_doctor_cmd(
         # implementation of it, and it is offered before the rows that report on file *contents*
         # because migrating can be what resolves them.
         if can_fix_migrations:
+            former_release_count = len(pending_migrations_check.former_release_files)
             migratable_count = len(pending_migrations_check.migratable_files)
-            if Confirm.ask(f"[bold]Migrate {migratable_count} configuration file(s) to the current schema?[/bold]", default=True):
+            question = _migration_fix_question(former_release_count=former_release_count, migratable_count=migratable_count)
+            if Confirm.ask(f"[bold]{question}[/bold]", default=True):
                 try:
                     console.print()
-                    applied = apply_pending_migrations(config_dirs=config_directories_to_migrate())
-                    console.print(f"[green]✓[/green] Migrated {len(applied.written_plans)} configuration file(s)")
+                    config_dirs = config_directories_to_migrate()
+                    # The cleanup first, as `pipelex migrate` runs it: the replay leaves the files it removes out of its walk.
+                    removed_paths: frozenset[Path] = frozenset()
+                    if former_release_count:
+                        cleaned = apply_former_release_cleanup(config_dirs=config_dirs)
+                        removed_paths = cleaned.removed_paths
+                        if cleaned.needs_attention:
+                            console.print(
+                                f"[yellow]⚠[/yellow] Cleaned up {len(cleaned.applied_files)} file(s) a former release left, "
+                                "and something is left for you to look at, as marked above"
+                            )
+                        else:
+                            console.print(f"[green]✓[/green] Cleaned up {len(cleaned.applied_files)} file(s) a former release left")
+                    if migratable_count:
+                        applied = apply_pending_migrations(config_dirs=config_dirs, skipped_paths=removed_paths)
+                        console.print(f"[green]✓[/green] Migrated {len(applied.written_plans)} configuration file(s)")
                     # The rows below were measured before this ran, so a file this just repaired can
                     # still be reported as broken further down.
                     console.print("[dim]Re-run[/dim] [cyan]pipelex doctor[/cyan] [dim]for an updated report.[/dim]")
@@ -1778,10 +2008,21 @@ def do_doctor_cmd(
                     console.print()
 
     # Handle issues that can't be auto-fixed
-    if has_config_validation_error or has_telemetry_validation_error or has_backend_credential_issues:
+    if has_config_validation_error or has_telemetry_validation_error or has_backend_credential_issues or not pipelex_api_key_healthy:
         console = get_console()
         console.print("[bold yellow]Manual Fixes Required[/bold yellow]")
         console.print()
+
+        # The Pipelex API key, the one credential a hosted setup needs
+        if pipelex_api_key_check is not None and not pipelex_api_key_check.is_healthy:
+            console.print("[bold]Pipelex API key:[/bold]")
+            console.print(f"  {escape(pipelex_api_key_check.message)}")
+            console.print()
+            console.print(
+                f"Run [cyan]{PIPELEX_LOGIN_COMMAND}[/cyan] to get one through your browser, "
+                f"or [cyan]{LOGIN_PASTE_COMMAND}[/cyan] on a machine without one."
+            )
+            console.print()
 
         # Config validation errors
         if has_config_validation_error:

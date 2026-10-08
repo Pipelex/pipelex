@@ -16,7 +16,7 @@ pipelex init
 
 The `cli` extra installs Rich, which the `pipelex` command renders its output through.
 
-`pipelex init` creates your project configuration. To run your methods, add your own provider keys to `~/.pipelex/.env`, or point Pipelex at a local model: see [Configure AI Providers](./configure-ai-providers.md).
+`pipelex init` creates your configuration and asks where your runs execute. Press Enter to run them on the hosted Pipelex API: it signs you in through your browser and saves a Pipelex API key, so you need no provider key of your own. To run them on this machine instead, answer `2`, then add your own provider keys or point Pipelex at a local model: see [Configure AI Providers](./configure-ai-providers.md).
 
 !!! tip "VS Code Extension"
     We **highly** recommend installing the Pipelex extension for `.mthds` syntax highlighting and flowchart visualization:

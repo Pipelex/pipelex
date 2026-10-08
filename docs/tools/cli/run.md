@@ -40,6 +40,8 @@ Runs a pipe by code from your project's pipe library.
 - `--dry-run` - Dry-run the pipeline without calling AI providers; no inference credentials are needed
 - `--mock-inputs` - Use mock inputs for the pipeline (requires `--dry-run`)
 - `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
+- `--hosted` / `--local` - Run on the hosted Pipelex API or on this machine. Defaults to `[run] execution` (see [Running on the Hosted API](#running-on-the-hosted-api)), else local
+- `--base-url` - The origin a hosted run calls, `scheme://host[:port]`. Overrides `PIPELEX_BASE_URL`, which overrides `https://api.pipelex.com`
 
 **Examples:**
 
@@ -64,6 +66,9 @@ pipelex run pipe my_pipe --dry-run
 
 # Run with custom library directories
 pipelex run pipe my_pipe -L ./pipelines -L ./shared_pipes
+
+# Run on the hosted Pipelex API, sending the library
+pipelex run pipe my_pipe -L ./pipelines --hosted --inputs data.json
 ```
 
 ## Run Bundle
@@ -93,6 +98,8 @@ Runs a pipeline from a bundle file (`.mthds`) or a pipeline directory. When a di
 - `--dry-run` - Dry-run the pipeline without calling AI providers; no inference credentials are needed
 - `--mock-inputs` - Use mock inputs for the pipeline (requires `--dry-run`)
 - `--library-dir`, `-L` - Directory to search for additional pipe definitions. Can be specified multiple times.
+- `--hosted` / `--local` - Run on the hosted Pipelex API or on this machine. Defaults to `[run] execution` (see [Running on the Hosted API](#running-on-the-hosted-api)), else local
+- `--base-url` - The origin a hosted run calls, `scheme://host[:port]`. Overrides `PIPELEX_BASE_URL`, which overrides `https://api.pipelex.com`
 
 **Examples:**
 
@@ -111,6 +118,9 @@ pipelex run bundle my_bundle.mthds --inputs invoice_data.json
 
 # Run with execution graph
 pipelex run bundle my_bundle.mthds --graph
+
+# Run on the hosted Pipelex API
+pipelex run bundle my_bundle.mthds --hosted
 ```
 
 ## Run Method
@@ -123,7 +133,7 @@ Runs a pipeline from an installed method package.
 
 **Arguments:**
 
-- `NAME` - The name of the installed method to run, a method address (`github.com/owner/repo[/name][@tag]`), or a GitHub URL — see [Run a Method by Address](run-by-address.md)
+- `NAME` - The name of the installed method to run, a method address (`github.com/owner/repo[/name][@tag]`), or a GitHub URL — see [Run a Method by Address](run-by-address.md). On a hosted run, also a stored method's catalog id (`mt_…`)
 
 **Options:**
 
@@ -140,6 +150,8 @@ Runs a pipeline from an installed method package.
 - `--dry-run` - Dry-run the pipeline without calling AI providers; no inference credentials are needed
 - `--mock-inputs` - Use mock inputs for the pipeline (requires `--dry-run`)
 - `--library-dir`, `-L` - Directory to search for additional pipe definitions. Can be specified multiple times.
+- `--hosted` / `--local` - Run on the hosted Pipelex API or on this machine. Defaults to `[run] execution` (see [Running on the Hosted API](#running-on-the-hosted-api)), else local
+- `--base-url` - The origin a hosted run calls, `scheme://host[:port]`. Overrides `PIPELEX_BASE_URL`, which overrides `https://api.pipelex.com`
 
 **Examples:**
 
@@ -155,7 +167,43 @@ pipelex run method invoice_extractor --inputs invoice_data.json
 
 # Run a method fetched by address from a public GitHub repository, pinned at a tag
 pipelex run method github.com/Pipelex/methods/documents@v0.1.0 --pipe extract_document_text
+
+# Run a published method on the hosted Pipelex API, which resolves the address itself
+pipelex run method github.com/Pipelex/methods/text_stats@v0.1.7 --hosted --inputs '{"text": "Hello world."}'
+
+# Run a method stored on the hosted platform, by its catalog id
+pipelex run method mt_abc123 --hosted --inputs data.json
 ```
+
+## Running on the Hosted API
+
+A run executes on this machine by default, with the inference backends configured in `.pipelex/inference/` and your own provider keys. It can execute on the hosted Pipelex API instead, which needs only a Pipelex API key: no provider key and no inference configuration on this machine, since a hosted run boots nothing locally.
+
+Where a run executes is decided in this order:
+
+1. `--hosted` or `--local` on the command.
+2. `[run] execution` in `.pipelex/pipelex.toml` (`"local"` or `"hosted"`; the project's file over the one in `~/.pipelex/`), which [`pipelex init`](init.md#where-your-runs-execute) writes from your answer, see [Run Configuration](../../configuration/config-practical/run-config.md).
+3. Local.
+
+The key is read from `PIPELEX_API_KEY`, exported in your shell or saved in `~/.pipelex/.env` (or a `.env` in the working directory), which Pipelex loads at startup. [`pipelex login`](login.md) gets a key through your browser and saves it there. The run goes to `--base-url` when given, else to `PIPELEX_BASE_URL`, else to `https://api.pipelex.com`. Either value must be an origin, `scheme://host[:port]` with `http` or `https` and no path such as `/v1`; anything else is refused before a request is sent, naming the setting it came from. A self-hosted Pipelex API server is reached the same way, by pointing the base URL at it.
+
+**What a hosted run sends** is what a local run would load:
+
+- `run bundle` sends the bundle, then every `.mthds` file of its library directories (the bundle's own directory for `run bundle <dir>`, then `-L`; for a bundle file with no `-L`, `PIPELEXPATH`), each once. Without `--pipe`, the bundle's `main_pipe` is read from the bundle here, as a local run reads it.
+- `run pipe` sends every `.mthds` file of its library directories: the installed method exporting the pipe and `-L`, else `PIPELEXPATH`. With none of them, the run is refused and asks for `-L`.
+- `run method` sends an installed or local method's files. A published address goes as a reference and a catalog id (`mt_…`) as an id, both resolved by the hosted API: nothing is fetched or read locally, `-L` is refused with them, and a relative `--inputs` path resolves against the working directory rather than the method's. A method installed under a name spelled like a catalog id, such as `mt_reports`, is that installed method, not an id.
+
+**Local files in the inputs** are uploaded before the run. A path at a document or image input (compact, as `"invoice.pdf"`, or as the `url` of a document or image object, in a list or nested in a structure) is uploaded, and the run receives its storage URI instead. A relative path written in an inputs file resolves against that file's directory, as on a local run, and a `file://` URI is read as the path it names. A text that reads like a file name at any other input is left as text, `http(s)://` URLs, whatever the case of the scheme, are passed through for the hosted API to fetch, and an explicit `null`, such as an optional image left out, reaches the run as `null`.
+
+The method's signature, which says where a file sits, is read from the hosted API only when some value of the inputs, at any depth, names an existing file on this machine (from the inputs file's directory or the working directory). Inputs naming none go straight to the run. When the signature is read, a method that does not load is refused there, before any run starts, with validation errors that name the file each fault is in. A method that calls another method by its address (`github.com/…`) cannot have its signature read yet, so a local file cannot be uploaded for it: the run is refused before it starts, and the file has to be given as an `https://` URL instead. The same method runs with inputs that name no local file.
+
+**What it saves** goes where a local run saves its outputs, in `<output-dir>/<pipe>_output_NN/`: `main_stuff.json` (and `main_stuff.md` when the main output is text), `working_memory.json`, and `graphspec.json` when the hosted API returned the run's graph, which [`pipelex graph render`](../../features/execution-graph.md) turns into a viewer. The run id is printed as soon as the hosted API acknowledges the run, as `Run <id> started on the hosted API`, and again with the recap.
+
+**When you interrupt it** with Ctrl-C, the command stops waiting, but a run the hosted API acknowledged keeps going and is paid for: the command prints its run id, so you can look it up on app.pipelex.com, and exits with `130`. Interrupted before the acknowledgement, it says that a run may have started if the request had reached the hosted API, and to check the run history before running again.
+
+**What it refuses**: `--dry-run`, `--mock-inputs`, `--mock-usage`, `--orchestrator`, `--save-csv`, `--costs` / `--no-costs` and `--graph-full-data` / `--graph-no-data` steer this machine's runtime, which a hosted run never boots, so each is refused with a message pointing at `--local`. `--base-url` on a run that executes locally is refused too.
+
+**When it fails**, the message gives the hosted API's reason and a next step: the one the server advised when it gave one, else one that follows the status (a refused key points at `PIPELEX_API_KEY` and `pipelex login`, an unknown method or route at the method's address and the base URL, a rate limit says to wait). A bundle the hosted API refuses lists its validation errors, and so does a run that started and failed on them. Once the hosted API has acknowledged the run, the failure also prints the run id: a run that failed, one that outlived the wait, one that completed without a main output, and one whose result could not be read, because the network or the hosted API failed while the run was being followed. That last one may still be running and is paid for, so look it up by its id on app.pipelex.com rather than running the command again. A connection lost after the request that runs the method was sent is not reported as a network failure either: the hosted API may have created the run before the connection failed, and its id never arrived, so check the run history before running again. Only a failure before the request left this machine, a connection that could not be made, points at the network and the base URL. A server that keeps no runs to poll, such as a self-hosted runner, is run on the blocking route, and when the connection is cut before its result comes back, the run may still be going there: running the command again runs the method again, so raise the timeout of the proxy in front of that server, or point the base URL at a server that keeps runs. The exit code is `1`.
 
 ## Input File Formats
 

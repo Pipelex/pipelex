@@ -26,6 +26,7 @@ class TestEdgeCases:
 
         # User inputs
         env.add_confirm_input(True)  # Confirm initialization
+        env.choose_local()  # Where runs execute: this machine
         env.add_prompt_input(str(indices[0]))  # Select only openai
         env.add_confirm_input(True)  # Confirm creating profile if needed
 
@@ -50,6 +51,7 @@ class TestEdgeCases:
 
         # User inputs - no fallback order prompt for exactly 2 backends
         env.add_confirm_input(True)  # Confirm initialization
+        env.choose_local()  # Where runs execute: this machine
         env.add_prompt_input(indices_str)  # Select anthropic, openai
         env.add_prompt_input("1")  # Primary backend: anthropic (first in selection)
 
@@ -84,6 +86,7 @@ class TestEdgeCases:
 
         # User inputs
         env.add_confirm_input(True)  # Confirm reset
+        env.choose_local()  # Where runs execute: this machine
         env.add_prompt_input(str(indices[0]))  # Select anthropic
         env.add_confirm_input(True)  # Confirm creating profile if needed
 
@@ -109,6 +112,7 @@ class TestEdgeCases:
 
         # User inputs
         env.add_confirm_input(True)  # Confirm initialization
+        env.choose_local()  # Where runs execute: this machine
         env.add_prompt_input(indices_str)  # Select openai, mistral
         env.add_prompt_input("1")  # Primary backend
 

@@ -5,9 +5,13 @@ from typing import Annotated
 
 import typer
 
+from pipelex.cli.commands.run._hosted_sources import resolve_hosted_method_target
 from pipelex.cli.commands.run._inputs_file_loader import resolve_inputs_arg_against_dir
 from pipelex.cli.commands.run._run_core import COMMAND, execute_run, validate_run_flag_combination
+from pipelex.cli.commands.run._run_hosted import execute_hosted_run, refuse_local_only_flags, resolve_cli_run_execution
 from pipelex.cli.method_resolver import method_output_base_dir, resolve_method_target
+from pipelex.hosted.exceptions import HostedRunSourceError
+from pipelex.methods.exceptions import MethodRefError
 
 
 def run_method_cmd(
@@ -103,12 +107,31 @@ def run_method_cmd(
             help="Write the main stuff to this literal CSV path (not under --output-dir; absolute/~/relative ok). Requires a flat list output.",
         ),
     ] = None,
+    hosted: Annotated[
+        bool | None,
+        typer.Option(
+            "--hosted/--local",
+            # Typer renders help as Rich markup, which drops an unescaped [run]: \[ prints the bracket.
+            help=r"Run on the hosted Pipelex API (key in PIPELEX_API_KEY) or on this machine. Default: \[run] execution, else local.",
+        ),
+    ] = None,
+    base_url: Annotated[
+        str | None,
+        typer.Option(
+            "--base-url",
+            help="Origin of the hosted API a hosted run calls, scheme://host[:port]. Overrides PIPELEX_BASE_URL; default https://api.pipelex.com.",
+        ),
+    ] = None,
 ) -> None:
-    """Run a method by name, address, or URL.
+    """Run a method by name, address, URL, or (hosted only) catalog id.
 
     Resolves the method from ~/.mthds/methods/ or .mthds/methods/ (or fetches it
     by address / GitHub URL, optionally pinned at a git tag), determines the pipe
     to execute (using --pipe or the method's main_pipe), and runs it.
+
+    With --hosted (or [run] execution = "hosted"), the run executes on the hosted
+    Pipelex API: an address or a catalog id (mt_...) is resolved there, an installed
+    or local method's files are sent, and local files named in the inputs are uploaded.
 
     Examples:
         pipelex run method my-method
@@ -116,8 +139,46 @@ def run_method_cmd(
         pipelex run method my-method --inputs data.json
         pipelex run method my-method --dry-run
         pipelex run method github.com/Pipelex/methods/documents@v0.1.0 --pipe extract_document_text
+        pipelex run method github.com/Pipelex/methods/text_stats@v0.1.7 --hosted --inputs '{"text": "Hello"}'
+        pipelex run method mt_abc123 --hosted --inputs data.json
     """
     validate_run_flag_combination(dry_run=dry_run, mock_usage=mock_usage, mock_inputs=mock_inputs)
+
+    execution = resolve_cli_run_execution(hosted=hosted, base_url=base_url)
+    if execution.is_hosted:
+        refuse_local_only_flags(
+            dry_run=dry_run,
+            mock_usage=mock_usage,
+            mock_inputs=mock_inputs,
+            orchestrator=orchestrator,
+            save_csv=save_csv,
+            costs=costs,
+            graph_full_data=graph_full_data,
+        )
+        # A published address and a stored method are resolved by the hosted API, so nothing is fetched here; an
+        # installed or local method is resolved as below, and its files are sent.
+        try:
+            target = resolve_hosted_method_target(name=name, pipe_override=pipe, library_dirs=library_dir)
+        except (HostedRunSourceError, MethodRefError) as exc:
+            typer.secho(f"Failed to run: {exc.message}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1) from exc
+        execute_hosted_run(
+            mthds_files=target.mthds_files,
+            method_ref=target.method_ref,
+            method_id=target.method_id,
+            pipe_code=target.pipe_code,
+            inputs=resolve_inputs_arg_against_dir(inputs, base_dir=target.inputs_anchor_dir),
+            dynamic_output_concept_ref=dynamic_output_concept_ref,
+            base_url=base_url,
+            output_label=target.label,
+            output_dir=output_dir or str(target.output_base_dir / "results"),
+            save_working_memory=save_working_memory,
+            working_memory_path=working_memory_path,
+            save_main_stuff=save_main_stuff,
+            no_pretty_print=no_pretty_print,
+            graph=graph,
+        )
+        return
 
     # Resolve method name to pipe_code and library dirs
     pipe_code, method_library_dirs, method = resolve_method_target(

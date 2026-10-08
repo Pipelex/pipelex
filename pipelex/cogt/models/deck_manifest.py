@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from enum import StrEnum
 from pathlib import Path
 
@@ -28,6 +29,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.kit.paths import get_kit_configs_dir
+from pipelex.kit.template_copy import can_fill_directory, write_text_atomically
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.package_utils import get_package_version
 
@@ -182,11 +184,26 @@ def compute_kit_manifest(*, area: KitManagedArea) -> DeckManifest:
 def stamp_kit_manifests(*, inference_dir: Path) -> None:
     """Write both areas' manifests for an ``inference/`` directory whose managed files were just copied from the kit.
 
-    For the installers (``pipelex init``, the first-run materialization), so a later ``pipelex update`` tells a file
-    the user edited from one the kit moved on.
+    For the installers that replace every kit file (``pipelex init``, ``pipelex-agent init``), so a later ``pipelex
+    update`` tells a file the user edited from one the kit moved on.
     """
     for area in KitManagedArea:
         write_manifest(compute_kit_manifest(area=area), installed_dir=inference_dir / area)
+
+
+def stamp_missing_kit_manifests(*, inference_dir: Path) -> None:
+    """Write the manifest of each area of an ``inference/`` directory that has none, and leave a recorded one alone.
+
+    For the first boot's fill of the home configuration directory, which copies only the kit files the home lacks:
+    a manifest already there records the install the area's files came from, and it stays the baseline ``pipelex
+    update`` compares against. Nothing is written through a link, the fill's own rule: a manifest path holding a
+    link, even a dangling one, counts as recorded, and an area whose directory is a link or a file is skipped.
+    """
+    for area in KitManagedArea:
+        installed_dir = inference_dir / area
+        if not can_fill_directory(directory=installed_dir) or os.path.lexists(manifest_path(installed_dir)):
+            continue
+        write_manifest(compute_kit_manifest(area=area), installed_dir=installed_dir)
 
 
 def manifest_path(installed_dir: Path) -> Path:
@@ -212,11 +229,14 @@ def read_manifest(installed_dir: Path) -> DeckManifest | None:
 
 
 def write_manifest(manifest: DeckManifest, *, installed_dir: Path) -> None:
-    """Persist the manifest, creating the area's directory if needed."""
+    """Persist the manifest, creating the area's directory if needed.
+
+    Written whole or not at all: a write cut short leaves no truncated manifest, which a fill would keep as
+    recorded and every boot would then report as stale.
+    """
     installed_dir.mkdir(parents=True, exist_ok=True)
     payload = manifest.model_dump()
-    target = manifest_path(installed_dir)
-    target.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_text_atomically(destination=manifest_path(installed_dir), text=json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
 def is_deck_stale_fast(deck_dir: Path) -> bool:

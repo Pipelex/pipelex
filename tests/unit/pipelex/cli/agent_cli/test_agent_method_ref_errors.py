@@ -42,7 +42,7 @@ class TestAgentMethodRefErrors:
         self._mock_failing_clone(mocker, tmp_path)
 
         with pytest.raises(typer.Exit) as exc_info:
-            run_method_cmd(ctx=mocker.MagicMock(), name=BROKEN_REF, error_format=CliOutputFormat.JSON)
+            run_method_cmd(name=BROKEN_REF, error_format=CliOutputFormat.JSON)
 
         assert exc_info.value.exit_code == 1
         error_obj = _parse_single_json_error(capsys.readouterr().err)

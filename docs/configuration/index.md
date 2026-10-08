@@ -34,7 +34,9 @@ The global layer lives in `~/.pipelex/` unless the `PIPELEX_HOME` environment va
 export PIPELEX_HOME=/path/to/ci/pipelex-home
 ```
 
-Everything that reads or writes the global layer follows it: its `pipelex.toml` and override files, the inference files and their personal overrides, the credentials in its `.env`, the telemetry configuration, `pipelex init`, `pipelex doctor`, `pipelex update`, `pipelex migrate`, and the agent CLI's `--global` flag. The first boot fills the directory from the kit's templates when it does not exist or is empty, as it does for `~/.pipelex/`, so a fresh `mktemp -d` or an empty volume mount works as it is; a directory with anything in it is left alone. A `~` is expanded, a relative path resolves against the working directory at the moment Pipelex is imported, and an empty value counts as unset.
+Everything that reads or writes the global layer follows it: its `pipelex.toml` and override files, the inference files and their personal overrides, the credentials in its `.env`, the telemetry configuration, `pipelex init`, `pipelex doctor`, `pipelex update`, `pipelex migrate`, and the agent CLI's `--global` flag. A `~` is expanded, a relative path resolves against the working directory at the moment Pipelex is imported, and an empty value counts as unset.
+
+Every boot fills the directory from the kit's templates, as it does `~/.pipelex/`: it creates the directory when it does not exist and copies in each kit file the directory lacks, never overwriting a file that is there or writing through a symbolic link, and leaving a link or a file that stands where the kit has a directory alone with everything under it. Each file is written whole or not at all, so a copy cut short leaves nothing half-written. A fresh `mktemp -d`, an empty volume mount, or a directory holding only a `.env` or a personal override therefore works as it is, and a directory that already holds every kit file is not written at all. The inference files are the one exception: they are copied as a whole, and only when the directory has no `inference/backends.toml`, so a directory with an inference setup of its own keeps it exactly as it is, and `pipelex init` or `pipelex update` is what changes it; `backends.toml` is written last, so a fill cut short part-way is completed by the next boot. A directory Pipelex cannot write to, such as a read-only mount, is read as it is.
 
 It is meant for any process that should not share the machine's settings: a test run or a CI job that commits a configuration of its own, a container, or a checkout that must not read the developer's personal backends. A project's own `.pipelex/` keeps winning over it, exactly as it wins over `~/.pipelex/`.
 
@@ -64,12 +66,13 @@ In addition to the base `pipelex.toml`, Pipelex applies override files from **in
 
 ## Configuration Structure
 
-The configuration is organized into four main sections, which mirror the layers of the runtime:
+The configuration is organized into five main sections. The first three mirror the layers of the runtime:
 
 1. `[runtime]` - process-scoped infrastructure: storage, secrets, logging, cloud credentials, outbound network posture, reporting, tracing, observation, and the plugin denylist
 2. `[inference]` - the model-calling seam: the model deck, LLM, image generation, extraction, the default templating style, and dry-run mocks
 3. `[interpreter]` - library-scoped method machinery: MTHDS parsing, pipe runs, pipe functions, pipeline execution, source scanning, and the builder
-4. `[kit]` - settings for the `pipelex-dev` kit tooling
+4. `[run]` - where `pipelex run` and `pipelex-agent run` execute a method by default: on this machine or on the hosted Pipelex API, see [Run Configuration](config-practical/run-config.md)
+5. `[kit]` - settings for the `pipelex-dev` kit tooling
 
 Each section contains multiple subsections for specific features and functionalities. A setting's address tells you which layer owns it: `[runtime.*]` applies to any process, whatever it loads; `[interpreter.*]` only means something once a method is loaded.
 

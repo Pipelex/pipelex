@@ -15,12 +15,10 @@ from __future__ import annotations
 
 import asyncio
 import json
-from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import pytest
 import typer
-from mthds.runners.types import RunnerType
 from rich.console import Console
 
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, set_agent_cli_error_format
@@ -91,10 +89,8 @@ def _run_bundle(*, bundle_path: Path, library_dir: list[str] | None) -> None:
 
 
 def _run_agent_bundle(*, bundle_path: Path, output_format: CliOutputFormat) -> None:
-    context = cast("typer.Context", SimpleNamespace(obj={"runner": RunnerType.PIPELEX}))
     try:
         agent_run_bundle_cmd(
-            ctx=context,
             path=str(bundle_path.parent),
             pipe=None,
             inputs=None,

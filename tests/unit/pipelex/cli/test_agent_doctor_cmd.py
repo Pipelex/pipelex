@@ -363,6 +363,35 @@ class TestAgentDoctorCmd:
         assert any(action.startswith(f"Run '{MIGRATE_COMMAND}' ") for action in actions)
         assert any(f"'{MIGRATE_COMMAND} --dry-run'" in action for action in actions)
 
+    def test_what_a_former_release_left_rides_the_envelope_with_the_command_that_cleans_it(
+        self,
+        mocker: MockerFixture,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        self._stub_every_other_check_healthy(mocker)
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_pending_migrations",
+            return_value=PendingMigrationsCheck(
+                finding=PendingMigrationsFinding.PENDING,
+                message="1 file(s) carry what a former release left",
+                former_release_files=["/home/user/.pipelex/inference/backends.toml"],
+                former_release_blocks_boot=True,
+            ),
+        )
+
+        agent_doctor_cmd(output_format=CliOutputFormat.JSON)
+
+        parsed = json.loads(capsys.readouterr().out)
+        row = parsed["checks"]["pending_migrations"]
+        assert row["former_release_files"] == ["/home/user/.pipelex/inference/backends.toml"]
+        assert row["former_release_blocks_boot"] is True
+        actions: list[str] = parsed["recommended_actions"]
+        assert any(
+            action.startswith(f"Run '{MIGRATE_COMMAND}' to clean up what a former release left")
+            and "/home/user/.pipelex/inference/backends.toml" in action
+            for action in actions
+        )
+
     def test_an_unreadable_row_is_reported_as_unchecked_rather_than_healthy(
         self,
         mocker: MockerFixture,
