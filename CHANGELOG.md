@@ -12,6 +12,7 @@
 ### Fixed
 
 - **A home configuration directory holding only some files gets the kit's missing ones**: every boot now copies into `~/.pipelex/`, or the directory `PIPELEX_HOME` names, each kit file it lacks, never overwriting one it holds or writing through a symbolic link, so a kit file deleted from it comes back. A directory holding anything at all, such as the `pipelex_service.toml` an earlier release wrote, used to be left as it was, and every boot then failed with "Config files are missing for the inference backend library". The inference files are copied as one unit, only when the directory has no `inference/backends.toml`, each file and kit manifest is written whole or not at all, so a fill cut short is completed by the next boot, and a directory Pipelex cannot write to is read as it is.
+- **`pipelex-agent init --help` keeps `list[str]`**: the `--config` help printed the schema's `"backends": list[str]` as `"backends": list`, because Typer renders help as Rich markup and Rich took `[str]` for a style; the bracket is now escaped and printed.
 
 ## [v0.78.0] - 2026-10-08
 

@@ -350,11 +350,12 @@ def agent_init_cmd(
         typer.Option(
             "--config",
             "-c",
+            # Typer renders help as Rich markup, which drops an unescaped [str] or [run]: \[ prints the bracket.
             help=(
                 "Inline JSON string or path to a JSON file. "
-                'Schema: {"execution": "hosted" | "local", "backends": list[str], "primary_backend": str}. '
+                r'Schema: {"execution": "hosted" | "local", "backends": list\[str], "primary_backend": str}. '
                 "All fields are optional. "
-                "execution: where runs execute by default, written to [run] execution; 'hosted' runs on the hosted Pipelex API "
+                r"execution: where runs execute by default, written to \[run] execution; 'hosted' runs on the hosted Pipelex API "
                 "with the key in PIPELEX_API_KEY and configures no backend; 'local' (the default) runs on this machine. "
                 "backends: backend keys to enable (e.g. 'openai', 'anthropic', 'openrouter'). Omit to keep template defaults "
                 "and the template's routing profile. "
