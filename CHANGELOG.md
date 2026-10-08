@@ -1,6 +1,12 @@
 # Changelog
 
-## [Unreleased]
+## [v0.78.0] - 2026-10-08
+
+### Highlights
+
+**A client can ask the runner what a model reference means.** `GET /v1/models/check` answers whether a reference resolves, as what kind, and to the model a run would call, from pipelex's own parser and deck, so a client keeps no grammar of model references of its own.
+
+**A handle names one model per model type.** One handle can be an LLM and a judgment model at once, and a pipe naming a model served only as another type is refused when the method loads rather than at its first call.
 
 ### Added
 
@@ -10,10 +16,10 @@
 
 ### Changed
 
-- **A model served only as another type is refused when the method loads (Breaking)**: a pipe naming a handle the deck serves only as another model type, such as a `PipeJudge` naming an LLM, is refused by `pipelex validate`, `POST /v1/validate` and a run's load as an `unknown_model` item, whose suggestions list only models of the type the pipe asks for, where it passed validation and failed at its first call. A handle served as another type no longer hides an alias or a waterfall of the same name from a lookup of this type.
+- **A model served only as another type is refused when the method loads (Breaking)**: a pipe naming a handle the deck serves only as another model type, such as a `PipeJudge` naming an LLM, is refused by `pipelex validate`, `POST /v1/validate` and a run's load as an `unknown_model` item saying the deck serves the handle but not as the type the pipe needs, whose suggestions list only models of that type, where it passed validation and failed at its first call; a deck preset naming one is reported at boot in the same words (a warning, or a refusal under `missing_presets_reaction = "raise"`), and an LLM override naming one refuses boot. A bare name resolves as a model of the pipe's type, then an alias of that type, then a waterfall of that type, an order the validation and the run's lookup share, so a handle served as another type no longer hides an alias or a waterfall of the same name, and the validation and the setting a pipe's `model` field is read into accept the waterfall only while model fallback is on. `ModelDeck` gains `is_bare_handle_resolvable`, `is_reference_defined`, `get_presets_for_type` and `peek_inference_model`, the run's model lookup without its logs.
 - **Model specs are keyed by model type and handle (Breaking)**: `InferenceBackend.model_specs` and `ModelDeck.inference_models` are the new `ModelSpecIndex`, read through `get(model_type=…, handle=…)`, `handles_of_type`, `all_specs`, `all_handles` and `types_serving`, and `InferenceBackend.get_model_spec` takes `model_type` and `handle`. `InferenceBackend.list_model_names`, `InferenceBackendLibrary.list_all_model_names` and `InferenceBackendLibrary.get_all_models_and_possible_backends` are removed. `PluginModelDeclarations.internal_models` is a tuple of `PluginInternalModel`, which carries its `name`, and `DuplicateInternalModelError` names the `model_type` two plugins both declared.
 - **Usage is reported per model type and name (Breaking)**: a run calling both kinds of one handle reports two rows in the cost table and the agent CLI's cost summary, and two entries in the graph's usage attribution, where they merged into one row typed by whichever call came last. `AggregatedCosts.grouped_by_model` is keyed by the new `ModelUsageKey`, and its `model_types` is removed.
-- **A model served only as another type is named as such, and `handle:` reads no sigil (Breaking)**: the `unknown_model` item refusing a bare handle the deck serves only as another model type now says the deck serves the handle but not as the type the pipe needs, where it said the handle was not found, and so do a deck preset naming one, reported at boot (a warning, or a refusal under `missing_presets_reaction = "raise"`), and an LLM override naming one, which refuses boot. A bare name resolves as a model of the pipe's type, then an alias of that type, then a waterfall of that type, an order the validation and the run's lookup share, and the validation and the setting a pipe's `model` field is read into accept the waterfall only while model fallback is on. A `handle:` reference writes a bare name without reading a sigil in the validation, the run and the check alike, so `handle:@name` is the bare name `@name`, not the alias `name`, and like any bare name it resolves as a model, then an alias, then a waterfall of that name, a validation refusing it where the deck has none. `ModelDeck` gains `is_bare_handle_resolvable`, `is_reference_defined`, `get_presets_for_type` and `peek_inference_model`, the run's model lookup without its logs.
+- **`handle:` reads no sigil (Breaking)**: a `handle:` reference writes a bare name without reading a sigil in the validation, the run and the check alike, so `handle:@name` is the bare name `@name`, not the alias `name`, and like any bare name it resolves as a model, then an alias, then a waterfall of that name, a validation refusing it where the deck has none.
 
 ### Fixed
 
