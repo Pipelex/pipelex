@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from pipelex.base_exceptions import ErrorReport
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource, doc_gen_choice_key
 from pipelex.cogt.inference.error_classification import RUNTIME_CLASSIFIED_ERROR_CODES
+from pipelex.cogt.model_backends.model_type import DEFAULT_MODEL_TYPE
 from pipelex.plugins.bundle_validator_registry import BundleValidatorProtocol
 from pipelex.plugins.exceptions import (
     DuplicateBundleValidatorError,
@@ -175,7 +176,8 @@ class PluginRegistrar:
         self.log_sinks: dict[str, LogSinkFactoryFn] = {}
         self.pipe_func_executors: dict[str, PipeFuncExecutorFactoryFn] = {}
         # Plain data, read once by ``make_model_declarations`` for the model manager to merge at boot.
-        self.internal_models: dict[str, dict[str, Any]] = {}
+        # Keyed by the model's name and its model type as written, since a handle names one model per model type.
+        self.internal_models: dict[tuple[str, str], dict[str, Any]] = {}
         self.doc_gen_defaults: dict[tuple[DocGenFormat, DocGenSource], str] = {}
         self.service_error_codes: dict[str, ServiceErrorCode] = {}
         # Ordered list (not a type-keyed dict) because the exception types are
@@ -193,7 +195,7 @@ class PluginRegistrar:
         self._secrets_provider_sources: dict[str, str] = {}
         self._log_sink_sources: dict[str, str] = {}
         self._pipe_func_executor_sources: dict[str, str] = {}
-        self._internal_model_sources: dict[str, str] = {}
+        self._internal_model_sources: dict[tuple[str, str], str] = {}
         self._doc_gen_default_sources: dict[tuple[DocGenFormat, DocGenSource], str] = {}
         self._service_error_code_sources: dict[str, str] = {}
         self._slot_sources: dict[HubSlot, str] = {}
@@ -358,17 +360,20 @@ class PluginRegistrar:
         ``internal.toml``, and registers the engine's worker with ``add_inference_backend`` for the same sdk.
 
         Plain data, so it is stored and nothing else: the model manager validates the table when it merges it into
-        the internal backend at boot, and refuses one whose name the installation's ``internal.toml`` already
-        declares. Fail-loud on a name another plugin declared, naming both plugins.
+        the internal backend at boot, and refuses one whose name and model type the installation's ``internal.toml``
+        already declares. A handle names one model per model type, so a model is identified by its name and by its
+        ``model_type`` as written, the default type when the table sets none. Fail-loud on a model another plugin
+        declared, naming both plugins.
         """
+        model_type = str(spec.get("model_type", DEFAULT_MODEL_TYPE))
         self._add(
             store=self.internal_models,
             sources=self._internal_model_sources,
-            key=name,
+            key=(name, model_type),
             value=copy.deepcopy(dict(spec)),
-            contribution=f"internal model {name}",
+            contribution=f"internal model {name} ({model_type})",
             on_duplicate=lambda first_plugin, second_plugin: DuplicateInternalModelError(
-                name=name, first_plugin=first_plugin, second_plugin=second_plugin
+                name=name, model_type=model_type, first_plugin=first_plugin, second_plugin=second_plugin
             ),
         )
 
@@ -506,10 +511,10 @@ class PluginRegistrar:
         A fresh value object with deep copies of the tables, so neither the model manager nor a plugin holding on to
         the mapping it passed, or a list inside it, can change what the registrar recorded.
         """
-        internal_models = {
-            name: PluginInternalModel(spec=copy.deepcopy(spec), plugin=self._internal_model_sources[name])
-            for name, spec in self.internal_models.items()
-        }
+        internal_models = tuple(
+            PluginInternalModel(name=name, spec=copy.deepcopy(spec), plugin=self._internal_model_sources[name, model_type])
+            for (name, model_type), spec in self.internal_models.items()
+        )
         doc_gen_defaults = tuple(
             PluginDocGenDefault(
                 doc_gen_format=doc_gen_format, source=source, model=model, plugin=self._doc_gen_default_sources[doc_gen_format, source]

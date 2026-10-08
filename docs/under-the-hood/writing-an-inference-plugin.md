@@ -204,15 +204,14 @@ def list_hello_models(
     backend's configuration file.
     """
     console = get_console()
-    model_names = backend.list_model_names()
+    # One entry per spec: a handle names one model per model type, so a name may appear once per type.
+    model_specs = [model_spec for model_spec in backend.model_specs.all_specs() if model_spec.sdk == sdk]
 
     if flat:
         if not any_listed:
             console.print("model_id,sdk,backend")
-        for model_name in model_names:
-            model_spec = backend.get_model_spec(model_name)
-            model_id = model_spec.model_id if model_spec else model_name
-            console.print(f"{model_id},{sdk},{backend_name}")
+        for model_spec in model_specs:
+            console.print(f"{model_spec.model_id},{sdk},{backend_name}")
         return
 
     table = Table(
@@ -223,10 +222,7 @@ def list_hello_models(
     )
     table.add_column("Model ID", style="green")
     table.add_column("Model Type", style="blue")
-    for model_name in model_names:
-        model_spec = backend.get_model_spec(model_name)
-        if model_spec is None:
-            continue
+    for model_spec in model_specs:
         table.add_row(model_spec.model_id, model_spec.model_type)
     console.print(table)
 ```

@@ -7,7 +7,7 @@ from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.cogt.model_backends.model_type import DEFAULT_MODEL_TYPE, ModelType
 from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.tools.typing.pydantic_utils import empty_dict_factory_of, empty_list_factory_of
@@ -19,7 +19,7 @@ class InferenceModelSpecBlueprint(ConfigModel):
     enabled: bool = True
     sdk: str
     variant: str | None = None
-    model_type: ModelType = Field(default=ModelType.LLM, strict=False)
+    model_type: ModelType = Field(default=DEFAULT_MODEL_TYPE, strict=False)
     model_id: str | None = None
     inputs: list[str] = Field(default_factory=list)
     outputs: list[str] = Field(default_factory=list)

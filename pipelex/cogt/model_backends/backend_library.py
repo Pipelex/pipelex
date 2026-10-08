@@ -1,7 +1,7 @@
 from collections.abc import Callable, Iterable, Sequence
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple, Self, cast
+from typing import Any, NamedTuple, Self, cast
 
 from pydantic import Field, PrivateAttr, RootModel, ValidationError
 
@@ -28,7 +28,9 @@ from pipelex.cogt.model_backends.model_spec_factory import (
     InferenceModelSpecBlueprint,
     InferenceModelSpecFactory,
 )
+from pipelex.cogt.model_backends.model_spec_index import ModelSpecIndex
 from pipelex.cogt.model_backends.model_spec_keys import describe_rejected_keys, split_model_spec_keys
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.migration.plan import MigrationPlan
 from pipelex.plugins.plugin_model_declarations import PluginModelDeclarations
 from pipelex.system.configuration.config_loader import config_manager
@@ -52,9 +54,6 @@ from pipelex.tools.secrets.exceptions import UnknownVarPrefixError, VarFallbackP
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.secrets.secrets_utils import placeholder_var_names, substitute_vars
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
-
-if TYPE_CHECKING:
-    from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 
 InferenceBackendLibraryRoot = dict[str, InferenceBackend]
 
@@ -81,7 +80,7 @@ TEMPLATABLE_MODEL_SPEC_FIELDS = frozenset({"model_id", "endpoint_path"})
 class RecoveredModelSpecs(NamedTuple):
     """One backend's model specs rebuilt from a migrated file, and what the ledger did to get there."""
 
-    model_specs: "dict[str, InferenceModelSpec]"
+    model_specs: ModelSpecIndex
     plans: list[MigrationPlan]
 
 
@@ -484,7 +483,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         backend_config_source: str,
         backend_listed_constraints: list[ListedConstraint],
         backend_valued_constraints: dict[ValuedConstraint, Any],
-    ) -> "dict[str, InferenceModelSpec]":
+    ) -> ModelSpecIndex:
         """Turn one backend's raw tables into model specs: pop `[defaults]`, split, merge, validate.
 
         Its own method so the boot-tolerance retry can run it a second time over a migrated document
@@ -494,7 +493,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         """
         remaining_tables = dict(model_specs_dict)
         defaults_dict: dict[str, Any] = remaining_tables.pop(MODEL_SPEC_DEFAULTS_TABLE, {})
-        backend_model_specs: dict[str, InferenceModelSpec] = {}
+        backend_model_specs = ModelSpecIndex.make_empty()
         for model_spec_name, value in remaining_tables.items():
             if not isinstance(value, dict):
                 msg = f"Model spec '{model_spec_name}' for backend '{backend_name}' from {backend_config_source} is not a dictionary"
@@ -525,7 +524,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     backend_valued_constraints=backend_valued_constraints,
                     extra_headers=key_split.headers,
                 )
-                backend_model_specs[model_spec_name] = model_spec
+                backend_model_specs.add(model_spec)
             except ValidationError as validation_error:
                 validation_error_msg = format_pydantic_validation_error(validation_error)
                 msg = (
@@ -685,11 +684,12 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         does not know is the plugin author's mistake and fatal, as it is in a local file. The table is complete on
         its own, so the `[defaults]` of `internal.toml` is not applied to it.
 
-        **A name the installation's `internal.toml` already declares is refused rather than overridden**, naming
-        the plugin and the file: which of the two declarations a boot would run would otherwise depend on nothing
-        the user can see. Model names are not global across backends — the same name in several backend files is
-        the ordinary case, and the routing profile picks one — so a name another backend declares is left to the
-        routing, exactly as it is for a model the file declares.
+        **A model the installation's `internal.toml` already declares, under the same name and model type, is refused
+        rather than overridden**, naming the plugin and the file: which of the two declarations a boot would run would
+        otherwise depend on nothing the user can see. A handle names one model per model type, so a plugin may declare
+        another kind of a name the file declares. Model names are not global across backends — the same name in several
+        backend files is the ordinary case, and the routing profile picks one — so a name another backend declares is
+        left to the routing, exactly as it is for a model the file declares.
 
         Returns:
             Whether this load has an internal backend. `False` when the installation disables it, or declares none:
@@ -704,19 +704,13 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         if internal_backend is None:
             return False
         internal_file_path = backend_toml_path(backends_dir_path=backends_dir_path, backend_name=PipelexBackend.INTERNAL)
-        merged_model_specs = dict(internal_backend.model_specs)
-        for model_name, plugin_model in plugin_model_declarations.internal_models.items():
+        merged_model_specs = ModelSpecIndex.make_from_specs(model_specs=internal_backend.model_specs.all_specs())
+        for plugin_model in plugin_model_declarations.internal_models:
+            model_name = plugin_model.name
             if model_name == MODEL_SPEC_DEFAULTS_TABLE:
                 msg = (
                     f"Plugin '{plugin_model.plugin}' declares an internal model named '{model_name}', which is the name of a backend "
                     "file's table of defaults, so it cannot name a model."
-                )
-                raise PluginModelDeclarationError(msg, plugin=plugin_model.plugin)
-            if model_name in internal_backend.model_specs:
-                msg = (
-                    f"Plugin '{plugin_model.plugin}' declares the internal model '{model_name}', which '{internal_file_path}' declares too. "
-                    "Remove it from that file, or run `pipelex update` to refresh the file from the kit: the plugin's declaration is the one "
-                    "that ships with its engine."
                 )
                 raise PluginModelDeclarationError(msg, plugin=plugin_model.plugin)
             try:
@@ -730,29 +724,37 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             except InferenceBackendLibraryError as exc:
                 msg = f"Plugin '{plugin_model.plugin}' declares the internal model '{model_name}' with a table that is not a valid model spec: {exc}"
                 raise PluginModelDeclarationError(msg, plugin=plugin_model.plugin) from exc
-            merged_model_specs.update(plugin_model_specs)
+            for plugin_model_spec in plugin_model_specs.all_specs():
+                if internal_backend.get_model_spec(model_type=plugin_model_spec.model_type, handle=plugin_model_spec.name) is not None:
+                    msg = (
+                        f"Plugin '{plugin_model.plugin}' declares the internal model '{model_name}' as "
+                        f"{plugin_model_spec.model_type.indefinite_description}, which '{internal_file_path}' declares too. "
+                        "Remove it from that file, or run `pipelex update` to refresh the file from the kit: the plugin's declaration is the one "
+                        "that ships with its engine."
+                    )
+                    raise PluginModelDeclarationError(msg, plugin=plugin_model.plugin)
+                try:
+                    merged_model_specs.add(plugin_model_spec)
+                except InferenceModelSpecError as exc:
+                    # The registrar refuses two plugins declaring one pair, so this is a declaration that
+                    # reached the boot by another road: still the plugin's to answer for.
+                    msg = f"Plugin '{plugin_model.plugin}' declares the internal model '{model_name}' twice: {exc}"
+                    raise PluginModelDeclarationError(msg, plugin=plugin_model.plugin) from exc
         self.root[PipelexBackend.INTERNAL] = internal_backend.model_copy(update={"model_specs": merged_model_specs})
         return True
 
     def list_backend_names(self) -> list[str]:
         return list(self.root.keys())
 
-    def list_all_model_names(self) -> list[str]:
-        """List the names of all models in all backends."""
-        all_model_names: set[str] = set()
+    def get_declared_types_by_handle(self) -> dict[str, list[ModelType]]:
+        """Every handle some loaded backend declares, with each model type some backend declares it as."""
+        declared_types_by_handle: dict[str, list[ModelType]] = {}
         for backend in self.root.values():
-            all_model_names.update(backend.list_model_names())
-        return sorted(all_model_names)
-
-    def get_all_models_and_possible_backends(self) -> dict[str, list[str]]:
-        """Get a dictionary of all models and their possible backends."""
-        all_models_and_possible_backends: dict[str, list[str]] = {}
-        for backend in self.root.values():
-            for model_name in backend.list_model_names():
-                if model_name not in all_models_and_possible_backends:
-                    all_models_and_possible_backends[model_name] = []
-                all_models_and_possible_backends[model_name].append(backend.name)
-        return all_models_and_possible_backends
+            for model_spec in backend.model_specs.all_specs():
+                declared_types = declared_types_by_handle.setdefault(model_spec.name, [])
+                if model_spec.model_type not in declared_types:
+                    declared_types.append(model_spec.model_type)
+        return declared_types_by_handle
 
     def get_inference_backend(self, backend_name: str) -> InferenceBackend | None:
         return self.root.get(backend_name)

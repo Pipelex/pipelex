@@ -17,6 +17,7 @@ from pipelex.cogt.exceptions import (
     InferenceBackendLibraryValidationError,
 )
 from pipelex.cogt.model_backends.credential_resolution import CredentialResolution
+from pipelex.cogt.model_backends.model_type import ModelType
 from tests.helpers.backend_library_loading import BOTH_MODES, load_library, required_backend
 from tests.helpers.recording_secrets_provider import RecordingSecretsProvider
 from tests.unit.pipelex.cogt.model_backends.test_data import LITERAL_FIELD_VAR, BackendLibraryTomls
@@ -140,7 +141,8 @@ class TestMalformedConfigurationIsFatalInBothModes:
             credentials=CredentialResolution.REQUIRE,
         )
 
-        model_spec = required_backend(library).model_specs["acme-one"]
+        model_spec = required_backend(library).get_model_spec(model_type=ModelType.LLM, handle="acme-one")
+        assert model_spec is not None
         assert model_spec.extra_headers == {"x-portkey-provider": "@openai"}
         assert model_spec.model_id == "acme-one"
 

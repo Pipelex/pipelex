@@ -1952,10 +1952,6 @@ rationale = "Verb–object: validates/checks the effort_to_level_map; single ope
 param = "key"
 rationale = "Keyed accessor by the key; single operand."
 
-["pipelex/cogt/model_backends/backend.py::InferenceBackend.get_model_spec"]
-param = "model_name"
-rationale = "Keyed accessor by the model_name; single operand."
-
 ["pipelex/cogt/model_backends/backend_credentials.py::BackendCredentialsErrorMsgFactory.make_comprehensive_error_msg"]
 param = "backend_credential_reports"
 rationale = "Factory from source: builds the result from the backend_credential_reports; single operand."
@@ -1983,6 +1979,10 @@ rationale = "Operates on the backend_name; single operand (qualifiers keyword-on
 ["pipelex/cogt/model_backends/model_spec_factory.py::InferenceModelSpecFactory.make_inference_model_spec"]
 param = "backend_name"
 rationale = "Factory from source: builds the result from the backend_name; single operand."
+
+["pipelex/cogt/model_backends/model_spec_index.py::ModelSpecIndex.add"]
+param = "model_spec"
+rationale = "add(model_spec) reads as a verb-object sentence: the spec is the one obvious operand"
 
 ["pipelex/cogt/model_routing/routing_profile_factory.py::RoutingProfileFactory.make_routing_profile"]
 param = "name"

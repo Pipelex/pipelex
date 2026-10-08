@@ -126,6 +126,18 @@ class TestPluginModelMerge:
         assert "'pipelex-xlsx'" in str(exc_info.value)
         assert str(internal_toml_path) in str(exc_info.value)
 
+    def test_a_plugin_may_declare_another_kind_of_a_name_internal_toml_declares(self, inference_dir: Path) -> None:
+        """A handle names one model per model type: the file's document engine and the plugin's extractor share a name."""
+        declarations = _declarations(
+            internal_models={"reportlab-pdf": {**PIPELEX_XLSX_SPEC, "model_type": "text_extractor", "model_id": "read-pdf"}}, doc_gen_defaults={}
+        )
+
+        model_deck = self._setup(inference_dir=inference_dir, plugin_model_declarations=declarations).get_model_deck()
+
+        assert model_deck.inference_models.types_serving(handle="reportlab-pdf") == [ModelType.TEXT_EXTRACTOR, ModelType.DOC_GEN]
+        assert model_deck.get_required_inference_model(model_handle="reportlab-pdf", model_type=ModelType.TEXT_EXTRACTOR).model_id == "read-pdf"
+        assert model_deck.get_required_inference_model(model_handle="reportlab-pdf", model_type=ModelType.DOC_GEN).model_id == "print-pdf"
+
     def test_a_plugin_table_takes_no_file_defaults(self, inference_dir: Path) -> None:
         """The plugin's table is complete on its own: `internal.toml`'s `[defaults]` reaches the file's models only."""
         internal_toml_path = inference_dir / "backends" / "internal.toml"
@@ -168,5 +180,5 @@ class TestPluginModelMerge:
 
         model_deck = self._setup(inference_dir=inference_dir, plugin_model_declarations=_xlsx_plugin_declarations()).get_model_deck()
 
-        assert "pipelex-xlsx" not in model_deck.inference_models
+        assert not model_deck.inference_models.types_serving(handle="pipelex-xlsx")
         assert model_deck.get_doc_gen_choice_default(doc_gen_format=DocGenFormat.XLSX, source=DocGenSource.LAYOUT) is None

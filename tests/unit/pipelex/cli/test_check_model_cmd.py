@@ -11,6 +11,9 @@ if TYPE_CHECKING:
 
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.check_model_cmd import agent_check_model_cmd
+from pipelex.cogt.llm.thinking_mode import ThinkingMode
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_spec_index import ModelSpecIndex
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_listing import ModelCategory
 
@@ -25,11 +28,18 @@ class _FakeSetting:
         self.description = description
 
 
-class _FakeInferenceModelSpec:
-    """Minimal stand-in for InferenceModelSpec."""
-
-    def __init__(self, model_type: ModelType):
-        self.model_type = model_type
+def _llm_spec(name: str) -> InferenceModelSpec:
+    return InferenceModelSpec(
+        backend_name="test_backend",
+        name=name,
+        sdk="test_sdk",
+        model_type=ModelType.LLM,
+        model_id=name,
+        costs={},
+        thinking_mode=ThinkingMode.NONE,
+        max_tokens=None,
+        max_prompt_images=None,
+    )
 
 
 class TestData:
@@ -48,13 +58,9 @@ class TestData:
     LLM_WATERFALLS: ClassVar[dict[str, list[str]]] = {
         "robust-llm": ["claude-sonnet", "gpt-4o"],
     }
-    INFERENCE_MODELS: ClassVar[dict[str, _FakeInferenceModelSpec]] = {
-        "claude-4.5-sonnet": _FakeInferenceModelSpec(model_type=ModelType.LLM),
-        "claude-4-sonnet": _FakeInferenceModelSpec(model_type=ModelType.LLM),
-        "claude-4.6-opus": _FakeInferenceModelSpec(model_type=ModelType.LLM),
-        "gpt-4o": _FakeInferenceModelSpec(model_type=ModelType.LLM),
-        "gpt-4o-mini": _FakeInferenceModelSpec(model_type=ModelType.LLM),
-    }
+    INFERENCE_MODELS: ClassVar[ModelSpecIndex] = ModelSpecIndex.make_from_specs(
+        model_specs=[_llm_spec(name) for name in ("claude-4.5-sonnet", "claude-4-sonnet", "claude-4.6-opus", "gpt-4o", "gpt-4o-mini")]
+    )
 
     EXTRACT_PRESETS: ClassVar[dict[str, Any]] = {}
     EXTRACT_ALIASES: ClassVar[dict[str, str]] = {}

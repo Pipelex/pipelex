@@ -17,8 +17,9 @@ from pipelex.cogt.model_backends.backend import InferenceBackend, PipelexBackend
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.credential_resolution import CredentialResolution
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_spec_index import ModelSpecIndex
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.cogt.model_routing.routing_models import BackendMatchingMethod
+from pipelex.cogt.model_routing.routing_models import BackendMatchForModel, BackendMatchingMethod
 from pipelex.cogt.model_routing.routing_profile import RoutingProfile
 from pipelex.cogt.model_routing.routing_profile_loader import load_active_routing_profile
 from pipelex.cogt.models.model_deck import ModelDeck, ModelDeckBlueprint
@@ -149,10 +150,21 @@ class ModelManager(ModelManagerAbstract):
         return self._routing_profile
 
     def build_deck(self, model_deck_blueprint: ModelDeckBlueprint, *, enabled_backends: list[str]) -> ModelDeck:
-        all_models_and_possible_backends = self.inference_backend_library.get_all_models_and_possible_backends()
-        inference_models: dict[str, InferenceModelSpec] = {}
+        """Build the deck over every pair of a handle and a model type some backend declares.
 
-        for model_name in all_models_and_possible_backends:
+        A routing profile matches a handle's name, so the name is matched once, and the matched
+        backend is then asked for the spec of each type the name is declared as. Each matching method
+        keeps its meaning per pair: a pattern match skips a pair its backend lacks, a default match
+        looks for it along the fallback order, and an exact match pins the name to its backend, so a
+        type that backend does not serve is not served at all.
+
+        Raises:
+            ModelManagerError: A routed backend is not loaded, or a handle routed exactly to a backend
+                that declares it under no model type at all.
+        """
+        inference_models = ModelSpecIndex.make_empty()
+
+        for model_name, declared_model_types in self.inference_backend_library.get_declared_types_by_handle().items():
             backend_match_for_model = self.routing_profile.get_backend_match_for_model(
                 enabled_backends=enabled_backends,
                 model_name=model_name,
@@ -160,54 +172,28 @@ class ModelManager(ModelManagerAbstract):
             if backend_match_for_model is None:
                 continue
             matched_backend_name = backend_match_for_model.backend_name
-            backend = self.inference_backend_library.get_inference_backend(backend_name=matched_backend_name)
-            if backend is None:
+            matched_backend = self.inference_backend_library.get_inference_backend(backend_name=matched_backend_name)
+            if matched_backend is None:
                 msg = f"Backend '{matched_backend_name}', requested for model '{model_name}', could not be found"
                 raise ModelManagerError(msg)
-            model_spec = backend.get_model_spec(model_name)
-            if model_spec is None:
-                # Not finding the model spec can be an error or not according to the matching method
-                match backend_match_for_model.matching_method:
-                    case BackendMatchingMethod.EXACT_MATCH:
-                        msg = (
-                            f"Model spec '{model_name}' not found in backend '{matched_backend_name}' "
-                            f"which was matched exactly in routing profile '{backend_match_for_model.routing_profile_name}'"
-                        )
-                        raise ModelManagerError(msg)
-                    case BackendMatchingMethod.PATTERN_MATCH:
-                        # We can skip it because it was only a pattern match
-                        continue
-                    case BackendMatchingMethod.DEFAULT:
-                        # We could not find the model spec, but it was a default match,
-                        # so we can look for it in the other available backends
-                        # Use fallback_order if specified, otherwise only try internal backend
-                        if backend_match_for_model.fallback_order:
-                            # Try fallback_order first, then any enabled backends not in fallback_order
-                            backends_to_try = backend_match_for_model.fallback_order + [
-                                b for b in enabled_backends if b not in backend_match_for_model.fallback_order
-                            ]
-                        else:
-                            # No fallback_order specified - only try the internal backend as a special case
-                            # Internal backend contains software-only models that should always be available
-                            # regardless of which AI provider routing profile is selected
-                            backends_to_try = [PipelexBackend.INTERNAL] if PipelexBackend.INTERNAL in enabled_backends else []
-
-                        for available_backend in backends_to_try:
-                            if available_backend == matched_backend_name:
-                                # we've already checked the matched_backend_name and it didn't have the model spec, that's why we're here
-                                continue
-                            backend = self.inference_backend_library.get_inference_backend(backend_name=available_backend)
-                            if backend is None:
-                                msg = f"Backend '{available_backend}' not found for model '{model_name}'"
-                                raise ModelManagerError(msg)
-                            model_spec = backend.get_model_spec(model_name)
-                            if model_spec is not None:
-                                break
-                        if model_spec is None:
-                            # Model not available in any of the searched backends - skip it
-                            # Not all models need to be available in the configured backends
-                            continue
-            inference_models[model_name] = model_spec
+            if backend_match_for_model.matching_method == BackendMatchingMethod.EXACT_MATCH and not matched_backend.model_specs.types_serving(
+                handle=model_name
+            ):
+                msg = (
+                    f"Model spec '{model_name}' not found in backend '{matched_backend_name}' "
+                    f"which was matched exactly in routing profile '{backend_match_for_model.routing_profile_name}'"
+                )
+                raise ModelManagerError(msg)
+            for model_type in declared_model_types:
+                model_spec = self._find_routed_model_spec(
+                    model_name=model_name,
+                    model_type=model_type,
+                    backend_match_for_model=backend_match_for_model,
+                    matched_backend=matched_backend,
+                    enabled_backends=enabled_backends,
+                )
+                if model_spec is not None:
+                    inference_models.add(model_spec)
 
         return ModelDeck(
             inference_models=inference_models,
@@ -246,6 +232,66 @@ class ModelManager(ModelManagerAbstract):
             judgment_choice_default=model_deck_blueprint.judgment.choice_default,
             model_deck_config=get_config().inference.model_deck,
         )
+
+    def _find_routed_model_spec(
+        self,
+        *,
+        model_name: str,
+        model_type: ModelType,
+        backend_match_for_model: BackendMatchForModel,
+        matched_backend: InferenceBackend,
+        enabled_backends: list[str],
+    ) -> InferenceModelSpec | None:
+        """The spec serving one pair, found by the routing match of its name, or `None` when the pair is not served.
+
+        Raises:
+            ModelManagerError: A backend of the fallback order is not loaded.
+        """
+        if model_spec := matched_backend.get_model_spec(model_type=model_type, handle=model_name):
+            return model_spec
+        # Not finding the pair in the matched backend can be fine or not according to the matching method
+        match backend_match_for_model.matching_method:
+            case BackendMatchingMethod.EXACT_MATCH:
+                # The route pinned the name to this backend, which declares it as another type only
+                # (the caller refused a backend declaring it as no type at all): a call for this pair
+                # never goes elsewhere, so the pair is not served.
+                log.verbose(
+                    f"Model '{model_name}' is routed exactly to backend '{matched_backend.name}' in routing profile "
+                    f"'{backend_match_for_model.routing_profile_name}', which does not serve it as "
+                    f"{model_type.indefinite_description}, so it is not served as one"
+                )
+                return None
+            case BackendMatchingMethod.PATTERN_MATCH:
+                # We can skip it because it was only a pattern match
+                return None
+            case BackendMatchingMethod.DEFAULT:
+                # We could not find the pair, but it was a default match,
+                # so we can look for it in the other available backends
+                # Use fallback_order if specified, otherwise only try internal backend
+                if backend_match_for_model.fallback_order:
+                    # Try fallback_order first, then any enabled backends not in fallback_order
+                    backends_to_try = backend_match_for_model.fallback_order + [
+                        b for b in enabled_backends if b not in backend_match_for_model.fallback_order
+                    ]
+                else:
+                    # No fallback_order specified - only try the internal backend as a special case
+                    # Internal backend contains software-only models that should always be available
+                    # regardless of which AI provider routing profile is selected
+                    backends_to_try = [PipelexBackend.INTERNAL] if PipelexBackend.INTERNAL in enabled_backends else []
+
+                for available_backend in backends_to_try:
+                    if available_backend == matched_backend.name:
+                        # we've already checked the matched backend and it didn't have the pair, that's why we're here
+                        continue
+                    backend = self.inference_backend_library.get_inference_backend(backend_name=available_backend)
+                    if backend is None:
+                        msg = f"Backend '{available_backend}' not found for model '{model_name}'"
+                        raise ModelManagerError(msg)
+                    if model_spec := backend.get_model_spec(model_type=model_type, handle=model_name):
+                        return model_spec
+                # Pair not available in any of the searched backends - skip it
+                # Not all models need to be available in the configured backends
+                return None
 
     @override
     def get_inference_model(self, model_handle: str, *, model_type: ModelType) -> InferenceModelSpec:

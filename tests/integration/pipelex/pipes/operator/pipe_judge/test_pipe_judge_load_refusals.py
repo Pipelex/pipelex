@@ -2,8 +2,10 @@
 
 import pytest
 
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.runtime_hub import get_model_deck
 from tests.integration.pipelex.pipes.operator.pipe_judge.test_data import PipeJudgeLoadTestData
 
 _MODEL = f'model = "{PipeJudgeLoadTestData.JUDGMENT_MODEL}"'
@@ -27,6 +29,21 @@ class TestPipeJudgeLoadRefusals:
         report = await _refusal_report(PipeJudgeLoadTestData.bundle(step_fields='model = "jev-9.99.9"'))
         assert "jev-9.99.9" in report
         assert "model" in report
+
+    async def test_a_model_the_deck_serves_only_as_an_llm_is_refused(self) -> None:
+        """A handle names one model per model type: an LLM of that name is no judgment model, and the load says so."""
+        served_models = get_model_deck().inference_models
+        llm_only_handle = next(
+            handle
+            for handle in served_models.handles_of_type(model_type=ModelType.LLM)
+            if ModelType.JUDGMENT not in served_models.types_serving(handle=handle)
+        )
+
+        report = await _refusal_report(PipeJudgeLoadTestData.bundle(step_fields=f'model = "{llm_only_handle}"'))
+
+        assert llm_only_handle in report
+        assert "field 'model'" in report
+        assert "'model_type': 'judgment'" in report
 
     @pytest.mark.parametrize(
         ("inputs", "file_kind"),
