@@ -22,8 +22,10 @@ PIPELEX_API_KEY_ENV_KEY = "PIPELEX_API_KEY"
 PIPELEX_BASE_URL_ENV_KEY = "PIPELEX_BASE_URL"
 #: The origin a hosted run goes to when neither `--base-url` nor `PIPELEX_BASE_URL` names another.
 HOSTED_API_DEFAULT_BASE_URL = DEFAULT_API_BASE_URL
-#: The name this runtime gives itself in the `User-Agent` of every hosted request.
-_APP_NAME = "pipelex"
+#: The name the `pipelex` and `pipelex-agent` CLIs give themselves in the `User-Agent` of every hosted request: the
+#: client-identification registry's token for them, which the hosted plane counts on its `cli` surface. Every caller of
+#: `make_hosted_client` is one of their commands; library code calling the hosted API would need a name of its own.
+_CLI_APP_NAME = "pipelex-cli"
 
 
 def redact_url_for_display(*, url: str) -> str:
@@ -73,7 +75,7 @@ def make_hosted_client(*, base_url: str | None = None, api_key: str | None = Non
         HostedBaseUrlError: If the base URL is not host-only, naming the setting it came from.
     """
     try:
-        return PipelexAPIClient(api_key=api_key, base_url=base_url, app_info=AppInfo(name=_APP_NAME, version=get_package_version()))
+        return PipelexAPIClient(api_key=api_key, base_url=base_url, app_info=AppInfo(name=_CLI_APP_NAME, version=get_package_version()))
     except PipelineRequestError:
         # The SDK's constructor raises this for one reason only: a base URL that is not an origin.
         source = "--base-url" if base_url is not None else PIPELEX_BASE_URL_ENV_KEY
