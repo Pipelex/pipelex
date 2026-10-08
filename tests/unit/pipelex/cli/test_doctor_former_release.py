@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from pipelex.cli.agent_cli.commands.doctor_cmd import _pending_migrations_actions  # pyright: ignore[reportPrivateUsage]
 from pipelex.cli.commands import doctor_cmd as doctor_cmd_module
 from pipelex.cli.commands.doctor_cmd import PendingMigrationsFinding, check_backend_credentials, check_models, check_pending_migrations
 from pipelex.core.validation import MIGRATE_COMMAND
@@ -181,3 +182,18 @@ class TestTheDoctorOnAFormerRelease:
         assert check.finding is PendingMigrationsFinding.NEEDS_ATTENTION
         assert check.former_release_files == []
         assert f"Pipelex would still not start once '{MIGRATE_COMMAND}' has run" in check.message
+
+    def test_a_home_override_activating_a_profile_no_file_defines_names_the_dry_run_as_its_remedy(self, machine: tuple[Path, Path]) -> None:
+        """Nothing is left to clean and `--fix` has nothing to write, so the dry run, which says what stops the boot, is the one move left."""
+        home, _ = machine
+        shutil.copytree(Path(str(get_kit_configs_dir())), home)
+        (home / INFERENCE_DIR_NAME / "routing_profiles_override.toml").write_text('active = "team_gateway"\n', encoding="utf-8")
+
+        check = check_pending_migrations()
+
+        assert check.finding is PendingMigrationsFinding.NEEDS_ATTENTION
+        assert not check.finding.is_repaired_by_migrating
+        assert (check.former_release_files, check.migratable_files, check.attention_files) == ([], [], [])
+        actions = _pending_migrations_actions(check=check)
+        assert any(action.startswith(f"Run '{MIGRATE_COMMAND} --dry-run' to see what still stops Pipelex from starting") for action in actions)
+        assert check.boot_still_blocked

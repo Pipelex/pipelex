@@ -52,7 +52,7 @@ def _informational_or_status_icon(*, check: dict[str, Any]) -> str:
 
 
 def _pending_migrations_actions(*, check: PendingMigrationsCheck) -> list[str]:
-    """What to tell an agent about the pending-migrations row — none, one move, or two.
+    """What to tell an agent about the pending-migrations row: nothing when it is up to date, else one action per thing it found.
 
     A machine consumer never learns of a pending migration from a boot: a stale configuration the
     ledger can explain boots with a warning, and the agent CLI silences its own logging before one
@@ -61,7 +61,8 @@ def _pending_migrations_actions(*, check: PendingMigrationsCheck) -> list[str]:
     Two actions rather than one when a run both migrates some files and leaves others behind,
     which is the ordinary shape on a machine that has drifted: the command is worth running *and*
     something is still owed afterwards, and an agent that only heard the first would stop early.
-    The cleanup of what a former release left is the command's first step, and has its own action.
+    The cleanup of what a former release left is the command's first step, and has its own action. A boot the command
+    would leave refused has one too, and it can be the only one: with nothing left to clean, the row lists no file.
     """
     actions: list[str] = []
     match check.finding:
@@ -84,6 +85,10 @@ def _pending_migrations_actions(*, check: PendingMigrationsCheck) -> list[str]:
         attention = ", ".join(check.attention_files)
         actions.append(
             f"Run '{MIGRATE_COMMAND} --dry-run' to see what these configuration files carry that the migration will not do on its own: {attention}"
+        )
+    if check.boot_still_blocked:
+        actions.append(
+            f"Run '{MIGRATE_COMMAND} --dry-run' to see what still stops Pipelex from starting, which the command leaves for a person to fix"
         )
     return actions
 

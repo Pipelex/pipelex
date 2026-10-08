@@ -342,6 +342,21 @@ class TestDoctorDisplayReport:
         assert "/home/user/.pipelex/pipelex_service.toml — left by a former release" in output
         assert f"Run {MIGRATE_COMMAND} to clean up 2 file(s) a former release left" in output
 
+    def test_a_boot_still_stopped_with_nothing_to_write_names_the_dry_run(self, console: Console) -> None:
+        """An override's `active` naming a profile no file defines: no file to list, nothing for `--fix`, and still a remedy."""
+        kwargs = _healthy_report_kwargs()
+        kwargs["pending_migrations_check"] = PendingMigrationsCheck(
+            finding=PendingMigrationsFinding.NEEDS_ATTENTION,
+            message=f"Pipelex would still not start once '{MIGRATE_COMMAND}' has run — '{MIGRATE_COMMAND} --dry-run' says why",
+            boot_still_blocked=True,
+        )
+
+        display_health_report(**kwargs)
+
+        solutions = console.export_text().split("Possible Solutions", 1)[-1]
+        assert f"Run {MIGRATE_COMMAND} --dry-run to see what still stops Pipelex from starting" in solutions
+        assert "pipelex doctor --fix" not in solutions, "the fix has nothing to write here"
+
     def test_a_row_that_could_not_be_checked_is_not_reported_as_healthy(self, console: Console) -> None:
         """Not knowing is not the same as being up to date, and it names a way to find out."""
         kwargs = _healthy_report_kwargs()

@@ -357,6 +357,10 @@ class PendingMigrationsCheck(BaseModel):
     """Whether what that release left stops this machine's boot until it is cleaned up: read off the files that boot
     merges, the project's own bases included, never off one directory alone."""
 
+    boot_still_blocked: bool = False
+    """Whether a boot of this machine would still be refused once the command has run: the cleanup's own check, on the
+    files as it would leave them. The command cannot fix this, so its dry run, which says why, is the remedy."""
+
     @property
     def is_healthy(self) -> bool:
         return self.finding.is_healthy
@@ -449,6 +453,7 @@ def check_pending_migrations() -> PendingMigrationsCheck:
         attention_files=attention_files,
         former_release_files=former_release_files,
         former_release_blocks_boot=former_release_blocks_boot,
+        boot_still_blocked=bool(cleanup.still_blocking),
     )
 
 
@@ -1045,6 +1050,8 @@ def display_health_report(
         # Read off the list rather than off the finding: a run can both migrate some files and
         # leave others for a person, and that combination is the ordinary one on a stale machine.
         migrations_need_a_look = bool(pending_migrations_check.attention_files)
+        # Its own bullet, since it can be the row's only one: with nothing left to clean the row lists no file.
+        boot_stays_stopped = pending_migrations_check.boot_still_blocked
         has_telemetry_validation_error = not telemetry_check.is_healthy and not can_auto_fix_telemetry and not telemetry_is_out_of_date
 
         # Check for backend file issues, which only runs on this machine meet
@@ -1072,6 +1079,7 @@ def display_health_report(
             or can_migrate
             or can_clean_up_former_release
             or migrations_need_a_look
+            or boot_stays_stopped
             or pending_migrations_check.finding.is_uncheckable
             or telemetry_is_out_of_date
             or has_telemetry_validation_error
@@ -1112,6 +1120,12 @@ def display_health_report(
                 console.print(
                     f"  • Run [cyan]{MIGRATE_COMMAND} --dry-run[/cyan] to see what "
                     f"{len(pending_migrations_check.attention_files)} configuration file(s) carry that the migration will not do on its own"
+                )
+
+            if boot_stays_stopped:
+                console.print(
+                    f"  • Run [cyan]{MIGRATE_COMMAND} --dry-run[/cyan] to see what still stops Pipelex from starting, "
+                    "which the command leaves for you to fix"
                 )
 
             if pending_migrations_check.finding.is_uncheckable:
