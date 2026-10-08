@@ -22,7 +22,7 @@ from collections.abc import Mapping, Sequence
 
 from pipelex import log
 from pipelex.cogt.llm.llm_report import LLMTokenCostReportField
-from pipelex.cogt.usage.cost_registry import AggregatedCosts, CostRegistry
+from pipelex.cogt.usage.cost_registry import AggregatedCosts, CostRegistry, ModelUsageKey
 from pipelex.graph.graphspec import ModelUsageSpec, NodeUsageSpec
 from pipelex.reporting.reporting_types import AnyTokensUsage
 
@@ -59,24 +59,25 @@ def _merge_token_categories(usages: Sequence[AnyTokensUsage]) -> dict[str, int]:
 def _model_specs(*, usages: Sequence[AnyTokensUsage], aggregated: AggregatedCosts) -> list[ModelUsageSpec]:
     """Per-model breakdown, taken from the cost report's own grouping.
 
-    ``AggregatedCosts.grouped_by_model`` already splits tokens and costs per model name;
-    all this adds is the model id, the call counts, and the unrated ``None`` the engine
-    cannot express. Ordered most-used first (ties by name) so a consumer can read
-    ``by_model[0]`` as the dominant model without sorting.
+    ``AggregatedCosts.grouped_by_model`` already splits tokens and costs per model type
+    and name, since a handle names one model per model type; all this adds is the model
+    id, the call counts, and the unrated ``None`` the engine cannot express. Ordered
+    most-used first (ties by name, then type) so a consumer can read ``by_model[0]`` as
+    the dominant model without sorting.
     """
-    calls_by_model: dict[str, int] = {}
-    rated_by_model: dict[str, int] = {}
-    model_ids: dict[str, str] = {}
+    calls_by_model: dict[ModelUsageKey, int] = {}
+    rated_by_model: dict[ModelUsageKey, int] = {}
+    model_ids: dict[ModelUsageKey, str] = {}
     for tokens_usage in usages:
-        model_name = tokens_usage.inference_model_name
-        calls_by_model[model_name] = calls_by_model.get(model_name, 0) + 1
-        model_ids.setdefault(model_name, tokens_usage.inference_model_id)
+        model_key = ModelUsageKey(model_type=tokens_usage.model_type, model_name=tokens_usage.inference_model_name)
+        calls_by_model[model_key] = calls_by_model.get(model_key, 0) + 1
+        model_ids.setdefault(model_key, tokens_usage.inference_model_id)
         if tokens_usage.unit_costs:
-            rated_by_model[model_name] = rated_by_model.get(model_name, 0) + 1
+            rated_by_model[model_key] = rated_by_model.get(model_key, 0) + 1
 
     specs: list[ModelUsageSpec] = []
-    for model_name, model_data in aggregated.grouped_by_model.items():
-        rated_calls = rated_by_model.get(model_name, 0)
+    for model_key, model_data in aggregated.grouped_by_model.items():
+        rated_calls = rated_by_model.get(model_key, 0)
         model_cost = CostRegistry.compute_total_cost(
             input_non_cached_cost=model_data[LLMTokenCostReportField.COST_INPUT_NON_CACHED],
             input_cached_cost=model_data[LLMTokenCostReportField.COST_INPUT_CACHED],
@@ -84,15 +85,15 @@ def _model_specs(*, usages: Sequence[AnyTokensUsage], aggregated: AggregatedCost
         )
         specs.append(
             ModelUsageSpec(
-                inference_model_name=model_name,
-                inference_model_id=model_ids.get(model_name, ""),
-                model_type=aggregated.model_types.get(model_name, "llm"),
-                inference_calls=calls_by_model.get(model_name, 0),
+                inference_model_name=model_key.model_name,
+                inference_model_id=model_ids.get(model_key, ""),
+                model_type=model_key.model_type,
+                inference_calls=calls_by_model.get(model_key, 0),
                 rated_inference_calls=rated_calls,
                 cost=model_cost if rated_calls else None,
             )
         )
-    specs.sort(key=lambda spec: (-spec.inference_calls, spec.inference_model_name, spec.inference_model_id))
+    specs.sort(key=lambda spec: (-spec.inference_calls, spec.inference_model_name, spec.model_type, spec.inference_model_id))
     return specs
 
 

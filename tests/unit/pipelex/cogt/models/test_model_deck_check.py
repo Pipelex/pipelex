@@ -12,9 +12,11 @@ from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoicesDefaults
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_spec_index import ModelSpecIndex
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.models.model_deck_check import (
+    check_doc_gen_choice_with_deck,
     check_extract_choice_with_deck,
     check_img_gen_choice_with_deck,
     check_judgment_choice_with_deck,
@@ -25,10 +27,16 @@ from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKi
 from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.system.runtime import ProblemReaction
+from tests.unit.pipelex.cogt.models.test_data import ModelDeckCheckTestData
 
 CheckFunction = Callable[[Any], None]
 
 GET_MODEL_DECK_TARGET = "pipelex.cogt.models.model_deck_check.get_model_deck"
+
+
+def _check_doc_gen_choice(doc_gen_choice: Any) -> None:
+    """The doc gen deck check, called like the other families' checks, which take the choice positionally."""
+    check_doc_gen_choice_with_deck(doc_gen_choice=doc_gen_choice)
 
 
 class TestModelDeckCheck:
@@ -48,13 +56,15 @@ class TestModelDeckCheck:
     def _create_test_model_deck(self) -> ModelDeck:
         """Build a deck with one preset, alias, waterfall and handle per model type."""
         return ModelDeck(
-            inference_models={
-                "gpt-4o-mini": self._create_model_spec("gpt-4o-mini", ModelType.LLM),
-                "extract-engine": self._create_model_spec("extract-engine", ModelType.TEXT_EXTRACTOR),
-                "img-painter": self._create_model_spec("img-painter", ModelType.IMG_GEN),
-                "web-searcher": self._create_model_spec("web-searcher", ModelType.SEARCH),
-                "verdict-giver": self._create_model_spec("verdict-giver", ModelType.JUDGMENT),
-            },
+            inference_models=ModelSpecIndex.make_from_specs(
+                model_specs=[
+                    self._create_model_spec("gpt-4o-mini", ModelType.LLM),
+                    self._create_model_spec("extract-engine", ModelType.TEXT_EXTRACTOR),
+                    self._create_model_spec("img-painter", ModelType.IMG_GEN),
+                    self._create_model_spec("web-searcher", ModelType.SEARCH),
+                    self._create_model_spec("verdict-giver", ModelType.JUDGMENT),
+                ]
+            ),
             # LLM-specific
             llm_default_temperature=0.7,
             llm_aliases={"best-gpt": "gpt-4o-mini"},
@@ -286,7 +296,10 @@ class TestModelDeckCheck:
         expected_model_type: ModelType,
         options_attr: str,
     ) -> None:
-        """A missing name raises ModelChoiceNotFoundError carrying the sigil-form choice, kind, type and the right deck collection."""
+        """A missing name raises ModelChoiceNotFoundError carrying the sigil-form choice, kind, type and the right deck collection.
+
+        A handle's options are the deck's models of the pipe's type alone, the ones its field may name.
+        """
         model_deck = self._create_test_model_deck()
         mocker.patch(GET_MODEL_DECK_TARGET, return_value=model_deck)
 
@@ -297,8 +310,14 @@ class TestModelDeckCheck:
         assert error.model_choice == model_choice
         assert error.reference_kind == expected_kind
         assert error.model_type == expected_model_type
-        expected_options: dict[str, Any] = getattr(model_deck, options_attr)
-        assert error.available_options == list(expected_options.keys())
+        if options_attr == "inference_models":
+            # A handle names one model per model type: only the handles served as the type the pipe asks for are options.
+            served_handles = model_deck.inference_models.handles_of_type(model_type=expected_model_type)
+            assert len(served_handles) == 1
+            assert error.available_options == served_handles
+        else:
+            expected_options: dict[str, Any] = getattr(model_deck, options_attr)
+            assert error.available_options == list(expected_options.keys())
 
     def test_near_miss_handle_yields_fuzzy_suggestion(self, mocker: MockerFixture) -> None:
         """A typo'd handle gets a fuzzy suggestion pointing at the close-by real handle."""
@@ -340,3 +359,61 @@ class TestModelDeckCheck:
 
         check_llm_choice_with_deck(model_choice)
         check_llm_choice_with_deck(ModelReference.parse(model_choice))
+
+    @pytest.mark.parametrize(
+        ("check_fn", "model_choice", "needed_model"),
+        [
+            pytest.param(check_img_gen_choice_with_deck, "gpt-4o-mini", "an image-generation model", id="llm-in-img_gen"),
+            pytest.param(check_llm_choice_with_deck, "img-painter", "an LLM", id="img_gen-in-llm"),
+            pytest.param(check_extract_choice_with_deck, "handle:web-searcher", "a text-extraction model", id="search-in-extract-spelled-out"),
+            pytest.param(check_judgment_choice_with_deck, "gpt-4o-mini", "a judgment model", id="llm-in-judgment"),
+        ],
+    )
+    def test_handle_served_as_another_type_is_refused_naming_the_type_needed(
+        self,
+        mocker: MockerFixture,
+        check_fn: CheckFunction,
+        model_choice: str,
+        needed_model: str,
+    ) -> None:
+        """A bare handle the deck serves only as another model type is refused, and the sentence names that mismatch rather than a missing handle."""
+        model_deck = self._create_test_model_deck()
+        mocker.patch(GET_MODEL_DECK_TARGET, return_value=model_deck)
+
+        with pytest.raises(ModelChoiceNotFoundError) as exc_info:
+            check_fn(model_choice)
+
+        error = exc_info.value
+        name = ModelReference.parse(model_choice).name
+        assert error.model_choice == model_choice
+        assert error.reference_kind == ModelReferenceKind.HANDLE
+        assert str(error).startswith(f"Model handle '{name}' is served by the model deck, but not as {needed_model}")
+        assert "was not found" not in str(error)
+
+    @pytest.mark.parametrize(
+        ("check_fn", "model_type"),
+        [
+            pytest.param(check_llm_choice_with_deck, ModelType.LLM, id="llm"),
+            pytest.param(check_extract_choice_with_deck, ModelType.TEXT_EXTRACTOR, id="extract"),
+            pytest.param(check_img_gen_choice_with_deck, ModelType.IMG_GEN, id="img_gen"),
+            pytest.param(check_search_choice_with_deck, ModelType.SEARCH, id="search"),
+            pytest.param(_check_doc_gen_choice, ModelType.DOC_GEN, id="doc_gen"),
+            pytest.param(check_judgment_choice_with_deck, ModelType.JUDGMENT, id="judgment"),
+        ],
+    )
+    def test_deck_check_agrees_with_is_reference_defined(self, mocker: MockerFixture, check_fn: CheckFunction, model_type: ModelType) -> None:
+        """The load-time check accepts exactly the references `is_reference_defined` holds, which the model reference check answers from."""
+        model_deck = self._create_test_model_deck()
+        mocker.patch(GET_MODEL_DECK_TARGET, return_value=model_deck)
+
+        for model_choice in ModelDeckCheckTestData.EVERY_REFERENCE:
+            is_defined = model_deck.is_reference_defined(reference=ModelReference.parse(model_choice), model_type=model_type)
+            try:
+                check_fn(model_choice)
+            except ModelChoiceNotFoundError:
+                is_accepted = False
+            else:
+                is_accepted = True
+            assert is_accepted == is_defined, (
+                f"{model_choice!r} as {model_type}: the deck check accepts it: {is_accepted}, is_reference_defined: {is_defined}"
+            )

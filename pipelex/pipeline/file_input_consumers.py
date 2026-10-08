@@ -280,8 +280,10 @@ def _resolve_model_specs(*, model_reference: str, model_type: ModelType, visited
         case ModelReferenceKind.WATERFALL:
             waterfall_members = waterfalls.get(reference.name)
         case ModelReferenceKind.HANDLE:
-            if model_spec := model_deck.inference_models.get(reference.name):
-                return [model_spec] if model_spec.model_type == model_type else []
+            # A handle served as another type only does not stop the lookup: this type's alias or
+            # waterfall of the same name is tried next, as the deck's own lookup does.
+            if model_spec := model_deck.inference_models.get(model_type=model_type, handle=reference.name):
+                return [model_spec]
             alias_target = aliases.get(reference.name)
             waterfall_members = None if alias_target else waterfalls.get(reference.name)
     if alias_target:

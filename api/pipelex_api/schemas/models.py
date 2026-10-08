@@ -53,8 +53,9 @@ class RunRequest(BaseModel):
     deliberately open (`extra="allow"`): a caller may send extra request
     properties, and they are kept rather than silently dropped. Openness is not
     a waiver, though — an unknown key never satisfies the run-source
-    precondition. Under the layered extension policy (the Pipelex workspace
-    spec `docs/specs/pipelex-platform-api.md` → "Layered extension policy"), an
+    precondition. Under the layered extension policy
+    (`conformance/specs/pipelex-platform-api.md` → "Layered extension policy",
+    in the `conformance` repo beside the tests that verify it), an
     extension-borne method selector is resolved by the layer that owns it
     BEFORE the request reaches this one, so a body arriving here with no source
     this server understands is an error whatever else it carries.

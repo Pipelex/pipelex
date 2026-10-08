@@ -30,7 +30,7 @@ from pipelex.cogt.img_gen.img_gen_job_components import (
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.img_gen.img_gen_report import ImgGenTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
-from pipelex.cogt.usage.cost_registry import CostRegistry
+from pipelex.cogt.usage.cost_registry import CostRegistry, ModelUsageKey
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.config import get_config
 from pipelex.reporting.reporting_manager import ReportingManager
@@ -148,7 +148,7 @@ class TestEmitRunnerFallbackNonLLM:
 
         aggregated = CostRegistry.aggregate_costs(tokens_usages=UsageAggregator.aggregate(events))
         assert aggregated.total_nb_tokens == 300  # 100 input + 200 output
-        assert aggregated.model_types == {"img-model": "img_gen"}
+        assert list(aggregated.grouped_by_model) == [ModelUsageKey(model_type="img_gen", model_name="img-model")]
         assert aggregated.has_reportable_usage is True
 
     def test_extract_usage_emitted_via_runner_fallback(self, tmp_path: Path, mocker: MockerFixture) -> None:
@@ -167,5 +167,5 @@ class TestEmitRunnerFallbackNonLLM:
 
         aggregated = CostRegistry.aggregate_costs(tokens_usages=UsageAggregator.aggregate(events))
         assert aggregated.total_nb_tokens == 700  # 300 input + 400 output
-        assert aggregated.model_types == {"extract-model": "extract"}
+        assert list(aggregated.grouped_by_model) == [ModelUsageKey(model_type="extract", model_name="extract-model")]
         assert aggregated.has_reportable_usage is True

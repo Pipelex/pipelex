@@ -76,6 +76,7 @@ anthropic = [
   "claude-5.1-fable",
   "claude-5.5-sonnet",
   "claude-5.5-opus",
+  "claude-5.5-haiku",
 ]
 
 # --- DeepSeek Models ---

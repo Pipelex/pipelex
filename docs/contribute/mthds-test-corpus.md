@@ -2,7 +2,7 @@
 
 The MTHDS Test Corpus is one canonical, tagged set of `.mthds` methods that every repository building on the MTHDS language — this runtime and the tools and services around it — draws its language-level fixtures from. It lives at `pipelex/test_extras/mthds_corpus/`, ships in the wheel, and is gated on both sides: the corpus must cover every feature the runtime registers, and each consumer must exercise every entry in the slice it declares.
 
-This page is both the pipelex-side working guide — where things are, how to add an entry, and what each gate is telling you when it goes red — and the contract other repositories are written against: the entry layout, the `entry.toml` manifest, the closed tag vocabulary with its `fails_at` field, the conformance tiers, and the two ways a consumer reaches the corpus.
+This page is both the pipelex-side working guide — where things are, how to add an entry, and what each gate is telling you when it goes red — and the public statement of the contract other repositories are written against: the entry layout, the `entry.toml` manifest, the closed tag vocabulary with its `fails_at` field, the conformance tiers, and the two ways a consumer reaches the corpus.
 
 !!! note "Why it exists"
 

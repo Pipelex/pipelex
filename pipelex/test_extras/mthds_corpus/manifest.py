@@ -1,6 +1,7 @@
 """The MTHDS Test Corpus entry manifest — the strict model behind every ``entry.toml``.
 
-Contract: ``docs/specs/mthds-test-corpus.md`` (workspace root), section "The entry manifest".
+Contract: ``conformance/specs/mthds-test-corpus.md`` (the cross-repo spec, kept in the ``conformance``
+repo), section "The entry manifest".
 The model is deliberately strict: an unknown key is an error rather than a
 forward-compatibility affordance, so a new field is a change to the spec and to this
 model in the same commit.

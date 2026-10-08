@@ -10,7 +10,7 @@ declaration as it merges it, and names the plugin when one is refused.
 
 from typing import Any, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource, doc_gen_choice_key
 
@@ -18,12 +18,15 @@ from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource, doc_
 class PluginInternalModel(BaseModel):
     """One model a plugin declares in the internal backend, and the plugin that declared it.
 
-    `spec` is exactly the table a backend file would hold for the model (`model_type`, `sdk`, `model_id`, `inputs`,
-    `outputs`, `costs`…). It is complete on its own: no backend file's `[defaults]` table is applied to it.
+    `name` is the model's handle, and `spec` is exactly the table a backend file would hold for the model
+    (`model_type`, `sdk`, `model_id`, `inputs`, `outputs`, `costs`…). It is complete on its own: no backend file's
+    `[defaults]` table is applied to it. A handle names one model per model type, so two declarations may share a
+    name when their model types differ.
     """
 
     model_config = ConfigDict(frozen=True)
 
+    name: str
     spec: dict[str, Any]
     plugin: str
 
@@ -49,8 +52,8 @@ class PluginModelDeclarations(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    internal_models: dict[str, PluginInternalModel] = Field(default_factory=dict)
-    """The plugins' internal models, keyed by model name."""
+    internal_models: tuple[PluginInternalModel, ...] = ()
+    """The plugins' internal models, in the order they were declared."""
     doc_gen_defaults: tuple[PluginDocGenDefault, ...] = ()
 
     @classmethod
