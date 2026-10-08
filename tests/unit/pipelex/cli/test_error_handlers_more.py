@@ -18,6 +18,7 @@ from pipelex.base_exceptions import MigrationErrorBlock
 from pipelex.cli.error_handlers import (
     ErrorContext,
     display_error_panel,
+    handle_former_release_config_error,
     handle_model_deck_preset_error,
     handle_telemetry_config_validation_error,
     handle_validate_bundle_error,
@@ -27,6 +28,7 @@ from pipelex.cogt.inference.error_classification import UserAction, UserActionKi
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.exceptions import DryRunFailureErrorData, PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
 from pipelex.core.validation import MIGRATE_COMMAND
+from pipelex.migration.exceptions import FormerReleaseConfigError
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 from pipelex.validation_error_types import PipeValidationErrorType
@@ -273,3 +275,20 @@ class TestErrorHandlersExtended:
 
         output = console.export_text()
         assert "payload has [red]markup[/red] inside" in output
+
+    def test_handle_former_release_config_error_shows_the_message_and_no_traceback(self, console: Console) -> None:
+        """The boot's refusal on what a former release left: its message names the files and both remedies, and is the whole answer."""
+        exc = FormerReleaseConfigError(
+            "This configuration was set up by a former Pipelex release.\n- 'backends.toml' enables the 'pipelex_gateway' backend\n\n"
+            f"Run `{MIGRATE_COMMAND}` to clean it up."
+        )
+
+        with pytest.raises(typer.Exit) as exc_info:
+            handle_former_release_config_error(exc=exc)
+
+        assert exc_info.value.exit_code == 1
+        output = console.export_text()
+        assert "Configuration left by a former release" in output
+        assert "'backends.toml' enables the 'pipelex_gateway' backend" in output
+        assert f"Run `{MIGRATE_COMMAND}` to clean it up." in output
+        assert "Traceback" not in output

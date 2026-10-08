@@ -103,6 +103,7 @@ FatalError | Fatal error | https://docs.pipelex.com/latest/errors/fatal-error/
 FileTypeError | File type | https://docs.pipelex.com/latest/errors/file-type-error/
 FixTransactionError | Fix transaction | https://docs.pipelex.com/latest/errors/fix-transaction-error/
 FixWriteConflictError | Fix write conflict | https://docs.pipelex.com/latest/errors/fix-write-conflict-error/
+FormerReleaseConfigError | Configuration left by a former release | https://docs.pipelex.com/latest/errors/former-release-config-error/
 FuncRegistryError | Func registry | https://docs.pipelex.com/latest/errors/func-registry-error/
 GcpLogSinkCredentialsError | Log sink credentials missing or refused | https://docs.pipelex.com/latest/errors/gcp-log-sink-credentials-error/
 GeneratedImageError | Generated image | https://docs.pipelex.com/latest/errors/generated-image-error/

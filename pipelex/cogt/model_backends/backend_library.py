@@ -39,6 +39,7 @@ from pipelex.cogt.model_backends.model_spec_factory import (
 from pipelex.cogt.model_backends.model_spec_index import ModelSpecIndex
 from pipelex.cogt.model_backends.model_spec_keys import describe_rejected_keys, split_model_spec_keys
 from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.migration.former_release import MODEL_SPECS_SECTION_KEY
 from pipelex.migration.plan import MigrationPlan
 from pipelex.plugins.plugin_model_declarations import PluginModelDeclarations
 from pipelex.system.configuration.config_loader import config_manager
@@ -67,9 +68,6 @@ if TYPE_CHECKING:
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 
 InferenceBackendLibraryRoot = dict[str, InferenceBackend]
-
-# A `backends.toml` key that named the remote-config section holding a backend's model specs.
-RETIRED_MODEL_SPECS_SECTION_KEY = "model_specs_section"
 
 # Where a keyless load records the variables a backend's own file references, beside the fields of
 # its `backends.toml` table (see `InferenceBackend.unresolved_credentials`).
@@ -219,14 +217,14 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             enabled = inference_backend_blueprint_dict_raw.get("enabled", True)
             if not enabled and not include_disabled:
                 continue
-            if enabled and RETIRED_MODEL_SPECS_SECTION_KEY in backend_table:
+            if enabled and MODEL_SPECS_SECTION_KEY in backend_table:
                 # The key once pointed at specs the remote config served. Read as an extra key, it would
                 # boot the backend with whatever its own file lists — for a backend whose file was a
                 # comment-only template, nothing — and every model routed to it would go missing with no
                 # word on why. Fatal in both modes, like any document that is wrong.
                 msg = (
                     f"Invalid inference backend '{backend_name}' in {library_paths_description}: "
-                    f"'{RETIRED_MODEL_SPECS_SECTION_KEY}' is no longer supported, because model specs are no longer "
+                    f"'{MODEL_SPECS_SECTION_KEY}' is no longer supported, because model specs are no longer "
                     f"downloaded. List the backend's models in 'backends/{backend_name}.toml' and remove the key, "
                     f"or disable the backend."
                 )

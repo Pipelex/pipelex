@@ -1145,9 +1145,11 @@ class TestAStaleTelemetryFileIsMigratedNotReset:
         assert "pipelex init telemetry" not in printed
 
 
-# A backend file earlier kits shipped, whose name matches the main configuration's `pipelex_*.toml` glob.
-LEGACY_PREFIXED_BACKEND_FILE_NAME = "pipelex_gateway.toml"
-LEGACY_PREFIXED_BACKEND_FILE_CONTENT = "# Per-model overrides for the Pipelex Gateway backend.\n"
+# A backend file of the user's own whose name matches the main configuration's `pipelex_*.toml` glob. Earlier kits
+# shipped one, `pipelex_gateway.toml`, but that one is now removed by the cleanup of a former release, which is
+# `pipelex migrate`'s first step, so the specimen is a backend the cleanup has no business with.
+PREFIXED_BACKEND_FILE_NAME = "pipelex_inhouse.toml"
+PREFIXED_BACKEND_FILE_CONTENT = "# Per-model overrides for an in-house backend.\n"
 
 
 class TestAStaleBackendDirectory:
@@ -1157,7 +1159,8 @@ class TestAStaleBackendDirectory:
     directory. These files do not: they are the reason the walk learned to enter a subdirectory at
     all, and the reason a file is claimed by `(directory, name)` rather than by name — earlier kits
     shipped a `pipelex_gateway.toml` in there, which the main configuration's `pipelex_*.toml` glob
-    would otherwise have claimed. It is planted here for that reason, untouched, and the assertions say so.
+    would otherwise have claimed. A backend file of that shape is planted here for that reason,
+    untouched, and the assertions say so.
 
     What a boot *says* is not asserted here and cannot be: the probe is `pipelex-agent`, which cuts
     logging off process-wide as its first act. The warning is asserted through the human binary
@@ -1168,10 +1171,9 @@ class TestAStaleBackendDirectory:
         """Everything in and beside the directory that no migration may rewrite.
 
         Excluded by name rather than by extension, and the difference is the whole point of this
-        class: earlier kits shipped `pipelex_gateway.toml` in this directory, and machines set up with
-        them still carry it, so it is planted here as they left it. The main configuration's
-        `pipelex_*.toml` glob would claim it by name alone, so it is the one file a walk that forgot
-        about directories would rewrite. An extension filter dropped it — and every other `.toml` in
+        class: a backend file named `pipelex_<name>.toml`, as earlier kits shipped one, is planted here.
+        The main configuration's `pipelex_*.toml` glob would claim it by name alone, so it is the one
+        file a walk that forgot about directories would rewrite. An extension filter dropped it — and every other `.toml` in
         here — out of the snapshot, leaving the class's own claim unasserted. Only the files the
         fixture aged are excluded now. `inference/backends.toml` is added back from one level up,
         which is a different claim entirely: it is a table per backend rather than a table per model,
@@ -1181,7 +1183,7 @@ class TestAStaleBackendDirectory:
         it and cannot break the comparison.
         """
         backends_dir = _backends_dir(hermetic_home=hermetic_home)
-        backends_dir.joinpath(LEGACY_PREFIXED_BACKEND_FILE_NAME).write_text(LEGACY_PREFIXED_BACKEND_FILE_CONTENT, encoding="utf-8")
+        backends_dir.joinpath(PREFIXED_BACKEND_FILE_NAME).write_text(PREFIXED_BACKEND_FILE_CONTENT, encoding="utf-8")
         neighbours = [path for path in sorted(backends_dir.iterdir()) if path not in migrated]
         neighbours.append(hermetic_home / ".pipelex" / INFERENCE_DIR_NAME / BACKENDS_FILE_NAME)
         return {path: path.read_bytes() for path in neighbours}
