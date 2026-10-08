@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:b453fc65605094195a9b7c5eb7db7f52b75144f20fc9cb9958ec1761e133258e"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-08T01:45:16Z"
-rationale = "real-catch: check_model_cmd.py's --type now takes ModelCheckCategory, the categories GET /v1/models/check answers in, so doc_gen is accepted. docs/tools/cli/agent-cli.md's check-model row now lists the categories, doc_gen included, and says a handle: reference names its handle literally; pipelex/cli/agent_cli/CLAUDE.md's check-model row names ModelCheckCategory and why the listing's ModelCategory differs. docs/tools/cli/validate.md's pointer to check-model is still true."
+digest = "sha256:67e74186129a0a063c16a4f36f412f61ede2624ab6201e489af587f58beed0de"
+reviewed_by = "Claude (Opus 5.5)"
+reviewed_at = "2026-10-08T07:21:15Z"
+rationale = "clean-pass: merged tree of origin/dev into this branch. Dev's check-model change keeps the review recorded on dev, whose doc edits in docs/tools/cli/agent-cli.md and pipelex/cli/agent_cli/CLAUDE.md came through the merge unchanged. This branch's only trigger change is init_config delegating its copy walk to the shared copy_kit_templates, with the same skip lists, overwrite on reset and the same dry-run count, so pipelex init config behaves as before. Re-read docs/tools/cli/init.md (full reset, every target replacing its file, the .gitignore rule) and the init rows of pipelex/cli/agent_cli/CLAUDE.md; none describes anything this changes."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -84,7 +84,7 @@ rationale = "real-catch: check_model_cmd.py's --type now takes ModelCheckCategor
 "pipelex/cli/commands/init/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/init/backends.py" = "blob:04a1a06f1003ed0c7157ec4ca6c8659e4e09fe6b"
 "pipelex/cli/commands/init/command.py" = "blob:f17d58fe1813d4bb9552cc418914ea4aebae2d2a"
-"pipelex/cli/commands/init/config_files.py" = "blob:c13be6b8d2a8b211ce9ef0f4889ee131ffc3d2d8"
+"pipelex/cli/commands/init/config_files.py" = "blob:8d1ea8e03e8117de5264d4bc046e5bc259fb1342"
 "pipelex/cli/commands/init/credentials.py" = "blob:a9c3ee9e8bdcc5d0f3148f055ab6e2ff34a940fc"
 "pipelex/cli/commands/init/ide_extension.py" = "blob:9f0ec1494c07062246ecc906bc55b7f2cf95c715"
 "pipelex/cli/commands/init/routing.py" = "blob:c73927deb99804556cb545cdaa6eabf8d1fc3450"
