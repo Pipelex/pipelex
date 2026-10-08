@@ -189,3 +189,23 @@ class TestPluginModelMerge:
 
         assert not model_deck.inference_models.types_serving(handle="pipelex-xlsx")
         assert model_deck.get_doc_gen_choice_default(doc_gen_format=DocGenFormat.XLSX, source=DocGenSource.LAYOUT) is None
+
+    def test_a_plugin_model_is_served_under_a_profile_reaching_no_enabled_backend(self, inference_dir: Path) -> None:
+        """With the internal backend alone enabled, the kit's own profile sends the plugin's name nowhere, and the internal backend serves it."""
+        (inference_dir / "backends.toml").write_text("[internal]\nenabled = true\n", encoding="utf-8")
+        routing_profiles_path = inference_dir / "routing_profiles.toml"
+        routing_profiles_path.write_text(
+            routing_profiles_path.read_text(encoding="utf-8").replace('active = "all_internal"', 'active = "all_enabled_backends"', 1),
+            encoding="utf-8",
+        )
+
+        models_manager = self._setup(inference_dir=inference_dir, plugin_model_declarations=_xlsx_plugin_declarations())
+
+        # Under `all_internal`, the fixture's profile, the name matches by default and the no-match path is never taken.
+        assert models_manager.routing_profile.name == "all_enabled_backends"
+        model_deck = models_manager.get_model_deck()
+        inference_model = model_deck.get_required_inference_model(model_handle="pipelex-xlsx", model_type=ModelType.DOC_GEN)
+        assert inference_model.backend_name == PipelexBackend.INTERNAL
+        choice = model_deck.get_doc_gen_choice_default(doc_gen_format=DocGenFormat.XLSX, source=DocGenSource.LAYOUT)
+        assert choice is not None
+        assert model_deck.get_doc_gen_setting(doc_gen_choice=choice).model == "pipelex-xlsx"

@@ -269,6 +269,7 @@ What an out-of-tree backend plugin imports *is* the contract. The published surf
 | `DocumentContent` | `pipelex.core.stuffs.document_content` | a source document a search result cites |
 | `JudgmentWorkerAbstract` | `pipelex.cogt.judgment.judgment_worker_abstract` | the judgment worker contract |
 | `DocGenWorkerAbstract` | `pipelex.cogt.doc_gen.doc_gen_worker_abstract` | the document-generation worker contract |
+| `RenderJob`, `RenderedDocument`, `RenderResources`, `LoadedResource` | `pipelex.cogt.doc_gen.render_job` | the job a document engine prints, the file it returns, and how it reads a file the document names, with that file's media type |
 | `NbTokensByCategoryDict`, `TokenCategory` | `pipelex.cogt.usage.token_category` | the token usage a worker reports |
 | `BaseModelTypeVar` | `pipelex.tools.typing.pydantic_utils` | the schema type variable of a structured-output signature |
 | `CogtError`, `SdkTypeError`, `ImgGenGenerationError`, `ImgGenParameterError`, `InferenceErrorCategory` | `pipelex.cogt.exceptions` | the inference error bases and categories a worker raises with |

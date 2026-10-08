@@ -221,7 +221,7 @@ _FORMAT_KEY_LIST_NAMES: Final[dict[str, str]] = {
 }
 
 
-def _base_mime_type(*, mime_type: str) -> str:
+def base_mime_type(*, mime_type: str) -> str:
     """The MIME type without its parameters, lowercased: `Text/Plain; charset=utf-8` → `text/plain`."""
     return mime_type.split(";", 1)[0].strip().lower()
 
@@ -236,7 +236,7 @@ def format_key_from_mime_type(*, mime_type: str | None) -> str | None:
     """
     if mime_type is None:
         return None
-    base = _base_mime_type(mime_type=mime_type)
+    base = base_mime_type(mime_type=mime_type)
     if not base or base in _GENERIC_MIME_TYPES:
         return None
     if base.startswith("image/"):
@@ -328,9 +328,9 @@ def identify_mime_type(*, head: bytes | None, declared_mime_type: str | None, fi
     named_mime_type = _MIME_DB.guess_type(file_name, strict=True)[0] if file_name else None
     candidate_mime_types = [mime_type for mime_type in (declared_mime_type, named_mime_type) if mime_type is not None]
     for candidate_mime_type in candidate_mime_types:
-        if _base_mime_type(mime_type=candidate_mime_type).startswith(_ZIP_BASED_DOCUMENT_MIME_PREFIXES):
+        if base_mime_type(mime_type=candidate_mime_type).startswith(_ZIP_BASED_DOCUMENT_MIME_PREFIXES):
             return candidate_mime_type
     for candidate_mime_type in candidate_mime_types:
-        if _base_mime_type(mime_type=candidate_mime_type) == _ZIP_MIME_TYPE:
+        if base_mime_type(mime_type=candidate_mime_type) == _ZIP_MIME_TYPE:
             return candidate_mime_type
     return None
