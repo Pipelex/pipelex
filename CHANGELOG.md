@@ -5,6 +5,13 @@
 ### Added
 
 - **Claude Haiku 5.5 on the `anthropic` backend**: `claude-5.5-haiku` (model id `claude-haiku-5-5`) takes text, images and PDF, produces text and structured output, and reasons with adaptive thinking, with up to 128K output tokens. It costs $0.10 / $0.50 per million tokens for a prompt up to 100,000 tokens and $0.50 / $2.50 above, of which the backend file records the first. It refuses `temperature` but, unlike Sonnet 5.5 and Opus 5.5, accepts a forced `tool_choice`, so structured output keeps `instructor/anthropic_tools`.
+- **One handle, one model per model type**: two models of different model types may share a handle, so `gpt-6-luna` can be an LLM and a judgment model at once, and each pipe reaches the one its family asks for. A backend file declares the second model of a handle on a table of its own with the new `handle` key, which may not appear in `[defaults]`, and a file declaring one handle twice as the same type fails to load, naming both tables. A plugin may declare an internal model under a name `internal.toml` already declares as another type.
+
+### Changed
+
+- **A model served only as another type is refused when the method loads (Breaking)**: a pipe naming a handle the deck serves only as another model type, such as a `PipeJudge` naming an LLM, is refused by `pipelex validate`, `POST /v1/validate` and a run's load as an `unknown_model` item, whose suggestions list only models of the type the pipe asks for, where it passed validation and failed at its first call. A handle served as another type no longer hides an alias or a waterfall of the same name from a lookup of this type.
+- **Model specs are keyed by model type and handle (Breaking)**: `InferenceBackend.model_specs` and `ModelDeck.inference_models` are the new `ModelSpecIndex`, read through `get(model_type=…, handle=…)`, `handles_of_type`, `all_specs`, `all_handles` and `types_serving`, and `InferenceBackend.get_model_spec` takes `model_type` and `handle`. `InferenceBackend.list_model_names`, `InferenceBackendLibrary.list_all_model_names` and `InferenceBackendLibrary.get_all_models_and_possible_backends` are removed. `PluginModelDeclarations.internal_models` is a tuple of `PluginInternalModel`, which carries its `name`, and `DuplicateInternalModelError` names the `model_type` two plugins both declared.
+- **Usage is reported per model type and name (Breaking)**: a run calling both kinds of one handle reports two rows in the cost table and the agent CLI's cost summary, and two entries in the graph's usage attribution, where they merged into one row typed by whichever call came last. `AggregatedCosts.grouped_by_model` is keyed by the new `ModelUsageKey`, and its `model_types` is removed.
 
 ## [v0.77.0] - 2026-10-07
 

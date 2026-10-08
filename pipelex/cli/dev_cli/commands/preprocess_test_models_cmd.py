@@ -13,6 +13,7 @@ from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 
+from pipelex.cogt.model_backends.model_spec_document import list_declared_model_specs
 from pipelex.runtime_hub import get_console
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.configs import ConfigPaths
@@ -33,49 +34,23 @@ TEST_PROFILES_OVERRIDE_PATH = Path(ConfigPaths.DEV_CONFIG_DIR_PATH) / "test_prof
 # Model types we care about
 MODEL_TYPES = ["llm", "img_gen", "text_extractor", "search", "judgment"]
 
-# Default model type from backend config
-DEFAULT_MODEL_TYPE = "llm"
 
+def _group_handles_by_model_type(*, document: dict[str, Any]) -> dict[str, list[str]]:
+    """Group the models a backend TOML declares by model type, reading the file as the loader reads it.
 
-def _group_handles_by_model_type(*, specs: dict[str, Any]) -> dict[str, list[str]]:
-    """Group a table of model specs by model type.
-
-    A backend TOML holds one table per model handle and an optional `defaults` table naming the
-    model type the rest inherit.
+    A handle names one model per model type, so a handle appears once under each type it is declared as.
 
     Args:
-        specs: The specs table, keyed by model handle.
+        document: The backend TOML document.
 
     Returns:
         Dictionary mapping model_type to a sorted list of model handles.
     """
-    defaults = specs.get("defaults", {})
-    default_model_type: str = DEFAULT_MODEL_TYPE
-    if isinstance(defaults, dict):
-        defaults_dict = cast("dict[str, Any]", defaults)
-        default_type_raw = defaults_dict.get("model_type")
-        if default_type_raw:
-            default_model_type = str(default_type_raw)
-
     models_by_type: dict[str, list[str]] = {model_type: [] for model_type in MODEL_TYPES}
 
-    for key, value in specs.items():
-        # Skip defaults and non-dict entries
-        if key == "defaults" or not isinstance(value, dict):
-            continue
-
-        # Skip rules sub-sections
-        if ".rules" in key:
-            continue
-
-        # Determine model type (cast for type safety)
-        value_dict = cast("dict[str, Any]", value)
-        model_type_raw = value_dict.get("model_type", default_model_type)
-        model_type = str(model_type_raw) if model_type_raw else default_model_type
-
-        # Add to appropriate list
-        if model_type in models_by_type:
-            models_by_type[model_type].append(key)
+    for declared in list_declared_model_specs(document=document):
+        if declared.model_type in models_by_type:
+            models_by_type[declared.model_type].append(declared.handle)
 
     # Sort model lists
     for model_list in models_by_type.values():
@@ -98,7 +73,7 @@ def _extract_models_from_backend_toml(backend_path: Path) -> dict[str, list[str]
     except (TomlError, OSError):
         return {}
 
-    return _group_handles_by_model_type(specs=config)
+    return _group_handles_by_model_type(document=config)
 
 
 def _collect_all_model_availability() -> dict[str, Any]:

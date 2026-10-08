@@ -9,6 +9,7 @@ from pipelex.cogt.inference.error_classification import UserAction, UserActionKi
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoices, LLMSettingChoicesDefaults
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_spec_index import ModelSpecIndex
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.usage.cost_category import CostCategory
@@ -29,7 +30,7 @@ def _make_deck() -> ModelDeck:
         max_prompt_images=None,
     )
     return ModelDeck(
-        inference_models={"served-model": served_model},
+        inference_models=ModelSpecIndex.make_from_specs(model_specs=[served_model]),
         llm_default_temperature=0.7,
         llm_aliases={"deck-alias": "deck-alias-target", "served-alias": "served-model"},
         llm_waterfalls={"deck-waterfall": ["deck-waterfall-member", "served-model"]},

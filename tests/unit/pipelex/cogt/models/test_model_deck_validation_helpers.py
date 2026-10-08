@@ -21,14 +21,14 @@ class TestModelDeckValidationHelpers:
     # ============================================================
 
     @pytest.fixture
-    def known_model_handles(self) -> dict[str, ModelType]:
+    def known_model_handles(self) -> dict[str, set[ModelType]]:
         """A small set of valid model handles with their types for testing."""
         return {
-            "gpt-4o": ModelType.LLM,
-            "claude-3-opus": ModelType.LLM,
-            "gemini-pro": ModelType.LLM,
-            "mistral-ocr": ModelType.TEXT_EXTRACTOR,
-            "dall-e-3": ModelType.IMG_GEN,
+            "gpt-4o": {ModelType.LLM},
+            "claude-3-opus": {ModelType.LLM},
+            "gemini-pro": {ModelType.LLM},
+            "mistral-ocr": {ModelType.TEXT_EXTRACTOR},
+            "dall-e-3": {ModelType.IMG_GEN},
         }
 
     @pytest.fixture
@@ -54,7 +54,7 @@ class TestModelDeckValidationHelpers:
         self,
         valid_aliases: dict[str, str],
         valid_waterfalls: dict[str, list[str]],
-        known_model_handles: dict[str, ModelType],
+        known_model_handles: dict[str, set[ModelType]],
     ):
         """Alias pointing to non-existent model handle is detected."""
         bad_aliases = {"broken": "nonexistent-model"}
@@ -75,7 +75,7 @@ class TestModelDeckValidationHelpers:
         self,
         valid_aliases: dict[str, str],
         valid_waterfalls: dict[str, list[str]],
-        known_model_handles: dict[str, ModelType],
+        known_model_handles: dict[str, set[ModelType]],
     ):
         """Alias pointing to a preset ($ prefix) is detected as invalid."""
         bad_aliases = {"broken": "$some_preset"}
@@ -95,7 +95,7 @@ class TestModelDeckValidationHelpers:
         self,
         valid_aliases: dict[str, str],
         valid_waterfalls: dict[str, list[str]],
-        known_model_handles: dict[str, ModelType],
+        known_model_handles: dict[str, set[ModelType]],
     ):
         """Alias pointing to a model with wrong type is detected (e.g., LLM alias -> IMG_GEN model)."""
         # LLM alias pointing to an IMG_GEN model
@@ -117,7 +117,7 @@ class TestModelDeckValidationHelpers:
         self,
         valid_aliases: dict[str, str],
         valid_waterfalls: dict[str, list[str]],
-        known_model_handles: dict[str, ModelType],
+        known_model_handles: dict[str, set[ModelType]],
     ):
         """Extract alias pointing to an LLM model is detected."""
         # TEXT_EXTRACTOR alias pointing to an LLM model
@@ -142,7 +142,7 @@ class TestModelDeckValidationHelpers:
     def test_detects_waterfall_containing_another_waterfall(
         self,
         valid_aliases: dict[str, str],
-        known_model_handles: dict[str, ModelType],
+        known_model_handles: dict[str, set[ModelType]],
     ):
         """Waterfall containing another waterfall (~ prefix) is detected."""
         bad_waterfalls = {"broken": ["gpt-4o", "~other_waterfall"]}
@@ -161,7 +161,7 @@ class TestModelDeckValidationHelpers:
     def test_detects_waterfall_containing_preset(
         self,
         valid_aliases: dict[str, str],
-        known_model_handles: dict[str, ModelType],
+        known_model_handles: dict[str, set[ModelType]],
     ):
         """Waterfall containing a preset ($ prefix) is detected."""
         bad_waterfalls = {"broken": ["$some_preset"]}
@@ -179,7 +179,7 @@ class TestModelDeckValidationHelpers:
     def test_detects_waterfall_containing_wrong_model_type(
         self,
         valid_aliases: dict[str, str],
-        known_model_handles: dict[str, ModelType],
+        known_model_handles: dict[str, set[ModelType]],
     ):
         """Waterfall containing a model with wrong type is detected."""
         # LLM waterfall containing an IMG_GEN model
@@ -199,7 +199,7 @@ class TestModelDeckValidationHelpers:
     def test_detects_empty_waterfall(
         self,
         valid_aliases: dict[str, str],
-        known_model_handles: dict[str, ModelType],
+        known_model_handles: dict[str, set[ModelType]],
     ):
         """Empty waterfall is detected (would cause IndexError at runtime)."""
         bad_waterfalls: dict[str, list[str]] = {"empty-waterfall": []}

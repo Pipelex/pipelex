@@ -7,7 +7,7 @@ description: "Reference for the `DuplicateInternalModelError` Pipelex error clas
 
 # Duplicate internal model
 
-Two plugins declared a model of the same name in the internal backend.
+Two plugins declared a model of the same name and model type in the internal backend.
 
 | Field | Value |
 |---|---|

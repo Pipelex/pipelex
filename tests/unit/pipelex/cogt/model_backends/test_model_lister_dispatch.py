@@ -7,28 +7,46 @@ across SDKs, treats a registry miss and the soft ``ModelListingUnsupportedError`
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import pytest
 
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.cogt.exceptions import ModelListingUnsupportedError
+from pipelex.cogt.llm.thinking_mode import ThinkingMode
+from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.model_lists import ModelLister
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_spec_index import ModelSpecIndex
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.plugins.model_lister_registry import ListModelsFn, ModelListerRegistry
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-    from pipelex.cogt.model_backends.backend import InferenceBackend
-
 _MODULE = "pipelex.cogt.model_backends.model_lists"
 
 
 def _fake_backend(model_specs: dict[str, str]) -> InferenceBackend:
-    # The loop only reads ``.model_specs`` and each spec's ``.sdk``.
-    return cast(
-        "InferenceBackend",
-        SimpleNamespace(model_specs={name: SimpleNamespace(sdk=sdk) for name, sdk in model_specs.items()}),
+    # The loop only reads ``.model_specs`` and each spec's ``.name`` and ``.sdk``.
+    return InferenceBackend(
+        name="acme",
+        model_specs=ModelSpecIndex.make_from_specs(
+            model_specs=[
+                InferenceModelSpec(
+                    backend_name="acme",
+                    name=name,
+                    sdk=sdk,
+                    model_type=ModelType.LLM,
+                    model_id=name,
+                    costs={},
+                    thinking_mode=ThinkingMode.NONE,
+                    max_tokens=None,
+                    max_prompt_images=None,
+                )
+                for name, sdk in model_specs.items()
+            ]
+        ),
     )
 
 
