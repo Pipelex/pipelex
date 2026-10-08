@@ -199,8 +199,11 @@ class TestPluginModelMerge:
             encoding="utf-8",
         )
 
-        model_deck = self._setup(inference_dir=inference_dir, plugin_model_declarations=_xlsx_plugin_declarations()).get_model_deck()
+        models_manager = self._setup(inference_dir=inference_dir, plugin_model_declarations=_xlsx_plugin_declarations())
 
+        # Under `all_internal`, the fixture's profile, the name matches by default and the no-match path is never taken.
+        assert models_manager.routing_profile.name == "all_enabled_backends"
+        model_deck = models_manager.get_model_deck()
         inference_model = model_deck.get_required_inference_model(model_handle="pipelex-xlsx", model_type=ModelType.DOC_GEN)
         assert inference_model.backend_name == PipelexBackend.INTERNAL
         choice = model_deck.get_doc_gen_choice_default(doc_gen_format=DocGenFormat.XLSX, source=DocGenSource.LAYOUT)
