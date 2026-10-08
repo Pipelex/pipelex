@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:3cfdb2a2e22433ddfc17acde3931833f7069d06a909414d146327406c775cbbb"
+digest = "sha256:35f1ecf9aa9cfa54726f3badc961f2efe548559cb1b2c8966f1bf22a25f4e0de"
 reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-10-08T07:30:30Z"
-rationale = "clean-pass: merged tree of origin/dev into this branch. No trigger file changed on both sides: dev changed only check_model_cmd.py, which reads no runner option, and this branch changed the hosted run surface, whose docs it reviewed and updated in run.md, run-by-address.md, index.md, update.md, agent-cli.md and pipelex/cli/agent_cli/CLAUDE.md. The two review targets both sides edited merged without conflict: agent-cli.md keeps dev's check-model row, whose link to the api-server models page resolves, beside this branch's run options and hosted refusals, and CLAUDE.md keeps dev's check-model row beside the hosted-run notes. Nothing under docs/tools/cli is stale against the merged CLI."
+reviewed_at = "2026-10-08T12:45:01Z"
+rationale = "clean-pass: merged tree of origin/dev into this branch. The open trigger changes are all this branch's hosted run surface, the run commands of both CLIs, _run_hosted.py, _hosted_sources.py and the removed _run_core_api.py, already answered on the branch in docs/tools/cli/run.md, run-by-address.md, agent-cli.md and pipelex/cli/agent_cli/CLAUDE.md. Dev touched no file under docs/tools/cli and no run command; its one CLI trigger, init_config delegating to copy_kit_templates, keeps the review dev recorded, and docs/tools/cli/init.md still describes it. The merged docs name --hosted, --local, --base-url and --runner local or hosted, and nothing under docs/tools/cli still names the removed --runner api path except the warning that says it is gone."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -84,7 +84,7 @@ rationale = "clean-pass: merged tree of origin/dev into this branch. No trigger 
 "pipelex/cli/commands/init/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/init/backends.py" = "blob:04a1a06f1003ed0c7157ec4ca6c8659e4e09fe6b"
 "pipelex/cli/commands/init/command.py" = "blob:f17d58fe1813d4bb9552cc418914ea4aebae2d2a"
-"pipelex/cli/commands/init/config_files.py" = "blob:c13be6b8d2a8b211ce9ef0f4889ee131ffc3d2d8"
+"pipelex/cli/commands/init/config_files.py" = "blob:8d1ea8e03e8117de5264d4bc046e5bc259fb1342"
 "pipelex/cli/commands/init/credentials.py" = "blob:a9c3ee9e8bdcc5d0f3148f055ab6e2ff34a940fc"
 "pipelex/cli/commands/init/ide_extension.py" = "blob:9f0ec1494c07062246ecc906bc55b7f2cf95c715"
 "pipelex/cli/commands/init/routing.py" = "blob:c73927deb99804556cb545cdaa6eabf8d1fc3450"

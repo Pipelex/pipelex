@@ -6,6 +6,10 @@
 
 - **Runs on the hosted Pipelex API, `--runner api` removed (Breaking)**: `pipelex run method|pipe|bundle` and `pipelex-agent run` take `--hosted` / `--local` and `--base-url <scheme://host[:port]>` (over `PIPELEX_BASE_URL`, over `https://api.pipelex.com`), and the new `[run] execution = "local" | "hosted"` setting (default `local`) chooses when no flag does; a hosted run boots nothing locally, needs only `PIPELEX_API_KEY`, sends what a local run would load (`PIPELEXPATH` included) or a published address or a catalog id (`mt_…`) for the hosted API to resolve, uploads the local files named at document and image inputs (reading the method's signature only when the inputs name an existing local file), saves its outputs where a local run does, prints the run id as soon as the run is acknowledged and names it in any failure met after that, Ctrl-C included, and reports a connection lost after the run request was sent as a run that may exist rather than as a network failure. The agent CLI's global `--runner pipelex|api` and its mthds `MthdsAPIClient` path are removed: `pipelex-agent run … --runner local|hosted` replaces it, on pipelex-sdk's `PipelexAPIClient`, which `pipelex` now requires (pinned exactly, like `mthds`) and which Python callers use directly to run on the hosted API.
 
+### Fixed
+
+- **A home configuration directory holding only some files gets the kit's missing ones**: every boot now copies into `~/.pipelex/`, or the directory `PIPELEX_HOME` names, each kit file it lacks, never overwriting one it holds or writing through a symbolic link, so a kit file deleted from it comes back. A directory holding anything at all, such as the `pipelex_service.toml` an earlier release wrote, used to be left as it was, and every boot then failed with "Config files are missing for the inference backend library". The inference files are copied as one unit, only when the directory has no `inference/backends.toml`, each file and kit manifest is written whole or not at all, so a fill cut short is completed by the next boot, and a directory Pipelex cannot write to is read as it is.
+
 ## [v0.78.0] - 2026-10-08
 
 ### Highlights
