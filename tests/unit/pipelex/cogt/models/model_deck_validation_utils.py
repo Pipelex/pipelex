@@ -12,7 +12,7 @@ def find_invalid_alias_targets(
     aliases: dict[str, str],
     all_aliases: dict[str, str],
     all_waterfalls: dict[str, list[str]],
-    known_model_handles: dict[str, ModelType],
+    known_model_handles: dict[str, set[ModelType]],
     expected_model_type: ModelType,
 ) -> list[tuple[str, str, str]]:
     """Find aliases that reference invalid targets.
@@ -21,7 +21,7 @@ def find_invalid_alias_targets(
         aliases: The aliases dict to validate
         all_aliases: All available aliases for this model type
         all_waterfalls: All available waterfalls for this model type
-        known_model_handles: Mapping of model handle -> ModelType
+        known_model_handles: Mapping of model handle -> the model types the backends declare it as
         expected_model_type: The expected model type for this deck (LLM, TEXT_EXTRACTOR, IMG_GEN)
 
     Returns:
@@ -44,10 +44,10 @@ def find_invalid_alias_targets(
             case ModelReferenceKind.HANDLE:
                 if ref.name not in known_model_handles:
                     invalid_refs.append((alias_name, target_value, f"model handle '{ref.name}' not found in backends"))
-                elif known_model_handles[ref.name] != expected_model_type:
-                    actual_type = known_model_handles[ref.name]
+                elif expected_model_type not in known_model_handles[ref.name]:
+                    actual_types = ", ".join(f"'{actual_type}'" for actual_type in sorted(known_model_handles[ref.name]))
                     invalid_refs.append(
-                        (alias_name, target_value, f"model handle '{ref.name}' has type '{actual_type}' but expected '{expected_model_type}'")
+                        (alias_name, target_value, f"model handle '{ref.name}' has type {actual_types} but expected '{expected_model_type}'")
                     )
 
     return invalid_refs
@@ -56,7 +56,7 @@ def find_invalid_alias_targets(
 def find_invalid_waterfall_entries(
     waterfalls: dict[str, list[str]],
     all_aliases: dict[str, str],
-    known_model_handles: dict[str, ModelType],
+    known_model_handles: dict[str, set[ModelType]],
     expected_model_type: ModelType,
 ) -> list[tuple[str, int, str, str]]:
     """Find waterfall entries that reference invalid targets.
@@ -64,7 +64,7 @@ def find_invalid_waterfall_entries(
     Args:
         waterfalls: The waterfalls dict to validate
         all_aliases: All available aliases for this model type
-        known_model_handles: Mapping of model handle -> ModelType
+        known_model_handles: Mapping of model handle -> the model types the backends declare it as
         expected_model_type: The expected model type for this deck (LLM, TEXT_EXTRACTOR, IMG_GEN)
 
     Returns:
@@ -92,14 +92,14 @@ def find_invalid_waterfall_entries(
                 case ModelReferenceKind.HANDLE:
                     if ref.name not in known_model_handles:
                         invalid_refs.append((waterfall_name, index, entry_value, f"model handle '{ref.name}' not found in backends"))
-                    elif known_model_handles[ref.name] != expected_model_type:
-                        actual_type = known_model_handles[ref.name]
+                    elif expected_model_type not in known_model_handles[ref.name]:
+                        actual_types = ", ".join(f"'{actual_type}'" for actual_type in sorted(known_model_handles[ref.name]))
                         invalid_refs.append(
                             (
                                 waterfall_name,
                                 index,
                                 entry_value,
-                                f"model handle '{ref.name}' has type '{actual_type}' but expected '{expected_model_type}'",
+                                f"model handle '{ref.name}' has type {actual_types} but expected '{expected_model_type}'",
                             )
                         )
 

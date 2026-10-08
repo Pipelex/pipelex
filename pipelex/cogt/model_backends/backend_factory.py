@@ -5,7 +5,7 @@ from pydantic import Field, field_validator
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.model_backends.credential_resolution import CredentialResolution
-from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_spec_index import ModelSpecIndex
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.tools.typing.pydantic_utils import empty_dict_factory_of, empty_list_factory_of
 
@@ -47,7 +47,7 @@ class InferenceBackendFactory:
         *,
         blueprint: InferenceBackendBlueprint,
         extra_config: dict[str, Any],
-        model_specs: dict[str, InferenceModelSpec],
+        model_specs: ModelSpecIndex,
         credentials: CredentialResolution,
         unresolved_credentials: dict[str, list[str]],
     ) -> InferenceBackend:

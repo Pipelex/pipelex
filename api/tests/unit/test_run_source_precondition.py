@@ -1,7 +1,7 @@
 """Route-level tests for the run-source precondition on /execute and /start.
 
-Pins the layered extension policy's Rule 4 (the Pipelex workspace spec
-`docs/specs/pipelex-platform-api.md` → "Layered extension policy"): an unknown
+Pins the layered extension policy's Rule 4 (`conformance/specs/pipelex-platform-api.md` →
+"Layered extension policy", in the `conformance` repo beside the tests that verify it): an unknown
 extension key never waives the requirement that a run request carry a source
 this server understands, and a source-less body whose keys this deployment does
 not handle gets a message that NAMES them — so "a hosted client was pointed at

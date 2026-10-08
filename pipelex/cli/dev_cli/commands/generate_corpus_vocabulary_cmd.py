@@ -1,6 +1,7 @@
 """Command to generate the MTHDS Test Corpus tag vocabulary.
 
-Contract: ``docs/specs/mthds-test-corpus.md`` (workspace root), section "Tag vocabulary".
+Contract: ``conformance/specs/mthds-test-corpus.md`` (the cross-repo spec, kept in the ``conformance``
+repo), section "Tag vocabulary".
 
 The generator is unshipped dev tooling — the wheel excludes ``pipelex/cli/dev_cli`` — while the
 ``vocabulary.toml`` it writes into the corpus tree is committed and ships. That split is the
@@ -45,8 +46,8 @@ _HEADER = """# The MTHDS Test Corpus tag vocabulary — the closed set an entry'
 # expects a diagnostic on exactly the `schema` entries and none on the others.
 #
 # This file ships in the pipelex wheel, so it names a document its readers can reach:
-# https://docs.pipelex.com/contribute/mthds-test-corpus/ — which in turn points at the
-# cross-repo contract, `docs/specs/mthds-test-corpus.md` in the Pipelex workspace repo.
+# https://docs.pipelex.com/contribute/mthds-test-corpus/, which states the contract the corpus's
+# consumers are written against.
 """
 
 _ADVISORY_HINT_LINT_EXCLUSION = (

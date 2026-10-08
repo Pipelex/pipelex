@@ -170,14 +170,15 @@ class DuplicateLogSinkError(PluginError):
 
 
 class DuplicateInternalModelError(PluginError):
-    """Two plugins declared a model of the same name in the internal backend."""
+    """Two plugins declared a model of the same name and model type in the internal backend."""
 
-    def __init__(self, *, name: str, first_plugin: str, second_plugin: str):
+    def __init__(self, *, name: str, model_type: str, first_plugin: str, second_plugin: str):
         self.name = name
+        self.model_type = model_type
         self.first_plugin = first_plugin
         self.second_plugin = second_plugin
         message = (
-            f"Internal model '{name}' is declared by both plugin '{first_plugin}' and plugin '{second_plugin}'. "
+            f"Internal model '{name}' of model type '{model_type}' is declared by both plugin '{first_plugin}' and plugin '{second_plugin}'. "
             "Each internal model must be declared by a single plugin."
         )
         super().__init__(message)

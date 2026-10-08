@@ -107,10 +107,10 @@ def _model_manager() -> ModelManager:
     return cast("ModelManager", get_models_manager())
 
 
-def _deck_models_with_their_constraints(model_deck: ModelDeck) -> dict[str, tuple[str, object, object]]:
+def _deck_models_with_their_constraints(model_deck: ModelDeck) -> dict[tuple[str, str], tuple[str, object, object]]:
     return {
-        name: (spec.backend_name, sorted(spec.listed_constraints), sorted(spec.valued_constraints.items()))
-        for name, spec in model_deck.inference_models.items()
+        (spec.model_type, spec.name): (spec.backend_name, sorted(spec.listed_constraints), sorted(spec.valued_constraints.items()))
+        for spec in model_deck.inference_models.all_specs()
     }
 
 

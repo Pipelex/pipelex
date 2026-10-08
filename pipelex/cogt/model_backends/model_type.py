@@ -1,4 +1,5 @@
 from enum import StrEnum
+from typing import Final
 
 
 class ModelType(StrEnum):
@@ -25,3 +26,7 @@ class ModelType(StrEnum):
                 return "a document-generation engine"
             case ModelType.JUDGMENT:
                 return "a judgment model"
+
+
+DEFAULT_MODEL_TYPE: Final[ModelType] = ModelType.LLM
+"""The model type of a model spec that declares none, in its own table or in its file's `[defaults]`."""
