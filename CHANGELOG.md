@@ -8,6 +8,10 @@
 - **`pipelex login`**: gets a Pipelex API key through the browser, with a one-time `state` value the app must echo, or from a hidden prompt with `--paste`, checks it against the hosted API, and saves it to `~/.pipelex/.env` as `PIPELEX_API_KEY` (mode 0600, other lines kept, a symlinked file written through, the key never printed), naming a working-directory `.env` whose own `PIPELEX_API_KEY` line would override it, and exiting 1 with the path and the error when the file cannot be written; `PIPELEX_APP_URL` aims it at another Pipelex app.
 - **`pipelex init` asks where runs execute**: Enter takes the hosted Pipelex API, which signs you in unless a key is already set and asks for no provider key, and the other answer runs today's backend, routing and credential steps; the answer is written to `[run] execution`, with a warning when the working directory's project overrides it. `pipelex doctor --fix` keeps a `[run] execution` already set, keeps a `pipelex.toml` that sets none local, and takes the hosted default only for a brand-new home, `pipelex doctor` and `pipelex-agent doctor` judge a hosted setup by its Pipelex API key and report provider credentials as needed only for `--local` runs, and `pipelex-agent init` takes `"execution": "hosted"` in `--config` and reports `execution`.
 
+### Fixed
+
+- **`pipelex-agent init --help` keeps `list[str]`**: the `--config` help printed the schema's `"backends": list[str]` as `"backends": list`, because Typer renders help as Rich markup and Rich took `[str]` for a style; the bracket is now escaped and printed.
+
 ## [v0.78.0] - 2026-10-08
 
 ### Highlights

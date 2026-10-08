@@ -111,7 +111,8 @@ def run_method_cmd(
         bool | None,
         typer.Option(
             "--hosted/--local",
-            help="Run on the hosted Pipelex API (key in PIPELEX_API_KEY) or on this machine. Default: [run] execution, else local.",
+            # Typer renders help as Rich markup, which drops an unescaped [run]: \[ prints the bracket.
+            help=r"Run on the hosted Pipelex API (key in PIPELEX_API_KEY) or on this machine. Default: \[run] execution, else local.",
         ),
     ] = None,
     base_url: Annotated[

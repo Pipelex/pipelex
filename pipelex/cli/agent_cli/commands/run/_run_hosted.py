@@ -33,8 +33,9 @@ from pipelex.hosted.run_config import RunExecution
 if TYPE_CHECKING:
     from pipelex_sdk.client import PipelexAPIClient
 
-#: The `--runner` help, shared by the run commands.
-RUNNER_OPTION_HELP = "Where the run executes: 'local' (this machine) or 'hosted' (the hosted Pipelex API). Default: [run] execution, else local."
+#: The `--runner` help, shared by the run commands. Typer renders help as Rich markup, which drops an unescaped `[run]`,
+#: so the bracket is escaped as `\[`.
+RUNNER_OPTION_HELP = r"Where the run executes: 'local' (this machine) or 'hosted' (the hosted Pipelex API). Default: \[run] execution, else local."
 #: The `--hosted/--local` help, shared by the run commands.
 HOSTED_OPTION_HELP = "Run on the hosted Pipelex API (key in PIPELEX_API_KEY) or on this machine; the same choice as --runner."
 #: The `--base-url` help, shared by the run commands.
