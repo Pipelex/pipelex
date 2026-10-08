@@ -19,14 +19,12 @@ from pipelex.cogt.doc_gen.layout_tree import (
     LayoutColumn,
     LayoutDocument,
     LayoutField,
-    LayoutScalar,
     MarkdownBlock,
     ParagraphsBlock,
     SectionBlock,
     TableBlock,
 )
 from pipelex.cogt.doc_gen.render_job import RenderJob
-from pipelex.providers.reportlab.reportlab_pdf_renderer import display_scalar
 from tests.unit.pipelex.providers.reportlab.reportlab_test_helpers import (
     TEST_FILENAME,
     TEST_TITLE,
@@ -155,10 +153,6 @@ class TestReportlabPdfRenderer:
             "as part of it is taller than a page and cannot be split across pages."
         )
         assert exc_info.value.error_domain == ErrorDomain.INPUT
-
-    @pytest.mark.parametrize(("value", "expected"), ReportlabRendererTestData.SCALAR_CASES)
-    def test_a_scalar_prints_plainly(self, value: LayoutScalar, expected: str) -> None:
-        assert display_scalar(value=value) == expected
 
     def test_table_cells_print_their_scalars(self) -> None:
         table = TableBlock(

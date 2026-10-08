@@ -1,6 +1,6 @@
 ---
 title: "Document Engine Plugins"
-description: "How a PipeDocGen step finds the engine that prints it, a model of the doc_gen family, how a plugin declares its engines and their defaults, the render job an engine receives, the template checker it may offer, and how a runtime refuses at load what it cannot print."
+description: "How a PipeDocGen step finds the engine that prints it, a model of the doc_gen family, how a plugin declares its engines and their defaults, the render job an engine receives, what it shares with the built-in engine, the template checker it may offer, and how a runtime refuses at load what it cannot print."
 ---
 
 # Document Engine Plugins
@@ -123,6 +123,22 @@ def render(self, *, job: RenderJob, resources: RenderResources) -> RenderedDocum
 - **`RenderedDocument`** holds the bytes. Their MIME type and suffix are the format's.
 
 `render` is synchronous and runs on a thread of a print pool of its own, never on the event loop's default executor, which the engine's reads need, while `RenderResources.load` hands each read back to the event loop the print started from. An engine keeps no state from one print into the next. It signals a document it cannot print by raising `DocGenRenderError`, which passes through; anything else it raises, beyond a Pipelex error, is reported as a `DocGenRenderError` naming the engine and the file.
+
+The contract is the worker, the render job and its resources, the layout tree in `layout_tree.py`, the template check request below, and the two modules of the next section, all in `pipelex.cogt.doc_gen`. An engine reaches Pipelex only through them and the registration seam every plugin uses: anything else in Pipelex may move or change in an ordinary release, while a breaking change to the contract moves `PLUGIN_API_VERSION`. A piece an engine is missing is added to the contract, rather than imported from elsewhere in Pipelex.
+
+---
+
+## What an engine shares with the built-in one
+
+A document should read the same whichever engine printed it, and a template should be held to the same rules whichever engine fills it, so an engine takes these from the contract rather than writing its own. None of them imports ReportLab, so an engine can use them without loading the built-in engine's library.
+
+`pipelex.cogt.doc_gen.layout_display` holds the rules by which every engine shows a layout tree's values, the built-in engine included:
+
+- **`display_scalar(value=…)`** writes a scalar as text: blank for nothing, `Yes` or `No` for a boolean, a whole float without its decimals, a date as `2026-09-29`, a datetime as `2026-09-29 14:05`, and a time of day as `09:07`, each followed by the UTC offset it states (` UTC`, ` +02:00`), if any.
+- **`is_numeric_column(values=…)`** says whether a table's column holds numbers only, blanks aside, and at least one, a boolean not counting as a number: such a column is aligned right.
+- **`markdown_as_html(markdown=…)`** converts a `MarkdownBlock` to an HTML fragment for an engine that writes HTML, with the one parser Pipelex reads Markdown with, as the `markdown` filter and the `Markdown` concept's HTML view do: CommonMark with tables and strikethrough, raw HTML shown as text, and only a URL with a scheme turned into a link, so `README.md` stays text. No render budget applies, since no template render runs while an engine prints, so an engine bounds what it converts itself.
+
+`pipelex.cogt.doc_gen.template_environment` holds **`make_plain_data_template_environment()`**, the Jinja environment an engine fills a template file's tags in when it fills them itself, as a Word template's tags are filled through docxtpl. It is synchronous; sandboxed as every Pipelex template is, each render spending from a budget of its own (see [Template Sandbox](template-sandbox.md)); strict, so a missing value fails the render instead of printing as empty text; and it registers only Jinja's built-in filters, since the plain data it reads holds no stuff for Pipelex's filters to work on.
 
 ---
 

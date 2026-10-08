@@ -11,6 +11,9 @@ It writes the tree as ReportLab flowables on A4 portrait pages:
 - paragraphs as they are, Markdown through its converter (`markdown_flowables`), and an image from the bytes the
   render's resources read, scaled to the page with its caption under it.
 
+A value is written as text, and a column found numeric, by the contract's rules (`layout_display.py`), which every
+engine shares, so a document reads the same whichever engine printed it.
+
 Every text is escaped before it enters ReportLab's paragraph markup, so a value prints as written. The engine
 fetches nothing itself: an image is read through `RenderResources`, which applies the run's read scope, and a
 Markdown image is not read at all. It is the worker of the `reportlab-pdf` model, made for each print; it registers
@@ -23,7 +26,6 @@ throughput, since a build is pure Python and would hold the interpreter lock any
 the lock is taken, so a slow image does not hold up another render.
 """
 
-import datetime
 import io
 import threading
 from functools import cache
@@ -40,12 +42,12 @@ from typing_extensions import override
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
 from pipelex.cogt.doc_gen.doc_gen_worker_abstract import DocGenWorkerAbstract
 from pipelex.cogt.doc_gen.exceptions import DocGenRenderError
+from pipelex.cogt.doc_gen.layout_display import display_scalar, is_numeric_column
 from pipelex.cogt.doc_gen.layout_tree import (
     FieldGridBlock,
     ImageBlock,
     LayoutBlock,
     LayoutDocument,
-    LayoutScalar,
     MarkdownBlock,
     ParagraphsBlock,
     SectionBlock,
@@ -372,7 +374,7 @@ class _LayoutWriter:
             for index, column in enumerate(block.columns)
         ]
         col_widths = fit_column_widths(extents=extents, available_width=FRAME_WIDTH)
-        numeric_columns = [_is_numeric_column(values=[row.get(column.key) for row in block.rows]) for column in block.columns]
+        numeric_columns = [is_numeric_column(values=[row.get(column.key) for row in block.rows]) for column in block.columns]
         styles = self._styles
         header_row: list[TableCell] = [
             text_cell(text=column.label, width=col_widths[index], style=styles.cell_header_right if numeric_columns[index] else styles.cell_header)
@@ -404,48 +406,3 @@ class _LayoutWriter:
         if block.caption:
             members.append(Paragraph(escape_text(text=block.caption), self._styles.caption))
         return self._tagged(flowable=KeepTogether(members), origin=f"image {number} of the document")
-
-
-def _is_numeric_column(*, values: list[LayoutScalar]) -> bool:
-    """Whether a column holds numbers only, blanks aside, and at least one: such a column is aligned right."""
-    present = [value for value in values if value is not None]
-    return bool(present) and all(isinstance(value, (int, float)) and not isinstance(value, bool) for value in present)
-
-
-def _utc_offset_suffix(*, value: datetime.datetime | datetime.time) -> str:
-    """The UTC offset a value states, as ' UTC' or ' +02:00', or nothing for a value that states none."""
-    offset = value.utcoffset()
-    if offset is None:
-        return ""
-    total_minutes = int(offset.total_seconds()) // 60
-    if total_minutes == 0:
-        return " UTC"
-    sign = "+" if total_minutes > 0 else "-"
-    hours, minutes = divmod(abs(total_minutes), 60)
-    return f" {sign}{hours:02d}:{minutes:02d}"
-
-
-def display_scalar(*, value: LayoutScalar) -> str:
-    """A scalar as the document prints it: blank for nothing, Yes or No, numbers plainly, dates and times in ISO order.
-
-    A time of day prints to the minute, with the UTC offset the value states, if any.
-    """
-    match value:
-        case None:
-            return ""
-        case bool():
-            return "Yes" if value else "No"
-        case int():
-            return str(value)
-        case float():
-            if value.is_integer():
-                return str(int(value))
-            return format(value, ".15g")
-        case datetime.datetime():
-            return value.strftime("%Y-%m-%d %H:%M") + _utc_offset_suffix(value=value)
-        case datetime.date():
-            return value.isoformat()
-        case datetime.time():
-            return value.strftime("%H:%M") + _utc_offset_suffix(value=value)
-        case str():
-            return value

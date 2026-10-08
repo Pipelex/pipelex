@@ -28,7 +28,11 @@ if TYPE_CHECKING:
 # ``InferenceFamily.DOC_GEN`` — the document engines a ``PipeDocGen`` step prints with, each a model of the
 # ``doc_gen`` family registered through ``add_inference_backend`` — joined under v4 on the same reasoning. Its
 # worker (``DocGenWorkerAbstract``), render job and template check request (``pipelex.cogt.doc_gen``) are part
-# of the contract: a breaking change to any of them is a bump.
+# of the contract: a breaking change to any of them is a bump. So is the layout tree an engine writes
+# (``layout_tree``), and so are two modules that joined under v5 without a bump, since an addition breaks no plugin
+# that targets v5: the rules by which every engine shows the tree's values (``layout_display``: ``display_scalar``,
+# ``is_numeric_column``, ``markdown_as_html``) and the environment an engine fills a template of plain data in
+# (``template_environment``).
 #
 # ``add_internal_model`` and ``add_doc_gen_default`` — plain data a plugin declares for the model manager to merge at
 # boot: a model of the internal backend, as the table a backend file would hold, and the model deck's default engine for

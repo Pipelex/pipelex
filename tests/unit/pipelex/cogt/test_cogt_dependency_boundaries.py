@@ -67,6 +67,7 @@ EXPECTED_THIRD_PARTY_ROOTS: frozenset[str] = frozenset(
         "datamodel_code_generator",
         "httpx",
         "instructor",
+        "jinja2",
         "opentelemetry",
         "polyfactory",
         "pydantic",
