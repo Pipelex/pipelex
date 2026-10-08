@@ -29,11 +29,11 @@ from pipelex.cogt.content_generation.read_authorization import authorize_assignm
 from pipelex.cogt.doc_gen.doc_gen_engine import get_doc_gen_inference_model, require_doc_gen_engine_installed
 from pipelex.cogt.doc_gen.doc_gen_worker_factory import DocGenWorkerFactory
 from pipelex.cogt.doc_gen.exceptions import DocGenRenderError
-from pipelex.cogt.doc_gen.render_job import RenderedDocument, RenderResources
+from pipelex.cogt.doc_gen.render_job import LoadedResource, RenderedDocument, RenderResources
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.runtime_hub import get_report_delegate
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
-from pipelex.tools.uri.uri_bytes import load_bytes_from_any_uri
+from pipelex.tools.uri.uri_bytes import load_bytes_and_mime_type_from_any_uri
 from pipelex.tools.uri.uri_read_scope import authorize_uri_read
 
 # How long an engine may wait for one file it reads, such as an image fetched over https.
@@ -56,12 +56,13 @@ class RunRenderResources(RenderResources):
         self._loop = loop
         self._loop_thread_id = threading.get_ident()
 
-    async def _load(self, *, uri: str, position: str) -> bytes:
+    async def _load(self, *, uri: str, position: str) -> LoadedResource:
         authorize_uri_read(uri=uri, read_scope=self._read_scope, position=position)
-        return await load_bytes_from_any_uri(uri, storage_provider=self._storage_provider)
+        loaded = await load_bytes_and_mime_type_from_any_uri(uri, storage_provider=self._storage_provider)
+        return LoadedResource(data=loaded.data, mime_type=loaded.mime_type)
 
     @override
-    def load(self, *, uri: str, position: str) -> bytes:
+    def load(self, *, uri: str, position: str) -> LoadedResource:
         if threading.get_ident() == self._loop_thread_id:
             msg = "An engine reads its resources from the worker thread it prints in, never from the event loop's own thread."
             raise RuntimeError(msg)
