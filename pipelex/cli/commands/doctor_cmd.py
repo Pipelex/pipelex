@@ -350,8 +350,8 @@ class PendingMigrationsCheck(BaseModel):
     operations of it that applied before the conflict are still written."""
 
     former_release_files: list[str] = Field(default_factory=list[str])
-    """The files the command cleans up first: what a release that ran on the Pipelex Gateway or
-    Pipelex Manifold left, each rewritten without it or removed, a copy of each kept."""
+    """The files the command cleans up first: what a release that ran on the Pipelex Gateway left, each
+    rewritten without it or removed, a copy of each kept."""
 
     former_release_blocks_boot: bool = False
     """Whether what that release left stops this machine's boot until it is cleaned up: read off the files that boot
@@ -391,7 +391,7 @@ def check_pending_migrations() -> PendingMigrationsCheck:
     the user came for. The catch stays narrow, so a bug in our applier still surfaces as itself.
 
     **The command's first step is the cleanup of a former release**, and the row reports it too: the
-    files a release that ran on the Pipelex Gateway or Pipelex Manifold left, which the command
+    files a release that ran on the Pipelex Gateway left, which the command
     removes or rewrites, and whether what is in them stops the boot. That verdict is the boot's own
     check over the files it merges, home and project together: a project booting on bases of its own
     is not told it cannot start because of the home's, and a profile one directory activates from
@@ -431,8 +431,7 @@ def check_pending_migrations() -> PendingMigrationsCheck:
     sentences: list[str] = []
     if former_release_files:
         sentence = (
-            f"{len(former_release_files)} file(s) carry what a former release left for the Pipelex Gateway or Pipelex Manifold, "
-            f"which '{MIGRATE_COMMAND}' cleans up"
+            f"{len(former_release_files)} file(s) carry what a former release left for the Pipelex Gateway, which '{MIGRATE_COMMAND}' cleans up"
         )
         if former_release_blocks_boot:
             sentence += " — Pipelex cannot start until it does"
@@ -1603,7 +1602,7 @@ def setup_doctor_runtime(*, log_config_overrides: Mapping[str, Any] | None = Non
 
 
 FORMER_RELEASE_STOPS_THE_MODELS_CHECK = (
-    f"Not checked: what a former release left for the Pipelex Gateway or Pipelex Manifold stops the boot — run '{MIGRATE_COMMAND}' to clean it up"
+    f"Not checked: what a former release left for the Pipelex Gateway stops the boot — run '{MIGRATE_COMMAND}' to clean it up"
 )
 
 

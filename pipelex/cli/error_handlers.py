@@ -437,7 +437,7 @@ def handle_telemetry_config_validation_error(exc: TelemetryConfigValidationError
 
 
 def handle_former_release_config_error(*, exc: FormerReleaseConfigError) -> NoReturn:
-    """Handle the boot's refusal of a configuration a former release set up for the Pipelex Gateway or Pipelex Manifold.
+    """Handle the boot's refusal of a configuration a former release set up for the Pipelex Gateway.
 
     The message is the whole answer: it names what stops the boot, file by file, and the remedies, `pipelex migrate`
     and `pipelex init`. A traceback would bury it, and any advice added here would repeat it.

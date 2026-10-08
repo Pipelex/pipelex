@@ -99,7 +99,7 @@ When you run `pipelex init`, Pipelex can guide you through:
 
 ## A Machine a Former Release Set Up
 
-Releases up to v0.72 ran models through the Pipelex Gateway, and offered Pipelex Manifold as a private beta. Neither exists any more, and Pipelex refuses to start on the files those releases wrote: a `pipelex_gateway` backend left enabled, or a routing profile such as `all_pipelex_gateway` left active.
+Releases up to v0.72 ran models through the Pipelex Gateway. It no longer exists, and Pipelex refuses to start on the files those releases wrote: a `pipelex_gateway` backend left enabled, or a routing profile such as `all_pipelex_gateway` left active.
 
 `pipelex init` looks for what such a release left, in the home configuration directory and in the project's `.pipelex/`, before it asks anything else, reading both together the way Pipelex merges them when it starts. When it finds some, it shows which files it is in and, when it stops Pipelex from starting here, what does: that is judged from the files Pipelex actually starts on in the current directory, so a project with configuration files of its own is told that what the home directory still carries no longer stops it, and is still offered the cleanup. Then it asks:
 

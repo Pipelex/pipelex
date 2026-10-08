@@ -19,7 +19,7 @@ changing.
 deck, no credentials, no network. A broken configuration is the reason to reach for it.
 
 **Its first step is the cleanup of a former release**, as in the human command: what a release that
-ran on the Pipelex Gateway or Pipelex Manifold left, reported under ``former_release`` and counted in
+ran on the Pipelex Gateway left, reported under ``former_release`` and counted in
 the verdict, so a machine whose boot names this command ends the loop able to boot. The replay never
 walks a file the cleanup removes, and what would still stop the boot once the cleanup is done — read on every
 run, off the files as a write left them or as a dry run would leave them, and on a machine with nothing to clean —
@@ -148,7 +148,7 @@ def _render_markdown(result: dict[str, Any]) -> str:
 
     for file_dict in result["former_release"]["files"]:
         file = FormerReleaseFileCleanup.model_validate(file_dict)
-        lines += ["", f"## `{file.file_path}`", "", "Left by a former release that ran on the Pipelex Gateway or Pipelex Manifold.", ""]
+        lines += ["", f"## `{file.file_path}`", "", "Left by a former release that ran on the Pipelex Gateway.", ""]
         lines += _former_release_lines(file=file, applied=applied)
     still_blocking: list[str] = result["former_release"]["still_blocking"]
     if still_blocking:

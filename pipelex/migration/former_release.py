@@ -1,12 +1,15 @@
 """What a former release left in the configuration directories, found by reading them and nothing else.
 
-Releases up to v0.72 ran models through the Pipelex Gateway and offered Pipelex Manifold as a private beta. The
-installations they set up still carry what that took: a `pipelex_gateway` and a `pipelex_manifold` table in
-`inference/backends.toml`, each with a per-backend file beside the others, routing profiles that send every model to
-one of them (`active = "all_pipelex_gateway"` above all), a `model_specs_section` key naming specs the remote
-configuration used to serve, the `pipelex_service.toml` that recorded the Gateway's terms acceptance, and the
-`pipelex_gateway_models*.md` model lists. The runtime no longer has either backend, so an enabled table or an active
-profile pointing at one stops every boot with a refusal about one file that says nothing of the release behind it.
+Releases up to v0.72 ran models through the Pipelex Gateway. The installations they set up still carry what that
+took: a `pipelex_gateway` table in `inference/backends.toml` with a per-backend file beside the others, routing profiles
+that send models to it (`active = "all_pipelex_gateway"` above all), a `model_specs_section` key naming specs the
+remote configuration used to serve, the `pipelex_service.toml` that recorded the Gateway's terms acceptance, and the
+`pipelex_gateway_models*.md` model lists. The runtime no longer has that backend, so an enabled table or an active
+profile pointing at it stops every boot with a refusal about one file that says nothing of the release behind it.
+
+Pipelex Manifold, which those releases offered as a private beta, is not retired: the hosted plane runs on it and
+declares its backend and profile itself. What a former release left for it — a table shipped disabled, its per-backend
+file, the `all_pipelex_manifold` profile — is inert on a user's machine and is left as it is (`MANIFOLD_BACKEND_NAME`).
 
 `detect_former_release_across` is the one reading of that state. The boot, `pipelex doctor`, `pipelex init`'s inspect
 stage and the `pipelex migrate` cleanup (`former_release_cleanup.py`) all ask it or `former_release_boot_blockers`,
@@ -67,12 +70,19 @@ from pipelex.tools.misc.toml_utils import load_toml_from_content, load_toml_from
 #: The command that sets Pipelex up, which offers the cleanup first when it finds what a former release left.
 INIT_COMMAND = "pipelex init"
 
-#: The backends a former release shipped that this one no longer has: the Pipelex Gateway and Pipelex Manifold.
-RETIRED_BACKEND_NAMES: frozenset[str] = frozenset({"pipelex_gateway", "pipelex_manifold"})
+#: The backends a former release shipped that this one no longer has: the Pipelex Gateway.
+RETIRED_BACKEND_NAMES: frozenset[str] = frozenset({"pipelex_gateway"})
 
-#: The routing profiles a former release shipped to send every model to one of them. Recognized by name only where the
+#: The routing profile a former release shipped to send every model to it. Recognized by name only where the
 #: file read holds no definition of the profile: an override naming one over a base in another directory.
-RETIRED_ROUTING_PROFILE_NAMES: frozenset[str] = frozenset({"all_pipelex_gateway", "all_pipelex_manifold"})
+RETIRED_ROUTING_PROFILE_NAMES: frozenset[str] = frozenset({"all_pipelex_gateway"})
+
+#: Pipelex Manifold's backend, which is not retired: the hosted plane runs every model through it, with a plugin of its
+#: own, and declares the `pipelex_manifold` table and the `all_pipelex_manifold` profile itself. A former release shipped
+#: the table disabled and still naming `model_specs_section`, which is inert while it is disabled, so nothing here
+#: reports or rewrites that table, and the hosted plane's is never touched. Enabled and still naming the key, the table
+#: is refused by the backend library's own load, whose message says what to change.
+MANIFOLD_BACKEND_NAME = "pipelex_manifold"
 
 #: The `backends.toml` key that named the remote-configuration section holding a backend's model specs.
 MODEL_SPECS_SECTION_KEY = "model_specs_section"
@@ -101,13 +111,14 @@ class FormerReleaseFindingKind(StrEnum):
     """One kind of thing a former release left behind."""
 
     RETIRED_BACKEND_TABLE = "retired_backend_table"
-    """A `pipelex_gateway` or `pipelex_manifold` table in `backends.toml` or its override. Stops the boot when enabled."""
+    """A `pipelex_gateway` table in `backends.toml` or its override. Stops the boot when enabled."""
 
     MODEL_SPECS_SECTION_KEY = "model_specs_section_key"
-    """A `model_specs_section` key on another backend's table. Stops the boot when that backend is enabled."""
+    """A `model_specs_section` key on another backend's table, Pipelex Manifold's aside. Stops the boot when that backend
+    is enabled."""
 
     RETIRED_BACKEND_FILE = "retired_backend_file"
-    """`inference/backends/pipelex_gateway.toml` or `pipelex_manifold.toml`, a retired backend's per-model file."""
+    """`inference/backends/pipelex_gateway.toml`, the retired backend's per-model file."""
 
     GATEWAY_MODELS_REFERENCE = "gateway_models_reference"
     """A `pipelex_gateway_models*.md` list of the models the Gateway served, beside the backend files."""
@@ -421,8 +432,8 @@ def describe_former_release_boot_refusal(*, blockers: Sequence[FormerReleaseFind
     """
     lines = [
         (
-            "This configuration was set up by a former Pipelex release, which ran models through the Pipelex Gateway or "
-            "Pipelex Manifold. This release has neither, so it cannot start on these files:"
+            "This configuration was set up by a former Pipelex release, which ran models through the Pipelex Gateway. "
+            "This release no longer has it, so it cannot start on these files:"
         ),
         *(f"- {finding.description}" for finding in blockers),
         "",
@@ -456,7 +467,7 @@ def backend_library_findings(*, sequences: Sequence[Sequence[Path]], contents: M
                 continue
             if backend_name in RETIRED_BACKEND_NAMES:
                 kind = FormerReleaseFindingKind.RETIRED_BACKEND_TABLE
-            elif MODEL_SPECS_SECTION_KEY in backend_table:
+            elif MODEL_SPECS_SECTION_KEY in backend_table and backend_name != MANIFOLD_BACKEND_NAME:
                 kind = FormerReleaseFindingKind.MODEL_SPECS_SECTION_KEY
             else:
                 continue
@@ -1118,7 +1129,7 @@ def _combined(*, earlier: FormerReleaseFinding | None, later: FormerReleaseFindi
 
 
 def _backend_directory_findings(*, backends_dir: Path) -> list[FormerReleaseFinding]:
-    """The retired backends' per-model files and the Gateway's model lists, beside the backend files."""
+    """The retired backend's per-model file and the Gateway's model lists, beside the backend files."""
     findings = [
         FormerReleaseFinding(
             kind=FormerReleaseFindingKind.RETIRED_BACKEND_FILE, file_path=backends_dir / f"{backend_name}.toml", subject=backend_name

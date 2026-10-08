@@ -1,6 +1,6 @@
 """The cleanup of what a former release left: the `pipelex migrate` step that removes it, with a copy of every file.
 
-`former_release.py` finds what a release that ran on the Pipelex Gateway or Pipelex Manifold left in the home and
+`former_release.py` finds what a release that ran on the Pipelex Gateway left in the home and
 project configuration directories, read as their boots merge them; this module removes exactly that, and nothing else.
 Each finding becomes one change:
 

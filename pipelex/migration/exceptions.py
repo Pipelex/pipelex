@@ -37,7 +37,7 @@ class MigrationSnapshotRefusedError(MigrationError):
 
 
 class FormerReleaseConfigError(PipelexSetupError):
-    """The inference configuration still carries what a former release wrote for the Pipelex Gateway or Pipelex Manifold.
+    """The inference configuration still carries what a former release wrote for the Pipelex Gateway.
 
     Raised at boot, before the backend and routing profile libraries load, when a retired backend is enabled, a backend
     still names `model_specs_section`, or the active routing profile sends models to a retired backend. The message

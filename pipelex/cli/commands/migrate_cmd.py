@@ -23,7 +23,7 @@ compares against the reading *that pass* took, so what it catches is a writer la
 run's own read and its replace, and not an edit made while the confirmation was pending.
 
 **The first step is the cleanup of a former release.** A machine set up by a release that ran models
-through the Pipelex Gateway or Pipelex Manifold carries tables, profiles and files the runtime no
+through the Pipelex Gateway carries tables, profiles and files the runtime no
 longer has, and the boot refuses it with an error naming this command. That cleanup is no ledger
 entry — it removes what a release left rather than reshaping a file — so it runs beside the replay,
 first, under the same two passes, the same question and the same backups

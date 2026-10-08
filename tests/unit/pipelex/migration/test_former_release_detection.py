@@ -64,15 +64,12 @@ class TestDetectFormerRelease:
         assert findings.config_dir == config_dir
         assert _summary(findings=findings.findings, config_dir=config_dir) == {
             (FormerReleaseFindingKind.RETIRED_BACKEND_TABLE, backends, "pipelex_gateway", None, True),
-            (FormerReleaseFindingKind.RETIRED_BACKEND_TABLE, backends, "pipelex_manifold", None, False),
             (FormerReleaseFindingKind.RETIRED_BACKEND_FILE, f"{backend_files}/pipelex_gateway.toml", "pipelex_gateway", None, False),
-            (FormerReleaseFindingKind.RETIRED_BACKEND_FILE, f"{backend_files}/pipelex_manifold.toml", "pipelex_manifold", None, False),
             (FormerReleaseFindingKind.GATEWAY_MODELS_REFERENCE, f"{backend_files}/pipelex_gateway_models.md", None, None, False),
             (FormerReleaseFindingKind.GATEWAY_MODELS_REFERENCE, f"{backend_files}/pipelex_gateway_models_plain.md", None, None, False),
             (FormerReleaseFindingKind.SERVICE_FILE, "pipelex_service.toml", None, None, False),
             (FormerReleaseFindingKind.ACTIVE_ROUTING_PROFILE, routing, "all_pipelex_gateway", None, True),
             (FormerReleaseFindingKind.RETIRED_ROUTING_PROFILE, routing, "all_pipelex_gateway", None, False),
-            (FormerReleaseFindingKind.RETIRED_ROUTING_PROFILE, routing, "all_pipelex_manifold", None, False),
             (FormerReleaseFindingKind.RETIRED_ROUTING_PROFILE, routing, "example_routing_using_patterns", None, False),
             (FormerReleaseFindingKind.ROUTE_TO_RETIRED_BACKEND, routing, "example_routing_using_specific_models", "gpt-5.4-nano", False),
             (FormerReleaseFindingKind.ROUTE_TO_RETIRED_BACKEND, routing, "example_routing_using_specific_models", "claude-4-sonnet", False),
@@ -81,6 +78,23 @@ class TestDetectFormerRelease:
         }
         assert not findings.is_clean
         assert findings.blocks_boot
+
+    def test_pipelex_manifold_is_never_found_even_enabled_and_active(self, tmp_path: Path) -> None:
+        """Manifold is live: the v0.72 table enabled, its `model_specs_section` kept, and its profile active, is no finding.
+
+        A boot on it is the backend library's to refuse, for the key, with a message naming the change.
+        """
+        config_dir = _copy_tree(source=V0_72_CONFIG_DIR, destination=tmp_path / ".pipelex")
+        inference_dir = config_dir / INFERENCE_DIR_NAME
+        (inference_dir / BACKENDS_OVERRIDE_FILE_NAME).write_text(
+            "[pipelex_gateway]\nenabled = false\n\n[pipelex_manifold]\nenabled = true\n", encoding="utf-8"
+        )
+        (inference_dir / ROUTING_PROFILES_OVERRIDE_FILE_NAME).write_text('active = "all_pipelex_manifold"\n', encoding="utf-8")
+
+        findings = detect_former_release(config_dir=config_dir)
+
+        assert not any("manifold" in str(finding.subject) or finding.file_path.name == "pipelex_manifold.toml" for finding in findings.findings)
+        assert not findings.blocks_boot
 
     def test_a_model_specs_section_key_is_found_on_a_backend_of_any_name(self, tmp_path: Path) -> None:
         """The previous kit under its neutral name: the key is what is found, whatever the backend is called."""

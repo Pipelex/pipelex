@@ -7,7 +7,7 @@ description: "Reference for the `FormerReleaseConfigError` Pipelex error class."
 
 # Configuration left by a former release
 
-The inference configuration still carries what a former release wrote for the Pipelex Gateway or Pipelex Manifold.
+The inference configuration still carries what a former release wrote for the Pipelex Gateway.
 
 | Field | Value |
 |---|---|

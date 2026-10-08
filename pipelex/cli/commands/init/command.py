@@ -4,7 +4,7 @@
 
 1. **Inspect** (`inspect_initialization`): read what is on disk and what the focus asks for, and decide which steps
    are needed. It asks nothing and writes nothing. It also finds what a former release that ran on the Pipelex Gateway
-   or Pipelex Manifold left in the configuration directories a boot reads, read together as the boot merges them, and
+   left in the configuration directories a boot reads, read together as the boot merges them, and
    whether it stops this machine's boot, which is the boot's own check over the files it merges.
 2. **Choose** (`choose_initialization`): first, when the inspection found what a former release left and someone is
    there to answer, say so and offer the cleanup `pipelex migrate` runs, then run it on a yes; then the
@@ -279,10 +279,7 @@ def describe_former_release_findings(*, findings: list[FormerReleaseFindings], b
         findings: What the former release left, per directory.
         blockers: What of it stops this machine's boot, as `former_release_boot_blockers` reads the files the boot merges.
     """
-    lead = (
-        "This machine was set up by a former Pipelex release, which ran models through the Pipelex Gateway or Pipelex Manifold, "
-        "and this release has neither."
-    )
+    lead = "This machine was set up by a former Pipelex release, which ran models through the Pipelex Gateway, and this release no longer has it."
     if blockers:
         lines = [f"{lead} Pipelex cannot start until what that release left is cleaned up:", *(f"• {finding.description}" for finding in blockers)]
     else:

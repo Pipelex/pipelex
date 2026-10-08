@@ -1,0 +1,15 @@
+# This suite's routing, the same the hosted worker and runner ship with: every model goes to Pipelex Manifold.
+#
+# Hand-maintained on purpose, beside a `backends.toml` that declares only `pipelex_manifold` and
+# `internal`. There is no `routing_profiles_override.toml`; this is the whole document.
+#
+# The profile names a default backend and no fallback order, so a model Manifold does not serve fails
+# rather than reaching some other backend. The internal backend needs no profile of its own: when the
+# default backend has no spec for a model and no fallback order is set, pipelex looks in `internal`,
+# which is how the PDF text extractors resolve.
+
+active = "all_pipelex_manifold"
+
+[profiles.all_pipelex_manifold]
+description = "Use Pipelex Manifold for all its supported models"
+default = "pipelex_manifold"

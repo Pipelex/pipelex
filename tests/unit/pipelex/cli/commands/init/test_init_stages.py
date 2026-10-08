@@ -1,6 +1,6 @@
 """`pipelex init`'s inspect stage decides, before anything is asked, whether the run asks where runs execute.
 
-It also finds what a former release that ran on the Pipelex Gateway or Pipelex Manifold left, which the choose stage
+It also finds what a former release that ran on the Pipelex Gateway left, which the choose stage
 offers to clean up before anything else is asked; the v0.72 kit, copied from that release's wheel, is the specimen.
 """
 

@@ -46,6 +46,18 @@ fallback_order = [
 [profiles.all_enabled_backends.optional_routes]
 "jev-*" = "typesafe"
 
+# The same model names, served by the Pipelex-operated inference service instead. Switching between
+# this profile and the one above needs no other edit: a model's wire id and sdk are per-backend, so
+# decks, aliases and presets keep naming the same handles.
+[profiles.all_pipelex_manifold]
+description = "Use Pipelex Manifold (private beta) for all its supported models"
+default = "pipelex_manifold"
+
+# Judgment models are brought by you rather than served by Pipelex, so they go to their own backend
+# whenever it is enabled. An optional route is inert while its backend is disabled.
+[profiles.all_pipelex_manifold.optional_routes]
+"jev-*" = "typesafe"
+
 [profiles.all_anthropic]
 description = "Use Anthropic backend for all its supported models"
 default = "anthropic"

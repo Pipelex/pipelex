@@ -53,7 +53,6 @@ BACKEND_FILES = f"{INFERENCE_DIR_NAME}/{BACKENDS_DIR_NAME}"
 V0_72_ACTIONS = [
     (BACKENDS, FormerReleaseFileAction.REWRITE),
     (f"{BACKEND_FILES}/pipelex_gateway.toml", FormerReleaseFileAction.REMOVE),
-    (f"{BACKEND_FILES}/pipelex_manifold.toml", FormerReleaseFileAction.REMOVE),
     (f"{BACKEND_FILES}/pipelex_gateway_models.md", FormerReleaseFileAction.REMOVE),
     (f"{BACKEND_FILES}/pipelex_gateway_models_plain.md", FormerReleaseFileAction.REMOVE),
     (RETIRED_SERVICE_FILE_NAME, FormerReleaseFileAction.REMOVE),
@@ -90,6 +89,21 @@ class TestCleanFormerRelease:
             assert existing_backups_of(path=original) == [backup]
             assert original.exists() == (action == FormerReleaseFileAction.REWRITE)
         assert detect_former_release(config_dir=config_dir).is_clean
+
+    def test_what_the_release_left_for_pipelex_manifold_stays_as_it_was(self, tmp_path: Path) -> None:
+        """Manifold is not retired: its disabled table, its file and its profile are inert, and the hosted plane declares its own."""
+        config_dir = _copy_v0_72(tmp_path=tmp_path)
+        manifold_file = config_dir / BACKEND_FILES / "pipelex_manifold.toml"
+        manifold_file_before = manifold_file.read_bytes()
+
+        cleanup = clean_former_release(config_dirs=[config_dir], dry_run=False, moment=MOMENT)
+
+        assert manifold_file.read_bytes() == manifold_file_before
+        assert not any("manifold" in change for file in cleanup.files for change in file.changes)
+        backends = load_toml_from_path(config_dir / BACKENDS)
+        assert backends["pipelex_manifold"] == load_toml_from_path(V0_72_CONFIG_DIR / BACKENDS)["pipelex_manifold"]
+        routing = load_toml_from_path(config_dir / ROUTING)
+        assert routing["profiles"]["all_pipelex_manifold"] == load_toml_from_path(V0_72_CONFIG_DIR / ROUTING)["profiles"]["all_pipelex_manifold"]
 
     def test_the_cleaned_routing_profiles_make_the_kit_default_active(self, tmp_path: Path) -> None:
         config_dir = _copy_v0_72(tmp_path=tmp_path)
@@ -133,13 +147,12 @@ class TestCleanFormerRelease:
         cleanup = clean_former_release(config_dirs=[config_dir], dry_run=True)
 
         changes = {file.file_path.relative_to(config_dir).as_posix(): file.changes for file in cleanup.files}
-        assert changes[BACKENDS] == ["removed the 'pipelex_gateway' backend", "removed the 'pipelex_manifold' backend"]
+        assert changes[BACKENDS] == ["removed the 'pipelex_gateway' backend"]
         kit_default = kit_default_routing_profile_name()
         assert changes[ROUTING] == [
             f"added the routing profile '{kit_default}', as this release ships it",
             f"moved the active routing profile from 'all_pipelex_gateway' to '{kit_default}'",
             "removed the routing profile 'all_pipelex_gateway'",
-            "removed the routing profile 'all_pipelex_manifold'",
             "removed the routing profile 'example_routing_using_patterns'",
             "removed the route of 'gpt-5.4-nano' to 'pipelex_gateway' from the routing profile 'example_routing_using_specific_models'",
             "removed the route of 'claude-4-sonnet' to 'pipelex_gateway' from the routing profile 'example_routing_using_specific_models'",

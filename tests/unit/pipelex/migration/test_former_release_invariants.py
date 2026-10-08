@@ -11,7 +11,7 @@ What must hold for every layout:
 - the cleanup never raises;
 - a boot that started before the cleanup still starts after it, on the same active profile, and if that profile sent
   models somewhere, it still does;
-- a boot that only the former release stopped — one that would start with the retired backends still enabled — starts
+- a boot that only the former release stopped — one that would start with the Gateway still enabled — starts
   after the cleanup, with an active profile that sends models somewhere; or the cleanup left a file both boots read
   for a hand edit, because no change to it suits both.
 
@@ -47,7 +47,7 @@ DEFAULTS = ("openai", "pipelex_gateway", None)
 ROUTE_BACKENDS = ("openai", "pipelex_gateway")
 ROUTE_PATTERNS = ("gpt-*", "*")
 ENABLED_BACKENDS = ["openai", "anthropic"]
-WITH_THE_RETIRED_BACKENDS = [*ENABLED_BACKENDS, "pipelex_gateway", "pipelex_manifold"]
+WITH_THE_GATEWAY = [*ENABLED_BACKENDS, "pipelex_gateway"]
 BACKENDS_TEXT = '[openai]\nenabled = true\napi_key = "${OPENAI_API_KEY}"\n\n[anthropic]\nenabled = true\napi_key = "${ANTHROPIC_API_KEY}"\n'
 
 # How each file of a layout is drawn: whether it is a base, and how likely it is to exist.
@@ -121,7 +121,7 @@ def _boots(*, home: Path, project: Path, retired_backends_enabled: bool) -> list
         try:
             profile = load_active_routing_profile(
                 routing_profile_library_paths=routing_paths,
-                enabled_backends=WITH_THE_RETIRED_BACKENDS if retired_backends_enabled else ENABLED_BACKENDS,
+                enabled_backends=WITH_THE_GATEWAY if retired_backends_enabled else ENABLED_BACKENDS,
             )
         except (RoutingProfileLibraryError, RoutingProfileLibraryNotFoundError, RoutingProfileDisabledBackendError):
             boots.append(("fails", None, False))

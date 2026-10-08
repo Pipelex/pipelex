@@ -1,7 +1,7 @@
 """The doctor on a machine a former release set up: the migrations row names the cleanup, and the models row defers to it.
 
 The migrations row is `pipelex migrate`'s own dry run, and that command's first step is the cleanup of what a release
-that ran on the Pipelex Gateway or Pipelex Manifold left, so the row reports it with the files it is about. The models
+that ran on the Pipelex Gateway left, so the row reports it with the files it is about. The models
 row would otherwise meet the refusal a boot meets on such a machine, about one backend or one profile; it names the
 cleanup instead.
 
@@ -38,7 +38,6 @@ V0_72_CONFIG_DIR = Path("tests/data/migration/former_release/v0_72")
 V0_72_CLEANUP_FILES = [
     f"{INFERENCE_DIR_NAME}/{BACKENDS_FILE_NAME}",
     f"{INFERENCE_DIR_NAME}/{BACKENDS_DIR_NAME}/pipelex_gateway.toml",
-    f"{INFERENCE_DIR_NAME}/{BACKENDS_DIR_NAME}/pipelex_manifold.toml",
     f"{INFERENCE_DIR_NAME}/{BACKENDS_DIR_NAME}/pipelex_gateway_models.md",
     f"{INFERENCE_DIR_NAME}/{BACKENDS_DIR_NAME}/pipelex_gateway_models_plain.md",
     RETIRED_SERVICE_FILE_NAME,

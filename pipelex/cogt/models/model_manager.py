@@ -85,7 +85,7 @@ class ModelManager(ModelManagerAbstract):
         resolved_backends_dir_path = backends_dir_path or str(config_manager.backends_dir_path)
         resolved_backends_library_paths = backends_library_paths or config_manager.backends_file_paths()
         resolved_routing_profile_library_paths = routing_profile_library_paths or config_manager.routing_profiles_file_paths()
-        # What a former release left for the Pipelex Gateway or Manifold is refused here, by one error naming the
+        # What a former release left for the Pipelex Gateway is refused here, by one error naming the
         # cleanup, ahead of the refusals below: the Gateway's unset key, its backend file declaring no model, or a
         # routing profile sending models to a backend that is not enabled — none of which says why, or what to run.
         if blockers := former_release_boot_blockers(

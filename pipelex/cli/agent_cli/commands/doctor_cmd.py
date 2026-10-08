@@ -75,7 +75,7 @@ def _pending_migrations_actions(*, check: PendingMigrationsCheck) -> list[str]:
     if check.former_release_files:
         stops = ", which stops every boot until it is gone" if check.former_release_blocks_boot else ""
         actions.append(
-            f"Run '{MIGRATE_COMMAND}' to clean up what a former release left for the Pipelex Gateway or Pipelex Manifold{stops} "
+            f"Run '{MIGRATE_COMMAND}' to clean up what a former release left for the Pipelex Gateway{stops} "
             f"(it keeps a copy of each file): {', '.join(check.former_release_files)}"
         )
     if check.migratable_files:

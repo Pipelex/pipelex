@@ -1,9 +1,9 @@
 """A machine a former release set up, through the installed binaries: refused at boot, cleaned up, booting again.
 
-The home and a project's `.pipelex/` each carry what the v0.72 release wrote for the Pipelex Gateway and Pipelex
-Manifold — its `backends.toml`, `routing_profiles.toml`, the two retired backend files, the Gateway's model lists and
-`pipelex_service.toml`, copied from that release's wheel — laid over the current kit's inference tree, which stands in
-for the per-backend files the inference-backend ledger carries forward on its own. That is the state every former user
+The home and a project's `.pipelex/` each carry what the v0.72 release wrote — its `backends.toml`,
+`routing_profiles.toml`, the Gateway's backend file and model lists, `pipelex_service.toml`, and what it left for Pipelex
+Manifold, which stays since Manifold is not retired, copied from that release's wheel — laid over the current kit's
+inference tree, which stands in for the per-backend files the inference-backend ledger carries forward on its own. That is the state every former user
 is in, and each command a remedy names is run on it: the boot names `pipelex migrate` and `pipelex init`, `pipelex
 migrate` and `pipelex-agent migrate` clean both directories so the machine boots, `pipelex doctor` names the cleanup
 and `--fix` runs it, and `pipelex init` offers it before it asks where runs execute.

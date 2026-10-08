@@ -113,4 +113,5 @@ class TestAFormerReleaseHomeAtBoot:
         models_manager = _setup(needs_inference=needs_inference)
 
         assert models_manager.routing_profile.name == kit_default_routing_profile_name()
-        assert not set(models_manager.inference_backend_library.root) & {"pipelex_gateway", "pipelex_manifold"}
+        assert "pipelex_gateway" not in models_manager.inference_backend_library.root
+        assert "pipelex_manifold" not in models_manager.inference_backend_library.root, "the table the release left for Manifold stays, disabled"

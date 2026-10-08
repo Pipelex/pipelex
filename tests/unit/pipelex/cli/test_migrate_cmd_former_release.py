@@ -123,8 +123,8 @@ class TestTheMigrateCommandOnAFormerRelease:
         assert f"{gateway_file} (inference-backend)" not in console.export_text()
 
     def test_an_unknown_key_in_a_file_the_cleanup_removes_needs_no_attention(self, former_release_machine: Path, console: Console) -> None:
-        manifold_file = former_release_machine / INFERENCE_DIR_NAME / BACKENDS_DIR_NAME / "pipelex_manifold.toml"
-        with manifold_file.open("a", encoding="utf-8") as stream:
+        gateway_file = former_release_machine / INFERENCE_DIR_NAME / BACKENDS_DIR_NAME / "pipelex_gateway.toml"
+        with gateway_file.open("a", encoding="utf-8") as stream:
             stream.write(UNKNOWN_MODEL_TABLE)
 
         migrate_cmd(dry_run=True)
