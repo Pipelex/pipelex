@@ -72,7 +72,7 @@ def markdown_as_html(*, markdown: str) -> str:
     shows as text rather than entering the document; and only a URL with a scheme becomes a link, so `README.md`
     or `www.example.com` stays text.
 
-    No render budget applies: a conversion is charged to the budget of the template render running at the time,
-    and none runs while an engine prints, so an engine bounds what it converts and prints itself.
+    A conversion is charged to the budget of the template render running at the time, so one an engine makes from
+    its own code, outside any template render, is charged to none: the engine bounds what it converts and prints.
     """
     return render_markdown_as_html(markdown)

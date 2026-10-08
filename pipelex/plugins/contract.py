@@ -26,11 +26,13 @@ if TYPE_CHECKING:
 # targets v4, and a bump would have made every installed plugin re-declare ``targets_api`` for nothing.
 #
 # ``InferenceFamily.DOC_GEN`` — the document engines a ``PipeDocGen`` step prints with, each a model of the
-# ``doc_gen`` family registered through ``add_inference_backend`` — joined under v4 on the same reasoning. Its
-# worker (``DocGenWorkerAbstract``), render job and template check request (``pipelex.cogt.doc_gen``) are part
-# of the contract: a breaking change to any of them is a bump. So is the layout tree an engine writes
-# (``layout_tree``), and so are two modules that joined under v5 without a bump, since an addition breaks no plugin
-# that targets v5: the rules by which every engine shows the tree's values (``layout_display``: ``display_scalar``,
+# ``doc_gen`` family registered through ``add_inference_backend`` — joined under v4 on the same reasoning. What an
+# engine uses in ``pipelex.cogt.doc_gen`` is part of the contract, and a breaking change to any of it is a bump: the
+# worker (``DocGenWorkerAbstract``), the render job with its resources and rendered document (``render_job``), the
+# formats and sources (``doc_gen_format``), ``DocGenRenderError``, the layout tree an engine writes (``layout_tree``),
+# and the template check request with its findings (``template_check``) and input shapes (``InputShape`` and
+# ``InputShapeKind``). Two modules joined it under v5 without a bump, since an addition breaks no plugin that targets
+# v5: the rules by which every engine shows the tree's values (``layout_display``: ``display_scalar``,
 # ``is_numeric_column``, ``markdown_as_html``) and the environment an engine fills a template of plain data in
 # (``template_environment``).
 #
