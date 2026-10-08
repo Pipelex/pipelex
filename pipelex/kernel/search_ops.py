@@ -13,6 +13,7 @@ library's business, so the kernel never asks for one.
 from pipelex.cogt.content_generation.assignment_models import SearchAssignment
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.cogt.models.model_reference import write_model_handle
 from pipelex.cogt.search.search_setting import SearchModelChoice, SearchSetting
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.concepts.concept import Concept
@@ -43,8 +44,10 @@ def resolve_search_setting(
     search_setting = model_deck.get_search_setting(search_choice=resolved_choice)
 
     inference_model = model_deck.get_required_inference_model(model_handle=search_setting.model, model_type=ModelType.SEARCH)
-    if inference_model.name != search_setting.model:
-        search_setting = search_setting.model_copy(update={"model": inference_model.name})
+    # Pinned as a reference that parses back to the resolved handle, whatever its spelling, since every lookup reads it again.
+    resolved_handle = write_model_handle(name=inference_model.name)
+    if resolved_handle != search_setting.model:
+        search_setting = search_setting.model_copy(update={"model": resolved_handle})
 
     if include_images_override is not None:
         search_setting = search_setting.model_copy(update={"include_images": include_images_override})

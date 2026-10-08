@@ -533,8 +533,11 @@ class TestModelReferenceCheck:
         assert not isinstance(exc_info.value, ModelWaterfallError)
         assert "model fallbacks are disabled" in exc_info.value.message
 
-    def test_a_handle_reference_names_a_literal_handle(self, mocker: MockerFixture) -> None:
-        """`handle:@best-gpt` names a model handle spelled `@best-gpt`, not the alias: the check, the validation and the run refuse it alike."""
+    def test_a_handle_reference_reads_no_sigil(self, mocker: MockerFixture) -> None:
+        """`handle:@best-gpt` is the bare name `@best-gpt`, not the alias `best-gpt`.
+
+        With nothing of that name, the check, the validation and the run refuse it alike.
+        """
         model_deck = _make_deck()
         mocker.patch(_DECK_CHECK_GET_MODEL_DECK_TARGET, return_value=model_deck)
 
@@ -557,7 +560,7 @@ class TestModelReferenceCheck:
             pytest.param({"llm_aliases": {"named": "other"}, "llm_waterfalls": {"named": ["other"]}}, id="colliding-alias-and-waterfall"),
         ],
     )
-    def test_a_served_handle_spelled_like_a_reference_is_called_literally(
+    def test_a_served_handle_spelled_like_a_reference_is_called_by_its_bare_name(
         self, mocker: MockerFixture, literal_name: str, bindings: dict[str, Any]
     ) -> None:
         """`handle:@named` names the model served as `@named`: the validation, the run and the check all select it, not the alias."""

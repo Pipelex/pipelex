@@ -228,8 +228,8 @@ class ModelDeck(ConfigModel):
         pipe's field passes through before the run's lookup: that lookup itself also resolves a bare
         waterfall name while fallback is off, where a binding inside the deck names one. A model of
         that name served only as another type does not make it resolve, so a pipe naming it is refused
-        when its bundle loads rather than when the run reaches it. The name is taken literally, so a
-        `handle:` reference whose name starts with a sigil names no alias, waterfall or preset.
+        when its bundle loads rather than when the run reaches it. The name's sigil is not read: a
+        `handle:` reference whose name starts with a sigil is that bare name, `@x` and not the alias `x`.
         """
         if self.inference_models.get(model_type=model_type, handle=name) is not None:
             return True

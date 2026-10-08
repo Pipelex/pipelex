@@ -62,7 +62,8 @@ class ModelReferenceName(NamedTuple):
     def written(self) -> str:
         """The name as a method writes it: a sigil for a preset, an alias or a waterfall, and the bare name for a handle.
 
-        A handle whose bare name would read as another kind of reference is written `handle:<name>` (`write_model_handle`).
+        A handle whose bare name would read as another kind of reference is written `handle:<name>`, which writes that
+        bare name with no sigil read (`write_model_handle`).
         """
         match self.kind:
             case ModelReferenceKind.HANDLE:
