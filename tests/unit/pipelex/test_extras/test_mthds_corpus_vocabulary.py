@@ -1,6 +1,7 @@
 """The corpus tag vocabulary: normalization, generation drift, and the exclusion mechanism.
 
-Contract: ``docs/specs/mthds-test-corpus.md`` (workspace root), section "Tag vocabulary".
+Contract: ``conformance/specs/mthds-test-corpus.md`` (the cross-repo spec, kept in the ``conformance``
+repo), section "Tag vocabulary".
 
 No `native.*` code is excluded today — every one of them turned out to support a meaningful
 focused entry — so the exclusion mechanism's semantics are pinned here rather than left to be

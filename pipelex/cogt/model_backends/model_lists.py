@@ -41,11 +41,12 @@ class ModelLister:
 
         # Group models by SDK
         models_by_sdk: dict[str, list[str]] = {}
-        for model_name, model_spec in backend.model_specs.items():
+        # One entry per spec: a handle served as two model types counts twice, possibly under two SDKs.
+        for model_spec in backend.model_specs.all_specs():
             sdk = model_spec.sdk
             if sdk not in models_by_sdk:
                 models_by_sdk[sdk] = []
-            models_by_sdk[sdk].append(model_name)
+            models_by_sdk[sdk].append(model_spec.name)
 
         # Process each SDK separately, dispatching to the lister its backend plugin registered.
         # A missing-extra guard lives inside each lister (it raises MissingDependencyError when

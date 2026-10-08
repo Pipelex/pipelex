@@ -12,6 +12,7 @@ from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoicesDefaults
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_spec_index import ModelSpecIndex
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.models.model_deck_check import (
@@ -48,13 +49,15 @@ class TestModelDeckCheck:
     def _create_test_model_deck(self) -> ModelDeck:
         """Build a deck with one preset, alias, waterfall and handle per model type."""
         return ModelDeck(
-            inference_models={
-                "gpt-4o-mini": self._create_model_spec("gpt-4o-mini", ModelType.LLM),
-                "extract-engine": self._create_model_spec("extract-engine", ModelType.TEXT_EXTRACTOR),
-                "img-painter": self._create_model_spec("img-painter", ModelType.IMG_GEN),
-                "web-searcher": self._create_model_spec("web-searcher", ModelType.SEARCH),
-                "verdict-giver": self._create_model_spec("verdict-giver", ModelType.JUDGMENT),
-            },
+            inference_models=ModelSpecIndex.make_from_specs(
+                model_specs=[
+                    self._create_model_spec("gpt-4o-mini", ModelType.LLM),
+                    self._create_model_spec("extract-engine", ModelType.TEXT_EXTRACTOR),
+                    self._create_model_spec("img-painter", ModelType.IMG_GEN),
+                    self._create_model_spec("web-searcher", ModelType.SEARCH),
+                    self._create_model_spec("verdict-giver", ModelType.JUDGMENT),
+                ]
+            ),
             # LLM-specific
             llm_default_temperature=0.7,
             llm_aliases={"best-gpt": "gpt-4o-mini"},
@@ -297,8 +300,14 @@ class TestModelDeckCheck:
         assert error.model_choice == model_choice
         assert error.reference_kind == expected_kind
         assert error.model_type == expected_model_type
-        expected_options: dict[str, Any] = getattr(model_deck, options_attr)
-        assert error.available_options == list(expected_options.keys())
+        if options_attr == "inference_models":
+            # A handle names one model per model type: only the handles served as the type the pipe asks for are options.
+            served_handles = model_deck.inference_models.handles_of_type(model_type=expected_model_type)
+            assert len(served_handles) == 1
+            assert error.available_options == served_handles
+        else:
+            expected_options: dict[str, Any] = getattr(model_deck, options_attr)
+            assert error.available_options == list(expected_options.keys())
 
     def test_near_miss_handle_yields_fuzzy_suggestion(self, mocker: MockerFixture) -> None:
         """A typo'd handle gets a fuzzy suggestion pointing at the close-by real handle."""

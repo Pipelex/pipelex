@@ -1,7 +1,7 @@
 """Loading the corpus and taking a view of it.
 
-Contract: ``docs/specs/mthds-test-corpus.md`` (workspace root), sections "Entry layout" and
-"Loader API".
+Contract: ``conformance/specs/mthds-test-corpus.md`` (the cross-repo spec, kept in the ``conformance``
+repo), sections "Entry layout" and "Loader API".
 
 The bundles themselves are validated by the integration-tier entry gate; this module pins the
 layout rules and the filter semantics a consumer selects on.

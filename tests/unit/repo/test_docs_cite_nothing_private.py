@@ -1,10 +1,10 @@
 """Guards the published documentation against citations its readers cannot follow.
 
 `docs/` is the MkDocs `docs_dir` published at docs.pipelex.com. A workspace ledger id, a `wip/` path or a
-document at the root of the private workspace (its `docs/specs/`, its ledger, its conventions) means
-something to a contributor with the workspace checked out and nothing to anyone reading the site, so the
-page states the fact in plain words, links a public page that states it, or leaves the pointer out. Ids and
-paths stay welcome in code comments, commit messages and pull request bodies.
+document in the private workspace (an interface spec in its internal `conformance` repo, its ledger, its
+conventions) means something to a contributor with the workspace checked out and nothing to anyone reading
+the site, so the page states the fact in plain words, links a public page that states it, or leaves the
+pointer out. Ids and paths stay welcome in code comments, commit messages and pull request bodies.
 """
 
 from __future__ import annotations
@@ -36,8 +36,12 @@ URL_PATTERN = re.compile(r"\b[a-z][a-z0-9+.-]*://\S+", re.IGNORECASE)
 #: ends a longer name (`mthds-wip/`).
 PRIVATE_PATH_PATTERNS: dict[str, re.Pattern[str]] = {
     "wip/ path": re.compile(r"(?<![\w-])wip/"),
-    # This repository has no docs/specs/, so the path can only name the workspace's.
+    # This repository has no docs/specs/, so the path can only name the workspace's, which now holds nothing
+    # but a pointer to the conformance repo.
     "workspace spec path": re.compile(r"(?<![\w-])docs/specs/"),
+    # Nor has it a conformance/ directory, so the path can only name the internal conformance repo, whose
+    # specs/ holds the interface specs that moved out of the workspace's docs/specs/.
+    "conformance repo path": re.compile(r"(?<![\w-])conformance/"),
 }
 
 TEXT_SUFFIXES = frozenset({".md", ".html", ".css", ".txt", ".yml", ".yaml"})
@@ -64,7 +68,7 @@ def private_references(*, line: str) -> list[str]:
 
 class TestDocsCiteNothingPrivate:
     def test_published_docs_cite_nothing_in_the_private_workspace(self) -> None:
-        """Every published page reads without the private workspace: no ledger id, no `wip/` path, no workspace-root document."""
+        """Every published page reads without the private workspace: no ledger id, no `wip/` path, no workspace or `conformance` spec."""
         doc_files = published_files()
         assert doc_files, f"no documentation files found under {DOCS_DIR}"
         offending_lines: list[str] = []
@@ -81,7 +85,22 @@ class TestDocsCiteNothingPrivate:
 
     def test_private_path_patterns_catch_relative_links_and_skip_urls(self) -> None:
         """A relative link out of docs/ is the likeliest way a page cites the workspace; another site's URL is not a citation."""
-        for cited in ("[d](../../wip/foo.md)", "./wip/x", "`wip/x`", "[s](../../../docs/specs/corpus.md)", "`docs/specs/x.md`"):
+        for cited in (
+            "[d](../../wip/foo.md)",
+            "./wip/x",
+            "`wip/x`",
+            "[s](../../../docs/specs/corpus.md)",
+            "`docs/specs/x.md`",
+            "[s](../../../conformance/specs/mthds-test-corpus.md)",
+            "`conformance/specs/x.md`",
+        ):
             assert private_references(line=cited), cited
-        for clean in ("mthds-wip/x", "https://opentelemetry.io/docs/specs/semconv/", "https://example.com/wip/y"):
+        for clean in (
+            "mthds-wip/x",
+            "mthds-conformance/x",
+            "## Conformance tiers",
+            "https://opentelemetry.io/docs/specs/semconv/",
+            "https://example.com/wip/y",
+            "https://example.com/conformance/specs/z",
+        ):
             assert not private_references(line=clean), clean

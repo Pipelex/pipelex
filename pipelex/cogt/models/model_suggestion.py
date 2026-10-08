@@ -81,7 +81,7 @@ def get_collection_keys(
                 case ModelType.JUDGMENT:
                     return list(model_deck.judgment_waterfalls.keys())
         case ModelReferenceKind.HANDLE:
-            return sorted(handle for handle, spec in model_deck.inference_models.items() if spec.model_type == model_type)
+            return model_deck.inference_models.handles_of_type(model_type=model_type)
 
 
 def suggest_model_alternatives(

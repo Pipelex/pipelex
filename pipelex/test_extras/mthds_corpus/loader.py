@@ -1,6 +1,7 @@
 """The MTHDS Test Corpus loader — how a consumer takes a view of the corpus.
 
-Contract: ``docs/specs/mthds-test-corpus.md`` (workspace root), section "Loader API".
+Contract: ``conformance/specs/mthds-test-corpus.md`` (the cross-repo spec, kept in the ``conformance``
+repo), section "Loader API".
 A consumer selects entries by the axes it declares rather than by path convention, so
 reorganizing storage never breaks it.
 """

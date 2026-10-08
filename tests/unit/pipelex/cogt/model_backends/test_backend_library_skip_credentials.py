@@ -13,6 +13,7 @@ from pytest_mock import MockerFixture
 
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.model_backends.credential_resolution import CredentialResolution
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.providers.openai.vertexai_factory import VertexAIFactory
 from tests.helpers.backend_library_loading import load_library, required_backend
 from tests.helpers.recording_secrets_provider import RecordingSecretsProvider
@@ -34,7 +35,7 @@ class TestSkipKeepsEveryBackendAndResolvesNothing:
         )
 
         backend = required_backend(library)
-        assert list(backend.model_specs) == ["acme-one"]
+        assert backend.model_specs.all_handles() == ["acme-one"]
         assert backend.listed_constraints == [ListedConstraint.TEMPERATURE_UNSUPPORTED]
         assert backend.valued_constraints == {ValuedConstraint.FIXED_TEMPERATURE: 1}
         assert secrets_provider.looked_up == []
@@ -100,7 +101,9 @@ class TestSkipKeepsEveryBackendAndResolvesNothing:
         )
 
         backend = required_backend(library)
-        assert backend.model_specs["acme-one"].model_id.startswith("${")
+        model_spec = backend.get_model_spec(model_type=ModelType.LLM, handle="acme-one")
+        assert model_spec is not None
+        assert model_spec.model_id.startswith("${")
         assert backend.unresolved_credentials == {"model_specs": expected_vars}
 
     def test_a_missing_backend_credential_keeps_the_backend(self, tmp_path: Path) -> None:
@@ -130,6 +133,6 @@ class TestSkipKeepsEveryBackendAndResolvesNothing:
         make_endpoint_and_api_key.assert_not_called()
         assert backend.endpoint is None
         assert backend.api_key is None
-        assert list(backend.model_specs) == ["gemini-one"]
+        assert backend.model_specs.all_handles() == ["gemini-one"]
         # No variable names this token: it is minted from the service-account file, so the field alone is recorded.
         assert backend.unresolved_credentials == {"endpoint": [], "api_key": []}

@@ -1,10 +1,10 @@
 """Envelope tests for `POST /v1/resolve` — the normalized-crate resolution route.
 
-Pins `docs/specs/pipelex-codegen.md#route-envelopes` (workspace root): the request accepts inline
-`files[]` XOR a `method_ref`; a produced verdict is a 200 discriminated on `is_valid` with the
-crate on the valid arm; request-shape errors are 422 problem+json; an address-form `method_ref`
-resolves the fetched package's `.mthds` files into the closure, while the registry form keeps its
-honest 501 until the method registry exists.
+Pins `conformance/specs/pipelex-codegen.md#route-envelopes`, in the `conformance` repo beside the tests
+that verify it: the request accepts inline `files[]` XOR a `method_ref`; a produced verdict is a 200
+discriminated on `is_valid` with the crate on the valid arm; request-shape errors are 422
+problem+json; an address-form `method_ref` resolves the fetched package's `.mthds` files into the
+closure, while the registry form keeps its honest 501 until the method registry exists.
 """
 
 from collections.abc import Callable

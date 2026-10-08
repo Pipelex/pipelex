@@ -21,16 +21,91 @@ on one model is rejected by name as `NOT_HEADER_SHAPED`. That is why one dead ke
 breaks a whole backend and why the two halves need two different remedies in the migration ledger.
 """
 
-from typing import Any, cast
+from collections.abc import Mapping
+from typing import Any, NamedTuple, cast
 
 from pydantic import ValidationError
 
 from pipelex.cogt.model_backends.model_spec_factory import InferenceModelSpecBlueprint
 from pipelex.cogt.model_backends.model_spec_keys import describe_rejected_keys, split_model_spec_keys
+from pipelex.cogt.model_backends.model_type import DEFAULT_MODEL_TYPE
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 MODEL_SPEC_DEFAULTS_TABLE = "defaults"
 """The one root table of a backend file that is not a model: what every model in it starts from."""
+
+MODEL_SPEC_HANDLE_FIELD = "handle"
+"""The model-table key naming the handle a table serves, when it is not the table's own name."""
+
+MODEL_SPEC_TYPE_FIELD = "model_type"
+
+
+class DeclaredModelSpec(NamedTuple):
+    """The model one table of a backend file declares: its table, the handle it serves and its model type, as written."""
+
+    table_name: str
+    handle: str
+    model_type: str
+
+
+def list_declared_model_specs(*, document: Mapping[str, Any]) -> list[DeclaredModelSpec]:
+    """Each model table of a backend document, with the handle it serves and the model type it declares.
+
+    The one statement of the file's shape that every reader shares — the loader, the document validator,
+    the kit's guards and the developer tools — so that none of them can disagree with another on what a
+    file declares. A handle names one model per model type, and the pair is what a file declares:
+
+    - every root table but `[defaults]` is one model;
+    - its handle is its `handle` key, else its table name;
+    - its model type is its own `model_type`, else the one `[defaults]` sets, else `DEFAULT_MODEL_TYPE`.
+
+    Nothing is validated here. A root value that is not a table declares nothing and is skipped, and a
+    value is read as the string a valid file holds: what is wrong with a file is the validation's to say,
+    and every reader that can meet an invalid file validates it.
+    """
+    defaults = document.get(MODEL_SPEC_DEFAULTS_TABLE, {})
+    typed_defaults: Mapping[str, Any] = cast("Mapping[str, Any]", defaults) if isinstance(defaults, Mapping) else {}
+    declared_model_specs: list[DeclaredModelSpec] = []
+    for table_name, value in document.items():
+        if table_name == MODEL_SPEC_DEFAULTS_TABLE or not isinstance(value, Mapping):
+            continue
+        model_table = cast("Mapping[str, Any]", value)
+        handle = model_table.get(MODEL_SPEC_HANDLE_FIELD, table_name)
+        model_type = model_table.get(MODEL_SPEC_TYPE_FIELD, typed_defaults.get(MODEL_SPEC_TYPE_FIELD, DEFAULT_MODEL_TYPE))
+        declared_model_specs.append(DeclaredModelSpec(table_name=table_name, handle=str(handle), model_type=str(model_type)))
+    return declared_model_specs
+
+
+def describe_defaults_not_a_table() -> str:
+    """Why a `defaults` that is not a table is refused, said once for the loader and the document validator."""
+    return f"'{MODEL_SPEC_DEFAULTS_TABLE}' is not a table"
+
+
+def describe_handle_in_defaults() -> str:
+    """Why a `[defaults]` table may not set `handle`, said once for the loader and the document validator."""
+    return (
+        f"'{MODEL_SPEC_HANDLE_FIELD}' is set in [{MODEL_SPEC_DEFAULTS_TABLE}], which every model of the file inherits, so it would "
+        f"give them all one handle: set it on the model table it renames"
+    )
+
+
+def find_duplicate_declared_model(*, declared_model_specs: list[DeclaredModelSpec]) -> tuple[DeclaredModelSpec, DeclaredModelSpec] | None:
+    """The first two tables declaring the same handle as the same model type, or `None` when every pair is declared once."""
+    first_declarations: dict[tuple[str, str], DeclaredModelSpec] = {}
+    for declared in declared_model_specs:
+        pair = (declared.model_type, declared.handle)
+        if first_declaration := first_declarations.get(pair):
+            return first_declaration, declared
+        first_declarations[pair] = declared
+    return None
+
+
+def describe_duplicate_declared_model(*, first: DeclaredModelSpec, second: DeclaredModelSpec) -> str:
+    """Why a file declaring one pair twice is refused, naming both tables."""
+    return (
+        f"models '{first.table_name}' and '{second.table_name}' both declare '{first.handle}' as model type '{first.model_type}': "
+        f"a handle names one model per model type"
+    )
 
 
 class InferenceModelSpecFileNode(InferenceModelSpecBlueprint):
@@ -77,8 +152,10 @@ def describe_model_spec_document_rejection(*, document: dict[str, Any]) -> str |
     """
     defaults = document.get(MODEL_SPEC_DEFAULTS_TABLE, {})
     if not isinstance(defaults, dict):
-        return f"'{MODEL_SPEC_DEFAULTS_TABLE}' is not a table"
+        return describe_defaults_not_a_table()
     typed_defaults = cast("dict[str, Any]", defaults)
+    if MODEL_SPEC_HANDLE_FIELD in typed_defaults:
+        return describe_handle_in_defaults()
     for model_name, value in document.items():
         if model_name == MODEL_SPEC_DEFAULTS_TABLE:
             continue
@@ -92,4 +169,7 @@ def describe_model_spec_document_rejection(*, document: dict[str, Any]) -> str |
             InferenceModelSpecBlueprint.model_validate({**typed_defaults, **key_split.fields})
         except ValidationError as exc:
             return f"model '{model_name}': {format_pydantic_validation_error(exc)}"
+    if duplicate := find_duplicate_declared_model(declared_model_specs=list_declared_model_specs(document=document)):
+        first, second = duplicate
+        return describe_duplicate_declared_model(first=first, second=second)
     return None

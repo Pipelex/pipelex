@@ -11,8 +11,8 @@
 # expects a diagnostic on exactly the `schema` entries and none on the others.
 #
 # This file ships in the pipelex wheel, so it names a document its readers can reach:
-# https://docs.pipelex.com/contribute/mthds-test-corpus/ — which in turn points at the
-# cross-repo contract, `docs/specs/mthds-test-corpus.md` in the Pipelex workspace repo.
+# https://docs.pipelex.com/contribute/mthds-test-corpus/, which states the contract the corpus's
+# consumers are written against.
 
 [native.dynamic]
 code = "Dynamic"
