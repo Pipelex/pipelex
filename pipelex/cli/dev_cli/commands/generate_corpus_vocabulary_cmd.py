@@ -47,8 +47,7 @@ _HEADER = """# The MTHDS Test Corpus tag vocabulary — the closed set an entry'
 #
 # This file ships in the pipelex wheel, so it names a document its readers can reach:
 # https://docs.pipelex.com/contribute/mthds-test-corpus/, which states the contract the corpus's
-# consumers are written against. Its normative text is `conformance/specs/mthds-test-corpus.md`,
-# kept with the other cross-repo specs in Pipelex's internal `conformance` repo.
+# consumers are written against.
 """
 
 _ADVISORY_HINT_LINT_EXCLUSION = (
