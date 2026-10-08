@@ -28,8 +28,10 @@ needing attention rather than as a success.
 
 Every file gets the backup the ledger replay gives the files it rewrites, through the same per-file transaction
 (`runner.write_file_with_backup` and `runner.remove_file_with_backup`): one `.bak.<stamp>` copy, taken first and
-kept, older ones pruned, and a file changed or unwritable mid-run left exactly as it was and reported. A dry run
-reads and reports the same changes and writes nothing.
+kept, older ones pruned, and a file changed or unwritable mid-run left exactly as it was and reported. The
+transaction is per file, not across the files: one that fails after others were written leaves those written, so a
+boot the plan kept on its profile through a change in another file can start on another profile until that file is
+edited. A dry run reads and reports the same changes and writes nothing.
 
 See `docs/migration-ledger.md` → "A former release's configuration".
 """
@@ -181,9 +183,10 @@ def clean_former_release(*, config_dirs: Sequence[Path], dry_run: bool, moment: 
     The directories are read together, as their boots merge them, and the cleanup is planned per boot
     (`former_release._routing_plan`). Every file's new text is worked out before anything is written, and checked:
     files whose changes would stop a boot that starts today, or change the profile it starts on, are left as they are,
-    for a hand edit (`_without_regressions`). Then, on every run, what would still stop a boot of the machine is read
-    off the files as the cleanup leaves them — after writing, or as a dry run would write them — and reported in
-    `still_blocking` rather than as a success.
+    for a hand edit (`_without_regressions`). That holds for the run's changes taken together: the files are written one
+    by one, and one that fails after others were written is reported blocked while those stay written. Then, on every
+    run, what would still stop a boot of the machine is read off the files as the cleanup leaves them — after writing,
+    or as a dry run would write them — and reported in `still_blocking` rather than as a success.
 
     Args:
         config_dirs: The directories to clean in tier order, `~/.pipelex/` then a project's `.pipelex/`, as
