@@ -48,7 +48,7 @@ class GoogleErrorHandlingTestData:
             429,
             "Too many requests, please slow down",
             InferenceErrorCategory.TRANSIENT,
-            "retry",
+            "run it again",
         ),
         (
             "bad_request_400_content_policy",

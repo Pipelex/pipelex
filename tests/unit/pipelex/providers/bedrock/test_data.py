@@ -17,7 +17,7 @@ class BedrockLLMErrorHandlingTestData:
             "ThrottlingException",
             "Rate exceeded for model",
             InferenceErrorCategory.TRANSIENT,
-            "retry",
+            "run it again",
         ),
         (
             "throttling_quota",

@@ -138,11 +138,27 @@ class TestMistralWorkerErrorHandling:
         assert exc_info.value.user_action.kind is UserActionKind.CHANGE_INPUT
         assert exc_info.value.__cause__ is sdk_exc
 
-    async def test_llm_worker_choice_without_message_is_transient(self, mocker: MockerFixture) -> None:
-        """A choice whose message is missing is retried as a transient failure, not read as empty text."""
+    @pytest.mark.parametrize(
+        ("response_shape", "expected_detail"),
+        [
+            pytest.param("no_response", "Mistral returned an empty response — wait a moment, then run it again", id="no_response"),
+            pytest.param("no_choices", "Mistral returned a response with no choices — wait a moment, then run it again", id="no_choices"),
+            pytest.param(
+                "choice_without_message",
+                "Mistral returned a choice with no message — wait a moment, then run it again",
+                id="choice_without_message",
+            ),
+        ],
+    )
+    async def test_llm_worker_malformed_response_is_transient(self, mocker: MockerFixture, response_shape: str, expected_detail: str) -> None:
+        """A malformed response is a transient failure, not read as empty text, and its advice says to wait then run again."""
         worker = _make_mistral_llm_worker(mocker)
-        response = mocker.MagicMock()
-        response.choices = [mocker.MagicMock(message=None)]
+        response: Any
+        if response_shape == "no_response":
+            response = None
+        else:
+            response = mocker.MagicMock()
+            response.choices = [] if response_shape == "no_choices" else [mocker.MagicMock(message=None)]
         worker.mistral_client_for_text.chat.complete_async.return_value = response  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:
@@ -151,6 +167,7 @@ class TestMistralWorkerErrorHandling:
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
+        assert exc_info.value.user_action.detail == expected_detail
 
     async def test_llm_worker_not_found_raises_llm_model_not_found_error(self, mocker: MockerFixture) -> None:
         """A 404 MistralError specializes to LLMModelNotFoundError (CONFIGURATION) on the LLM path."""

@@ -16,7 +16,7 @@ class AnthropicErrorHandlingTestData:
             "generic_rate_limit",
             "rate_limit_error: Number of request tokens has exceeded your per-minute limit",
             InferenceErrorCategory.TRANSIENT,
-            "retry",
+            "run it again",
         ),
         (
             "quota_exhaustion",

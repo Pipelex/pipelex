@@ -26,6 +26,9 @@ from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, U
 from pipelex.cogt.inference.error_classify import ClassificationResult
 from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.inference.provider_name import ProviderName
+from pipelex.pipe_run.exceptions import PipeRouterError
+from pipelex.pipeline.exceptions import PipelineExecutionError
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 class _TestCases:
@@ -134,26 +137,55 @@ class TestRenderInferenceError:
         assert rendered.user_action is not None
         assert "safety filters" in rendered.user_action.detail
 
-    def test_retry_after_seconds_surfaced_in_detail(self) -> None:
+    @pytest.mark.parametrize(
+        ("retry_after_seconds", "expected_detail"),
+        [
+            pytest.param(None, "Transient provider error — wait a moment, then run it again.", id="no_retry_after"),
+            pytest.param(12.0, "Transient provider error — wait at least 12s, then run it again.", id="retry_after"),
+        ],
+    )
+    def test_failed_run_report_says_to_wait_then_run_again(self, retry_after_seconds: float | None, expected_detail: str) -> None:
+        """The advice a failed run's report carries for a transient inference error.
+
+        The report is read once the run has failed and every automatic retry is spent, so the
+        advice says what the reader can do, and never that the system will retry.
+        """
         metadata = ProviderErrorMetadata(
             provider=ProviderName.OPENAI,
             sdk_exception_type="RateLimitError",
             message="Rate limited",
             status_code=429,
-            retry_after_seconds=12.0,
+            retry_after_seconds=retry_after_seconds,
         )
         classification = ClassificationResult(
             category=InferenceErrorCategory.TRANSIENT,
             user_action_kind=UserActionKind.WAIT_AND_RETRY,
         )
-
-        rendered = render_inference_error(
+        root_fault = render_inference_error(
             metadata=metadata,
             classification=classification,
             family=InferenceErrorFamily.LLM,
             model_desc="gpt-fake",
             model_handle="fake-handle",
         )
+        # Wrapped as the runner wraps it: located at the failing pipe, then reported as the run's failure.
+        located = PipeRouterError.make_located(
+            failure=root_fault,
+            run_mode=PipeRunMode.LIVE,
+            pipe_code="summarize",
+            output_name=None,
+            pipe_stack=["flow", "summarize"],
+        )
+        located.__cause__ = root_fault
+        failed_run = PipelineExecutionError.make_for_run_failure(
+            failure=located,
+            run_mode=PipeRunMode.LIVE,
+            entry_pipe_code="flow",
+            output_name=None,
+        )
+        failed_run.__cause__ = located
 
-        assert rendered.user_action is not None
-        assert "12s" in rendered.user_action.detail
+        report_payload = failed_run.to_error_report().to_dict()
+
+        assert report_payload["user_action"] == {"kind": "wait_and_retry", "detail": expected_detail}
+        assert "automatically" not in report_payload["user_action"]["detail"]

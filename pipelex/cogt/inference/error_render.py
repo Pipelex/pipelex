@@ -94,9 +94,11 @@ def _render_detail(metadata: SDKErrorEnvelope, *, classification: Classification
         return _render_model_not_allowed_detail(model_handle=model_handle)
     match classification.user_action_kind:
         case UserActionKind.WAIT_AND_RETRY:
+            # The advice is read on a failed run's report, once every automatic retry is spent, so
+            # it says what the reader can do next and never promises another attempt by the system.
             if metadata.retry_after_seconds is not None:
-                return f"Transient provider error — the system will retry automatically after {metadata.retry_after_seconds:.0f}s."
-            return "Transient provider error — the system will retry automatically."
+                return f"Transient provider error — wait at least {metadata.retry_after_seconds:.0f}s, then run it again."
+            return "Transient provider error — wait a moment, then run it again."
         case UserActionKind.CHECK_BILLING:
             return "Your account quota or credits are exhausted — check your billing dashboard."
         case UserActionKind.CHECK_CREDENTIALS:
