@@ -9543,7 +9543,7 @@ default-general = "gpt-5.6-terra"
 default-small = "gpt-5.6-luna"
 ```
 
-The system first looks for direct model names, then checks aliases if no direct match is found. The system handles model routing through backends automatically.
+A bare name in a pipe's `model` field is first looked up among the models the enabled backends serve as the pipe's model type, then among the aliases of that type, then among its waterfalls while model fallback is on. A model served as another type does not count: an LLM named in a `PipeImgGen` is refused when the bundle is validated or loaded, with an `unknown_model` item naming the pipe, the handle and the type the pipe needs. The deck's own presets and LLM overrides are held to the same rule when the runner boots. A sigiled name is looked up by its sigil alone, so `~name` is the waterfall even where a model or an alias shares its name. The system handles model routing through backends automatically.
 
 !!! tip "Alias Naming Convention"
     Defining an alias is always meant to describe what model it is. Never define an alias to describe what it is for or what it's good at. LLM Presets are for that.
@@ -11721,6 +11721,7 @@ These commands do not have subcommands:
 | `fmt` | Format a `.mthds`/`.toml`/`.plx` file in-place (delegates to `plxt`) |
 | `lint` | Lint a `.mthds`/`.toml`/`.plx` file for errors (delegates to `plxt`) |
 | `models` | List available model presets, aliases, and waterfalls (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
+| `check-model` | Check a model reference for a model category (`check-model <reference> --type <category>`, the category being `llm`, `extract`, `img_gen`, `search`, `judgment` or `doc_gen`) and suggest alternatives when it is not valid. It applies the rule a validation applies, as [`GET /v1/models/check`](../../api-server/models.md#check-a-model-reference) does: a sigiled reference names that kind of binding, and a bare name is valid when it is a model of the category, an alias of the category, or a waterfall of the category while model fallback is on; a `handle:` reference writes a bare name without reading a sigil, so `handle:@best-gpt` is the bare name `@best-gpt`, not the alias `best-gpt`. `--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value |
 | `doctor` | Check config, credentials, and model health (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
 
 ## Output Contract
@@ -13340,6 +13341,36 @@ costs = { input = 0.04, output = 0.0 }
 ```
 
 The `[defaults]` table applies to every model of the file, and a model table overrides any key of it.
+
+#### One handle, several kinds of model
+
+A handle names one model per model type. The same name may be an LLM and a judgment model at once, and each pipe reaches the kind its family asks for: a `PipeLLM` naming `acme-one` gets the LLM, and a `PipeJudge` naming it gets the judgment model. A table's name is its handle, and TOML forbids declaring a table twice, so the second model of a handle gets a table name of its own and says which handle it serves with `handle`:
+
+```toml
+# acme.toml
+[defaults]
+model_type = "llm"
+sdk = "openai_responses"
+
+["acme-one"]
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.1, output = 0.5 }
+
+["acme-one-judgment"]
+handle = "acme-one"
+model_type = "judgment"
+sdk = "acme_judgments"   # the judgment SDK the provider's plugin registers
+inputs = ["text"]
+outputs = ["judgments"]
+costs = { input = 0.1, output = 0 }
+```
+
+The table name `acme-one-judgment` names the table and nothing else: methods, the model deck and the routing profiles all use the handle `acme-one`, and the model id defaults to the handle too. Two tables may share a handle only when their model types differ, so a file declaring one handle twice as the same type fails to load, naming both tables. `handle` cannot go in `[defaults]`, which every model of the file inherits, and like every key that describes the model rather than a value a call sends, it cannot reference a variable.
+
+A routing profile routes a handle's name, so its route applies to every kind of model of that name. A model type the routed backend does not serve is looked for along the profile's `fallback_order`, or in the internal backend when it has none, when the name reached that backend by default, is left out when it reached it through a wildcard pattern, and is not served at all when the profile routes the name to that backend exactly: an exact route pins the name to one backend.
+
+A method whose pipe names a handle the deck serves only as another kind of model is refused when it loads: a `PipeJudge` naming a handle served only as an LLM is told that the deck serves the handle, but not as a judgment model, and the suggestions list judgment models only.
 
 #### Input formats
 
@@ -17337,7 +17368,7 @@ A GraphSpec names a model in three places, and only one of them is the outcome:
 
 `execution_data.resolved_model` is captured from `LLMSetting.model` (`pipe_llm.py`), which is a *handle*: alias resolution happens later, at inference time. The name overstates what it holds — roughly a third of the nodes in a typical corpus carry an unresolved `@alias` there. Only `by_model` survives alias resolution, deck defaults, and any fallback or retry that landed somewhere other than what was requested.
 
-**`by_model` is a list because one node routinely uses more than one model.** A `PipeLLM`'s text pass and its object-structuring pass resolve separately (that is what `resolved_model_for_object` is about), and a retry can land elsewhere again. Collapsing them into "the model" would be wrong in exactly the way a single `cost` across mixed rated and unrated calls is wrong. Entries are ordered most-used first, ties broken by name, so a consumer can take `by_model[0]` as the dominant model without sorting. Per-model `cost` follows invariant 2: `None` iff no call to that model was priced.
+**`by_model` is a list because one node routinely uses more than one model.** A `PipeLLM`'s text pass and its object-structuring pass resolve separately (that is what `resolved_model_for_object` is about), and a retry can land elsewhere again. Collapsing them into "the model" would be wrong in exactly the way a single `cost` across mixed rated and unrated calls is wrong. An entry is one model type and name, since a handle names one model per model type: a node calling `gpt-6-luna` as an LLM and as a judgment model has two entries. Entries are ordered most-used first, ties broken by name and then by model type, so a consumer can take `by_model[0]` as the dominant model without sorting. Per-model `cost` follows invariant 2: `None` iff no call to that model was priced.
 
 The same breakdown rolls up: `subtree_by_model` tells you every model a controller's whole branch used.
 
@@ -20440,15 +20471,14 @@ def list_hello_models(
     backend's configuration file.
     """
     console = get_console()
-    model_names = backend.list_model_names()
+    # One entry per spec: a handle names one model per model type, so a name may appear once per type.
+    model_specs = [model_spec for model_spec in backend.model_specs.all_specs() if model_spec.sdk == sdk]
 
     if flat:
         if not any_listed:
             console.print("model_id,sdk,backend")
-        for model_name in model_names:
-            model_spec = backend.get_model_spec(model_name)
-            model_id = model_spec.model_id if model_spec else model_name
-            console.print(f"{model_id},{sdk},{backend_name}")
+        for model_spec in model_specs:
+            console.print(f"{model_spec.model_id},{sdk},{backend_name}")
         return
 
     table = Table(
@@ -20459,10 +20489,7 @@ def list_hello_models(
     )
     table.add_column("Model ID", style="green")
     table.add_column("Model Type", style="blue")
-    for model_name in model_names:
-        model_spec = backend.get_model_spec(model_name)
-        if model_spec is None:
-            continue
+    for model_spec in model_specs:
         table.add_row(model_spec.model_id, model_spec.model_type)
     console.print(table)
 ```
@@ -21531,7 +21558,7 @@ class MyDocGenPlugin:
 
 The model's `spec` is exactly the table a backend file would hold for it (`model_type`, `sdk`, `model_id`, `inputs`, `outputs`, `costs`, and any other model-spec field), and it is complete on its own: the `[defaults]` table of `internal.toml` is not applied to it. A default names a model, directly or through any reference the deck resolves.
 
-`register` stores these declarations and validates nothing. The model manager merges them at boot, before it builds the deck, and refuses what it cannot merge with `PluginModelDeclarationError`, naming the plugin: a model whose name the install's `internal.toml` already declares (the message names the file too), a table that is not a valid model spec, or a default for a format and source no step composes. Model names are not global across backends, so a name another backend declares is left to the routing profile, as it is for a model a file declares. When the install disables the `internal` backend, or declares none, the plugin's models are not merged, as a disabled backend's own models are not loaded, and its defaults are left out with them, so a plugin never makes a boot fail that would succeed without it. A second plugin declaring the same model fails at registration with `DuplicateInternalModelError`, and the same format and source with `DuplicateDocGenDefaultError`, each naming both plugins. `pipelex plugins list` shows each declaration on the plugin's row.
+`register` stores these declarations and validates nothing. The model manager merges them at boot, before it builds the deck, and refuses what it cannot merge with `PluginModelDeclarationError`, naming the plugin: a model whose name and model type the install's `internal.toml` already declares (the message names the file too), a table that is not a valid model spec, or a default for a format and source no step composes. A handle names one model per model type, so a plugin may declare another kind of a name the file declares. Model names are not global across backends, so a name another backend declares is left to the routing profile, as it is for a model a file declares. When the install disables the `internal` backend, or declares none, the plugin's models are not merged, as a disabled backend's own models are not loaded, and its defaults are left out with them, so a plugin never makes a boot fail that would succeed without it. A second plugin declaring the same model, the same name with the same model type, fails at registration with `DuplicateInternalModelError`, and the same format and source with `DuplicateDocGenDefaultError`, each naming both plugins. `pipelex plugins list` shows each declaration on the plugin's row.
 
 A document engine is a kernel-layer capability, and so are its model and its defaults, so an out-of-tree engine publishes under the `pipelex.plugins.kernel` entry-point group (see [Inference Backend Plugins](inference-backend-plugins.md#shipping-it-as-an-out-of-tree-plugin) for the groups). `make_worker` is called for each print, with the model's spec, and imports the engine's library inside it, so `register` stays import-light and a process that never prints never imports the library. An engine loads its library, fonts and styles once per process, in the module that holds its worker, rather than per worker. A second registration of the same sdk fails loud at boot with `DuplicateInferenceBackendError`, naming both plugins.
 
@@ -23721,7 +23748,7 @@ Keep the manifest small. Contracts are added one at a time, where staleness has 
 
 The MTHDS Test Corpus is one canonical, tagged set of `.mthds` methods that every repository building on the MTHDS language — this runtime and the tools and services around it — draws its language-level fixtures from. It lives at `pipelex/test_extras/mthds_corpus/`, ships in the wheel, and is gated on both sides: the corpus must cover every feature the runtime registers, and each consumer must exercise every entry in the slice it declares.
 
-This page is both the pipelex-side working guide — where things are, how to add an entry, and what each gate is telling you when it goes red — and the contract other repositories are written against: the entry layout, the `entry.toml` manifest, the closed tag vocabulary with its `fails_at` field, the conformance tiers, and the two ways a consumer reaches the corpus.
+This page is both the pipelex-side working guide — where things are, how to add an entry, and what each gate is telling you when it goes red — and the public statement of the contract other repositories are written against: the entry layout, the `entry.toml` manifest, the closed tag vocabulary with its `fails_at` field, the conformance tiers, and the two ways a consumer reaches the corpus.
 
 !!! note "Why it exists"
 
@@ -24881,7 +24908,7 @@ MTHDS Protocol  ⊂  Pipelex API (this server)  ⊂  Pipelex hosted API
 ```
 
 - **MTHDS Protocol** — five routes: `POST /execute`, `POST /start`, `POST /validate`, `GET /models`, `GET /version`. Tagged `x-mthds-protocol: true` in the [committed OpenAPI artifact](openapi/pipelex-api.openapi.yaml), and **only** those five — the flag is how a conformance suite or a third-party runner extracts the portable subset.
-- **Pipelex API (this server)** — the protocol verbatim, plus the Pipelex extensions: resolve and codegen (`/resolve`, `/codegen`), pipe I/O (`/pipe-io`), and editor tooling (`/lint`, `/format`). `/upload` and `/resolve-storage-url` were non-contract convenience routes and have been **removed** — see [Storage Transport](storage-transport.md) for where they went and why.
+- **Pipelex API (this server)** — the protocol verbatim, plus the Pipelex extensions: resolve and codegen (`/resolve`, `/codegen`), pipe I/O (`/pipe-io`), the model reference check (`/models/check`), and editor tooling (`/lint`, `/format`). `/upload` and `/resolve-storage-url` were non-contract convenience routes and have been **removed** — see [Storage Transport](storage-transport.md) for where they went and why.
 - **Pipelex hosted API** (`api.pipelex.com/v1`) — everything here, same shapes, plus durable runs, the method catalog, and account management.
 
 All routes are served under the `/v1` base path (clients compose `{base}/v1/{endpoint}`).
@@ -24895,7 +24922,7 @@ The API currently allows you to:
 3. **Resolve** a library closure into its normalized crate, and **codegen** typed artifacts from it (TypeScript/Zod, Pydantic, Pipelex structures)
 4. **Describe** a method's inputs and output — its pipe I/O contracts, input form and output form, from which a client projects an inputs template
 5. **Lint and format** single `.mthds` files for editor workflows
-6. **List** available model presets and configurations
+6. **List** available model presets and configurations, and **check** whether one model reference resolves, as what, to which model
 
 ## Deployment
 
@@ -25042,9 +25069,12 @@ Lint and format single `.mthds` files without loading or executing a pipeline.
 [Learn more →](mthds-tools.md)
 
 ### Models
-List the models this runner can route to.
+List the models this runner can route to, and check one model reference against them.
 
 - `GET /v1/models` — The protocol model deck this runner routes to (flat `models` list, plus category-keyed `aliases`/`waterfalls` routing extensions); optional single `?type=` category filter
+- `GET /v1/models/check` — Whether one model reference (`?reference=`, optionally in one `?type=` category, `doc_gen` included) resolves on this runner, as what kind of reference and to which model, with suggestions when it does not; answered from pipelex's own parser and the deck lookups a validation runs (Pipelex API extension)
+
+[Learn more →](models.md)
 
 ### Uploader (removed)
 
@@ -26267,7 +26297,7 @@ The 200 body is one of two arms, discriminated on the mandatory `is_valid` field
 **Response Fields (invalid arm):**
 
 - `is_valid` (`false`): the discriminant of the invalid arm
-- `validation_errors` (list): the structured per-error diagnostics a client maps to per-line problems — built by pipelex's one shared builder, so they are byte-for-byte the same items the agent CLI emits. Each item carries a `category` (the closed set `blueprint_validation` | `pipe_factory` | `pipe_validation` | `dry_run`), a `message`, and the locators the runtime can attribute (`error_type`, `pipe_code` / `concept_code` / `domain_code`, `field_path` / `field_name`, and `source`). Absent locators are omitted, not null. An item may also carry a **`suggested_fix`** — a structured, deterministic repair (`fix_code`, `description`, `safety: safe|unsafe`, and the `ops[]` of semantic TOML patch operations to apply). It is present only when the fix planner derived one from the typed error data; a client that ignores it behaves exactly as before. See [Error Responses → Structured validation errors](error-responses.md#structured-validation-errors) and [→ Suggested fixes](error-responses.md#suggested-fixes) for every field. The array is **never empty on an invalid verdict** (the structured-info invariant is total): a failing dry run becomes one `dry_run` item per failing pipe, located at the innermost pipe that failed (its `pipe_code`, `domain_code` and, when known, `source`), a TOML syntax error carries the `line` and `column` the parser stopped at, and a parse-level failure with no attributable locator (an empty blueprint, an elaborator failure) becomes one `blueprint_validation` residual item carrying the message (no `source`). Every refusal of the bundle while it loads is an item of the verdict, never a no-verdict `5xx`: an unknown model is an `unknown_model` item on the pipe's `model` field, a model setting the model it resolves to refuses (a reasoning setting on a model that does not reason, for instance) is an `llm_setting_refused_by_model` item on the field naming the setting, and a call into a method package this runtime cannot resolve (not installed and not fetchable, or a fetch that failed) is an `unresolved_package_dependency` item on the first pipe naming the package, whose `missing_pipe_code` is the reference as written, `<address>->domain.code`
+- `validation_errors` (list): the structured per-error diagnostics a client maps to per-line problems — built by pipelex's one shared builder, so they are byte-for-byte the same items the agent CLI emits. Each item carries a `category` (the closed set `blueprint_validation` | `pipe_factory` | `pipe_validation` | `dry_run`), a `message`, and the locators the runtime can attribute (`error_type`, `pipe_code` / `concept_code` / `domain_code`, `field_path` / `field_name`, and `source`). Absent locators are omitted, not null. An item may also carry a **`suggested_fix`** — a structured, deterministic repair (`fix_code`, `description`, `safety: safe|unsafe`, and the `ops[]` of semantic TOML patch operations to apply). It is present only when the fix planner derived one from the typed error data; a client that ignores it behaves exactly as before. See [Error Responses → Structured validation errors](error-responses.md#structured-validation-errors) and [→ Suggested fixes](error-responses.md#suggested-fixes) for every field. The array is **never empty on an invalid verdict** (the structured-info invariant is total): a failing dry run becomes one `dry_run` item per failing pipe, located at the innermost pipe that failed (its `pipe_code`, `domain_code` and, when known, `source`), a TOML syntax error carries the `line` and `column` the parser stopped at, and a parse-level failure with no attributable locator (an empty blueprint, an elaborator failure) becomes one `blueprint_validation` residual item carrying the message (no `source`). Every refusal of the bundle while it loads is an item of the verdict, never a no-verdict `5xx`: an unknown model is an `unknown_model` item on the pipe's `model` field (a reference the deck does not define, or a bare handle it serves only as another model type, such as an LLM named in a `PipeImgGen`; [`GET /v1/models/check`](models.md#check-a-model-reference) answers the same question for one reference), a model setting the model it resolves to refuses (a reasoning setting on a model that does not reason, for instance) is an `llm_setting_refused_by_model` item on the field naming the setting, and a call into a method package this runtime cannot resolve (not installed and not fetchable, or a fetch that failed) is an `unresolved_package_dependency` item on the first pipe naming the package, whose `missing_pipe_code` is the reference as written, `<address>->domain.code`
 - `pending_signatures` (list[str]): best-effort outstanding signatures (empty on the invalid arm, since no library was assembled)
 - `is_runnable` (`false`): an invalid bundle is never runnable
 - `message` (string): the human-readable verdict summary: the lone item's message when there is one item, `N validation errors (first: <the first item's message>)` when there are several, and the parser's own message for a parse-level failure
@@ -26628,6 +26658,134 @@ describing the blocking issue. Malformed formatter options, such as a non-numeri
 ```
 
 `changed` is `true` when `formatted` differs from `content`.
+
+
+## Models
+
+# Models
+
+Two routes tell a client about the models a method may name on this runner: the deck it routes to, and whether one model reference resolves on it. A client asks them rather than keeping its own table of providers, its own parser of model references or its own copy of the deck.
+
+## List the deck
+
+**Endpoint:** `GET /v1/models`
+
+The MTHDS Protocol's `models` operation, tagged `x-mthds-protocol` in the [OpenAPI artifact](openapi/pipelex-api.openapi.yaml). It answers the protocol's model deck: a flat `models` list of the deck's presets, each a `{name, type}` entry whose `type` is one of the protocol's model categories, plus this implementation's routing extensions, `aliases` and `waterfalls`, keyed by category because the same alias name exists in several categories.
+
+The optional `type` query parameter filters the deck to one category: `llm`, `extract`, `img_gen`, `search` or `judgment`. It takes a single value, so a repeated `type` is a `422` `ValidationError`, and an unknown or empty one is a `422` `InvalidModelCategory`.
+
+## Check a model reference
+
+**Endpoint:** `GET /v1/models/check`
+
+Answers whether one model reference resolves on this runner, as what kind of reference, to which model, and, when it does not, what the caller most likely meant. It reads the runner's deck and the models the runner can call, and runs no inference.
+
+It is a **Pipelex API extension**, not an MTHDS Protocol route: it is not tagged `x-mthds-protocol`. The answer comes from pipelex's own reference parser and the deck lookups a validation runs, so a reference the check finds resolved in a category is one a pipe of that category may name in its `model` field, and one it finds not found is one a validation refuses. A client therefore needs no grammar of its own to read a reference.
+
+### Request
+
+| Query parameter | Required | Meaning |
+|---|---:|---|
+| `reference` | yes, once | The reference as a method's `model` field writes it: `$preset`, `@alias`, `~waterfall`, a bare model handle, or one of the spelled-out namespaces `preset:`, `alias:`, `waterfall:` and `handle:`. Leading and trailing whitespace is ignored, and the trimmed reference holds at most 199 characters. |
+| `type` | no, at most once | The category to check in. When it is absent, the check is made in every category it covers. |
+
+The check covers the protocol's model categories, in the protocol's order (`llm`, `extract`, `img_gen`, `search`, `judgment`), then `doc_gen`, the family of `PipeDocGen`. The protocol defines no category for `doc_gen`, so `GET /v1/models` leaves it out, but a method names a `doc_gen` model like any other, so the check answers in it. Every list the check returns that is ordered by category follows this order.
+
+### Resolution
+
+The reference is parsed as a method's `model` field is: a sigil first (`$` preset, `@` alias, `~` waterfall), then a spelled-out namespace, and otherwise a bare handle. `alias:best-gpt` and `@best-gpt` are the same reference. `handle:` is the bare kind's own namespace: it writes a bare name without reading a sigil, so `handle:@best-gpt` is the bare name `@best-gpt`, not the alias `best-gpt`, and `handle:best-gpt` is the bare name `best-gpt`. Like any bare name, it resolves as a model of that name, then an alias, then a waterfall of that name: where the runner serves a model `@best-gpt`, the check resolves to it and a run calls it, and where the deck holds nothing of that name, a validation refuses it as the check finds it `not_found`. A suggestion naming a handle spelled like a reference writes it with the namespace, `handle:@best-gpt`, so it can be written back as it is.
+
+A reference **resolves in a category** when the runner holds its name there:
+
+- a preset, an alias or a waterfall, when the deck defines that name in the category;
+- a bare handle, as a run reads it: when the runner can call a model of that name in the category, among every model it can call and not only those the deck names; failing that, when the category defines an alias of that name, or a waterfall of that name while model fallback is on. A model of that name in another category does not make it resolve, so an LLM handle checked as `img_gen` is `not_found`, as a validation refuses it in a `PipeImgGen`.
+
+The reference is `resolved` when it resolves in at least one category in scope, and `not_found` otherwise. Both values are definitive: a client that reads a value it does not know treats the reference as unresolved.
+
+Resolution is a matter of names, like a validation. A preset, an alias or a waterfall the deck defines resolves even when its binding reaches no model the runner can call (a target on a backend the runner has not enabled, a waterfall none of whose usable steps it serves, a binding that leads back to itself through aliases and waterfalls), and its match says so with a `resolves_to` of `null`. A sigiled reference resolves by its sigil, in the check and in a run alike: `~best-gpt` is the waterfall even where an alias or a model is also named `best-gpt`. A waterfall step that leads back to an alias or a waterfall being resolved is a step no model serves, and so is a step reaching another waterfall none of whose models the runner serves, so the waterfall goes on to its next step. The check reads the deck as a run would and leaves no trace: it logs nothing, and the one-time notice a run logs when a waterfall falls back is left to that run. A run through such a reference fails where a validation passes, so a client shows it as a warning rather than as an unknown name.
+
+### The verdict
+
+A verdict is a `200`, whatever the resolution:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `reference` | string | The caller's reference, trimmed. |
+| `kind` | `"preset"`, `"alias"`, `"waterfall"` or `"handle"` | What the reference names, from its parsing. |
+| `name` | string | The reference without its sigil or namespace. |
+| `category` | string or `null` | The `type` asked, or `null` when none was. |
+| `resolution` | `"resolved"` or `"not_found"` | Whether the reference resolves in a category in scope. |
+| `matches` | list | One entry per category in scope where the reference resolves, in category order. Empty on `not_found`. |
+| `suggestions` | list of strings | On `not_found`, the nearest names the caller may have meant. |
+| `other_kinds` | list of strings | On `not_found`, the same name under another kind, in the categories in scope. |
+| `other_categories` | list of strings | On `not_found` with a `type`, the categories outside it where the same reference resolves. |
+
+A `matches` entry says what the reference is in one category. A field that does not apply to the reference's kind is absent rather than `null`:
+
+| Field | Present for | Meaning |
+|---|---|---|
+| `category` | every kind | The category the entry is about. |
+| `resolves_to` | every kind | The model handle a run through the reference would call now in this category, or `null` when it would find none: a preset and an alias through their target, a waterfall through the first of its steps the runner serves (its first step alone when model fallback is off), and a handle itself, or, for a bare name that resolves through an alias or a waterfall, what that alias or waterfall resolves to. |
+| `target` | preset, alias | The model the deck binds the name to, as the deck writes it, which may itself be a reference (`@default-premium`). |
+| `description` | preset | The preset's description, or `null` when the deck gives it none. |
+| `fallbacks` | waterfall | The waterfall's steps, in order. |
+| `via` | handle | The presets, aliases and waterfalls of the category whose binding names the handle directly, each written as a reference. |
+
+A preset, checked in its category:
+
+```json
+{
+  "reference": "$writing-factual",
+  "kind": "preset",
+  "name": "writing-factual",
+  "category": "llm",
+  "resolution": "resolved",
+  "matches": [
+    { "category": "llm", "resolves_to": "gpt-5.6-sol", "target": "@default-premium", "description": "Factual writing with high accuracy" }
+  ],
+  "suggestions": [],
+  "other_kinds": [],
+  "other_categories": []
+}
+```
+
+### Suggestions
+
+On `not_found`, `suggestions`, `other_kinds` and `other_categories` say what the caller may have meant. They follow the rule a validation follows when it refuses an unknown model, so the check offers what a failing validation of the same reference offers, applied in each category in scope and joined in category order, a name two categories give appearing once, at its first place:
+
+- `suggestions`: up to five names of the reference's own kind, nearest first, then, for each other kind under which the name does not exist exactly, up to three names of that kind, with a stricter threshold of nearness. For a handle, the candidates are every model the runner can call in the category.
+- `other_kinds`: the same name under each other kind the category defines it as (`best-gpt` asked as a preset, found as `@best-gpt`). It is the likeliest fault, so a client shows it first.
+- `other_categories`: when `type` was given, each other category where the same reference resolves (`$gen-image` asked as `llm`, found in `img_gen`).
+
+Every name is written as a method would write it, a sigil for a preset, an alias or a waterfall and a bare name for a handle, without the kind labels a validation's report adds.
+
+A preset name asked under the alias sigil:
+
+```json
+{
+  "reference": "@writing-factual",
+  "kind": "alias",
+  "name": "writing-factual",
+  "category": "llm",
+  "resolution": "not_found",
+  "matches": [],
+  "suggestions": [],
+  "other_kinds": ["$writing-factual"],
+  "other_categories": []
+}
+```
+
+### Refusals
+
+A request the route cannot produce a verdict for is a `422` `application/problem+json` in the `input` error domain, carrying no verdict:
+
+| Cause | `error_type` |
+|---|---|
+| `reference` missing or given more than once, or `type` given more than once | `ValidationError` |
+| `reference` blank once trimmed, a sigil or namespace with nothing after it, or longer than 199 characters | `InvalidModelReference` |
+| `type` unknown or empty | `InvalidModelCategory` |
+
+A reference that parses and resolves nowhere is never refused: it is the `not_found` verdict, which is the successful product of the call. See [Error Responses](error-responses.md) for the problem document's shape.
 
 
 ## Error Responses
