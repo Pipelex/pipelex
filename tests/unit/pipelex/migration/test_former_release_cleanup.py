@@ -15,14 +15,17 @@ import pytest
 from pipelex.cogt.model_routing.routing_profile_loader import load_active_routing_profile
 from pipelex.fix_ops.file_transaction import PendingFileUpdate, commit_file_updates
 from pipelex.kit.paths import RETIRED_SERVICE_FILE_NAME, get_kit_configs_dir
+from pipelex.migration import former_release_cleanup as former_release_cleanup_module
 from pipelex.migration.backup import backup_path_for, existing_backups_of
 from pipelex.migration.former_release import (
     MODEL_SPECS_SECTION_KEY,
+    FormerReleaseFinding,
     detect_former_release,
     kit_default_routing_profile_name,
 )
-from pipelex.migration.former_release_cleanup import FormerReleaseFileAction, clean_former_release
+from pipelex.migration.former_release_cleanup import CleanedText, FormerReleaseFileAction, clean_former_release
 from pipelex.migration.plan import FileBlockedReason
+from pipelex.suggested_fix import DeleteKeyOp
 from pipelex.system.configuration.config_loader import (
     BACKENDS_DIR_NAME,
     BACKENDS_FILE_NAME,
@@ -335,3 +338,108 @@ class TestCleanFormerRelease:
         text = backends_path.read_text(encoding="utf-8")
         assert text.startswith(user_note)
         assert "pipelex_gateway" not in text
+
+    def test_a_catch_all_route_to_the_gateway_is_deleted_as_the_literal_key_it_is(self, tmp_path: Path) -> None:
+        """`"*"` is a route a user writes to send every other model somewhere; to the cleanup it is a key like any other."""
+        config_dir = tmp_path / ".pipelex"
+        routing_path = config_dir / ROUTING
+        routing_path.parent.mkdir(parents=True)
+        routing_path.write_text(
+            'active = "mine"\n\n[profiles.mine]\ndescription = "everything through the gateway except claude"\ndefault = "openai"\n\n'
+            '[profiles.mine.routes]\n"*" = "pipelex_gateway"\n"claude-*" = "anthropic"\n',
+            encoding="utf-8",
+        )
+
+        cleanup = clean_former_release(config_dirs=[config_dir], dry_run=False, moment=MOMENT)
+
+        assert not cleanup.needs_attention
+        assert [file.changes for file in cleanup.files] == [["removed the route of '*' to 'pipelex_gateway' from the routing profile 'mine'"]]
+        profile = load_active_routing_profile(routing_profile_library_paths=[routing_path], enabled_backends=["openai", "anthropic"])
+        assert (profile.name, profile.default, profile.routes) == ("mine", "openai", {"claude-*": "anthropic"})
+
+    def test_a_profile_named_like_the_wildcard_is_the_only_one_removed(self, tmp_path: Path) -> None:
+        """A profile spelled `"*"` names itself, never every profile of the file."""
+        config_dir = tmp_path / ".pipelex"
+        routing_path = config_dir / ROUTING
+        routing_path.parent.mkdir(parents=True)
+        routing_path.write_text(
+            'active = "mine"\n\n[profiles."*"]\ndescription = "odd"\ndefault = "pipelex_gateway"\n\n'
+            '[profiles.mine]\ndescription = "mine"\ndefault = "openai"\n',
+            encoding="utf-8",
+        )
+
+        cleanup = clean_former_release(config_dirs=[config_dir], dry_run=False, moment=MOMENT)
+
+        assert not cleanup.needs_attention
+        assert list(load_toml_from_path(routing_path)["profiles"]) == ["mine"]
+
+    def test_a_change_the_cleanup_cannot_express_blocks_its_file_and_never_the_run(self, tmp_path: Path, mocker: "MockerFixture") -> None:
+        """One odd file is reported for a hand edit, and every other file is still cleaned: nothing crosses the per-file boundary."""
+        config_dir = _copy_v0_72(tmp_path=tmp_path)
+        routing_path = config_dir / ROUTING
+        routing_before = routing_path.read_bytes()
+        real_cleaned_text = former_release_cleanup_module.cleaned_text
+
+        def _refused_for_the_routing_file(*, text: str, findings: list[FormerReleaseFinding], kit_default: str, is_override: bool) -> CleanedText:
+            if findings[0].file_path == routing_path:
+                DeleteKeyOp(table_path=[], key="*")
+            return real_cleaned_text(text=text, findings=findings, kit_default=kit_default, is_override=is_override)
+
+        mocker.patch.object(former_release_cleanup_module, "cleaned_text", side_effect=_refused_for_the_routing_file)
+
+        cleanup = clean_former_release(config_dirs=[config_dir], dry_run=False, moment=MOMENT)
+
+        assert [file.file_path for file in cleanup.blocked_files] == [routing_path]
+        assert cleanup.blocked_files[0].blocked_reason is FileBlockedReason.NEEDS_A_HAND_EDIT
+        assert routing_path.read_bytes() == routing_before
+        assert (config_dir / BACKENDS).read_bytes() == (V0_72_CLEANED_DIR / BACKENDS).read_bytes()
+
+    def test_a_users_notes_mentioning_the_gateway_at_the_head_stay(self, tmp_path: Path) -> None:
+        """Only the paragraphs the former release itself shipped go from the head of a document; a user's note naming the Gateway stays."""
+        config_dir = tmp_path / ".pipelex"
+        backends_path = config_dir / BACKENDS
+        routing_path = config_dir / ROUTING
+        backends_path.parent.mkdir(parents=True)
+        backends_note = "# My backends. Note to self: I stopped using pipelex_gateway in March, keys are in 1Password.\n"
+        routing_note = "# Kept for history: the old pipelex_gateway profile was my default until v0.72.\n"
+        backends_path.write_text(
+            f'{backends_note}[openai]\nenabled = true\napi_key = "${{OPENAI_API_KEY}}"\nmodel_specs_section = "openai"\n\n'
+            '[anthropic]\nenabled = true\napi_key = "${ANTHROPIC_API_KEY}"\n',
+            encoding="utf-8",
+        )
+        routing_path.write_text(
+            f'active = "mine"\n\n{routing_note}[profiles.mine]\ndescription = "mine"\ndefault = "openai"\n\n'
+            '[profiles.old]\ndescription = "old"\ndefault = "pipelex_gateway"\n',
+            encoding="utf-8",
+        )
+
+        cleanup = clean_former_release(config_dirs=[config_dir], dry_run=False, moment=MOMENT)
+
+        assert not cleanup.needs_attention
+        assert len(cleanup.applied_files) == 2
+        assert backends_path.read_text(encoding="utf-8").startswith(backends_note)
+        assert routing_note in routing_path.read_text(encoding="utf-8")
+        assert all("removed a comment" not in change for file in cleanup.files for change in file.changes)
+
+    @pytest.mark.parametrize("dry_run", [True, False])
+    def test_a_rewrite_that_would_stop_a_boot_that_starts_is_never_written(self, tmp_path: Path, mocker: "MockerFixture", dry_run: bool) -> None:
+        """The last check before writing reads the new texts as the boot would: a rewrite the plan did not foresee leaving a
+        boot that starts today without its profile is left for a hand edit, whatever produced it.
+        """
+        config_dir = tmp_path / ".pipelex"
+        routing_path = config_dir / ROUTING
+        routing_path.parent.mkdir(parents=True)
+        kit_routing = (Path(str(get_kit_configs_dir())) / ROUTING).read_text(encoding="utf-8")
+        routing_path.write_text(kit_routing + '\n[profiles.old]\ndescription = "old"\ndefault = "pipelex_gateway"\n', encoding="utf-8")
+        routing_before = routing_path.read_bytes()
+
+        def _a_cleanup_bug(**kwargs: object) -> CleanedText:
+            return CleanedText(text=f'active = "{kwargs["kit_default"]}"\n', changes=["removed every routing profile"])
+
+        mocker.patch.object(former_release_cleanup_module, "cleaned_text", side_effect=_a_cleanup_bug)
+
+        cleanup = clean_former_release(config_dirs=[config_dir], dry_run=dry_run, moment=MOMENT)
+
+        assert [(file.file_path, file.blocked_reason) for file in cleanup.blocked_files] == [(routing_path, FileBlockedReason.NEEDS_A_HAND_EDIT)]
+        assert "would stop Pipelex from starting as it does now" in (cleanup.blocked_files[0].blocked_detail or "")
+        assert routing_path.read_bytes() == routing_before

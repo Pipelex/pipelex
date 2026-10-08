@@ -437,6 +437,10 @@ def check_pending_migrations() -> PendingMigrationsCheck:
         sentences.append(f"{len(migratable_files)} configuration file(s) can be brought up to date by '{MIGRATE_COMMAND}'")
     if attention_files:
         sentences.append(f"{len(attention_files)} configuration file(s) need a look — run '{MIGRATE_COMMAND} --dry-run' for the detail")
+    if cleanup.still_blocking:
+        # The cleanup's own check, run on the files as it would leave them: what a cleanup run from another project
+        # left half done, above all, which no file here carries any more.
+        sentences.append(f"Pipelex would still not start once '{MIGRATE_COMMAND}' has run — '{MIGRATE_COMMAND} --dry-run' says why")
     has_work = bool(migratable_files or former_release_files)
     return PendingMigrationsCheck(
         finding=PendingMigrationsFinding.PENDING if has_work else PendingMigrationsFinding.NEEDS_ATTENTION,
@@ -1590,7 +1594,7 @@ FORMER_RELEASE_STOPS_THE_MODELS_CHECK = (
 
 
 def _migration_fix_question(*, former_release_count: int, migratable_count: int) -> str:
-    """The `--fix` question for `pipelex migrate`'s write pass, counting the files of each of its two steps."""
+    """The `--fix` question for `pipelex migrate`'s write pass, counting the files of each of its steps: the cleanup, then the migration."""
     migration = f"{migratable_count} configuration file(s) to the current schema"
     if not former_release_count:
         return f"Migrate {migration}?"

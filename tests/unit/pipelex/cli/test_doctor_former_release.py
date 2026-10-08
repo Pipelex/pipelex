@@ -151,3 +151,33 @@ class TestTheDoctorOnAFormerRelease:
 
         assert str(gateway_file) in check.former_release_files
         assert str(gateway_file) not in check.migratable_files
+
+    def test_a_catch_all_route_to_the_gateway_is_offered_for_cleanup_rather_than_crashing_the_row(self, machine: tuple[Path, Path]) -> None:
+        home, _ = machine
+        shutil.copytree(Path(str(get_kit_configs_dir())), home)
+        routing_path = home / INFERENCE_DIR_NAME / ROUTING_PROFILES_FILE_NAME
+        routing_path.write_text(
+            'active = "mine"\n\n[profiles.mine]\ndescription = "everything through the gateway except claude"\ndefault = "openai"\n\n'
+            '[profiles.mine.routes]\n"*" = "pipelex_gateway"\n"claude-*" = "anthropic"\n',
+            encoding="utf-8",
+        )
+
+        check = check_pending_migrations()
+
+        assert check.finding is PendingMigrationsFinding.PENDING
+        assert check.former_release_files == [str(routing_path)]
+        assert check.former_release_blocks_boot
+
+    def test_a_boot_still_stopped_with_nothing_left_to_clean_needs_attention(self, machine: tuple[Path, Path]) -> None:
+        """What a cleanup run from another project leaves: no file a former release left, and an `active` naming a profile it removed."""
+        home, project = machine
+        shutil.copytree(Path(str(get_kit_configs_dir())), home)
+        project_override = project / INFERENCE_DIR_NAME / "routing_profiles_override.toml"
+        project_override.parent.mkdir(parents=True)
+        project_override.write_text('active = "team_gateway"\n', encoding="utf-8")
+
+        check = check_pending_migrations()
+
+        assert check.finding is PendingMigrationsFinding.NEEDS_ATTENTION
+        assert check.former_release_files == []
+        assert f"Pipelex would still not start once '{MIGRATE_COMMAND}' has run" in check.message

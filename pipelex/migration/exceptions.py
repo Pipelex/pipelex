@@ -41,7 +41,7 @@ class FormerReleaseConfigError(PipelexSetupError):
 
     Raised at boot, before the backend and routing profile libraries load, when a retired backend is enabled, a backend
     still names `model_specs_section`, or the active routing profile sends models to a retired backend. The message
-    names each of them with its file, and the two remedies: `pipelex migrate`, which removes what that release left and
+    names each of them with its file, and the remedies: `pipelex migrate`, which removes what that release left and
     keeps a copy of each file it changes, and `pipelex init`, which offers the same cleanup and then sets Pipelex up
     again, on the hosted Pipelex API or on this machine.
     """

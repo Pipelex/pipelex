@@ -21,8 +21,9 @@ deck, no credentials, no network. A broken configuration is the reason to reach 
 **Its first step is the cleanup of a former release**, as in the human command: what a release that
 ran on the Pipelex Gateway or Pipelex Manifold left, reported under ``former_release`` and counted in
 the verdict, so a machine whose boot names this command ends the loop able to boot. The replay never
-walks a file the cleanup removes, and what still stops the boot after a write is listed under
-``former_release.still_blocking`` and makes the verdict ``needs_attention``.
+walks a file the cleanup removes, and what would still stop the boot once the cleanup is done — read on every
+run, off the files as a write left them or as a dry run would leave them, and on a machine with nothing to clean —
+is listed under ``former_release.still_blocking``, and makes the verdict ``needs_attention`` and never ``is_clean``.
 
 See ``docs/migration-ledger.md``.
 """
@@ -151,7 +152,7 @@ def _render_markdown(result: dict[str, Any]) -> str:
         lines += _former_release_lines(file=file, applied=applied)
     still_blocking: list[str] = result["former_release"]["still_blocking"]
     if still_blocking:
-        lines += ["", "## Pipelex still cannot start", "", "After the cleanup, a boot of this machine is still refused:", ""]
+        lines += ["", "## Pipelex still cannot start", "", "Once the cleanup is done, a boot of this machine is still refused:", ""]
         lines += [f"- {problem}" for problem in still_blocking]
 
     for plan_dict in result["plans"]:

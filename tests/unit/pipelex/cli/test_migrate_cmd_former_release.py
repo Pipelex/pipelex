@@ -16,9 +16,9 @@ from rich.console import Console
 
 from pipelex.cli.commands import migrate_cmd as migrate_cmd_module
 from pipelex.cli.commands.migrate_cmd import migrate_cmd
-from pipelex.kit.paths import RETIRED_SERVICE_FILE_NAME
+from pipelex.kit.paths import RETIRED_SERVICE_FILE_NAME, get_kit_configs_dir
 from pipelex.migration.backup import existing_backups_of
-from pipelex.migration.former_release import detect_former_release
+from pipelex.migration.former_release import detect_former_release, kit_default_routing_profile_name
 from pipelex.system.configuration.config_loader import BACKENDS_DIR_NAME, BACKENDS_FILE_NAME, INFERENCE_DIR_NAME, ROUTING_PROFILES_FILE_NAME
 
 if TYPE_CHECKING:
@@ -148,3 +148,27 @@ class TestTheMigrateCommandOnAFormerRelease:
         assert "After the cleanup, Pipelex still cannot start:" in output
         assert "'ghost'" in output
         assert "a copy of each original is beside it" not in output
+
+    @pytest.mark.parametrize("dry_run", [True, False])
+    def test_a_machine_with_nothing_left_to_clean_that_cannot_start_is_never_up_to_date(
+        self, tmp_path: Path, console: Console, mocker: MockerFixture, dry_run: bool
+    ) -> None:
+        """A cleanup left half done — run from another project, or stopped by a file it could not write — leaves no file a
+        former release left and a boot still stopped: the retry says what stops it, and exits non-zero.
+        """
+        config_dir = tmp_path / ".pipelex"
+        shutil.copytree(Path(str(get_kit_configs_dir())), config_dir)
+        routing_path = config_dir / INFERENCE_DIR_NAME / ROUTING_PROFILES_FILE_NAME
+        text = routing_path.read_text(encoding="utf-8")
+        routing_path.write_text(text.replace(f'active = "{kit_default_routing_profile_name()}"', 'active = "team_gateway"'), encoding="utf-8")
+        mocker.patch.object(migrate_cmd_module, "config_directories_to_migrate", return_value=[config_dir])
+
+        with pytest.raises(SystemExit) as leaving:
+            migrate_cmd(dry_run=dry_run, yes=not dry_run)
+
+        assert leaving.value.code == 1
+        output = console.export_text()
+        assert "Pipelex cannot start:" in output
+        assert "'team_gateway'" in output
+        assert "at the current schema" not in output
+        assert "file(s)?" not in output

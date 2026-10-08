@@ -28,9 +28,10 @@ longer has, and the boot refuses it with an error naming this command. That clea
 entry — it removes what a release left rather than reshaping a file — so it runs beside the replay,
 first, under the same two passes, the same question and the same backups
 (`pipelex/migration/former_release_cleanup.py`). The replay leaves the files the cleanup removes out
-of its walk in both passes, so a file about to go is never counted, migrated or reported on. After
-writing, the cleanup reads the files each boot merges again, and a machine that still cannot start
-is reported as such, with a non-zero exit, never as a success.
+of its walk in both passes, so a file about to go is never counted, migrated or reported on. On
+every run, a dry run and one with nothing to clean included, the cleanup reads the files each boot
+merges as it leaves them, and a machine that still cannot start is reported as such, with a non-zero
+exit, never as a success or as nothing to do.
 
 See `docs/migration-ledger.md`.
 """
@@ -106,7 +107,7 @@ def migrate_cmd(*, dry_run: bool = False, yes: bool = False) -> None:
         _exit_on_attention(report=rehearsal, cleanup=former_release)
         return
 
-    if not rehearsal.changed_plans and former_release.is_clean:
+    if not rehearsal.changed_plans and not former_release.files:
         # The clean return's twin, and it needs the rule for the same reason: `--dry-run` has
         # already returned above, so this run is authorized to write, and nothing was declined
         # because nothing was asked. Unguarded on purpose — the guard would be dead code, and it
@@ -127,7 +128,7 @@ def migrate_cmd(*, dry_run: bool = False, yes: bool = False) -> None:
         _exit_on_attention(report=rehearsal, cleanup=former_release)
         return
 
-    # The cleanup first: it removes files the replay leaves out of its walk, and rewrites two it never claims.
+    # The cleanup first: it removes files the replay leaves out of its walk, and rewrites files the replay never claims.
     cleaned = apply_former_release_cleanup(config_dirs=config_dirs)
     applied = apply_pending_migrations(config_dirs=config_dirs, skipped_paths=cleaned.removed_paths)
     done = _done_in_words(cleaned=len(cleaned.applied_files), migrated=len(applied.written_plans))
@@ -183,7 +184,8 @@ def apply_former_release_cleanup(*, config_dirs: list[Path]) -> FormerReleaseCle
 def print_former_release_cleanup(*, cleanup: FormerReleaseCleanup) -> None:
     """Each file the cleanup touches, with its changes: rehearsed (`→`) or made (`✓`), and the copy kept of it.
 
-    Then, after a write, what still stops the boot: the check the cleanup ran on its own work.
+    Then what would still stop the boot, the check the cleanup runs on every run: once it has written, once a dry run
+    would have, or as the files stand when there was nothing to clean.
     """
     console = get_console()
     for file in cleanup.files:
@@ -199,9 +201,18 @@ def print_former_release_cleanup(*, cleanup: FormerReleaseCleanup) -> None:
             console.print(f"    [dim]backup: {escape(str(file.backup_path))}[/dim]")
     if cleanup.still_blocking:
         console.print()
-        console.print("  [bold]After the cleanup, Pipelex still cannot start:[/bold]")
+        console.print(f"  [bold]{_still_blocking_heading(cleanup=cleanup)}[/bold]")
         for problem in cleanup.still_blocking:
             console.print(f"    [red]✗[/red] {escape(problem)}")
+
+
+def _still_blocking_heading(*, cleanup: FormerReleaseCleanup) -> str:
+    """The heading over what still stops the boot, in the tense of the run."""
+    if not cleanup.files:
+        return "Pipelex cannot start:"
+    if cleanup.dry_run:
+        return "After the cleanup, Pipelex would still not start:"
+    return "After the cleanup, Pipelex still cannot start:"
 
 
 def apply_pending_migrations(*, config_dirs: list[Path], skipped_paths: Collection[Path] = ()) -> MigrationReport:
