@@ -209,6 +209,36 @@ costs = { input = 0.04, output = 0.0 }
 
 The `[defaults]` table applies to every model of the file, and a model table overrides any key of it.
 
+#### One handle, several kinds of model
+
+A handle names one model per model type. The same name may be an LLM and a judgment model at once, and each pipe reaches the kind its family asks for: a `PipeLLM` naming `acme-one` gets the LLM, and a `PipeJudge` naming it gets the judgment model. A table's name is its handle, and TOML forbids declaring a table twice, so the second model of a handle gets a table name of its own and says which handle it serves with `handle`:
+
+```toml
+# acme.toml
+[defaults]
+model_type = "llm"
+sdk = "openai_responses"
+
+["acme-one"]
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.1, output = 0.5 }
+
+["acme-one-judgment"]
+handle = "acme-one"
+model_type = "judgment"
+sdk = "acme_judgments"   # the judgment SDK the provider's plugin registers
+inputs = ["text"]
+outputs = ["judgments"]
+costs = { input = 0.1, output = 0 }
+```
+
+The table name `acme-one-judgment` names the table and nothing else: methods, the model deck and the routing profiles all use the handle `acme-one`, and the model id defaults to the handle too. Two tables may share a handle only when their model types differ, so a file declaring one handle twice as the same type fails to load, naming both tables. `handle` cannot go in `[defaults]`, which every model of the file inherits, and like every key that describes the model rather than a value a call sends, it cannot reference a variable.
+
+A routing profile routes a handle's name, so its route applies to every kind of model of that name. A model type the routed backend does not serve is looked for along the profile's `fallback_order`, or in the internal backend when it has none, when the name reached that backend by default, is left out when it reached it through a wildcard pattern, and is not served at all when the profile routes the name to that backend exactly: an exact route pins the name to one backend.
+
+A method whose pipe names a handle the deck serves only as another kind of model is refused when it loads: a `PipeJudge` naming a handle served only as an LLM is told that no judgment model of that name exists, and the suggestions list judgment models only.
+
 #### Input formats
 
 `inputs` lists what a model reads. For files, its entries are format keys, the same keys the runtime derives from a file's MIME type to check, before a run starts, that every file reaches a model able to read it: every image type is the `image` family, and any other type is its extension.

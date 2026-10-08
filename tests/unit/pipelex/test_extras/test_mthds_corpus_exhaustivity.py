@@ -1,7 +1,7 @@
 """The corpus-side exhaustivity gate — the gate the whole corpus exists for.
 
-Contract: ``docs/specs/mthds-test-corpus.md`` (workspace root), section "Gates" →
-"Corpus-side: exhaustivity".
+Contract: ``conformance/specs/mthds-test-corpus.md`` (the cross-repo spec, kept in the ``conformance``
+repo), section "Gates" → "Corpus-side: exhaustivity".
 
 The moment a runtime registry grows a code, regeneration adds its tag and this gate stays red
 until a focused entry covers it. It is why "the `Time` native concept has no fixture anywhere"

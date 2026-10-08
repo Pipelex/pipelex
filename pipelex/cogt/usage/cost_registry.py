@@ -58,6 +58,17 @@ def compute_tokens_usage_cost(tokens_usage: TokensUsage) -> float | None:
     )
 
 
+class ModelUsageKey(NamedTuple):
+    """One model a run called, as its usage is grouped: the kind of call, then the model's name.
+
+    A handle names one model per model type, so one run may call `gpt-6-luna` as an LLM and as a judgment
+    model: grouped by the name alone, the two would merge into one row typed by whichever call came last.
+    """
+
+    model_type: str
+    model_name: str
+
+
 class AggregatedCosts(NamedTuple):
     """One run's token usage aggregated for reporting: flat records, per-model groups, and run totals.
 
@@ -67,8 +78,7 @@ class AggregatedCosts(NamedTuple):
     """
 
     records: list[dict[str, Any]]
-    grouped_by_model: dict[str, dict[str, float]]
-    model_types: dict[str, str]
+    grouped_by_model: dict[ModelUsageKey, dict[str, float]]
     total_cost: float
     total_nb_tokens: int
 
@@ -136,7 +146,6 @@ class CostRegistry(RootModel[CostRegistryRoot]):
         """
         records = aggregated.records
         grouped_by_model = aggregated.grouped_by_model
-        model_types = aggregated.model_types
 
         # Use LLMTokenCostReportField for field names (same string values as ImgGenTokenCostReportField)
         report_field = LLMTokenCostReportField
@@ -191,15 +200,15 @@ class CostRegistry(RootModel[CostRegistryRoot]):
             table.add_column(f"Total Cost ({scale_str}$)", justify="right", style="bold yellow")
 
             # Add rows for each model
-            for model_name, aggregated_data in grouped_by_model.items():
+            for model_key, aggregated_data in grouped_by_model.items():
                 row_total_cost = cls.compute_total_cost(
                     input_non_cached_cost=aggregated_data[report_field.COST_INPUT_NON_CACHED],
                     input_cached_cost=aggregated_data[report_field.COST_INPUT_CACHED],
                     output_cost=aggregated_data[report_field.COST_OUTPUT],
                 )
                 table.add_row(
-                    model_name,
-                    model_types.get(model_name, "llm"),
+                    model_key.model_name,
+                    model_key.model_type,
                     f"{int(aggregated_data[report_field.NB_TOKENS_INPUT_CACHED]):,}",
                     f"{int(aggregated_data[report_field.NB_TOKENS_INPUT_NON_CACHED]):,}",
                     f"{int(aggregated_data[report_field.NB_TOKENS_INPUT_JOINED]):,}",
@@ -270,8 +279,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
         records = cost_registry.to_records()
 
         report_field = LLMTokenCostReportField
-        grouped_by_model: dict[str, dict[str, float]] = {}
-        model_types: dict[str, str] = {}
+        grouped_by_model: dict[ModelUsageKey, dict[str, float]] = {}
         for record in records:
             model_name = (
                 record.get(report_field.LLM_NAME)
@@ -280,9 +288,9 @@ class CostRegistry(RootModel[CostRegistryRoot]):
                 or record.get(SearchTokenCostReportField.SEARCH_NAME)
                 or record.get(JudgmentTokenCostReportField.JUDGMENT_NAME, "unknown")
             )
-            model_types[model_name] = record.get(report_field.MODEL_TYPE, "llm")
-            if model_name not in grouped_by_model:
-                grouped_by_model[model_name] = {
+            model_key = ModelUsageKey(model_type=record.get(report_field.MODEL_TYPE, "llm"), model_name=model_name)
+            if model_key not in grouped_by_model:
+                grouped_by_model[model_key] = {
                     report_field.NB_TOKENS_INPUT_CACHED: 0,
                     report_field.NB_TOKENS_INPUT_NON_CACHED: 0,
                     report_field.NB_TOKENS_INPUT_JOINED: 0,
@@ -302,7 +310,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
                 report_field.COST_INPUT_JOINED,
                 report_field.COST_OUTPUT,
             ]:
-                grouped_by_model[model_name][field] += record.get(field, 0)
+                grouped_by_model[model_key][field] += record.get(field, 0)
 
         total_cost = cls.compute_total_cost(
             input_non_cached_cost=sum(record.get(report_field.COST_INPUT_NON_CACHED, 0) for record in records),
@@ -316,7 +324,6 @@ class CostRegistry(RootModel[CostRegistryRoot]):
         return AggregatedCosts(
             records=records,
             grouped_by_model=grouped_by_model,
-            model_types=model_types,
             total_cost=total_cost,
             total_nb_tokens=total_nb_tokens,
         )
@@ -335,7 +342,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
 
         report_field = LLMTokenCostReportField
         by_model: list[dict[str, Any]] = []
-        for model_name, aggregated_data in aggregated.grouped_by_model.items():
+        for model_key, aggregated_data in aggregated.grouped_by_model.items():
             model_cost = cls.compute_total_cost(
                 input_non_cached_cost=aggregated_data[report_field.COST_INPUT_NON_CACHED],
                 input_cached_cost=aggregated_data[report_field.COST_INPUT_CACHED],
@@ -343,8 +350,8 @@ class CostRegistry(RootModel[CostRegistryRoot]):
             )
             by_model.append(
                 {
-                    "model": model_name,
-                    "model_type": aggregated.model_types.get(model_name, "llm"),
+                    "model": model_key.model_name,
+                    "model_type": model_key.model_type,
                     "nb_tokens_input": int(aggregated_data[report_field.NB_TOKENS_INPUT_JOINED]),
                     "nb_tokens_output": int(aggregated_data[report_field.NB_TOKENS_OUTPUT]),
                     "cost": model_cost,

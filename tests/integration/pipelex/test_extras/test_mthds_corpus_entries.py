@@ -1,7 +1,7 @@
 """The MTHDS Test Corpus entry-validation gate: every entry means what its manifest claims.
 
-Contract: ``docs/specs/mthds-test-corpus.md`` (workspace root), section "Gates" →
-"Corpus-side: entry validation".
+Contract: ``conformance/specs/mthds-test-corpus.md`` (the cross-repo spec, kept in the ``conformance``
+repo), section "Gates" → "Corpus-side: entry validation".
 
 It drives the in-process validation engine — the one behind ``pipelex validate bundle`` — and
 never a hosted API: the corpus is defined against the local runtime, and a deployed API lags

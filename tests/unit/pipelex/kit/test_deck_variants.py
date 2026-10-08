@@ -5,10 +5,12 @@ every variant through the same loader the runtime uses and holds it to the shipp
 
 - the same alias, preset and waterfall names, per model family, except for the names the shipped
   deck deliberately dropped, which are listed here by variant;
-- every model handle the variant names and the shipped deck does not is still declared by one of
-  the kit's backend files, because handle retirement is how a parked deck actually goes stale.
+- every model the variant names and the shipped deck does not is still declared by one of the
+  kit's backend files, as the model type of the family that names it, because handle retirement is
+  how a parked deck actually goes stale. A handle names one model per model type, so a handle
+  declared only as another type does not count.
 
-The second check is scoped to the handles only the variant names. A handle the shipped deck names
+The second check is scoped to the models only the variant names. A handle the shipped deck names
 too is not held to them here: some are served only through Pipelex, with no backend section
 of their own, and the shipped deck's default aliases have their own guard in `test_shipped_deck_defaults.py`.
 """
@@ -21,12 +23,16 @@ import pytest
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice, DocGenSetting
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting
+from pipelex.cogt.judgment.judgment_setting import JudgmentModelChoice, JudgmentSetting
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting
+from pipelex.cogt.model_backends.model_spec_document import list_declared_model_specs
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.deck_manifest import KitManagedArea, kit_deck_dir, list_managed_kit_files
 from pipelex.cogt.models.model_deck import (
     DocGenDeckBlueprint,
     ExtractDeckBlueprint,
     ImgGenDeckBlueprint,
+    JudgmentDeckBlueprint,
     LLMDeckBlueprint,
     ModelDeckBlueprint,
     SearchDeckBlueprint,
@@ -38,7 +44,21 @@ from pipelex.kit.paths import get_kit_configs_dir, get_kit_deck_variants_dir
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 # A vocabulary coordinate: the model family, then the kind of name within it.
-DeckFamilyBlueprint = LLMDeckBlueprint | ExtractDeckBlueprint | ImgGenDeckBlueprint | SearchDeckBlueprint | DocGenDeckBlueprint
+DeckFamilyBlueprint = (
+    LLMDeckBlueprint | ExtractDeckBlueprint | ImgGenDeckBlueprint | SearchDeckBlueprint | DocGenDeckBlueprint | JudgmentDeckBlueprint
+)
+# A model a deck names or a backend declares: a handle names one model per model type, so the pair is the identity.
+DeclaredModel = tuple[ModelType, str]
+
+# The model type each family of the deck asks its models for.
+FAMILY_MODEL_TYPES: dict[str, ModelType] = {
+    "llm": ModelType.LLM,
+    "extract": ModelType.TEXT_EXTRACTOR,
+    "img_gen": ModelType.IMG_GEN,
+    "search": ModelType.SEARCH,
+    "doc_gen": ModelType.DOC_GEN,
+    "judgment": ModelType.JUDGMENT,
+}
 VocabularyKey = tuple[str, str]
 Vocabulary = dict[VocabularyKey, set[str]]
 PermittedDrops = Mapping[VocabularyKey, frozenset[str]]
@@ -68,6 +88,7 @@ def extract_vocabulary(blueprint: ModelDeckBlueprint) -> Vocabulary:
         "img_gen": blueprint.img_gen,
         "search": blueprint.search,
         "doc_gen": blueprint.doc_gen,
+        "judgment": blueprint.judgment,
     }
     vocabulary: Vocabulary = {}
     for family, family_blueprint in family_blueprints.items():
@@ -103,63 +124,76 @@ def load_deck_from_dir(deck_dir: Path, *, filenames: list[str]) -> ModelDeckBlue
     return load_model_deck_blueprint([str(deck_dir / filename) for filename in sorted(filenames)])
 
 
-def list_declared_backend_handles() -> set[str]:
-    """Every model handle the kit's backend files declare. Each top-level table is one, bar `defaults`."""
+def list_declared_backend_models() -> set[DeclaredModel]:
+    """Every model the kit's backend files declare, as its model type and its handle, read as the loader reads a file."""
     backends_dir = Path(str(get_kit_configs_dir())) / "inference" / "backends"
-    handles: set[str] = set()
+    declared_models: set[DeclaredModel] = set()
     for backend_path in sorted(backends_dir.glob("*.toml")):
         backend_dict = load_toml_from_path(str(backend_path))
-        handles.update(name for name, value in backend_dict.items() if isinstance(value, dict) and name != "defaults")
-    return handles
+        declared_models.update((ModelType(declared.model_type), declared.handle) for declared in list_declared_model_specs(document=backend_dict))
+    return declared_models
 
 
-def list_choice_default_references(blueprint: ModelDeckBlueprint) -> list[str]:
-    """The reference each family's default choice names: a setting's model, or the reference the deck wrote."""
-    choices: list[LLMModelChoice | ExtractModelChoice | ImgGenModelChoice | SearchModelChoice | DocGenModelChoice] = [
-        blueprint.llm.choice_defaults.for_text,
-        blueprint.llm.choice_defaults.for_object,
-        blueprint.extract.choice_default,
-        blueprint.img_gen.choice_default,
-        blueprint.search.choice_default,
-        *blueprint.doc_gen.choice_defaults.values(),
+def list_choice_default_references(blueprint: ModelDeckBlueprint) -> list[tuple[ModelType, str]]:
+    """The reference each family's default choice names, with that family's model type: a setting's model, or the reference the deck wrote."""
+    choices: list[
+        tuple[ModelType, LLMModelChoice | ExtractModelChoice | ImgGenModelChoice | SearchModelChoice | DocGenModelChoice | JudgmentModelChoice]
+    ] = [
+        (ModelType.LLM, blueprint.llm.choice_defaults.for_text),
+        (ModelType.LLM, blueprint.llm.choice_defaults.for_object),
+        (ModelType.TEXT_EXTRACTOR, blueprint.extract.choice_default),
+        (ModelType.IMG_GEN, blueprint.img_gen.choice_default),
+        (ModelType.SEARCH, blueprint.search.choice_default),
+        *((ModelType.DOC_GEN, choice) for choice in blueprint.doc_gen.choice_defaults.values()),
     ]
-    references: list[str] = []
-    for choice in choices:
+    # The judgment family alone may have no default, since no judgment model is served out of the box.
+    if blueprint.judgment.choice_default is not None:
+        choices.append((ModelType.JUDGMENT, blueprint.judgment.choice_default))
+    references: list[tuple[ModelType, str]] = []
+    for model_type, choice in choices:
         match choice:
-            case LLMSetting() | ExtractSetting() | ImgGenSetting() | SearchSetting() | DocGenSetting():
-                references.append(choice.model)
+            case LLMSetting() | ExtractSetting() | ImgGenSetting() | SearchSetting() | DocGenSetting() | JudgmentSetting():
+                references.append((model_type, choice.model))
             case ModelReference():
-                references.append(choice.raw)
+                references.append((model_type, choice.raw))
             case str():
-                references.append(choice)
+                references.append((model_type, choice))
     return references
 
 
-def extract_model_handles(blueprint: ModelDeckBlueprint) -> set[str]:
-    """Every concrete handle a deck names, from its alias targets, its waterfall entries, its presets' models and its default choices.
+def extract_named_models(blueprint: ModelDeckBlueprint) -> set[DeclaredModel]:
+    """Every concrete model a deck names, from its alias targets, its waterfall entries, its presets' models and its default choices.
 
-    A reference naming an alias, a preset or a waterfall carries no handle of its own: it resolves
-    through one of the collections this function reads directly. A waterfall's own entries do
-    carry handles, which is why they are read here and not only through whatever names the waterfall,
-    and so does a default choice that names a model directly.
+    Each handle comes with the model type of the family that names it, which is the type a lookup asks
+    for. A reference naming an alias, a preset or a waterfall carries no handle of its own: it resolves
+    through one of the collections this function reads directly. A waterfall's own entries do carry
+    handles, which is why they are read here and not only through whatever names the waterfall, and so
+    does a default choice that names a model directly.
     """
-    family_blueprints: list[DeckFamilyBlueprint] = [blueprint.llm, blueprint.extract, blueprint.img_gen, blueprint.search, blueprint.doc_gen]
-    references: list[str] = []
-    for family_blueprint in family_blueprints:
-        references.extend(family_blueprint.aliases.values())
+    family_blueprints: list[tuple[ModelType, DeckFamilyBlueprint]] = [
+        (ModelType.LLM, blueprint.llm),
+        (ModelType.TEXT_EXTRACTOR, blueprint.extract),
+        (ModelType.IMG_GEN, blueprint.img_gen),
+        (ModelType.SEARCH, blueprint.search),
+        (ModelType.DOC_GEN, blueprint.doc_gen),
+        (ModelType.JUDGMENT, blueprint.judgment),
+    ]
+    references: list[tuple[ModelType, str]] = []
+    for model_type, family_blueprint in family_blueprints:
+        references.extend((model_type, target) for target in family_blueprint.aliases.values())
         for waterfall_entries in family_blueprint.waterfalls.values():
-            references.extend(waterfall_entries)
-        references.extend(setting.model for setting in family_blueprint.presets.values())
+            references.extend((model_type, entry) for entry in waterfall_entries)
+        references.extend((model_type, setting.model) for setting in family_blueprint.presets.values())
     references.extend(list_choice_default_references(blueprint))
-    handles: set[str] = set()
-    for reference in references:
+    named_models: set[DeclaredModel] = set()
+    for model_type, reference in references:
         parsed = ModelReference.parse(reference)
         match parsed.kind:
             case ModelReferenceKind.HANDLE:
-                handles.add(parsed.name)
+                named_models.add((model_type, parsed.name))
             case ModelReferenceKind.ALIAS | ModelReferenceKind.WATERFALL | ModelReferenceKind.PRESET:
                 continue
-    return handles
+    return named_models
 
 
 def make_vocabulary(*, aliases: set[str], presets: set[str]) -> Vocabulary:
@@ -196,15 +230,24 @@ class TestDeckVariants:
     def test_variant_only_handles_are_still_declared_by_a_backend(self, variant_dir: Path):
         """Name parity says nothing about a handle that was retired from the backends underneath it."""
         managed_filenames = list(list_managed_kit_files(area=KitManagedArea.DECK))
-        shipped_handles = extract_model_handles(load_deck_from_dir(kit_deck_dir(), filenames=managed_filenames))
-        variant_handles = extract_model_handles(load_deck_from_dir(variant_dir, filenames=managed_filenames))
+        shipped_models = extract_named_models(load_deck_from_dir(kit_deck_dir(), filenames=managed_filenames))
+        variant_models = extract_named_models(load_deck_from_dir(variant_dir, filenames=managed_filenames))
 
-        variant_only_handles = variant_handles - shipped_handles
-        assert variant_only_handles, f"Variant '{variant_dir.name}' names no handle of its own, which makes this guard vacuous"
+        variant_only_models = variant_models - shipped_models
+        assert variant_only_models, f"Variant '{variant_dir.name}' names no handle of its own, which makes this guard vacuous"
 
-        declared_handles = list_declared_backend_handles()
-        undeclared = sorted(handle for handle in variant_only_handles if handle not in declared_handles)
-        assert not undeclared, f"Variant '{variant_dir.name}' names handles no backend file declares any more: {', '.join(undeclared)}"
+        declared_models = list_declared_backend_models()
+        undeclared = sorted(f"{handle} ({model_type})" for model_type, handle in variant_only_models if (model_type, handle) not in declared_models)
+        assert not undeclared, f"Variant '{variant_dir.name}' names models no backend file declares any more: {', '.join(undeclared)}"
+
+    def test_a_handle_declared_as_another_type_only_does_not_count(self):
+        """A handle names one model per model type: an image model's name does not serve an LLM lookup."""
+        declared_models = list_declared_backend_models()
+        img_gen_handles = sorted(handle for model_type, handle in declared_models if model_type == ModelType.IMG_GEN)
+        img_gen_only_handle = next(handle for handle in img_gen_handles if (ModelType.LLM, handle) not in declared_models)
+
+        assert (ModelType.IMG_GEN, img_gen_only_handle) in declared_models
+        assert (ModelType.LLM, img_gen_only_handle) not in declared_models
 
     def test_handle_collection_reads_waterfall_entries(self):
         """A handle a deck names only inside a waterfall must still reach the retirement check above.
@@ -213,20 +256,30 @@ class TestDeckVariants:
         go quietly blind to every handle a variant names only inside a waterfall.
         """
         blueprint = load_deck_from_dir(kit_deck_dir(), filenames=list(list_managed_kit_files(area=KitManagedArea.DECK)))
-        probe_handle = "handle-named-only-by-a-waterfall"
-        assert probe_handle not in extract_model_handles(blueprint)
+        probe_model = (ModelType.LLM, "handle-named-only-by-a-waterfall")
+        assert probe_model not in extract_named_models(blueprint)
 
-        blueprint.llm.waterfalls["waterfall-parity-probe"] = [probe_handle]
-        assert probe_handle in extract_model_handles(blueprint), "A handle named inside a waterfall escaped the handle collection"
+        blueprint.llm.waterfalls["waterfall-parity-probe"] = [probe_model[1]]
+        assert probe_model in extract_named_models(blueprint), "A handle named inside a waterfall escaped the handle collection"
 
     def test_handle_collection_reads_default_choices(self):
         """A handle a deck names only as a family's default choice must still reach the retirement check above."""
         blueprint = load_deck_from_dir(kit_deck_dir(), filenames=list(list_managed_kit_files(area=KitManagedArea.DECK)))
-        probe_handle = "handle-named-only-by-a-default"
-        assert probe_handle not in extract_model_handles(blueprint)
+        probe_model = (ModelType.DOC_GEN, "handle-named-only-by-a-default")
+        assert probe_model not in extract_named_models(blueprint)
 
-        blueprint.doc_gen.choice_defaults["xlsx.layout"] = ModelReference.parse(probe_handle)
-        assert probe_handle in extract_model_handles(blueprint), "A handle named as a default choice escaped the handle collection"
+        blueprint.doc_gen.choice_defaults["xlsx.layout"] = ModelReference.parse(probe_model[1])
+        assert probe_model in extract_named_models(blueprint), "A handle named as a default choice escaped the handle collection"
+
+    def test_handle_collection_reads_the_judgment_family(self):
+        """A handle a deck names only as a judgment alias must still reach the retirement check above, as a judgment model."""
+        blueprint = load_deck_from_dir(kit_deck_dir(), filenames=list(list_managed_kit_files(area=KitManagedArea.DECK)))
+        probe_model = (ModelType.JUDGMENT, "handle-named-only-by-a-judgment-alias")
+        assert probe_model not in extract_named_models(blueprint)
+
+        blueprint.judgment.aliases["judgment-parity-probe"] = probe_model[1]
+        assert probe_model in extract_named_models(blueprint), "A handle named by a judgment alias escaped the handle collection"
+        assert ("judgment", "aliases") in extract_vocabulary(blueprint)
 
     def test_comparator_reports_a_preset_the_variant_is_missing(self):
         differences = compare_vocabularies(

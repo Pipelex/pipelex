@@ -13,6 +13,7 @@ from pipelex.cogt.extract.extract_setting import ExtractSetting
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
 from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
 from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.cogt.model_backends.model_spec_document import list_declared_model_specs
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import (
     ModelDeckBlueprint,
@@ -41,7 +42,7 @@ class TestModelDeckReferences:
         return load_model_deck_blueprint(model_deck_paths=model_deck_paths)
 
     @pytest.fixture(scope="class")
-    def all_known_model_handles(self) -> dict[str, ModelType]:
+    def all_known_model_handles(self) -> dict[str, set[ModelType]]:
         """Collect all valid model handles with their types from the local backend TOML files.
 
         Returns:
@@ -53,35 +54,25 @@ class TestModelDeckReferences:
     # Helper methods
     # ============================================================
 
-    def _get_local_backend_models(self) -> dict[str, ModelType]:
-        """Parse all local backend TOML files to collect model handles with their types.
+    def _get_local_backend_models(self) -> dict[str, set[ModelType]]:
+        """Parse all local backend TOML files to collect model handles with the model types they are declared as.
 
-        Model names are the top-level keys in each backend TOML file,
-        excluding the 'defaults' section which contains shared config.
-        Model types are determined from the model's 'model_type' field or the defaults section.
+        Read as the loader reads a backend file: every root table but `[defaults]` is a model, its handle is its
+        `handle` key or else its table name, and its type is its own, else the `[defaults]` one, else the default.
+        A handle names one model per model type, so one handle may be declared as several.
 
         Returns:
-            Mapping of model_handle -> ModelType
+            Mapping of model_handle -> the model types the backends declare it as
         """
-        known_handles: dict[str, ModelType] = {}
+        known_handles: dict[str, set[ModelType]] = {}
         backends_dir = config_manager.backends_dir_path
 
         toml_files = find_files_in_dir(backends_dir, pattern="*.toml", is_recursive=False)
         for toml_path in toml_files:
             backend_data = load_toml_from_path_if_exists(str(toml_path))
             if backend_data:
-                # Get default model_type from defaults section if present
-                defaults = backend_data.get("defaults", {})
-                default_model_type_str = defaults.get("model_type")
-
-                # Model names are top-level keys except "defaults"
-                for key in backend_data:
-                    if key != "defaults":
-                        model_config = backend_data[key]
-                        # Model can override the default model_type
-                        model_type_str = model_config.get("model_type", default_model_type_str)
-                        if model_type_str:
-                            known_handles[key] = ModelType(model_type_str)
+                for declared in list_declared_model_specs(document=backend_data):
+                    known_handles.setdefault(declared.handle, set()).add(ModelType(declared.model_type))
 
         return known_handles
 
@@ -90,7 +81,7 @@ class TestModelDeckReferences:
         presets: Mapping[str, LLMSetting | ExtractSetting | ImgGenSetting | SearchSetting | DocGenSetting | JudgmentSetting],
         all_aliases: dict[str, str],
         all_waterfalls: dict[str, list[str]],
-        known_model_handles: dict[str, ModelType],
+        known_model_handles: dict[str, set[ModelType]],
         expected_model_type: ModelType,
     ) -> list[tuple[str, str, str]]:
         """Find presets that reference invalid model targets.
@@ -99,7 +90,7 @@ class TestModelDeckReferences:
             presets: The presets dict to validate
             all_aliases: All available aliases for this model type
             all_waterfalls: All available waterfalls for this model type
-            known_model_handles: Mapping of model handle -> ModelType
+            known_model_handles: Mapping of model handle -> the model types the backends declare it as
             expected_model_type: The expected model type for this deck (LLM, TEXT_EXTRACTOR, IMG_GEN)
 
         Returns:
@@ -123,10 +114,10 @@ class TestModelDeckReferences:
                 case ModelReferenceKind.HANDLE:
                     if ref.name not in known_model_handles:
                         invalid_refs.append((preset_name, model_value, f"model handle '{ref.name}' not found in backends"))
-                    elif known_model_handles[ref.name] != expected_model_type:
-                        actual_type = known_model_handles[ref.name]
+                    elif expected_model_type not in known_model_handles[ref.name]:
+                        actual_types = ", ".join(f"'{actual_type}'" for actual_type in sorted(known_model_handles[ref.name]))
                         invalid_refs.append(
-                            (preset_name, model_value, f"model handle '{ref.name}' has type '{actual_type}' but expected '{expected_model_type}'")
+                            (preset_name, model_value, f"model handle '{ref.name}' has type {actual_types} but expected '{expected_model_type}'")
                         )
 
         return invalid_refs
@@ -169,7 +160,7 @@ class TestModelDeckReferences:
     def test_aliases_reference_valid_targets(
         self,
         model_deck_blueprint: ModelDeckBlueprint,
-        all_known_model_handles: dict[str, ModelType],
+        all_known_model_handles: dict[str, set[ModelType]],
         model_type: ModelType,
         deck_name: str,
     ):
@@ -204,7 +195,7 @@ class TestModelDeckReferences:
     def test_presets_reference_valid_models(
         self,
         model_deck_blueprint: ModelDeckBlueprint,
-        all_known_model_handles: dict[str, ModelType],
+        all_known_model_handles: dict[str, set[ModelType]],
         model_type: ModelType,
         deck_name: str,
     ):
@@ -239,7 +230,7 @@ class TestModelDeckReferences:
     def test_waterfalls_contain_valid_models(
         self,
         model_deck_blueprint: ModelDeckBlueprint,
-        all_known_model_handles: dict[str, ModelType],
+        all_known_model_handles: dict[str, set[ModelType]],
         model_type: ModelType,
         deck_name: str,
     ):

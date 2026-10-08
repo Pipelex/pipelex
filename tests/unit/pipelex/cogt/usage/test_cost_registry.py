@@ -12,7 +12,7 @@ from pipelex.cogt.judgment.judgment_report import JudgmentTokenCostReport, Judgm
 from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokenCostReportField, LLMTokensUsage
 from pipelex.cogt.search.search_report import SearchTokenCostReport
 from pipelex.cogt.usage.cost_category import CostCategory
-from pipelex.cogt.usage.cost_registry import CostRegistry
+from pipelex.cogt.usage.cost_registry import CostRegistry, ModelUsageKey
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.system.exceptions import MissingDependencyError
@@ -669,5 +669,4 @@ class TestCostRegistry:
         aggregated = CostRegistry.aggregate_costs(tokens_usages=[UsageFixtures.judgment_usage()])
 
         assert cost_report.as_flat_dictionary()[JudgmentTokenCostReportField.JUDGMENT_NAME] == "jev"
-        assert "jev" in aggregated.grouped_by_model
-        assert aggregated.model_types["jev"] == "judgment"
+        assert ModelUsageKey(model_type="judgment", model_name="jev") in aggregated.grouped_by_model

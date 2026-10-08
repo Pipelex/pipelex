@@ -17,7 +17,7 @@ from pipelex.cogt.extract.extract_report import ExtractTokensUsage
 from pipelex.cogt.img_gen.img_gen_report import ImgGenTokensUsage
 from pipelex.cogt.search.search_report import SearchTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
-from pipelex.cogt.usage.cost_registry import CostRegistry
+from pipelex.cogt.usage.cost_registry import CostRegistry, ModelUsageKey
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
@@ -93,9 +93,8 @@ class TestNonLLMUsageAggregation:
         #   search:  10*0.005  + 20*0.005  = 0.15
         assert abs(aggregated.total_cost - 1.35) < 1e-9
         assert aggregated.has_reportable_usage is True
-        assert set(aggregated.grouped_by_model.keys()) == {"img-gen-model", "extract-model", "search-model"}
-        assert aggregated.model_types == {
-            "img-gen-model": "img_gen",
-            "extract-model": "extract",
-            "search-model": "search",
+        assert set(aggregated.grouped_by_model.keys()) == {
+            ModelUsageKey(model_type="img_gen", model_name="img-gen-model"),
+            ModelUsageKey(model_type="extract", model_name="extract-model"),
+            ModelUsageKey(model_type="search", model_name="search-model"),
         }

@@ -144,7 +144,9 @@ class TestImgGenParamSupportIntegration:
         """
         deck = get_model_deck()
         img_gen_models = [
-            (handle, spec) for handle, spec in deck.inference_models.items() if spec.model_type == ModelType.IMG_GEN and spec.rules is not None
+            (handle, spec)
+            for handle in deck.inference_models.handles_of_type(model_type=ModelType.IMG_GEN)
+            if (spec := deck.inference_models.get(model_type=ModelType.IMG_GEN, handle=handle)) is not None and spec.rules is not None
         ]
         assert img_gen_models, "Expected at least one img-gen model with rules in the deck"
         for handle, spec in img_gen_models:

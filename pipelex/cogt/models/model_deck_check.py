@@ -100,7 +100,7 @@ def check_llm_choice_with_deck(llm_choice: LLMModelChoice) -> None:
                 raw_choice=ref.raw,
                 name=ref.name,
                 reference_kind=ModelReferenceKind.HANDLE,
-                available_options=list(model_deck.inference_models.keys()),
+                available_options=model_deck.inference_models.handles_of_type(model_type=ModelType.LLM),
             )
 
 
@@ -162,7 +162,7 @@ def check_extract_choice_with_deck(extract_choice: ExtractModelChoice) -> None:
                 raw_choice=ref.raw,
                 name=ref.name,
                 reference_kind=ModelReferenceKind.HANDLE,
-                available_options=list(model_deck.inference_models.keys()),
+                available_options=model_deck.inference_models.handles_of_type(model_type=ModelType.TEXT_EXTRACTOR),
             )
 
 
@@ -224,7 +224,7 @@ def check_search_choice_with_deck(search_choice: SearchModelChoice) -> None:
                 raw_choice=ref.raw,
                 name=ref.name,
                 reference_kind=ModelReferenceKind.HANDLE,
-                available_options=list(model_deck.inference_models.keys()),
+                available_options=model_deck.inference_models.handles_of_type(model_type=ModelType.SEARCH),
             )
 
 
@@ -286,7 +286,7 @@ def check_doc_gen_choice_with_deck(*, doc_gen_choice: DocGenModelChoice) -> None
                 raw_choice=ref.raw,
                 name=ref.name,
                 reference_kind=ModelReferenceKind.HANDLE,
-                available_options=list(model_deck.inference_models.keys()),
+                available_options=model_deck.inference_models.handles_of_type(model_type=ModelType.DOC_GEN),
             )
 
 
@@ -348,7 +348,7 @@ def check_judgment_choice_with_deck(judgment_choice: JudgmentModelChoice) -> Non
                 raw_choice=ref.raw,
                 name=ref.name,
                 reference_kind=ModelReferenceKind.HANDLE,
-                available_options=list(model_deck.inference_models.keys()),
+                available_options=model_deck.inference_models.handles_of_type(model_type=ModelType.JUDGMENT),
             )
 
 
@@ -410,5 +410,5 @@ def check_img_gen_choice_with_deck(img_gen_choice: ImgGenModelChoice) -> None:
                 raw_choice=ref.raw,
                 name=ref.name,
                 reference_kind=ModelReferenceKind.HANDLE,
-                available_options=list(model_deck.inference_models.keys()),
+                available_options=model_deck.inference_models.handles_of_type(model_type=ModelType.IMG_GEN),
             )
