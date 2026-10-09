@@ -6,6 +6,8 @@
 
 - **The console shows a log call's fields and renders named layouts**: the `console` sink prints a record's fields after its message as a `key=value` suffix, `Scanned the inputs files=7`, each value on one line and cut short when long, leaving out the run identifiers, and colours a value by its field's name, a pipe code red and a concept bold green, with any other field dimmed. A call can name a console layout with `layout=`, a Rich template over its fields in which every value is escaped, starting with `LogLayout.PIPE_RUN` for the pipe-run tree; every other sink writes the plain message and the fields.
 
+## [v0.80.0] - 2026-10-09
+
 ### Changed
 
 - **MTHDS standard 4.0.0 (Breaking)**: pipelex now requires `mthds==0.20.0` and `pipelex-sdk==0.37.0`, the releases that report MTHDS standard `4.0.0`, the language this runtime has implemented since v0.75.0, so everyone downstream inherits those exact versions and a project that pins either package itself has to move with them. `pipelex --version` prints `mthds-standard 4.0.0`, every crate pipelex normalizes is stamped with `mthds_version` `4.0.0` while crate fingerprints stay the same, and a package whose `METHODS.toml` constrains `mthds_version` to `^3.0.0`, `~3.0.0` or exactly `3.0.0` now logs a warning when it loads, which `>=3.0.0` or `^4.0.0` does not.
