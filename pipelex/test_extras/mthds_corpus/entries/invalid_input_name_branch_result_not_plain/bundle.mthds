@@ -1,0 +1,38 @@
+domain      = "weeknight_recipes"
+description = "Getting ready to cook a recipe"
+main_pipe   = "prepare_recipe"
+
+[concept.Recipe]
+description = "A recipe from a family cookbook"
+
+[concept.Recipe.structure]
+title       = { type = "text", description = "The name of the dish", required = true }
+ingredients = { type = "text", description = "The ingredients, as the cookbook lists them", required = true }
+method      = { type = "text", description = "How to cook the dish", required = true }
+
+[pipe.write_shopping_list]
+type        = "PipeCompose"
+description = "Writes the shopping list of a recipe"
+inputs      = { recipe = "Recipe" }
+output      = "Text"
+template    = "To buy for {{ recipe.title }}: {{ recipe.ingredients }}"
+
+[pipe.write_cooking_card]
+type        = "PipeCompose"
+description = "Writes the card pinned above the stove"
+inputs      = { recipe = "Recipe" }
+output      = "Text"
+template    = "{{ recipe.title }}: {{ recipe.method }}"
+
+[pipe.prepare_recipe]
+type            = "PipeParallel"
+description     = "Writes the shopping list and the cooking card at the same time"
+inputs          = { recipe = "Recipe" }
+output          = "Composite"
+add_each_output = true
+# Wrong on purpose: a branch's result is stored for a later pipe to read through an input, so the name is a plain
+# snake_case one. Renaming it to `shopping_list` is the whole fix.
+branches = [
+  { pipe = "write_shopping_list", result = "ShoppingList" },
+  { pipe = "write_cooking_card", result = "cooking_card" },
+]

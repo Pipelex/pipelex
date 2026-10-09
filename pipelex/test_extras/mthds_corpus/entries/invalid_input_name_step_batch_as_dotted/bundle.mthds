@@ -1,0 +1,28 @@
+domain      = "parcel_dispatch"
+description = "Writing the shipping label of every parcel in a delivery round"
+main_pipe   = "label_round"
+
+[concept.Parcel]
+description = "A parcel waiting to be delivered"
+
+[concept.Parcel.structure]
+recipient = { type = "text", description = "Who the parcel is for", required = true }
+address   = { type = "text", description = "Where the parcel is delivered", required = true }
+
+[pipe.write_label]
+type        = "PipeCompose"
+description = "Writes the shipping label of one parcel"
+inputs      = { parcel = "Parcel" }
+output      = "Text"
+template    = "{{ parcel.recipient }}, {{ parcel.address }}"
+
+[pipe.label_round]
+type        = "PipeSequence"
+description = "Writes the label of each parcel in the round"
+inputs      = { parcels = "Parcel[]" }
+output      = "Text[]"
+# Wrong on purpose: each parcel is stored under `batch_as` for the label pipe to read through an input, so the name is never
+# dotted. Renaming it to `parcel`, the input the label pipe reads, is the whole fix.
+steps = [
+  { pipe = "write_label", batch_over = "parcels", batch_as = "round.parcel", result = "labels" },
+]

@@ -1,0 +1,28 @@
+domain      = "cheese_counter"
+description = "Writing the price tag of every cheese on a shop counter"
+main_pipe   = "tag_cheeses"
+
+[concept.Cheese]
+description = "A cheese sold by weight at the counter"
+
+[concept.Cheese.structure]
+variety        = { type = "text", description = "The kind of cheese", required = true }
+price_per_kilo = { type = "number", description = "The price of one kilogram, in euros", required = true }
+
+[pipe.tag_cheeses]
+type             = "PipeBatch"
+description      = "Writes the price tag of each cheese in turn"
+inputs           = { cheeses = "Cheese[]" }
+output           = "Text[]"
+branch_pipe_code = "write_price_tag"
+input_list_name  = "cheeses"
+# Wrong on purpose: each cheese is stored under `input_item_name` for the branch pipe to read through an input, so the name
+# is a plain snake_case one. Renaming it to `cheese`, the input the branch pipe reads, is the whole fix.
+input_item_name  = "Cheese"
+
+[pipe.write_price_tag]
+type        = "PipeCompose"
+description = "Writes the price tag of one cheese"
+inputs      = { cheese = "Cheese" }
+output      = "Text"
+template    = "{{ cheese.variety }}: {{ cheese.price_per_kilo }} euros per kilo"

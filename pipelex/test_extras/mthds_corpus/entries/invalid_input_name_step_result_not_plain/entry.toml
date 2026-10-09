@@ -1,0 +1,12 @@
+name = "invalid_input_name_step_result_not_plain"
+description = "The departures from a station announced by a sequence whose last step stores its announcements under a name that is not a plain input name"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.invalid_input_name",
+]
+
+expected_error = "invalid_input_name"
