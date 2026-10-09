@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **The console shows a log call's fields and renders named layouts**: the `console` sink prints a record's fields after its message as a `key=value` suffix, `Scanned the inputs files=7`, each value on one line and cut short when long, leaving out the run identifiers, and colours a value by its field's name, a pipe code red and a concept bold green, with any other field dimmed. A call can name a console layout with `layout=`, a Rich template over its fields in which every value is escaped, starting with `LogLayout.PIPE_RUN` for the pipe-run tree; every other sink writes the plain message and the fields.
+
 ### Changed
 
 - **Hosted-run guidance in messages and help**: the next step of a refused Pipelex API key names `pipelex login` and the working directory's `.env` rather than a shell export, which a `.env` file setting the key overrides, and `pipelex login` names `[run] execution = "hosted"` rather than `pipelex init` to make hosted runs the default. A CLI run missing a provider key, and the `pipelex doctor` report, offer the hosted Pipelex API as a way out; a failed `pipelex-agent` boot points at `pipelex-agent migrate` and `pipelex-agent init` rather than the interactive `pipelex init config`; and `FormerReleaseConfigError` carries its remedy, `pipelex migrate`, as its `user_action`. The `run` help of both CLIs names hosted runs, catalog ids, local method directories and TOML or inline inputs, and `pipelex-agent --help` describes the program rather than printing an internal note.

@@ -14,8 +14,18 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from pipelex import log
+from pipelex.tools.log.console_layouts import LogLayout
 from pipelex.tools.log.log_context import get_log_context
-from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX, DATA_FIELD, FORWARDED_MARK, VERBATIM_MARK, carried_attributes
+from pipelex.tools.log.log_fields import (
+    COLLIDING_FIELD_PREFIX,
+    DATA_FIELD,
+    FIELD_NAMES_MARK,
+    FORWARDED_MARK,
+    LAYOUT_MARK,
+    VERBATIM_MARK,
+    attached_field_names,
+    carried_attributes,
+)
 from pipelex.tools.log.log_levels import LOGGING_LEVEL_VERBOSE
 
 if TYPE_CHECKING:
@@ -264,6 +274,37 @@ class TestLogFields:
         (record,) = _own_records(caplog)
         setattr(record, VERBATIM_MARK, False)
         assert carried_attributes(record=record) == {"safe": 1}
+
+    def test_the_names_the_call_attached_are_recorded_in_order_and_are_no_field(self, caplog: pytest.LogCaptureFixture) -> None:
+        """The console renders what the call attached and nothing else on the record, so the names are recorded where they landed."""
+        with caplog.at_level(logging.INFO), log.context(request_id="r1"):
+            log.info("recorded", fields={"files": 7, "name": "alpha"})
+
+        (record,) = _own_records(caplog)
+        assert attached_field_names(record=record) == ("request_id", "files", f"{COLLIDING_FIELD_PREFIX}name")
+        assert FIELD_NAMES_MARK not in carried_attributes(record=record)
+
+    def test_the_layout_a_call_names_rides_the_record_under_its_mark_and_is_no_field(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.INFO):
+            log.info("laid out", fields={"pipe_code": "main"}, layout=LogLayout.PIPE_RUN)
+            log.info("not laid out", fields={"pipe_code": "main"})
+
+        laid_out, plain = _own_records(caplog)
+        assert getattr(laid_out, LAYOUT_MARK) == LogLayout.PIPE_RUN
+        assert not hasattr(plain, LAYOUT_MARK)
+        assert carried_attributes(record=laid_out) == {"pipe_code": "main"}
+
+    @pytest.mark.parametrize("mark", [FIELD_NAMES_MARK, LAYOUT_MARK])
+    def test_a_field_named_like_a_console_mark_is_prefixed_and_steers_nothing(self, caplog: pytest.LogCaptureFixture, mark: str) -> None:
+        """Left unreserved, a caller's field would hand the console a list of names or pick the line's layout."""
+        with caplog.at_level(logging.INFO):
+            log.info("impersonation", fields={mark: "pipe_run", "safe": 1})
+
+        (record,) = _own_records(caplog)
+        assert getattr(record, f"{COLLIDING_FIELD_PREFIX}{mark}") == "pipe_run"
+        assert not hasattr(record, LAYOUT_MARK)
+        assert attached_field_names(record=record) == (f"{COLLIDING_FIELD_PREFIX}{mark}", "safe")
+        assert carried_attributes(record=record) == {f"{COLLIDING_FIELD_PREFIX}{mark}": "pipe_run", "safe": 1}
 
     def test_the_forwarding_marker_a_record_already_carries_is_not_a_carried_field(self, caplog: pytest.LogCaptureFixture) -> None:
         """A structured sink reads the record's own fields; the marker is machinery and belongs on no wire."""

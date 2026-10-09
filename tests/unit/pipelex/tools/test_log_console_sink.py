@@ -1,8 +1,9 @@
-"""The ``console`` sink renders byte for byte what the Rich handler rendered before it existed.
+"""The ``console`` sink renders byte for byte what the Rich handler rendered before it existed, plus the fields.
 
 The reference is the handler ``log.configure`` used to build inline: a ``RichHandler`` fed every
 ``[runtime.log.rich_log]`` setting and the emoji formatter. Both handlers are pointed at the same kind
-of non-terminal console and handed the same fixed record set, and their output must be identical.
+of non-terminal console and handed the same fixed record set. A record whose call gave no field renders
+identically through both; a record with fields renders the same line with the fields after the message.
 """
 
 from __future__ import annotations
@@ -57,9 +58,13 @@ def _reference_handler(*, config: RichLogConfig) -> logging.Handler:
     return handler
 
 
-def _fixed_record_set() -> list[logging.LogRecord]:
-    """Every shape a record takes: a bare line, a warning with fields, structured content, an error with a traceback, a foreign logger."""
+def _fixed_record_set(*, is_with_call_fields: bool = True) -> list[logging.LogRecord]:
+    """Every shape a record takes: a bare line, a warning with fields, structured content, an error with a traceback, a foreign logger.
+
+    Without call fields, the warning carries the run identifier alone, which the console never shows.
+    """
     records: list[logging.LogRecord] = []
+    warning_extra: dict[str, Any] = {"files": 7, "request_id": "r1"} if is_with_call_fields else {"request_id": "r1"}
 
     def record(*, name: str, level: int, message: str, exc_info: Any = None, extra: dict[str, Any] | None = None) -> None:
         built = logging.LogRecord(name=name, level=level, pathname="/repo/pipelex/module.py", lineno=42, msg=message, args=(), exc_info=exc_info)
@@ -70,7 +75,7 @@ def _fixed_record_set() -> list[logging.LogRecord]:
         records.append(built)
 
     record(name="pipelex.pipe_operators.pipe_llm", level=logging.INFO, message="Running the pipe")
-    record(name="pipelex.pipe_operators.pipe_llm", level=logging.WARNING, message="Slow backend", extra={"files": 7, "request_id": "r1"})
+    record(name="pipelex.pipe_operators.pipe_llm", level=logging.WARNING, message="Slow backend", extra=warning_extra)
     record(name="pipelex.pipeline.pipe_run", level=logging.INFO, message='Config:\n{\n    "key": "value"\n}', extra={"data": {"key": "value"}})
     try:
         msg = "boom"
@@ -97,28 +102,42 @@ def _render_one(*, config: RichLogConfig, message: str, extra: dict[str, Any] | 
     return buffer.getvalue()
 
 
-def _render(handler: logging.Handler) -> str:
+def _render(handler: logging.Handler, *, is_with_call_fields: bool = True) -> str:
     buffer = io.StringIO()
     rich_handler = handler
     assert isinstance(rich_handler, RichHandler)
     rich_handler.console = Console(file=buffer, width=CONSOLE_WIDTH, force_terminal=False, color_system=None, legacy_windows=False)
-    for record in _fixed_record_set():
+    for record in _fixed_record_set(is_with_call_fields=is_with_call_fields):
         handler.handle(record)
     return buffer.getvalue()
 
 
 class TestConsoleLogSink:
-    def test_output_is_byte_identical_to_the_handler_configure_used_to_build(self) -> None:
+    def test_output_is_byte_identical_to_the_handler_configure_used_to_build_when_no_call_gave_a_field(self) -> None:
+        """The run identifier and the structured content's ``data`` are attached too, and neither adds anything to the line."""
+        config = _package_rich_log_config()
+        reference = _render(_reference_handler(config=config), is_with_call_fields=False)
+        sink = ConsoleLogSink(rich_log_config=config, target=ConsoleTarget.STDERR)
+
+        rendered = _render(sink.handler, is_with_call_fields=False)
+
+        assert rendered
+        assert "🧠: Running the pipe" in rendered
+        assert "ValueError" in rendered
+        assert rendered == reference
+
+    def test_a_record_with_fields_gets_them_after_the_message_and_every_other_line_is_unchanged(self) -> None:
         config = _package_rich_log_config()
         reference = _render(_reference_handler(config=config))
         sink = ConsoleLogSink(rich_log_config=config, target=ConsoleTarget.STDERR)
 
         rendered = _render(sink.handler)
 
-        assert rendered
-        assert "🧠: Running the pipe" in rendered
-        assert "ValueError" in rendered
-        assert rendered == reference
+        assert "🧠: Slow backend files=7" in rendered
+        assert "r1" not in rendered
+        # The suffix takes the padding the message column had after the message, so the line keeps its width.
+        suffix = " files=7"
+        assert rendered == reference.replace(f"🧠: Slow backend{' ' * len(suffix)}", f"🧠: Slow backend{suffix}")
 
     def test_the_prefix_stays_on_a_line_that_carries_a_traceback(self) -> None:
         """The Rich handler renders such a line from ``formatMessage`` alone, and the emoji must survive that path too."""

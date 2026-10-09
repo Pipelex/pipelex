@@ -150,7 +150,7 @@ silenced_problem_ids = ["azure_openai_no_stream_options"]
 
 ## The `console` Sink
 
-Configuration section: `[runtime.log.rich_log]`, read only when `sink = "console"`. The sink writes to `console_log_target`.
+Configuration section: `[runtime.log.rich_log]`, read only when `sink = "console"`. The sink writes to `console_log_target`. It shows a record's fields after its message, coloured by name, and renders the layouts a call names; neither has a setting (see [Console rendering](../../tools/logging.md#console-rendering)).
 
 ### Display Options
 

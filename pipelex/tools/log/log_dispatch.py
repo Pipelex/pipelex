@@ -18,13 +18,15 @@ from typing import TYPE_CHECKING, Any, cast
 
 from pipelex.tools.log.log_config import CallerInfoTemplate, LogConfig
 from pipelex.tools.log.log_context import get_log_context
-from pipelex.tools.log.log_fields import attach_log_record_extra, build_log_record_extra
+from pipelex.tools.log.log_fields import LAYOUT_MARK, attach_log_record_extra, build_log_record_extra
 from pipelex.tools.log.log_redaction import redact_secret_entries
 from pipelex.tools.misc.json_utils import purify_json, purify_json_dict, purify_json_list
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
     from types import FrameType
+
+    from pipelex.tools.log.console_layouts import LogLayout
 
     # The triple ``sys.exc_info`` returns while an exception is being handled.
     ExcInfo = tuple[type[BaseException], BaseException, Any]
@@ -107,6 +109,7 @@ class LogDispatch:
         inline: str | None = None,
         include_exception: bool = False,
         fields: Mapping[str, Any] | None = None,
+        layout: LogLayout | None = None,
     ):
         """Emit one record for the call, on the logger named after the calling module.
 
@@ -119,6 +122,8 @@ class LogDispatch:
             include_exception: Whether to carry the exception being handled on the record, as its
                 ``exc_info``, for every sink to render its own way. Nothing is spliced into the message.
             fields: Named values carried as attributes of the record, never rendered into the message.
+            layout: The console layout the record is rendered through, carried under ``LAYOUT_MARK``,
+                which only the console sink reads.
 
         """
         caller_frame = _caller_frame()
@@ -135,7 +140,7 @@ class LogDispatch:
         exc_info = _active_exc_info() if include_exception else None
 
         extra = build_log_record_extra(context=get_log_context(), fields=fields, data=data)
-        self._emit_record(message=message, severity=severity, logger=logger, caller_frame=caller_frame, exc_info=exc_info, extra=extra)
+        self._emit_record(message=message, severity=severity, logger=logger, caller_frame=caller_frame, exc_info=exc_info, extra=extra, layout=layout)
 
     ########################################################
     # Private methods
@@ -221,11 +226,13 @@ class LogDispatch:
         caller_frame: FrameType | None,
         exc_info: ExcInfo | None,
         extra: dict[str, Any],
+        layout: LogLayout | None,
     ):
         """Build the record at the caller's location, attach what it carries, and hand it to the logger's handlers.
 
         The record is built first and the extra attached afterwards: ``makeRecord`` raises on a key the
-        record already owns, and what it owns is only known once the installed record factory has run.
+        record already owns, and what it owns is only known once the installed record factory has run. The
+        layout is stamped last, under a name no field can take.
         """
         if caller_frame is None:
             pathname, lineno, func_name = UNKNOWN_FILE_NAME, 0, UNKNOWN_FUNCTION_NAME
@@ -242,4 +249,6 @@ class LogDispatch:
             func=func_name,
         )
         attach_log_record_extra(record=record, extra=extra)
+        if layout is not None:
+            record.__dict__[LAYOUT_MARK] = layout
         logger.handle(record)

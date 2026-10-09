@@ -53,13 +53,24 @@ VERBATIM_MARK = "markup"
 # second thing to go right at the moment the first one went wrong.
 UNSCRUBBED_MARK = "_pipelex_unscrubbed"
 
+# The attribute naming, in order, the attributes ``attach_log_record_extra`` set on the record: the fields,
+# the context identifiers and ``data`` under the names they landed on. It is how the console tells what the
+# call attached from what a record factory or a third-party library stamped, which it does not render. A
+# caller's field spelling it would hand the console a list of names the call never gave.
+FIELD_NAMES_MARK = "_pipelex_field_names"
+
+# The attribute carrying the console layout a call named with ``layout=``. The layout is console
+# presentation: the console sink reads it, and reserving it is what keeps it off every wire, where the
+# message already says what the line is. A caller's field spelling it would pick the line's layout.
+LAYOUT_MARK = "_pipelex_layout"
+
 # The names this package stamps on a record itself. Never a field: a caller's entry of the same name is
 # prefixed on the way on, and a record carrying one does not hand it to a sink as something it carries.
 # Reserving them is what makes each one safe, because each is stamped later than the entries are attached
 # and so a fresh record owns none of them: a caller's field spelling ``FORWARDED_MARK`` would be read as
 # the forwarding marker and cost the whole record its delivery, and one spelling ``UNSCRUBBED_MARK`` would
 # have a perfectly ordinary record read as one the scrub could not strip, and dropped.
-PIPELEX_OWNED_ATTRIBUTES = frozenset({FORWARDED_MARK, VERBATIM_MARK, UNSCRUBBED_MARK})
+PIPELEX_OWNED_ATTRIBUTES = frozenset({FORWARDED_MARK, VERBATIM_MARK, UNSCRUBBED_MARK, FIELD_NAMES_MARK, LAYOUT_MARK})
 
 # Reserved whether or not the record carries the name yet, which is exactly what the stdlib's own refusal
 # cannot cover: both sets are stamped after the entries are attached.
@@ -122,12 +133,25 @@ def attach_log_record_extra(*, record: logging.LogRecord, extra: Mapping[str, An
     the name lands on an attribute nobody owns, and entries are attached in order, so an entry attached
     earlier under a prefixed name is owned for the entries after it: whatever the order of the mapping, no
     value is lost.
+
+    The names the entries landed on are recorded, in order, under ``FIELD_NAMES_MARK``, which is how the
+    console tells what this call attached from what anything else stamped on the record.
     """
+    attached: list[str] = []
     for name, value in extra.items():
         attribute = name
         while hasattr(record, attribute) or attribute in RESERVED_ATTRIBUTES:
             attribute = f"{COLLIDING_FIELD_PREFIX}{attribute}"
         setattr(record, attribute, value)
+        attached.append(attribute)
+    already_attached: tuple[str, ...] = record.__dict__.get(FIELD_NAMES_MARK, ())
+    record.__dict__[FIELD_NAMES_MARK] = (*already_attached, *attached)
+
+
+def attached_field_names(*, record: logging.LogRecord) -> tuple[str, ...]:
+    """The attributes ``attach_log_record_extra`` set on the record, in order, or none for a record it never saw."""
+    names: tuple[str, ...] = record.__dict__.get(FIELD_NAMES_MARK, ())
+    return names
 
 
 def carried_attributes(*, record: logging.LogRecord) -> dict[str, Any]:

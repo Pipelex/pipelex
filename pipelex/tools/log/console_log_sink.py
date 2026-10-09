@@ -1,5 +1,9 @@
 """The ``console`` sink: the Rich handler with the emoji formatter and every ``[runtime.log.rich_log]`` setting.
 
+The handler renders a record's fields after its message as a styled ``key=value`` suffix, and a record that
+names a layout through that layout's template; what is shown and how it is coloured is in
+``console_fields`` and ``console_layouts``.
+
 Rich is the ``cli`` extra. It is imported when the handler is built and nowhere else in this module, so
 this module asks for Rich only where this sink is the one selected; a process that selects another sink
 never reaches that import. One that selects this sink without Rich installed fails at boot with the extra
@@ -17,14 +21,18 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
+from pipelex.tools.log.console_fields import attached_fields, field_suffix_segments
+from pipelex.tools.log.console_layouts import console_layout
 from pipelex.tools.log.log_config import HighlighterName
-from pipelex.tools.log.log_formatter import EmojiLogFormatter
+from pipelex.tools.log.log_fields import LAYOUT_MARK
+from pipelex.tools.log.log_formatter import EmojiLogFormatter, channel_prefix
 from pipelex.tools.log.log_sink import LogSink, LogSinkMethod, stream_for_target
 from pipelex.tools.misc.rich_extra import require_rich
 
 if TYPE_CHECKING:
     import logging
 
+    from rich.console import ConsoleRenderable
     from rich.logging import RichHandler
 
     from pipelex.system.console_target import ConsoleTarget
@@ -38,7 +46,7 @@ CONSOLE_SINK_MISSING_MESSAGE = (
 
 
 class ConsoleLogSink(LogSink):
-    """Today's console rendering, byte for byte: a ``RichHandler`` on the configured stream."""
+    """A ``RichHandler`` on the configured stream, rendering the message, or its layout, and the fields after it."""
 
     def __init__(self, *, rich_log_config: RichLogConfig, target: ConsoleTarget) -> None:
         super().__init__()
@@ -50,8 +58,10 @@ class ConsoleLogSink(LogSink):
     def make_handler(self) -> logging.Handler:
         require_rich(message=CONSOLE_SINK_MISSING_MESSAGE)
         from rich.console import Console
+        from rich.errors import MarkupError
         from rich.highlighter import Highlighter, JSONHighlighter, ReprHighlighter
         from rich.logging import RichHandler
+        from rich.text import Text
 
         # Declared here because ``RichHandler`` is imported here, which is what keeps Rich off the import
         # path of a process that selected another sink. ``RichHandler`` overrides ``emit`` and does not
@@ -68,6 +78,35 @@ class ConsoleLogSink(LogSink):
                     super().emit(record)
                 except Exception:  # ruff: ignore[blind-except]
                     self.handleError(record)
+
+            @override
+            def render_message(self, record: logging.LogRecord, message: str) -> ConsoleRenderable:
+                """The message, or the layout the call named, followed by the fields as a styled ``key=value`` suffix.
+
+                The suffix is assembled as ``Text`` from styled segments and appended after the highlighter has
+                run on the message, so neither the markup setting nor the highlighter ever reads a field's value.
+                A layout that cannot be filled, a field missing or a value its derivation refuses, falls back to
+                the message, and every field then goes to the suffix.
+                """
+                fields = attached_fields(record=record)
+                presented_fields: frozenset[str] = frozenset()
+                message_text: ConsoleRenderable | None = None
+                layout_name = record.__dict__.get(LAYOUT_MARK)
+                layout = console_layout(name=layout_name) if isinstance(layout_name, str) else None
+                if layout is not None:
+                    try:
+                        layout_markup = layout.render_markup(fields=fields)
+                        # No emoji codes either: a value spelled `:fire:` is a value, not a picture.
+                        message_text = Text.assemble(channel_prefix(logger_name=record.name), Text.from_markup(layout_markup, emoji=False))
+                        presented_fields = layout.presented_fields
+                    except (KeyError, TypeError, ValueError, MarkupError):
+                        message_text = None
+                if message_text is None:
+                    message_text = super().render_message(record, message)
+                segments = field_suffix_segments(fields=fields, presented_fields=presented_fields)
+                if segments and isinstance(message_text, Text):
+                    message_text.append_text(Text.assemble(*segments))
+                return message_text
 
         config = self._rich_log_config
         highlighter: Highlighter
