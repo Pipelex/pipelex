@@ -177,7 +177,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
                 provider_metadata=None,
                 user_action=UserAction(
                     kind=UserActionKind.WAIT_AND_RETRY,
-                    detail="Mistral returned an empty response — the system will retry automatically",
+                    detail="Mistral returned an empty response — wait a moment, then run it again",
                 ),
             )
         if not response.choices:
@@ -188,7 +188,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
                 provider_metadata=None,
                 user_action=UserAction(
                     kind=UserActionKind.WAIT_AND_RETRY,
-                    detail="Mistral returned a response with no choices — the system will retry automatically",
+                    detail="Mistral returned a response with no choices — wait a moment, then run it again",
                 ),
             )
         message = response.choices[0].message
@@ -200,7 +200,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
                 provider_metadata=None,
                 user_action=UserAction(
                     kind=UserActionKind.WAIT_AND_RETRY,
-                    detail="Mistral returned a choice with no message — the system will retry automatically",
+                    detail="Mistral returned a choice with no message — wait a moment, then run it again",
                 ),
             )
         mistral_response_content = message.content

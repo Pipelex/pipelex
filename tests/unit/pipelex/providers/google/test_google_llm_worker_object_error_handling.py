@@ -114,7 +114,7 @@ class TestGoogleLLMWorkerObjectErrorHandling:
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
-        assert "retry" in exc_info.value.user_action.detail.lower()
+        assert "run it again" in exc_info.value.user_action.detail
         metadata = exc_info.value.provider_metadata
         assert metadata is not None
         assert metadata.status_code == 429

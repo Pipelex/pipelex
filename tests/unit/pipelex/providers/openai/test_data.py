@@ -16,7 +16,7 @@ class OpenAIErrorHandlingTestData:
             "generic_rate_limit",
             "Rate limit exceeded. Please retry after 20s",
             InferenceErrorCategory.TRANSIENT,
-            "retry",
+            "run it again",
         ),
         (
             "quota_insufficient",
