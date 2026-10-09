@@ -5114,7 +5114,7 @@ components:
         content.
 
 
-        Keyed in `PipeIOContract.inputs` by the authored input name, dotted names included.
+        Keyed in `PipeIOContract.inputs` by the authored input name, a plain name.
 
         Every member is required: `item_count` is always on the wire, `null` off the fixed arm.
 

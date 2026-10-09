@@ -19,6 +19,7 @@ from pipelex.pipe_machinery.validation import (
     PARALLEL_BRANCH_BATCH_OVER_PATTERN,
     RESERVED_NAME_PATTERN,
     SEQUENCE_STEP_BATCH_OVER_PATTERN,
+    STORED_NAME_PATTERN,
 )
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
 from pipelex.tools.misc.package_utils import get_package_version
@@ -48,9 +49,9 @@ _SIGNATURE_DEFINITION_NAME = PipeSignatureBlueprint.__name__
 # (`_constrain_batch_over`). No Python class carries the name, since steps and branches share one blueprint.
 _PARALLEL_BRANCH_DEFINITION_NAME = "ParallelBranchBlueprint"
 
-# The fields of a pipe step, and of a PipeParallel branch, naming a slot of working memory: the runtime refuses each when it
-# takes the prefix reserved for the bound list of a dotted `batch_over` (`_reserve_private_binding_names`).
-_PIPE_STEP_NAME_FIELDS: tuple[str, ...] = ("result", "batch_as", "batch_over")
+# The fields of a pipe step, and of a PipeParallel branch, naming a slot of working memory the step stores a value under: each
+# is a stored name, held to the input-name grammar (`_constrain_stored_names`).
+_PIPE_STEP_STORED_NAME_FIELDS: tuple[str, ...] = ("result", "batch_as")
 
 
 def generate_mthds_schema() -> dict[str, Any]:
@@ -74,8 +75,8 @@ def generate_mthds_schema() -> dict[str, Any]:
     schema = _convert_to_draft4(schema)
     schema = _patch_construct_schema(schema)
     schema = _constrain_input_names(schema)
-    # Before `_constrain_batch_over`, so the branch definition it copies from the pipe step's carries the reservation too.
-    schema = _reserve_private_binding_names(schema)
+    # Before `_constrain_batch_over`, so the branch definition it copies from the pipe step's carries these constraints too.
+    schema = _constrain_stored_names(schema)
     schema = _constrain_batch_over(schema)
 
     return _add_taplo_metadata(schema)
@@ -309,31 +310,37 @@ def _constrain_input_names(schema: dict[str, Any]) -> dict[str, Any]:
     return schema
 
 
-def _reserve_private_binding_names(schema: dict[str, Any]) -> dict[str, Any]:
-    """Refuse the names the runtime reserves for the bound list of a dotted `batch_over`, as the runtime does.
+def _constrain_stored_names(schema: dict[str, Any]) -> dict[str, Any]:
+    """Hold every stored name to the input-name grammar, and keep a plain `batch_over` off the reserved prefix, as the runtime does.
 
-    A pipe step's `result`, `batch_as` and plain `batch_over`, and a PipeBatch's `input_item_name`, never take the `_bound_`
-    prefix: the runtime refuses each as `invalid_input_name` when the bundle is parsed, which keeps that error type's
-    `fails_at = "schema"` true. Each is a Draft-4 `not` holding a `pattern` on the field's string arm: a negative lookahead in
-    the pattern itself would say the same, but not every validator's regex engine has one, while every Draft-4 validator
-    applies `not`, plxt's included. The other names an author writes into working memory, input names and a binding step's
-    `result`, already follow the plain-name grammar, which no underscore-led name matches.
+    A pipe step's `result` and `batch_as`, the same fields on a PipeParallel branch, and a PipeBatch's `input_item_name` are
+    stored names: a step stores a value under each for a pipe to read through an input, so each takes the plain input-name
+    grammar (`STORED_NAME_PATTERN`), as a binding step's `result` does through its own field. The runtime refuses any other
+    form as `invalid_input_name` when the bundle is parsed, which keeps that error type's `fails_at = "schema"` true, and no
+    name of that grammar takes the `_bound_` prefix the runtime reserves for the bound list of a dotted `batch_over`, being
+    never underscore-led. A plain `batch_over` reads a name rather than storing one, so no such grammar holds it, and it is
+    kept off the prefix by a Draft-4 `not` holding a `pattern` on its string arm: a negative lookahead in the pattern itself
+    would say the same, but not every validator's regex engine has one, while every Draft-4 validator applies `not`, plxt's
+    included. `_constrain_batch_over` gives it its path grammar besides.
     """
     schema = copy.deepcopy(schema)
     definitions = schema.get("definitions", {})
     pipe_step_properties = definitions.get(SubPipeBlueprint.__name__, {}).get("properties", {})
-    for field_name in _PIPE_STEP_NAME_FIELDS:
-        _refuse_reserved_names(field_schema=pipe_step_properties.get(field_name))
-    _refuse_reserved_names(field_schema=definitions.get(PipeBatchBlueprint.__name__, {}).get("properties", {}).get("input_item_name"))
+    for field_name in _PIPE_STEP_STORED_NAME_FIELDS:
+        _set_string_arm_constraint(field_schema=pipe_step_properties.get(field_name), constraint={"pattern": STORED_NAME_PATTERN})
+    _set_string_arm_constraint(field_schema=pipe_step_properties.get("batch_over"), constraint={"not": {"pattern": RESERVED_NAME_PATTERN}})
+    batch_properties = definitions.get(PipeBatchBlueprint.__name__, {}).get("properties", {})
+    _set_string_arm_constraint(field_schema=batch_properties.get("input_item_name"), constraint={"pattern": STORED_NAME_PATTERN})
     return schema
 
 
-def _refuse_reserved_names(*, field_schema: dict[str, Any] | None) -> None:
+def _set_string_arm_constraint(*, field_schema: dict[str, Any] | None, constraint: dict[str, Any]) -> None:
+    """Add a constraint to every string arm of a field, the field itself standing for its one arm when it has no `anyOf`."""
     if field_schema is None:
         return
     for arm in field_schema.get("anyOf", [field_schema]):
         if arm.get("type") == "string":
-            arm["not"] = {"pattern": RESERVED_NAME_PATTERN}
+            arm.update(copy.deepcopy(constraint))
 
 
 def _constrain_batch_over(schema: dict[str, Any]) -> dict[str, Any]:

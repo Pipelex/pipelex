@@ -43,7 +43,7 @@ from pipelex.pipe_controllers.sequence.sequence_typed_flow import (
 )
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_machinery.memory_writes import MemoryWrite, SlotTaint, is_same_value_spec, taint_after_write
-from pipelex.pipe_machinery.validation import is_valid_input_name
+from pipelex.pipe_machinery.validation import is_valid_input_name, suggest_plain_name
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams, output_multiplicity_to_apply
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.validation_error_types import PipeValidationErrorType
@@ -275,7 +275,8 @@ class PipeSequence(PipeController):
     def refuse_undeclared_needed_input(self, *, variable_name: str) -> None:
         """Refuse a binding's root that the sequence neither declares nor always stores, asking for the concept its path walks.
 
-        A root that is not a plain input name cannot be declared, so the refusal asks for a step storing it instead.
+        A root that is not a plain input name can be neither declared nor stored by a step, since every stored name is a plain
+        input name too, so the refusal asks to bind from a plain name instead.
         """
         _, binding_root_needs = self._walk_needed_inputs(visited_pipes=set())
         if variable_name not in binding_root_needs:
@@ -287,9 +288,12 @@ class PipeSequence(PipeController):
                         f"Declare '{variable_name}' in the sequence's `inputs`, with the concept whose structure holds the path '{step.from_path}'."
                     )
                 else:
+                    plain_name = suggest_plain_name(name=variable_name)
+                    suggestion = f", such as '{plain_name}'" if plain_name is not None else ""
                     remedy = (
-                        f"'{variable_name}' cannot be an input of the sequence, since an input name is a plain snake_case identifier: "
-                        f"store a value under '{variable_name}' in an earlier step, whose `result` names it, or bind from a plain name."
+                        f"'{variable_name}' is not a plain snake_case identifier, so it can be neither an input of the sequence nor a name "
+                        f"a step stores a value under: bind from a plain name{suggestion}, declared in the sequence's `inputs` or stored by "
+                        "an earlier step."
                     )
                 msg = (
                     f"In pipe '{self.code}', the {step.label} reads '{variable_name}', which is neither an input of the "

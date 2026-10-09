@@ -30,7 +30,7 @@ from pipelex_sdk.errors import ApiResponseError
 from pydantic import ValidationError
 
 from pipelex.base_exceptions import PipelexError, ValidationErrorItem, iter_cause_chain
-from pipelex.hosted.error_rendering import hosted_refusal_message, hosted_refusal_next_step
+from pipelex.hosted.error_rendering import hosted_refusal_message, hosted_refusal_next_step, sent_verdict
 from pipelex.pipe_run.located_failure import find_root_fault
 from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
 from pipelex.pipeline.validation_render import build_fix_command, count_applicable_fixes, format_validation_error_items_markdown
@@ -503,7 +503,8 @@ def api_response_error_payload(*, error: ApiResponseError) -> dict[str, Any]:
       status class (a 4xx asks for a change to the request, anything else for a report); never the hint keyed on the
       runner's class, which names a local command that cannot fix a remote refusal.
     - ``retryable`` (only when true, as on every envelope), ``error_domain`` and ``error_category`` are the answer's,
-      with no local fallback, since only the runner knows whether the caller or its operator has to act. The one
+      with no local fallback, since only the runner knows whether the caller or its operator has to act; the verdict
+      pipelex-sdk decides for every refusal is not read, since it fills an unsent member from its own table. The one
       exception is ``retryable`` on a 429 that did not say, a refusal sent before anything ran. A 503 is never
       inferred retryable: a hosted plane can answer it after the run completed.
     - ``validation_errors`` are the runner's items, each whole, as it sent them.
@@ -520,10 +521,11 @@ def api_response_error_payload(*, error: ApiResponseError) -> dict[str, Any]:
         "message": hosted_refusal_message(error=error),
         "hint": hosted_refusal_next_step(error=error),
     }
-    if error.retryable or (error.retryable is None and error.status in _API_RETRYABLE_STATUSES):
+    sent = sent_verdict(error=error)
+    if sent.retryable or (sent.retryable is None and error.status in _API_RETRYABLE_STATUSES):
         payload["retryable"] = True
-    if error.error_domain:
-        payload["error_domain"] = error.error_domain
+    if sent.error_domain:
+        payload["error_domain"] = sent.error_domain
     if error_category := _non_empty_string(value=problem.get("error_category")):
         payload["error_category"] = error_category
     if error.validation_errors:

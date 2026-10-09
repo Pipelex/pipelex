@@ -16,7 +16,7 @@ description = "Run parallel summaries then consume one downstream"
 inputs = { input_text = "Text" }
 output = "Text"
 steps = [
-  { pipe = "parallel_summarize", result = "..." },
+  { pipe = "parallel_summarize", result = "summaries" },
   { pipe = "combine_summaries" },
 ]
 

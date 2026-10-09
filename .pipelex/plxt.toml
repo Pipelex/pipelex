@@ -59,8 +59,13 @@ exclude = [
   "**/mthds_corpus/entries/invalid_binding_step_pipe_and_from/*.mthds",
   "**/mthds_corpus/entries/invalid_binding_step_result_not_plain/*.mthds",
   "**/mthds_corpus/entries/invalid_binding_step_without_result/*.mthds",
+  "**/mthds_corpus/entries/invalid_input_name_batch_item_name_not_plain/*.mthds",
+  "**/mthds_corpus/entries/invalid_input_name_branch_batch_as_reserved/*.mthds",
+  "**/mthds_corpus/entries/invalid_input_name_branch_result_not_plain/*.mthds",
   "**/mthds_corpus/entries/invalid_input_name_lone_dotted/*.mthds",
   "**/mthds_corpus/entries/invalid_input_name_redundant_dotted/*.mthds",
+  "**/mthds_corpus/entries/invalid_input_name_step_batch_as_dotted/*.mthds",
+  "**/mthds_corpus/entries/invalid_input_name_step_result_not_plain/*.mthds",
   "**/mthds_corpus/entries/invalid_missing_pipe_type/*.mthds",
   "**/mthds_corpus/entries/invalid_unknown_pipe_type/*.mthds",
 ] # Glob patterns for files to ignore.

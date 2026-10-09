@@ -88,7 +88,8 @@ class HostedRunOutcomeUnknownError(HostedRunError):
 
     The hosted API may have created the run before the connection failed, with no way to tell from here: its id never
     arrived. Running the command again could start a second paid run, so the next step is the run history first. The
-    cause is the transport failure, a read, a write or a protocol failure met after the request left this machine.
+    cause is pipelex-sdk's `ApiUnreachableError`, whose own cause is the transport failure: a read, a write, a protocol
+    failure or a body that could not be decoded, met after the request left this machine.
     """
 
     error_domain = ErrorDomain.RUNTIME

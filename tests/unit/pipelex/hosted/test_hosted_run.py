@@ -76,6 +76,23 @@ def _mocked_client(
     return client
 
 
+async def _sdk_transport_failure(*, transport_error: httpx.TransportError) -> ApiUnreachableError:
+    """The error the real client raises when its transport fails this way while sending `POST /v1/start`."""
+
+    def _fail(_request: httpx.Request) -> httpx.Response:
+        raise transport_error
+
+    sdk_client = PipelexAPIClient(api_key="plx_sk_test_not_a_secret", base_url="https://hosted.test")
+    sdk_client.client = httpx.AsyncClient(transport=httpx.MockTransport(_fail))
+    try:
+        with pytest.raises(ApiUnreachableError) as exc_info:
+            await sdk_client.start(pipe_code="entry", mthds_contents=[BUNDLE_FILE.content])
+    finally:
+        await sdk_client.close()
+    assert exc_info.value.__cause__ is transport_error
+    return exc_info.value
+
+
 class TestHostedRun:
     @pytest.mark.asyncio
     async def test_an_inline_bundle_without_inputs_starts_and_waits_on_its_contents(self, mocker: MockerFixture) -> None:
@@ -376,8 +393,8 @@ class TestHostedRun:
         ("transport_error", "expected_code"),
         [
             (httpx.ConnectError("connection refused"), "ConnectError"),
-            (httpx.ConnectTimeout("connect timed out"), "ABORT_TIMEOUT"),
-            (httpx.PoolTimeout("no free connection"), "ABORT_TIMEOUT"),
+            (httpx.ConnectTimeout("connect timed out"), "ConnectTimeout"),
+            (httpx.PoolTimeout("no free connection"), "PoolTimeout"),
             (httpx.UnsupportedProtocol("unknown scheme"), "UnsupportedProtocol"),
             (httpx.ProxyError("proxy refused"), "ProxyError"),
         ],
@@ -386,12 +403,14 @@ class TestHostedRun:
         self, mocker: MockerFixture, transport_error: httpx.TransportError, expected_code: str
     ) -> None:
         """No byte of the start left this machine, so no run exists: checking the network is the right advice."""
+        sdk_error = await _sdk_transport_failure(transport_error=transport_error)
         client = _mocked_client(mocker)
-        client.start.side_effect = transport_error
+        client.start.side_effect = sdk_error
 
         with pytest.raises(ApiUnreachableError) as exc_info:
             await run_hosted(client=client, request=HostedRunRequest(mthds_files=[BUNDLE_FILE]))
 
+        assert exc_info.value is sdk_error
         assert exc_info.value.api_url == "https://hosted.test"
         assert exc_info.value.code == expected_code
         assert str(exc_info.value).startswith("Could not reach Pipelex API at https://hosted.test")
@@ -412,16 +431,17 @@ class TestHostedRun:
         self, mocker: MockerFixture, transport_error: httpx.TransportError, bare_runner: bool
     ) -> None:
         """The hosted API may have created the run before the connection failed, so "check the network" would lead to a second paid run."""
+        sdk_error = await _sdk_transport_failure(transport_error=transport_error)
         bare_version = '{"protocol_version":"0.1.0","implementation":"pipelex-api","implementation_version":"0.76.0"}'
         client = _mocked_client(mocker, version=bare_version) if bare_runner else _mocked_client(mocker)
-        client.start.side_effect = transport_error
-        client.execute.side_effect = transport_error
+        client.start.side_effect = sdk_error
+        client.execute.side_effect = sdk_error
 
         with pytest.raises(HostedRunOutcomeUnknownError) as exc_info:
             await run_hosted(client=client, request=HostedRunRequest(mthds_files=[BUNDLE_FILE]))
 
         error = exc_info.value
-        assert error.__cause__ is transport_error
+        assert error.__cause__ is sdk_error
         assert type(transport_error).__name__ in error.message
         assert error.user_action is not None
         assert "run history" in error.user_action.detail
