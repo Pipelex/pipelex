@@ -1,0 +1,12 @@
+name = "invalid_input_name_step_batch_as_dotted"
+description = "The shipping labels of a delivery round written by a sequence step that hands each parcel to the label pipe under a dotted name"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.invalid_input_name",
+]
+
+expected_error = "invalid_input_name"

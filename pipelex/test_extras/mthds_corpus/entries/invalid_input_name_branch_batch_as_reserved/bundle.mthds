@@ -1,0 +1,38 @@
+domain      = "weather_station"
+description = "Writing the daily log of a weather station"
+main_pipe   = "write_daily_log"
+
+[concept.Reading]
+description = "One reading taken by a weather station"
+
+[concept.Reading.structure]
+hour        = { type = "text", description = "The hour the reading was taken", required = true }
+temperature = { type = "number", description = "The temperature, in degrees Celsius", required = true }
+
+[pipe.write_reading_line]
+type        = "PipeCompose"
+description = "Writes the line of the daily log for one reading"
+inputs      = { reading = "Reading" }
+output      = "Text"
+template    = "{{ reading.hour }}: {{ reading.temperature }} degrees"
+
+[pipe.write_log_heading]
+type        = "PipeCompose"
+description = "Writes the heading of the daily log"
+inputs      = { station_name = "Text" }
+output      = "Text"
+template    = "Daily log of $station_name"
+
+[pipe.write_daily_log]
+type            = "PipeParallel"
+description     = "Writes the heading and the line of every reading at the same time"
+inputs          = { readings = "Reading[]", station_name = "Text" }
+output          = "Composite"
+add_each_output = true
+# Wrong on purpose: each reading is stored under `batch_as` for the line pipe to read through an input, so the name is a plain
+# snake_case one, which never takes the `_bound_` prefix the runtime keeps for itself. Renaming it to `reading`, the input the
+# line pipe reads, is the whole fix.
+branches = [
+  { pipe = "write_reading_line", batch_over = "readings", batch_as = "_bound_reading", result = "reading_lines" },
+  { pipe = "write_log_heading", result = "heading" },
+]

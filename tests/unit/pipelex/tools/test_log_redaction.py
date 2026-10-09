@@ -18,9 +18,10 @@ from pydantic import BaseModel, field_serializer
 from typing_extensions import override
 
 from pipelex.system.configuration.config_loader import ConfigLoader
+from pipelex.tools.log.console_layouts import LogLayout
 from pipelex.tools.log.log import Log
 from pipelex.tools.log.log_config import LogConfig, LogRedactionConfig
-from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX, DATA_FIELD
+from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX, DATA_FIELD, LAYOUT_MARK
 from pipelex.tools.log.log_redaction import (
     ARGUMENTS_WITHHELD_TEXT,
     CYCLE_TEXT,
@@ -367,6 +368,7 @@ class TestLogRedaction:
             )
         record.payload = {"nested": "sk_live_0123456789abcdef"}
         setattr(record, DATA_FIELD, ["sk_live_0123456789abcdef"])
+        record.__dict__[LAYOUT_MARK] = LogLayout.PIPE_RUN
         processor = make_redaction_processor(config=LogRedactionConfig(is_enabled=True, extra_patterns=[]))
 
         with pytest.raises(RecursionError):
@@ -376,6 +378,8 @@ class TestLogRedaction:
         assert record.args == ()
         assert getattr(record, FIELD_NAME) == REDACTED_TEXT
         assert getattr(record, DATA_FIELD) == REDACTED_TEXT
+        # A layout renders in place of the message, so one left on the record would hide the notice.
+        assert LAYOUT_MARK not in record.__dict__
         assert record.exc_info is None
         assert record.exc_text is None
         assert "sk_live" not in logging.Formatter().format(record)

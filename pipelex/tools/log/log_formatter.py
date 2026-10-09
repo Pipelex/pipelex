@@ -41,9 +41,14 @@ class EmojiLogFormatter(logging.Formatter):
 
     @override
     def formatMessage(self, record: logging.LogRecord) -> str:
-        emoji = emoji_for_channel(record.name)
-        if emoji == "":
-            return record.message
-        if emoji:
-            return f"{emoji}: {record.message}"
-        return f"[{record.name}]: {record.message}"
+        return f"{channel_prefix(logger_name=record.name)}{record.message}"
+
+
+def channel_prefix(*, logger_name: str) -> str:
+    """What the console puts before a record's message: the logger's emoji, nothing for the root, else the logger's name in brackets."""
+    emoji = emoji_for_channel(logger_name)
+    if emoji == "":
+        return ""
+    if emoji:
+        return f"{emoji}: "
+    return f"[{logger_name}]: "

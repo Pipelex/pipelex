@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:2114e33c19f9ff6713baf58cbd6a510c905cf70422ea6e50a1ebb44c7e8ae0db"
-reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-10-09T17:40:07Z"
-rationale = "clean-pass: the trigger changes delete VERBOSE lines only, the per-file 'saved to' lines of pipelex run's output writer and the 'resolved' line of pipelex which; no option, output file, printed console line or exit behaviour moved. docs/tools/cli (run.md, agent-cli.md and the rest) and the agent CLI CLAUDE.md were grepped for the deleted messages and for verbose or debug output and quote none of them."
+digest = "sha256:7398755782f220e2cb9fa6ba5396251d5cd1dfd16fdfce691421472189c06279"
+reviewed_by = "Louis Choquel"
+reviewed_at = "2026-10-09T19:02:50Z"
+rationale = "clean-pass: the merge of dev into the log-pruning branch joins two trigger changes each reviewed on its own side, the deletion of VERBOSE lines in pipelex run's output writer and in pipelex which, and the agent CLI's hosted refusal envelope reading error_domain and retryable through sent_verdict. They touch different files and neither moves an option, an output file, a printed line or an exit behaviour the other's review relied on, so docs/tools/cli/ and the agent CLI CLAUDE.md still read as both reviews left them; no docs change."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -11,7 +11,7 @@ rationale = "clean-pass: the trigger changes delete VERBOSE lines only, the per-
 "pipelex/cli/agent_cli/_agent_cli.py" = "blob:690be5b3b3f0fbe69ed3e7baddd24538f590de01"
 "pipelex/cli/agent_cli/commands/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/agent_cli_factory.py" = "blob:050ca1344abc4c1ca22d431923e1577681552fe6"
-"pipelex/cli/agent_cli/commands/agent_output.py" = "blob:a3651bb1023350e358d7865c3e9d401b3408b5c7"
+"pipelex/cli/agent_cli/commands/agent_output.py" = "blob:53812c4c3c6664255f9df52c69bf5948258330c8"
 "pipelex/cli/agent_cli/commands/bundle_path_resolver.py" = "blob:a1904517c731afb72af7d49adf6d217dc50b2660"
 "pipelex/cli/agent_cli/commands/check_model_cmd.py" = "blob:3a9c93daecadf266b3eba466904b3d005d448d40"
 "pipelex/cli/agent_cli/commands/codegen/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"

@@ -1,0 +1,12 @@
+name = "invalid_input_name_batch_item_name_not_plain"
+description = "The price tags of the cheeses on a shop counter written by a batch that hands each cheese to its branch pipe under a name that is not a plain input name"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.invalid_input_name",
+]
+
+expected_error = "invalid_input_name"

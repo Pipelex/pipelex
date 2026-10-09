@@ -407,7 +407,7 @@ class TestMthdsSchemaGeneration:
         ("batch_over", "is_valid_on_a_step", "is_valid_on_a_branch"),
         [
             pytest.param("pages", True, True, id="a-plain-name"),
-            pytest.param("PagesOfTheCatalog", True, True, id="a-name-a-pipe-step-may-store-under"),
+            pytest.param("PagesOfTheCatalog", True, True, id="a-name-that-is-not-snake-case"),
             pytest.param("catalog.pages", True, False, id="a-dotted-path"),
             pytest.param("catalogs.pages.page_view", True, False, id="a-deep-dotted-path"),
             pytest.param("catalog..pages", False, False, id="an-empty-segment"),
@@ -435,17 +435,23 @@ class TestMthdsSchemaGeneration:
         [
             pytest.param("catalog_pages", True, id="a-plain-name"),
             pytest.param("bound_pages", True, id="the-prefix-without-its-underscore"),
-            pytest.param("_draft", True, id="another-underscore-led-name"),
+            pytest.param("page2", True, id="a-digit-after-the-first-letter"),
+            pytest.param("Pages", False, id="pascal-case"),
+            pytest.param("catalog.pages", False, id="dotted"),
+            pytest.param("_draft", False, id="underscore-led"),
+            pytest.param("2nd_pages", False, id="digit-led"),
             pytest.param("_bound_catalog_pages", False, id="the-reserved-prefix"),
             pytest.param("_bound_", False, id="the-reserved-prefix-alone"),
         ],
     )
-    @pytest.mark.parametrize("field_name", ["result", "batch_as", "batch_over"])
-    def test_a_step_and_a_branch_refuse_the_reserved_prefix(self, schema: dict[str, Any], field_name: str, name: str, should_validate: bool) -> None:
-        """A pipe step's `result`, `batch_as` and plain `batch_over` never take `_bound_`, the runtime's prefix for a dotted `batch_over`'s list.
+    @pytest.mark.parametrize("field_name", ["result", "batch_as"])
+    def test_a_step_and_a_branch_hold_their_stored_names_to_the_plain_name_grammar(
+        self, schema: dict[str, Any], field_name: str, name: str, should_validate: bool
+    ) -> None:
+        """A pipe step's `result` and `batch_as` are stored names, plain input names on a PipeSequence step and a PipeParallel branch alike.
 
-        The runtime refuses them as `invalid_input_name` when the bundle is parsed, and the schema refuses them first, through a
-        Draft-4 `not` on the string arm, on a PipeSequence step and on a PipeParallel branch alike.
+        The runtime refuses any other form as `invalid_input_name` when the bundle is parsed, and the schema refuses it first,
+        through the input-name `pattern` on the string arm, which no underscore-led name, the reserved prefix's included, matches.
         """
         validator = _pipe_union_oneof_validator(schema)
         pipe_step: dict[str, Any] = {"pipe": "describe_page", "batch_over": "pages", "batch_as": "page", "result": "descriptions", field_name: name}
@@ -455,17 +461,66 @@ class TestMthdsSchemaGeneration:
         assert validator.is_valid(parallel_table) is should_validate, f"parallel branch {field_name} {name!r}"
 
     @pytest.mark.parametrize(
+        ("batch_over", "should_validate"),
+        [
+            pytest.param("catalog_pages", True, id="a-plain-name"),
+            pytest.param("bound_pages", True, id="the-prefix-without-its-underscore"),
+            pytest.param("_draft", True, id="another-underscore-led-name"),
+            pytest.param("_bound_catalog_pages", False, id="the-reserved-prefix"),
+            pytest.param("_bound_", False, id="the-reserved-prefix-alone"),
+        ],
+    )
+    def test_a_step_and_a_branch_keep_a_plain_batch_over_off_the_reserved_prefix(
+        self, schema: dict[str, Any], batch_over: str, should_validate: bool
+    ) -> None:
+        """A plain `batch_over` reads a name rather than storing one, and never `_bound_`, the runtime's prefix for a dotted `batch_over`'s list.
+
+        The runtime refuses it as `invalid_input_name` when the bundle is parsed, and the schema refuses it first, through a
+        Draft-4 `not` on the string arm, on a PipeSequence step and on a PipeParallel branch alike.
+        """
+        validator = _pipe_union_oneof_validator(schema)
+        pipe_step: dict[str, Any] = {"pipe": "describe_page", "batch_over": batch_over, "batch_as": "page", "result": "descriptions"}
+        sequence_table = {**_minimal_pipe_table("PipeSequence"), "steps": [pipe_step]}
+        parallel_table = {**_minimal_pipe_table("PipeParallel"), "branches": [pipe_step]}
+        assert validator.is_valid(sequence_table) is should_validate, f"sequence step batch_over {batch_over!r}"
+        assert validator.is_valid(parallel_table) is should_validate, f"parallel branch batch_over {batch_over!r}"
+
+    @pytest.mark.parametrize(
         ("input_item_name", "should_validate"),
         [
             pytest.param("item", True, id="a-plain-name"),
-            pytest.param("_draft_item", True, id="another-underscore-led-name"),
+            pytest.param("item2", True, id="a-digit-after-the-first-letter"),
+            pytest.param("Item", False, id="pascal-case"),
+            pytest.param("catalog.item", False, id="dotted"),
+            pytest.param("_draft_item", False, id="underscore-led"),
             pytest.param("_bound_item", False, id="the-reserved-prefix"),
         ],
     )
-    def test_batch_input_item_name_refuses_the_reserved_prefix(self, schema: dict[str, Any], input_item_name: str, should_validate: bool) -> None:
+    def test_batch_input_item_name_follows_the_plain_name_grammar(self, schema: dict[str, Any], input_item_name: str, should_validate: bool) -> None:
+        """A PipeBatch's `input_item_name` is a stored name, the branch pipe reading each item through an input of that name."""
         validator = _pipe_union_oneof_validator(schema)
         table = {**_minimal_pipe_table("PipeBatch"), "input_item_name": input_item_name}
         assert validator.is_valid(table) is should_validate
+
+    @pytest.mark.parametrize(
+        "pattern_path",
+        [
+            pytest.param(("SubPipeBlueprint", "result"), id="step-result"),
+            pytest.param(("SubPipeBlueprint", "batch_as"), id="step-batch-as"),
+            pytest.param(("ParallelBranchBlueprint", "result"), id="branch-result"),
+            pytest.param(("ParallelBranchBlueprint", "batch_as"), id="branch-batch-as"),
+            pytest.param(("PipeBatchBlueprint", "input_item_name"), id="batch-input-item-name"),
+            pytest.param(("BindingStepBlueprint", "result"), id="binding-step-result"),
+        ],
+    )
+    def test_every_stored_name_carries_the_input_name_pattern(self, schema: dict[str, Any], pattern_path: tuple[str, str]) -> None:
+        """Each stored name's string arm carries the same input-name pattern, and nothing else, as a structural consumer reads it."""
+        definition_name, field_name = pattern_path
+        field_schema = schema["definitions"][definition_name]["properties"][field_name]
+        string_arms = [arm for arm in field_schema.get("anyOf", [field_schema]) if arm.get("type") == "string"]
+        assert len(string_arms) == 1
+        assert string_arms[0]["pattern"] == "^[a-z][a-z0-9_]*$"
+        assert "not" not in string_arms[0]
 
     def test_minimal_table_coverage_matches_schema_pipe_kinds(self, schema: dict[str, Any]) -> None:
         """Guard: the test's per-kind table map covers exactly the *concrete* pipe kinds in the schema.

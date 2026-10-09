@@ -113,6 +113,15 @@ class TestTheGcpAndJsonPayloadsAgree:
         for key in (PIPELEX_TRACE_ID_KEY, PIPELEX_SPAN_ID_KEY):
             assert gcp_payload[key] == json_payload[key]
 
+    def test_a_value_json_refuses_costs_only_itself_under_both_sinks(self) -> None:
+        """Each sink writes the refused value as its ``repr`` and keeps the type of every value beside it."""
+        json_payload, gcp_payload = self._both_payloads(self._record(fields={"payload": {(1, 2): "tuple-key"}, "count": 7, "ok": True}))
+
+        for payload in (json_payload, gcp_payload):
+            assert payload["payload"] == repr({(1, 2): "tuple-key"})
+            assert payload["count"] == 7
+            assert payload["ok"] is True
+
     def test_a_field_named_like_a_pipelex_key_is_prefixed_under_both(self) -> None:
         json_payload, gcp_payload = self._both_payloads(self._record(fields={PIPELEX_TRACE_ID_KEY: "mine", PIPELEX_SPAN_ID_KEY: "mine"}))
 

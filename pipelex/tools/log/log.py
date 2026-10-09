@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
     from contextlib import AbstractContextManager
 
+    from pipelex.tools.log.console_layouts import LogLayout
     from pipelex.tools.log.log_config import LogConfig
     from pipelex.tools.log.log_context import LogContext
     from pipelex.tools.log.log_sink import LogRecordProcessor, LogSink
@@ -336,6 +337,7 @@ class Log:
         title: str | None = None,
         inline: str | None = None,
         fields: Mapping[str, Any] | None = None,
+        layout: LogLayout | None = None,
     ):
         """Log a verbose message.
 
@@ -345,10 +347,11 @@ class Log:
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
             fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
+            layout (LogLayout | None, optional): The console layout to render a string content through; every other sink ignores it.
 
         """
         severity = LOGGING_LEVEL_VERBOSE
-        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline, fields=fields)
+        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline, fields=fields, layout=layout)
 
     def debug(
         self,
@@ -357,6 +360,7 @@ class Log:
         title: str | None = None,
         inline: str | None = None,
         fields: Mapping[str, Any] | None = None,
+        layout: LogLayout | None = None,
     ):
         """Log a debug message.
 
@@ -366,10 +370,11 @@ class Log:
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
             fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
+            layout (LogLayout | None, optional): The console layout to render a string content through; every other sink ignores it.
 
         """
         severity = logging.DEBUG
-        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline, fields=fields)
+        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline, fields=fields, layout=layout)
 
     def info(
         self,
@@ -378,6 +383,7 @@ class Log:
         title: str | None = None,
         inline: str | None = None,
         fields: Mapping[str, Any] | None = None,
+        layout: LogLayout | None = None,
     ):
         """Log an info message.
 
@@ -387,10 +393,11 @@ class Log:
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
             fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
+            layout (LogLayout | None, optional): The console layout to render a string content through; every other sink ignores it.
 
         """
         severity = logging.INFO
-        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline, fields=fields)
+        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline, fields=fields, layout=layout)
 
     def warning(
         self,
@@ -400,6 +407,7 @@ class Log:
         inline: str | None = None,
         problem_id: str | None = None,
         fields: Mapping[str, Any] | None = None,
+        layout: LogLayout | None = None,
     ):
         """Log a warning message.
 
@@ -409,13 +417,14 @@ class Log:
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
             fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
+            layout (LogLayout | None, optional): The console layout to render a string content through; every other sink ignores it.
             problem_id (str | None, optional): A problem ID to associate with the warning. Defaults to None.
 
         """
         if self._should_ignore(problem_id=problem_id):
             return
         severity = logging.WARNING
-        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline, fields=fields)
+        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline, fields=fields, layout=layout)
 
     def error(
         self,
@@ -426,6 +435,7 @@ class Log:
         include_exception: bool = False,
         problem_id: str | None = None,
         fields: Mapping[str, Any] | None = None,
+        layout: LogLayout | None = None,
     ):
         """Log an error message.
 
@@ -435,6 +445,7 @@ class Log:
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
             fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
+            layout (LogLayout | None, optional): The console layout to render a string content through; every other sink ignores it.
             include_exception (bool, optional): Whether to include exception information. Defaults to False.
             problem_id (str | None, optional): A problem ID to associate with the error. Defaults to None.
 
@@ -449,6 +460,7 @@ class Log:
             inline=inline,
             include_exception=include_exception,
             fields=fields,
+            layout=layout,
         )
 
     def critical(
@@ -460,6 +472,7 @@ class Log:
         include_exception: bool = False,
         problem_id: str | None = None,
         fields: Mapping[str, Any] | None = None,
+        layout: LogLayout | None = None,
     ):
         """Log a critical message.
 
@@ -469,6 +482,7 @@ class Log:
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
             fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
+            layout (LogLayout | None, optional): The console layout to render a string content through; every other sink ignores it.
             include_exception (bool, optional): Whether to include exception information. Defaults to False.
             problem_id (str | None, optional): A problem ID to associate with the critical message. Defaults to None.
 
@@ -483,6 +497,7 @@ class Log:
             inline=inline,
             include_exception=include_exception,
             fields=fields,
+            layout=layout,
         )
 
 

@@ -3544,6 +3544,10 @@ rationale = "One post-processing pass of the schema pipeline, called as a verb o
 param = "schema"
 rationale = "Schema-pipeline stage transforming the schema dict; single operand."
 
+["pipelex/language/mthds_schema_generator.py::_constrain_stored_names"]
+param = "schema"
+rationale = "One post-processing pass of the schema pipeline, called as a verb on the schema it rewrites, like its sibling passes."
+
 ["pipelex/language/mthds_schema_generator.py::_convert_to_draft4"]
 param = "schema"
 rationale = "Schema-pipeline stage transforming the schema dict; single operand."
@@ -3571,10 +3575,6 @@ rationale = "Verb-object: mutates the schema object's required list; field_names
 ["pipelex/language/mthds_schema_generator.py::_remove_internal_fields"]
 param = "schema"
 rationale = "Schema-pipeline stage transforming the schema dict; single operand."
-
-["pipelex/language/mthds_schema_generator.py::_reserve_private_binding_names"]
-param = "schema"
-rationale = "One post-processing pass of the schema pipeline, called as a verb on the schema it rewrites, like its sibling passes."
 
 ["pipelex/language/mthds_schema_generator.py::_walk_schema"]
 param = "node"

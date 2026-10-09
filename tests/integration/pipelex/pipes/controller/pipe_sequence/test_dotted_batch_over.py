@@ -415,29 +415,6 @@ class TestDottedBatchOver:
 
         assert response.pipe_output.main_stuff_as_items(item_type=TextContent) == []
 
-    async def test_a_batch_over_a_result_that_is_not_a_plain_name_runs(self) -> None:
-        """Regression: the batch a step runs was built from a blueprint, which refused any list name but a plain input name, so a
-        batch over a result named `IndexLines`, which a pipe step may store under, failed when it ran.
-        """
-        mthds_content = _catalog_bundle(
-            inputs='{ catalog = "Catalog" }',
-            steps=[
-                '{ pipe = "write_index_line", batch_over = "catalog.pages", batch_as = "page", result = "IndexLines" }',
-                '{ pipe = "copy_line", batch_over = "IndexLines", batch_as = "line", result = "copied_lines" }',
-            ],
-        ).replace(
-            "[pipe.make_catalog]",
-            '[pipe.copy_line]\ntype = "PipeCompose"\ndescription = "Copies a line"\ninputs = { line = "Text" }\noutput = "Text"\n'
-            'template = "Copy of $line"\n\n[pipe.make_catalog]',
-        )
-
-        response = await _index_lines(
-            mthds_content=mthds_content, inputs={"catalog": {"concept": "catalog_index.Catalog", "content": _SPRING_CATALOG}}
-        )
-
-        lines = [item.text for item in response.pipe_output.main_stuff_as_items(item_type=TextContent)]
-        assert lines == ["Copy of Page: Garden chairs", "Copy of Page: Parasols"]
-
     async def test_two_dotted_batch_overs_of_one_path_take_two_private_names(self, load_empty_library: Callable[[], str]) -> None:
         mthds_content = _catalog_bundle(
             inputs='{ catalog = "Catalog" }',
@@ -470,11 +447,9 @@ class TestDottedBatchOver:
         result_refusals = [error for error in errors if "The `result` of the step running pipe 'write_index_line'" in error.message]
         assert len(result_refusals) == 1
         assert result_refusals[0].variable_names == [reserved_name]
-        assert (
-            f"'{reserved_name}', takes the `_bound_` prefix, which is reserved for the bound list of a dotted `batch_over`"
-            in result_refusals[0].message
-        )
-        assert "Choose another name, such as 'catalog_pages'." in result_refusals[0].message
+        assert f"'{reserved_name}', is not a plain input name" in result_refusals[0].message
+        assert "the `_bound_` prefix it starts with is reserved for the bound list of a dotted `batch_over`" in result_refusals[0].message
+        assert "Rename it to a plain name, such as 'catalog_pages'," in result_refusals[0].message
 
     async def test_a_caller_name_outside_the_prefix_keeps_its_value_across_a_nested_binding(self) -> None:
         response = await _index_lines(

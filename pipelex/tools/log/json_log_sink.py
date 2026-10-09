@@ -15,7 +15,9 @@ keys, the trace keys among them, are reserved whether or not the line carries th
 one is carried under the same ``field_`` prefix the record uses for a name the stdlib owns, on every line
 and not only the ones with an exception or a span, so no value is lost and a field keeps one wire name.
 A non-finite float is written as the string ``"NaN"``, ``"Infinity"`` or ``"-Infinity"``, since JSON has
-no token for it that a strict parser accepts.
+no token for it that a strict parser accepts. A carried value ``json`` refuses outright, a circular
+reference or a mapping with a non-string key, is written as its ``repr`` alone, and every other field on
+the line keeps its JSON type, as under the ``gcp`` sink.
 """
 
 from __future__ import annotations
@@ -36,7 +38,7 @@ from pipelex.system.telemetry.current_span import (
     pipelex_trace_fields_for_logs,
 )
 from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX, carried_attributes
-from pipelex.tools.log.log_sink import LogSink, json_fallback, spell_non_finite
+from pipelex.tools.log.log_sink import LogSink, json_fallback, render_json, spell_non_finite
 
 if TYPE_CHECKING:
     from typing import TextIO
@@ -71,15 +73,17 @@ def _json_line(*, payload: dict[str, Any]) -> str:
 
     A model dumps in JSON mode and an unknown object becomes its text. When ``json`` refuses the
     payload outright, a circular reference or a mapping with a non-string key inside a carried value,
-    every carried value is written as its ``repr`` and the line keeps its shape: a sink must render
+    each value is rendered on its own through the wire renderer the ``gcp`` sink uses, so the value
+    ``json`` refuses is written as its ``repr`` and every other value on the line keeps its JSON type: a
+    number stays a number and a boolean a boolean beside it. The line keeps its shape: a sink must render
     every record it is handed, and a serialization failure is a fact about the value, never a reason to
-    lose the line or to break the one-object-per-line contract.
+    lose the line, to break the one-object-per-line contract or to cost another field its type.
     """
     try:
         return json.dumps(payload, ensure_ascii=False, allow_nan=False, default=json_fallback)
     except (TypeError, ValueError):
-        safe_payload = {key: value if key in FIXED_KEYS else repr(value) for key, value in payload.items()}
-        return json.dumps(safe_payload, ensure_ascii=False, default=str)
+        safe_payload = {key: json.loads(render_json(value=value)) for key, value in payload.items()}
+        return json.dumps(safe_payload, ensure_ascii=False, allow_nan=False)
 
 
 def _trace_context() -> dict[str, str]:
