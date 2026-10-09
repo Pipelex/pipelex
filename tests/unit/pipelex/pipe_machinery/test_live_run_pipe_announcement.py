@@ -1,10 +1,11 @@
 """The line every live pipe run starts with: a fixed message, the pipe in its fields, and the console's pipe-run layout.
 
 The announcement used to be Rich markup assembled into the message, which every sink but the console wrote
-with its tags. It is now ``Pipe run starts`` with ``pipe_type``, ``pipe_code``, ``output_concept``,
-``pipe_depth`` and ``is_dry_run`` as fields, and the console draws the pipe tree from them through
-``LogLayout.PIPE_RUN``. The reference for that drawing is the markup the message used to carry, rendered by a
-Rich handler that read it, so the console line is checked byte for byte, colour codes included.
+with its tags. It is now ``Pipe run starts`` with ``pipe_type``, ``pipe_code``, ``output_concept`` and
+``pipe_depth`` as fields, and the console draws the pipe tree from them through ``LogLayout.PIPE_RUN``.
+The reference for that drawing is the markup the message used to carry, rendered by a Rich handler that
+read it, so the console line is checked byte for byte, colour codes included. Only a live run announces
+itself, and ``live_run_pipe`` refuses a dry run mode.
 """
 
 from __future__ import annotations
@@ -37,8 +38,8 @@ from pipelex.tools.log.json_log_sink import MESSAGE_KEY, JsonLogSink
 from pipelex.tools.log.log_config import HighlighterName, RichLogConfig
 from pipelex.tools.log.log_fields import LAYOUT_MARK
 from pipelex.tools.log.log_formatter import EmojiLogFormatter
-from pipelex.tools.misc.pretty import MARKUP_TAG_PATTERN
 from tests.helpers.console_log_rendering import package_log_config
+from tests.helpers.rich_markup import find_markup_tags
 
 if TYPE_CHECKING:
     from pipelex.core.memory.working_memory import WorkingMemory
@@ -46,6 +47,8 @@ if TYPE_CHECKING:
 
 PIPE_CODE = "compose_company"
 CONSOLE_WIDTH = 120
+# Every field the announcement carries, all of which the console's pipe-run layout draws.
+ANNOUNCEMENT_FIELDS = ("pipe_type", "pipe_code", "output_concept", "pipe_depth")
 
 # The pipes a run is nested under, the announcing pipe last, as `run_pipe` leaves the stack when it calls
 # `live_run_pipe`, with the depth the announcement reports for each.
@@ -124,15 +127,20 @@ def _make_pipe() -> QuietPipe:
     )
 
 
+def _job_metadata() -> JobMetadata:
+    return JobMetadata(run_metadata=RunMetadata(user_id="pytest", storage_scope="test/scope", read_scope=None, pipeline_run_id="plr-announce"))
+
+
+def _pipe_run_params(*, run_mode: PipeRunMode, pipe_stack: list[str]) -> PipeRunParams:
+    return PipeRunParams(run_mode=run_mode, batch_max_concurrency=1, pipe_stack_limit=10, pipe_stack=list(pipe_stack))
+
+
 async def _announcement(*, caplog: pytest.LogCaptureFixture, pipe_stack: list[str]) -> logging.LogRecord:
     """The record the pipe's live run announced itself with, the pipe stack left as `run_pipe` leaves it."""
     pipe = _make_pipe()
-    job_metadata = JobMetadata(
-        run_metadata=RunMetadata(user_id="pytest", storage_scope="test/scope", read_scope=None, pipeline_run_id="plr-announce")
-    )
-    pipe_run_params = PipeRunParams(run_mode=PipeRunMode.LIVE, batch_max_concurrency=1, pipe_stack_limit=10, pipe_stack=list(pipe_stack))
+    pipe_run_params = _pipe_run_params(run_mode=PipeRunMode.LIVE, pipe_stack=pipe_stack)
     with caplog.at_level(logging.INFO, logger=PipeAbstract.__module__):
-        await pipe.live_run_pipe(job_metadata=job_metadata, working_memory=WorkingMemoryFactory.make_empty(), pipe_run_params=pipe_run_params)
+        await pipe.live_run_pipe(job_metadata=_job_metadata(), working_memory=WorkingMemoryFactory.make_empty(), pipe_run_params=pipe_run_params)
     (record,) = [record for record in caplog.records if record.name == PipeAbstract.__module__ and record.getMessage() == PIPE_RUN_STARTS_MESSAGE]
     return record
 
@@ -192,14 +200,14 @@ class TestLiveRunPipeAnnouncement:
     ) -> None:
         record = await _announcement(caplog=caplog, pipe_stack=pipe_stack)
 
-        assert MARKUP_TAG_PATTERN.search(record.getMessage()) is None
-        assert {name: getattr(record, name) for name in ("pipe_type", "pipe_code", "output_concept", "pipe_depth", "is_dry_run")} == {
+        assert find_markup_tags(text=record.getMessage()) == []
+        assert {name: getattr(record, name) for name in ANNOUNCEMENT_FIELDS} == {
             "pipe_type": "QuietPipe",
             "pipe_code": PIPE_CODE,
             "output_concept": "Text",
             "pipe_depth": pipe_depth,
-            "is_dry_run": False,
         }
+        assert not hasattr(record, "is_dry_run"), "only a live run announces itself, so the announcement carries no run mode"
         assert record.__dict__[LAYOUT_MARK] == LogLayout.PIPE_RUN
 
     @pytest.mark.parametrize(("pipe_stack", "pipe_depth"), PIPE_STACKS, ids=PIPE_STACK_IDS)
@@ -240,11 +248,25 @@ class TestLiveRunPipeAnnouncement:
 
         line: dict[str, Any] = json.loads(buffer.getvalue())
         assert line[MESSAGE_KEY] == PIPE_RUN_STARTS_MESSAGE
-        assert {name: line[name] for name in ("pipe_type", "pipe_code", "output_concept", "pipe_depth", "is_dry_run")} == {
+        assert {name: line[name] for name in ANNOUNCEMENT_FIELDS} == {
             "pipe_type": "QuietPipe",
             "pipe_code": PIPE_CODE,
             "output_concept": "Text",
             "pipe_depth": 1,
-            "is_dry_run": False,
         }
+        assert "is_dry_run" not in line
         assert LogLayout.PIPE_RUN not in line.values()
+
+    async def test_a_dry_run_mode_is_refused_before_anything_is_announced(self, caplog: pytest.LogCaptureFixture) -> None:
+        """Only `run_pipe`'s live case calls it, but it is public: a dry run handed to it would announce itself and open a span."""
+        pipe_run_params = _pipe_run_params(run_mode=PipeRunMode.DRY, pipe_stack=[PIPE_CODE])
+
+        with (
+            caplog.at_level(logging.INFO, logger=PipeAbstract.__module__),
+            pytest.raises(AssertionError, match=rf"^Live run of PipeFunc '{PIPE_CODE}' called with run_mode = dry$"),
+        ):
+            await _make_pipe().live_run_pipe(
+                job_metadata=_job_metadata(), working_memory=WorkingMemoryFactory.make_empty(), pipe_run_params=pipe_run_params
+            )
+
+        assert not [record for record in caplog.records if record.getMessage() == PIPE_RUN_STARTS_MESSAGE]

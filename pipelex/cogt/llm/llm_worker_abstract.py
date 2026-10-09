@@ -405,8 +405,10 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
                 "The model takes a fixed temperature, so it is used in place of the requested one",
                 fields={
                     "model_handle": self.inference_model.name,
-                    "backend": self.inference_model.backend_name,
-                    "gen_ai.request.temperature": requested_temperature,
+                    "backend_name": self.inference_model.backend_name,
+                    "sdk": self.inference_model.sdk,
+                    GenAISpanAttr.REQUEST_MODEL: self.inference_model.model_id,
+                    GenAISpanAttr.REQUEST_TEMPERATURE: requested_temperature,
                     "fixed_temperature": fixed_temperature,
                 },
             )

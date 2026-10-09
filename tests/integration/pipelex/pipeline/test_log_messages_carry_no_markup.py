@@ -4,7 +4,8 @@ Colour is the console sink's job: it styles a record's fields by their names and
 and reads no message as markup. A message carrying a tag would reach every other sink with the tag in it, as
 the pipe announcement did when a helper assembled its markup, which is exactly what a search of the log calls
 cannot see. So this runs a method and reads every message the ``json`` sink was handed, at the lowest level,
-against Rich's own tag pattern.
+for a tag Rich would apply as styling. A bracketed word that names no style, a ``list[int]``, a ``[cycle]``
+marker or a backend's ``[openai]`` table, is plain text that prints as written, and passes.
 
 The run is live, because only a live run announces its pipes, a dry one taking another path. Every model call
 is answered by a stand-in worker, so nothing reaches a provider and the run costs nothing.
@@ -30,7 +31,7 @@ from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.log.json_log_sink import LOGGER_KEY, MESSAGE_KEY, SEVERITY_KEY, JsonLogSink
 from pipelex.tools.log.log_levels import LOGGING_LEVEL_VERBOSE, LOGGING_LEVEL_VERBOSE_NAME
-from pipelex.tools.misc.pretty import MARKUP_TAG_PATTERN
+from tests.helpers.rich_markup import find_markup_tags
 from tests.integration.pipelex.pipeline.test_data import LogMarkupTestData
 
 if TYPE_CHECKING:
@@ -115,5 +116,9 @@ class TestLogMessagesCarryNoMarkup:
             ("route_report", 1),
             ("compose_report", 2),
         }
-        carrying_markup = [f"{line[LOGGER_KEY]}: {line[MESSAGE_KEY]!r}" for line in lines if MARKUP_TAG_PATTERN.search(line[MESSAGE_KEY]) is not None]
-        assert not carrying_markup, "These log messages carry what Rich reads as a markup tag:\n" + "\n".join(carrying_markup)
+        carrying_markup = [
+            f"{line[LOGGER_KEY]}: {line[MESSAGE_KEY]!r} holds {find_markup_tags(text=line[MESSAGE_KEY])}"
+            for line in lines
+            if find_markup_tags(text=line[MESSAGE_KEY])
+        ]
+        assert not carrying_markup, "These log messages carry what Rich would apply as markup:\n" + "\n".join(carrying_markup)

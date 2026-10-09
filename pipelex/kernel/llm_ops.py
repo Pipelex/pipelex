@@ -110,7 +110,7 @@ def check_llm_setting_with_served_model(*, llm_setting: LLMSetting, is_structure
         # The backend's SDK is not installed here, so no worker for the model can be built: the run says so
         log.verbose(
             "The model's settings were not checked: its backend's SDK is not installed",
-            fields={"model_handle": inference_model.name, "backend": inference_model.backend_name, "sdk": inference_model.sdk},
+            fields={"model_handle": inference_model.name, "backend_name": inference_model.backend_name, "sdk": inference_model.sdk},
         )
     except LLMCapabilityError as refusal:
         if registered_check and not registered_check.is_builtin:

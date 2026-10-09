@@ -14,8 +14,7 @@ class BackendCredentialsReport(ConfigModel):
 
 
 #: The way out a command-line user has besides provider keys: a run on the hosted Pipelex API needs none. Only a caller that
-#: knows it serves the `pipelex` or `pipelex-agent` CLI adds it, since a server operator cannot act on it. No square
-#: brackets: the message is printed through Rich markup and as plain text alike.
+#: knows it serves the `pipelex` or `pipelex-agent` CLI adds it, since a server operator cannot act on it.
 HOSTED_RUNS_HINT = (
     "\n☁ Or run on the hosted Pipelex API, which needs no provider key:\n"
     "   Run 'pipelex login' to save a Pipelex API key, then add --hosted to a run, or make hosted runs\n"
@@ -24,6 +23,13 @@ HOSTED_RUNS_HINT = (
 
 
 class BackendCredentialsErrorMsgFactory:
+    """The messages that say which credentials a backend lacks and how to provide them or disable it.
+
+    A message is plain text, an exception's message or a report's, and names a backend's table in
+    `backends.toml` as it is written there, `[openai]`. It holds no Rich markup and no markup escape: a
+    surface that prints it through Rich markup escapes it where it prints it.
+    """
+
     @classmethod
     def make_one_variable_missing_error_msg(
         cls,
@@ -51,7 +57,7 @@ class BackendCredentialsErrorMsgFactory:
                 f"   Add the variable to your environment or .env file:\n"
                 f"   - '{var_name}'=<your_api_key>\n"
                 "\n2. Disable this backend\n"
-                rf"   Add 'enabled = false' under '\[{backend_name}]' in '.pipelex/inference/backends.toml'" + "\n"
+                f"   Add 'enabled = false' under '[{backend_name}]' in '.pipelex/inference/backends.toml'\n"
             )
         else:
             error_msg = (
@@ -61,7 +67,7 @@ class BackendCredentialsErrorMsgFactory:
                 "1. Provide the missing secret\n"
                 f"   Make sure '{var_name}' is available from your secrets provider.\n"
                 "\n2. Disable this backend\n"
-                rf"   Add 'enabled = false' under '\[{backend_name}]' in '.pipelex/inference/backends.toml'" + "\n"
+                f"   Add 'enabled = false' under '[{backend_name}]' in '.pipelex/inference/backends.toml'\n"
             )
 
         # Point at the BYOK (Bring Your Own Keys) setup
@@ -131,7 +137,7 @@ class BackendCredentialsErrorMsgFactory:
 
             error_msg += "\n2. Disable unused backends\n   Disable backends you don't need in '.pipelex/inference/backends.toml':\n"
             for backend_name in backend_names:
-                error_msg += rf"   - Add 'enabled = false' under '\[{backend_name}]'" + "\n"
+                error_msg += f"   - Add 'enabled = false' under '[{backend_name}]'\n"
         else:
             error_msg = (
                 f"Could not get credentials for inference backend(s): {backends_list}\n\n"
@@ -146,7 +152,7 @@ class BackendCredentialsErrorMsgFactory:
 
             error_msg += "\n2. Disable unused backends\n   Disable backends you don't need in '.pipelex/inference/backends.toml':\n"
             for backend_name in backend_names:
-                error_msg += rf"   - Add 'enabled = false' under '\[{backend_name}]'" + "\n"
+                error_msg += f"   - Add 'enabled = false' under '[{backend_name}]'\n"
 
         # Point at the BYOK (Bring Your Own Keys) setup
         error_msg += (

@@ -120,5 +120,10 @@ class TestCheckLLMSettingWithServedModel:
     def test_a_backend_whose_sdk_is_missing_is_left_to_the_run(self, mocker: MockerFixture) -> None:
         check = mocker.MagicMock(side_effect=MissingDependencyError("some-sdk", "some-extra"))
         _serve(mocker, served=_make_model(thinking_mode=ThinkingMode.MANUAL), check=check)
+        log_spy = mocker.patch("pipelex.kernel.llm_ops.log")
         check_llm_setting_with_served_model(llm_setting=_SETTING, is_structured=True)
         check.assert_called_once()
+        log_spy.verbose.assert_called_once_with(
+            "The model's settings were not checked: its backend's SDK is not installed",
+            fields={"model_handle": "some-model", "backend_name": "some_backend", "sdk": "some_sdk"},
+        )

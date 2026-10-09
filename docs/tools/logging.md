@@ -41,7 +41,7 @@ from pipelex.tools.log.console_layouts import LogLayout
 
 log.info(
     "Pipe run starts",
-    fields={"pipe_type": "PipeCompose", "pipe_code": "compose_company", "output_concept": "Company", "pipe_depth": 1, "is_dry_run": False},
+    fields={"pipe_type": "PipeCompose", "pipe_code": "compose_company", "output_concept": "Company", "pipe_depth": 1},
     layout=LogLayout.PIPE_RUN,
 )
 
@@ -224,7 +224,7 @@ log.error("Expected list[int], got [red]str[/red]")
 ERROR    🧠: Expected list[int], got [red]str[/red]
 ```
 
-A tag-shaped span in a message is text like any other: a `list[int]` in a type complaint, a bracketed path, the `[cycle]` marker in the rendering of a circular content, and the `[name]: ` prefix the console puts before a line from a logger with no emoji, such as `[myapp.jobs.nightly]: `. Colour is the console's own: it styles the [fields after the message](#fields-after-the-message) by their names and draws the few [layouts](#layouts), so a call is coloured by naming its fields, never by writing markup into its message. No sink but the console has ever read markup, so a message carrying a tag would reach the `json`, `otlp` and `gcp` sinks with the tag in it; no Pipelex message carries one, and a test runs a method live and fails on any message that matches Rich's tag pattern.
+A tag-shaped span in a message is text like any other: a `list[int]` in a type complaint, a bracketed path, the `[cycle]` marker in the rendering of a circular content, and the `[name]: ` prefix the console puts before a line from a logger with no emoji, such as `[myapp.jobs.nightly]: `. Colour is the console's own: it styles the [fields after the message](#fields-after-the-message) by their names and draws the few [layouts](#layouts), so a call is coloured by naming its fields, never by writing markup into its message. No sink but the console has ever read markup, so a message carrying a tag would reach the `json`, `otlp` and `gcp` sinks with the tag in it; no Pipelex message carries one, and a test runs a method live and fails on any message holding a tag Rich would apply as styling: a closing tag, an `@` handler, or a tag naming a style, `[bold]` or `[link=https://pipelex.com]`. A bracketed word that names no style, `list[int]` or `[openai]`, passes, since it prints as written.
 
 Rich still honours its own per-record `markup` attribute, which a third-party library may set on a record it logs to ask for markup. No Pipelex call can set it: a field of that name is [reserved](#names-that-are-not-yours-to-give) and lands under `field_markup`.
 
@@ -259,7 +259,7 @@ from pipelex.tools.log.console_layouts import LogLayout
 
 log.info(
     "Pipe run starts",
-    fields={"pipe_type": "PipeCompose", "pipe_code": "compose_company", "output_concept": "Company", "pipe_depth": 1, "is_dry_run": False},
+    fields={"pipe_type": "PipeCompose", "pipe_code": "compose_company", "output_concept": "Company", "pipe_depth": 1},
     layout=LogLayout.PIPE_RUN,
 )
 ```
@@ -279,7 +279,7 @@ The registry holds these layouts:
 
 | Layout | Fields it presents | What it draws |
 | --- | --- | --- |
-| `LogLayout.PIPE_RUN` | `pipe_type`, `pipe_code`, `output_concept`, `pipe_depth` (an integer, `0` at the top level and at most `100`), `is_dry_run` (a boolean) | `PipeCompose: compose_company → Company`, indented three spaces per level of depth and behind `↳` when nested, with `Dry run:` before the pipe type for a dry run, in the style map's colours. A depth or a flag of another type, or a depth out of range, falls back to the message. The pipe announcement names it; a dry run announces nothing, so the announcement's `is_dry_run` is always `false` |
+| `LogLayout.PIPE_RUN` | `pipe_type`, `pipe_code`, `output_concept`, `pipe_depth` (an integer, `0` at the top level and at most `100`) | `PipeCompose: compose_company → Company`, indented three spaces per level of depth and behind `↳` when nested, in the style map's colours. A depth of another type, or out of range, falls back to the message. The pipe announcement names it, and only a live run announces itself, so the line carries no run mode |
 
 A layout is a `ConsoleLayout`: a `template` of Rich markup whose placeholders are bare field names (`{pipe_code}`, never an attribute, an index or a format spec, which registration refuses), the `presented_fields` the suffix leaves out, and, for a shape a template cannot express alone, a subclass whose `derived_values` computes presentation values such as an indentation from the fields.
 

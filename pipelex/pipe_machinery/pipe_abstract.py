@@ -645,15 +645,13 @@ class PipeAbstract(ABC, BaseModel):
 
         The depth counts the pipes this one runs under: the top-level pipe is already on the stack when it
         announces itself, so it stands at depth 0, and a pipe run with no stack at all is drawn there too.
-        Only a live run announces itself, `run_pipe` sending a dry one to `dry_run_pipe`, so the dry-run flag
-        the layout reads is always false here.
+        Only a live run announces itself, so the fields carry no run mode.
         """
         return {
             "pipe_type": self.pipe_type,
             "pipe_code": self.code,
             "output_concept": self.output.concept.code,
             "pipe_depth": max(len(pipe_run_params.pipe_stack) - 1, 0),
-            "is_dry_run": False,
         }
 
     @final
@@ -990,6 +988,7 @@ class PipeAbstract(ABC, BaseModel):
         output_name: str | None = None,
         library_crate: LibraryCrate | None = None,
     ) -> PipeOutput:
+        assert not pipe_run_params.run_mode.is_dry, f"Live run of {self.type} '{self.code}' called with run_mode = {pipe_run_params.run_mode}"
         # Generate pipe_run_id (business ID, always set)
         this_pipe_run_id = PipelineFactory.make_pipe_run_id()
 
@@ -1005,8 +1004,8 @@ class PipeAbstract(ABC, BaseModel):
 
             # Handle telemetry ------------------------------------------------------------
 
-            # Derive OtelContext if telemetry is enabled (a tracer is available). Only a live run gets
-            # here, `run_pipe` sending a dry one to `dry_run_pipe`, so no run-mode check is needed.
+            # Derive OtelContext if telemetry is enabled (a tracer is available). The assertion above
+            # holds this method to a live run, so no run-mode check is needed.
             # The trace_id comes from parent's otel_context (already computed at pipeline start)
             this_otel_context: OtelContext | None = None
             span: Span | None = None
@@ -1086,9 +1085,8 @@ class PipeAbstract(ABC, BaseModel):
         # unset — so everything downstream that identifies a step by it (leaf-activity labelling in a
         # distributed backend, log correlation) sees an anonymous step in DRY and a named one in LIVE.
         # Telemetry stays live-only on purpose: `pipe_run_id` and `otel_context` belong to a real run.
-        # `otel_context=None` matches what `live_run_pipe` itself computes in dry mode, and clearing
-        # it explicitly is the point of that parameter being required — inheriting the parent's would
-        # attach a dry step to a live span.
+        # A dry run opens no span, so `otel_context` is cleared, and explicitly, which is the point of
+        # that parameter being required: inheriting the parent's would attach a dry step to a live span.
         child_metadata = job_metadata.copy_with_update(otel_context=None, pipe_code=self.code)
         return await self._dry_run_pipe(
             job_metadata=child_metadata,

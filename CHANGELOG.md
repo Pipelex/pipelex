@@ -8,11 +8,11 @@
 
 ### Changed
 
-- **The pipe announcement is a plain message with fields**: every live pipe run logs `Pipe run starts` with `pipe_type`, `pipe_code`, `output_concept`, `pipe_depth` and `is_dry_run` as fields, where the `json`, `otlp` and `gcp` sinks used to receive Rich markup inside the message, and the console draws the same coloured pipe tree from those fields through `LogLayout.PIPE_RUN`. The warning that a model's fixed temperature replaced the requested one names the model and both temperatures as fields in the same way.
+- **The pipe announcement is a plain message with fields**: every live pipe run logs `Pipe run starts` with `pipe_type`, `pipe_code`, `output_concept` and `pipe_depth` as fields, where the `json`, `otlp` and `gcp` sinks used to receive Rich markup inside the message, and the console draws the same coloured pipe tree from those fields through `LogLayout.PIPE_RUN`. The warning that a model's fixed temperature replaced the requested one carries its values as fields in the same way: `model_handle`, `backend_name`, `sdk`, the provider's model id under `gen_ai.request.model`, the requested temperature under `gen_ai.request.temperature`, and `fixed_temperature`.
 
 ### Fixed
 
-- **Model descriptions carry no backslashes**: a model's description in an error message or a log line, such as `gpt-5 → SDK[openai]•Backend[openai]•Model[gpt-5-2025]`, no longer has a backslash before each bracket, and `pipelex run` prints a failed run's message exactly as written rather than reading it as markup.
+- **Model descriptions and credential errors carry no backslashes**: a model's description in an error message or a log line, such as `gpt-5 → SDK[openai]•Backend[openai]•Model[gpt-5-2025]`, no longer has a backslash before each bracket, and the error naming a backend's missing credentials tells you to add `enabled = false` under `[openai]` rather than `\[openai]`. `pipelex run` prints a failed run's message exactly as written rather than reading it as markup.
 
 ### Removed
 

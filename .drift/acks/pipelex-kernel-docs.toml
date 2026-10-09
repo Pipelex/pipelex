@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:c69fa684a838bd18e55dc275c5e9cc270f72275f517f810f85922532ca0b9d56"
+digest = "sha256:59045b101086535346b6001e091771aee6e67183fdb1030009e0b283ef820e0d"
 reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-10-09T19:30:02Z"
-rationale = "clean-pass: llm_ops.py's VERBOSE line for a model whose backend SDK is not installed becomes a fixed message with model_handle, backend and sdk as fields; no kernel function, parameter or behaviour moved. pipelex-kernel.md line 90 was re-read against check_llm_setting_with_served_model: the refusal still names the model by its deck handle, the code replacing inference_model.desc, now unescaped, with inference_model.name in the worker's own text built from the same property, and a model whose SDK is not installed is still left to the run."
+reviewed_at = "2026-10-09T20:06:36Z"
+rationale = "clean-pass: llm_ops.py renames the VERBOSE line's backend field to backend_name, the name the backends configuration gives it; no kernel function, parameter or behaviour moved. Re-read pipelex-kernel.md's check_llm_setting_with_served_model paragraph against the function: a model whose backend's SDK is not installed is still left to the run, and the doc names no log field."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -18,7 +18,7 @@ rationale = "clean-pass: llm_ops.py's VERBOSE line for a model whose backend SDK
 "pipelex/kernel/img_gen_results.py" = "blob:46b4ca11c70d906ae6d58ce66461f9b3414f1bfa"
 "pipelex/kernel/judgment_ops.py" = "blob:49ce7414eed9cfdf5595e877a64aacd29ada86ca"
 "pipelex/kernel/judgment_results.py" = "blob:40ba1258cc81d34df3e427d5511ccd40c6edf789"
-"pipelex/kernel/llm_ops.py" = "blob:ff8395295830352d8f158c4c7167e71c3518a6aa"
+"pipelex/kernel/llm_ops.py" = "blob:527bf57eb544747b02ac7e4100f653b6c163b98c"
 "pipelex/kernel/llm_prompt_content.py" = "blob:eabf0ee760c3a26b8967973d511e712e9275e99b"
 "pipelex/kernel/llm_results.py" = "blob:6e3b8a2878b5bb284ece5fac10262fb59ac2029d"
 "pipelex/kernel/memory_ops.py" = "blob:7fbbfaaec99f9712d8e215520cb02e26aad3fb40"

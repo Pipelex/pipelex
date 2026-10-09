@@ -508,6 +508,27 @@ class TestDoctorDisplayReport:
         assert "my[test]backend" in output
         assert "MY[dev]_API_KEY" in output
 
+    def test_the_credentials_advice_names_each_backend_table_as_written(self, console: Console) -> None:
+        """The advice names a backend's table as `[openai]`, which the console would read as a style tag and drop."""
+        kwargs = _healthy_report_kwargs()
+        kwargs["backends_healthy"] = False
+        kwargs["backends_message"] = "1 backend(s) have missing or invalid credentials"
+        kwargs["backend_credential_reports"] = {
+            "openai": BackendCredentialsReport(
+                backend_name="openai",
+                required_vars=["OPENAI_API_KEY"],
+                missing_vars=["OPENAI_API_KEY"],
+                placeholder_vars=[],
+                all_credentials_valid=False,
+            )
+        }
+
+        display_health_report(**kwargs)
+
+        output = console.export_text()
+        assert "   - Add 'enabled = false' under '[openai]'" in output
+        assert "\\[" not in output
+
     def test_a_bracketed_deck_filename_survives_the_per_file_detail(self, console: Console) -> None:
         kwargs = _healthy_report_kwargs()
         kwargs["deck_healthy"] = False
