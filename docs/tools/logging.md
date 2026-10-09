@@ -331,7 +331,7 @@ log.warning(
 
 ### Values in fields
 
-What varies goes in `fields`, named by the [naming convention](#naming-convention), and one concept has one name across the codebase, so that a query written for one line finds every line about the same thing. Pipelex's own concepts take the names in the table below. A concept the OpenTelemetry semantic conventions define takes their key verbatim: `file.path` for a path on disk, `url.full` for a URL, `user.id` for a user, `error.type` for the class of an error, and the `gen_ai.*` keys for inference, such as `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.operation.name`, `gen_ai.usage.input_tokens` and `gen_ai.usage.output_tokens`. A count is named `<what>_count` (`concept_count`) and a duration `duration_ms`, in milliseconds.
+What varies goes in `fields`, named by the [naming convention](#naming-convention), and one concept has one name across the codebase, so that a query written for one line finds every line about the same thing. Pipelex's own concepts take the names in the table below. A concept the OpenTelemetry semantic conventions define takes their key verbatim: `file.path` for a path on disk, `url.full` for a URL, `user.id` for a user, `error.type` for the class of an error, and the `gen_ai.*` keys for inference, such as `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.request.temperature`, `gen_ai.operation.name`, `gen_ai.usage.input_tokens` and `gen_ai.usage.output_tokens`. A `gen_ai.*` key means on a log line what it means on Pipelex's LLM span: `gen_ai.request.model` is the model's handle and `gen_ai.response.model` the provider's id of the model serving it. A line about an inference call carries them beside `model_handle`, `backend_name` and `sdk`, so it joins its span in a log store, while `model_handle` names the handle on every line about a model, inference or not. A count is named `<what>_count` (`concept_count`) and a duration `duration_ms`, in milliseconds.
 
 | Field | What it names |
 | --- | --- |
@@ -356,6 +356,8 @@ What varies goes in `fields`, named by the [naming convention](#naming-conventio
 | `crate_fingerprint` | The fingerprint that identifies a normalized crate in the library it is loaded into |
 | `model_handle` | The handle a pipe or the model deck names a model by, an alias included: `gpt-image-2`, `@default-premium` |
 | `backend_name` | The inference backend serving a model, as the backends configuration names it: `anthropic`, `bedrock` |
+| `sdk` | The SDK a backend reaches a model through, as the backends configuration names it: `openai`, `bedrock_anthropic` |
+| `fixed_temperature` | The one temperature a model accepts, as its constraints declare it, used in place of the one requested |
 | `node_id` | A node of a run's execution graph, as the graph tracer names it |
 | `env_var` | The name of an environment variable, never its value |
 | `error.type`, `error.message` | A handled exception's class name and its text, as [Exceptions](#exceptions) describes |

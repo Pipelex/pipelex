@@ -52,7 +52,7 @@ A markup tag is what Rich reads as one, matched with Rich's own tag pattern:
 - an `@` handler, `[@click=app.bell]`;
 - an opening tag whose text Rich parses as a style, `[red]`, `[bold green]`, `[on blue]`, `[link=https://pipelex.com]`, or names a style of Rich's default theme, `[repr.number]`.
 
-A bracketed word that is no style, `list[int]`, `[Errno 2]` or `items[index]`, is text and passes, and so does a tag escaped with a backslash.
+A bracketed word that is no style, `list[int]`, `[Errno 2]` or `items[index]`, is text and passes, and so does a tag escaped with a backslash. The tests that check the messages a live run logs, described under [Messages are plain text](../tools/logging.md#messages-are-plain-text), read tags by this same rule, the guard's `find_markup_tags`, so the source and the run are held to one definition.
 
 ## The baseline
 

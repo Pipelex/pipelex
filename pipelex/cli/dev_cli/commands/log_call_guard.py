@@ -58,7 +58,6 @@ import ast
 import copy
 import itertools
 import json
-import re
 import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import tomllib
 from collections import Counter
@@ -70,6 +69,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, cast
 import tomlkit
 from rich.default_styles import DEFAULT_STYLES
 from rich.errors import StyleSyntaxError
+from rich.markup import RE_TAGS
 from rich.style import Style
 from typing_extensions import override
 
@@ -117,10 +117,6 @@ TITLE_KEYWORDS = ("title", "inline")
 
 #: The qualified name of a call made outside any function or class.
 MODULE_SCOPE_NAME = "<module>"
-
-#: Rich's own console-markup tag pattern, ``rich.markup.RE_TAGS``: a run of backslashes, then a bracketed tag whose
-#: text opens with a lowercase letter, ``#``, ``/`` or ``@``. An odd run of backslashes escapes the tag.
-MARKUP_TAG_PATTERN = re.compile(r"((\\*)\[([a-z#/@][^[]*?)])")
 
 #: How long a git command reading the trusted baseline may take.
 GIT_TIMEOUT_SECONDS = 30
@@ -214,7 +210,15 @@ class BaselineGrowth(NamedTuple):
 
 
 # --------------------------------------------------------------------------------------
-# Markup
+# Markup: what Rich would read as console markup in a piece of text
+#
+# The one reading of a markup tag in the repo's checks: the guard applies it to a call's literal text, and the
+# live-run tests to the messages a run logs. A tag-shaped span is not markup by its shape alone. Rich's tag pattern
+# also matches the `[int]` of `list[int]`, a `[cycle]` marker and a backend's table, `[openai]`, yet none of them
+# names a style, and a message holding one prints as written. So a tag counts as markup only when Rich would style
+# with it: a closing tag, `[/]` or `[/red]`; an `@` handler, `[@click=app.bell]`; or an opening tag whose text Rich
+# parses as a style, `[bold]`, `[on blue]`, `[link=https://pipelex.com]`, or that names a style of Rich's default
+# theme, `[repr.number]`. A tag escaped with a backslash is text, since Rich prints it as written.
 # --------------------------------------------------------------------------------------
 
 
@@ -239,12 +243,17 @@ def _reads_as_style(*, tag_text: str) -> bool:
 
 
 def find_markup_tags(*, text: str) -> list[str]:
-    """The unescaped Rich markup tags a piece of literal message text holds, in order."""
+    """The unescaped tags in the text that Rich would apply as markup, in order, each as written.
+
+    Tags are found by Rich's own pattern, ``rich.markup.RE_TAGS``: a run of backslashes, then a bracketed tag whose
+    text opens with a lowercase letter, ``#``, ``/`` or ``@``.
+    """
     if "[" not in text:
         return []
     tags: list[str] = []
-    for match in MARKUP_TAG_PATTERN.finditer(text):
+    for match in RE_TAGS.finditer(text):
         full_text, escapes, tag_text = match.groups()
+        # An odd run of backslashes escapes the tag, which then prints as written.
         if len(escapes) % 2 == 1:
             continue
         if _reads_as_style(tag_text=tag_text):
