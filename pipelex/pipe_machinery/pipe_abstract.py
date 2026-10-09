@@ -46,6 +46,7 @@ from pipelex.system.telemetry.otel_constants import (
 from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_identity import make_run_identity_span_attributes
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
+from pipelex.tools.log.console_layouts import LogLayout
 from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path, is_snake_case
 from pipelex.validation_error_types import PipeValidationErrorType
@@ -54,6 +55,9 @@ if TYPE_CHECKING:
     from pipelex.system.trace_context import TraceContext
 
 PipeAbstractType = type["PipeAbstract"]
+
+#: The message every live pipe run announces itself with; the pipe is in the fields, and the console draws it as the pipe tree.
+PIPE_RUN_STARTS_MESSAGE = "Pipe run starts"
 
 
 class AbsentInput(NamedTuple):
@@ -636,18 +640,19 @@ class PipeAbstract(ABC, BaseModel):
         """
         return {}
 
-    def _format_pipe_run_info(self, pipe_run_params: PipeRunParams) -> str:
-        indent_level = len(pipe_run_params.pipe_stack) - 1
-        indent = "   " * indent_level
-        if indent_level > 0:
-            indent = f"{indent}[yellow]↳[/yellow] "
-        pipe_type_label = f"[white]{self.pipe_type}:[/white]"
-        if pipe_run_params.run_mode.is_dry:
-            pipe_type_label = f"[dim]Dry run:[/dim] {pipe_type_label}"
-        pipe_code_label = f"[red]{self.code}[/red]"
-        concept_code_label = f"[bold green]{self.output.concept.code}[/bold green]"
-        arrow = "[yellow]→[/yellow]"
-        return f"{indent}{pipe_type_label} {pipe_code_label} {arrow} {concept_code_label}"
+    def _pipe_run_fields(self, *, pipe_run_params: PipeRunParams) -> dict[str, Any]:
+        """The fields of the pipe announcement, the ones the console's pipe-run layout draws as the pipe tree.
+
+        The depth counts the pipes this one runs under: the top-level pipe is already on the stack when it
+        announces itself, so it stands at depth 0, and a pipe run with no stack at all is drawn there too.
+        Only a live run announces itself, so the fields carry no run mode.
+        """
+        return {
+            "pipe_type": self.pipe_type,
+            "pipe_code": self.code,
+            "output_concept": self.output.concept.code,
+            "pipe_depth": max(len(pipe_run_params.pipe_stack) - 1, 0),
+        }
 
     @final
     async def run_pipe(
@@ -983,6 +988,7 @@ class PipeAbstract(ABC, BaseModel):
         output_name: str | None = None,
         library_crate: LibraryCrate | None = None,
     ) -> PipeOutput:
+        assert not pipe_run_params.run_mode.is_dry, f"Live run of {self.type} '{self.code}' called with run_mode = {pipe_run_params.run_mode}"
         # Generate pipe_run_id (business ID, always set)
         this_pipe_run_id = PipelineFactory.make_pipe_run_id()
 
@@ -992,18 +998,21 @@ class PipeAbstract(ABC, BaseModel):
         # comes back when the pipe returns, however it returns. A pipe lifted for absent optional
         # inputs never gets here: it has no run and no id, and its skip line carries the enclosing binding.
         with log.context(pipe_run_id=this_pipe_run_id):
-            log.info(self._format_pipe_run_info(pipe_run_params=pipe_run_params))
+            # A fixed message, the pipe in the fields: the console draws the pipe tree from them through
+            # the pipe-run layout, and every other sink writes them as keys a query can select on.
+            log.info(PIPE_RUN_STARTS_MESSAGE, fields=self._pipe_run_fields(pipe_run_params=pipe_run_params), layout=LogLayout.PIPE_RUN)
 
             # Handle telemetry ------------------------------------------------------------
 
-            # Derive OtelContext if telemetry is enabled (not dry mode and tracer available)
+            # Derive OtelContext if telemetry is enabled (a tracer is available). The assertion above
+            # holds this method to a live run, so no run-mode check is needed.
             # The trace_id comes from parent's otel_context (already computed at pipeline start)
             this_otel_context: OtelContext | None = None
             span: Span | None = None
             is_root_span: bool = False
 
             parent_otel_context = job_metadata.otel_context
-            if not pipe_run_params.run_mode.is_dry and parent_otel_context is not None:
+            if parent_otel_context is not None:
                 # Start OTel span first
                 span, is_root_span = self._start_pipe_span(
                     parent_otel_context=parent_otel_context,
@@ -1023,7 +1032,7 @@ class PipeAbstract(ABC, BaseModel):
             # Create child metadata with updated pipe_code and pipe_run_id
             # This passes down a modified copy rather than mutating the original
             # otel_context is passed separately because it must always be set explicitly
-            # (even when None in dry mode) to avoid inheriting stale parent context
+            # (even when None, with no tracer) to avoid inheriting stale parent context
             child_metadata = job_metadata.copy_with_update(
                 otel_context=this_otel_context,
                 pipe_code=self.code,
@@ -1076,9 +1085,8 @@ class PipeAbstract(ABC, BaseModel):
         # unset — so everything downstream that identifies a step by it (leaf-activity labelling in a
         # distributed backend, log correlation) sees an anonymous step in DRY and a named one in LIVE.
         # Telemetry stays live-only on purpose: `pipe_run_id` and `otel_context` belong to a real run.
-        # `otel_context=None` matches what `live_run_pipe` itself computes in dry mode, and clearing
-        # it explicitly is the point of that parameter being required — inheriting the parent's would
-        # attach a dry step to a live span.
+        # A dry run opens no span, so `otel_context` is cleared, and explicitly, which is the point of
+        # that parameter being required: inheriting the parent's would attach a dry step to a live span.
         child_metadata = job_metadata.copy_with_update(otel_context=None, pipe_code=self.code)
         return await self._dry_run_pipe(
             job_metadata=child_metadata,

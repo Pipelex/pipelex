@@ -102,8 +102,8 @@ class HoldingLogHandler(logging.Handler):
     def release_to(self, *, handler: logging.Handler) -> None:
         """Hand every held record to the handler, in the order they were emitted, and forward to it whatever arrives after.
 
-        One record the handler cannot render, a line Rich reads as unbalanced markup for one, gets the
-        stdlib's own recovery, ``handleError``, and costs none of the records after it.
+        One record the handler cannot render, a third-party line Rich is asked to read as markup and cannot
+        balance for one, gets the stdlib's own recovery, ``handleError``, and costs none of the records after it.
 
         A drained record is marked after its delivery exactly as a forwarded one is, and for the same
         reason: a thread that read the root logger's handler list before the handoff can still reach the

@@ -1,9 +1,10 @@
-"""The ``console`` sink renders byte for byte what the Rich handler rendered before it existed, plus the fields.
+"""The ``console`` sink renders byte for byte what a plain Rich handler renders, plus the fields.
 
-The reference is the handler ``log.configure`` used to build inline: a ``RichHandler`` fed every
-``[runtime.log.rich_log]`` setting and the emoji formatter. Both handlers are pointed at the same kind
-of non-terminal console and handed the same fixed record set. A record whose call gave no field renders
-identically through both; a record with fields renders the same line with the fields after the message.
+The reference is the handler ``log.configure`` used to build inline before the sink existed, reading no
+message as markup as the console now does: a ``RichHandler`` fed every ``[runtime.log.rich_log]`` setting,
+``markup=False`` and the emoji formatter. Both handlers are pointed at the same kind of non-terminal console
+and handed the same fixed record set. A record whose call gave no field renders identically through both; a
+record with fields renders the same line with the fields after the message.
 """
 
 from __future__ import annotations
@@ -22,8 +23,9 @@ from pipelex.system.console_target import ConsoleTarget
 from pipelex.tools.log.console_layouts import LogLayout
 from pipelex.tools.log.console_log_sink import ConsoleLogSink
 from pipelex.tools.log.log_config import HighlighterName, LogConfig, RichLogConfig
-from pipelex.tools.log.log_fields import VERBATIM_MARK, attach_log_record_extra
+from pipelex.tools.log.log_fields import RICH_MARKUP_ATTRIBUTE, attach_log_record_extra
 from pipelex.tools.log.log_formatter import EmojiLogFormatter
+from pipelex.tools.log.log_redaction import CYCLE_TEXT
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 from tests.helpers.console_log_rendering import (
     PIPE_RUN_FIELDS,
@@ -41,7 +43,7 @@ def _package_rich_log_config() -> RichLogConfig:
 
 
 def _reference_handler(*, config: RichLogConfig) -> logging.Handler:
-    """The handler ``log.configure`` built before the sink seam, setting for setting."""
+    """The handler ``log.configure`` built before the sink seam, setting for setting, reading no message as markup."""
     highlighter: Highlighter
     match config.highlighter_name:
         case HighlighterName.JSON:
@@ -54,7 +56,7 @@ def _reference_handler(*, config: RichLogConfig) -> logging.Handler:
         show_level=config.is_show_level,
         enable_link_path=config.is_link_path_enabled,
         highlighter=highlighter,
-        markup=config.is_markup_enabled,
+        markup=False,
         rich_tracebacks=config.is_rich_tracebacks,
         tracebacks_word_wrap=config.is_tracebacks_word_wrap,
         tracebacks_show_locals=config.is_tracebacks_show_locals,
@@ -135,6 +137,7 @@ class TestConsoleLogSink:
 
         assert rendered
         assert "🧠: Running the pipe" in rendered
+        assert "[myapp.jobs.nightly]: A logger with no emoji" in rendered
         assert "ValueError" in rendered
         assert rendered == reference
 
@@ -234,48 +237,62 @@ class TestConsoleLogSink:
         "message",
         [
             "expected list[int], got str",
+            "Expected list[int], got [red]str[/red]",
             "no such file: [/etc/pipelex.toml]",
+            "[bold]not a style[/bold] :fire:",
         ],
-        ids=["a type complaint", "a bracketed path"],
+        ids=["a type complaint", "a type complaint carrying a style tag", "a bracketed path", "a style tag and an emoji code"],
     )
-    def test_a_message_shaped_like_markup_renders_intact_only_when_the_record_asks_for_verbatim(self, message: str) -> None:
-        """An error message carries text nobody chose, and Rich reads a tag-shaped span in it as markup.
+    def test_a_message_shaped_like_markup_prints_exactly_as_written(self, message: str) -> None:
+        """An error message carries text nobody chose, and Rich read a tag-shaped span in it as markup.
 
-        Rich's tag has to start with a lowercase letter, `#`, `/` or `@`, so `[Errno 2]` is safe and the
-        two shapes this codebase's messages are actually made of are not: `list[int]` loses the bracketed
-        span, and a bracketed path opens what Rich reads as a closing tag and raises inside the handler,
-        where `handleError` costs the whole line. The configuration asks for markup and Pipelex's own
-        lines use it, so the opt-out is per record: Rich reads `markup` off the record ahead of its
-        handler's setting, which is what `TracebackMessageError` stamps through `VERBATIM_MARK`.
+        Rich's tag starts with a lowercase letter, `#`, `/` or `@`, so `list[int]` lost its bracketed span, a
+        style tag coloured what it wrapped and vanished, and a bracketed path opened what Rich reads as a
+        closing tag and raised inside the handler, costing the whole line. The console reads no message as
+        markup, so each prints as written, an emoji code included.
         """
-        config = _package_rich_log_config()
-        assert config.is_markup_enabled, "the mark is an opt-out, so an enabled setting is what it opts out of"
+        rendered = _render_one(config=_package_rich_log_config(), message=message, extra=None)
 
-        interpreted = _render_one(config=config, message=message, extra=None)
-        verbatim = _render_one(config=config, message=message, extra={VERBATIM_MARK: False})
+        assert message in rendered
 
-        assert message not in interpreted
-        assert message in verbatim
+    def test_a_logger_named_in_lowercase_keeps_its_channel_prefix(self, caplog: pytest.LogCaptureFixture) -> None:
+        """A logger with no emoji is prefixed with its name in brackets, which Rich read as a tag and removed when the name starts lowercase.
 
-    @pytest.mark.parametrize(
-        "message",
-        [
-            "expected list[int], got str",
-            "no such file: [/etc/pipelex.toml]",
-        ],
-        ids=["a type complaint", "a bracketed path"],
-    )
-    def test_a_message_rich_refuses_costs_its_rendering_and_never_the_log_call(self, message: str) -> None:
+        The line printed as ``: Pipe run failed``, with nothing saying which library wrote it.
+        """
+        caplog.set_level(logging.INFO, logger="myapp.jobs.nightly")
+        buffer = io.StringIO()
+        with installed_log(sink=console_sink_on_buffer(buffer=buffer)):
+            logging.getLogger("myapp.jobs.nightly").error("Pipe run failed")
+
+        assert "[myapp.jobs.nightly]: Pipe run failed" in buffer.getvalue()
+
+    def test_a_circular_content_prints_its_cycle_marker(self, caplog: pytest.LogCaptureFixture) -> None:
+        """A content JSON refuses is rendered as its ``repr``, where the redaction cuts the cycle with ``[cycle]``.
+
+        Read as markup, the marker was a tag Rich removed, so the line printed ``'self': ''``.
+        """
+        caplog.set_level(logging.INFO, logger=__name__)
+        circular: dict[str, Any] = {"the_content_key": 1}
+        circular["self"] = circular
+        buffer = io.StringIO()
+        with installed_log(sink=console_sink_on_buffer(buffer=buffer)) as fresh:
+            fresh.info(circular)
+
+        assert f"{{'the_content_key': 1, 'self': '{CYCLE_TEXT}'}}" in buffer.getvalue()
+
+    def test_a_line_rich_refuses_costs_its_rendering_and_never_the_log_call(self) -> None:
         """Rich overrides ``emit`` without the stdlib's ``handleError`` guard, so a refusal left the log call.
 
-        A bracketed path reads as a closing tag with nothing open and Rich raises ``MarkupError`` from
-        inside the handler: unguarded, that propagated out of `log.error` and replaced the failure being
-        reported with itself. The sink's handler restores the guard, so the worst a line Rich refuses costs
-        is its own rendering.
+        No Pipelex message is read as markup, but Rich still honours its own per-record ``markup`` attribute,
+        which a third-party library may stamp on its record: a bracketed path in such a line reads as a closing
+        tag with nothing open, and Rich raises ``MarkupError`` from inside the handler. Unguarded, that
+        propagated out of the call that logged it and replaced whatever was being reported with itself. The
+        sink's handler restores the guard, so the worst a line Rich refuses costs is its own rendering.
         """
-        config = _package_rich_log_config()
+        message = "no such file: [/etc/pipelex.toml]"
 
-        rendered = _render_one(config=config, message=message, extra=None)
+        rendered = _render_one(config=_package_rich_log_config(), message=message, extra={RICH_MARKUP_ATTRIBUTE: True})
 
         assert message not in rendered
 

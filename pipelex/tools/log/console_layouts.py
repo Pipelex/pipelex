@@ -118,9 +118,11 @@ def _styled_placeholder(*, field: str, suffix: str = "") -> str:
 #: How far a nested pipe run is indented per level of depth.
 PIPE_RUN_INDENT = "   "
 #: What marks a nested pipe run, after its indentation.
-PIPE_RUN_BRANCH = "↳ "
-#: What precedes a dry run's pipe type.
-PIPE_RUN_DRY_RUN_LABEL = "Dry run: "
+PIPE_RUN_BRANCH = "↳"
+#: What separates the branch mark from the pipe type. It is a placeholder of its own, outside the mark's style, so
+#: the line is the very one the announcement printed when it was written as markup in its message, colour codes
+#: included.
+PIPE_RUN_GAP = " "
 #: The deepest nesting the pipe-run layout indents. The indentation is built from the depth, so an unbounded
 #: one builds a string as long as the caller likes, or raises ``OverflowError``; a deeper run than this,
 #: which is far past any pipe stack a run reaches, falls back to its message.
@@ -128,23 +130,22 @@ PIPE_RUN_MAX_DEPTH = 100
 
 
 class PipeRunLayout(ConsoleLayout):
-    """The pipe-run tree: a nested run indented under its parent, behind a branch mark, a dry run labelled.
+    """The pipe-run tree: a nested run indented under its parent, behind a branch mark.
 
     ``PipeCompose: compose_company → Company`` at the top level, the same line indented and behind ``↳`` for
-    a nested run, ``Dry run:`` before the pipe type for a dry one. It reads ``pipe_depth``, an integer from
-    ``0`` for a top-level run up to ``PIPE_RUN_MAX_DEPTH``, and ``is_dry_run``, a boolean.
+    a nested run. It reads ``pipe_depth``, an integer from ``0`` for a top-level run up to
+    ``PIPE_RUN_MAX_DEPTH``. Only a live run announces itself, so the layout draws no run mode.
     """
 
     @override
     def derived_values(self, *, fields: Mapping[str, Any]) -> dict[str, Any]:
-        """The indentation, the branch mark and the dry-run label, from a depth and a flag this layout checks first.
+        """The indentation and the branch mark, from a depth this layout checks first.
 
         Raises:
-            TypeError: If the depth is not an integer, or the flag not a boolean.
+            TypeError: If the depth is not an integer.
             ValueError: If the depth is negative or deeper than ``PIPE_RUN_MAX_DEPTH``.
         """
         depth = fields["pipe_depth"]
-        is_dry_run = fields["is_dry_run"]
         # A boolean is an integer to Python, and ``True`` would indent one level.
         if isinstance(depth, bool) or not isinstance(depth, int):
             msg = f"The pipe-run layout's depth must be an integer, not {type(depth).__name__}"
@@ -152,24 +153,21 @@ class PipeRunLayout(ConsoleLayout):
         if not 0 <= depth <= PIPE_RUN_MAX_DEPTH:
             msg = f"The pipe-run layout's depth must be between 0 and {PIPE_RUN_MAX_DEPTH}"
             raise ValueError(msg)
-        # Judged by truthiness, the string ``"false"`` would label a live run a dry one.
-        if not isinstance(is_dry_run, bool):
-            msg = f"The pipe-run layout's dry-run flag must be a boolean, not {type(is_dry_run).__name__}"
-            raise TypeError(msg)
+        is_nested = depth > 0
         return {
             "indent": PIPE_RUN_INDENT * depth,
-            "branch": PIPE_RUN_BRANCH if depth > 0 else "",
-            "dry_run_label": PIPE_RUN_DRY_RUN_LABEL if is_dry_run else "",
+            "branch": PIPE_RUN_BRANCH if is_nested else "",
+            "branch_gap": PIPE_RUN_GAP if is_nested else "",
         }
 
 
 PIPE_RUN_LAYOUT = PipeRunLayout(
     template=(
-        "{indent}[yellow]{branch}[/yellow][dim]{dry_run_label}[/dim]"
+        "{indent}[yellow]{branch}[/yellow]{branch_gap}"
         f"{_styled_placeholder(field='pipe_type', suffix=':')} {_styled_placeholder(field='pipe_code')} "
         f"[yellow]→[/yellow] {_styled_placeholder(field='output_concept')}"
     ),
-    presented_fields=frozenset({"pipe_type", "pipe_code", "output_concept", "pipe_depth", "is_dry_run"}),
+    presented_fields=frozenset({"pipe_type", "pipe_code", "output_concept", "pipe_depth"}),
 )
 
 #: Every layout a call can name, by its name.

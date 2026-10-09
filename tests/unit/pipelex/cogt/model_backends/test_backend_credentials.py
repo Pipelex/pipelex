@@ -62,7 +62,7 @@ class TestBackendCredentials:
             "   Add the variable to your environment or .env file:\n"
             "   - 'OPENAI_API_KEY'=<your_api_key>\n"
             "\n2. Disable this backend\n"
-            "   Add 'enabled = false' under '\\[openai]' in '.pipelex/inference/backends.toml'\n" + BYOK_HINT
+            "   Add 'enabled = false' under '[openai]' in '.pipelex/inference/backends.toml'\n" + BYOK_HINT
         )
         assert error_msg == expected_msg
 
@@ -81,7 +81,7 @@ class TestBackendCredentials:
             "1. Provide the missing secret\n"
             "   Make sure 'ANTHROPIC_API_KEY' is available from your secrets provider.\n"
             "\n2. Disable this backend\n"
-            "   Add 'enabled = false' under '\\[anthropic]' in '.pipelex/inference/backends.toml'\n" + BYOK_HINT
+            "   Add 'enabled = false' under '[anthropic]' in '.pipelex/inference/backends.toml'\n" + BYOK_HINT
         )
         assert error_msg == expected_msg
         assert ".env file" not in error_msg
@@ -103,7 +103,7 @@ class TestBackendCredentials:
             "   - 'OPENAI_API_KEY'=<your_api_key>\n"
             "\n2. Disable unused backends\n"
             "   Disable backends you don't need in '.pipelex/inference/backends.toml':\n"
-            "   - Add 'enabled = false' under '\\[openai]'\n" + BYOK_HINT
+            "   - Add 'enabled = false' under '[openai]'\n" + BYOK_HINT
         )
         assert error_msg == expected_msg
 
@@ -117,7 +117,7 @@ class TestBackendCredentials:
         assert "  • 'mistral': unresolved placeholders: 'MISTRAL_API_KEY'" in error_msg
         assert "   (Also replace placeholder values like '${VAR}' with actual keys)\n" in error_msg
         assert "=<your_api_key>" not in error_msg
-        assert "   - Add 'enabled = false' under '\\[mistral]'\n" in error_msg
+        assert "   - Add 'enabled = false' under '[mistral]'\n" in error_msg
 
     def test_comprehensive_env_both_kinds_one_backend(self):
         """Missing and placeholder issues on one backend are joined with a semicolon on its detail line."""
@@ -146,8 +146,8 @@ class TestBackendCredentials:
         openai_var_pos = error_msg.index("   - 'OPENAI_API_KEY'=<your_api_key>\n")
         shared_var_pos = error_msg.index("   - 'SHARED_KEY'=<your_api_key>\n")
         assert azure_var_pos < openai_var_pos < shared_var_pos
-        assert "   - Add 'enabled = false' under '\\[openai]'\n" in error_msg
-        assert "   - Add 'enabled = false' under '\\[azure]'\n" in error_msg
+        assert "   - Add 'enabled = false' under '[openai]'\n" in error_msg
+        assert "   - Add 'enabled = false' under '[azure]'\n" in error_msg
 
     @pytest.mark.parametrize("provider_kind", ["none", "generic_mock"])
     def test_comprehensive_non_env_provider(self, mocker: MockerFixture, provider_kind: str):
@@ -177,8 +177,8 @@ class TestBackendCredentials:
             "   - 'AWS_REGION'\n"
             "\n2. Disable unused backends\n"
             "   Disable backends you don't need in '.pipelex/inference/backends.toml':\n"
-            "   - Add 'enabled = false' under '\\[anthropic]'\n"
-            "   - Add 'enabled = false' under '\\[bedrock]'\n" + BYOK_HINT
+            "   - Add 'enabled = false' under '[anthropic]'\n"
+            "   - Add 'enabled = false' under '[bedrock]'\n" + BYOK_HINT
         )
         assert error_msg == expected_msg
 
@@ -206,8 +206,27 @@ class TestBackendCredentials:
         assert error_msg.endswith(BYOK_HINT + HOSTED_RUNS_HINT) is suggest_hosted_runs
         assert ("--hosted" in error_msg) is suggest_hosted_runs
 
-    def test_hosted_runs_hint_holds_no_square_bracket(self):
-        """The hint is printed through Rich markup and as plain text, so it names the setting without a bracketed table."""
-        assert "[" not in HOSTED_RUNS_HINT
+    def test_hosted_runs_hint_names_the_login_and_the_setting(self):
         assert "pipelex login" in HOSTED_RUNS_HINT
         assert 'execution = "hosted"' in HOSTED_RUNS_HINT
+
+    @pytest.mark.parametrize("secrets_provider_kind", ["env", "generic_mock"])
+    def test_every_message_names_the_table_as_written_with_no_markup_escape(self, mocker: MockerFixture, secrets_provider_kind: str):
+        r"""The messages are plain text: a Rich escape in them reached the user as `\[openai]` wherever nothing read them as markup."""
+        secrets_provider: SecretsProviderAbstract
+        if secrets_provider_kind == "env":
+            secrets_provider = EnvSecretsProvider()
+        else:
+            secrets_provider = mocker.MagicMock(spec=SecretsProviderAbstract)
+        reports = {"openai": make_report(backend_name="openai", missing_vars=["OPENAI_API_KEY"], placeholder_vars=[])}
+        messages = [
+            BackendCredentialsErrorMsgFactory.make_one_variable_missing_error_msg(
+                secrets_provider=secrets_provider, backend_name="openai", var_name="OPENAI_API_KEY", suggest_hosted_runs=True
+            ),
+            BackendCredentialsErrorMsgFactory.make_comprehensive_error_msg(
+                backend_credential_reports=reports, secrets_provider=secrets_provider, suggest_hosted_runs=True
+            ),
+        ]
+        for message in messages:
+            assert "under '[openai]'" in message
+            assert "\\" not in message

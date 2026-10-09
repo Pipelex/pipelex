@@ -27,13 +27,12 @@ if TYPE_CHECKING:
 
 CONSOLE_WIDTH = 200
 
-# The fields the pipe-run layout presents, for a top-level run that is not a dry run.
+# The fields the pipe-run layout presents, for a top-level run.
 PIPE_RUN_FIELDS: dict[str, Any] = {
     "pipe_type": "PipeCompose",
     "pipe_code": "compose_company",
     "output_concept": "Company",
     "pipe_depth": 0,
-    "is_dry_run": False,
 }
 
 

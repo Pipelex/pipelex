@@ -193,12 +193,16 @@ def graph_render_cmd(
     except GraphSpecValidationError as spec_error:
         # A refused spec is a diagnosis, not a crash, so it gets its message and no traceback. The
         # traceback below would print the pydantic error it was raised from, and that error quotes the
-        # input it refused — which on a graph file is the run's own traced content. The message names the
-        # user's path, which is escaped because both sinks read Rich markup and a path may hold brackets.
-        escaped_message = escape(str(spec_error))
-        log.error(escaped_message)
+        # input it refused — which on a graph file is the run's own traced content. For the same reason
+        # the log line carries the error as fields and not the exception itself, whose chain every sink
+        # would write. No sink reads a log message as markup, so the fields hold the text as written; the
+        # console print below does read markup, and a path may hold brackets, so it prints the text escaped.
+        log.error(
+            "The graph spec was refused, so no graph was rendered",
+            fields={"file.path": str(input_file), "error.type": type(spec_error).__name__, "error.message": str(spec_error)},
+        )
         console = get_console()
-        console.print(f"\n[bold red]Failed to render graph[/bold red]\n\n{escaped_message}\n")
+        console.print(f"\n[bold red]Failed to render graph[/bold red]\n\n{escape(str(spec_error))}\n")
         raise typer.Exit(1) from spec_error
 
     except Exception as exc:

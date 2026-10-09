@@ -994,7 +994,8 @@ def display_health_report(
             backend_credential_reports=bad_backend_credential_reports,
             suggest_hosted_runs=True,
         )
-        console.print(error_msg)
+        # Plain text naming each backend's table as `[openai]`, which Rich would read as a style tag and drop
+        console.print(escape(error_msg))
     console.print()
 
     # Models section

@@ -4028,10 +4028,6 @@ rationale = "Verb-object: ends the span; result fields stay keyword."
 param = "needed_inputs"
 rationale = "Noun-named derivation from the needed inputs; single operand."
 
-["pipelex/pipe_machinery/pipe_abstract.py::PipeAbstract._format_pipe_run_info"]
-param = "pipe_run_params"
-rationale = "Derivation from the run params; single operand."
-
 ["pipelex/pipe_machinery/pipe_abstract.py::PipeAbstract._make_single_concept_data_for_registry"]
 param = "concept"
 rationale = "Derivation from the concept; single operand."

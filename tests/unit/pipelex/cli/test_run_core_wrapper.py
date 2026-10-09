@@ -11,13 +11,15 @@ import pytest
 import typer
 from rich.console import Console
 
-from pipelex.base_exceptions import PipelexError
+from pipelex.base_exceptions import PipelexError, PipelexSetupError
 from pipelex.cli.commands.run._run_core import execute_run
 from pipelex.cli.error_handlers import ErrorContext
+from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsErrorMsgFactory
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -134,9 +136,17 @@ class TestExecuteRunWrapper:
         assert exc_info.value.exit_code == 1
         wrapper_mocks["teardown"].assert_called_once()
 
-    def test_pipelex_error_prints_message_and_exits(self, wrapper_mocks: dict[str, Any]) -> None:
-        """A PipelexError prints the friendly failure message and exits 1."""
-        wrapper_mocks["core"].side_effect = PipelexError("the pipe blew up")
+    @pytest.mark.parametrize(
+        "message",
+        [
+            "the pipe blew up",
+            "Model 'gpt-5 → SDK[openai]•Backend[openai]•Model[gpt-5-2025]' does not support documents",
+            "Expected list[int], got [red]str[/red]",
+        ],
+    )
+    def test_pipelex_error_prints_message_and_exits(self, wrapper_mocks: dict[str, Any], message: str) -> None:
+        """A PipelexError prints the friendly failure message, its own message exactly as written, and exits 1."""
+        wrapper_mocks["core"].side_effect = PipelexError(message)
 
         with pytest.raises(typer.Exit) as exc_info:
             _call_execute_run()
@@ -144,7 +154,25 @@ class TestExecuteRunWrapper:
         assert exc_info.value.exit_code == 1
         output = wrapper_mocks["console"].export_text()
         assert "Failed to execute pipeline" in output
-        assert "the pipe blew up" in output
+        assert message in output
+
+    def test_a_missing_credential_message_prints_the_backend_table_as_written(self, wrapper_mocks: dict[str, Any]) -> None:
+        r"""The message names the table as `[openai]`; it used to carry a Rich escape, which the escape here printed as `\[openai]`."""
+        message = BackendCredentialsErrorMsgFactory.make_one_variable_missing_error_msg(
+            secrets_provider=EnvSecretsProvider(),
+            backend_name="openai",
+            var_name="OPENAI_API_KEY",
+            suggest_hosted_runs=True,
+        )
+        wrapper_mocks["core"].side_effect = PipelexSetupError(message)
+
+        with pytest.raises(typer.Exit) as exc_info:
+            _call_execute_run()
+
+        assert exc_info.value.exit_code == 1
+        output = wrapper_mocks["console"].export_text()
+        assert "Add 'enabled = false' under '[openai]' in '.pipelex/inference/backends.toml'" in output
+        assert "\\[" not in output
 
     def test_unexpected_error_prints_exception_and_exits(self, wrapper_mocks: dict[str, Any]) -> None:
         """An unexpected exception prints the rich traceback and exits 1."""

@@ -31,9 +31,9 @@ class TestConsoleLayouts:
         [
             ({}, "PipeCompose: compose_company → Company"),
             ({"pipe_depth": 1}, "   ↳ PipeCompose: compose_company → Company"),
-            ({"pipe_depth": 2, "is_dry_run": True}, "      ↳ Dry run: PipeCompose: compose_company → Company"),
+            ({"pipe_depth": 2}, "      ↳ PipeCompose: compose_company → Company"),
         ],
-        ids=["top level", "nested", "nested dry run"],
+        ids=["top level", "nested", "nested twice"],
     )
     def test_the_pipe_run_layout_draws_the_tree_in_the_style_map_colours(self, overrides: dict[str, Any], expected: str) -> None:
         text = rendered_text(record=record_with_fields(message="Pipe run starts", extra={**PIPE_RUN_FIELDS, **overrides}, layout=LogLayout.PIPE_RUN))
@@ -68,13 +68,11 @@ class TestConsoleLayouts:
     @pytest.mark.parametrize(
         ("overrides", "expected_values"),
         [
-            ({"pipe_depth": "deep"}, "pipe_depth=deep is_dry_run=false"),
-            ({"pipe_depth": 10**20}, "pipe_depth=100000000000000000000 is_dry_run=false"),
-            ({"pipe_depth": PIPE_RUN_MAX_DEPTH + 1}, f"pipe_depth={PIPE_RUN_MAX_DEPTH + 1} is_dry_run=false"),
-            ({"pipe_depth": -1}, "pipe_depth=-1 is_dry_run=false"),
-            ({"pipe_depth": True}, "pipe_depth=true is_dry_run=false"),
-            ({"is_dry_run": "false"}, "pipe_depth=0 is_dry_run=false"),
-            ({"is_dry_run": 1}, "pipe_depth=0 is_dry_run=1"),
+            ({"pipe_depth": "deep"}, "pipe_depth=deep"),
+            ({"pipe_depth": 10**20}, "pipe_depth=100000000000000000000"),
+            ({"pipe_depth": PIPE_RUN_MAX_DEPTH + 1}, f"pipe_depth={PIPE_RUN_MAX_DEPTH + 1}"),
+            ({"pipe_depth": -1}, "pipe_depth=-1"),
+            ({"pipe_depth": True}, "pipe_depth=true"),
         ],
         ids=[
             "a depth that is no integer",
@@ -82,17 +80,12 @@ class TestConsoleLayouts:
             "a depth past the bound",
             "a negative depth",
             "a boolean depth",
-            "a dry-run flag spelled as a string",
-            "a dry-run flag given as an integer",
         ],
     )
     def test_a_value_the_pipe_run_derivation_refuses_falls_back_to_the_message_and_every_field(
         self, overrides: dict[str, Any], expected_values: str
     ) -> None:
-        """A depth used to be repeated as given, so a huge one raised ``OverflowError`` past the fallback and lost the line, or built a huge string.
-
-        The flag used to be judged by truthiness, so ``"false"`` labelled a live run ``Dry run:``.
-        """
+        """A depth was repeated as given: a huge one raised ``OverflowError`` past the fallback and lost the line, or built a huge string."""
         record = record_with_fields(message="Pipe run starts", extra={**PIPE_RUN_FIELDS, **overrides}, layout=LogLayout.PIPE_RUN)
 
         text = rendered_text(record=record)
@@ -122,7 +115,7 @@ class TestConsoleLayouts:
         rendered = buffer.getvalue()
         assert "Pipe run starts:" in rendered
         assert '"the_content_key": 1' in rendered
-        assert "} pipe_type=PipeCompose pipe_code=compose_company output_concept=Company pipe_depth=0 is_dry_run=false attempt=2" in rendered
+        assert "} pipe_type=PipeCompose pipe_code=compose_company output_concept=Company pipe_depth=0 attempt=2" in rendered
         assert "→" not in rendered
 
     def test_a_content_json_refuses_keeps_its_message_rather_than_a_layout(self, caplog: pytest.LogCaptureFixture) -> None:

@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:a67b12d7b36c494bbc641d0ed14bd2c574e6ce49a8a3588b1032bf561e796287"
+digest = "sha256:f5bde33c053cdc8c339cad7478dace7beeb9f9a3323e22e1fb98992bdb05717a"
 reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-10-09T17:40:08Z"
-rationale = "clean-pass: the trigger changes delete VERBOSE lines in llm_ops.py, img_gen_prompt.py and llm_prompt_content.py (the per-image and per-document extraction lines, the prompting-style line and the object-direct generation lines) and the imports they used; no kernel function, parameter or behaviour moved. pipelex-kernel.md's log-context section was re-checked against the code: every kernel function taking a job_metadata still opens with job_metadata.log_context(), and the page quotes none of the deleted lines."
+reviewed_at = "2026-10-09T20:31:54Z"
+rationale = "clean-pass: llm_ops.py's VERBOSE line for a model whose backend SDK is not installed gains gen_ai.request.model (the deck handle) and gen_ai.response.model (the provider's model id), the keys and meanings of the LLM span; no kernel function, parameter or behaviour moved. Re-read pipelex-kernel.md's check_llm_setting_with_served_model paragraph: such a model is still left to the run, and the doc names no log field."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -18,7 +18,7 @@ rationale = "clean-pass: the trigger changes delete VERBOSE lines in llm_ops.py,
 "pipelex/kernel/img_gen_results.py" = "blob:46b4ca11c70d906ae6d58ce66461f9b3414f1bfa"
 "pipelex/kernel/judgment_ops.py" = "blob:49ce7414eed9cfdf5595e877a64aacd29ada86ca"
 "pipelex/kernel/judgment_results.py" = "blob:40ba1258cc81d34df3e427d5511ccd40c6edf789"
-"pipelex/kernel/llm_ops.py" = "blob:c106daf0905dd9548a2a3661d580901abff52faa"
+"pipelex/kernel/llm_ops.py" = "blob:4002e83ea886140a930d994a717d3ef329453d25"
 "pipelex/kernel/llm_prompt_content.py" = "blob:eabf0ee760c3a26b8967973d511e712e9275e99b"
 "pipelex/kernel/llm_results.py" = "blob:6e3b8a2878b5bb284ece5fac10262fb59ac2029d"
 "pipelex/kernel/memory_ops.py" = "blob:7fbbfaaec99f9712d8e215520cb02e26aad3fb40"
