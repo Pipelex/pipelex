@@ -33,7 +33,12 @@ class HostedBaseUrlError(HostedRunError):
 
 
 class HostedRunSourceError(HostedRunError):
-    """A hosted run cannot be given the method to run: no bundle file, no `.mthds` file in the library directories, or no source at all."""
+    """A hosted run cannot be given its method: no bundle file, an unreadable method file, no `.mthds` file, or `-L` with an address or a catalog id.
+
+    The hosted API resolves a published address or a catalog id itself and loads no local library, so `-L` is refused
+    with either. Every other case is about the files a hosted run sends: none named, none found in the library
+    directories, or one that cannot be read.
+    """
 
     error_domain = ErrorDomain.INPUT
     _authors_caller_facing_message: ClassVar[bool] = True

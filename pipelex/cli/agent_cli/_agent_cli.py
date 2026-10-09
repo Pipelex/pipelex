@@ -77,7 +77,15 @@ def version_callback(value: bool) -> None:  # kw-only: ignore — click invokes 
         raise typer.Exit
 
 
-@app.callback(invoke_without_command=True)
+#: What `pipelex-agent --help` says of the program. Given explicitly, since Typer would otherwise print the callback's
+#: docstring, which is written for this module's maintainers.
+AGENT_CLI_HELP = (
+    "The machine-oriented Pipelex CLI, for AI agents, IDE extensions and automation: no prompts and no logs, results on stdout "
+    "(Markdown or JSON for most commands), and errors as a structured envelope on stderr."
+)
+
+
+@app.callback(invoke_without_command=True, help=AGENT_CLI_HELP)
 def app_callback(
     version: Annotated[  # ruff: ignore[unused-function-argument]
         bool,

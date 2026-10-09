@@ -91,5 +91,5 @@ An agent usually meets this command through a failure rather than by choosing it
 
 ## See also
 
-- [`pipelex doctor`](index.md) — check configuration health
+- [`pipelex doctor`](doctor.md) — check configuration health
 - [`pipelex init`](init.md) — create configuration files from scratch

@@ -10,7 +10,7 @@ Use the client directly: it has no Pipelex wrapper, and it needs no `Pipelex.mak
 
 ## The Key and the Origin
 
-The client reads its key from `PIPELEX_API_KEY` and its origin from `PIPELEX_BASE_URL`, falling back to `https://api.pipelex.com`. Both can also be passed to the constructor, as `api_key=` and `base_url=`. The client reads the process environment only. To use a key saved in `~/.pipelex/.env`, as `pipelex run --hosted` does, import `pipelex.system.environment` before creating the client: importing it loads `~/.pipelex/.env` (or the one in `PIPELEX_HOME`), then a `.env` in the working directory.
+The client reads its key from `PIPELEX_API_KEY` and its origin from `PIPELEX_BASE_URL`, falling back to `https://api.pipelex.com`. Both can also be passed to the constructor, as `api_key=` and `base_url=`. The client reads the process environment only. To use a key saved in `~/.pipelex/.env`, as `pipelex run --hosted` does, import `pipelex.system.environment` before creating the client: importing it loads `~/.pipelex/.env` (or the one in `PIPELEX_HOME`), then a `.env` in the working directory. Each of those files replaces the variables it sets, so a `PIPELEX_API_KEY` or `PIPELEX_BASE_URL` set in one of them wins over the same variable already in the process environment, whether exported in your shell or set by your program before the import. To use a key of your own whatever the files say, pass it to the constructor as `api_key=`.
 
 ## Running a Method
 

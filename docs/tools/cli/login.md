@@ -26,10 +26,10 @@ The key is never printed. The `.env` file is readable and writable by you only (
 
 - When the hosted API accepts the key, it is saved, and the command says which account it belongs to.
 - When the hosted API refuses it (HTTP 401 or 403), nothing is saved and the command exits with code `1`, naming the status.
-- When the key cannot be checked, because the hosted API cannot be reached or answers anything else, it is saved anyway, with a warning saying why it was not checked.
+- When the key cannot be checked, because the hosted API cannot be reached, answers anything else, or `PIPELEX_BASE_URL` is not an origin, it is saved anyway, with a warning saying why it was not checked.
 - A value that does not start with `plx_sk_` is refused before any check.
 
-**A `.env` in the working directory wins.** Pipelex loads the `.env` of the directory a command runs in after `~/.pipelex/.env`, so a `PIPELEX_API_KEY` line there, even an empty one, is what commands run in that directory send. When that file sets another value than the key just saved, `pipelex login` names it, without printing either value: remove the line from it.
+**A `.env` in the working directory wins.** Pipelex loads the `.env` of the directory a command runs in after `~/.pipelex/.env`, so a `PIPELEX_API_KEY` line there, even an empty one, is what commands run in that directory send. When that file sets another value than the key just saved, `pipelex login` names it, without printing either value: remove the line from it. Both files also win over your shell, since each `.env` Pipelex loads replaces the variables it sets: a `PIPELEX_API_KEY` exported in your shell is read only when neither file sets it.
 
 **The handover is protected.** Each login sends the app a random `state` value along with the port, and the app sends it back with the key. A request to the port that does not carry this login's `state` is refused and its key discarded: any page open in your browser can send a request to a local port, so a key that arrives without it did not come from the page this login opened. The command says so in the terminal and keeps waiting.
 
@@ -43,7 +43,7 @@ pipelex login --paste
 
 On a machine where no browser can reach a local port, such as a remote server over SSH or a CI job, create a key in the Pipelex app on any machine, then paste it at the prompt. The key is not shown as you type. It goes through the same check and is saved the same way.
 
-In CI, you can also skip the file entirely and set `PIPELEX_API_KEY` as a secret of the job.
+In CI, you can also skip the file entirely and set `PIPELEX_API_KEY` as a secret of the job. The job's value is read as long as no `.env` file Pipelex loads, in the home configuration directory or in the working directory, sets the variable.
 
 ## Other Apps and APIs
 
@@ -52,13 +52,15 @@ In CI, you can also skip the file entirely and set `PIPELEX_API_KEY` as a secret
 | `PIPELEX_APP_URL` | The Pipelex app the browser opens, given as an origin (`scheme://host[:port]`, no path) | `https://app.pipelex.com` |
 | `PIPELEX_BASE_URL` | The hosted API the key is checked against, and that hosted runs go to | `https://api.pipelex.com` |
 
-A value that is not an origin is refused before anything opens. Most people never set either; they point the command at a development or staging plane, for instance:
+A `PIPELEX_APP_URL` that is not an origin is refused before anything opens. A `PIPELEX_BASE_URL` that is not one is only met when the key is checked, after the browser has handed it back or the key was pasted: the key cannot be checked, so it is saved anyway, with a warning that names `PIPELEX_BASE_URL` and what an origin looks like, and the command exits with code `0`. Correct the value before a hosted run uses it.
+
+Most people never set either; they point the command at a development or staging plane, for instance:
 
 ```bash
 PIPELEX_APP_URL=https://app-dev.pipelex.com PIPELEX_BASE_URL=https://api-dev.pipelex.com pipelex login
 ```
 
-Set them in `~/.pipelex/.env` to keep them for every command.
+Set them in `~/.pipelex/.env` to keep them for every command. Once a `.env` file Pipelex loads sets one of them, that file wins over a value given on the command line as above, which is then ignored: change the value in the file instead.
 
 ## Exit Codes
 

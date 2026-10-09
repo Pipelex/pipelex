@@ -21,7 +21,7 @@ pipelex init config --local  # creates the project config at {project_root}/.pip
 !!! important "Configuration Setup Notes"
     1. By default `pipelex init config` targets the **global** `~/.pipelex/` directory, or the one `PIPELEX_HOME` names (see [below](#the-home-configuration-directory-pipelex_home)); pass `--local` to create the project-level `.pipelex/` instead.
     2. `pipelex init config` creates a **template** configuration file with sample settings. It does not include all possible configuration options - it's meant as a starting point.
-    3. Running `pipelex init config` will **overwrite** your existing `pipelex.toml` file without warning. Make sure to backup your configuration before running this command.
+    3. Running `pipelex init config` **replaces** your existing `pipelex.toml` with the template once you confirm, keeping only its `[run] execution` setting, so back up anything else you changed first. On a first setup, where no `inference/backends.toml` exists yet, it asks where your runs execute instead, and for the hosted Pipelex API it signs you in through your browser unless a Pipelex API key is already set (see [Init](../tools/cli/init.md#where-your-runs-execute)).
     4. Credentials (the `.env` in `~/.pipelex/`) always remain in the global directory regardless of `--local` — only config, inference, and telemetry files are written to the project `.pipelex/`.
 
 For a complete list of all possible configuration options, refer to the configuration group documentation below.

@@ -184,4 +184,4 @@ export PIPELEX_API_KEY=plx_sk_...
 
 ## Prefer to run it yourself?
 
-The Pipelex runtime runs your methods on your own machine, against the model providers you choose. [Run It Yourself](./run-it-yourself.md) installs it, and [The MTHDS Language Tutorial](./mthds-language-tutorial.md) walks through writing a method by hand.
+The Pipelex runtime runs your methods from your terminal, either on the hosted Pipelex API once `pipelex login` has saved your key, or on your own machine against the model providers you choose. [Run It Yourself](./run-it-yourself.md) installs it, and [The MTHDS Language Tutorial](./mthds-language-tutorial.md) walks through writing a method by hand.

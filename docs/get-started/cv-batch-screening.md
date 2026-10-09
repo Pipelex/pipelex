@@ -1,11 +1,11 @@
 ---
 title: "CV Batch Screening, Step by Step"
-description: "Screen a stack of CVs against a job offer with a multi-step Pipelex method that extracts each document, analyzes it and scores the match, run on your own machine from the CLI and from Python."
+description: "Screen a stack of CVs against a job offer with a multi-step Pipelex method that extracts each document, analyzes it and scores the match, run from the CLI on the hosted Pipelex API or on your own machine, and from Python."
 ---
 
 # CV Batch Screening, Step by Step
 
-A production method that takes a stack of CVs and a job offer PDF, extracts and analyzes each, then scores how well each candidate matches the role. This page reads it part by part and runs it on your own machine with the Pipelex runtime, from the CLI and from Python, once you have followed [Run It Yourself](./run-it-yourself.md).
+A production method that takes a stack of CVs and a job offer PDF, extracts and analyzes each, then scores how well each candidate matches the role. This page reads it part by part and runs it with the Pipelex runtime, from the CLI and from Python, once you have followed [Run It Yourself](./run-it-yourself.md).
 
 ## What it demonstrates
 
@@ -263,6 +263,8 @@ flowchart LR
 pipelex run bundle cv_batch_screening.mthds --inputs inputs.json
 ```
 
+The command runs where your setup says. After the default answer to `pipelex init`, it runs on the hosted Pipelex API with your Pipelex API key, and a local file named in the inputs, such as `inputs/Jane-Smith-CV.pdf` below, is uploaded before the run. Add `--local` to run it on this machine instead, which needs the provider keys of a local setup (see [Configure AI Providers](./configure-ai-providers.md)).
+
 Create an `inputs.json` file with your PDF URLs:
 
 ```json
@@ -284,6 +286,8 @@ Create an `inputs.json` file with your PDF URLs:
 ```
 
 ### From Python
+
+This code runs the method in your own process, so it always runs on this machine, whatever `[run] execution` says, and it needs the provider keys of a local setup (see [Configure AI Providers](./configure-ai-providers.md)). To run the method on the hosted Pipelex API from Python, use pipelex-sdk's `PipelexAPIClient`, as [Running on the Hosted API from Python](../building-methods/pipes/running-on-the-hosted-api.md) shows.
 
 ```python
 import asyncio

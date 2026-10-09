@@ -990,7 +990,10 @@ def display_health_report(
                 if backend_credential_report.placeholder_vars:
                     console.print(f"    [yellow]⚠[/yellow] Placeholders: {escape(', '.join(backend_credential_report.placeholder_vars))}")
 
-        error_msg = BackendCredentialsErrorMsgFactory.make_comprehensive_error_msg(backend_credential_reports=bad_backend_credential_reports)
+        error_msg = BackendCredentialsErrorMsgFactory.make_comprehensive_error_msg(
+            backend_credential_reports=bad_backend_credential_reports,
+            suggest_hosted_runs=True,
+        )
         console.print(error_msg)
     console.print()
 

@@ -128,8 +128,13 @@ AGENT_CLI_CONFIG_OVERRIDES: Mapping[str, Any] = MappingProxyType(
 )
 
 
-#: The next step of a boot that failed, and of any other failure to read this machine's configuration.
-AGENT_INIT_FAILURE_HINT = "Initialization failed. Run 'pipelex-agent doctor' to diagnose, or 'pipelex init config' to reset configuration"
+#: The next step of a boot that failed, and of any other failure to read this machine's configuration. It names only
+#: commands an agent can run: `pipelex init config` asks questions and can open a browser.
+AGENT_INIT_FAILURE_HINT = (
+    "Initialization failed. Run 'pipelex-agent doctor' to diagnose. An out-of-date configuration is brought up to date by "
+    "'pipelex-agent migrate --dry-run --format json', shown to the user, then 'pipelex-agent migrate --yes'; "
+    "'pipelex-agent init' (--global for the home configuration) writes a fresh one instead, discarding its settings"
+)
 
 
 def apply_agent_cli_output_discipline() -> None:
@@ -208,8 +213,8 @@ def make_pipelex_for_agent_cli(*, library_dirs: list[str] | list[Path] | None = 
     except TelemetryConfigValidationError as exc:
         agent_error(exc.message, error_type="TelemetryConfigValidationError", cause=exc)
     except FormerReleaseConfigError as exc:
-        # Its own hint rather than the generic one, which offers a reset: the cleanup keeps everything but what a former
-        # release left, and an agent can run it.
+        # Its own hint, the class's user_action, rather than the generic one, which offers a reset: the cleanup keeps
+        # everything but what a former release left, and an agent can run it.
         agent_error(exc.message, error_type="FormerReleaseConfigError", cause=exc)
     except ModelDeckPresetValidatonError as exc:
         agent_error(

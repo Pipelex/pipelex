@@ -35,10 +35,12 @@ from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunError, 
 
 #: The command that gets a Pipelex API key and saves it where a hosted run reads it.
 PIPELEX_LOGIN_COMMAND = "pipelex login"
-#: Where a hosted run takes its key from, and how a person gets one.
+#: Where a hosted run takes its key from, and how a person gets one. The runtime loads the home `.env`, then the working
+#: directory's, each over the environment, so a key exported in the shell cannot replace one either file sets.
 HOSTED_API_KEY_NEXT_STEP = (
-    f"Run {PIPELEX_LOGIN_COMMAND} to get a Pipelex API key (plx_sk_…) and save it to ~/.pipelex/.env as {PIPELEX_API_KEY_ENV_KEY}, "
-    f"or set {PIPELEX_API_KEY_ENV_KEY} to one in your shell"
+    f"Run {PIPELEX_LOGIN_COMMAND} to get a Pipelex API key (plx_sk_…) and save it to ~/.pipelex/.env as {PIPELEX_API_KEY_ENV_KEY}. "
+    f"A .env in the working directory that sets {PIPELEX_API_KEY_ENV_KEY} wins over that file, so correct or remove the line there; "
+    f"a key exported in your shell is used only when neither .env file sets {PIPELEX_API_KEY_ENV_KEY}"
 )
 #: Where a hosted run takes its origin from.
 HOSTED_BASE_URL_NEXT_STEP = (

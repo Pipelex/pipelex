@@ -7,7 +7,7 @@ description: "Reference for the `HostedRunSourceError` Pipelex error class."
 
 # Hosted run source
 
-A hosted run cannot be given the method to run: no bundle file, no `.mthds` file in the library directories, or no source at all.
+A hosted run cannot be given its method: no bundle file, an unreadable method file, no `.mthds` file, or `-L` with an address or a catalog id.
 
 | Field | Value |
 |---|---|

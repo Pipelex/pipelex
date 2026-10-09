@@ -168,6 +168,8 @@ The codec defaults to a comma delimiter and UTF-8 encoding. Reads use `utf-8-sig
 
 - **Local file paths only.** A remote `url` with a tabular suffix — `http(s)://`, `s3://`, `gs://`, a signed URL — is actively rejected with a clear error, never opened. Reading remote tabular files is a deferred follow-up.
 
+- **Not uploaded on a hosted run.** A run on the hosted Pipelex API uploads the local files named at document and image inputs only, so a `.csv` path at a structured-list input reaches the hosted runner as a path on your machine, which it cannot read. Give the rows as a JSON list of objects instead, or run with `--local`. `--save-csv` is refused on a hosted run too (see [Running on the Hosted API](../../tools/cli/run.md#running-on-the-hosted-api)).
+
 - **`.xlsx` is recognized but not yet implemented.** An `.xlsx` path is detected as tabular and routed to a clear "needs `pipelex[tabular]`" message; the Excel backend itself is not built in v1.
 
 - **Empty string is indistinguishable from `None`.** An empty cell reads as `None`, and on write `None` is rendered as an empty cell, so a genuinely empty string `""` cannot be told apart from a missing value through a CSV round trip.
