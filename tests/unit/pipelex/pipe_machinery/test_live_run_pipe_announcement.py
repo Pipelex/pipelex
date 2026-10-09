@@ -22,6 +22,7 @@ from rich.logging import RichHandler
 from rich.text import Text
 from typing_extensions import override
 
+from pipelex.cli.dev_cli.commands.log_call_guard import find_markup_tags
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
@@ -39,7 +40,6 @@ from pipelex.tools.log.log_config import HighlighterName, RichLogConfig
 from pipelex.tools.log.log_fields import LAYOUT_MARK
 from pipelex.tools.log.log_formatter import EmojiLogFormatter
 from tests.helpers.console_log_rendering import package_log_config
-from tests.helpers.rich_markup import find_markup_tags
 
 if TYPE_CHECKING:
     from pipelex.core.memory.working_memory import WorkingMemory

@@ -6,6 +6,7 @@ from pytest_mock import MockerFixture
 
 from pipelex.libraries.library_factory import LibraryFactory
 from pipelex.libraries.library_manager import LibraryManager
+from pipelex.tools.log.error_fields import ERROR_MESSAGE_FIELD, ERROR_TYPE_FIELD
 
 
 class TestMthdsVersionWarning:
@@ -23,10 +24,14 @@ class TestMthdsVersionWarning:
         )
 
         mock_log.warning.assert_called_once()
-        warning_msg = mock_log.warning.call_args[0][0]
-        assert "github.com/org/pkg" in warning_msg
-        assert "^2.0.0" in warning_msg
-        assert "1.0.0" in warning_msg
+        assert mock_log.warning.call_args.args == (
+            "A package requires another MTHDS standard version than this runtime's; some features may not work correctly",
+        )
+        assert mock_log.warning.call_args.kwargs["fields"] == {
+            "package_address": "github.com/org/pkg",
+            "mthds_version_constraint": "^2.0.0",
+            "mthds_standard_version": "1.0.0",
+        }
 
     def test_no_warning_when_version_satisfied(self, mocker: MockerFixture) -> None:
         """No warning emitted when current MTHDS standard version satisfies the constraint."""
@@ -52,8 +57,12 @@ class TestMthdsVersionWarning:
         )
 
         mock_log.warning.assert_called_once()
-        warning_msg = mock_log.warning.call_args[0][0]
-        assert "Could not parse" in warning_msg
+        assert mock_log.warning.call_args.args == ("The mthds_version constraint of a package could not be parsed",)
+        fields = mock_log.warning.call_args.kwargs["fields"]
+        assert fields["package_address"] == "github.com/org/pkg"
+        assert fields["mthds_version_constraint"] == ">>>garbage"
+        assert fields[ERROR_TYPE_FIELD]
+        assert fields[ERROR_MESSAGE_FIELD]
 
     def test_warning_emitted_for_dependency_mthds_version(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """Warning emitted when a dependency manifest has unsatisfied mthds_version."""
@@ -89,6 +98,10 @@ class TestMthdsVersionWarning:
         )
 
         # Verify a version warning was emitted for the dependency address
-        warning_calls = [call_args[0][0] for call_args in mock_log.warning.call_args_list]
-        dep_version_warnings = [msg for msg in warning_calls if "github.com/org/dep-pkg" in msg and "^2.0.0" in msg]
+        warning_fields = [call_args.kwargs.get("fields", {}) for call_args in mock_log.warning.call_args_list]
+        dep_version_warnings = [
+            fields
+            for fields in warning_fields
+            if fields.get("package_address") == "github.com/org/dep-pkg" and fields.get("mthds_version_constraint") == "^2.0.0"
+        ]
         assert len(dep_version_warnings) >= 1

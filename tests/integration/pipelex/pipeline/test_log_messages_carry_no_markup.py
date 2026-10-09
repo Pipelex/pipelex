@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from typing_extensions import override
 
+from pipelex.cli.dev_cli.commands.log_call_guard import find_markup_tags
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -31,7 +32,6 @@ from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.log.json_log_sink import LOGGER_KEY, MESSAGE_KEY, SEVERITY_KEY, JsonLogSink
 from pipelex.tools.log.log_levels import LOGGING_LEVEL_VERBOSE, LOGGING_LEVEL_VERBOSE_NAME
-from tests.helpers.rich_markup import find_markup_tags
 from tests.integration.pipelex.pipeline.test_data import LogMarkupTestData
 
 if TYPE_CHECKING:

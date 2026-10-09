@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from tests.helpers.rich_markup import find_markup_tags
+from pipelex.cli.dev_cli.commands.log_call_guard import find_markup_tags
 
 
 class TestFindMarkupTags:
