@@ -88,7 +88,7 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
         # HuggingFace's text_to_image doesn't support batch generation directly,
         # so we generate images one at a time
         generated_image_list: list[GeneratedImageRawDetails] = []
-        for _ in range(nb_images):
+        for _index_image in range(nb_images):
             generated_image = await self._gen_image(img_gen_job=img_gen_job)
             generated_image_list.append(generated_image)
 

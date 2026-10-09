@@ -124,17 +124,19 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
     @classmethod
     def _log_reasoning_sent(cls, *, api_name: str, settings: Mapping[str, object]) -> None:
-        """Say the reasoning settings an LLM call sends, once per call, at VERBOSE.
+        """Say the reasoning settings an LLM call sends, once per call, at DEBUG.
 
-        `check_request` resolves the same settings before the call, so a provider's resolvers and builders say
-        nothing and each call site says it here. A setting the call does not send is passed as `None` and left
-        out, and a call that sends none logs nothing.
+        DEBUG because the settings actually sent are what a diagnosis of an exhausted thinking budget or a
+        refused parameter needs. The message is fixed; `api_name` and each setting sent ride as fields, a
+        setting under the name of the request parameter that carries it. `check_request` resolves the same
+        settings before the call, so a provider's resolvers and builders say nothing and each call site says
+        it here. A setting the call does not send is passed as `None` and left out, and a call that sends none
+        logs nothing.
         """
         sent = {name: value for name, value in settings.items() if value is not None}
         if not sent:
             return
-        details = ", ".join(f"{name}={value}" for name, value in sent.items())
-        log.verbose(f"{api_name} request sends {details}")
+        log.debug("Sending reasoning settings", fields={"api_name": api_name, **sent})
 
     #########################################################
     # Instance methods

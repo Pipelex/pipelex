@@ -2,12 +2,15 @@
 
 `DEV` was an enumerated spelling of both `default_log_level` and every level under
 `[runtime.log.package_log_levels]`, whose keys are the user's own package names. The entry remaps it to
-`DEBUG` at both paths, the second through the `*` key a remap alone may take, and it is `safe` because no
-current-valid file can carry the retired spelling. Being `safe`, it is also what a boot replays in memory
-over a file still naming `DEV`, so such a file boots at `DEBUG` with a stale-configuration warning rather
-than stopping the boot.
+`INFO` at both paths, the second through the `*` key a remap alone may take: a threshold at `DEV` passed
+`INFO` and above plus the `DEV` records, and nothing logs at `DEV` any more, so `INFO` passes the same
+records, where `DEBUG` would have turned on a third-party library's debug output the file had suppressed.
+It is `safe` because no current-valid file can carry the retired spelling. Being `safe`, it is also what a
+boot replays in memory over a file still naming `DEV`, so such a file boots at `INFO` with a
+stale-configuration warning rather than stopping the boot.
 """
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +35,7 @@ default_log_level = "DEV"
 
 [runtime.log.package_log_levels]
 pipelex = "DEV"
+openai = "DEV"
 my-package = "DEV"
 httpx = "WARNING"
 """
@@ -52,7 +56,7 @@ def _base_log_section() -> dict[str, Any]:
 
 
 class TestTheDevLogLevelRetirement:
-    def test_dev_becomes_debug_at_the_root_level_and_under_every_package_key(self) -> None:
+    def test_dev_becomes_info_at_the_root_level_and_under_every_package_key(self) -> None:
         ledger = load_ledger(migration_dir=packaged_migration_dir(), surface_id=PIPELEX_CONFIG_SURFACE_ID)
         replay = replay_ledger_over_text(ledger=ledger, text=FILE_NAMING_DEV)
 
@@ -62,8 +66,8 @@ class TestTheDevLogLevelRetirement:
         assert migrated == {
             "runtime": {
                 "log": {
-                    "default_log_level": "DEBUG",
-                    "package_log_levels": {"pipelex": "DEBUG", "my-package": "DEBUG", "httpx": "WARNING"},
+                    "default_log_level": "INFO",
+                    "package_log_levels": {"pipelex": "INFO", "openai": "INFO", "my-package": "INFO", "httpx": "WARNING"},
                 }
             }
         }
@@ -75,8 +79,23 @@ class TestTheDevLogLevelRetirement:
 
         log_config = LogConfig.model_validate({**_base_log_section(), **migrated["runtime"]["log"]})
 
-        assert log_config.default_log_level is LogLevel.DEBUG
-        assert log_config.package_log_levels["my-package"] is LogLevel.DEBUG
+        assert log_config.default_log_level is LogLevel.INFO
+        assert log_config.package_log_levels["my-package"] is LogLevel.INFO
+
+    def test_a_third_party_dev_threshold_still_suppresses_debug_after_the_migration(self) -> None:
+        """`openai = "DEV"` kept the SDK's DEBUG request dumps, prompts included, out of the log; the migrated level must too."""
+        ledger = load_ledger(migration_dir=packaged_migration_dir(), surface_id=PIPELEX_CONFIG_SURFACE_ID)
+        replay = replay_ledger_over_text(ledger=ledger, text=FILE_NAMING_DEV)
+        migrated: dict[str, Any] = load_toml_from_content(replay.text)
+        log_config = LogConfig.model_validate({**_base_log_section(), **migrated["runtime"]["log"]})
+        openai_level = log_config.package_log_levels["openai"]
+        # A logger of this module's own, so the threshold is tried without touching the process's `openai` logger
+        third_party_logger = logging.getLogger(f"{__name__}.openai")
+        third_party_logger.setLevel(openai_level.int_logging_level)
+
+        assert openai_level.int_logging_level > logging.DEBUG
+        assert not third_party_logger.isEnabledFor(logging.DEBUG)
+        assert third_party_logger.isEnabledFor(logging.INFO)
 
     def test_the_model_alone_refuses_dev_and_names_the_valid_levels(self) -> None:
         """The refusal the boot's in-memory replay answers: validated without the ledger, `DEV` is no level."""
@@ -99,7 +118,7 @@ class TestTheDevLogLevelRetirement:
         assert replay.text == FILE_AT_THE_CURRENT_SHAPE
 
     @pytest.mark.usefixtures("no_pipelex_home")
-    def test_a_project_file_naming_dev_boots_at_debug_with_a_warning(self, tmp_path: Path, mocker: MockerFixture) -> None:
+    def test_a_project_file_naming_dev_boots_at_info_with_a_warning(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Through the boot's own loader: the file is migrated in memory, left as it is on disk, and the warning names the remedy."""
         fake_home = tmp_path / "home"
         (fake_home / ".pipelex").mkdir(parents=True)
@@ -115,9 +134,10 @@ class TestTheDevLogLevelRetirement:
 
         config = loader.load_config_validated(config_cls=PipelexConfig)
 
-        assert config.runtime.log.default_log_level is LogLevel.DEBUG
-        assert config.runtime.log.package_log_levels["pipelex"] is LogLevel.DEBUG
-        assert config.runtime.log.package_log_levels["my-package"] is LogLevel.DEBUG
+        assert config.runtime.log.default_log_level is LogLevel.INFO
+        assert config.runtime.log.package_log_levels["pipelex"] is LogLevel.INFO
+        assert config.runtime.log.package_log_levels["openai"] is LogLevel.INFO
+        assert config.runtime.log.package_log_levels["my-package"] is LogLevel.INFO
         assert config.runtime.log.package_log_levels["httpx"] is LogLevel.WARNING
         assert project_file.read_text(encoding="utf-8") == FILE_NAMING_DEV, "a boot writes nothing"
         parked = loader.take_stale_configuration_warning()

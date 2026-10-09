@@ -189,6 +189,13 @@ class GoogleLLMWorker(LLMWorkerAbstract):
         return genai_types.ThinkingConfig(thinking_budget=0)
 
     @classmethod
+    def _thinking_settings_sent(cls, *, thinking_config: genai_types.ThinkingConfig | None) -> dict[str, Any]:
+        """The thinking settings as the request sends them: the wire values, `HIGH` rather than the SDK's `ThinkingLevel` member."""
+        if thinking_config is None:
+            return {}
+        return thinking_config.model_dump(mode="json", exclude_none=True)
+
+    @classmethod
     def _build_thinking_config_for_budget(
         cls,
         *,
@@ -224,7 +231,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
         contents = await GoogleFactory.prepare_user_contents(llm_prompt=llm_job.llm_prompt)
 
         thinking_config = self._build_thinking_config(inference_model=self.inference_model, job_params=job_params, max_tokens=job_params.max_tokens)
-        self._log_reasoning_sent(api_name="Google", settings=thinking_config.model_dump(exclude_none=True) if thinking_config is not None else {})
+        self._log_reasoning_sent(api_name="Google", settings=self._thinking_settings_sent(thinking_config=thinking_config))
 
         # Build generation config
         generation_config = genai_types.GenerateContentConfig(
@@ -292,7 +299,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
         """Generate structured output using Google Gemini API with instructor."""
         job_params = llm_job.applied_job_params or llm_job.job_params
         thinking_config = self._build_thinking_config(inference_model=self.inference_model, job_params=job_params, max_tokens=job_params.max_tokens)
-        self._log_reasoning_sent(api_name="Google", settings=thinking_config.model_dump(exclude_none=True) if thinking_config is not None else {})
+        self._log_reasoning_sent(api_name="Google", settings=self._thinking_settings_sent(thinking_config=thinking_config))
         # instructor's genai handlers read the system prompt only from `system`, and pop it only when it is not
         # None: a `system=None` reaches `generate_content`, which refuses the unknown keyword
         system_kwargs: dict[str, Any] = {"system": system_text} if (system_text := llm_job.llm_prompt.system_text) else {}

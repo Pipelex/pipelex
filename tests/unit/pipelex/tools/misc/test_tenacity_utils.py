@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from typing import Any
 
 import pytest
 from pytest_mock import MockerFixture
@@ -37,21 +38,34 @@ def _return_none_once() -> Callable[[], str | None]:
 
 class TestLogRetry:
     @pytest.mark.parametrize(
-        ("topic", "make_attempt", "retry_condition", "expected_exception_type"),
+        ("topic", "make_attempt", "retry_condition", "expected_fields"),
         [
-            ("retry on an exception", _fail_once_with_value_error, retry_if_exception_type(ValueError), "ValueError"),
-            ("retry on a result", _return_none_once, retry_if_result(lambda result: result is None), None),
+            (
+                "retry on an exception",
+                _fail_once_with_value_error,
+                retry_if_exception_type(ValueError),
+                {"attempt_number": 1, "wait_seconds": WAIT_SECONDS, "exception_type": "ValueError"},
+            ),
+            (
+                "retry on a result",
+                _return_none_once,
+                retry_if_result(lambda result: result is None),
+                {"attempt_number": 1, "wait_seconds": WAIT_SECONDS},
+            ),
         ],
     )
-    def test_a_retry_is_logged_at_debug_with_its_values_as_fields(
+    def test_a_retry_is_logged_at_debug_by_its_outcome_with_its_values_as_fields(
         self,
         mocker: MockerFixture,
         topic: str,
         make_attempt: Callable[[], Callable[[], str | None]],
         retry_condition: retry_base,
-        expected_exception_type: str | None,
+        expected_fields: dict[str, Any],
     ) -> None:
-        """One fixed message per retry, the attempt, the exception's class and the wait carried as fields."""
+        """One fixed message per retry, true of a retry on a result as of one on an exception.
+
+        The attempt and the wait ride as fields, and the exception's class only when the attempt raised.
+        """
         debug = mocker.patch.object(tenacity_utils.log, "debug")
         retrying = Retrying(
             retry=retry_condition,
@@ -63,7 +77,4 @@ class TestLogRetry:
         )
 
         assert retrying(make_attempt()) == "done", topic
-        debug.assert_called_once_with(
-            "Retrying after a failed attempt",
-            fields={"attempt_number": 1, "exception_type": expected_exception_type, "wait_seconds": WAIT_SECONDS},
-        )
+        debug.assert_called_once_with("Retrying", fields=expected_fields)
