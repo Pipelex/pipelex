@@ -28,6 +28,7 @@ from pipelex.pipelex import Pipelex
 from pipelex.runtime_hub import get_console, get_telemetry_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.tools.misc.file_utils import load_text_from_path
 from pipelex.tools.misc.package_utils import get_package_version
@@ -197,20 +198,21 @@ def graph_render_cmd(
         # the log line carries the error as fields and not the exception itself, whose chain every sink
         # would write. No sink reads a log message as markup, so the fields hold the text as written; the
         # console print below does read markup, and a path may hold brackets, so it prints the text escaped.
-        log.error(
-            "The graph spec was refused, so no graph was rendered",
-            fields={"file.path": str(input_file), "error.type": type(spec_error).__name__, "error.message": str(spec_error)},
-        )
+        log.error("The graph spec was refused, so no graph was rendered", fields={"file.path": str(input_file), **error_fields(exc=spec_error)})
         console = get_console()
         console.print(f"\n[bold red]Failed to render graph[/bold red]\n\n{escape(str(spec_error))}\n")
         raise typer.Exit(1) from spec_error
 
     except Exception as exc:
         # CLI command root: any unexpected failure is reported to the user and exits non-zero via typer.Exit.
-        log.error(f"Error rendering graph: {exc}")
+        # As for a refused spec, the log line carries the error's class and text as fields rather than the
+        # exception itself, whose chain every sink would write: an unexpected rendering error can be raised
+        # from one that quotes the graph file's traced content. The traceback is the console's to print, and
+        # it prints no locals, which would print the loaded graph.
+        log.error("The graph could not be rendered", fields={"file.path": str(input_file), **error_fields(exc=exc)})
         console = get_console()
         console.print("\n[bold red]Failed to render graph[/bold red]\n")
-        console.print_exception(show_locals=True)
+        console.print_exception()
         raise typer.Exit(1) from exc
 
     finally:

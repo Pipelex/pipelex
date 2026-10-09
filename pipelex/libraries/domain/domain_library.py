@@ -42,14 +42,14 @@ class DomainLibrary(RootModel[DomainLibraryRoot], DomainLibraryAbstract):
             existing = self.root[domain_code]
             existing.description = merge_domain_metadata_field(
                 domain_code=domain_code,
-                field_label="description",
+                metadata_field="description",
                 established=existing.description,
                 incoming=domain.description,
                 show_values_on_conflict=True,
             )
             existing.system_prompt = merge_domain_metadata_field(
                 domain_code=domain_code,
-                field_label="system_prompt",
+                metadata_field="system_prompt",
                 established=existing.system_prompt,
                 incoming=domain.system_prompt,
                 show_values_on_conflict=False,

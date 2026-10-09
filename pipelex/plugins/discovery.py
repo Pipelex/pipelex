@@ -149,7 +149,8 @@ def _skip_if_disabled(
         return False
     if name in core_unconditional_plugin_names:
         raise CoreUnconditionalPluginDisabledError(plugin_name=name)
-    log.info(f"Plugin '{name}' is disabled via runtime.plugins.disabled; skipping.")
+    # The user asked for this, and the discovery below records it for `pipelex plugins list`, so it is no news at INFO.
+    log.debug("A plugin disabled by runtime.plugins.disabled is skipped", fields={"plugin_name": name})
     registrar.discoveries.append(
         PluginDiscovery(
             name=name,

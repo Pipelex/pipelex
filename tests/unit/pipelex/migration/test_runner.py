@@ -547,6 +547,7 @@ class TestMigrationRunner:
             entries=[build_entry(to_schema_version=2, ops=[RenameTableKeyOp(table_path=["reporting"], key="output_config", new_key="output")])]
         )
         mocker.patch("pipelex.migration.runner.prune_backups_except", side_effect=OSError(errno.EACCES, "Permission denied"))
+        warning_mock = mocker.patch("pipelex.migration.runner.log.warning")
 
         plan = migrate_file(surface=build_surface(), ledger=ledger, file_path=target, dry_run=False, moment=MOMENT)
 
@@ -554,6 +555,16 @@ class TestMigrationRunner:
         assert plan.blocked_reason is None
         assert "output = " in target.read_text(encoding="utf-8")
         assert stale_backup.exists()
+        # The warning names the file and the backup just taken, and carries the system's reason alone, the paths being fields.
+        warning_mock.assert_called_once_with(
+            "A change to a configuration file was backed up, but an older backup of the file could not be pruned",
+            fields={
+                "file.path": str(target),
+                "backup_path": str(plan.backup_path),
+                "error.type": "PermissionError",
+                "error.message": "Permission denied",
+            },
+        )
 
     def test_an_unparseable_file_is_blocked_and_its_siblings_are_still_migrated(
         self,

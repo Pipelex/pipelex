@@ -174,8 +174,12 @@ class TestExecuteRunWrapper:
         assert "Add 'enabled = false' under '[openai]' in '.pipelex/inference/backends.toml'" in output
         assert "\\[" not in output
 
-    def test_unexpected_error_prints_exception_and_exits(self, wrapper_mocks: dict[str, Any]) -> None:
-        """An unexpected exception prints the rich traceback and exits 1."""
+    def test_unexpected_error_prints_exception_and_exits(self, wrapper_mocks: dict[str, Any], mocker: MockerFixture) -> None:
+        """An unexpected exception prints the rich traceback without its locals, logs the error's class and text as fields, and exits 1.
+
+        The log line carries no exception: its chain can quote the run's inputs, and every sink would write it.
+        """
+        log_mock = mocker.patch("pipelex.cli.commands.run._run_core.log")
         wrapper_mocks["core"].side_effect = RuntimeError("totally unexpected")
 
         with pytest.raises(typer.Exit) as exc_info:
@@ -185,3 +189,7 @@ class TestExecuteRunWrapper:
         output = wrapper_mocks["console"].export_text()
         assert "Failed to execute pipeline" in output
         assert "totally unexpected" in output
+        assert " locals ─" not in output
+        log_mock.error.assert_called_once_with(
+            "The pipeline could not be executed", fields={"error.type": "RuntimeError", "error.message": "totally unexpected"}
+        )

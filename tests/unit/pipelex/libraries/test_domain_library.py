@@ -5,6 +5,8 @@ import pytest
 from pipelex.core.domains.domain import Domain
 from pipelex.libraries.domain.domain_library import DomainLibrary
 
+DOMAIN_FIELD_CONFLICT_MESSAGE = "Two declarations of one domain give one of its fields different values, so the first is kept"
+
 
 class TestDomainLibrary:
     """Tests for DomainLibrary domain management."""
@@ -46,7 +48,7 @@ class TestDomainLibrary:
         merged = library.get_required_domain("meta")
         assert merged.description == "Meta domain"
         assert merged.system_prompt == "You are a meta assistant."
-        assert not [record for record in caplog.records if "declared with different" in record.message]
+        assert not [record for record in caplog.records if record.getMessage() == DOMAIN_FIELD_CONFLICT_MESSAGE]
 
     def test_same_values_no_warning(self, caplog: pytest.LogCaptureFixture):
         """Two Domains declaring the same non-empty description/system_prompt merge without warning."""
@@ -61,7 +63,7 @@ class TestDomainLibrary:
         merged = library.get_required_domain("meta")
         assert merged.description == "Meta domain"
         assert merged.system_prompt == "You are a meta assistant."
-        assert not [record for record in caplog.records if "declared with different" in record.message]
+        assert not [record for record in caplog.records if record.getMessage() == DOMAIN_FIELD_CONFLICT_MESSAGE]
 
     def test_conflict_keeps_first_and_warns(self, caplog: pytest.LogCaptureFixture):
         """Two Domains declaring different non-empty values keep the first and warn for each field."""
@@ -76,9 +78,14 @@ class TestDomainLibrary:
         merged = library.get_required_domain("meta")
         assert merged.description == "Meta domain"
         assert merged.system_prompt == "You are a meta assistant."
-        messages = [record.message for record in caplog.records]
-        assert any(
-            "Domain 'meta' declared with different descriptions: 'Meta domain' vs 'A different meta domain'. Keeping the first." in message
-            for message in messages
-        )
-        assert any("Domain 'meta' declared with different system_prompts. Keeping the first." in message for message in messages)
+        # A short field carries both values, while a prompt never rides the line.
+        conflicts = {
+            record.__dict__["metadata_field"]: (
+                record.__dict__["domain_code"],
+                record.__dict__.get("established_value"),
+                record.__dict__.get("incoming_value"),
+            )
+            for record in caplog.records
+            if record.getMessage() == DOMAIN_FIELD_CONFLICT_MESSAGE
+        }
+        assert conflicts == {"description": ("meta", "Meta domain", "A different meta domain"), "system_prompt": ("meta", None, None)}
