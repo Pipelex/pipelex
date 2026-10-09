@@ -11,18 +11,19 @@ Pipelex logs through one facade, `from pipelex import log`, built on Python's st
 
 ## Log Levels
 
-In addition to standard Python log levels, Pipelex introduces custom levels:
+Pipelex uses the standard Python log levels and adds two of its own, `VERBOSE` below `DEBUG` and `OFF` above everything. Each level makes a promise about what a line at that level means:
 
-| Level | Value | Description |
-|-------|-------|-------------|
-| VERBOSE | 5 | Most detailed logging, below DEBUG |
-| DEBUG | 10 | Standard debug information |
-| DEV | 15 | Development-specific logging (between DEBUG and INFO) |
-| INFO | 20 | General informational messages |
-| WARNING | 30 | Warning messages |
-| ERROR | 40 | Error messages |
-| CRITICAL | 50 | Critical errors |
+| Level | Value | What a line at this level means |
+|-------|-------|---------------------------------|
+| VERBOSE | 5 | Step-level tracing for Pipelex's own developers, following the runtime through its steps |
+| DEBUG | 10 | What you would need to diagnose a problem from a log a user sends |
+| INFO | 20 | A lifecycle milestone, and there are few of them |
+| WARNING | 30 | A handled degradation, or a user misconfiguration worth fixing; a warning is actionable |
+| ERROR | 40 | A run failed or data was lost |
+| CRITICAL | 50 | The process cannot go on |
 | OFF | 999 | Disable logging |
+
+A line names what it is about, a pipe, a model or a file, and never carries its contents: base64 data, a prompt or a raw response stays out of the log at every level, `DEBUG` and `VERBOSE` included.
 
 ## Using the Logger
 
@@ -60,14 +61,11 @@ log.warning("API rate limit approaching", problem_id="rate_limit_warning")
 # Error carrying the exception being handled, for the sink to render
 log.error("Failed to process", include_exception=True)
 
-# Development logging
-log.dev("Testing new feature")
-
 # Verbose logging
 log.verbose("Detailed debug information")
 ```
 
-Every one of the seven methods (`verbose`, `debug`, `dev`, `info`, `warning`, `error`, `critical`) takes the same keyword-only `fields` and `layout`, the second naming a [console layout](#layouts). `title`, `inline`, `problem_id` and `include_exception` keep their meaning beside them. `include_exception=True` carries the exception being handled as the record's `exc_info`, with nothing spliced into the message: the `console` sink renders the traceback under the line, the `json` sink writes it under the `exception` key and the `otlp` sink under the `exception.*` attributes. Outside an `except` block it carries nothing.
+Each level's method (`verbose`, `debug`, `info`, `warning`, `error`, `critical`) takes the same keyword-only `fields` and `layout`, the second naming a [console layout](#layouts). `title`, `inline`, `problem_id` and `include_exception` keep their meaning beside them. `include_exception=True` carries the exception being handled as the record's `exc_info`, with nothing spliced into the message: the `console` sink renders the traceback under the line, the `json` sink writes it under the `exception` key and the `otlp` sink under the `exception.*` attributes. Outside an `except` block it carries nothing.
 
 ## Fields
 
@@ -298,13 +296,13 @@ Optional inclusion of caller information in logs, prefixed to the console line:
 
 1. **Log Level Selection**:
 
-    - Use VERBOSE for detailed debugging
-    - Use DEBUG for general debugging
-    - Use DEV for development-specific logging
-    - Use INFO for general progress
-    - Use WARNING for potential issues
-    - Use ERROR for actual errors
-    - Use CRITICAL for system-critical issues
+    - Use VERBOSE for step-level tracing only Pipelex's own developers read
+    - Use DEBUG for what a diagnosis from a user's log would need
+    - Use INFO for the few lifecycle milestones
+    - Use WARNING for a handled degradation or a misconfiguration the user can fix
+    - Use ERROR when a run failed or data was lost
+    - Use CRITICAL when the process cannot go on
+    - Log what a value is about, never the value's payload: no base64 data, prompt or raw response
 
 2. **Fields over interpolation**:
 

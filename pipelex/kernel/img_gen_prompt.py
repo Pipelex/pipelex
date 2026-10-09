@@ -20,7 +20,6 @@ a line of code — not the kind of subtlety this module exists to centralise.
 
 from typing import TYPE_CHECKING, Any, cast
 
-from pipelex import log
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
@@ -118,8 +117,6 @@ async def assemble_img_gen_prompt(
     if image_registry.images:
         input_images = [PromptImageFactory.make_prompt_image(uri=registry_image.url) for registry_image in image_registry.images]
 
-    log.verbose(f"ImgGenPrompt: {len(input_images or [])} input images")
-
     return ImgGenPrompt(
         positive_text=positive_text,
         negative_text=negative_text,
@@ -175,7 +172,6 @@ def _extract_direct_image(
     image_registry_indices: dict[str, int],
 ) -> None:
     """Extract a single ImageContent from context and register it."""
-    log.verbose(f"Getting direct image '{image_ref.variable_path}' from context")
     try:
         prompt_image_content = context_provider.get_typed_object_or_attribute(
             name=image_ref.variable_path,
@@ -201,7 +197,6 @@ def _extract_direct_list_images(
     image_registry_indices: dict[str, int],
 ) -> None:
     """Extract a list of ImageContent from context and register them."""
-    log.verbose(f"Getting image list '{image_ref.variable_path}' from context")
     try:
         prompt_image_content = context_provider.get_typed_object_or_attribute(
             name=image_ref.variable_path,

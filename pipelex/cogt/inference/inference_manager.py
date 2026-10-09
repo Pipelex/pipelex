@@ -1,6 +1,5 @@
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.extract.extract_worker_factory import ExtractWorkerFactory
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
@@ -29,21 +28,6 @@ class InferenceManager(InferenceManagerProtocol):
         for extract_worker in self.extract_workers.values():
             extract_worker.teardown()
         self.extract_workers = {}
-        log.verbose("InferenceManager teardown done")
-
-    def print_workers(self):
-        log.verbose("LLM Workers:")
-        for handle, llm_worker in self.llm_workers.items():
-            log.verbose(f"  {handle}:")
-            log.verbose(llm_worker.desc)
-        log.verbose("Image Workers:")
-        for handle, img_gen_worker_async in self.img_gen_workers.items():
-            log.verbose(f"  {handle}:")
-            log.verbose(img_gen_worker_async.desc)
-        log.verbose("OCR Workers:")
-        for handle, extract_worker_async in self.extract_workers.items():
-            log.verbose(f"  {handle}:")
-            log.verbose(extract_worker_async.desc)
 
     ####################################################################################################
     # Setup LLM Workers
@@ -74,7 +58,6 @@ class InferenceManager(InferenceManagerProtocol):
 
     def _setup_one_img_gen_worker(self, img_gen_handle: str) -> ImgGenWorkerAbstract:
         inference_model = get_models_manager().get_inference_model(model_handle=img_gen_handle, model_type=ModelType.IMG_GEN)
-        log.verbose(f"Setting up Image Generation Worker for '{img_gen_handle}'")
         img_gen_worker = ImgGenWorkerFactory.make_img_gen_worker(
             inference_model=inference_model,
             reporting_delegate=get_report_delegate(),

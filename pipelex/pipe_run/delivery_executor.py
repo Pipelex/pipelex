@@ -417,7 +417,7 @@ class DeliveryExecutor:
             for filename, result_file in result_files.items():
                 key: str = f"{base_key}/{filename}"
                 await storage_provider.store(data=result_file.data, key=key, content_type=result_file.content_type)
-                log.debug(f"Stored: {key}")
+                log.debug("Stored a delivery result file", fields={"storage_key": key})
 
             # TODO: include the full S3 URI (s3://bucket/key/) so result_url is
             # self-contained and doesn't depend on knowing the bucket externally.

@@ -37,7 +37,7 @@ from typing_extensions import override
 
 from pipelex.system.telemetry.current_span import PIPELEX_SPAN_ID_KEY, PIPELEX_TRACE_ID_KEY, pipelex_trace_fields_for_logs
 from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX, carried_attributes
-from pipelex.tools.log.log_levels import LOGGING_LEVEL_DEV, LOGGING_LEVEL_VERBOSE
+from pipelex.tools.log.log_levels import LOGGING_LEVEL_VERBOSE
 from pipelex.tools.log.log_sink import LogSink, render_json
 
 if TYPE_CHECKING:
@@ -101,13 +101,11 @@ class ExportPathFilter(logging.Filter):
 
 
 def _severity_number(*, levelno: int) -> SeverityNumber:
-    """The OTel severity for a stdlib level, our two custom levels placed where they sit on ours."""
+    """The OTel severity for a stdlib level, our custom ``VERBOSE`` level placed where it sits on ours."""
     if levelno <= LOGGING_LEVEL_VERBOSE:
         return SeverityNumber.TRACE
-    if levelno < LOGGING_LEVEL_DEV:
-        return SeverityNumber.DEBUG
     if levelno < logging.INFO:
-        return SeverityNumber.DEBUG4
+        return SeverityNumber.DEBUG
     if levelno < logging.WARNING:
         return SeverityNumber.INFO
     if levelno < logging.ERROR:

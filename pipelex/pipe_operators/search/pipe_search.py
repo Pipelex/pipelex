@@ -2,7 +2,6 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.models.model_deck_check import check_search_choice_with_deck
 from pipelex.cogt.search.search_setting import SearchModelChoice
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
@@ -84,9 +83,6 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeSearchOutput:
-        search_choice_desc = self.search_choice or "default"
-        log.dev(f"✨ PipeSearch '{self.code}' running with search choice '{search_choice_desc}' ✨")
-
         # The deck chain, the handle resolution and the override application are kernel semantics; the
         # setting is resolved per run into a local and never cached onto `self`, for the reason
         # `pipe_llm.py` states about its own settings.

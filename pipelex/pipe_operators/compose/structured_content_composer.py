@@ -4,7 +4,6 @@ from typing import Any, NamedTuple, TypeAlias, cast, get_args, get_origin
 
 from pydantic import BaseModel, ValidationError
 
-from pipelex import log
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.date_content import DateContent
@@ -197,7 +196,6 @@ class StructuredContentComposer:
 
         path = field_blueprint.from_path
         expected_type: type[Any] | None = self._get_field_expected_type(field_name=field_name)
-        log.verbose(f"_resolve_from_var: resolving path '{path}' for field '{field_name}' (expected: {expected_type})")
 
         if "." in path:
             resolved_value = self._resolve_dotted_path(path=path, expected_type=expected_type)
@@ -244,7 +242,6 @@ class StructuredContentComposer:
         if find_private_path_segment(path=key_attr):
             msg = f"list_to_dict_keyed_by names '{key_attr}', which starts with an underscore: it names a public field only"
             raise StructuredContentComposerValueError(msg)
-        log.verbose(f"  Converting list of {len(items)} items to dict keyed by '{key_attr}'")
 
         result: dict[str, Any] = {}
         for idx, item in enumerate(items):
@@ -269,7 +266,6 @@ class StructuredContentComposer:
             else:
                 result[key] = item  # pyright: ignore[reportUnknownVariableType]
 
-        log.verbose(f"  Converted to dict with keys: {list(result.keys())}")
         return result
 
     def _resolve_dotted_path(self, path: str, *, expected_type: type[Any] | None) -> Any:
@@ -296,7 +292,6 @@ class StructuredContentComposer:
 
         stuff = self.working_memory.get_stuff(base_name)
         stuff_content: StuffContent = stuff.content
-        log.verbose(f"  Stuff '{base_name}' content type: {type(stuff_content).__name__}")
 
         # Navigate the attribute path - this is dynamic attribute access at runtime
         current_value: Any = stuff_content
@@ -308,7 +303,6 @@ class StructuredContentComposer:
             else:
                 msg = f"Cannot resolve path '{path}': attribute '{attr}' not found"
                 raise StructuredContentComposerValueError(msg)
-        log.verbose(f"  Resolved value type: {type(current_value).__name__}")  # pyright: ignore[reportUnknownArgumentType]
 
         # Apply type conversion if the resolved value is a StuffContent
         if isinstance(current_value, StuffContent):
@@ -330,7 +324,6 @@ class StructuredContentComposer:
         """
         stuff = self.working_memory.get_stuff(name=name)
         stuff_content: StuffContent = stuff.content
-        log.verbose(f"  Stuff '{name}' content type: {type(stuff_content).__name__}")
         return self._convert_for_target_type(stuff_content=stuff_content, expected_type=expected_type)
 
     def _convert_for_target_type(
@@ -353,7 +346,6 @@ class StructuredContentComposer:
         if expected_type is not None:
             extraction = self._extract_native_scalar(stuff_content=stuff_content, expected_type=expected_type)
             if extraction.matched and extraction.value is not None:
-                log.verbose(f"  -> Target expects a native scalar, extracted {type(extraction.value).__name__} from {type(stuff_content).__name__}")
                 return extraction.value
         if isinstance(stuff_content, TextContent):
             return self._convert_text_content(text_content=stuff_content, expected_type=expected_type)
@@ -361,11 +353,9 @@ class StructuredContentComposer:
             list_content = cast("ListContent[StuffContent]", stuff_content)
             return self._convert_list_content(list_content=list_content, expected_type=expected_type)
         elif expected_type is not None and self._expects_type(expected_type=expected_type, target_type=StuffContent):
-            log.verbose(f"  -> Target expects {expected_type.__name__}, converting content")
             return self._convert_content_for_field(stuff_content=stuff_content, expected_type=expected_type)
         else:
             # Fallback: return as-is
-            log.verbose(f"  -> Unknown target type, returning {type(stuff_content).__name__} object")
             return stuff_content
 
     def _convert_text_content(self, text_content: TextContent, *, expected_type: Any) -> TextContent:
@@ -388,7 +378,6 @@ class StructuredContentComposer:
             return converted_text_content
         else:
             # Default: return the object as-is
-            log.verbose(f"  -> Unknown target type, returning {type(text_content).__name__} object")
             return text_content
 
     def _extract_native_scalar(self, *, stuff_content: StuffContent, expected_type: type[Any]) -> NativeScalarExtraction:
@@ -463,21 +452,17 @@ class StructuredContentComposer:
         if expected_type and self._expects_list_content_type(expected_type=expected_type):
             # Target field expects ListContent[X], check item compatibility and return as ListContent
             expected_item_type = self._get_list_item_type(expected_type=expected_type)
-            log.verbose(f"  -> Target expects ListContent[{expected_item_type}]")
             converted_items = self._convert_list_items_as_objects(items=list_content.items, expected_item_type=expected_item_type)
             return ListContent(items=converted_items)
         elif expected_type and self._expects_list_type(expected_type=expected_type):
             expected_item_type = self._get_list_item_type(expected_type=expected_type)
             if expected_item_type is not None and expected_item_type in NATIVE_SCALAR_TARGET_TYPES:
                 # Target expects list of native scalars, extract the scalar from each item wrapper
-                log.verbose(f"  -> Target expects list[{expected_item_type}], extracting native scalars from ListContent items")
                 return self._convert_list_items_as_scalars(items=list_content.items, expected_item_type=expected_item_type)
             # Target expects list[X] with structured items, extract items as dicts for Pydantic reconstruction
-            log.verbose(f"  -> Target expects list[{expected_item_type}], extracting items from ListContent")
             return self._convert_list_items_as_dicts(items=list_content.items, expected_item_type=expected_item_type)
         else:
             # Default: return the object as-is
-            log.verbose(f"  -> Unknown target type, returning ListContent object with {list_content.nb_items} items")
             return list_content
 
     def _get_field_expected_type(self, field_name: str) -> type[Any] | None:
@@ -540,17 +525,14 @@ class StructuredContentComposer:
 
         if isinstance(stuff_content, expected_type):
             # Exact match or subclass - return as-is
-            log.verbose(f"  -> {actual_type.__name__} is compatible with {expected_type.__name__}, returning as-is")
             return stuff_content
         elif are_classes_equivalent(class_1=actual_type, class_2=expected_type):
             # Check structural equivalence and rebuild if compatible
-            log.verbose(f"  -> {actual_type.__name__} is structurally equivalent to {expected_type.__name__}, rebuilding")
             content_dict = stuff_content.model_dump(exclude_none=False, serialize_as_any=True)
             return expected_type.model_validate(content_dict)
         else:
             # Try to rebuild anyway if expected_type accepts the content's fields
             try:
-                log.verbose(f"  -> Attempting to rebuild {actual_type.__name__} as {expected_type.__name__}")
                 content_dict = stuff_content.model_dump(exclude_none=False, serialize_as_any=True)
                 return expected_type.model_validate(content_dict)
             except ValidationError as exc:
@@ -624,10 +606,7 @@ class StructuredContentComposer:
         Returns:
             List of item dicts
         """
-        log.verbose(f"     Converting {len(items)} items to dicts, expected item type: {expected_item_type}")
-
         if expected_item_type is None:
-            log.verbose("     No expected item type, converting all items to dicts")
             return [item.model_dump(exclude_none=False, serialize_as_any=True) for item in items]
 
         converted_items: list[dict[str, Any]] = []
@@ -635,7 +614,6 @@ class StructuredContentComposer:
             self._validate_item_compatibility(item=item, expected_type=expected_item_type, idx=idx)
             converted_items.append(item.model_dump(exclude_none=False, serialize_as_any=True))
 
-        log.verbose(f"     Returning {len(converted_items)} items as dicts")
         return converted_items
 
     def _convert_list_items_as_scalars(self, *, items: list[StuffContent], expected_item_type: type[Any]) -> list[NativeScalarValue]:
@@ -654,8 +632,6 @@ class StructuredContentComposer:
         Raises:
             StructuredContentComposerTypeError: If an item is not a wrapper of the expected scalar type
         """
-        log.verbose(f"     Extracting {len(items)} items as native scalars, expected item type: {expected_item_type}")
-
         converted_items: list[NativeScalarValue] = []
         for idx, item in enumerate(items):
             extraction = self._extract_native_scalar(stuff_content=item, expected_type=expected_item_type)
@@ -665,7 +641,6 @@ class StructuredContentComposer:
                 raise StructuredContentComposerTypeError(msg)
             converted_items.append(extraction.value)
 
-        log.verbose(f"     Returning {len(converted_items)} items as native scalars")
         return converted_items
 
     def _convert_list_items_as_objects(self, items: list[StuffContent], *, expected_item_type: type[Any] | None) -> list[StuffContent]:
@@ -681,10 +656,7 @@ class StructuredContentComposer:
         Returns:
             List of StuffContent objects
         """
-        log.verbose(f"     Converting {len(items)} items as objects, expected item type: {expected_item_type}")
-
         if expected_item_type is None:
-            log.verbose("     No expected item type, returning items as-is")
             return items
 
         converted_items: list[StuffContent] = []
@@ -692,7 +664,6 @@ class StructuredContentComposer:
             converted_item = self._convert_single_item_as_object(item, expected_type=expected_item_type, idx=idx)
             converted_items.append(converted_item)
 
-        log.verbose(f"     Returning {len(converted_items)} items as objects")
         return converted_items
 
     def _validate_item_compatibility(self, item: StuffContent, *, expected_type: type[Any], idx: int) -> None:
@@ -715,7 +686,6 @@ class StructuredContentComposer:
         if inspect.isclass(expected_type):
             try:
                 if isinstance(item, expected_type):
-                    log.verbose(f"     Item[{idx}]: {actual_type.__name__} is compatible with {expected_type_name}")
                     return
             except TypeError:
                 # isinstance() failed - expected_type is not a valid type for this check
@@ -724,7 +694,6 @@ class StructuredContentComposer:
         # Case 2: Check structural equivalence - OK
         if hasattr(actual_type, "model_fields") and hasattr(expected_type, "model_fields"):
             if are_classes_equivalent(class_1=actual_type, class_2=expected_type):
-                log.verbose(f"     Item[{idx}]: {actual_type.__name__} is structurally equivalent to {expected_type_name}")
                 return
 
         # Case 3: native scalar item type - a wrapper dump can never validate into a bare scalar,
@@ -738,7 +707,6 @@ class StructuredContentComposer:
             raise StructuredContentComposerTypeError(msg)
 
         # Case 4: Try to validate via dict
-        log.verbose(f"     Item[{idx}]: Validating conversion {actual_type.__name__} -> {expected_type_name}")
         item_dict = item.model_dump(exclude_none=False, serialize_as_any=True)
 
         if inspect.isclass(expected_type) and issubclass(expected_type, BaseModel):
@@ -767,7 +735,6 @@ class StructuredContentComposer:
             ValueError: If the item cannot be converted to the expected type
         """
         try:
-            log.verbose(f"     Item[{idx}]: Converting {type(item).__name__} to {expected_type.__name__}")
             return self._convert_content_for_field(item, expected_type=expected_type)
         except StructuredContentComposerTypeError as exc:
             # Re-raise with item index in message

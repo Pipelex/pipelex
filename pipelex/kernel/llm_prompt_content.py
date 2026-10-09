@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING, Any, Self, cast
 
 from pydantic import BaseModel
 
-from pipelex import log
 from pipelex.cogt.document.prompt_document import PromptDocument
 from pipelex.cogt.document.prompt_document_factory import PromptDocumentFactory
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
@@ -259,7 +258,6 @@ def _extract_direct_image(
     image_registry_indices: dict[str, int],
 ) -> None:
     """Extract a single ImageContent from context and register it."""
-    log.verbose(f"Getting direct image '{image_ref.variable_path}' from context")
     try:
         prompt_image_content = context_provider.get_typed_object_or_attribute(
             name=image_ref.variable_path,
@@ -285,7 +283,6 @@ def _extract_direct_list_images(
     image_registry_indices: dict[str, int],
 ) -> None:
     """Extract a list of ImageContent from context and register them."""
-    log.verbose(f"Getting image list '{image_ref.variable_path}' from context")
     try:
         prompt_image_content = context_provider.get_typed_object_or_attribute(
             name=image_ref.variable_path,
@@ -320,7 +317,6 @@ def _extract_direct_document(
     prompt_user_documents: dict[str, PromptDocument],
 ) -> None:
     """Extract a single DocumentContent from context."""
-    log.verbose(f"Getting direct document '{doc_ref.variable_path}' from context")
     try:
         prompt_document_content = context_provider.get_typed_object_or_attribute(
             name=doc_ref.variable_path,
@@ -348,7 +344,6 @@ def _extract_direct_list_documents(
     prompt_user_documents: dict[str, PromptDocument],
 ) -> None:
     """Extract a list of DocumentContent from context."""
-    log.verbose(f"Getting document list '{doc_ref.variable_path}' from context")
     try:
         prompt_document_content = context_provider.get_typed_object_or_attribute(
             name=doc_ref.variable_path,
@@ -389,7 +384,6 @@ async def _unravel_text(
     # A style declared on the blueprint wins over the run-derived one. Kept as a local: writing
     # it onto `jinja2_blueprint` would mutate an object the pipe library holds and hands out.
     effective_style = jinja2_blueprint.templating_style or templating_style
-    log.verbose(f"Rendering with prompting style {effective_style}")
 
     context: dict[str, Any] = context_provider.generate_context()
     if extra_params:

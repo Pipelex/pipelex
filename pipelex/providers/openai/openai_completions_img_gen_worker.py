@@ -7,7 +7,6 @@ from openai import (
 )
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError, InferenceErrorCategory, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
@@ -66,7 +65,6 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
         self,
         img_gen_job: ImgGenJob,
     ) -> GeneratedImageRawDetails:
-        log.debug(f"Generating image with model: {self.inference_model.tag}")
         image_format = self.fixed_output_format
         if image_format is not None:
             requested_format = img_gen_job.job_params.output_format

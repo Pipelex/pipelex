@@ -83,7 +83,6 @@ class TestLogFields:
         [
             (LOGGING_LEVEL_VERBOSE, "verbose"),
             (logging.DEBUG, "debug"),
-            (15, "dev"),
             (logging.INFO, "info"),
             (logging.WARNING, "warning"),
             (logging.ERROR, "error"),

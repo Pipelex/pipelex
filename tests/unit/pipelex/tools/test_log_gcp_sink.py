@@ -385,7 +385,6 @@ class TestGcpLogSink:
         [
             ("verbose", GcpLogSeverity.DEBUG),
             ("debug", GcpLogSeverity.DEBUG),
-            ("dev", GcpLogSeverity.DEBUG),
             ("info", GcpLogSeverity.INFO),
             ("warning", GcpLogSeverity.WARNING),
             ("error", GcpLogSeverity.ERROR),

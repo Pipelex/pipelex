@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, Mapping, cast
 import tomlkit
 from tomlkit import array, document, inline_table, table
 
-from pipelex import log
 from pipelex.config import get_config
 from pipelex.language.toml_string_utils import format_toml_string
 from pipelex.tools.misc.json_utils import remove_none_values_from_dict
@@ -249,15 +248,11 @@ class MthdsFactory:
     @classmethod
     def make_table_obj_for_pipe(cls, section_value: Mapping[str, Any]) -> Any:
         """Make a table object for a pipe section."""
-        log.verbose("******** Making table object for pipe section ********")
         table_obj = table()
         for field_key, field_value in section_value.items():
-            log.verbose(f"------ Field {field_key} is a {type(field_value)}")
             if not isinstance(field_value, Mapping):
-                log.verbose(f"Field is not a mapping: key = {field_key}, value = {field_value}")
                 table_obj.add(field_key, cls.convert_dicts_to_inline_tables(field_value))
                 continue
-            log.verbose(f"Field is a mapping: key = {field_key}, value = {field_value}")
             field_value = cast("Mapping[str, Any]", field_value)
             # Convert pipe configuration to table (handles template field specially)
             table_obj.add(field_key, cls.convert_mapping_to_table(field_value, field_ordering=cls._mthds_config().pipes.field_ordering))
@@ -266,34 +261,28 @@ class MthdsFactory:
     @classmethod
     def make_table_obj_for_concept(cls, section_value: Mapping[str, Any]) -> Any:
         """Make a table object for a concept section."""
-        log.verbose("******** Making table object for concept section ********")
         table_obj = table()
         for concept_key, concept_value in section_value.items():
             if isinstance(concept_value, str):
-                log.verbose(f"Concept '{concept_key}' is a string: {concept_value}")
                 table_obj.add(concept_key, concept_value)
                 continue
             if not isinstance(concept_value, Mapping):
                 msg = f"Concept field value is not a mapping: key = {concept_key}, value = {concept_value}"
                 raise TypeError(msg)
-            log.verbose(f"Concept '{concept_key}' is a mapping: {concept_value}")
             concept_value = cast("Mapping[str, Any]", concept_value)
             concept_table_obj = table()
             for concept_field_key, concept_field_value in concept_value.items():
                 if concept_field_key == CONCEPT_STRUCTURE_FIELD_KEY:
                     if isinstance(concept_field_value, str):
-                        log.verbose(f"Structure for concept '{concept_key}' is a string: {concept_field_value}")
                         concept_table_obj.add("structure", concept_field_value)
                         continue
                     if not isinstance(concept_field_value, Mapping):
                         msg = f"Structure field value is not a mapping: key = {concept_field_key}, value = {concept_field_value}"
                         raise TypeError(msg)
-                    log.verbose(f"Structure for concept '{concept_key}' is a mapping: {concept_field_value}")
                     structure_value = cast("Mapping[str, Any]", concept_field_value)
                     structure_table_obj = table()
                     for structure_field_key, structure_field_value in structure_value.items():
                         if isinstance(structure_field_value, str):
-                            log.verbose(f"Structure '{structure_field_key}' is a string: {structure_field_value}")
                             structure_table_obj.add(structure_field_key, structure_field_value)
                             continue
                         if not isinstance(structure_field_value, Mapping):
@@ -302,7 +291,6 @@ class MthdsFactory:
                                 f"key = {structure_field_key}, value = {structure_field_value}"
                             )
                             raise TypeError(msg)
-                        log.verbose(f"Structure for '{concept_key}' is a mapping: {structure_field_value}")
                         # Filter out "required" key if its value is False
                         structure_field_value = cast("Mapping[str, Any]", structure_field_value)
                         filtered_value = {key: value for key, value in structure_field_value.items() if not (key == "required" and not value)}
@@ -315,7 +303,6 @@ class MthdsFactory:
                     concept_table_obj.add("structure", structure_table_obj)
                 else:
                     # sub_table = _convert_mapping_to_table(concept_field_value)
-                    log.verbose(f"{concept_key}/'{concept_field_key}' is inline: {concept_field_value}")
                     concept_table_obj.add(concept_field_key, cls.convert_dicts_to_inline_tables(concept_field_value))
             table_obj.add(concept_key, concept_table_obj)
         return table_obj
@@ -323,23 +310,19 @@ class MthdsFactory:
     @classmethod
     def dict_to_mthds_styled_toml(cls, data: Mapping[str, Any]) -> str:
         """Top-level keys become tables; second-level mappings become tables; inline tables start at third level."""
-        log.verbose("=" * 100)
         data = remove_none_values_from_dict(data=data)
         document_root = document()
         for root_key, root_value in data.items():
             if not isinstance(root_value, Mapping):
-                log.verbose(f"Root root_key is not a mapping: key = {root_key}, value = {root_value}")
                 document_root.add(root_key, cls.convert_dicts_to_inline_tables(root_value))
                 continue
 
             # It's a mapping, therefore it's a section
-            log.verbose(f"Root {root_key} is a section -------------------")
 
             section_key = SectionKey(root_key)
             section_value = cast("Mapping[str, Any]", root_value)
             # Skip empty mappings (empty concept and pipe sections)
             if not section_value:
-                log.verbose(f"Section {section_key} is empty, skipping")
                 continue
             match section_key:
                 case SectionKey.PIPE:

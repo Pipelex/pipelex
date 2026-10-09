@@ -2,7 +2,6 @@ from typing import cast
 
 from pydantic import BaseModel
 
-from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import LLMAssignment, ObjectAssignment
 from pipelex.cogt.content_generation.dry_mock import (
     dry_llm_gen_object,
@@ -29,7 +28,6 @@ async def llm_gen_text(llm_assignment: LLMAssignment) -> str:
     dump_prompt(llm_prompt=llm_job.llm_prompt)
     generated_text = await llm_worker.gen_text(llm_job=llm_job)
     dump_response_from_text_gen(response=generated_text)
-    log.verbose(generated_text, title="llm_gen_text")
     return generated_text
 
 
@@ -69,7 +67,6 @@ async def llm_gen_object_list(object_assignment: ObjectAssignment, *, object_cla
     authorize_assignment_reads(job_metadata=llm_assignment.job_metadata, uri_references=object_assignment.referenced_uris())
     if object_assignment.cogt_run_params.run_mode.is_dry:
         return dry_llm_gen_object_list(object_assignment, object_class=object_class)
-    log.verbose(f"llm_gen_object_list to generate a list of '{object_assignment.object_class_name}'")
     llm_worker = get_llm_worker(llm_handle=llm_assignment.llm_handle)
     llm_job = LLMJobFactory.make_llm_job(
         job_metadata=llm_assignment.job_metadata,

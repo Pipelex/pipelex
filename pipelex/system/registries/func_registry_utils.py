@@ -41,7 +41,6 @@ class FuncRegistryUtils:
         ):
             # Import the module
             module = importlib.import_module(modname)
-            log.verbose(f"Imported {modname}")
 
             # Find @pipe_func decorated functions in this module
             decorated_functions = cls._find_functions_in_module(module)
@@ -59,7 +58,6 @@ class FuncRegistryUtils:
                         name=func_name,
                     )
                     functions_registered += 1
-                    log.verbose(f"Registered @pipe_func: {func_name} from {modname}")
                 else:
                     # Function has @pipe_func but is not eligible - track it for better error messages
                     func_registry.register_ineligible_function(
@@ -200,7 +198,6 @@ class FuncRegistryUtils:
                     log.warning(f"Function '{func_name}' in '{file_path}' has @pipe_func() decorator but is not eligible: {eligibility_error}")
         except ModuleFileError:
             # Expected: file validation issues (directories with .py extension, etc.)
-            # log.verbose(f"Skipping file {file_path}: {e}")
             pass
         except ImportError as exc:
             # A module that fails to import (missing sibling module, circular import, bad relative

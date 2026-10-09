@@ -11,7 +11,6 @@ from anthropic.types import OutputConfigParam, ThinkingConfigParam
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, SdkTypeError
 from pipelex.cogt.inference.error_classification import (
     UserAction,
@@ -192,7 +191,6 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                         output_config=None,
                         suppress_temperature=False,
                     )
-                log.verbose(f"Anthropic adaptive thinking with effort={anthropic_effort}")
                 thinking_config: ThinkingConfigParam = {"type": "adaptive"}
                 output_config = OutputConfigParam(effort=anthropic_effort)  # type: ignore[typeddict-item]  # pyright: ignore[reportArgumentType]
                 return _ThinkingParams(
@@ -220,7 +218,6 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                     max_budget=inference_model.max_thinking_budget,
                     model_desc=inference_model.desc,
                 )
-                log.verbose(f"Anthropic manual thinking with budget_tokens={safe_budget} (from effort={effort})")
                 thinking_config = {"type": "enabled", "budget_tokens": safe_budget}
                 return _ThinkingParams(
                     thinking=thinking_config,
@@ -255,7 +252,6 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                     max_budget=inference_model.max_thinking_budget,
                     model_desc=inference_model.desc,
                 )
-                log.verbose(f"Anthropic thinking with explicit budget_tokens={safe_budget}")
                 thinking_config: ThinkingConfigParam = {"type": "enabled", "budget_tokens": safe_budget}
                 return _ThinkingParams(
                     thinking=thinking_config,
@@ -276,8 +272,9 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         max_tokens = self._sent_max_tokens(requested_max_tokens=job_params.max_tokens or self.default_max_tokens, is_structured=False)
 
         thinking_params = self._build_thinking_params(inference_model=self.inference_model, job_params=job_params, max_tokens=max_tokens)
-        log.verbose(thinking_params, title="Thinking params")
-        log.verbose(max_tokens, title="Max tokens")
+        self._log_reasoning_sent(
+            api_name="Anthropic", settings={"thinking": thinking_params.thinking, "output_config": thinking_params.output_config}
+        )
         sends_temperature = self.inference_model.accepts_temperature and not thinking_params.suppress_temperature
 
         try:
@@ -314,12 +311,6 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                 stripped = content_block.text.strip()
                 if stripped:
                     text_parts.append(stripped)
-
-        log.verbose(
-            f"content_block_types={block_types}, text_parts_count={len(text_parts)}, "
-            f"stop_reason={final_message.stop_reason}, usage={final_message.usage}",
-            title="Anthropic response",
-        )
 
         if not text_parts:
             msg = (
@@ -408,7 +399,9 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
 
         # The thinking budget is fitted against the max_tokens this call actually sends
         thinking_params = self._build_thinking_params(inference_model=self.inference_model, job_params=job_params, max_tokens=effective_max_tokens)
-        log.verbose(thinking_params, title="Thinking params")
+        self._log_reasoning_sent(
+            api_name="Anthropic", settings={"thinking": thinking_params.thinking, "output_config": thinking_params.output_config}
+        )
         sends_temperature = self.inference_model.accepts_temperature and not thinking_params.suppress_temperature
 
         # Deferred import: avoid pulling heavy SDK at module-load time

@@ -2,7 +2,6 @@ from abc import abstractmethod
 
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import CogtError, ImgGenParameterError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
@@ -53,8 +52,6 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
         self,
         img_gen_job: ImgGenJob,
     ) -> GeneratedImageRawDetails:
-        log.dev(f"✨ {self.desc} ✨")
-
         # Verify that the job is valid
         img_gen_job.validate_before_execution()
 
@@ -94,8 +91,6 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
         *,
         nb_images: int,
     ) -> list[GeneratedImageRawDetails]:
-        log.dev(f"✨ {self.desc} ✨")
-
         # Verify that the job is valid
         img_gen_job.validate_before_execution()
 

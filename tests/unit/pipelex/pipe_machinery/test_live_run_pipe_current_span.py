@@ -46,7 +46,6 @@ from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManager
 from pipelex.tools.log.json_log_sink import LOGGER_KEY, MESSAGE_KEY, SPAN_ID_KEY, TRACE_ID_KEY, JsonLogSink
 from pipelex.tools.log.log import Log
 from pipelex.tools.log.log_config import LogConfig
-from pipelex.tools.log.log_levels import LOGGING_LEVEL_VERBOSE
 from pipelex.tools.log.otlp_log_sink import OtlpLogSink
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
@@ -59,9 +58,6 @@ if TYPE_CHECKING:
 
     from pipelex.core.memory.working_memory import WorkingMemory
     from pipelex.libraries.library_crate import LibraryCrate
-
-# The logger the pipe's own span lines are written on.
-PIPE_ABSTRACT_LOGGER = PipeAbstract.__module__
 
 # The trace the submission derived for the run, and the virtual root parent every root pipe span takes.
 RUN_TRACE_ID = 0x0123456789ABCDEF0123456789ABCDEF
@@ -336,25 +332,6 @@ class TestLiveRunPipeCurrentSpan:
             pipelex_trace_id=f"{RUN_TRACE_ID:032x}",
             pipelex_span_id=_hex_span_id(pipe_span),
         )
-
-    async def test_a_span_started_line_names_the_span_it_announces(
-        self, sunk: Sunk, span_exporter: InMemorySpanExporter, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        """The verbose line a pipe logs once its span has started carries that span's ids, not the enclosing pipe's or none."""
-        caplog.set_level(LOGGING_LEVEL_VERBOSE, logger=PIPE_ABSTRACT_LOGGER)
-        outer = _make_pipe(code="outer", nested=_make_pipe(code="inner"))
-
-        await _run(outer)
-
-        spans = span_exporter.get_finished_spans()
-        started = {
-            message: line for message, line in sunk.read_lines_of(PIPE_ABSTRACT_LOGGER).items() if message.startswith("[OTel] PIPE SPAN STARTED")
-        }
-        assert sorted(line.pipelex_span_id or "" for line in started.values()) == sorted(
-            _hex_span_id(_span_named(spans, code=code)) for code in ("outer", "inner")
-        )
-        for message, line in started.items():
-            assert f"\n  span_id={line.pipelex_span_id}\n" in message
 
     async def test_a_nested_pipe_holds_its_own_span_and_the_outer_one_comes_back(self, sunk: Sunk, span_exporter: InMemorySpanExporter) -> None:
         outer = _make_pipe(code="outer", nested=_make_pipe(code="inner"))

@@ -6,6 +6,7 @@ The absence source is the phase-1 `continue` semantics: the branch is a PipeCond
 matching items to a processing pipe and non-matching items to `continue` (declared-absent output).
 """
 
+import logging
 from typing import Callable, cast
 
 import pytest
@@ -16,6 +17,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.interpreter_hub import get_pipe_library
+from pipelex.pipe_controllers.batch import pipe_batch as pipe_batch_module
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
@@ -136,6 +138,47 @@ class TestPipeBatchCompaction:
         assert isinstance(list_content, ListContent)
         texts = [item.text for item in cast("ListContent[TextContent]", list_content).items]
         assert texts == ["GOOD MORNING", "GOOD NIGHT"]
+
+    async def test_a_dropped_branch_is_logged_at_debug_with_its_index_and_absence_reason(
+        self,
+        job_metadata: JobMetadata,
+        load_empty_library: Callable[[], str],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """The only account of why the list is shorter than its input: one DEBUG record per dropped branch, the reason as a field."""
+        load_empty_library()
+        batch = _build_compacting_batch()
+
+        items_stuff = StuffFactory.make_stuff(
+            concept=batch.inputs.get_required_stuff_spec("items").concept,
+            content=ListContent[TextContent](
+                items=[TextContent(text="good morning"), TextContent(text="bad day"), TextContent(text="good night")],
+            ),
+            name="items",
+        )
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(items_stuff)
+
+        with caplog.at_level(logging.DEBUG, logger=pipe_batch_module.__name__):
+            await batch.run_pipe(
+                job_metadata=job_metadata,
+                working_memory=working_memory,
+                pipe_run_params=_make_live_run_params(),
+            )
+
+        dropped_records = [
+            record
+            for record in caplog.records
+            if record.name == pipe_batch_module.__name__ and record.getMessage() == "Dropped an absent batch branch result"
+        ]
+        assert len(dropped_records) == 1
+        dropped_record = dropped_records[0]
+        assert dropped_record.levelno == logging.DEBUG
+        record_fields = vars(dropped_record)
+        assert {name: record_fields.get(name) for name in ("pipe_code", "branch_index", "absence_reason")} == {
+            "pipe_code": "opt_batch_compact",
+            "branch_index": 1,
+            "absence_reason": "PipeCondition 'opt_batch_gate' resolved to its 'continue' outcome",
+        }
 
     async def test_all_branches_absent_yields_empty_list(self, job_metadata: JobMetadata, load_empty_library: Callable[[], str]):
         """Every item rejected: the batch still delivers a real (empty) list output."""

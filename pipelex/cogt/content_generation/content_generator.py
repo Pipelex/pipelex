@@ -2,7 +2,6 @@ from typing import Any
 
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import (
     ExtractAssignment,
     ImgGenAssignment,
@@ -71,18 +70,13 @@ class ContentGenerator(ContentGeneratorProtocol):
         llm_setting_main: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
     ) -> str:
-        log.verbose(f"{self.__class__.__name__} make_llm_text: {llm_prompt_for_text}")
-        log.verbose(f"llm_setting_main: {llm_setting_main}")
         llm_assignment = LLMAssignment.make_from_prompt(
             job_metadata=job_metadata,
             cogt_run_params=cogt_run_params,
             llm_setting=llm_setting_main,
             llm_prompt=llm_prompt_for_text,
         )
-        log.verbose(llm_assignment.desc, title="llm_assignment")
-        generated_text = await llm_gen_text(llm_assignment=llm_assignment)
-        log.verbose(f"{self.__class__.__name__} generated text: {generated_text}")
-        return generated_text
+        return await llm_gen_text(llm_assignment=llm_assignment)
 
     @override
     @update_job_metadata
@@ -95,7 +89,6 @@ class ContentGenerator(ContentGeneratorProtocol):
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_object: LLMPrompt,
     ) -> BaseModelTypeVar:
-        log.verbose(f"{self.__class__.__name__} make_object: {llm_prompt_for_object}")
         llm_assignment_for_object = LLMAssignment.make_from_prompt(
             job_metadata=job_metadata,
             cogt_run_params=cogt_run_params,
@@ -107,7 +100,6 @@ class ContentGenerator(ContentGeneratorProtocol):
             llm_assignment=llm_assignment_for_object,
         )
         raw_obj = await llm_gen_object(object_assignment=object_assignment, object_class=object_class)
-        log.verbose(f"{self.__class__.__name__} generated object direct: {raw_obj}")
         return revalidate_leaf_object(raw_obj, object_class=object_class, is_mock_built=cogt_run_params.run_mode.is_dry)
 
     @override
@@ -134,7 +126,6 @@ class ContentGenerator(ContentGeneratorProtocol):
             nb_items=nb_items,
         )
         raw_list = await llm_gen_object_list(object_assignment=object_assignment, object_class=object_class)
-        log.verbose(f"{self.__class__.__name__} generated object list direct: {raw_list}")
         return [revalidate_leaf_object(raw_obj, object_class=object_class, is_mock_built=cogt_run_params.run_mode.is_dry) for raw_obj in raw_list]
 
     @override
@@ -159,12 +150,10 @@ class ContentGenerator(ContentGeneratorProtocol):
             img_gen_job_config=img_gen_job_config or img_gen_config.img_gen_job,
             nb_images=1,
         )
-        image_content = await img_gen_single_image_and_store(
+        return await img_gen_single_image_and_store(
             img_gen_assignment=img_gen_assignment,
             generated_content_factory=self._generated_content_factory,
         )
-        log.verbose(f"{self.__class__.__name__} generated image: {image_content}")
-        return image_content
 
     @override
     @update_job_metadata
@@ -189,12 +178,10 @@ class ContentGenerator(ContentGeneratorProtocol):
             img_gen_job_config=img_gen_job_config or img_gen_config.img_gen_job,
             nb_images=nb_images,
         )
-        image_contents = await img_gen_image_list_and_store(
+        return await img_gen_image_list_and_store(
             img_gen_assignment=img_gen_assignment,
             generated_content_factory=self._generated_content_factory,
         )
-        log.verbose(f"{self.__class__.__name__} generated image list: {image_contents}")
-        return image_contents
 
     @override
     async def make_templated_text(

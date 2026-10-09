@@ -1146,7 +1146,6 @@ class PipeAbstract(ABC, BaseModel):
         """
         tracer = TelemetryManagerAbstract.get_instance_tracer()
         if tracer is None:
-            log.verbose(f"[OTel] No tracer available for pipe '{self.code}'")
             return None, False
 
         pipeline_run_id = run_metadata.pipeline_run_id
@@ -1236,19 +1235,6 @@ class PipeAbstract(ABC, BaseModel):
         if span.get_span_context() == parent_span_context:
             return None, False
 
-        # Debug logging, under the span it announces, so the line's `pipelex.*` fields name that span
-        span_ctx = span.get_span_context()
-        with pipelex_span_active(span=span):
-            log.verbose(
-                f"[OTel] PIPE SPAN STARTED:\n"
-                f"  pipe_code='{self.code}'\n"
-                f"  pipeline_run_id='{pipeline_run_id}'\n"
-                f"  trace_id={span_ctx.trace_id:032x}\n"
-                f"  span_id={span_ctx.span_id:016x}\n"
-                f"  parent_span_id={parent_span_id:016x}\n"
-                f"  is_root_span={is_root_span}"
-            )
-
         return span, is_root_span
 
     def _end_pipe_span_success(self, span: Span | None, *, pipe_output: PipeOutput, is_root_span: bool) -> None:
@@ -1261,9 +1247,6 @@ class PipeAbstract(ABC, BaseModel):
         """
         if span is None:
             return
-
-        span_ctx = span.get_span_context()
-        log.verbose(f"[OTel] PIPE SPAN ENDING:\n  pipe_code='{self.code}'\n  trace_id={span_ctx.trace_id:032x}\n  span_id={span_ctx.span_id:016x}")
 
         # Always capture full output content for Langfuse
         if TelemetryManagerAbstract.get_langfuse_enabled():
@@ -1295,11 +1278,6 @@ class PipeAbstract(ABC, BaseModel):
         """
         if span is None:
             return
-
-        span_ctx = span.get_span_context()
-        log.verbose(
-            f"[OTel] PIPE SPAN ENDING WITH ERROR:\n  pipe_code='{self.code}'\n  trace_id={span_ctx.trace_id:032x}\n  span_id={span_ctx.span_id:016x}"
-        )
 
         span.set_attribute(PipelexSpanAttr.OUTCOME, SpanOutcome.FAILURE)
         span.record_exception(error)

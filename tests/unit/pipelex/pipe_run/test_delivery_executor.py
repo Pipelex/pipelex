@@ -112,6 +112,34 @@ class TestDeliveryExecutor:
         assert any("tenant/plr-123/results/main_stuff.html" in key for key in stored_keys)
         assert any("tenant/plr-123/results/tokens_usages.json" in key for key in stored_keys)
 
+    async def test_each_stored_file_is_logged_at_debug_by_its_key(self, mocker: MockerFixture) -> None:
+        """A user's log says which result files were written before a failure, one line per key."""
+        from pipelex import log as pipelex_log  # ruff: ignore[import-outside-top-level]
+
+        debug_spy = mocker.spy(pipelex_log, "debug")
+        mock_storage = mocker.AsyncMock()
+        mock_storage.store = mocker.AsyncMock(return_value="pipelex-storage://test-key")
+        mocker.patch("pipelex.pipe_run.delivery_executor.get_storage_provider", return_value=mock_storage)
+
+        mock_output = _make_output_mock(mocker)
+        mock_output.working_memory_raw = None
+        mock_output.working_memory.smart_dump.return_value = {"root": {}, "aliases": {}}
+        mock_output.working_memory.resolve_main_stuff.return_value = _make_main_stuff()
+        mock_output.graph_spec = None
+
+        await DeliveryExecutor().execute(
+            pipe_output=mock_output,
+            storage_scope="tenant/plr-123",
+            pipeline_run_id="plr-123",
+            delivery_assignment=DeliveryAssignment(storage=StorageTarget()),
+            status=DeliveryStatus.COMPLETED,
+        )
+
+        stored_keys = [call.kwargs["key"] for call in mock_storage.store.call_args_list]
+        logged_keys = [call.kwargs["fields"]["storage_key"] for call in debug_spy.call_args_list if call.args[0] == "Stored a delivery result file"]
+        assert stored_keys
+        assert logged_keys == stored_keys
+
     async def test_key_prefix_inserts_a_level_and_never_supplies_the_leaf(self, mocker: MockerFixture) -> None:
         """`results/` is the RUNTIME's leaf; `key_prefix` sits before it, never instead of it.
 

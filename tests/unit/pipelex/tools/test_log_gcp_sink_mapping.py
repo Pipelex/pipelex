@@ -10,12 +10,13 @@ from __future__ import annotations
 import logging
 
 from pipelex.tools.log.gcp_log_sink import GcpLogSeverity, severity_for_level, trace_name
+from pipelex.tools.log.log_levels import LOGGING_LEVEL_VERBOSE
 
 
 class TestGcpLogSinkMapping:
-    def test_the_two_custom_levels_land_on_debug(self) -> None:
-        assert severity_for_level(levelno=5) is GcpLogSeverity.DEBUG
-        assert severity_for_level(levelno=15) is GcpLogSeverity.DEBUG
+    def test_every_level_below_info_lands_on_debug(self) -> None:
+        assert severity_for_level(levelno=LOGGING_LEVEL_VERBOSE) is GcpLogSeverity.DEBUG
+        assert severity_for_level(levelno=logging.DEBUG + 5) is GcpLogSeverity.DEBUG
 
     def test_a_level_above_critical_still_maps_to_critical(self) -> None:
         assert severity_for_level(levelno=logging.CRITICAL + 10) is GcpLogSeverity.CRITICAL

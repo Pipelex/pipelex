@@ -12,7 +12,7 @@ id = "pipelex-config"
 title = "The main Pipelex configuration"
 base_file = "pipelex.toml"
 tier_glob = "pipelex_*.toml"
-current_schema_version = 5
+current_schema_version = 6
 min_supported_schema_version = 0
 
 # This entry is inserted *below* the reshape rather than appended above it, and the order is what
@@ -447,3 +447,38 @@ key = "generic_poor_logger"
 kind = "delete_key"
 table_path = ["runtime", "log"]
 key = "is_console_logging_enabled"
+
+# Safe, because the remap legality rule holds: both paths are enum-typed at this version and `DEV` is no
+# longer a member, so a current-valid file cannot carry it and a replay over one skips. `INFO` rather than
+# `DEBUG` because it is the faithful threshold: a level of `DEV` (15) passed `INFO` and above plus the `DEV`
+# records, and nothing logs at 15 any more, so `INFO` passes exactly the same records. `DEBUG` would lower
+# the threshold, and under `package_log_levels` that would turn on a third-party library's debug output,
+# an SDK's request dumps with prompt content among them, which the file had chosen to suppress.
+[[migration]]
+id = "pipelex-config@6"
+to_schema_version = 6
+introduced_in = "0.80.0"
+breaking = true
+safety = "safe"
+title = "Retire the DEV log level: a file naming it logs at INFO"
+description = """
+The `DEV` log level, which sat between `DEBUG` and `INFO`, is gone, along with `log.dev()`. A file that \
+names it as `default_log_level` or as a level under `[runtime.log.package_log_levels]` has it rewritten to \
+`INFO`, which lets through exactly the records `DEV` did now that nothing logs at the `DEV` level.
+"""
+guidance = """
+Nothing to decide: the rewritten file logs what it logged before. Set `DEBUG` where you want the lines a \
+diagnosis needs, which `DEV` never showed.
+"""
+
+[[migration.ops]]
+kind = "remap_value"
+table_path = ["runtime", "log"]
+key = "default_log_level"
+mapping = { DEV = "INFO" }
+
+[[migration.ops]] # the package names are the user's own keys, so `*` reaches each of them
+kind = "remap_value"
+table_path = ["runtime", "log", "package_log_levels"]
+key = "*"
+mapping = { DEV = "INFO" }

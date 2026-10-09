@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, Any, Literal
 from pydantic import ValidationError
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.base_exceptions import iter_cause_chain
 from pipelex.cogt.exceptions import LLMCompletionError, ModelChoiceNotFoundError
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting, LLMSettingChoices
@@ -346,11 +345,6 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             rendered_llm_prompt = text_result.rendered_prompt
             structuring_path = text_result.structuring_path
         else:
-            if is_multiple_output:
-                log.verbose(f"PipeLLM generating {fixed_nb_output} output(s)" if fixed_nb_output else "PipeLLM generating a list of output(s)")
-            else:
-                log.verbose(f"PipeLLM generating a single object output, class name: '{output_stuff_spec.concept.structure_class_name}'")
-
             try:
                 object_result = await run_llm_object(
                     memory=working_memory,

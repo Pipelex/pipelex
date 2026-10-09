@@ -22,7 +22,8 @@ sites: KitConfig._validate_targets, DryRunConfig.validate_image_urls, \
 ImgGenConfig.validate_quality_mapping, LLMConfig.validate_effort_to_budget_mapping.\
 """
 # The config model tree is rooted in system/configuration/ but several documented
-# submodels are defined in their own packages — they trigger too.
+# submodels are defined in their own packages — they trigger too, and so does the log-level
+# enum, whose members are the values the logging docs list.
 triggers = [
   "pipelex/system/configuration/**/*.py",
   "pipelex/system/telemetry/telemetry_config.py",
@@ -33,6 +34,7 @@ triggers = [
   "pipelex/methods/methods_config.py",
   "pipelex/tools/aws/aws_config.py",
   "pipelex/tools/log/log_config.py",
+  "pipelex/tools/log/log_levels.py",
   "pipelex/tools/network/network_config.py",
   "pipelex/tools/secrets/secrets_config.py",
   "pipelex/tools/storage/storage_config.py",

@@ -86,7 +86,6 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 task = self._event_loop.create_task(self.genai_async_client.aclose())
                 # Add a callback to log any errors that occur during cleanup
                 task.add_done_callback(lambda t: log.debug(f"Google async client cleanup error: {t.exception()}") if t.exception() else None)
-                log.verbose("Scheduled Google async client cleanup on captured event loop")
                 return
 
             # Otherwise, try to get the current running loop
@@ -96,15 +95,13 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 task = current_loop.create_task(self.genai_async_client.aclose())
                 # Add a callback to log any errors that occur during cleanup
                 task.add_done_callback(lambda t: log.debug(f"Google async client cleanup error: {t.exception()}") if t.exception() else None)
-                log.verbose("Scheduled Google async client cleanup on current event loop")
             except RuntimeError:
                 # No running event loop, we can safely use asyncio.run()
                 try:
                     asyncio.run(self.genai_async_client.aclose())
-                    log.verbose("Closed Google async client using asyncio.run()")
                 except Exception as exc:  # ruff: ignore[blind-except]
                     # Best-effort: asyncio.run() runs aclose(), whose failure surface is not enumerable; teardown must never fail.
-                    log.verbose(f"Error closing Google async client during teardown: {exc}")
+                    log.debug(f"Error closing Google async client during teardown: {exc}")
         except Exception as exc:  # ruff: ignore[blind-except]
             # Best-effort cleanup boundary: teardown must never fail, whatever client/event-loop close throws.
             log.debug(f"Error during Google async client teardown: {exc}")
@@ -158,7 +155,6 @@ class GoogleLLMWorker(LLMWorkerAbstract):
             case ThinkingMode.MANUAL:
                 google_level = get_config().inference.llm.google.get_reasoning_level(effort=effort)
                 if google_level is None:
-                    log.verbose("Google manual thinking disabled (effort mapped to disabled)")
                     return cls._thinking_off_config(inference_model=inference_model)
                 budget = get_config().inference.llm.get_reasoning_budget(
                     family=cls.reasoning_budget_family,
@@ -171,14 +167,11 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                     max_budget=inference_model.max_thinking_budget,
                     model_desc=inference_model.desc,
                 )
-                log.verbose(f"Google manual thinking with thinking_budget={budget} (from effort={effort})")
                 return genai_types.ThinkingConfig(thinking_budget=budget)
             case ThinkingMode.ADAPTIVE:
                 thinking_level = get_config().inference.llm.google.get_reasoning_level(effort=effort)
                 if thinking_level is None:
-                    log.verbose("Google adaptive thinking disabled (effort=NONE)")
                     return cls._thinking_off_config(inference_model=inference_model)
-                log.verbose(f"Google adaptive thinking with thinking_level={thinking_level}")
                 return genai_types.ThinkingConfig(thinking_level=thinking_level)
             case ThinkingMode.NONE:
                 msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
@@ -194,6 +187,13 @@ class GoogleLLMWorker(LLMWorkerAbstract):
             )
             raise LLMCapabilityError(msg)
         return genai_types.ThinkingConfig(thinking_budget=0)
+
+    @classmethod
+    def _thinking_settings_sent(cls, *, thinking_config: genai_types.ThinkingConfig | None) -> dict[str, Any]:
+        """The thinking settings as the request sends them: the wire values, `HIGH` rather than the SDK's `ThinkingLevel` member."""
+        if thinking_config is None:
+            return {}
+        return thinking_config.model_dump(mode="json", exclude_none=True)
 
     @classmethod
     def _build_thinking_config_for_budget(
@@ -213,7 +213,6 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                     max_budget=inference_model.max_thinking_budget,
                     model_desc=inference_model.desc,
                 )
-                log.verbose(f"Google thinking with explicit thinking_budget={budget}")
                 return genai_types.ThinkingConfig(thinking_budget=budget)
             case ThinkingMode.NONE:
                 msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
@@ -232,6 +231,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
         contents = await GoogleFactory.prepare_user_contents(llm_prompt=llm_job.llm_prompt)
 
         thinking_config = self._build_thinking_config(inference_model=self.inference_model, job_params=job_params, max_tokens=job_params.max_tokens)
+        self._log_reasoning_sent(api_name="Google", settings=self._thinking_settings_sent(thinking_config=thinking_config))
 
         # Build generation config
         generation_config = genai_types.GenerateContentConfig(
@@ -299,6 +299,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
         """Generate structured output using Google Gemini API with instructor."""
         job_params = llm_job.applied_job_params or llm_job.job_params
         thinking_config = self._build_thinking_config(inference_model=self.inference_model, job_params=job_params, max_tokens=job_params.max_tokens)
+        self._log_reasoning_sent(api_name="Google", settings=self._thinking_settings_sent(thinking_config=thinking_config))
         # instructor's genai handlers read the system prompt only from `system`, and pop it only when it is not
         # None: a `system=None` reaches `generate_content`, which refuses the unknown keyword
         system_kwargs: dict[str, Any] = {"system": system_text} if (system_text := llm_job.llm_prompt.system_text) else {}
