@@ -12,7 +12,7 @@ info:
   license:
     name: Elastic License 2.0
     identifier: Elastic-2.0
-  version: 0.79.1
+  version: 0.80.0
 paths:
   /health:
     get:
@@ -5114,7 +5114,7 @@ components:
         content.
 
 
-        Keyed in `PipeIOContract.inputs` by the authored input name, dotted names included.
+        Keyed in `PipeIOContract.inputs` by the authored input name, a plain name.
 
         Every member is required: `item_count` is always on the wire, `null` off the fixed arm.
 

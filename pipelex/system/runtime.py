@@ -19,6 +19,27 @@ class IntegrationMode(StrEnum):
     PYTEST = "pytest"
     PYTHON = "python"
 
+    @property
+    def is_pipelex_command_line(self) -> bool:
+        """Whether this process serves the `pipelex` or `pipelex-agent` command line, whose user can act on CLI advice.
+
+        Such a user can run `pipelex login` and pass `--hosted`, so an error may offer the hosted Pipelex API as a way out;
+        a server, a test run or an embedding program cannot.
+        """
+        match self:
+            case IntegrationMode.CLI:
+                return True
+            case (
+                IntegrationMode.CI
+                | IntegrationMode.DOCKER
+                | IntegrationMode.FASTAPI
+                | IntegrationMode.MCP
+                | IntegrationMode.N8N
+                | IntegrationMode.PYTEST
+                | IntegrationMode.PYTHON
+            ):
+                return False
+
 
 class RunMode(StrEnum):
     NORMAL = "normal"

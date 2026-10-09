@@ -48,8 +48,8 @@ output = "Text"
 template = "View: {{{{ page_view.caption }}}}"
 """
 
-# A root that is not a plain name: no input can bear it, so only an earlier pipe step's `result`, which the standard leaves
-# unrestricted, can store a value under it.
+# A root that is not a plain name: no input can bear it, and no step can store a value under it either, since a pipe step's
+# `result` is a stored name, held to the plain input-name form like an input name.
 _UPPERCASE_ROOT_BUNDLE = """domain = "billing"
 description = "Reading the total of an invoice stored under a name that is not a plain name"
 main_pipe = "read_total"
@@ -117,17 +117,21 @@ class TestBindingRefusalRemedy:
         assert result.pipe_output.main_stuff.as_text.text == "View: Garden chairs on a lawn"
 
     @pytest.mark.asyncio(loop_scope="class")
-    async def test_a_root_that_is_not_a_plain_name_reads_an_earlier_steps_result(self) -> None:
-        """The path grammar lets the root be any segment, so it can read a pipe step's `result` that is not a plain name."""
-        result = await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.LIVE).execute(
-            mthds_contents=[_UPPERCASE_ROOT_BUNDLE], inputs={"amount": {"concept": "native.Number", "content": {"number": 120}}}
-        )
+    async def test_a_pipe_step_storing_under_a_name_that_is_not_plain_is_refused(self) -> None:
+        """A pipe step's `result` is a stored name, so it cannot store the value a root that is not a plain name would read."""
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_contents=[_UPPERCASE_ROOT_BUNDLE])
 
-        assert result.pipe_output.main_stuff_as_number.number == 120
+        validation_errors = exc_info.value.to_error_report().validation_errors or []
+        assert [error.error_type for error in validation_errors] == [PipeValidationErrorType.INVALID_INPUT_NAME]
+        assert validation_errors[0].variable_names == ["Invoice"]
+        message = validation_errors[0].message or ""
+        assert "The `result` of the step running pipe 'make_invoice', 'Invoice', is not a plain input name" in message
+        assert "Rename it to a plain name, such as 'invoice'," in message
 
     @pytest.mark.asyncio(loop_scope="class")
     async def test_a_missing_root_that_is_not_a_plain_name_is_never_asked_for_as_an_input(self) -> None:
-        """Regression: the refusal of a root nothing stores never tells the author to declare an input no input name can match."""
+        """Regression: the refusal of a root nothing stores never asks to declare it, or to store a value under it, when it is not plain."""
         mthds_content = _UPPERCASE_ROOT_BUNDLE.replace('  { pipe = "make_invoice", result = "Invoice" },\n', "")
 
         with pytest.raises(ValidateBundleError) as exc_info:
@@ -137,5 +141,6 @@ class TestBindingRefusalRemedy:
         assert [error.error_type for error in validation_errors] == [PipeValidationErrorType.MISSING_INPUT_VARIABLE]
         message = validation_errors[0].message or ""
         assert "Declare 'Invoice'" not in message
-        assert "'Invoice' cannot be an input of the sequence" in message
-        assert "store a value under 'Invoice' in an earlier step" in message
+        assert "store a value under 'Invoice'" not in message
+        assert "it can be neither an input of the sequence nor a name a step stores a value under" in message
+        assert "bind from a plain name, such as 'invoice'," in message

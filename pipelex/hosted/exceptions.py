@@ -33,7 +33,12 @@ class HostedBaseUrlError(HostedRunError):
 
 
 class HostedRunSourceError(HostedRunError):
-    """A hosted run cannot be given the method to run: no bundle file, no `.mthds` file in the library directories, or no source at all."""
+    """A hosted run cannot be given its method: no bundle file, an unreadable method file, no `.mthds` file, or `-L` with an address or a catalog id.
+
+    The hosted API resolves a published address or a catalog id itself and loads no local library, so `-L` is refused
+    with either. Every other case is about the files a hosted run sends: none named, none found in the library
+    directories, or one that cannot be read.
+    """
 
     error_domain = ErrorDomain.INPUT
     _authors_caller_facing_message: ClassVar[bool] = True
@@ -83,7 +88,8 @@ class HostedRunOutcomeUnknownError(HostedRunError):
 
     The hosted API may have created the run before the connection failed, with no way to tell from here: its id never
     arrived. Running the command again could start a second paid run, so the next step is the run history first. The
-    cause is the transport failure, a read, a write or a protocol failure met after the request left this machine.
+    cause is pipelex-sdk's `ApiUnreachableError`, whose own cause is the transport failure: a read, a write, a protocol
+    failure or a body that could not be decoded, met after the request left this machine.
     """
 
     error_domain = ErrorDomain.RUNTIME

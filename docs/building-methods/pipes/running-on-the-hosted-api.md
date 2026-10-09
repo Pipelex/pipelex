@@ -10,7 +10,7 @@ Use the client directly: it has no Pipelex wrapper, and it needs no `Pipelex.mak
 
 ## The Key and the Origin
 
-The client reads its key from `PIPELEX_API_KEY` and its origin from `PIPELEX_BASE_URL`, falling back to `https://api.pipelex.com`. Both can also be passed to the constructor, as `api_key=` and `base_url=`. The client reads the process environment only. To use a key saved in `~/.pipelex/.env`, as `pipelex run --hosted` does, import `pipelex.system.environment` before creating the client: importing it loads `~/.pipelex/.env` (or the one in `PIPELEX_HOME`), then a `.env` in the working directory.
+The client reads its key from `PIPELEX_API_KEY` and its origin from `PIPELEX_BASE_URL`, falling back to `https://api.pipelex.com`. Both can also be passed to the constructor, as `api_key=` and `base_url=`. The client reads the process environment only. To use a key saved in `~/.pipelex/.env`, as `pipelex run --hosted` does, import `pipelex.system.environment` before creating the client: importing it loads `~/.pipelex/.env` (or the one in `PIPELEX_HOME`), then a `.env` in the working directory. Each of those files replaces the variables it sets, so a `PIPELEX_API_KEY` or `PIPELEX_BASE_URL` set in one of them wins over the same variable already in the process environment, whether exported in your shell or set by your program before the import. To use a key of your own whatever the files say, pass it to the constructor as `api_key=`.
 
 ## Running a Method
 
@@ -75,13 +75,36 @@ Two cases where `pipelex run --hosted` goes further than `prepare_inputs`:
 
 ## Errors
 
-A failure is one of the SDK's typed errors, from `pipelex_sdk.errors`, all subclasses of the protocol's `PipelineRequestError`, with one exception: `start` and `execute`, which the client inherits from the MTHDS protocol client, let httpx's transport errors through. A `ConnectError` or a `ConnectTimeout` means the request never left your machine. A `ReadError`, a `RemoteProtocolError` or a `ReadTimeout` can come after the hosted API received it, so a run may exist with no id returned: check the run history on app.pipelex.com before starting it again.
+A failure is one of the SDK's typed errors, from `pipelex_sdk.errors`, all subclasses of the protocol's `PipelineRequestError`:
 
 - `ApiResponseError` is a refusal the hosted API answered: `status`, the reason in `server_message`, the next step in `user_action.detail` when the server advised one, and `validation_errors` locating the faults of a bundle it refused to load.
 - `RunFailedError` is a run that started and failed; `error` holds its stored report, with the runner's `error_type`, `message`, `error_domain` and `user_action`.
 - `RunTimeoutError` is a run that outlived the wait; it keeps running, and `run_id` reads its result later with `wait_for_result`.
-- `ApiUnreachableError` is a hosted API that could not be reached at all, on the routes the SDK owns: the signature read, the uploads, and the polling of a started run.
+- `ApiUnreachableError` is a request that got no answer, on every route, `start` and `execute` included. Its `__cause__` is httpx's exception, and its `code` names the failure: `ABORT_TIMEOUT` for a read or a write that timed out, otherwise httpx's class name, such as `ConnectError`, `ConnectTimeout`, `ReadError` or `RemoteProtocolError`.
 - `InputPreparationError` and its subclasses are a local file that could not be read or uploaded.
+
+### A Start That Got No Answer
+
+An `ApiUnreachableError` raised by `start` does not say by itself whether the run was created, but its cause does. A `ConnectError`, `ConnectTimeout`, `PoolTimeout`, `UnsupportedProtocol` or `ProxyError` means the request never left your machine, so no run exists and starting again is safe. Any other cause, such as a `ReadError`, a `WriteError`, a `RemoteProtocolError` or a timeout coded `ABORT_TIMEOUT`, can come after the hosted API received the request, so a run may exist with no id returned: check the run history on app.pipelex.com before starting it again.
+
+```python
+import httpx
+from pipelex_sdk.errors import ApiUnreachableError
+
+NEVER_SENT = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout, httpx.UnsupportedProtocol, httpx.ProxyError)
+
+try:
+    started = await client.start(method_ref="github.com/Pipelex/methods/text_stats@v0.1.7", inputs={"text": "Hello world."})
+except ApiUnreachableError as exc:
+    if isinstance(exc.__cause__, NEVER_SENT):
+        ...  # No run was created: check the network and the origin, then start again.
+    else:
+        ...  # A run may exist: look it up in the run history before starting again.
+```
+
+`start_and_wait` sends more than the start, so tell its requests apart with its two callbacks. `on_starting` is called right before each request that may create a run is sent, and `on_started` with the acknowledgement once the run exists. A failure before `on_starting` was called started nothing, a failure after `on_started` concerns a run whose id you hold, which `wait_for_result` follows, and only a failure in between needs its cause read as above.
+
+`pipelex run --hosted` and `pipelex-agent run --runner hosted` draw the same line, and report the second case as pipelex's own [`HostedRunOutcomeUnknownError`](../../errors/hosted-run-outcome-unknown-error.md). `PipelexAPIClient` never raises that error, so a program that calls the client directly reads the cause itself.
 
 ## Related Documentation
 

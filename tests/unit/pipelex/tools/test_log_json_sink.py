@@ -166,17 +166,48 @@ class TestJsonLogSink:
         assert cyclic_line["loop"] == {"me": CYCLE_TEXT}
 
     def test_a_raw_cycle_reaching_the_formatter_keeps_the_line_an_object(self) -> None:
-        """The sink's own guard, for a process with redaction off: a value ``json`` refuses is written as its ``repr``, the line stays one object."""
+        """The sink's own guard, for a process with redaction off: a value ``json`` refuses is written as its ``repr``, the line stays one object.
+
+        The ``repr`` costs the cycle alone: the values beside it keep their JSON types.
+        """
         cyclic: dict[str, Any] = {}
         cyclic["me"] = cyclic
         record = logging.LogRecord(name=__name__, level=logging.INFO, pathname="", lineno=0, msg="cyclic value", args=(), exc_info=None)
         record.loop = cyclic
+        record.count = 7
+        record.ok = True
+        record.tags = ["a", "b"]
 
         line = json.loads(JsonLogFormatter().format(record))
 
         assert line[MESSAGE_KEY] == "cyclic value"
         assert isinstance(line["loop"], str)
         assert "{...}" in line["loop"]
+        assert line["count"] == 7
+        assert line["ok"] is True
+        assert line["tags"] == ["a", "b"]
+
+    def test_a_value_json_refuses_costs_only_itself_its_type(self, json_log: tuple[Log, io.StringIO]) -> None:
+        """A mapping with a non-string key is written as its ``repr``, and the number, the boolean and the rest beside it keep their JSON types.
+
+        The line's recovery used to write every carried value as its ``repr``, so a query over ``count``
+        or ``ok`` silently missed the line: ``count`` arrived as ``"7"`` and ``ok`` as ``"True"``.
+        """
+        fresh, buffer = json_log
+        fresh.info(
+            "one refused value",
+            fields={"payload": {(1, 2): "tuple-key"}, "count": 7, "ok": True, "ratio": 0.5, "reading": float("nan"), "nested": {"flag": False}},
+        )
+
+        (line,) = _own_lines(buffer)
+        assert line[MESSAGE_KEY] == "one refused value"
+        assert line[SEVERITY_KEY] == "INFO"
+        assert line["payload"] == repr({(1, 2): "tuple-key"})
+        assert line["count"] == 7
+        assert line["ok"] is True
+        assert line["ratio"] == 0.5
+        assert line["reading"] == "NaN"
+        assert line["nested"] == {"flag": False}
 
     def test_a_non_finite_float_is_written_as_text_a_strict_parser_accepts(self, json_log: tuple[Log, io.StringIO]) -> None:
         """JSON has no NaN: the bare tokens Python writes by default would cost the whole line, so they are strings."""

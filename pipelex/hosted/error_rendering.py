@@ -35,10 +35,12 @@ from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunError, 
 
 #: The command that gets a Pipelex API key and saves it where a hosted run reads it.
 PIPELEX_LOGIN_COMMAND = "pipelex login"
-#: Where a hosted run takes its key from, and how a person gets one.
+#: Where a hosted run takes its key from, and how a person gets one. The runtime loads the home `.env`, then the working
+#: directory's, each over the environment, so a key exported in the shell cannot replace one either file sets.
 HOSTED_API_KEY_NEXT_STEP = (
-    f"Run {PIPELEX_LOGIN_COMMAND} to get a Pipelex API key (plx_sk_…) and save it to ~/.pipelex/.env as {PIPELEX_API_KEY_ENV_KEY}, "
-    f"or set {PIPELEX_API_KEY_ENV_KEY} to one in your shell"
+    f"Run {PIPELEX_LOGIN_COMMAND} to get a Pipelex API key (plx_sk_…) and save it to ~/.pipelex/.env as {PIPELEX_API_KEY_ENV_KEY}. "
+    f"A .env in the working directory that sets {PIPELEX_API_KEY_ENV_KEY} wins over that file, so correct or remove the line there; "
+    f"a key exported in your shell is used only when neither .env file sets {PIPELEX_API_KEY_ENV_KEY}"
 )
 #: Where a hosted run takes its origin from.
 HOSTED_BASE_URL_NEXT_STEP = (
@@ -76,6 +78,30 @@ HOSTED_SERVER_FAULT_NEXT_STEP = (
 )
 #: The next step of a request that never reached the hosted API.
 HOSTED_UNREACHABLE_NEXT_STEP = f"Check the network connection. {HOSTED_BASE_URL_NEXT_STEP}"
+
+
+class SentVerdict(NamedTuple):
+    """The `error_domain` and `retryable` a hosted API's problem document carried, each `None` when it sent none."""
+
+    error_domain: str | None
+    retryable: bool | None
+
+
+def sent_verdict(*, error: ApiResponseError) -> SentVerdict:
+    """The verdict the hosted API sent with a refusal, read off the problem document it answered.
+
+    pipelex-sdk gives every `ApiResponseError` a decided `error_domain` and `retryable`, filling a member the server
+    did not send from its own table by status, which reads every unlabelled 5xx, a 503 included, as retryable. A 503
+    does not say whether the run happened (see `_UNAVAILABLE_NEXT_STEP`), and who has to act is only the runner's to
+    say, so both CLIs report what the server sent and nothing the SDK inferred. `problem` keeps the server's members.
+    """
+    problem = error.problem or {}
+    sent_domain = problem.get("error_domain")
+    sent_retryable = problem.get("retryable")
+    return SentVerdict(
+        error_domain=sent_domain if isinstance(sent_domain, str) and sent_domain else None,
+        retryable=sent_retryable if isinstance(sent_retryable, bool) else None,
+    )
 
 
 class HostedErrorView(NamedTuple):
@@ -149,8 +175,7 @@ def describe_hosted_error(*, error: PipelineRequestError | HostedRunError) -> Ho
             error_type = error.error_type or error_type
             message = hosted_refusal_message(error=error)
             next_step = hosted_refusal_next_step(error=error)
-            error_domain = error.error_domain
-            retryable = error.retryable
+            error_domain, retryable = sent_verdict(error=error)
             validation_errors = tuple(error.validation_errors or ())
         case RunFailedError():
             report = error.error

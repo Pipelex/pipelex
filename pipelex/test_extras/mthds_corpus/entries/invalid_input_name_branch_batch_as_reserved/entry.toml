@@ -1,0 +1,12 @@
+name = "invalid_input_name_branch_batch_as_reserved"
+description = "The daily log of a weather station written in parallel, one branch handing each reading to its pipe under a name taking the reserved prefix"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.invalid_input_name",
+]
+
+expected_error = "invalid_input_name"

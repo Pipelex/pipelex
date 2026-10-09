@@ -146,23 +146,19 @@ async def _start_or_execute(*, client: PipelexAPIClient, request: HostedRunReque
     A start the server refuses for a missing run store created no run, so running the blocking route next cannot run
     the method twice.
 
-    The SDK maps a transport failure to `ApiUnreachableError` on the routes it owns, but `start` and `execute`, which
-    it inherits from mthds, let httpx's error through, and only some of them mean the hosted API was not reached. A
-    failure before the request left this machine is mapped as the SDK maps it. Any later one, a connection lost after
-    the request was sent, is a `HostedRunOutcomeUnknownError`: the hosted API may have created the run, and its id
-    never arrived.
+    The SDK raises `ApiUnreachableError` for every transport failure, chained from httpx's error, and only some of
+    them mean the hosted API was not reached. A failure before the request left this machine stays the SDK's error.
+    Any later one, a connection lost or a read timed out after the request was sent, is a
+    `HostedRunOutcomeUnknownError`: the hosted API may have created the run, and its id never arrived.
     """
     try:
         return await _start_or_execute_unmapped(client=client, request=request, inputs=inputs)
-    except _PRE_SEND_TRANSPORT_ERRORS as exc:
-        if isinstance(exc, httpx.TimeoutException):
-            msg = f"Could not reach Pipelex API at {client.base_url} (timeout)"
-            raise ApiUnreachableError(msg, api_url=client.base_url, code="ABORT_TIMEOUT") from exc
-        code = type(exc).__name__
-        msg = f"Could not reach Pipelex API at {client.base_url} ({code})"
-        raise ApiUnreachableError(msg, api_url=client.base_url, code=code) from exc
-    except httpx.TransportError as exc:
-        msg = f"The connection to the hosted API at {client.base_url} failed after the run request was sent ({type(exc).__name__}: {exc})"
+    except ApiUnreachableError as exc:
+        transport_error = exc.__cause__
+        if isinstance(transport_error, _PRE_SEND_TRANSPORT_ERRORS):
+            raise
+        failure = f"{type(transport_error).__name__}: {transport_error}" if transport_error is not None else str(exc)
+        msg = f"The connection to the hosted API at {client.base_url} failed after the run request was sent ({failure})"
         raise HostedRunOutcomeUnknownError(msg) from exc
 
 
@@ -178,8 +174,9 @@ async def _follow(*, client: PipelexAPIClient, run_id: str) -> RunResults:
     except (RunFailedError, RunTimeoutError, MissingMainStuffError):
         raise
     except (PipelineRequestError, httpx.HTTPError, ValueError) as exc:
-        # `ValueError` covers an answer that is not what the results route promises: a body that is not JSON
-        # (`json.JSONDecodeError`) or one that drifted from the SDK's model (pydantic's `ValidationError`).
+        # The SDK raises a `PipelineRequestError` for the network and for an answer it cannot read; httpx's errors and
+        # `ValueError` (a body that is not JSON, one that drifted from the SDK's model) are caught too, so that no
+        # failure met after the start was acknowledged loses the id of a run that may still be going.
         msg = f"The run {run_id} started on the hosted API, but following it to its result failed: {exc}"
         raise HostedRunPollingError(msg, pipeline_run_id=run_id) from exc
 

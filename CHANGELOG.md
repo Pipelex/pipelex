@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.80.0] - 2026-10-09
+
+### Changed
+
+- **MTHDS standard 4.0.0 (Breaking)**: pipelex now requires `mthds==0.20.0` and `pipelex-sdk==0.37.0`, the releases that report MTHDS standard `4.0.0`, the language this runtime has implemented since v0.75.0, so everyone downstream inherits those exact versions and a project that pins either package itself has to move with them. `pipelex --version` prints `mthds-standard 4.0.0`, every crate pipelex normalizes is stamped with `mthds_version` `4.0.0` while crate fingerprints stay the same, and a package whose `METHODS.toml` constrains `mthds_version` to `^3.0.0`, `~3.0.0` or exactly `3.0.0` now logs a warning when it loads, which `>=3.0.0` or `^4.0.0` does not.
+- **Stored names are plain input names (Breaking)**: every name under which a step stores a value in working memory, a `PipeSequence` step's or a `PipeParallel` branch's `result`, the `batch_as` of either, and a `PipeBatch`'s `input_item_name`, must now be a plain input name matching `[a-z][a-z0-9_]*`, as a binding step's `result` already had to, and a name in any other form, such as `Pages`, `doc.pages` or `_pages`, is refused as `invalid_input_name` wherever a bundle loads, and by the MTHDS JSON Schema, which now carries the input-name pattern on these fields. Rename such a name to a plain one, such as `pages`, along with every input, binding path and `batch_over` that reads it; a plain `batch_over` is still refused only when it starts with the reserved `_bound_`.
+- **Hosted-run guidance in messages and help**: the next step of a refused Pipelex API key names `pipelex login` and the working directory's `.env` rather than a shell export, which a `.env` file setting the key overrides, and `pipelex login` names `[run] execution = "hosted"` rather than `pipelex init` to make hosted runs the default. A CLI run missing a provider key, and the `pipelex doctor` report, offer the hosted Pipelex API as a way out; a failed `pipelex-agent` boot points at `pipelex-agent migrate` and `pipelex-agent init` rather than the interactive `pipelex init config`; and `FormerReleaseConfigError` carries its remedy, `pipelex migrate`, as its `user_action`. The `run` help of both CLIs names hosted runs, catalog ids, local method directories and TOML or inline inputs, and `pipelex-agent --help` describes the program rather than printing an internal note.
+
+### Fixed
+
+- **The `json` log sink keeps each field's type**: a field value JSON refuses outright, a mapping with a non-string key or a circular reference, is written as its `repr` alone, where it used to turn every other field on the line into its `repr` as well, so a number or a boolean beside it arrived as `"7"` or `"True"` and a query over that field missed the line. The other fields now keep their JSON types, as they already did under the `gcp` sink.
+
 ## [v0.79.1] - 2026-10-09
 
 ### Fixed

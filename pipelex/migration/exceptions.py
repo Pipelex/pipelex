@@ -1,4 +1,5 @@
 from pipelex.base_exceptions import ErrorDomain, PipelexError, PipelexSetupError
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 
 
 class MigrationError(PipelexError):
@@ -47,3 +48,13 @@ class FormerReleaseConfigError(PipelexSetupError):
     """
 
     _declared_title = "Configuration left by a former release"
+    # One next step for a person and an agent alike, since both read it: the human command first, then the loop an
+    # agent runs, which shows the user what the cleanup would remove before it writes anything.
+    user_action = UserAction(
+        kind=UserActionKind.UNKNOWN,
+        detail=(
+            "Run 'pipelex migrate' to remove what the former release left; it keeps a copy of each file it changes or removes. "
+            "From an agent, run 'pipelex-agent migrate --dry-run --format json' to see what the cleanup would remove "
+            "(its 'former_release' key), show the user, then run 'pipelex-agent migrate --yes'."
+        ),
+    )

@@ -239,28 +239,31 @@ branches = [
         assert refusal.error_type == PipeValidationErrorType.BINDING_STEP_INVALID
 
     @pytest.mark.parametrize(
-        ("step_toml", "field_name", "reserved_name"),
+        ("field_name", "refused_name", "message_fragment"),
         [
-            pytest.param('{ pipe = "write_receipt", result = "_bound_invoice_lines" }', "result", "_bound_invoice_lines", id="result"),
-            pytest.param(
-                '{ pipe = "write_receipt", batch_over = "lines", batch_as = "_bound_line", result = "receipts" }',
-                "batch_as",
-                "_bound_line",
-                id="batch-as",
-            ),
-            pytest.param(
-                '{ pipe = "write_receipt", batch_over = "_bound_invoice_lines", batch_as = "total_amount", result = "receipts" }',
-                "batch_over",
-                "_bound_invoice_lines",
-                id="plain-batch-over",
-            ),
+            pytest.param("result", "Receipts", "is not a plain input name", id="result-pascal-case"),
+            pytest.param("result", "invoice.receipts", "is not a plain input name", id="result-dotted"),
+            pytest.param("result", "_bound_invoice_lines", "is not a plain input name", id="result-reserved-prefix"),
+            pytest.param("batch_as", "TotalAmount", "is not a plain input name", id="batch-as-pascal-case"),
+            pytest.param("batch_as", "line.total", "is not a plain input name", id="batch-as-dotted"),
+            pytest.param("batch_as", "_bound_line", "is not a plain input name", id="batch-as-reserved-prefix"),
+            pytest.param("batch_over", "_bound_invoice_lines", "takes the `_bound_` prefix", id="plain-batch-over-reserved-prefix"),
         ],
     )
     @pytest.mark.parametrize("controller", ["sequence", "parallel"])
-    def test_a_name_taking_the_reserved_prefix_is_refused_on_a_step_and_a_branch(
-        self, controller: str, step_toml: str, field_name: str, reserved_name: str
+    def test_a_stored_name_that_is_not_plain_or_a_reserved_batch_over_is_refused_on_a_step_and_a_branch(
+        self, controller: str, field_name: str, refused_name: str, message_fragment: str
     ) -> None:
-        """A nested sequence binds a dotted `batch_over` in its caller's working memory, under a `_bound_` name no author may write."""
+        """A step's `result` and `batch_as` are stored names, plain input names on a sequence step and a parallel branch alike.
+
+        A plain `batch_over` reads a name rather than storing one, and only stays off the `_bound_` prefix, under which a nested
+        sequence binds a dotted `batch_over` in its caller's working memory.
+        """
+        step_fields = {"result": "receipts", "batch_over": "lines", "batch_as": "total_amount", field_name: refused_name}
+        step_toml = (
+            f'{{ pipe = "write_receipt", batch_over = "{step_fields["batch_over"]}", batch_as = "{step_fields["batch_as"]}", '
+            f'result = "{step_fields["result"]}" }}'
+        )
         pipe_code: str
         mthds_content: str
         if controller == "sequence":
@@ -286,9 +289,22 @@ branches = [
         errors = exc_info.value.validation_errors
         assert [error.error_type for error in errors] == [PipeValidationErrorType.INVALID_INPUT_NAME]
         assert errors[0].pipe_code == pipe_code
-        assert errors[0].variable_names == [reserved_name]
-        assert f"The `{field_name}` of the step running pipe 'write_receipt', '{reserved_name}', takes the `_bound_` prefix" in errors[0].message
-        assert "which is reserved for the bound list of a dotted `batch_over`" in errors[0].message
+        assert errors[0].variable_names == [refused_name]
+        assert f"The `{field_name}` of the step running pipe 'write_receipt', '{refused_name}', {message_fragment}" in errors[0].message
+
+    @pytest.mark.parametrize("controller", ["sequence", "parallel"])
+    def test_plain_stored_names_parse_on_a_step_and_a_branch(self, controller: str) -> None:
+        step = SubPipeBlueprint(pipe="write_receipt", batch_over="lines", batch_as="total_amount", result="receipts")
+        if controller == "sequence":
+            sequence = _parse_sequence(
+                steps_toml='    { pipe = "write_receipt", batch_over = "lines", batch_as = "total_amount", result = "receipts" },'
+            )
+            assert sequence.steps == [step]
+        else:
+            parallel = PipeParallelBlueprint.model_validate(
+                {"description": "Writes receipts in parallel", "output": "Composite", "branches": [step.model_dump(exclude_none=True)]}
+            )
+            assert parallel.branches == [step]
 
     def test_a_plain_batch_over_in_a_parallel_branch_parses(self) -> None:
         blueprint = PipeParallelBlueprint.model_validate(
