@@ -6,6 +6,10 @@
 
 - **Hosted-run guidance in messages and help**: the next step of a refused Pipelex API key names `pipelex login` and the working directory's `.env` rather than a shell export, which a `.env` file setting the key overrides, and `pipelex login` names `[run] execution = "hosted"` rather than `pipelex init` to make hosted runs the default. A CLI run missing a provider key, and the `pipelex doctor` report, offer the hosted Pipelex API as a way out; a failed `pipelex-agent` boot points at `pipelex-agent migrate` and `pipelex-agent init` rather than the interactive `pipelex init config`; and `FormerReleaseConfigError` carries its remedy, `pipelex migrate`, as its `user_action`. The `run` help of both CLIs names hosted runs, catalog ids, local method directories and TOML or inline inputs, and `pipelex-agent --help` describes the program rather than printing an internal note.
 
+### Fixed
+
+- **The `json` log sink keeps each field's type**: a field value JSON refuses outright, a mapping with a non-string key or a circular reference, is written as its `repr` alone, where it used to turn every other field on the line into its `repr` as well, so a number or a boolean beside it arrived as `"7"` or `"True"` and a query over that field missed the line. The other fields now keep their JSON types, as they already did under the `gcp` sink.
+
 ## [v0.79.1] - 2026-10-09
 
 ### Fixed
