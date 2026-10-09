@@ -21,6 +21,7 @@ from pipelex.tools.misc.string_utils import (
     FIELD_PATH_SEGMENT_REGEX,
     SNAKE_CASE_IDENTIFIER_REGEX,
     SNAKE_CASE_PATTERN,
+    camel_to_snake_case,
     get_root_from_dotted_path,
     is_snake_case,
 )
@@ -33,9 +34,13 @@ from pipelex.validation_error_types import PipeValidationErrorType
 # snake_case grammar of `string_utils`, the one source every name grammar here is composed from.
 INPUT_NAME_PATTERN = SNAKE_CASE_PATTERN
 
-# The grammar of a binding step's `result`: a plain input name, since it exists to be read by a later
-# step's input or as a later binding's root, both of which are plain names.
-BINDING_RESULT_PATTERN = INPUT_NAME_PATTERN
+# The grammar of a stored name, a name under which a step stores a value in working memory: a pipe step's or
+# a PipeParallel branch's `result`, the `batch_as` of either, a PipeBatch's `input_item_name`, and a binding
+# step's `result`. A later pipe reads a stored value through an input, or a later binding through its root,
+# both plain names, so a stored name is a plain input name and every value a step stores can be read. The
+# MTHDS JSON Schema generator writes this pattern on each of these fields, so a structural check refuses
+# exactly what `check_stored_name` and the binding step's own validator refuse.
+STORED_NAME_PATTERN = INPUT_NAME_PATTERN
 
 # The grammar of a binding step's `from`: a root name followed by zero or more field names, separated by
 # single dots, each segment a letter followed by letters, digits and underscores. Subscripts, expressions,
@@ -52,10 +57,11 @@ SEQUENCE_STEP_BATCH_OVER_PATTERN = rf"^(?:[^.]*|{FIELD_PATH_SEGMENT_REGEX}(?:\.{
 PARALLEL_BRANCH_BATCH_OVER_PATTERN = r"^[^.]*$"
 
 # The names the runtime reserves: those taking the prefix a PipeSequence binds a dotted `batch_over`'s list under. A nested
-# sequence binds in its caller's working memory, so a caller's name taking the prefix could be overwritten by that list.
-# `check_name_is_not_reserved` refuses it on every name an author writes into working memory or batches over by name, the
-# ones no other grammar already keeps underscore-free, and the MTHDS JSON Schema generator writes this pattern under `not`
-# on the same fields, so a structural check refuses exactly what the runtime refuses.
+# sequence binds in its caller's working memory, so a caller's name taking the prefix could be overwritten by that list. No
+# stored name or input name can take it, being plain and so never underscore-led, and `check_name_is_not_reserved` refuses
+# it on the one name an author writes that no such grammar holds, a plain `batch_over`, which reads a name rather than
+# storing one. The MTHDS JSON Schema generator writes this pattern under `not` on that field, so a structural check refuses
+# exactly what the runtime refuses.
 RESERVED_NAME_PATTERN = f"^{re.escape(PRIVATE_BINDING_NAME_PREFIX)}"
 
 # The marker of an input declaration as `_input_marker` writes it after the concept: an optional multiplicity
@@ -472,17 +478,70 @@ def check_input_list_name(*, input_list_name: str, branch_pipe_code: str, input_
     raise PipeValidationError(message=msg, error_type=PipeValidationErrorType.INVALID_INPUT_NAME, variable_names=[input_list_name])
 
 
-def check_name_is_not_reserved(*, name: str, field_label: str) -> None:
-    """Refuse a name an author writes that takes the prefix the runtime reserves for the bound list of a dotted `batch_over`.
+def suggest_plain_name(*, name: str) -> str | None:
+    """A plain input name close to a name that is not one, for a refusal to offer, or `None` when none comes out of it.
 
-    A PipeSequence binds a dotted `batch_over`'s list under a private name taking the prefix, `_bound_catalog_pages` for
-    `catalog.pages`, and a nested sequence binds in the working memory of the sequence calling it. A caller's name taking
-    the prefix could then be overwritten by the list a sequence it calls binds, so the prefix is the runtime's alone: a
-    name an author stores a value under, hands an item to a pipe under, or batches over by name never takes it.
+    The reserved prefix is dropped, dots and hyphens become underscores and PascalCase or camelCase becomes snake_case, so
+    `Pages` gives `pages`, `catalog.pages` gives `catalog_pages` and `_bound_catalog_pages` gives `catalog_pages`.
+    """
+    unprefixed_name = name.removeprefix(PRIVATE_BINDING_NAME_PREFIX).replace(".", "_").replace("-", "_")
+    candidate = re.sub(r"_+", "_", camel_to_snake_case(name=unprefixed_name)).strip("_")
+    if candidate == name or not is_valid_input_name(candidate):
+        return None
+    return candidate
+
+
+def check_stored_name(*, name: str, field_label: str) -> None:
+    """Refuse a stored name that is not a plain input name.
+
+    A stored name is a name under which a step stores a value in working memory: a pipe step's or a PipeParallel branch's
+    `result`, the `batch_as` of either, and a PipeBatch's `input_item_name`. A later pipe reads a stored value through an
+    input, and an input name is a plain snake_case identifier, so a value stored under any other name could never be read.
+    No plain name takes the prefix the runtime reserves for the bound list of a dotted `batch_over`, being never
+    underscore-led, so this refuses such a name too, and the message says why the prefix is not the author's. A binding
+    step's `result` is a stored name held to the same grammar, which its own blueprint refuses as `binding_step_invalid`.
 
     Args:
         name: The name as written.
         field_label: The field holding it, for the message, such as "The `result` of the step running pipe 'describe_page'".
+
+    Raises:
+        PipeValidationError: ``INVALID_INPUT_NAME`` naming the name.
+    """
+    if is_valid_input_name(name):
+        return
+    stored_name_rule = "a value is stored under it in working memory for a pipe to read through an input, so it must be a plain input name"
+    reason: str
+    if name.startswith(PRIVATE_BINDING_NAME_PREFIX):
+        reason = (
+            f"{stored_name_rule}, and the `{PRIVATE_BINDING_NAME_PREFIX}` prefix it starts with is reserved for the bound list of a "
+            "dotted `batch_over`, which only the runtime writes or reads."
+        )
+    elif "." in name:
+        reason = f"{stored_name_rule}, which names one whole value and cannot reach into a field with a dot."
+    else:
+        reason = f"{stored_name_rule}, and {_PLAIN_NAME_RULE}."
+    plain_name = suggest_plain_name(name=name)
+    suggestion = f", such as '{plain_name}'" if plain_name is not None else ""
+    msg = (
+        f"{field_label}, '{name}', is not a plain input name: {reason} Rename it to a plain name{suggestion}, and rename every input, "
+        "binding path and `batch_over` reading it to match."
+    )
+    raise PipeValidationError(message=msg, error_type=PipeValidationErrorType.INVALID_INPUT_NAME, variable_names=[name])
+
+
+def check_name_is_not_reserved(*, name: str, field_label: str) -> None:
+    """Refuse a plain `batch_over` taking the prefix the runtime reserves for the bound list of a dotted `batch_over`.
+
+    A PipeSequence binds a dotted `batch_over`'s list under a private name taking the prefix, `_bound_catalog_pages` for
+    `catalog.pages`, and a nested sequence binds in the working memory of the sequence calling it. A step batching over such
+    a name by hand would read a list a sequence it calls binds, so the prefix is the runtime's alone. A stored name never
+    takes it, being a plain input name (`check_stored_name`), but a plain `batch_over` reads a name rather than storing
+    one, so no other grammar keeps it off the prefix.
+
+    Args:
+        name: The name as written.
+        field_label: The field holding it, for the message, such as "The `batch_over` of the step running pipe 'describe_page'".
 
     Raises:
         PipeValidationError: ``INVALID_INPUT_NAME`` naming the name.

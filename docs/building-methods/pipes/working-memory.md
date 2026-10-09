@@ -35,6 +35,8 @@ How does data get from `generate_tagline` to `extract_keywords_from_tagline`? Th
 
 This mechanism allows you to chain pipes together, creating a flow of information through your pipeline.
 
+Because a later pipe reads a stored value through an input, every name a value is stored under is a plain input name, like `tagline`: a `result`, a `batch_as` or a `PipeBatch`'s `input_item_name` written in any other form, such as `Tagline` or `marketing.tagline`, is refused with `invalid_input_name` (see [Stored names](pipe-controllers/PipeSequence.md#stored-names)).
+
 ## Working Memory Lifecycle
 
 *   **Creation**: The Working Memory is created at the start of a pipeline run.

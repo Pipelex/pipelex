@@ -1,0 +1,36 @@
+domain      = "rail_timetables"
+description = "Announcing the next departures from a station"
+main_pipe   = "announce_departures"
+
+[concept.Departure]
+description = "One train leaving the station"
+
+[concept.Departure.structure]
+destination = { type = "text", description = "Where the train goes", required = true }
+platform    = { type = "text", description = "The platform it leaves from", required = true }
+
+[pipe.list_departures]
+type        = "PipeLLM"
+description = "Lists the departures shown on a timetable board"
+inputs      = { board = "Text" }
+output      = "Departure[]"
+prompt      = "List the departures shown on this timetable board: $board"
+
+[pipe.write_announcement]
+type        = "PipeCompose"
+description = "Writes the announcement of one departure"
+inputs      = { departure = "Departure" }
+output      = "Text"
+template    = "The train to {{ departure.destination }} leaves from platform {{ departure.platform }}."
+
+[pipe.announce_departures]
+type        = "PipeSequence"
+description = "Lists the departures, then writes the announcement of each"
+inputs      = { board = "Text" }
+output      = "Text[]"
+# Wrong on purpose: a step stores its result for a later pipe to read through an input, so the name is a plain
+# snake_case one. Nothing reads it here, so renaming it to `announcements` is the whole fix.
+steps = [
+  { pipe = "list_departures", result = "departures" },
+  { pipe = "write_announcement", batch_over = "departures", batch_as = "departure", result = "Announcements" },
+]

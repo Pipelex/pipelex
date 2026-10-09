@@ -55,11 +55,13 @@ class PipeValidationErrorType(StrEnum):
     LLM_SETTING_REFUSED_BY_MODEL = "llm_setting_refused_by_model"
     INVALID_PIPE_CODE_SYNTAX = "invalid_pipe_code_syntax"
     # An input name that is not a plain snake_case identifier, a dotted name (`invoice.total`) included,
-    # on any pipe's `inputs` or as a PipeBatch's `input_list_name`; or a name taking the `_bound_` prefix
-    # the runtime reserves for the bound list of a dotted `batch_over`, as a pipe step's or a parallel
-    # branch's `result`, `batch_as` or plain `batch_over`, or a PipeBatch's `input_item_name`. Detected at
-    # blueprint parse time; a dotted name whose root the same `inputs` table declares carries the
-    # enrichment the fix planner turns into deleting the key.
+    # on any pipe's `inputs` or as a PipeBatch's `input_list_name`; a stored name that is not one either,
+    # in any form (`Pages`, `doc.pages`, `_bound_pages`), as a pipe step's or a parallel branch's `result`
+    # or `batch_as`, or a PipeBatch's `input_item_name`; or a plain `batch_over` taking the `_bound_`
+    # prefix the runtime reserves for the bound list of a dotted `batch_over`, the one check a plain
+    # `batch_over` gets. A binding step's `result` is a stored name too, refused as BINDING_STEP_INVALID.
+    # Detected at blueprint parse time; a dotted input name whose root the same `inputs` table declares
+    # carries the enrichment the fix planner turns into deleting the key.
     INVALID_INPUT_NAME = "invalid_input_name"
     UNKNOWN_PIPE_TYPE = "unknown_pipe_type"
     # A `[pipe.x]` section declared no `type` yet carries fields beyond the signature contract

@@ -86,36 +86,69 @@ class TestPipeBatchValidation:
             )
 
     @pytest.mark.parametrize(
-        ("input_list_name", "input_item_name", "reserved_name", "message_fragment"),
+        "input_item_name",
         [
-            pytest.param(
-                "items",
-                "_bound_item",
-                "_bound_item",
-                "The PipeBatch's `input_item_name`, '_bound_item', takes the `_bound_` prefix, which is reserved for the bound list of a "
-                "dotted `batch_over`",
-                id="input-item-name",
-            ),
-            pytest.param("_bound_items", "item", "_bound_items", "is not a valid input name", id="input-list-name"),
+            pytest.param("Item", id="pascal-case"),
+            pytest.param("catalog.item", id="dotted"),
+            pytest.param("_bound_item", id="the-reserved-prefix"),
+            pytest.param("_item", id="underscore-led"),
+            pytest.param("2nd_item", id="digit-led"),
         ],
     )
-    def test_rejects_a_name_taking_the_reserved_prefix(
-        self, input_list_name: str, input_item_name: str, reserved_name: str, message_fragment: str
-    ) -> None:
-        """The batch writes its item into the branch's memory under its own name, so the runtime's `_bound_` prefix is refused there too."""
+    def test_rejects_an_input_item_name_that_is_not_a_plain_input_name(self, input_item_name: str) -> None:
+        """The batch stores each item under `input_item_name` for the branch pipe to read through an input, so it is a plain name."""
         with pytest.raises(ValidationError) as exc_info:
             PipeBatchBlueprint(
                 description="Process each item",
                 inputs={"items": "Item[]"},
                 output="Result[]",
                 branch_pipe_code="process_item",
-                input_list_name=input_list_name,
+                input_list_name="items",
                 input_item_name=input_item_name,
             )
         refusals = [raw_error.get("ctx", {}).get("error") for raw_error in exc_info.value.errors()]
-        reserved_name_refusals = [
-            refusal for refusal in refusals if isinstance(refusal, PipeValidationError) and refusal.variable_names == [reserved_name]
+        assert len(refusals) == 1
+        refusal = refusals[0]
+        assert isinstance(refusal, PipeValidationError)
+        assert refusal.error_type == PipeValidationErrorType.INVALID_INPUT_NAME
+        assert refusal.variable_names == [input_item_name]
+        assert f"The PipeBatch's `input_item_name`, '{input_item_name}', is not a plain input name" in str(refusal)
+
+    @pytest.mark.parametrize(
+        "input_item_name",
+        [
+            pytest.param("item", id="a-plain-name"),
+            pytest.param("bound_item", id="the-prefix-without-its-underscore"),
+            pytest.param("item2", id="a-digit-after-the-first-letter"),
+        ],
+    )
+    def test_accepts_a_plain_input_item_name(self, input_item_name: str) -> None:
+        blueprint = PipeBatchBlueprint(
+            description="Process each item",
+            inputs={"items": "Item[]"},
+            output="Result[]",
+            branch_pipe_code="process_item",
+            input_list_name="items",
+            input_item_name=input_item_name,
+        )
+
+        assert blueprint.input_item_name == input_item_name
+
+    def test_rejects_an_input_list_name_taking_the_reserved_prefix(self) -> None:
+        """The list's name is a plain input name, which no underscore-led name is."""
+        with pytest.raises(ValidationError) as exc_info:
+            PipeBatchBlueprint(
+                description="Process each item",
+                inputs={"items": "Item[]"},
+                output="Result[]",
+                branch_pipe_code="process_item",
+                input_list_name="_bound_items",
+                input_item_name="item",
+            )
+        refusals = [raw_error.get("ctx", {}).get("error") for raw_error in exc_info.value.errors()]
+        list_name_refusals = [
+            refusal for refusal in refusals if isinstance(refusal, PipeValidationError) and refusal.variable_names == ["_bound_items"]
         ]
-        assert len(reserved_name_refusals) == 1
-        assert reserved_name_refusals[0].error_type == PipeValidationErrorType.INVALID_INPUT_NAME
-        assert message_fragment in str(reserved_name_refusals[0])
+        assert len(list_name_refusals) == 1
+        assert list_name_refusals[0].error_type == PipeValidationErrorType.INVALID_INPUT_NAME
+        assert "is not a valid input name" in str(list_name_refusals[0])
