@@ -13,6 +13,16 @@ class BackendCredentialsReport(ConfigModel):
     all_credentials_valid: bool
 
 
+#: The way out a command-line user has besides provider keys: a run on the hosted Pipelex API needs none. Only a caller that
+#: knows it serves the `pipelex` or `pipelex-agent` CLI adds it, since a server operator cannot act on it. No square
+#: brackets: the message is printed through Rich markup and as plain text alike.
+HOSTED_RUNS_HINT = (
+    "\n☁ Or run on the hosted Pipelex API, which needs no provider key:\n"
+    "   Run 'pipelex login' to save a Pipelex API key, then add --hosted to a run, or make hosted runs\n"
+    '   the default with execution = "hosted" in the run section of your pipelex.toml.\n'
+)
+
+
 class BackendCredentialsErrorMsgFactory:
     @classmethod
     def make_one_variable_missing_error_msg(
@@ -21,6 +31,7 @@ class BackendCredentialsErrorMsgFactory:
         secrets_provider: SecretsProviderAbstract,
         backend_name: str | None,
         var_name: str,
+        suggest_hosted_runs: bool = False,
     ) -> str:
         """Build an error message for a single missing credential variable.
 
@@ -28,6 +39,7 @@ class BackendCredentialsErrorMsgFactory:
             secrets_provider: The secrets provider being used
             backend_name: Name of the backend with the missing credential
             var_name: Name of the missing variable
+            suggest_hosted_runs: Whether to add the hosted Pipelex API as a way out, for a command-line user
         """
         error_msg: str
         if isinstance(secrets_provider, EnvSecretsProvider):
@@ -60,6 +72,9 @@ class BackendCredentialsErrorMsgFactory:
             "   backends in '.pipelex/inference/backends.toml'.\n"
         )
 
+        if suggest_hosted_runs:
+            error_msg += HOSTED_RUNS_HINT
+
         return error_msg
 
     @classmethod
@@ -68,12 +83,14 @@ class BackendCredentialsErrorMsgFactory:
         backend_credential_reports: dict[str, BackendCredentialsReport],
         *,
         secrets_provider: SecretsProviderAbstract | None = None,
+        suggest_hosted_runs: bool = False,
     ) -> str:
         """Build a comprehensive error message for missing backend credentials.
 
         Args:
             secrets_provider: The secrets provider being used
             backend_credential_reports: Dict of backend_name -> credential report for backends with issues
+            suggest_hosted_runs: Whether to add the hosted Pipelex API as a way out, for a command-line user
         """
         # Build the details section for each backend with issues
         backend_details_lines: list[str] = []
@@ -138,5 +155,8 @@ class BackendCredentialsErrorMsgFactory:
             "   MISTRAL_API_KEY, AZURE_API_KEY, OPENROUTER_API_KEY, etc.) and enable the corresponding\n"
             "   backends in '.pipelex/inference/backends.toml'.\n"
         )
+
+        if suggest_hosted_runs:
+            error_msg += HOSTED_RUNS_HINT
 
         return error_msg

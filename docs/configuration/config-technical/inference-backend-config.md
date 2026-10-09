@@ -8,7 +8,7 @@ The Inference Backend Configuration System manages how Pipelex handles AI model 
 
 ## Configuration Approaches
 
-Pipelex calls AI models through backends you configure with your own provider API keys.
+Pipelex calls AI models through backends you configure with your own provider API keys. This is how runs on this machine reach their models: a run on the hosted Pipelex API uses none of this configuration and no provider key, only a Pipelex API key (see [Running on the Hosted API](../../tools/cli/run.md#running-on-the-hosted-api)).
 
 ### Bring Your Own Keys
 

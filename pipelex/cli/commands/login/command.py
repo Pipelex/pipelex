@@ -274,8 +274,11 @@ def login_cmd(*, paste: bool = False) -> None:
     console.print()
     if not outcome.is_saved:
         raise typer.Exit(code=1)
+    # `pipelex init` would also make hosted runs the default, but it resets every configuration file: the one setting is lighter.
+    home_pipelex_toml_path = get_global_env_path().parent / "pipelex.toml"
     console.print(
-        "[dim]Run a method on the hosted API with[/dim] [cyan]pipelex run … --hosted[/cyan][dim], or make it the default with[/dim] "
-        "[cyan]pipelex init[/cyan][dim].[/dim]"
+        "[dim]Run a method on the hosted API with[/dim] [cyan]pipelex run … --hosted[/cyan][dim], or make it the default by setting[/dim] "
+        f'[cyan]\\[run] execution = "hosted"[/cyan] [dim]in {escape(str(home_pipelex_toml_path))}, '
+        "or in a project's .pipelex/pipelex.toml.[/dim]"
     )
     console.print()

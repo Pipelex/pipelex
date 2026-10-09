@@ -46,7 +46,7 @@ def run_pipe_cmd(
     ],
     inputs: Annotated[
         str | None,
-        typer.Option("--inputs", "-i", help="Path to JSON file with inputs or inline JSON"),
+        typer.Option("--inputs", "-i", help="Inputs: a JSON or TOML file (by its extension), or inline JSON starting with {"),
     ] = None,
     dry_run: Annotated[
         bool,

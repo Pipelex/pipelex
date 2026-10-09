@@ -44,7 +44,12 @@ from pipelex.pipeline.exceptions import PipelineExecutionError
 def run_method_cmd(
     name: Annotated[
         str,
-        typer.Argument(help="Installed method name, method address (github.com/owner/repo\\[/name]\\[@tag]), or GitHub URL"),
+        typer.Argument(
+            help=(
+                "Installed method name, local method directory, method address (github.com/owner/repo\\[/name]\\[@tag]), "
+                "GitHub URL, or, on a hosted run, a catalog id (mt_…)"
+            ),
+        ),
     ],
     pipe: Annotated[
         str | None,
@@ -52,7 +57,7 @@ def run_method_cmd(
     ] = None,
     inputs: Annotated[
         str | None,
-        typer.Option("--inputs", "-i", help="Path to JSON file with inputs or inline JSON"),
+        typer.Option("--inputs", "-i", help="Inputs: a JSON or TOML file (by its extension), or inline JSON starting with {"),
     ] = None,
     dry_run: Annotated[
         bool,

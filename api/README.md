@@ -123,7 +123,7 @@ The full reference for this API server is part of the Pipelex documentation, und
 - [Resolve & Codegen](https://docs.pipelex.com/latest/api-server/codegen/) — `/resolve`, `/codegen`
 - [Configuration](https://docs.pipelex.com/latest/api-server/configuration/) — env vars, mounting your own `.pipelex/` config
 
-For broader Pipelex documentation (MTHDS language, concepts, pipe types, the Gateway): **[https://docs.pipelex.com/](https://docs.pipelex.com/)**
+For broader Pipelex documentation (MTHDS language, concepts, pipe types, running on the hosted Pipelex API): **[https://docs.pipelex.com/](https://docs.pipelex.com/)**
 
 # 💬 Support
 

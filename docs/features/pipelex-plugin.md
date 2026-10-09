@@ -73,4 +73,4 @@ The tools the skills call to validate a method, prepare its inputs, run it, gene
 
 - [Quick Start](../get-started/quick-start.md) — sign up, install the plugin and run your first method, then run it from your chatbot, as a webapp or via API
 - [MTHDS Language](mthds-language.md) — the language the plugin's skills write
-- [Run It Yourself](../get-started/run-it-yourself.md) — the Pipelex runtime on your own machine
+- [Run It Yourself](../get-started/run-it-yourself.md) — the Pipelex runtime in your terminal, running methods on the hosted Pipelex API or on your own machine

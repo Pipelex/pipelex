@@ -294,6 +294,7 @@ plugins:
         - tools/cli/login.md: "CLI Login"
         - tools/cli/update.md: "CLI Update"
         - tools/cli/migrate.md: "CLI Migrate"
+        - tools/cli/doctor.md: "CLI Doctor"
         - tools/cli/validate.md: "CLI Validate"
         - tools/cli/fix.md: "CLI Fix"
         - tools/cli/run.md: "CLI Run"
@@ -536,6 +537,7 @@ nav:
       - Login: tools/cli/login.md
       - Update: tools/cli/update.md
       - Migrate: tools/cli/migrate.md
+      - Doctor: tools/cli/doctor.md
       - Validate: tools/cli/validate.md
       - Fix: tools/cli/fix.md
       - Run: tools/cli/run.md

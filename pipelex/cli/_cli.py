@@ -283,7 +283,7 @@ app.add_typer(
 )
 app.command(name="resolve", help="Resolve a bundle closure into the normalized library crate (JSON or TOML) on stdout")(resolve_cmd)
 app.add_typer(codegen_app, name="codegen", help="Project the resolved crate into typed, runnable artifacts (types, inputs) and check for drift")
-app.add_typer(run_app, name="run", help="Run a method or pipe, optionally providing a specific bundle file (.mthds)")
+app.add_typer(run_app, name="run", help="Run a method, a pipe, or a bundle (.mthds), on this machine or on the hosted Pipelex API (--hosted)")
 app.add_typer(graph_app, name="graph", help="Generate and render execution graphs")
 app.add_typer(show_app, name="show", help="Show configuration, pipes, and list AI models")
 app.command(name="which", help="Locate where a pipe is defined, similar to 'which' for executables")(which_cmd)

@@ -13,6 +13,9 @@ run_app = typer.Typer(
     no_args_is_help=True,
 )
 
-run_app.command(name="method", help="Execute a pipeline for an installed method")(run_method_cmd)
+run_app.command(
+    name="method",
+    help="Execute a method by installed name, local directory, published address, or, on a hosted run, catalog id (mt_…)",
+)(run_method_cmd)
 run_app.command(name="pipe", help="Execute a pipeline by pipe code")(run_pipe_cmd)
 run_app.command(name="bundle", help="Execute a pipeline from a bundle file or directory")(run_bundle_cmd)

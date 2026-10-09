@@ -27,6 +27,7 @@ The Pipelex CLI is organized into several command groups:
 | [**login**](login.md) | Get a Pipelex API key through your browser, or paste one, and save it for runs on the hosted Pipelex API |
 | [**update**](update.md) | Refresh the model deck and `backends/internal.toml` to match the installed pipelex version |
 | [**migrate**](migrate.md) | Bring your configuration files up to the schema the installed version expects |
+| [**doctor**](doctor.md) | Check configuration health, judged by where your runs execute, and fix what can be fixed |
 | [**validate**](validate.md) | Validate configuration and pipelines |
 | [**fix**](fix.md) | Apply deterministic safe fixes to a bundle and re-validate |
 | [**show**](show.md) | Inspect configuration, pipes, and AI models |
@@ -90,6 +91,7 @@ Package manifest management currently lives in the `mthds` CLI:
 
 4. **Configuration Management**
 
+    - Use `pipelex doctor` to check that your configuration is healthy, and `pipelex doctor --fix` to fix what can be fixed
     - Use `pipelex show config` to verify current settings
     - Use `pipelex show backends` to check inference backend setup
     - Use `pipelex show models backend_name` to see available models

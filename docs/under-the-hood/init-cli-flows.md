@@ -26,7 +26,7 @@ These two categories are managed by separate steps. `init_config()` copies only 
 
 | Command | Focus | What It Does |
 |---------|-------|--------------|
-| `pipelex init` | `all` | Full setup: config, where runs execute, then inference + routing + credentials (this machine) or sign-in (hosted), then telemetry |
+| `pipelex init` | `all` | Full setup: config, where runs execute, then inference + routing + credentials (this machine), then telemetry, then sign-in (hosted) |
 | `pipelex init config` | `config` | Copy config templates, then ask where runs execute and set it up if first-time |
 | `pipelex init inference` | `inference` | Interactive backend selection + routing for runs on this machine; never asks where runs execute |
 | `pipelex init routing` | `routing` | Routing profile customization only |

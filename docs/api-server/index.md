@@ -90,6 +90,8 @@ Once deployed locally, the API is available at:
 http://localhost:8081/v1
 ```
 
+To run methods on it from the `pipelex` CLI, give its origin, without `/v1`, to `--base-url` or `PIPELEX_BASE_URL`: `http://localhost:8081`. A value with a path is refused before any request is sent. See [Running on the Hosted API](../tools/cli/run.md#running-on-the-hosted-api) for what such a server does and does not do for a CLI run.
+
 ## Authentication
 
 The API supports three authentication modes via the `AUTH_MODE` environment variable:

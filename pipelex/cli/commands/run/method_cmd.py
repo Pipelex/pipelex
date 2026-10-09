@@ -17,7 +17,12 @@ from pipelex.methods.exceptions import MethodRefError
 def run_method_cmd(
     name: Annotated[
         str,
-        typer.Argument(help="Installed method name, method address (github.com/owner/repo\\[/name]\\[@tag]), or GitHub URL to run"),
+        typer.Argument(
+            help=(
+                "Installed method name, local method directory, method address (github.com/owner/repo\\[/name]\\[@tag]), "
+                "GitHub URL, or, on a hosted run, a catalog id (mt_…)"
+            ),
+        ),
     ],
     pipe: Annotated[
         str | None,
@@ -25,7 +30,7 @@ def run_method_cmd(
     ] = None,
     inputs: Annotated[
         str | None,
-        typer.Option("--inputs", "-i", help="Path to JSON file with inputs"),
+        typer.Option("--inputs", "-i", help="Inputs: a JSON or TOML file (by its extension), or inline JSON starting with {"),
     ] = None,
     save_working_memory: Annotated[
         bool,

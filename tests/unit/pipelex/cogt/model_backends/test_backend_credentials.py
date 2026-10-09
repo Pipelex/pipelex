@@ -2,6 +2,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.model_backends.backend_credentials import (
+    HOSTED_RUNS_HINT,
     BackendCredentialsErrorMsgFactory,
     BackendCredentialsReport,
 )
@@ -180,3 +181,33 @@ class TestBackendCredentials:
             "   - Add 'enabled = false' under '\\[bedrock]'\n" + BYOK_HINT
         )
         assert error_msg == expected_msg
+
+    @pytest.mark.parametrize("suggest_hosted_runs", [True, False])
+    def test_one_variable_missing_offers_hosted_runs_only_when_asked(self, suggest_hosted_runs: bool):
+        """A command-line caller gets the hosted Pipelex API as the last way out, after the BYOK hint; the default leaves it out."""
+        error_msg = BackendCredentialsErrorMsgFactory.make_one_variable_missing_error_msg(
+            secrets_provider=EnvSecretsProvider(),
+            backend_name="openai",
+            var_name="OPENAI_API_KEY",
+            suggest_hosted_runs=suggest_hosted_runs,
+        )
+        assert error_msg.endswith(BYOK_HINT + HOSTED_RUNS_HINT) is suggest_hosted_runs
+        assert ("pipelex login" in error_msg) is suggest_hosted_runs
+
+    @pytest.mark.parametrize("suggest_hosted_runs", [True, False])
+    def test_comprehensive_offers_hosted_runs_only_when_asked(self, suggest_hosted_runs: bool):
+        """The doctor's report offers the hosted Pipelex API after the BYOK hint; the default leaves it out."""
+        reports = {"openai": make_report(backend_name="openai", missing_vars=["OPENAI_API_KEY"], placeholder_vars=[])}
+        error_msg = BackendCredentialsErrorMsgFactory.make_comprehensive_error_msg(
+            backend_credential_reports=reports,
+            secrets_provider=EnvSecretsProvider(),
+            suggest_hosted_runs=suggest_hosted_runs,
+        )
+        assert error_msg.endswith(BYOK_HINT + HOSTED_RUNS_HINT) is suggest_hosted_runs
+        assert ("--hosted" in error_msg) is suggest_hosted_runs
+
+    def test_hosted_runs_hint_holds_no_square_bracket(self):
+        """The hint is printed through Rich markup and as plain text, so it names the setting without a bracketed table."""
+        assert "[" not in HOSTED_RUNS_HINT
+        assert "pipelex login" in HOSTED_RUNS_HINT
+        assert 'execution = "hosted"' in HOSTED_RUNS_HINT
