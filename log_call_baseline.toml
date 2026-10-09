@@ -57,7 +57,6 @@ calls = [
 
 ["pipelex/cli/commands/graph_cmd.py::graph_render_cmd"]
 calls = [
-  "error: escaped_message [non-literal] where escaped_message = escape(str(spec_error))",
   "error: f\"Error rendering graph: {exc}\" [f-string]",
 ]
 
@@ -96,11 +95,6 @@ calls = [
   "error: f\"Prompt template system_text should be None or contain text. system_text = '{self.system_text}'\" [f-string]",
   "warning: f\"system_text should be None or contain text. system_text = '{self.system_text}'\" [f-string]",
   "warning: f\"system_text should be None or contain text. system_text = '{self.system_text}'\" [f-string]",
-]
-
-["pipelex/cogt/llm/llm_worker_abstract.py::LLMWorkerAbstract._apply_constraints"]
-calls = [
-  "warning: f\"Model {self.inference_model.desc} used with temperature {requested_temperature}, but it must be {fixed_temperature} for this model so we forced it to {fixed_temperature}\" [f-string]",
 ]
 
 ["pipelex/cogt/model_backends/backend_library.py::InferenceBackendLibrary.load"]
@@ -305,11 +299,6 @@ calls = [
 ["pipelex/pipe_machinery/pipe_abstract.py::PipeAbstract._make_lifted_output"]
 calls = [
   "info: f\"Skipping {self.type} '{self.code}': absent input(s): {absent_names}\" [f-string]",
-]
-
-["pipelex/pipe_machinery/pipe_abstract.py::PipeAbstract.live_run_pipe"]
-calls = [
-  "info: self._format_pipe_run_info(pipe_run_params=pipe_run_params) [non-literal]",
 ]
 
 ["pipelex/pipe_machinery/pipe_abstract.py::PipeAbstract.validate_pipe_code_syntax"]

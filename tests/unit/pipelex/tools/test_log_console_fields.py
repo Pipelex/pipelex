@@ -19,13 +19,12 @@ from pipelex.tools.log.log_fields import (
     COLLIDING_FIELD_PREFIX,
     FIELD_NAMES_MARK,
     RICH_HIGHLIGHTER_ATTRIBUTE,
-    VERBATIM_MARK,
+    RICH_MARKUP_ATTRIBUTE,
     attach_log_record_extra,
 )
 from tests.helpers.console_log_rendering import (
     console_sink_on_buffer,
     installed_log,
-    package_log_config,
     record_with_fields,
     rendered_text,
     styles_of,
@@ -71,7 +70,7 @@ class TestConsoleFields:
     def test_a_field_named_like_a_record_attribute_or_a_mark_shows_under_the_name_it_landed_on(self, console_log: tuple[Log, io.StringIO]) -> None:
         fresh, buffer = console_log
 
-        fresh.info("Renamed", fields={"name": "alpha", VERBATIM_MARK: True})
+        fresh.info("Renamed", fields={"name": "alpha", RICH_MARKUP_ATTRIBUTE: True})
 
         assert "Renamed field_name=alpha field_markup=true" in buffer.getvalue()
 
@@ -128,15 +127,12 @@ class TestConsoleFields:
         assert "\x1b" not in rendered
         assert not any(line.lstrip().startswith("FORGED") for line in rendered.splitlines())
 
-    def test_a_value_carrying_markup_prints_as_written_while_the_message_still_reads_markup(self, console_log: tuple[Log, io.StringIO]) -> None:
-        assert package_log_config().rich_log.is_markup_enabled, "the suffix must hold whatever the setting it runs beside"
+    def test_neither_the_message_nor_a_value_is_read_as_markup(self, console_log: tuple[Log, io.StringIO]) -> None:
         fresh, buffer = console_log
 
         fresh.info("[bold]Received[/bold]", fields={"detail": "[red]x[/red]"})
 
-        rendered = buffer.getvalue()
-        assert "Received detail=[red]x[/red]" in rendered
-        assert "[bold]" not in rendered
+        assert "[bold]Received[/bold] detail=[red]x[/red]" in buffer.getvalue()
 
     def test_a_long_value_is_cut_short(self, console_log: tuple[Log, io.StringIO]) -> None:
         fresh, buffer = console_log
@@ -201,7 +197,7 @@ class TestConsoleFields:
     def test_what_a_record_factory_or_the_runtime_stamped_is_not_shown(self) -> None:
         record = record_with_fields(message="Stamped", extra={"files": 7})
         record.otelSpanID = "0"
-        record.__dict__[VERBATIM_MARK] = False
+        record.__dict__[RICH_MARKUP_ATTRIBUTE] = False
 
         text = rendered_text(record=record)
 

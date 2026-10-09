@@ -41,7 +41,7 @@ from pipelex.tools.log.console_layouts import LogLayout
 
 log.info(
     "Pipe run starts",
-    fields={"pipe_type": "PipeCompose", "pipe_code": "compose_company", "output_concept": "Company", "pipe_depth": 1, "is_dry_run": False},
+    fields={"pipe_type": "PipeCompose", "pipe_code": "compose_company", "output_concept": "Company", "pipe_depth": 1},
     layout=LogLayout.PIPE_RUN,
 )
 
@@ -85,7 +85,7 @@ The stdlib refuses an `extra` key that would overwrite one of the record's own a
 
 Two kinds of name are reserved though nothing on a fresh record owns them yet, because both are stamped after the entries are attached and the stdlib's refusal therefore cannot cover them: what the formatter sets (`message`, `asctime`) and what Pipelex's own logging machinery sets — `_pipelex_forwarded`, the marker that tells the sink's handler a record reached it through the boot's holding handler already, `_pipelex_field_names`, the names the call's entries landed on, which is what the console renders, and `_pipelex_layout`, the [layout](#layouts) a call named. Both kinds take the same `field_` prefix, and no mark is ever handed to a sink as something the record carries. Without that reservation, `fields={"_pipelex_forwarded": True}` would have the sink's own filter read the record as one already delivered and drop it whole, and `fields={"_pipelex_layout": "pipe_run"}` would pick the line's layout.
 
-The names Rich's console handler reads off each record ahead of its own settings, `markup` and `highlighter`, are reserved the same way and for the same reason: a field landing on `markup` would decide whether the console reads that line's markup, and one landing on `highlighter` would be called in the highlighter's place, so `fields={"highlighter": "pygments"}` would raise inside the handler and lose the whole line. Such a field rides under `field_markup` or `field_highlighter`, and neither name is handed to a sink as something the record carries.
+The names Rich's console handler reads off each record ahead of its own settings, `markup` and `highlighter`, are reserved the same way and for the same reason: a field landing on `markup` would turn markup back on for that line, which the console otherwise never reads, and one landing on `highlighter` would be called in the highlighter's place, so `fields={"highlighter": "pygments"}` would raise inside the handler and lose the whole line. Such a field rides under `field_markup` or `field_highlighter`, and neither name is handed to a sink as something the record carries.
 
 ## The run-scoped context
 
@@ -210,7 +210,23 @@ Logging is configured in two steps at boot. `log.configure` sets the levels and 
 
 ## Console rendering
 
-The default sink, `console`, renders through Rich with every `[runtime.log.rich_log]` setting. Rich is the `cli` extra (`pipelex[cli]`), which the command-line tools install. The sink imports Rich when it is built, so a process that selects `json` or `otlp` never loads it through the sink, and one that selects `console` without Rich installed stops at boot naming the extra to install and the `json` alternative. That refusal is not what keeps a server off the console: `typer` and `instructor`, both core dependencies, require Rich, so it is installed even where the extra is not, and a server that forgot to select `json` boots on the `console` sink. A server therefore selects `json` in its own configuration, and sets `pretty_print_mode` to `"poor"` or `"silent"` beside it, since the boot makes neither choice for it (see [Pretty-Print Mode](../configuration/config-practical/logging-config.md#pretty-print-mode)).
+The default sink, `console`, renders through Rich with every `[runtime.log.rich_log]` setting, and reads no message as markup (see [Messages are plain text](#messages-are-plain-text)). Rich is the `cli` extra (`pipelex[cli]`), which the command-line tools install. The sink imports Rich when it is built, so a process that selects `json` or `otlp` never loads it through the sink, and one that selects `console` without Rich installed stops at boot naming the extra to install and the `json` alternative. That refusal is not what keeps a server off the console: `typer` and `instructor`, both core dependencies, require Rich, so it is installed even where the extra is not, and a server that forgot to select `json` boots on the `console` sink. A server therefore selects `json` in its own configuration, and sets `pretty_print_mode` to `"poor"` or `"silent"` beside it, since the boot makes neither choice for it (see [Pretty-Print Mode](../configuration/config-practical/logging-config.md#pretty-print-mode)).
+
+### Messages are plain text
+
+The console reads no log message as Rich markup: a message is the caller's text, made of values nobody chose, and it prints exactly as written.
+
+```python
+log.error("Expected list[int], got [red]str[/red]")
+```
+
+```text
+ERROR    🧠: Expected list[int], got [red]str[/red]
+```
+
+A tag-shaped span in a message is text like any other: a `list[int]` in a type complaint, a bracketed path, the `[cycle]` marker in the rendering of a circular content, and the `[name]: ` prefix the console puts before a line from a logger with no emoji, such as `[myapp.jobs.nightly]: `. Colour is the console's own: it styles the [fields after the message](#fields-after-the-message) by their names and draws the few [layouts](#layouts), so a call is coloured by naming its fields, never by writing markup into its message. No sink but the console has ever read markup, so a message carrying a tag would reach the `json`, `otlp` and `gcp` sinks with the tag in it, and the rule for a Pipelex log call is to write none. Two checks hold the calls to it, by one reading of what a tag is: a tag Rich would apply as styling, a closing tag, an `@` handler, or a tag naming a style, `[bold]` or `[link=https://pipelex.com]`. A bracketed word that names no style, `list[int]` or `[openai]`, passes, since it prints as written. The [log-call guard](../contribute/log-calls.md), `make check-log-calls`, reads the source of every call: it refuses such a tag in the literal text of a message, its title or its inline title, at every level, that text folded across concatenations and named literals the way it reaches the console. A test checks the messages of one run: it runs the pipes of one test bundle live, a sequence nesting a structuring step, parallel summaries and a condition, with a stand-in worker answering every model call, and fails on any message the run logs, at any level, that holds such a tag, whatever built it. A message the guard cannot read, a value built at run time, is covered only when that run logs it.
+
+Rich still honours its own per-record `markup` attribute, which a third-party library may set on a record it logs to ask for markup. No Pipelex call can set it: a field of that name is [reserved](#names-that-are-not-yours-to-give) and lands under `field_markup`.
 
 ### Fields after the message
 
@@ -226,7 +242,7 @@ INFO     🧠: Scanned the inputs file_count=7 source=inbox/march
 
 - **What is shown.** The fields the call attached, in the order it gave them, under the name each landed on (`field_name` for a field called `name`). The run identifiers (`request_id`, `pipeline_run_id`, `pipe_run_id`) are left out, since they are the same on every line of a run and would drown the message, and so is `data`, the structured content the message already renders. Nothing else on the record is shown: neither the stdlib's own attributes, nor Pipelex's marks, nor what a record factory or a third-party library stamped on it.
 - **How a value is written.** On one line: a string bare, or quoted when it is empty or holds a space, an `=`, a `"`, a `\` or a character a terminal would act on. Inside the quotes a backslash is written `\\`, a quote `\"` and any character a terminal would act on as its escape (`"line\nbreak"`), so `fields={"a": "b=c"}` prints `a="b=c"` rather than a second pair. A number, a boolean, `None`, a mapping, a list or a pydantic model is written as compact JSON (`true`, `null`, `{"key":"value"}`, `["a","b"]`), and anything else as its text. A value longer than 80 characters is cut short and ends with `…`, except `error.message`, a handled exception's text, which is cut only past 2000 characters, quoted and escaped the same way: its diagnosis, a cause chain or a parse error's location, is what a fragment would lose, while a dependency's raw output, a validation error's every line or git's stderr, would flood the terminal uncut. A key is written the same way, so a field whose name holds a line break, a space, an `=` or an escape sequence is quoted and escaped rather than forging a line or a second pair: `fields={"x=1": 2}` prints `"x=1"=2`. The [redaction](#redaction) has run before the console renders, so a secret is already `[REDACTED]`.
-- **Never markup.** The suffix is built as styled Rich `Text`, not as a markup string, so a value carrying `[red]x[/red]` prints exactly that, whatever `is_markup_enabled` says about the message.
+- **Never markup.** The suffix is built as styled Rich `Text`, not as a markup string, so a value carrying `[red]x[/red]` prints exactly that.
 
 There is no setting to hide the suffix: it carries the values a message used to interpolate, so hiding it would hide what the line is about.
 
@@ -236,14 +252,14 @@ A field's value is coloured by the field's name, wherever it appears, from one t
 
 ### Layouts
 
-A few lines have a shape that matters on a terminal, the pipe-run tree above all. For those, a call names a layout, a Rich template over the record's fields registered in `pipelex/tools/log/console_layouts.py`:
+A few lines have a shape that matters on a terminal, the pipe-run tree above all. For those, a call names a layout, a Rich template over the record's fields registered in `pipelex/tools/log/console_layouts.py`. Every live pipe run announces itself this way, with the message `Pipe run starts` and the pipe in the fields, and the console draws the line byte for byte as it did when the announcement was markup in its message:
 
 ```python
 from pipelex.tools.log.console_layouts import LogLayout
 
 log.info(
     "Pipe run starts",
-    fields={"pipe_type": "PipeCompose", "pipe_code": "compose_company", "output_concept": "Company", "pipe_depth": 1, "is_dry_run": False},
+    fields={"pipe_type": "PipeCompose", "pipe_code": "compose_company", "output_concept": "Company", "pipe_depth": 1},
     layout=LogLayout.PIPE_RUN,
 )
 ```
@@ -263,7 +279,7 @@ The registry holds these layouts:
 
 | Layout | Fields it presents | What it draws |
 | --- | --- | --- |
-| `LogLayout.PIPE_RUN` | `pipe_type`, `pipe_code`, `output_concept`, `pipe_depth` (an integer, `0` at the top level and at most `100`), `is_dry_run` (a boolean) | `PipeCompose: compose_company → Company`, indented three spaces per level of depth and behind `↳` when nested, with `Dry run:` before the pipe type for a dry run, in the style map's colours. A depth or a flag of another type, or a depth out of range, falls back to the message |
+| `LogLayout.PIPE_RUN` | `pipe_type`, `pipe_code`, `output_concept`, `pipe_depth` (an integer, `0` at the top level and at most `100`) | `PipeCompose: compose_company → Company`, indented three spaces per level of depth and behind `↳` when nested, in the style map's colours. A depth of another type, or out of range, falls back to the message. The pipe announcement names it, and only a live run announces itself, so the line carries no run mode |
 
 A layout is a `ConsoleLayout`: a `template` of Rich markup whose placeholders are bare field names (`{pipe_code}`, never an attribute, an index or a format spec, which registration refuses), the `presented_fields` the suffix leaves out, and, for a shape a template cannot express alone, a subclass whose `derived_values` computes presentation values such as an indentation from the fields.
 
@@ -359,7 +375,7 @@ An exception rides the record, never the message. Spliced into the text, `{exc}`
 
 - **No run identifier in the text.** `request_id`, `pipeline_run_id` and `pipe_run_id` are stamped on every record by the [run-scoped context](#the-run-scoped-context); a message repeating one is noise, and a field passing one is only for a call that speaks about a run it is not running under.
 - **No payload contents, at any level.** No prompt text, no base64 data, no raw response and no whole object: a size, a count, a hash or a code instead, as the [level table](#log-levels) already says of every level.
-- **No markup and no emoji in a message.** Colour is the console sink's job: it colours a value by its field's name and draws the few [layouts](#layouts), and its emoji are its own per-logger decoration. Markup in a message travels to every sink as literal tags, and on the console turns a bracketed word into styling. Markup keeps its place in the CLI's own output and in the pretty-print channel, which are presentation to a person and not log records.
+- **No markup and no emoji in a message.** Colour is the console sink's job: it colours a value by its field's name and draws the few [layouts](#layouts), and its emoji are its own per-logger decoration. Markup in a message travels to every sink as literal tags, the console's included, since it reads no message as markup (see [Messages are plain text](#messages-are-plain-text)). Markup keeps its place in the CLI's own output and in the pretty-print channel, which are presentation to a person and not log records.
 
 ### Choosing a level
 

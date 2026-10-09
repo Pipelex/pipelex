@@ -23,7 +23,7 @@ from pipelex.tools.log.log_fields import (
     FORWARDED_MARK,
     LAYOUT_MARK,
     RICH_HIGHLIGHTER_ATTRIBUTE,
-    VERBATIM_MARK,
+    RICH_MARKUP_ATTRIBUTE,
     attached_field_names,
     carried_attributes,
 )
@@ -255,12 +255,12 @@ class TestLogFields:
         assert FORWARDED_MARK not in carried
         assert carried[f"{COLLIDING_FIELD_PREFIX}{FORWARDED_MARK}"] is True
 
-    @pytest.mark.parametrize("name", [VERBATIM_MARK, RICH_HIGHLIGHTER_ATTRIBUTE])
+    @pytest.mark.parametrize("name", [RICH_MARKUP_ATTRIBUTE, RICH_HIGHLIGHTER_ATTRIBUTE])
     def test_a_field_named_like_a_rich_per_record_override_is_prefixed_and_reaches_no_sink(self, caplog: pytest.LogCaptureFixture, name: str) -> None:
         """``markup`` and ``highlighter`` are what Rich's console handler reads off a record ahead of its own settings.
 
-        Left unreserved, a caller naming ``markup`` would decide whether the console interprets markup for
-        that line, and one naming ``highlighter`` would have its value called as the highlighter, which
+        Left unreserved, a caller naming ``markup`` would turn markup back on for that line, which the
+        console otherwise never reads, and one naming ``highlighter`` would have its value called as the highlighter, which
         raises for a string and loses the line. Either value would also ride into the `json` and `otlp`
         payloads as a field, where it means nothing. Reserved, the caller's value is carried under the
         prefix and is not a carried attribute.
@@ -276,25 +276,19 @@ class TestLogFields:
         assert carried[f"{COLLIDING_FIELD_PREFIX}{name}"] is True
         assert carried["safe"] == 1
 
-    def test_what_a_third_party_stamped_as_rich_s_highlighter_is_no_carried_field(self, caplog: pytest.LogCaptureFixture) -> None:
-        """A library steering the console through ``extra`` puts an object there that means nothing on a wire.
+    @pytest.mark.parametrize(("name", "value"), [(RICH_HIGHLIGHTER_ATTRIBUTE, object()), (RICH_MARKUP_ATTRIBUTE, True)])
+    def test_what_a_third_party_stamped_as_a_rich_per_record_override_is_no_carried_field(
+        self, caplog: pytest.LogCaptureFixture, name: str, value: object
+    ) -> None:
+        """A library steering the console through ``extra`` puts a value there that means nothing on a wire.
 
-        Carried, the scrub would also turn that object into text, which Rich would then fail to call.
+        Carried, the scrub would also turn a highlighter object into text, which Rich would then fail to call.
         """
         with caplog.at_level(logging.INFO):
             log.info("a line", fields={"safe": 1})
 
         (record,) = _own_records(caplog)
-        setattr(record, RICH_HIGHLIGHTER_ATTRIBUTE, object())
-        assert carried_attributes(record=record) == {"safe": 1}
-
-    def test_a_record_the_error_path_stamped_verbatim_hands_no_such_field_to_a_sink(self, caplog: pytest.LogCaptureFixture) -> None:
-        """`TracebackMessageError` stamps the mark itself, and a structured sink must not write it as a field."""
-        with caplog.at_level(logging.INFO):
-            log.info("a line", fields={"safe": 1})
-
-        (record,) = _own_records(caplog)
-        setattr(record, VERBATIM_MARK, False)
+        setattr(record, name, value)
         assert carried_attributes(record=record) == {"safe": 1}
 
     def test_the_names_the_call_attached_are_recorded_in_order_and_are_no_field(self, caplog: pytest.LogCaptureFixture) -> None:

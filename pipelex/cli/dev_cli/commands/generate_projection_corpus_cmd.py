@@ -37,6 +37,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field
+from rich.markup import escape
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.cli.cli_factory import make_pipelex_for_cli
@@ -509,9 +510,7 @@ class ShapingGate:
         failures = self.failures
         undeclared = sorted(key for key in failures if key not in self.registry)
         if undeclared:
-            # Parenthesised, not bracketed: this message is printed through the Rich console, which
-            # reads a `[compact]` as markup and eats it — leaving two shapes of one pipe as two
-            # identical lines, each missing the half of the address that says which one failed.
+            # Parenthesised, so a refusal reads the same as the `unshapeable` lines a passing run prints.
             listed = "\n  ".join(
                 f"{pipe_ref} ({shape}): {type(failures[pipe_ref, shape]).__name__}: {str(failures[pipe_ref, shape]).splitlines()[0]}"
                 for pipe_ref, shape in undeclared
@@ -681,20 +680,20 @@ def generate_projection_corpus_cmd(*, bundle_paths: list[Path], output_dir: Path
     console = get_console()
     for bundle_path in bundle_paths:
         if not bundle_path.is_file():
-            console.print(f"[red]Bundle file not found: {bundle_path}[/red]")
+            console.print(f"[red]Bundle file not found: {escape(str(bundle_path))}[/red]")
             sys.exit(2)
 
     make_pipelex_for_cli(context=ErrorContext.VALIDATION, needs_inference=False)
     try:
         manifest = asyncio.run(generate_projection_corpus(bundle_paths=bundle_paths, output_dir=output_dir))
     except ValidateBundleError as exc:
-        console.print(f"[red]Bundle validation failed — the corpus requires valid bundles:[/red]\n{exc}")
+        console.print(f"[red]Bundle validation failed — the corpus requires valid bundles:[/red]\n{escape(str(exc))}")
         sys.exit(1)
     except ValueError as exc:
-        console.print(f"[red]The corpus's own record is out of date:[/red]\n{exc}")
+        console.print(f"[red]The corpus's own record is out of date:[/red]\n{escape(str(exc))}")
         sys.exit(1)
     except PipelexError as exc:
-        console.print(f"[red]Corpus generation failed:[/red]\n{exc}")
+        console.print(f"[red]Corpus generation failed:[/red]\n{escape(str(exc))}")
         sys.exit(1)
     finally:
         Pipelex.teardown_if_needed()

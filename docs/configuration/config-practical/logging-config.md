@@ -168,11 +168,11 @@ is_link_path_enabled = true
 
 ```toml
 highlighter_name = "json"  # or "repr"
-is_markup_enabled = true
 ```
 
 - `highlighter_name`: Choose between JSON or repr highlighting
-- `is_markup_enabled`: Enable Rich markup syntax in log messages
+
+The console reads no log message as Rich markup: a message prints exactly as written, and colour comes from the fields and the layouts (see [Messages are plain text](../../tools/logging.md#messages-are-plain-text)). There is no setting to turn markup on. A file that still sets `is_markup_enabled` does not stop the boot: Pipelex deletes the key in memory with ledger entry `pipelex-config@7`, writes nothing, and warns that the configuration is out of date. Run `pipelex migrate` to delete it from the file on disk, which also ends the warning.
 
 ### Traceback Settings
 
@@ -302,7 +302,6 @@ is_show_time = false
 is_show_level = true
 is_link_path_enabled = true
 highlighter_name = "json"
-is_markup_enabled = true
 is_rich_tracebacks = true
 is_tracebacks_word_wrap = true
 is_tracebacks_show_locals = false

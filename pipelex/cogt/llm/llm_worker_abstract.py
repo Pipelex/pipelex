@@ -402,8 +402,17 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         requested_temperature = self._scaled_temperature(inference_model=self.inference_model, temperature=llm_job.job_params.temperature)
         if fixed_temperature is not None and requested_temperature != fixed_temperature:
             log.warning(
-                f"Model {self.inference_model.desc} used with temperature {requested_temperature}, "
-                f"but it must be {fixed_temperature} for this model so we forced it to {fixed_temperature}"
+                "The model takes a fixed temperature, so it is used in place of the requested one",
+                fields={
+                    "model_handle": self.inference_model.name,
+                    "backend_name": self.inference_model.backend_name,
+                    "sdk": self.inference_model.sdk,
+                    # The model keys mean what they mean on the LLM span: the handle requested, then the provider's id serving it
+                    GenAISpanAttr.REQUEST_MODEL: self._get_request_model_name(),
+                    GenAISpanAttr.RESPONSE_MODEL: self._get_response_model_name(),
+                    GenAISpanAttr.REQUEST_TEMPERATURE: requested_temperature,
+                    "fixed_temperature": fixed_temperature,
+                },
             )
         return self.constrained_job_params(inference_model=self.inference_model, job_params=llm_job.job_params)
 

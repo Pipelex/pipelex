@@ -37,6 +37,7 @@ class TestGraphRenderRefusedSpec:
         telemetry_manager.telemetry_context.return_value = contextlib.nullcontext()
         printed = io.StringIO()
         mocker.patch(f"{GRAPH_CMD}.get_console", return_value=Console(file=printed, width=1000))
+        log_spy = mocker.patch(f"{GRAPH_CMD}.log")
 
         spec_dir = tmp_path / bracketed_dir
         spec_dir.mkdir(parents=True)
@@ -49,3 +50,12 @@ class TestGraphRenderRefusedSpec:
         assert exit_info.value.exit_code == 1
         assert "Failed to render graph" in printed.getvalue()
         assert str(spec_file) in printed.getvalue()
+        # The log line is a fixed message and carries the path and the diagnosis as written, with no escape:
+        # only the console print reads markup, and no sink reads a log message as markup.
+        log_spy.error.assert_called_once()
+        assert log_spy.error.call_args.args == ("The graph spec was refused, so no graph was rendered",)
+        fields = log_spy.error.call_args.kwargs["fields"]
+        assert fields["file.path"] == str(spec_file)
+        assert fields["error.type"] == "GraphSpecValidationError"
+        assert str(spec_file) in fields["error.message"]
+        assert "\\[" not in fields["error.message"]

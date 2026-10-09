@@ -10,6 +10,16 @@
 ### Changed
 
 - **Library-loading warnings carry their values as fields**: the warnings logged while a library loads, for an unparseable `METHODS.toml`, an unsatisfied or unparseable `mthds_version`, a dependency with no valid bundle or a pipe that would not load, an unresolvable method package and the teardown of a stale library, each have one fixed message and carry the package address, the dependency alias, the pipe code and the error as fields, where they used to splice those values into the text.
+- **The pipe announcement is a plain message with fields**: every live pipe run logs `Pipe run starts` with `pipe_type`, `pipe_code`, `output_concept` and `pipe_depth` as fields, where the `json`, `otlp` and `gcp` sinks used to receive Rich markup inside the message, and the console draws the same coloured pipe tree from those fields through `LogLayout.PIPE_RUN`. The warning that a model's fixed temperature replaced the requested one carries its values as fields in the same way: `model_handle`, `backend_name`, `sdk`, the model's handle under `gen_ai.request.model` and the provider's model id under `gen_ai.response.model` as on the LLM call's span, the requested temperature under `gen_ai.request.temperature`, and `fixed_temperature`; the verbose line saying a model's settings were not checked, since its backend's SDK is not installed, carries the same model fields.
+
+### Fixed
+
+- **Model descriptions and credential errors carry no backslashes**: a model's description in an error message or a log line, such as `gpt-5 → SDK[openai]•Backend[openai]•Model[gpt-5-2025]`, no longer has a backslash before each bracket, and the error naming a backend's missing credentials tells you to add `enabled = false` under `[openai]` rather than `\[openai]`. `pipelex run` prints a failed run's message exactly as written rather than reading it as markup.
+- **An empty list's output panel says so**: the title of the panel showing an operator pipe's output ends with `[empty list]` when the pipe produced an empty list, a label the console used to drop, as it already showed `[1 item]` or `[3 items]`.
+
+### Removed
+
+- **`is_markup_enabled` (Breaking)**: the console reads no log message as Rich markup, so the `[runtime.log.rich_log]` key that switched it is gone, along with `VERBATIM_MARK` in `pipelex.tools.log.log_fields`. A message now prints exactly as written, so a `list[int]`, a bracketed path, the `[myapp.jobs.nightly]: ` prefix of a logger named in lowercase and the `[cycle]` marker of a circular content no longer vanish, while a message of your own that relied on markup for its colour shows its tags and should put its values in `fields`. **Migration:** run `pipelex migrate`, which deletes the key from the file on disk (ledger entry `pipelex-config@7`).
 
 ## [v0.80.0] - 2026-10-09
 

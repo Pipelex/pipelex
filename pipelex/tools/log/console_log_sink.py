@@ -1,9 +1,11 @@
 """The ``console`` sink: the Rich handler with the emoji formatter and every ``[runtime.log.rich_log]`` setting.
 
-The handler renders a record's fields after its message as a styled ``key=value`` suffix, and a record that
-names a layout through that layout's template; what is shown and how it is coloured is in
-``console_fields`` and ``console_layouts``. A traceback printed as text, with Rich tracebacks off, goes
-under the line, after the suffix.
+The handler reads no message as Rich markup: a message is the caller's text, made of values nobody chose,
+and prints as written, ``list[int]`` and ``[red]`` included. The colour is the sink's own: it renders a
+record's fields after its message as a styled ``key=value`` suffix, and a record that names a layout
+through that layout's template; what is shown and how it is coloured is in ``console_fields`` and
+``console_layouts``. A traceback printed as text, with Rich tracebacks off, goes under the line, after the
+suffix.
 
 Rich is the ``cli`` extra. It is imported when the handler is built and nowhere else in this module, so
 this module asks for Rich only where this sink is the one selected; a process that selects another sink
@@ -66,11 +68,11 @@ class ConsoleLogSink(LogSink):
         # Declared here because ``RichHandler`` is imported here, which is what keeps Rich off the import
         # path of a process that selected another sink. ``RichHandler`` overrides ``emit`` and does not
         # restore the ``try``/``handleError`` the stdlib's own handlers put around theirs, so anything
-        # raised while rendering leaves the log call: a message carrying a tag-shaped span — `list[int]` in
-        # a type complaint, or a bracketed path, both of which an error message is made of — raises
-        # ``MarkupError`` out of `log.error` and replaces whatever was being reported with itself. A log
-        # call never raises, so the guard goes back on and a line Rich cannot render gets the stdlib's own
-        # recovery instead.
+        # raised while rendering leaves the log call: a record a third-party library stamped with Rich's own
+        # ``markup`` attribute, whose message Rich then reads as markup and cannot balance, raises
+        # ``MarkupError`` out of the call that logged it and replaces whatever was being reported with
+        # itself. A log call never raises, so the guard goes back on and a line Rich cannot render gets the
+        # stdlib's own recovery instead.
         class GuardedRichHandler(RichHandler):
             @override
             def emit(self, record: logging.LogRecord) -> None:
@@ -83,8 +85,9 @@ class ConsoleLogSink(LogSink):
             def render_message(self, record: logging.LogRecord, message: str) -> ConsoleRenderable:
                 """The message, or the layout the call named, then the fields as a styled ``key=value`` suffix, then any traceback text.
 
-                The suffix is assembled as ``Text`` from styled segments and appended after the highlighter has
-                run on the message, so neither the markup setting nor the highlighter ever reads a field's value.
+                The message is plain text, read as no markup, and the suffix is assembled as ``Text`` from styled
+                segments and appended after the highlighter has run on the message, so the highlighter never reads
+                a field's value.
                 A layout that cannot be filled, whatever it raises, falls back to the message, and every field
                 then goes to the suffix. The dispatch stamps a layout only on a call whose content is a string,
                 so a structured content, which only its message renders, never meets one.
@@ -143,7 +146,13 @@ class ConsoleLogSink(LogSink):
             show_level=config.is_show_level,
             enable_link_path=config.is_link_path_enabled,
             highlighter=highlighter,
-            markup=config.is_markup_enabled,
+            # A message is the caller's text, and none of Pipelex's carries markup: colour comes from the
+            # fields and the layouts, which style their own text. Read as markup, a message loses whatever
+            # is shaped like a tag, the `[name]: ` channel prefix of a lowercase logger, a `list[int]`, the
+            # `[cycle]` marker of a circular content, or raises on a bracketed path. Rich still honours its
+            # own per-record `markup` attribute, which no Pipelex call can set: a field of that name is
+            # reserved and lands under the `field_` prefix.
+            markup=False,
             rich_tracebacks=config.is_rich_tracebacks,
             tracebacks_word_wrap=config.is_tracebacks_word_wrap,
             tracebacks_show_locals=config.is_tracebacks_show_locals,

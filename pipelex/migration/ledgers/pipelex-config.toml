@@ -12,7 +12,7 @@ id = "pipelex-config"
 title = "The main Pipelex configuration"
 base_file = "pipelex.toml"
 tier_glob = "pipelex_*.toml"
-current_schema_version = 6
+current_schema_version = 7
 min_supported_schema_version = 0
 
 # This entry is inserted *below* the reshape rather than appended above it, and the order is what
@@ -482,3 +482,27 @@ kind = "remap_value"
 table_path = ["runtime", "log", "package_log_levels"]
 key = "*"
 mapping = { DEV = "INFO" }
+
+[[migration]]
+id = "pipelex-config@7"
+to_schema_version = 7
+introduced_in = "0.81.0"
+breaking = true
+safety = "safe"
+title = "The console reads no log message as markup"
+description = """
+`is_markup_enabled` under `[runtime.log.rich_log]` is gone: the `console` sink prints every log message as \
+written and reads none of it as Rich markup, the colour coming from the fields and the layouts instead. The \
+key is deleted from files that still set it.
+"""
+guidance = """
+Nothing to decide. No Pipelex log message carries markup any more, and a message read as markup lost \
+whatever in it was shaped like a tag, a `list[int]` or a lowercase logger's `[name]: ` prefix. Text you \
+log through Pipelex now prints exactly as written, so a message that relied on markup for its colour shows \
+its tags: put the values in `fields`, which the console colours by name.
+"""
+
+[[migration.ops]]
+kind = "delete_key"
+table_path = ["runtime", "log", "rich_log"]
+key = "is_markup_enabled"
