@@ -7,6 +7,7 @@ wraps when ``instructor`` exhausts its retry loop.
 """
 
 import json
+import math
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from enum import StrEnum
@@ -385,13 +386,20 @@ def parse_retry_after_seconds(value: Any) -> float | None:
     The HTTP spec allows two forms: a non-negative number of seconds, or an
     HTTP-date. Numeric values are returned directly; HTTP-date values are
     converted to a delay relative to now, clamped to ``0.0`` when already past.
+    A number the spec does not allow — negative, or one ``float`` accepts but no
+    delay can be, such as ``inf``, ``nan`` or ``1e999`` — reads as no delay, so
+    nothing downstream rounds or waits on it.
     """
     if value is None:
         return None
     try:
-        return float(value)
+        seconds = float(value)
     except (TypeError, ValueError):
         pass
+    else:
+        if math.isfinite(seconds) and seconds >= 0:
+            return seconds
+        return None
     if not isinstance(value, str):
         return None
     try:

@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.79.1] - 2026-10-09
+
+### Fixed
+
+- **The `wait_and_retry` advice says to run again**: the `user_action.detail` of a transient inference failure said "the system will retry automatically", which no longer held by the time anyone read the failed run's report, and now says to wait, at least the provider's `Retry-After` delay when it gave one, then run it again; the advice on an empty or malformed Mistral response says the same.
+- **A malformed `Retry-After` is no delay**: a provider's `Retry-After` that is negative or not a finite number (`inf`, `nan`, `1e999`) is ignored rather than taken as a delay, so the advice says to wait a moment instead of naming an impossible wait.
+
 ## [v0.79.0] - 2026-10-09
 
 ### Highlights

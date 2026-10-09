@@ -31,7 +31,7 @@ class MistralLLMErrorHandlingTestData:
             429,
             "Rate limit exceeded. Please retry after 20s",
             InferenceErrorCategory.TRANSIENT,
-            "retry",
+            "run it again",
         ),
         (
             "auth_error_401",
@@ -99,7 +99,7 @@ class MistralExtractErrorHandlingTestData:
             429,
             "Rate limit exceeded. Please retry after 20s",
             InferenceErrorCategory.TRANSIENT,
-            "retry",
+            "run it again",
         ),
         (
             "auth_error_401",
