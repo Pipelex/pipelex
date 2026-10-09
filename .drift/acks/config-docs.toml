@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:46c31fd39394e47c2ae4442305c8ba645a976ff45dc44286f8f3416f73a3bf11"
+digest = "sha256:0dcf4278293e52e34df729a2ebddbdeb212835cfbf907e5254d7735ff0558696"
 reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-10-08T12:44:52Z"
-rationale = "clean-pass: merged tree of origin/dev into this branch. The open trigger changes are this branch's own, the run section in pipelex/pipelex.toml and RunConfig in configs.py, already answered on the branch by run-config.md and the five-section list in docs/configuration/index.md; dev changed only the home fill in config_loader.py. The auto-merged index.md reads as one: dev's rewritten PIPELEX_HOME section and this branch's section list touch different paragraphs. A hosted run that reads the run setting goes through load_config and so now fills a home's missing kit files like any boot; run-config.md and run.md say a hosted run boots nothing locally and needs no inference configuration, which stays true, and no doc claims it leaves the home untouched. The run path is additive, so no migration ledger entry, and neither side touched the ledgers."
+reviewed_at = "2026-10-09T17:39:57Z"
+rationale = "real-catch: the trigger, aws_config.py, only moves two credential-source log lines from VERBOSE to DEBUG and deletes two others, which touches no setting. The review covered this branch's config-model change that no trigger names, the retirement of LogLevel.DEV, which default_log_level and package_log_levels are typed with: logging-config.md listed DEV among the valid values and in the gcp severity note, both now fixed, and gains a section on migrating from DEV; the ledger gains pipelex-config@6, a safe remap of DEV to DEBUG at both paths, with its goldens. configs.py and config_cogt.py name no level and are unchanged."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:02f71cb4a6b01aebda59c2e31f262ef9c865e17b"
@@ -20,7 +20,7 @@ rationale = "clean-pass: merged tree of origin/dev into this branch. The open tr
 "pipelex/system/configuration/configs.py" = "blob:1754391061f3be47e28088a4f8ea85e60b1cdd2b"
 "pipelex/system/configuration/pipe_func_config.py" = "blob:dc8890e914fbcdb611147e42eaa0cd87b32288a5"
 "pipelex/system/telemetry/telemetry_config.py" = "blob:068a785d97a2d52ee43e82e723cd944b8b6601bc"
-"pipelex/tools/aws/aws_config.py" = "blob:c1aeafeae08d3921464db33795f11a29ff3892ba"
+"pipelex/tools/aws/aws_config.py" = "blob:e27dc96bf0b2ef98a45354712421252fe0b893b5"
 "pipelex/tools/log/log_config.py" = "blob:63dd9f81fdbafc1a095aec6cde1b047d0ebdd2d4"
 "pipelex/tools/network/network_config.py" = "blob:e12d1d0e4a40d04859f10a77addeaf8fe2b00414"
 "pipelex/tools/secrets/secrets_config.py" = "blob:cf30aaec1c76c9cabc0531a5b9fe681e153d7024"

@@ -28,7 +28,7 @@ async def render_page_views_and_store(
     """
     authorize_assignment_reads(job_metadata=render_assignment.job_metadata, uri_references=render_assignment.referenced_uris())
     if render_assignment.cogt_run_params.run_mode.is_dry:
-        return dry_render_page_views(render_assignment)
+        return dry_render_page_views()
     # Deferred import: avoid pulling the pdf rendering SDK at module-load time
     from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer  # ruff: ignore[import-outside-top-level]
 

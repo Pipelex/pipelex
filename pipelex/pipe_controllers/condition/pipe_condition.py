@@ -342,7 +342,6 @@ class PipeCondition(PipeController):
             context=working_memory.generate_context(),
         )
 
-        log.verbose(f"add_alias: {evaluated_expression} -> {self.add_alias_from_expression_to}")
         if self.add_alias_from_expression_to:
             working_memory.add_alias(
                 alias=evaluated_expression,
@@ -376,7 +375,6 @@ class PipeCondition(PipeController):
         # main stuff stays under its own name (the migration idiom: consume it explicitly
         # downstream); it no longer passes through as this pipe's output.
         if SpecialOutcome.is_continue(outcome):
-            log.dev(f"PipeCondition '{self.code}' continued with outcome: {outcome}. Evaluated expression: {evaluated_expression}")
             self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
             # The reason names only the pipe and the outcome: a pipe that force-unwraps this output quotes it to the caller
             # under STRICT disclosure, and the value the expression rendered can be literal text of a condition a host
@@ -458,12 +456,10 @@ class PipeCondition(PipeController):
     ) -> PipeOutput:
         # Validate that the expression template is valid
         try:
-            full_paths = detect_jinja2_required_variables(
+            detect_jinja2_required_variables(
                 template_category=TemplateCategory.EXPRESSION,
                 template_source=self.expression,
             )
-            required_variables = {get_root_from_dotted_path(path) for path in full_paths}
-            log.verbose(f"Expression template is valid, requires variables: {required_variables}")
         except Jinja2DetectVariablesError as exc:
             log.error(f"Dry run failed: could not detect required variables from expression template: {exc}")
             # The expression is the caller's own method. The message quotes neither the expression nor the parser's

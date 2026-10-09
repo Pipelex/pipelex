@@ -94,6 +94,13 @@ class MistralLLMWorker(LLMWorkerAbstract):
         return inference_model.get_instructor_mode() or InstructorMode.TOOLS
 
     @classmethod
+    def _log_reasoning_effort_sent(cls, *, reasoning_effort: "OptionalNullable[MistralReasoningEffort]") -> None:
+        """Say the reasoning effort a call sends, once per call: `check_request` resolves it before the call, so the resolver says nothing."""
+        if reasoning_effort is UNSET:
+            return
+        log.verbose(f"Mistral request sends reasoning_effort={reasoning_effort}")
+
+    @classmethod
     def _resolve_reasoning_effort(
         cls, *, inference_model: InferenceModelSpec, job_params: LLMJobParams
     ) -> "OptionalNullable[MistralReasoningEffort]":
@@ -128,11 +135,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
             match thinking_mode:
                 case ThinkingMode.MANUAL:
                     mistral_effort = get_config().inference.llm.mistral.get_reasoning_level(effort=effort)
-                    if mistral_effort is None:
-                        log.verbose("Mistral reasoning_effort omitted (reasoning disabled)")
-                        return UNSET
-                    log.verbose(f"Mistral reasoning_effort={mistral_effort}")
-                    return mistral_effort
+                    return UNSET if mistral_effort is None else mistral_effort
                 case ThinkingMode.ADAPTIVE:
                     msg = f"Model '{inference_model.desc}' has thinking_mode=adaptive which is not supported for Mistral models"
                     raise LLMCapabilityError(msg)
@@ -150,6 +153,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
         job_params = llm_job.applied_job_params or llm_job.job_params
         messages = await self.mistral_factory.make_simple_messages(llm_job=llm_job)
         reasoning_effort = self._resolve_reasoning_effort(inference_model=self.inference_model, job_params=job_params)
+        self._log_reasoning_effort_sent(reasoning_effort=reasoning_effort)
         try:
             response: ChatCompletionResponse | None = await self.mistral_client_for_text.chat.complete_async(
                 messages=messages,
@@ -257,6 +261,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
         reasoning_effort = self._resolve_reasoning_effort(inference_model=self.inference_model, job_params=job_params)
+        self._log_reasoning_effort_sent(reasoning_effort=reasoning_effort)
         # Deferred import: avoid pulling heavy SDK at module-load time
         from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]
 

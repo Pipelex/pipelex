@@ -61,7 +61,7 @@ def _make_search_job(search_assignment: SearchAssignment) -> SearchJob:
 async def search_gen_sourced_answer(search_assignment: SearchAssignment) -> SearchResultContent:
     authorize_assignment_reads(job_metadata=search_assignment.job_metadata, uri_references=search_assignment.referenced_uris())
     if search_assignment.cogt_run_params.run_mode.is_dry:
-        return dry_search_gen_sourced_answer(search_assignment)
+        return dry_search_gen_sourced_answer()
     worker = _make_search_worker(search_assignment)
     search_job = _make_search_job(search_assignment)
     return await worker.search_sourced_answer(search_job=search_job)
@@ -108,7 +108,7 @@ async def search_gen_structured_object(
     """
     authorize_assignment_reads(job_metadata=search_assignment.job_metadata, uri_references=search_assignment.referenced_uris())
     if search_assignment.cogt_run_params.run_mode.is_dry:
-        return dry_search_gen_structured_object(search_assignment, output_class=output_class)
+        return dry_search_gen_structured_object(output_class=output_class)
     result_dict = await _run_structured_search(search_assignment, schema=output_class)
     # ``is_mock_built=False`` is a statement, not a formality: this data came from the provider, so a
     # failure here is a malformed response and keeps its ``ValidationError`` — it is not the dry-run

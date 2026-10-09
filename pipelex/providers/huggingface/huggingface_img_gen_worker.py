@@ -5,7 +5,6 @@ from huggingface_hub.errors import HfHubHTTPError, InferenceTimeoutError
 from PIL import Image
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import ImgGenParameterError, InferenceErrorCategory, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
@@ -77,9 +76,7 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
     ) -> GeneratedImageRawDetails:
         pil_image = await self._generate_single_image(img_gen_job=img_gen_job)
         output_format = img_gen_job.job_params.output_format or ImageFormat.PNG
-        generated_image = GeneratedImageRawDetails.make_from_pil_image(pil_image=pil_image, image_format=output_format)
-        log.verbose(generated_image, title="generated_image")
-        return generated_image
+        return GeneratedImageRawDetails.make_from_pil_image(pil_image=pil_image, image_format=output_format)
 
     @override
     async def _gen_image_list(
@@ -91,8 +88,7 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
         # HuggingFace's text_to_image doesn't support batch generation directly,
         # so we generate images one at a time
         generated_image_list: list[GeneratedImageRawDetails] = []
-        for idx in range(nb_images):
-            log.verbose(f"Generating image {idx + 1}/{nb_images}")
+        for _ in range(nb_images):
             generated_image = await self._gen_image(img_gen_job=img_gen_job)
             generated_image_list.append(generated_image)
 

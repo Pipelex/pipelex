@@ -227,8 +227,6 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
                 return
             elif name != TEST_DUMMY_NAME:
                 log.warning(f"Key '{name}' already exists in WorkingMemory and will be replaced by something different")
-                log.verbose(f"Existing stuff: {existing_stuff}")
-                log.verbose(f"New stuff: {stuff}")
 
         # it's a new stuff
         self.set_stuff(name=name, stuff=stuff)
@@ -244,11 +242,9 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
         if name:
             self.remove_main_stuff()
             self.add_new_stuff(name=name, stuff=stuff, aliases=[MAIN_STUFF_NAME])
-            log.verbose(f"Setting new main stuff {name}: {stuff.concept.code} = '{stuff.short_desc}'")
         else:
             self.remove_alias_to_main_stuff()
             self.set_stuff(name=MAIN_STUFF_NAME, stuff=stuff)
-            log.verbose(f"Setting new main stuff (unnamed): {stuff.concept.code} = '{stuff.short_desc}'")
 
     def set_alias(self, alias: str, *, target: str) -> None:
         """Add an alias pointing to a target name."""

@@ -1,4 +1,3 @@
-from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import ImgGenAssignment
 from pipelex.cogt.content_generation.dry_mock import dry_img_gen_image_contents
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
@@ -18,9 +17,7 @@ async def img_gen_single_image(img_gen_assignment: ImgGenAssignment) -> Generate
         img_gen_job_config=img_gen_assignment.img_gen_job_config,
         job_metadata=img_gen_assignment.job_metadata,
     )
-    generated_image = await img_gen_worker.gen_image(img_gen_job=img_gen_job)
-    log.verbose(f"generated_image:\n{generated_image}")
-    return generated_image
+    return await img_gen_worker.gen_image(img_gen_job=img_gen_job)
 
 
 async def img_gen_image_list(img_gen_assignment: ImgGenAssignment) -> list[GeneratedImageRawDetails]:
@@ -32,12 +29,10 @@ async def img_gen_image_list(img_gen_assignment: ImgGenAssignment) -> list[Gener
         img_gen_job_config=img_gen_assignment.img_gen_job_config,
         job_metadata=img_gen_assignment.job_metadata,
     )
-    generated_image_list = await img_gen_worker.gen_image_list(
+    return await img_gen_worker.gen_image_list(
         img_gen_job=img_gen_job,
         nb_images=img_gen_assignment.nb_images,
     )
-    log.verbose(f"generated_image_list:\n{generated_image_list}")
-    return generated_image_list
 
 
 async def img_gen_single_image_and_store(

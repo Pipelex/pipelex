@@ -1,6 +1,5 @@
 from enum import StrEnum
 
-from pipelex import log
 from pipelex.cogt.exceptions import LLMCapabilityError
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
@@ -38,7 +37,6 @@ class BedrockFactory:
             raise BedrockFactoryError(msg) from exc
 
         bedrock_async_client: BedrockClientProtocol
-        log.verbose(f"Using '{sdk_variant}' for BedrockClient")
         match sdk_variant:
             case BedrockSdkVariant.AIOBOTO:
                 from pipelex.providers.bedrock.bedrock_client_aiobotocore import BedrockClientAiobotocore  # ruff: ignore[import-outside-top-level]

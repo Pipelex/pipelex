@@ -2,7 +2,6 @@ from typing import Any, Literal
 
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.judgment.judgment_models import ChoiceQuestion, JudgmentKind, JudgmentQuestion, RatingQuestion, YesNoQuestion
 from pipelex.cogt.judgment.judgment_setting import JudgmentModelChoice
 from pipelex.cogt.models.model_deck_check import check_judgment_choice_with_deck
@@ -183,7 +182,6 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeJudgeOutput:
-        log.dev(f"✨ PipeJudge '{self.code}' asking a {self.judgment_kind} question with judgment choice '{self.judgment_choice or 'default'}' ✨")
 
         # Resolved per run into a local and never cached onto `self`, for the reason `pipe_llm.py`
         # states about its own settings.

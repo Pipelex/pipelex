@@ -3,7 +3,6 @@ from typing import Any
 
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import CogtError, ExtractCapabilityError, ExtractInputFormatError
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job import ExtractJob
@@ -113,8 +112,6 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
         self,
         extract_job: ExtractJob,
     ) -> ExtractOutput:
-        log.dev(f"✨ {self.desc} ✨")
-
         # Verify that the job is valid
         extract_job.validate_before_execution()
 

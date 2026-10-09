@@ -333,7 +333,6 @@ class TelemetryManager(TelemetryManagerAbstract):
             try:
                 log.verbose("Shutting down OTel TracerProvider (flushing pending spans)...")
                 self._tracer_provider.shutdown()
-                log.verbose("OTel TracerProvider shutdown complete")
             except Exception as exc:  # ruff: ignore[blind-except]
                 # Suppress any shutdown errors to avoid cascading failures
                 log.debug(f"Error during TracerProvider shutdown: {exc}")
@@ -389,7 +388,8 @@ class TelemetryManager(TelemetryManagerAbstract):
                         ),
                     )
             case PostHogMode.OFF:
-                log.verbose(f"Custom telemetry is off, skipping event '{event_name}' for custom client")
+                # Custom telemetry is off: the event goes nowhere.
+                pass
 
     @classmethod
     def resolve_event_caller_identity(cls, *, run_metadata: "RunMetadata | None") -> CallerIdentity | None:
@@ -424,11 +424,9 @@ class TelemetryManager(TelemetryManagerAbstract):
                 properties=capture_properties,
                 groups=identity.groups or None,
             )
-            log.verbose(f"Tracked identified event '{event_name}' with properties: {capture_properties}")
         else:
             capture_properties[PostHogAttr.PROCESS_PERSON_PROFILE] = False
             self.custom_posthog_client.capture(event_name, properties=capture_properties)
-            log.verbose(f"Tracked anonymous event '{event_name}' with properties: {capture_properties}")
 
     @override
     @contextmanager
@@ -508,12 +506,6 @@ class TelemetryManager(TelemetryManagerAbstract):
                 only with none in scope leaves the stream's fallback.
         """
         caller_identity = self.resolve_event_caller_identity(run_metadata=run_metadata)
-        log.verbose(
-            f"[Telemetry] Emitting trace start event:\n"
-            f"  trace_name='{trace_name}'\n"
-            f"  trace_name_redacted='{trace_name_redacted}'\n"
-            f"  trace_id={trace_id:032x}"
-        )
 
         # Send to PostHog if configured (uses full trace name based on user's capture settings)
         if self.custom_posthog_client and self.telemetry_config.custom_posthog.tracing.enabled:

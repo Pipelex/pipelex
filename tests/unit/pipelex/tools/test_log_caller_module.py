@@ -70,7 +70,6 @@ class TestLoggerNames:
         with caplog.at_level(LOGGING_LEVEL_VERBOSE):
             log.verbose("verbose")
             log.debug("debug")
-            log.dev("dev")
             log.info("info")
             log.warning("warning")
             log.error("error")
@@ -78,5 +77,5 @@ class TestLoggerNames:
             log.info({"structured": True})
 
         messages = [record.getMessage() for record in _own_records(caplog, name=__name__)]
-        assert messages[:7] == ["verbose", "debug", "dev", "info", "warning", "error", "critical"]
-        assert len(messages) == 8
+        assert messages[:6] == ["verbose", "debug", "info", "warning", "error", "critical"]
+        assert len(messages) == 7

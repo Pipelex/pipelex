@@ -31,7 +31,6 @@ class TestLogBeforeConfigure:
         with caplog.at_level(LOGGING_LEVEL_VERBOSE):
             fresh.verbose("verbose")
             fresh.debug("debug")
-            fresh.dev("dev")
             fresh.info("info", fields={"files": 1})
             fresh.warning("warning", problem_id="some_problem")
             try:
@@ -45,12 +44,12 @@ class TestLogBeforeConfigure:
         assert logging.getLogger().handlers == root_handlers_before
         records = _own_records(caplog)
         messages = [record.getMessage() for record in records]
-        assert messages[:5] == ["verbose", "debug", "dev", "info", "warning"]
-        assert messages[5] == "error"
-        assert records[5].exc_info is not None
-        assert records[5].exc_info[0] is ValueError
-        assert messages[6] == "critical"
-        assert messages[7].startswith("Data:")
+        assert messages[:4] == ["verbose", "debug", "info", "warning"]
+        assert messages[4] == "error"
+        assert records[4].exc_info is not None
+        assert records[4].exc_info[0] is ValueError
+        assert messages[5] == "critical"
+        assert messages[6].startswith("Data:")
         assert all(record.name == __name__ for record in _own_records(caplog))
 
     def test_a_cold_process_routes_to_the_stdlib_default_handling(self) -> None:

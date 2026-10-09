@@ -25,7 +25,6 @@ from pipelex.plugins.model_handle import ModelHandle
 from pipelex.providers.azure_rest.azure_exceptions import AzureCredentialsError
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.runtime_hub import get_models_manager
-from pipelex.tools.log.log import log
 
 
 class AzureImgGenWorker(ImgGenWorkerAbstract):
@@ -248,7 +247,6 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
 
         # Extract usage tokens if available
         if (usage_dict := response_dict.get("usage")) and (img_gen_tokens_usage := img_gen_job.job_report.img_gen_tokens_usage):
-            log.debug(usage_dict, title="Azure img gen usage")
             nb_tokens: NbTokensByCategoryDict = {}
             input_tokens = usage_dict.get("prompt_tokens")
             if input_tokens is None:

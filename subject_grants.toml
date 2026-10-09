@@ -1164,21 +1164,9 @@ rationale = "Consumes the llm_assignment; single operand."
 param = "render_assignment"
 rationale = "Dry-run mock of the render leaf: mocks the one render assignment it is handed."
 
-["pipelex/cogt/content_generation/dry_mock.py::dry_render_page_views"]
-param = "render_assignment"
-rationale = "Consumes the render_assignment; single operand."
-
-["pipelex/cogt/content_generation/dry_mock.py::dry_search_gen_sourced_answer"]
-param = "search_assignment"
-rationale = "Consumes the search_assignment; single operand."
-
 ["pipelex/cogt/content_generation/dry_mock.py::dry_search_gen_structured"]
 param = "search_object_assignment"
 rationale = "Consumes the search_object_assignment; single operand."
-
-["pipelex/cogt/content_generation/dry_mock.py::dry_search_gen_structured_object"]
-param = "search_assignment"
-rationale = "Worker verb–object: processes the search_assignment; single operand."
 
 ["pipelex/cogt/content_generation/dry_mock.py::dry_templating_gen_text"]
 param = "templating_assignment"
@@ -5436,10 +5424,6 @@ rationale = "Predicate on the function; single operand."
 param = "func"
 rationale = "Predicate on the function; single operand."
 
-["pipelex/system/registries/func_registry.py::FuncRegistry.log"]
-param = "message"
-rationale = "Verb-object: logs the message; single operand."
-
 ["pipelex/system/registries/func_registry.py::FuncRegistry.register_function"]
 param = "func"
 rationale = "Verb-object: registers the function; options stay keyword."
@@ -5455,10 +5439,6 @@ rationale = "Verb-object: registers the functions mapping; single operand."
 ["pipelex/system/registries/func_registry.py::FuncRegistry.register_ineligible_function"]
 param = "func"
 rationale = "Verb-object: records the function; reason stays keyword."
-
-["pipelex/system/registries/func_registry.py::FuncRegistry.set_logger"]
-param = "logger"
-rationale = "Setter: installs the logger; single self-labelling operand."
 
 ["pipelex/system/registries/func_registry.py::FuncRegistry.unregister_function"]
 param = "func"
@@ -5921,10 +5901,6 @@ param = "content"
 rationale = "Logs the content; single operand (formatting keyword-only)."
 
 ["pipelex/tools/log/log.py::Log.debug"]
-param = "content"
-rationale = "Logs the content; single operand (formatting keyword-only)."
-
-["pipelex/tools/log/log.py::Log.dev"]
 param = "content"
 rationale = "Logs the content; single operand (formatting keyword-only)."
 

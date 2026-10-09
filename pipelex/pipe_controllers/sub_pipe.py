@@ -2,7 +2,6 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, field_validator
 
-from pipelex import log
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError, PipeRunInputsError
@@ -187,7 +186,6 @@ class SubPipe(BaseModel):
                     variable_name=missing_names[0],
                     concept_code=None,
                 )
-            log.verbose(working_memory.get_existing_stuffs(names=required_stuff_names), title=f"Required stuffs for {self.pipe_code}")
             pipe_output = await get_pipe_router().run(
                 pipe_job=PipeJobFactory.make_pipe_job(
                     pipe=sub_pipe,

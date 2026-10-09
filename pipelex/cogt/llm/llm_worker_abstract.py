@@ -167,12 +167,12 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         # Skip if telemetry is disabled (no otel_context)
         if otel_context is None:
-            log.verbose("[OTel] No otel_context - skipping LLM span")
+            log.verbose("OTel: the job carries no otel_context, so no LLM span is started")
             return None
 
         tracer = TelemetryManagerAbstract.get_instance_tracer()
         if tracer is None:
-            log.verbose("[OTel] No tracer available for LLM span")
+            log.verbose("OTel: no tracer is available, so no LLM span is started")
             return None
 
         unit_job_id = job_metadata.unit_job_id
@@ -273,8 +273,6 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # Use trace_id and span_id from otel_context (precomputed)
         # The span_id in otel_context is the parent pipe's span - use it as parent
         parent_span_id = otel_context.span_id
-        log.verbose(f"[OTel] LLM span:\n  pipe_code='{pipe_code}'\n  pipeline_run_id='{pipeline_run_id}'\n  parent_span_id={parent_span_id:016x}")
-
         parent_span_context = SpanContext(
             trace_id=otel_context.trace_id,
             span_id=parent_span_id,
@@ -295,34 +293,12 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         if span.get_span_context() == parent_span_context:
             return None
 
-        # Debug logging, under the span it announces, so the line's `pipelex.*` fields name that span
-        span_ctx = span.get_span_context()
-        with pipelex_span_active(span=span):
-            log.verbose(
-                f"[OTel] LLM SPAN STARTED:\n"
-                f"  pipe_code='{pipe_code}'\n"
-                f"  pipeline_run_id='{pipeline_run_id}'\n"
-                f"  trace_id={span_ctx.trace_id:032x}\n"
-                f"  span_id={span_ctx.span_id:016x}\n"
-                f"  parent_span_id={parent_span_id:016x}"
-            )
-
         return span
 
     def _end_otel_span_with_completion_text(self, span: Span | None, *, llm_job: LLMJob, completion_text: str) -> None:
         """End the OTel span, recording usage and status. Safe to call if span is None."""
         if span is None:
             return
-
-        job_metadata = llm_job.job_metadata
-        span_ctx = span.get_span_context()
-        log.verbose(
-            f"[OTel] LLM SPAN ENDING:\n"
-            f"  pipe_code='{job_metadata.pipe_code}'\n"
-            f"  pipeline_run_id='{job_metadata.run_metadata.pipeline_run_id}'\n"
-            f"  trace_id={span_ctx.trace_id:032x}\n"
-            f"  span_id={span_ctx.span_id:016x}"
-        )
 
         # Record token usage if available
         if llm_job.job_report.llm_tokens_usage:
@@ -345,16 +321,6 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         if span is None:
             return
 
-        job_metadata = llm_job.job_metadata
-        span_ctx = span.get_span_context()
-        log.verbose(
-            f"[OTel] LLM SPAN ENDING:\n"
-            f"  pipe_code='{job_metadata.pipe_code}'\n"
-            f"  pipeline_run_id='{job_metadata.run_metadata.pipeline_run_id}'\n"
-            f"  trace_id={span_ctx.trace_id:032x}\n"
-            f"  span_id={span_ctx.span_id:016x}"
-        )
-
         # Record token usage if available
         if llm_job.job_report.llm_tokens_usage:
             tokens = llm_job.job_report.llm_tokens_usage.nb_tokens_by_category
@@ -372,20 +338,10 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         span.set_status(Status(StatusCode.OK))
         span.end()
 
-    def _end_otel_span_with_error(self, span: Span | None, *, llm_job: LLMJob, error: BaseException) -> None:
+    def _end_otel_span_with_error(self, span: Span | None, *, error: BaseException) -> None:
         """End the OTel span, recording the error. Safe to call if span is None."""
         if span is None:
             return
-
-        job_metadata = llm_job.job_metadata
-        span_ctx = span.get_span_context()
-        log.verbose(
-            f"[OTel] LLM SPAN ENDING WITH ERROR:\n"
-            f"  pipe_code='{job_metadata.pipe_code}'\n"
-            f"  pipeline_run_id='{job_metadata.run_metadata.pipeline_run_id}'\n"
-            f"  trace_id={span_ctx.trace_id:032x}\n"
-            f"  span_id={span_ctx.span_id:016x}"
-        )
 
         span.record_exception(error)
         span.set_status(Status(StatusCode.ERROR, str(error)))
@@ -399,8 +355,6 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         self,
         llm_job: LLMJob,
     ):
-        log.dev(f"✨ {self.desc} ✨")
-
         # Verify that the job is valid
         llm_job.validate_before_execution()
 
@@ -502,9 +456,6 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         self,
         llm_job: LLMJob,
     ) -> str:
-        log.verbose("LLM Worker gen_text")
-        log.verbose(llm_job.llm_prompt.desc(), title="llm_prompt")
-
         # metadata
         llm_job.job_metadata.unit_job_id = UnitJobId.LLM_GEN_TEXT
 
@@ -531,7 +482,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
                 # failure stays in telemetry. On success `_after_text_job` already ended the span.
                 pending_error = sys.exc_info()[1]
                 if pending_error is not None and span is not None and span.is_recording():
-                    self._end_otel_span_with_error(span=span, llm_job=llm_job, error=pending_error)
+                    self._end_otel_span_with_error(span=span, error=pending_error)
 
     @abstractmethod
     async def _gen_text(
@@ -546,9 +497,6 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         *,
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
-        log.verbose(f"LLM Worker gen_object using {self.desc}")
-        log.verbose(llm_job.llm_prompt.desc(), title="llm_prompt")
-
         # metadata
         llm_job.job_metadata.unit_job_id = UnitJobId.LLM_GEN_OBJECT
 
@@ -580,7 +528,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
                 # failure stays in telemetry. On success `_after_object_job` already ended the span.
                 pending_error = sys.exc_info()[1]
                 if pending_error is not None and span is not None and span.is_recording():
-                    self._end_otel_span_with_error(span=span, llm_job=llm_job, error=pending_error)
+                    self._end_otel_span_with_error(span=span, error=pending_error)
 
     @abstractmethod
     async def _gen_object(

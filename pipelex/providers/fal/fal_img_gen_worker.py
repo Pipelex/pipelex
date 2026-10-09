@@ -1,11 +1,10 @@
 from typing import Any
 
-from fal_client import AsyncClient, InProgress
+from fal_client import AsyncClient
 from fal_client.auth import MissingCredentialsError
 from fal_client.client import FalClientError, FalClientHTTPError, FalClientTimeoutError
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import ImgGenParameterError, InferenceErrorCategory, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
@@ -54,23 +53,11 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
         if fal_application is None:
             msg = f"Model '{self.inference_model.name}' rules must include a 'model_choice' entry"
             raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
-        log.verbose(args_dict, title=f"Fal arguments, application={fal_application}")
         try:
             handler = await self.fal_async_client.submit(
                 application=fal_application,
                 arguments=args_dict,
             )
-
-            log_index = 0
-            async for event in handler.iter_events(with_logs=True):
-                if isinstance(event, InProgress):
-                    if not event.logs:
-                        continue
-                    new_logs = event.logs[log_index:]
-                    for event_log in new_logs:
-                        log.verbose(event_log["message"], title="FAL Log")
-                    log_index = len(event.logs)
-
             return await handler.get()
         except (MissingCredentialsError, FalClientHTTPError, FalClientTimeoutError, FalClientError) as exc:
             metadata = extract_fal_metadata(exc)
@@ -89,9 +76,7 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
         img_gen_job: ImgGenJob,
     ) -> GeneratedImageRawDetails:
         fal_result = await self._submit_and_get_result(img_gen_job=img_gen_job, nb_images=1)
-        generated_image = FalFactory.make_generated_image(fal_result=fal_result)
-        log.verbose(generated_image, title="generated_image")
-        return generated_image
+        return FalFactory.make_generated_image(fal_result=fal_result)
 
     @override
     async def _gen_image_list(
@@ -101,6 +86,4 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
         nb_images: int,
     ) -> list[GeneratedImageRawDetails]:
         fal_result = await self._submit_and_get_result(img_gen_job=img_gen_job, nb_images=nb_images)
-        generated_image_list = FalFactory.make_generated_image_list(fal_result=fal_result)
-        log.verbose(generated_image_list, title="generated_image_list")
-        return generated_image_list
+        return FalFactory.make_generated_image_list(fal_result=fal_result)

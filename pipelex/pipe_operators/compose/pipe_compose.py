@@ -3,7 +3,6 @@ from typing import Any, Literal
 from pydantic import Field
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
 from pipelex.config import get_config
@@ -221,7 +220,6 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             result_name=output_name,
         )
         working_memory = compose_result.memory
-        log.verbose(f"Template rendered text:\n{compose_result.rendered_text}")
 
         # Capture execution data for the graph tracer
         execution_data_dict: dict[str, Any] = {
@@ -268,7 +266,6 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         except PipeComposeError as exc:
             msg = f"In pipe '{self.code}' (output: {self.output.concept.code}): {exc.message}"
             raise PipeComposeError(msg) from exc
-        log.verbose(f"Composed structured content: {the_content}")
 
         output_stuff = StuffFactory.make_stuff(concept=self.output.concept, content=the_content, name=output_name)
 

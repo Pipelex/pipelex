@@ -2,7 +2,7 @@
 
 The sink declares the transport's shape rather than importing it, it computes the severity itself
 rather than letting the library derive one from the level, because the library's own normalization has
-no spelling for our ``VERBOSE`` and ``DEV``, and it rejects the library's own export path by the logger
+no spelling for our ``VERBOSE``, and it rejects the library's own export path by the logger
 names and the thread name the library chooses. Every one of those is an assumption about a third party
 whose change would break a production sink silently and no other test would see: a renamed worker
 thread or a renamed transport logger would let a refused batch be reported through the pipeline that

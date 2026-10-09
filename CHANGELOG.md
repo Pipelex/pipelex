@@ -5,6 +5,11 @@
 ### Changed
 
 - **Hosted-run guidance in messages and help**: the next step of a refused Pipelex API key names `pipelex login` and the working directory's `.env` rather than a shell export, which a `.env` file setting the key overrides, and `pipelex login` names `[run] execution = "hosted"` rather than `pipelex init` to make hosted runs the default. A CLI run missing a provider key, and the `pipelex doctor` report, offer the hosted Pipelex API as a way out; a failed `pipelex-agent` boot points at `pipelex-agent migrate` and `pipelex-agent init` rather than the interactive `pipelex init config`; and `FormerReleaseConfigError` carries its remedy, `pipelex migrate`, as its `user_action`. The `run` help of both CLIs names hosted runs, catalog ids, local method directories and TOML or inline inputs, and `pipelex-agent --help` describes the program rather than printing an internal note.
+- **Debug and verbose log output**: the `DEBUG` and `VERBOSE` lines are fewer and shorter, each naming what it is about rather than narrating every step, and none carries a payload any more: no base64 data, prompt, rendered template, raw response or model dump. An LLM call's reasoning setting is logged once per call rather than twice, and the error for undecodable base64 input gives the input's length instead of its first bytes.
+
+### Removed
+
+- **The DEV log level (Breaking)**: `LogLevel.DEV` and `log.dev()` are gone; the levels are `VERBOSE`, `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` and `OFF`. **Migration:** run `pipelex migrate`; ledger entry `pipelex-config@6` rewrites `DEV` to `DEBUG` wherever a configuration file names it, as `default_log_level` or as a level under `[runtime.log.package_log_levels]`, and until then a file naming it stops the boot on the invalid level with a message pointing at `pipelex migrate`. Code calling `log.dev()` calls `log.debug()` instead.
 
 ## [v0.79.1] - 2026-10-09
 

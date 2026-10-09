@@ -1,6 +1,5 @@
 from uuid import uuid4
 
-from pipelex import log
 from pipelex.pipeline.pipeline import Pipeline
 
 
@@ -8,7 +7,6 @@ class PipelineFactory:
     @classmethod
     def make_pipeline(cls, *, pipeline_run_id: str | None = None) -> Pipeline:
         pipeline_run_id = pipeline_run_id or cls.make_pipeline_run_id()
-        log.verbose(f"Making new pipeline with run id: {pipeline_run_id}")
         return Pipeline(
             pipeline_run_id=pipeline_run_id,
         )

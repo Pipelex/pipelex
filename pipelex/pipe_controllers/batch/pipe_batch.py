@@ -222,7 +222,6 @@ class PipeBatch(PipeController):
             if isinstance(branch_resolved, AbsenceRecord):
                 # Compaction (D4): an absent branch result cannot occupy a list slot — it is
                 # dropped, so the aggregated output holds only the found items (compactMap).
-                log.verbose(f"PipeBatch '{self.code}': dropping absent branch result ({branch_resolved.reason})")
                 continue
             output_items.append(branch_resolved.content)
             branch_output_stuff_codes.append(branch_resolved.stuff_code)

@@ -319,7 +319,6 @@ class ReportingManager(ReportingProtocol):
 
     @override
     def report_inference_job(self, inference_job: InferenceJobAbstract):
-        log.verbose(f"Inference job '{inference_job.job_metadata.unit_job_id}' completed in {inference_job.job_metadata.duration:.2f} seconds")
         if isinstance(inference_job, LLMJob):
             self._report_llm_job(llm_job=inference_job)
         elif isinstance(inference_job, ImgGenJob):

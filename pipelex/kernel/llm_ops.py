@@ -210,8 +210,6 @@ async def generate_object_content(
     with job_metadata.log_context():
         content_generator = get_content_generator()
         if is_multiple_output:
-            count_desc = f"{fixed_nb_output}x" if fixed_nb_output else "list of "
-            log.verbose(f"Kernel generating {count_desc}{output_class.__name__} by object_direct")
             generated_objects = await content_generator.make_object_list(
                 job_metadata=job_metadata,
                 cogt_run_params=cogt_run_params,
@@ -222,7 +220,6 @@ async def generate_object_content(
             )
             return ListContent(items=generated_objects)
 
-        log.verbose(f"Kernel generating a single {output_class.__name__} by object_direct")
         return await content_generator.make_object(
             job_metadata=job_metadata,
             cogt_run_params=cogt_run_params,

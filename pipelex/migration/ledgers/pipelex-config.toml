@@ -12,7 +12,7 @@ id = "pipelex-config"
 title = "The main Pipelex configuration"
 base_file = "pipelex.toml"
 tier_glob = "pipelex_*.toml"
-current_schema_version = 5
+current_schema_version = 6
 min_supported_schema_version = 0
 
 # This entry is inserted *below* the reshape rather than appended above it, and the order is what
@@ -447,3 +447,36 @@ key = "generic_poor_logger"
 kind = "delete_key"
 table_path = ["runtime", "log"]
 key = "is_console_logging_enabled"
+
+# Safe, because the remap legality rule holds: both paths are enum-typed at this version and `DEV` is no
+# longer a member, so a current-valid file cannot carry it and a replay over one skips. `DEBUG` rather than
+# `INFO` because `DEV` sat between them and a file that chose it asked to see more than `INFO` shows; the
+# few lines that used `DEV` now log at `DEBUG` or `VERBOSE`, or are gone.
+[[migration]]
+id = "pipelex-config@6"
+to_schema_version = 6
+introduced_in = "0.80.0"
+breaking = true
+safety = "safe"
+title = "Retire the DEV log level: a file naming it logs at DEBUG"
+description = """
+The `DEV` log level, which sat between `DEBUG` and `INFO`, is gone, along with `log.dev()`. A file that \
+names it as `default_log_level` or as a level under `[runtime.log.package_log_levels]` has it rewritten to \
+`DEBUG`.
+"""
+guidance = """
+Nothing to decide. `DEBUG` shows everything `DEV` showed and the debug lines below it, which are now the \
+lines a diagnosis needs. Set `INFO` instead where that is too much.
+"""
+
+[[migration.ops]]
+kind = "remap_value"
+table_path = ["runtime", "log"]
+key = "default_log_level"
+mapping = { DEV = "DEBUG" }
+
+[[migration.ops]] # the package names are the user's own keys, so `*` reaches each of them
+kind = "remap_value"
+table_path = ["runtime", "log", "package_log_levels"]
+key = "*"
+mapping = { DEV = "DEBUG" }

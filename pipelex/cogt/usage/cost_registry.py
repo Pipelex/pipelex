@@ -117,8 +117,6 @@ class CostRegistry(RootModel[CostRegistryRoot]):
         if not tokens_usages:
             if pipeline_run_id != "untitled":
                 log.warning(f"No report to generate for pipeline '{pipeline_run_id}'")
-            else:
-                log.verbose(f"No report to generate for pipeline '{pipeline_run_id}'")
             return
         cls.render_report(
             cls.aggregate_costs(tokens_usages=tokens_usages),

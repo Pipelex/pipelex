@@ -19,7 +19,7 @@ default_log_level = "INFO"
 ```
 
 - Sets the default logging level for all loggers
-- Valid values: `"VERBOSE"`, `"DEBUG"`, `"DEV"`, `"INFO"`, `"WARNING"`, `"ERROR"`, `"CRITICAL"`, `"OFF"`
+- Valid values: `"VERBOSE"`, `"DEBUG"`, `"INFO"`, `"WARNING"`, `"ERROR"`, `"CRITICAL"`, `"OFF"`; what a line at each level means is in [Logging](../../tools/logging.md#log-levels)
 - `"OFF"` silences the loggers `[runtime.log.package_log_levels]` does not pin; Pipelex's own loggers are pinned there at `INFO`, so silencing them, whichever sink is selected, is `pipelex = "OFF"` in that section
 
 ### Package-Specific Log Levels
@@ -254,7 +254,7 @@ The sink refreshes its credentials once when it is built, before the transport s
 
 Each record becomes one Cloud Logging entry with a JSON payload:
 
-- The level maps onto the Cloud Logging severity scale. That scale has nothing below `DEBUG`, so Pipelex's two custom levels, `VERBOSE` and `DEV`, both land there
+- The level maps onto the Cloud Logging severity scale. That scale has nothing below `DEBUG`, so Pipelex's custom `VERBOSE` level lands there
 - The payload carries `message`, `logger` and `exception` when the record carries one, `pipelex.trace_id` and `pipelex.span_id` when a Pipelex span is active, the pipe's own or the LLM call's, written exactly as the `json` sink writes them, then every field and the `data` attribute flat beside them. The keys the `json` sink reserves are reserved here too, `time`, `severity`, `trace_id`, `span_id` and `trace_flags` included although the payload carries none of them — the client library takes the time and the severity out of band, and the entry's own `trace`, `spanId` and `traceSampled` carry the current span — so a field named like one of them is carried under a `field_` prefix under either sink rather than under one and not the other; a value JSON cannot carry — a non-finite float, a model, a circular structure — is written as text rather than costing the line
 - The run-scoped identifiers become the entry's **labels** rather than payload keys: `request_id`, `pipeline_run_id` and `pipe_run_id`, whichever of them the record carries. Cloud Logging indexes labels, so these are what a query filters a run by
 - The entry's `trace`, `spanId` and `traceSampled` name OpenTelemetry's current span, your own code's, the trace project-qualified as `projects/<project>/traces/<trace-id>`, so Cloud Logging files the line under your trace. A line logged where no current span names a trace carries none of the three, inside a Pipelex run too: the `pipeline_run_id` label is what selects a run's lines, and the `pipelex.*` payload keys name its spans
@@ -325,6 +325,10 @@ Two of those keys chose a behaviour their deletion undoes, and no operation in t
 - `is_console_logging_enabled = false` suppressed every record Pipelex's own log calls emitted. Its equivalent is `pipelex = "OFF"` under `[runtime.log.package_log_levels]`, which deep-merges over the base's `INFO` and leaves the third-party levels alone; `default_log_level` governs only the loggers that section does not pin, so on its own it silences none of Pipelex's records. Silence for everything takes `default_log_level = "OFF"` and every entry of that section at `OFF`, and sending the records elsewhere instead means selecting the sink that goes there. `is_console_logging_enabled = true` was the default and asks for nothing: the migration deletes it and the new default renders the same console.
 - `log_mode = "poor"` chose a plain handler for a process with no terminal; that process now sets `sink = "json"`. `log_mode = "rich"` chose what `console` renders, and asks for nothing either.
 - `poor_loggers` and `generic_poor_logger` have nothing to carry over: every record goes to the one selected sink.
+
+## Migrating From the DEV Level
+
+The `DEV` level, which sat between `DEBUG` and `INFO`, is gone, and so is `log.dev()`. Run `pipelex migrate`: ledger entry `pipelex-config@6` rewrites `DEV` to `DEBUG` wherever a file names it, as `default_log_level` or as a level under `[runtime.log.package_log_levels]`. `DEBUG` shows everything `DEV` showed; set `INFO` instead where that is too much. A file that still names `DEV` stops the boot on the invalid level, and the message names this migration and `pipelex migrate`.
 
 ## Best Practices
 

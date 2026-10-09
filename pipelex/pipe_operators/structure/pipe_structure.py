@@ -2,7 +2,6 @@ from typing import Any, Literal
 
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import LLMCompletionError, ModelChoiceNotFoundError
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting
@@ -178,8 +177,6 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
             what_failed = "object list" if is_multiple_output else "single object"
             msg = f"Error generating {what_failed} in PipeStructure {location}: {exc}"
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
-
-        log.verbose(f"PipeStructure '{self.code}' produced {content_class.__name__} (list={is_multiple_output})")
 
         working_memory = store_result(
             memory=working_memory,

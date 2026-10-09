@@ -18,7 +18,7 @@ def _make_local_storage_provider(config: StorageProviderConfig) -> StorageProvid
         msg = "local config is required when method is local"
         raise StorageConfigError(msg)
     config.local.lazy_validate()
-    log.verbose(f"Using local storage at: {config.local.local_storage_path}")
+    log.debug(f"Using local storage at: {config.local.local_storage_path}")
     return LocalStorageProvider(root_path=Path(config.local.local_storage_path))
 
 
@@ -27,7 +27,7 @@ def _make_in_memory_storage_provider(config: StorageProviderConfig) -> StoragePr
         msg = "in_memory config is required when method is in_memory"
         raise StorageConfigError(msg)
     config.in_memory.lazy_validate()
-    log.verbose("Using in-memory storage")
+    log.debug("Using in-memory storage")
     return InMemoryStorageProvider()
 
 
@@ -36,7 +36,7 @@ def _make_s3_storage_provider(config: StorageProviderConfig) -> StorageProviderA
         msg = "S3 config is required when method is s3"
         raise StorageConfigError(msg)
     config.s3.lazy_validate()
-    log.verbose(f"Using S3 storage: bucket={config.s3.bucket_name}, region={config.s3.region}")
+    log.debug(f"Using S3 storage: bucket={config.s3.bucket_name}, region={config.s3.region}")
     return S3StorageProvider(
         bucket_name=config.s3.bucket_name,
         region=config.s3.region,
@@ -49,7 +49,7 @@ def _make_gcp_storage_provider(config: StorageProviderConfig) -> StorageProvider
         msg = "GCP config is required when method is gcp"
         raise StorageConfigError(msg)
     config.gcp.lazy_validate()
-    log.verbose(f"Using GCP storage: bucket={config.gcp.bucket_name}, project={config.gcp.project_id}")
+    log.debug(f"Using GCP storage: bucket={config.gcp.bucket_name}, project={config.gcp.project_id}")
     return GcpStorageProvider(
         bucket_name=config.gcp.bucket_name,
         project_id=config.gcp.project_id,

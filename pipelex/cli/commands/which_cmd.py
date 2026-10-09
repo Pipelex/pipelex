@@ -59,7 +59,6 @@ def do_which_pipe(pipe_code: str, *, library_dirs: list[Path], source_label: str
         source_path = get_pipe_source(pipe_code=pipe_code)
         if source_path:
             console.print(f"  Source: [cyan]{source_path}[/cyan]")
-        log.verbose(f"Pipe '{pipe_code}' resolved", title="which")
         console.print("")
         return True
     else:
