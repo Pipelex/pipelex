@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:eb78038e1f2fe78d06f60a6af4327c2fcba3d92292d5b856d88f21e893b79b96"
+digest = "sha256:13211c0b5189edf723da8779be456ddd41d0a13eb5f352b6d08f0b91bb314e9b"
 reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-10-09T11:47:00Z"
-rationale = "real-catch: the trigger changes are this branch's help and next-step text: the run help of both CLIs (catalog ids, local method directories, TOML or inline inputs), the pipelex-agent --help description, the login closing line, the agent boot-failure hint, the FormerReleaseConfigError hint moving from the agent lookup dict to the class's user_action, and the doctor's credentials row offering the hosted Pipelex API. Reviewing docs/tools/cli against them caught one stale target: doctor.md did not say the Backend Credentials row now names the hosted Pipelex API, which it now does. run.md already lists inline JSON and the new options, agent-cli.md and migrate.md describe the FormerReleaseConfigError loop the new user_action carries, and the agent CLI CLAUDE.md now says --graph and --costs are ignored on a hosted run; none of the docs quote the changed help strings."
+reviewed_at = "2026-10-09T18:08:28Z"
+rationale = "clean-pass: the trigger change makes the hosted refusal envelope read error_domain and retryable off the problem document through sent_verdict, because pipelex-sdk 0.36+ fills unsent members from its own table and would otherwise mark an unlabelled 503 retryable; the envelope's output is unchanged. docs/tools/cli/agent-cli.md still says what it does (domain, category and retryable are the runner's own, a 429 is inferred retryable, a 503 only when the answer says so, ApiUnreachableError only before the run request left, HostedRunOutcomeUnknownError after), so no docs change; the agent CLI CLAUDE.md got a clause naming sent_verdict, written with the change rather than caught by this review."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -11,7 +11,7 @@ rationale = "real-catch: the trigger changes are this branch's help and next-ste
 "pipelex/cli/agent_cli/_agent_cli.py" = "blob:690be5b3b3f0fbe69ed3e7baddd24538f590de01"
 "pipelex/cli/agent_cli/commands/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/agent_cli_factory.py" = "blob:050ca1344abc4c1ca22d431923e1577681552fe6"
-"pipelex/cli/agent_cli/commands/agent_output.py" = "blob:a3651bb1023350e358d7865c3e9d401b3408b5c7"
+"pipelex/cli/agent_cli/commands/agent_output.py" = "blob:53812c4c3c6664255f9df52c69bf5948258330c8"
 "pipelex/cli/agent_cli/commands/bundle_path_resolver.py" = "blob:a1904517c731afb72af7d49adf6d217dc50b2660"
 "pipelex/cli/agent_cli/commands/check_model_cmd.py" = "blob:3a9c93daecadf266b3eba466904b3d005d448d40"
 "pipelex/cli/agent_cli/commands/codegen/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"

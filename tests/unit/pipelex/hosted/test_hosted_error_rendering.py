@@ -97,6 +97,26 @@ class TestHostedErrorRendering:
         error = _refusal(status=status, body=HostedRefusals.SERVER_FAULT)
         assert hosted_refusal_next_step(error=error) == expected_next_step
 
+    @pytest.mark.parametrize(
+        ("status", "body", "expected_domain", "expected_retryable"),
+        [
+            (422, HostedRefusals.INVALID_BUNDLE, "input", False),
+            (401, HostedRefusals.UNAUTHORIZED, None, None),
+            (500, HostedRefusals.SERVER_FAULT, None, None),
+            (503, HostedRefusals.SERVER_FAULT, None, None),
+        ],
+    )
+    def test_a_refusal_carries_only_the_verdict_the_hosted_api_sent(
+        self, status: int, body: str, expected_domain: str | None, expected_retryable: bool | None
+    ) -> None:
+        """pipelex-sdk fills an unsent member from its own table, which reads a 503 as retryable; the view reports what the server said."""
+        error = _refusal(status=status, body=body)
+
+        view = describe_hosted_error(error=error)
+
+        assert view.error_domain == expected_domain
+        assert view.retryable == expected_retryable
+
     def test_an_unreachable_api_names_the_base_url_settings(self) -> None:
         error = ApiUnreachableError("Could not reach Pipelex API at https://api.test (ConnectError)", api_url=API_URL, code="ConnectError")
 
