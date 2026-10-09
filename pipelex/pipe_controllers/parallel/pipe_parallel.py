@@ -547,7 +547,6 @@ class PipeParallel(PipeController):
                 working_memory.add_new_stuff(name=sub_pipe_output_name, stuff=output_stuff)
             output_stuffs[sub_pipe_output_name] = output_stuff
             output_stuff_contents[sub_pipe_output_name] = output_stuff.content
-            log.verbose(f"PipeParallel '{self.code}': output_stuff_contents[{sub_pipe_output_name}]: {output_stuff_contents[sub_pipe_output_name]}")
 
         # Always combine the branch outputs into the declared output concept and stamp it as main stuff:
         # a pipe run always resolves its declared output — the combine is the parallel's value arm.

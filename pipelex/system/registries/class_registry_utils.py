@@ -118,11 +118,9 @@ class ClassRegistryUtils:
                     import_module_from_file(python_file)
             except ModuleFileError:
                 # Expected: file validation issues (directories with .py extension, etc.)
-                # log.verbose(f"Skipping file {python_file}: {e}")
                 pass
             except ImportError:
                 # Common: missing dependencies, circular imports, relative imports
-                # log.verbose(f"Could not import {python_file}: {e}"
                 pass
             except SyntaxError as exc:
                 # Potentially problematic: invalid Python syntax may indicate broken code

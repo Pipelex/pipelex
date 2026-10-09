@@ -4,7 +4,6 @@ from collections.abc import Mapping
 
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import CogtError, JudgmentAnswerMismatchError, JudgmentCapabilityError
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.inference.prompt_file_checks import check_prompt_documents_are_read, check_prompt_images_are_images
@@ -43,7 +42,6 @@ class JudgmentWorkerAbstract(InferenceWorkerAbstract):
         judgment_job: JudgmentJob,
     ) -> dict[str, JudgmentAnswer]:
         """Answer every question in the job over its state, keyed as the questions were."""
-        log.dev(f"✨ {self.desc} ✨")
         judgment_job.validate_before_execution()
         judgment_job.job_metadata.unit_job_id = UnitJobId.JUDGMENT_ANSWER
         judgment_job.judgment_job_before_start(inference_model=self.inference_model)

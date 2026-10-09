@@ -1227,7 +1227,7 @@ class ModelDeck(ConfigModel):
             served_types_description = ", ".join(f"'{served_type}'" for served_type in served_types)
             log.warning(f"Model handle '{ref.name}' is served as {served_types_description} but was requested as '{model_type}'. Skipping.")
             return None
-        log.verbose(f"Skipping model handle '{model_handle}' because it's was not found in the model deck, it could be an external plugin.")
+        log.verbose(f"Skipping model handle '{model_handle}' because it was not found in the model deck, it could be an external plugin.")
         return None
 
     def is_handle_defined(self, model_handle: str, *, model_type: ModelType) -> bool:
@@ -1343,5 +1343,5 @@ class ModelDeck(ConfigModel):
                 )
             raise model_not_found_error
         if self.inference_models.get(model_type=model_type, handle=model_handle) is None:
-            log.verbose(f"Model handle '{model_handle}' is an alias which resolves to '{inference_model.name}'")
+            log.verbose(f"Model reference '{model_handle}' resolves to model '{inference_model.name}'")
         return inference_model

@@ -10,7 +10,6 @@ from openai import (
 from openai.types.shared_params import Reasoning
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import (
     InferenceErrorCategory,
     LLMCapabilityError,
@@ -115,7 +114,6 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
                     openai_effort = get_config().inference.llm.openai.get_reasoning_level(effort=effort)
                     if openai_effort is None:
                         return None
-                    log.verbose(f"OpenAI Responses reasoning effort={openai_effort}")
                     return Reasoning(effort=openai_effort)
                 case ThinkingMode.ADAPTIVE:
                     msg = f"Model '{inference_model.desc}' has thinking_mode=adaptive which is not supported by the OpenAI Responses API"
@@ -147,6 +145,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
         input_items = await self.openai_responses_factory.make_input_items(llm_job=llm_job)
 
         openai_reasoning = self._resolve_reasoning(inference_model=self.inference_model, job_params=job_params)
+        self._log_reasoning_sent(api_name="OpenAI Responses", settings={"reasoning": openai_reasoning})
 
         try:
             extra_headers, extra_body = self.openai_responses_factory.make_extras(
@@ -198,6 +197,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
         openai_reasoning = self._resolve_reasoning(inference_model=self.inference_model, job_params=job_params)
+        self._log_reasoning_sent(api_name="OpenAI Responses", settings={"reasoning": openai_reasoning})
         from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]
 
         if not hasattr(self.instructor_for_objects, "responses"):

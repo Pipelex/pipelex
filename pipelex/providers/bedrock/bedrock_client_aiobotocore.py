@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 class BedrockClientAiobotocore(BedrockClientProtocol):
     def __init__(self, aws_region: str):
-        log.verbose(f"Init BedrockClientAiobotocore with region '{aws_region}'")
+        log.debug(f"Init BedrockClientAiobotocore with region '{aws_region}'")
         self.aws_region = aws_region
         self.session = get_session()
 

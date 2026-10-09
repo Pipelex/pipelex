@@ -29,9 +29,7 @@ def get_pipelex_mthds_files_from_package() -> list[Path]:
 
             for child in sorted(traversable.iterdir(), key=lambda entry: entry.name):
                 if child.is_file() and is_pipelex_file(Path(child.name)):
-                    mthds_path_str = str(child)
-                    collected.append(Path(mthds_path_str))
-                    log.verbose(f"Found pipelex package MTHDS file: {mthds_path_str}")
+                    collected.append(Path(str(child)))
                 elif child.is_dir():
                     # Skip excluded directories
                     if child.name not in excluded_dirs:

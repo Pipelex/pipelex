@@ -250,7 +250,6 @@ class RuntimeBoot(metaclass=MetaSingleton):
         self.runtime_hub.set_console_print_target(target=log_config.console_print_target)
         log.configure(log_config=log_config)
         self.runtime_hub.set_pretty_print_mode(mode=log_config.pretty_print_mode)
-        log.verbose("Logs are configured")
         if (stale_warning := config_manager.take_stale_configuration_warning()) is not None:
             log.warning(stale_warning)
 
@@ -266,8 +265,6 @@ class RuntimeBoot(metaclass=MetaSingleton):
 
         self.reporting_delegate: ReportingProtocol | None = None
         self.telemetry_manager: TelemetryManagerAbstract | None = None
-
-        log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} runtime init done")
 
     @staticmethod
     def _get_config_file_not_found_error_msg(*, component: BootComponent) -> str:
@@ -617,7 +614,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # no meaning.
         self.class_registry.register_classes(CoreRegistryModels.get_all_models())
         if runtime_manager.is_unit_testing:
-            log.verbose("Registering test models for unit testing")
             self.class_registry.register_classes(TestRegistryModels.get_all_models())
 
         # --- Observers -------------------------------------------------------------------------
@@ -650,8 +646,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         isolated_execution_probe_factory = plugin_registrar.slot_claims.get(HubSlot.ISOLATED_EXECUTION_PROBE)
         if isolated_execution_probe_factory is not None:
             self.runtime_hub.set_isolated_execution_probe(isolated_execution_probe_factory())
-
-        log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} runtime setup done")
 
     def _resolve_hub_slot(self, *, slot: HubSlot, default: Callable[[], _HubSlotImplT]) -> _HubSlotImplT:
         """Resolve a process-global hub slot: a plugin's claimed thunk if present, else the core default.
@@ -935,7 +929,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # and the delete-on-failure handler above is behind us, so a reader can never adopt an instance
         # that is about to be removed from the registry.
         runtime_boot.is_ready = True
-        log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} runtime ready")
+        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} runtime ready")
         return runtime_boot
 
     @classmethod

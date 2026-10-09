@@ -186,7 +186,6 @@ def save_graph_outputs_to_dir(
         file_path = output_dir / "graphspec.json"
         file_path.write_text(graph_outputs.graphspec_json, encoding="utf-8")
         saved_files["graphspec_json"] = file_path
-        log.verbose(f"GraphSpec JSON saved to: {file_path}")
 
     # The graphspec's companions sit beside it under the standard's names: a reader resolves them
     # from the graphspec's directory, whatever the graphspec file is later renamed to.
@@ -200,7 +199,6 @@ def save_graph_outputs_to_dir(
         if text is not None:
             file_path.write_text(text, encoding="utf-8")
             saved_files[output_key] = file_path
-            log.verbose(f"{file_name} saved to: {file_path}")
         elif graph_outputs.graphspec_json is not None and file_path.exists():
             # A written graphspec owns the companions beside it: one left by an earlier run in a reused
             # directory would describe this graph's data with another method's declarations. Said out
@@ -212,18 +210,15 @@ def save_graph_outputs_to_dir(
         file_path = output_dir / "mermaidflow.mmd"
         file_path.write_text(graph_outputs.mermaidflow_mmd, encoding="utf-8")
         saved_files["mermaidflow_mmd"] = file_path
-        log.verbose(f"Mermaidflow MMD saved to: {file_path}")
 
     if graph_outputs.mermaidflow_html is not None:
         file_path = output_dir / "mermaidflow.html"
         file_path.write_text(graph_outputs.mermaidflow_html, encoding="utf-8")
         saved_files["mermaidflow_html"] = file_path
-        log.verbose(f"Mermaidflow HTML saved to: {file_path}")
 
     if graph_outputs.reactflow_html is not None:
         file_path = output_dir / "reactflow.html"
         file_path.write_text(graph_outputs.reactflow_html, encoding="utf-8")
         saved_files["reactflow_html"] = file_path
-        log.verbose(f"ReactFlow HTML saved to: {file_path}")
 
     return saved_files

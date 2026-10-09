@@ -339,37 +339,31 @@ async def _execute_run(
         if isinstance(main_resolved, AbsenceRecord):
             absence_json_path = output_path / "main_stuff.json"
             absence_json_path.write_text(build_absence_json(main_resolved), encoding="utf-8")
-            log.verbose(f"Main stuff absence JSON saved to: {absence_json_path}")
             saved_main_stuff_formats.append("json")
 
             absence_md_path = output_path / "main_stuff.md"
             absence_md_path.write_text(build_absence_markdown(main_resolved), encoding="utf-8")
-            log.verbose(f"Main stuff absence Markdown saved to: {absence_md_path}")
             saved_main_stuff_formats.append("md")
         else:
             main_stuff = main_resolved
             main_stuff_json = await main_stuff.content.rendered_json_async()
             main_stuff_json_path = output_path / "main_stuff.json"
             main_stuff_json_path.write_text(main_stuff_json, encoding="utf-8")
-            log.verbose(f"Main stuff JSON saved to: {main_stuff_json_path}")
             saved_main_stuff_formats.append("json")
 
             main_stuff_md = await main_stuff.content.rendered_markdown_async()
             main_stuff_md_path = output_path / "main_stuff.md"
             main_stuff_md_path.write_text(main_stuff_md, encoding="utf-8")
-            log.verbose(f"Main stuff Markdown saved to: {main_stuff_md_path}")
             saved_main_stuff_formats.append("md")
 
             main_stuff_html = await main_stuff.content.rendered_html_async()
             main_stuff_html_path = output_path / "main_stuff.html"
             main_stuff_html_path.write_text(main_stuff_html, encoding="utf-8")
-            log.verbose(f"Main stuff HTML saved to: {main_stuff_html_path}")
             saved_main_stuff_formats.append("html")
 
             main_stuff_viewer = await render_stuff_viewer(main_stuff)
             main_stuff_viewer_path = output_path / "main_stuff_viewer.html"
             main_stuff_viewer_path.write_text(main_stuff_viewer, encoding="utf-8")
-            log.verbose(f"Main stuff HTML viewer saved to: {main_stuff_viewer_path}")
             saved_main_stuff_formats.append("html_viewer")
 
             # A Document or Image main output also lands as the file itself, under its own name. A dry run
@@ -391,7 +385,6 @@ async def _execute_run(
             working_memory_output_path = str(output_path / _WORKING_MEMORY_FILENAME)
         working_memory_dict = pipe_output.working_memory.smart_dump()
         save_as_json_to_path(object_to_save=working_memory_dict, path=Path(working_memory_output_path))
-        log.verbose(f"Working memory saved to: {working_memory_output_path}")
 
     # Save main_stuff as CSV if requested. CQ1: write to the literal <path> (cwd-relative),
     # NOT resolved under --output-dir. Requires the main stuff to be a flat list (e.g. PersonSummary[]);
@@ -455,7 +448,6 @@ async def _execute_run(
         except (ConceptValueError, PipelexError, OSError) as csv_exc:
             typer.secho(f"Failed to --save-csv to '{save_csv}': {csv_exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from csv_exc
-        log.verbose(f"Main stuff CSV saved to: {save_csv}")
 
     # Render the end-of-run cost report from the usage assembled onto pipe_output (event-sourced).
     # The gate is read off the output itself — pipe_output.tokens_usages is None exactly when cost

@@ -118,9 +118,8 @@ def acquire_library(
 
         effective_dirs, source_label = resolve_library_dirs(library_dirs)
         if effective_dirs:
-            log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}):")
-            for index_dir, dir_path in enumerate(effective_dirs):
-                log.verbose(f"  [{index_dir + 1}] {dir_path}")
+            effective_dirs_desc = ", ".join(str(dir_path) for dir_path in effective_dirs)
+            log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}): {effective_dirs_desc}")
             library_dirs_translation: AbstractContextManager[None] = (
                 translate_to_validate_bundle_error() if library_dirs_are_callers else nullcontext()
             )

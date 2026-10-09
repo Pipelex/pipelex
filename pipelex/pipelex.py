@@ -76,8 +76,6 @@ class Pipelex(RuntimeBoot):
         # pipeline
         self.library_manager: LibraryManagerAbstract | None = None
 
-        log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} init done")
-
     @override
     def setup(
         self,
@@ -202,8 +200,6 @@ class Pipelex(RuntimeBoot):
         self.interpreter_hub.set_pipe_run(
             self._resolve_hub_slot(slot=HubSlot.PIPE_RUN, default=lambda: PipeRun(pipe_router=self.interpreter_hub.get_required_pipe_router()))
         )
-
-        log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done")
 
     @override
     def teardown(self) -> None:
@@ -345,5 +341,5 @@ class Pipelex(RuntimeBoot):
         # and the delete-on-failure handler above is behind us, so a reader can never adopt an instance
         # that is about to be removed from the registry.
         pipelex_instance.is_ready = True
-        log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} ready")
+        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} ready")
         return pipelex_instance

@@ -197,7 +197,6 @@ class TestOtlpLogSink:
         [
             ("verbose", "VERBOSE", SeverityNumber.TRACE),
             ("debug", "DEBUG", SeverityNumber.DEBUG),
-            ("dev", "DEV", SeverityNumber.DEBUG4),
             ("info", "INFO", SeverityNumber.INFO),
             ("warning", "WARN", SeverityNumber.WARN),
             ("error", "ERROR", SeverityNumber.ERROR),

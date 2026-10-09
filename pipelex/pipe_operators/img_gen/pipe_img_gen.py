@@ -3,7 +3,6 @@ from typing import Any, Literal
 from pydantic import Field
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenSize
 from pipelex.cogt.img_gen.img_gen_param_support import ImgGenParamSupport
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting, ImgGenSettingValueError
@@ -207,7 +206,6 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             background=self.background,
             output_format=self.output_format,
         )
-        log.verbose(f"Using img_gen handle: {img_gen_setting.model}")
 
         nb_images: int
         if applied_output_multiplicity is True:
@@ -241,7 +239,6 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             result_name=output_name,
         )
         working_memory = img_gen_result.memory
-        log.verbose(img_gen_result.content, title=f"output stuff content of PipeImg {self.code}")
 
         # Capture execution data for the graph tracer
         execution_data_dict: dict[str, Any] = {

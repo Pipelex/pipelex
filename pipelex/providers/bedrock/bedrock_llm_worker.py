@@ -3,7 +3,6 @@ from typing import Any
 from botocore.exceptions import ClientError
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import LLMCapabilityError, SdkTypeError
 from pipelex.cogt.inference.error_classification import extract_bedrock_metadata
 from pipelex.cogt.inference.error_classify import classify_inference_error
@@ -67,8 +66,6 @@ class BedrockLLMWorker(LLMWorkerAbstract):
     ) -> str:
         job_params = llm_job.applied_job_params or llm_job.job_params
         message = BedrockFactory.make_simple_message(llm_job=llm_job)
-
-        log.verbose(self.inference_model.model_id)
 
         try:
             bedrock_response_text, nb_tokens_by_category = await self.bedrock_client_for_text.chat(

@@ -217,12 +217,16 @@ class PipeBatch(PipeController):
         output_items: list[StuffContent] = []
         branch_output_stuff_codes: list[str] = []
 
-        for pipe_output in pipe_outputs:
+        for branch_index, pipe_output in enumerate(pipe_outputs):
             branch_resolved = pipe_output.working_memory.resolve_main_stuff()
             if isinstance(branch_resolved, AbsenceRecord):
                 # Compaction (D4): an absent branch result cannot occupy a list slot — it is
                 # dropped, so the aggregated output holds only the found items (compactMap).
-                log.verbose(f"PipeBatch '{self.code}': dropping absent branch result ({branch_resolved.reason})")
+                # This line is the only account of why the output list is shorter than its input.
+                log.debug(
+                    "Dropped an absent batch branch result",
+                    fields={"pipe_code": self.code, "branch_index": branch_index, "absence_reason": branch_resolved.reason},
+                )
                 continue
             output_items.append(branch_resolved.content)
             branch_output_stuff_codes.append(branch_resolved.stuff_code)

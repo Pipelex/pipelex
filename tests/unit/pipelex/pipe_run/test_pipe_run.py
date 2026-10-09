@@ -1,7 +1,12 @@
+import logging
+from contextlib import AbstractContextManager, nullcontext
+from typing import Any
+
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, StorageTarget
+from pipelex.pipe_run import pipe_run as pipe_run_module
+from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus, StorageTarget
 from pipelex.pipe_run.exceptions import PipeRouterError, WebhookDeliveryError
 from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
@@ -77,6 +82,44 @@ class TestPipeRun:
         mock_executor_instance.execute.assert_called_once()
         call_kwargs = mock_executor_instance.execute.call_args.kwargs
         assert call_kwargs["request_id"] == "req-direct-mode"
+
+    @pytest.mark.parametrize(
+        ("router_error", "expected_status"),
+        [
+            (None, DeliveryStatus.COMPLETED),
+            (RuntimeError("router blew up"), DeliveryStatus.FAILED),
+        ],
+    )
+    async def test_the_delivery_is_logged_at_debug_with_its_status(
+        self,
+        mocker: MockerFixture,
+        caplog: pytest.LogCaptureFixture,
+        router_error: Exception | None,
+        expected_status: DeliveryStatus,
+    ) -> None:
+        """A user's log says whether delivery ran and for which outcome; the run context stamps the run id."""
+        mock_router = mocker.AsyncMock()
+        mock_router.run = mocker.AsyncMock(return_value=mocker.MagicMock(), side_effect=router_error)
+        mock_executor = mocker.patch("pipelex.pipe_run.pipe_run.DeliveryExecutor")
+        mock_executor.return_value.execute = mocker.AsyncMock()
+        mock_job = mocker.MagicMock()
+        mock_job.job_metadata = JobMetadata(
+            run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-delivery-log", storage_scope="test/scope", read_scope=None)
+        )
+
+        expectation: AbstractContextManager[Any] = pytest.raises(RuntimeError, match="router blew up") if router_error is not None else nullcontext()
+        with expectation, caplog.at_level(logging.DEBUG, logger=pipe_run_module.__name__):
+            await PipeRun(pipe_router=mock_router).run(pipe_job=mock_job, delivery_assignment=DeliveryAssignment(storage=StorageTarget()))
+
+        delivery_records = [
+            record for record in caplog.records if record.name == pipe_run_module.__name__ and record.getMessage() == "Executing the delivery"
+        ]
+        assert len(delivery_records) == 1
+        delivery_record = delivery_records[0]
+        assert delivery_record.levelno == logging.DEBUG
+        record_fields = vars(delivery_record)
+        assert record_fields.get("delivery_status") == expected_status
+        assert record_fields.get("pipeline_run_id") == "plr-delivery-log"
 
     async def test_run_success_no_delivery_when_none(self, mocker: MockerFixture) -> None:
         """When delivery_assignment is None, the delivery executor is not called."""

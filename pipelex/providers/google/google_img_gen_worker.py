@@ -58,7 +58,6 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                 task = self._event_loop.create_task(self.genai_async_client.aclose())
                 # Add a callback to log any errors that occur during cleanup
                 task.add_done_callback(lambda t: log.debug(f"Google async client cleanup error: {t.exception()}") if t.exception() else None)
-                log.verbose("Scheduled Google async client cleanup on captured event loop")
                 return
 
             # Otherwise, try to get the current running loop
@@ -68,15 +67,13 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                 task = current_loop.create_task(self.genai_async_client.aclose())
                 # Add a callback to log any errors that occur during cleanup
                 task.add_done_callback(lambda t: log.debug(f"Google async client cleanup error: {t.exception()}") if t.exception() else None)
-                log.verbose("Scheduled Google async client cleanup on current event loop")
             except RuntimeError:
                 # No running event loop, we can safely use asyncio.run()
                 try:
                     asyncio.run(self.genai_async_client.aclose())
-                    log.verbose("Closed Google async client using asyncio.run()")
                 except Exception as exc:  # ruff: ignore[blind-except]
                     # Best-effort: asyncio.run() runs aclose(), whose failure surface is not enumerable; teardown must never fail.
-                    log.verbose(f"Error closing Google async client during teardown: {exc}")
+                    log.debug(f"Error closing Google async client during teardown: {exc}")
         except Exception as exc:  # ruff: ignore[blind-except]
             # Best-effort cleanup boundary: teardown must never fail, whatever client/event-loop close throws.
             log.debug(f"Error during Google async client teardown: {exc}")

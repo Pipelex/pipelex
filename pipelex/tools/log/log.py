@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from pipelex.tools.log.log_context import bind_log_context
 from pipelex.tools.log.log_dispatch import LogDispatch
 from pipelex.tools.log.log_holding import ForwardedRecordFilter, HoldingLogHandler
-from pipelex.tools.log.log_levels import LOGGING_LEVEL_DEV, LOGGING_LEVEL_OFF, LOGGING_LEVEL_VERBOSE, LogLevel
+from pipelex.tools.log.log_levels import LOGGING_LEVEL_VERBOSE, LogLevel
 from pipelex.tools.log.log_redaction import make_redaction_processor
 from pipelex.tools.log.log_sink import ProcessorFilter
 
@@ -277,16 +277,13 @@ class Log:
         """Set the log level using a string name.
 
         Args:
-            level_name (str): The name of the log level.
+            level_name (str): The name of the log level, one of the ``LogLevel`` members in any case.
+
+        Raises:
+            ValueError: When the name is not a ``LogLevel`` member.
 
         """
-        if level_name.upper() == LogLevel.DEV:
-            level = LOGGING_LEVEL_DEV
-        elif level_name.upper() == LogLevel.OFF:
-            level = LOGGING_LEVEL_OFF
-        else:
-            level = getattr(logging, level_name.upper())
-        self.set_level_by_int(level_int=level)
+        self.set_level(LogLevel(level_name.upper()))
 
     def set_level(self, level: LogLevel):
         """Set the default log level for all loggers.
@@ -377,29 +374,6 @@ class Log:
 
         """
         severity = logging.DEBUG
-        self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline, fields=fields, layout=layout)
-
-    def dev(
-        self,
-        content: str | Any,
-        *,
-        title: str | None = None,
-        inline: str | None = None,
-        fields: Mapping[str, Any] | None = None,
-        layout: LogLayout | None = None,
-    ):
-        """Log a development message.
-
-        Args:
-            content (Union[str, Any]): The content to log.
-            title (str | None, optional): The title of the log message. Defaults to None.
-            inline (str | None, optional): Inline title for the log message. Defaults to None.
-                Used to display the title inline, only if the title arg is None.
-            fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
-            layout (LogLayout | None, optional): The console layout to render a string content through; every other sink ignores it.
-
-        """
-        severity = LOGGING_LEVEL_DEV
         self.log_dispatch.dispatch(content=content, severity=severity, title=title, inline=inline, fields=fields, layout=layout)
 
     def info(

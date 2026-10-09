@@ -287,7 +287,6 @@ class TestCostRegistry:
         """Test proper handling when no usage data."""
         # Mock logging
         mock_log_warning = mocker.patch("pipelex.cogt.usage.cost_registry.log.warning")
-        mock_log_verbose = mocker.patch("pipelex.cogt.usage.cost_registry.log.verbose")
 
         # Test with non-untitled pipeline
         CostRegistry.generate_report(
@@ -298,14 +297,14 @@ class TestCostRegistry:
         )
         mock_log_warning.assert_called_once()
 
-        # Test with untitled pipeline
+        # Test with untitled pipeline: nothing more is warned
         CostRegistry.generate_report(
             pipeline_run_id="untitled",
             tokens_usages=[],
             unit_scale=1.0,
             cost_report_file_path=None,
         )
-        mock_log_verbose.assert_called_once()
+        mock_log_warning.assert_called_once()
 
     def test_generate_report_with_file_output(self, job_metadata: JobMetadata, tmp_path: Path, mocker: MockerFixture):
         """Test that CSV file is created when file path is provided."""

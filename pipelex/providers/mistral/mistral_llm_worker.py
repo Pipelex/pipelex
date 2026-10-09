@@ -8,7 +8,6 @@ from mistralai.client.models import TextChunk, ThinkChunk
 from mistralai.client.types import UNSET
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, SdkTypeError
 from pipelex.cogt.inference.error_classification import (
     UserAction,
@@ -128,11 +127,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
             match thinking_mode:
                 case ThinkingMode.MANUAL:
                     mistral_effort = get_config().inference.llm.mistral.get_reasoning_level(effort=effort)
-                    if mistral_effort is None:
-                        log.verbose("Mistral reasoning_effort omitted (reasoning disabled)")
-                        return UNSET
-                    log.verbose(f"Mistral reasoning_effort={mistral_effort}")
-                    return mistral_effort
+                    return UNSET if mistral_effort is None else mistral_effort
                 case ThinkingMode.ADAPTIVE:
                     msg = f"Model '{inference_model.desc}' has thinking_mode=adaptive which is not supported for Mistral models"
                     raise LLMCapabilityError(msg)
@@ -150,6 +145,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
         job_params = llm_job.applied_job_params or llm_job.job_params
         messages = await self.mistral_factory.make_simple_messages(llm_job=llm_job)
         reasoning_effort = self._resolve_reasoning_effort(inference_model=self.inference_model, job_params=job_params)
+        self._log_reasoning_sent(api_name="Mistral", settings={"reasoning_effort": None if reasoning_effort is UNSET else reasoning_effort})
         try:
             response: ChatCompletionResponse | None = await self.mistral_client_for_text.chat.complete_async(
                 messages=messages,
@@ -257,6 +253,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
         reasoning_effort = self._resolve_reasoning_effort(inference_model=self.inference_model, job_params=job_params)
+        self._log_reasoning_sent(api_name="Mistral", settings={"reasoning_effort": None if reasoning_effort is UNSET else reasoning_effort})
         # Deferred import: avoid pulling heavy SDK at module-load time
         from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]
 

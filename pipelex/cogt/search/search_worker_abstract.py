@@ -3,7 +3,6 @@ from typing import Any
 
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import CogtError
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -33,7 +32,6 @@ class SearchWorkerAbstract(InferenceWorkerAbstract):
         search_job: SearchJob,
     ) -> SearchResultContent:
         """Execute a search query and return a sourced answer with sources."""
-        log.dev(f"✨ {self.desc} ✨")
         search_job.validate_before_execution()
         search_job.job_metadata.unit_job_id = UnitJobId.SEARCH_SOURCED_ANSWER
         search_job.search_job_before_start(inference_model=self.inference_model)
@@ -63,7 +61,6 @@ class SearchWorkerAbstract(InferenceWorkerAbstract):
         schema: type[BaseModelTypeVar],
     ) -> dict[str, Any]:
         """Execute a search query and return structured data matching the schema."""
-        log.dev(f"✨ {self.desc} ✨")
         search_job.validate_before_execution()
         search_job.job_metadata.unit_job_id = UnitJobId.SEARCH_STRUCTURED
         search_job.search_job_before_start(inference_model=self.inference_model)

@@ -160,7 +160,7 @@ class WorkingMemoryFactory(BaseModel):
                     needed_inputs_for_factory.append(typed_named_stuff_spec)
                 else:
                     # Fallback to TextContent if we can't get the proper class
-                    log.verbose(
+                    log.debug(
                         f"Could not get structure class '{structure_class_name}' for "
                         f"concept '{named_stuff_spec.concept.code}', falling back to TextContent",
                     )
@@ -200,7 +200,7 @@ class WorkingMemoryFactory(BaseModel):
         structure_class = class_registry.get_class(name=structure_class_name)
         if structure_class and issubclass(structure_class, StuffContent):
             return TypedNamedStuffSpec.make_from_named(named=named, structure_class=structure_class)
-        log.verbose(
+        log.debug(
             f"Could not get structure class '{structure_class_name}' for concept '{concept.code}', falling back to TextContent",
         )
         return TypedNamedStuffSpec.make_from_named(named=named, structure_class=TextContent)

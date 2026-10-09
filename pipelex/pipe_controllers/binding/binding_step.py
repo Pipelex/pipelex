@@ -145,7 +145,6 @@ class BindingStep(BaseModel):
         concept = root_stuff.concept if derivation.is_bare_name else result_concept
         bound_stuff = StuffFactory.make_stuff(concept=concept, content=bound_content, name=self.output_name, code=stuff_code)
         working_memory.set_new_main_stuff(bound_stuff, name=self.output_name)
-        log.verbose(f"Bound '{self.from_path}' to '{self.output_name}': {concept.concept_ref}")
         return BindingOutcome(stuff=bound_stuff)
 
     def skip_untyped_root(self, *, working_memory: WorkingMemory, calling_pipe_code: str, run_mode: PipeRunMode) -> BindingOutcome:

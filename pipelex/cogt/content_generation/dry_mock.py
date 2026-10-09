@@ -40,7 +40,6 @@ from polyfactory.exceptions import FactoryException
 from pydantic import BaseModel, ValidationError
 from pydantic.errors import PydanticInvalidForJsonSchema
 
-from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import (
     ExtractAssignment,
     ImgGenAssignment,
@@ -48,8 +47,6 @@ from pipelex.cogt.content_generation.assignment_models import (
     LLMAssignment,
     ObjectAssignment,
     RenderDocumentAssignment,
-    RenderPageViewsAssignment,
-    SearchAssignment,
     SearchObjectAssignment,
     TemplatingAssignment,
 )
@@ -276,7 +273,6 @@ def _dry_text_gen_truncate_length() -> int:
 def dry_llm_gen_text(llm_assignment: LLMAssignment) -> str:
     """Dry leaf for ``llm_gen_text``: synthetic job report + a ``DRY RUN:`` marker string."""
     job_metadata = llm_assignment.job_metadata
-    log.verbose(f"🤡 DRY RUN: llm_gen_text for '{job_metadata.run_metadata.pipeline_run_id}'")
     report_func = _dry_report_func(llm_assignment.cogt_run_params)
     report_func(job_metadata, llm_setting=llm_assignment.llm_setting, llm_prompt=llm_assignment.llm_prompt)
     prompt_truncated = llm_assignment.llm_prompt.desc(truncate_text_length=_dry_text_gen_truncate_length())
@@ -289,13 +285,11 @@ def dry_llm_gen_object(object_assignment: ObjectAssignment, *, object_class: typ
     Mirrors the live leaf's class resolution so the two run modes cannot drift: with the caller's class
     in hand the mock is built from it, without it the class is rebuilt from the schema.
     """
-    log.verbose(f"🤡 DRY RUN: llm_gen_object for '{object_assignment.object_class_name}'")
     return _leaf_gen_object(object_assignment, report_func=_dry_report_func(object_assignment.cogt_run_params), object_class=object_class)
 
 
 def dry_llm_gen_object_list(object_assignment: ObjectAssignment, *, object_class: type[BaseModel] | None = None) -> list[BaseModel]:
     """Dry leaf for ``llm_gen_object_list``: ``nb_items`` mocks + one synthetic report."""
-    log.verbose(f"🤡 DRY RUN: llm_gen_object_list for '{object_assignment.object_class_name}'")
     return _leaf_gen_object_list(object_assignment, report_func=_dry_report_func(object_assignment.cogt_run_params), object_class=object_class)
 
 
@@ -307,7 +301,6 @@ def dry_templating_gen_text(templating_assignment: TemplatingAssignment) -> str:
         template_source=templating_assignment.template,
         template_category=templating_assignment.category,
     )
-    log.verbose("🤡 DRY RUN: templating_gen_text")
     jinja2_truncated = templating_assignment.template[: _dry_text_gen_truncate_length()]
     # Context KEYS only: the context is built from working memory, so dumping values would leak
     # inputs the real template never renders (and bloat the mock output).
@@ -339,7 +332,6 @@ def dry_img_gen_image_contents(img_gen_assignment: ImgGenAssignment) -> list[Ima
     Sits at the ``*_and_store`` layer — one step above the raw provider leaf — so a dry run never
     touches the storage provider (eng review D10).
     """
-    log.verbose(f"🤡 DRY RUN: img_gen for '{img_gen_assignment.img_gen_handle}'")
     image_urls = get_config().inference.dry_run.image_urls
     return [
         _dry_image_content(image_url=image_urls[image_index % len(image_urls)], img_gen_assignment=img_gen_assignment)
@@ -353,7 +345,6 @@ def dry_extract_page_contents(extract_assignment: ExtractAssignment) -> list[Pag
     Sits at the ``*_and_store`` layer (eng review D10). Page views are attached above the leaf by the
     generator-level page-view logic, exactly as in a LIVE run.
     """
-    log.verbose(f"🤡 DRY RUN: extract_gen_pages for '{extract_assignment.extract_handle}'")
     nb_pages: int
     if extract_assignment.extract_input.image_uri:
         nb_pages = 1
@@ -371,13 +362,12 @@ def dry_extract_page_contents(extract_assignment: ExtractAssignment) -> list[Pag
     ]
 
 
-def dry_render_page_views(render_assignment: RenderPageViewsAssignment) -> list[ImageContent]:
+def dry_render_page_views() -> list[ImageContent]:
     """Dry leaf for page-view rendering: URL-only page-view image mocks, no pdf rendering, no storage IO.
 
     Fake URLs come from ``inference.dry_run.image_urls`` (validated non-empty) — the single configured
     source of truth for dry fake images, same as the img-gen mock.
     """
-    log.verbose(f"🤡 DRY RUN: render_page_views for '{render_assignment.job_metadata.run_metadata.pipeline_run_id}'")
     nb_pages = get_config().inference.dry_run.nb_extract_pages
     image_urls = get_config().inference.dry_run.image_urls
     return [_dry_image_content(image_url=image_urls[page_index % len(image_urls)]) for page_index in range(nb_pages)]
@@ -389,13 +379,11 @@ def dry_render_document(render_assignment: RenderDocumentAssignment) -> Document
     Its URL is the blank one-page PDF every mocked document carries, whatever the format asked for.
     """
     composition = render_assignment.composition
-    log.verbose(f"🤡 DRY RUN: render_document '{composition.filename}' for '{render_assignment.job_metadata.run_metadata.pipeline_run_id}'")
     return DocumentContent(url=DryRunFactory.generate_mock_document_url(), mime_type=composition.format.mime_type, filename=composition.filename)
 
 
-def dry_search_gen_sourced_answer(search_assignment: SearchAssignment) -> SearchResultContent:
+def dry_search_gen_sourced_answer() -> SearchResultContent:
     """Dry leaf for sourced-answer search: polyfactory-built result with mock sources, no provider."""
-    log.verbose(f"🤡 DRY RUN: search_gen_sourced_answer for '{search_assignment.search_handle}'")
     nb_sources = get_config().inference.dry_run.nb_list_items
     mock_sources = build_mock_objects(DocumentContent, count=nb_sources)
     return build_mock_object(SearchResultContent, sources=mock_sources)
@@ -410,7 +398,6 @@ def dry_judgment_gen_answers(judgment_assignment: JudgmentAssignment) -> dict[st
     producer that measured nothing can say so, and a mock probability would be the one number in the
     whole family that nobody could tell apart from a real one.
     """
-    log.verbose(f"🤡 DRY RUN: judgment_gen_answers for '{judgment_assignment.judgment_handle}'")
     answers: dict[str, JudgmentAnswer] = {}
     for question_key, question in judgment_assignment.questions.items():
         match question:
@@ -437,7 +424,6 @@ def dry_search_gen_structured(search_object_assignment: SearchObjectAssignment) 
     attribute — would come back under the renamed key and fail re-validation; see
     :func:`~pipelex.cogt.content_generation.object_revalidation.revalidate_leaf_object`.
     """
-    log.verbose(f"🤡 DRY RUN: search_gen_structured for '{search_object_assignment.output_class_name}'")
     boundary_class = SchemaToModelFactory.make_from_json_schema(
         schema=search_object_assignment.output_class_schema,
         class_name=search_object_assignment.output_class_name,
@@ -445,11 +431,7 @@ def dry_search_gen_structured(search_object_assignment: SearchObjectAssignment) 
     return build_mock_object(boundary_class).model_dump(mode="json", by_alias=True)
 
 
-def dry_search_gen_structured_object(
-    search_assignment: SearchAssignment,
-    *,
-    output_class: type[BaseModelTypeVar],
-) -> BaseModelTypeVar:
+def dry_search_gen_structured_object(*, output_class: type[BaseModelTypeVar]) -> BaseModelTypeVar:
     """Dry leaf for structured search *in-process*: a mock built from the caller's own class, no provider.
 
     Returns the instance rather than a dump of it, and that is load-bearing rather than a convenience:
@@ -470,7 +452,6 @@ def dry_search_gen_structured_object(
     builds the assignment, so a dry-run verdict would depend on how the method is deployed.
     """
     _validate_schema_is_generable(output_class=output_class)
-    log.verbose(f"🤡 DRY RUN: search_gen_structured_object for '{output_class.__name__}' ({search_assignment.search_handle})")
     return build_mock_object(output_class)
 
 

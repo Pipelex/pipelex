@@ -1,5 +1,4 @@
 import inspect
-import logging
 from collections.abc import Callable
 from typing import Any, TypeVar, cast, get_origin, get_type_hints
 
@@ -8,8 +7,6 @@ from typing_extensions import override
 
 from pipelex.system.registries.exceptions import FuncRegistryError
 from pipelex.urls import URLs
-
-FUNC_REGISTRY_LOGGER_CHANNEL_NAME = "func_registry"
 
 # Type variable for generic function types
 T = TypeVar("T")
@@ -93,14 +90,7 @@ def _make_ineligible_funcs_dict() -> IneligibleFuncsDict:
 
 class FuncRegistry(RootModel[FuncRegistryDict]):
     root: FuncRegistryDict = Field(default_factory=dict)
-    _logger: logging.Logger = PrivateAttr(logging.getLogger(FUNC_REGISTRY_LOGGER_CHANNEL_NAME))
     _ineligible_decorated_funcs: IneligibleFuncsDict = PrivateAttr(default_factory=_make_ineligible_funcs_dict)
-
-    def log(self, message: str) -> None:
-        self._logger.debug(message)
-
-    def set_logger(self, logger: logging.Logger) -> None:
-        self._logger = logger
 
     def teardown(self) -> None:
         """Resets the registry to an empty state."""
@@ -128,7 +118,6 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
         already_registered = self.root.get(key)
         if already_registered is not None:
             if already_registered is func:
-                self.log(f"Function '{key}' is already registered in registry with the same function object")
                 return
             msg = (
                 f"Function name '{key}' is already registered by a different function: "
@@ -139,7 +128,6 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
             )
             raise FuncRegistryError(msg)
 
-        self.log(f"Registered new single function '{key}' in registry")
         self.root[key] = func
 
     def unregister_function(self, func: Callable[..., Any]) -> None:
@@ -149,7 +137,6 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
             msg = f"Function '{key}' not found in registry"
             raise FuncRegistryError(msg)
         del self.root[key]
-        self.log(f"Unregistered single function '{key}' from registry")
 
     def unregister_function_by_name(self, name: str) -> None:
         """Unregisters a function from the registry by its name."""
@@ -390,7 +377,6 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
         func_name = getattr(func, "_pipe_func_name", None) or func.__name__
         info = IneligibleFunctionInfo(func_name=func_name, reason=reason, source_file=source_file)
         self._ineligible_decorated_funcs[func_name] = info
-        self.log(f"Registered ineligible @pipe_func function: {info}")
 
     def get_ineligible_function_info(self, name: str) -> IneligibleFunctionInfo | None:
         """Get information about an ineligible @pipe_func decorated function.

@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:46c31fd39394e47c2ae4442305c8ba645a976ff45dc44286f8f3416f73a3bf11"
+digest = "sha256:da981a7560d55779afc3d749b23978386605f9333bd8e9c2d25954b7cad15243"
 reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-10-08T12:44:52Z"
-rationale = "clean-pass: merged tree of origin/dev into this branch. The open trigger changes are this branch's own, the run section in pipelex/pipelex.toml and RunConfig in configs.py, already answered on the branch by run-config.md and the five-section list in docs/configuration/index.md; dev changed only the home fill in config_loader.py. The auto-merged index.md reads as one: dev's rewritten PIPELEX_HOME section and this branch's section list touch different paragraphs. A hosted run that reads the run setting goes through load_config and so now fills a home's missing kit files like any boot; run-config.md and run.md say a hosted run boots nothing locally and needs no inference configuration, which stays true, and no doc claims it leaves the home untouched. The run path is additive, so no migration ledger entry, and neither side touched the ledgers."
+reviewed_at = "2026-10-09T18:11:07Z"
+rationale = "real-catch: log_levels.py joins the triggers because the LogLevel enum is what the config docs list. Re-derived from the enum its members VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL and OFF, which match the valid values logging-config.md gives for default_log_level and its gcp severity note naming VERBOSE as the only custom level; removing LogLevel.from_int touches no setting. The review caught logging-config.md's Migrating From the DEV Level section claiming a file naming DEV stops the boot: ConfigLoader.load_config_validated replays the ledger in memory on a validation failure and pipelex-config@6 is a safe remap, so such a file boots at DEBUG with a stale-configuration warning, now said there and pinned by a test through the loader. The ledger entry, configs.py and config_cogt.py name no level beyond that and are unchanged."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:02f71cb4a6b01aebda59c2e31f262ef9c865e17b"
@@ -20,8 +20,9 @@ rationale = "clean-pass: merged tree of origin/dev into this branch. The open tr
 "pipelex/system/configuration/configs.py" = "blob:1754391061f3be47e28088a4f8ea85e60b1cdd2b"
 "pipelex/system/configuration/pipe_func_config.py" = "blob:dc8890e914fbcdb611147e42eaa0cd87b32288a5"
 "pipelex/system/telemetry/telemetry_config.py" = "blob:068a785d97a2d52ee43e82e723cd944b8b6601bc"
-"pipelex/tools/aws/aws_config.py" = "blob:c1aeafeae08d3921464db33795f11a29ff3892ba"
+"pipelex/tools/aws/aws_config.py" = "blob:e27dc96bf0b2ef98a45354712421252fe0b893b5"
 "pipelex/tools/log/log_config.py" = "blob:63dd9f81fdbafc1a095aec6cde1b047d0ebdd2d4"
+"pipelex/tools/log/log_levels.py" = "blob:12b94e4d4793a70156ac547ee20c9d483910ecae"
 "pipelex/tools/network/network_config.py" = "blob:e12d1d0e4a40d04859f10a77addeaf8fe2b00414"
 "pipelex/tools/secrets/secrets_config.py" = "blob:cf30aaec1c76c9cabc0531a5b9fe681e153d7024"
 "pipelex/tools/storage/storage_config.py" = "blob:3ba0fee5282937e2639d2707ee8ab61aad7bf206"
