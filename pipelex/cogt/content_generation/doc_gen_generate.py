@@ -120,7 +120,7 @@ async def render_document_and_store(
     run_context = contextvars.copy_context()
 
     def _print() -> RenderedDocument:
-        return run_context.run(worker.render, job=render_job, resources=resources)
+        return run_context.run(worker.print_document, job=render_job, resources=resources)
 
     try:
         rendered = await asyncio.get_running_loop().run_in_executor(_PRINT_EXECUTOR, _print)

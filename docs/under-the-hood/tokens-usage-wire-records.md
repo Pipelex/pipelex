@@ -41,7 +41,7 @@ The record shape is also invariant to server-side observability settings: teleme
 
 ## Cost semantics
 
-`cost` is computed by `compute_tokens_usage_cost` (`pipelex/cogt/usage/cost_registry.py`) from the rates stamped on the internal record at inference time — the same cost engine and the same canonical total as the CLI cost table: input_non_cached + input_cached + output component costs, with the cached-discount fallback (cached input at 50% of the input rate when no explicit cached rate exists). Categories the cost engine excludes from totals (audio, reasoning, prediction) are excluded here too. A run-level total is the sum of per-record `cost` values.
+`cost` is computed by `compute_tokens_usage_cost` (`pipelex/cogt/usage/usage_cost.py`) from the rates stamped on the internal record at inference time — the same cost engine and the same canonical total as the CLI cost table: input_non_cached + input_cached + output component costs, with the cached-discount fallback (cached input at 50% of the input rate when no explicit cached rate exists). Categories the cost engine excludes from totals (audio, reasoning, prediction) are excluded here too. A run-level total is the sum of per-record `cost` values.
 
 `cost: null` means "unrated" (no rate table: own-GPU models, mock/dry runs) — distinct from `0.0`, which is a rated call that cost nothing.
 

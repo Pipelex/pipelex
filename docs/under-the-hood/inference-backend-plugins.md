@@ -275,6 +275,8 @@ What an out-of-tree backend plugin imports *is* the contract. The published surf
 | `CogtError`, `SdkTypeError`, `ImgGenGenerationError`, `ImgGenParameterError`, `InferenceErrorCategory` | `pipelex.cogt.exceptions` | the inference error bases and categories a worker raises with |
 | `LLMCapabilityError` | `pipelex.cogt.exceptions` | a request the model refuses, raised by an LLM request check |
 
+A worker implements the provider half of a call, `_gen_text` or `_extract_pages` for instance, and records the usage the provider answered with on its job's report. The base around it logs the event every call ends with, `Inference call ends`, with that usage, its cost, its duration and its outcome, so a worker logs nothing for the call itself (see [Summary events](../tools/logging.md#summary-events)).
+
 **Building on an OpenAI- or Anthropic-compatible service**
 
 | Symbol | Module | Role |

@@ -7,6 +7,7 @@ from pipelex.cogt.exceptions import CogtError, ExtractCapabilityError, ExtractIn
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput
+from pipelex.cogt.inference.inference_call_summary import InferenceCallSummary, InferenceOperation
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
@@ -108,6 +109,14 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
         )
         raise ExtractInputFormatError(msg)
 
+    def _call_summary(self, *, extract_job: ExtractJob) -> InferenceCallSummary:
+        """The event the call ends with, its usage read off the job it reports."""
+        return InferenceCallSummary(
+            operation=InferenceOperation.EXTRACT,
+            inference_model=self.inference_model,
+            read_tokens_usage=lambda: extract_job.job_report.extract_tokens_usage,
+        )
+
     async def extract_pages(
         self,
         extract_job: ExtractJob,
@@ -125,25 +134,28 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
         # Prepare job
         extract_job.extract_job_before_start(inference_model=self.inference_model)
 
-        # Execute job
-        try:
-            result = await self._extract_pages(extract_job=extract_job)
-        except CogtError as exc:
-            exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
-            raise
+        # Execute and report the job, which ends with its summary event whichever way it ends
+        with self._call_summary(extract_job=extract_job) as call_summary:
+            try:
+                result = await self._extract_pages(extract_job=extract_job)
+            except CogtError as exc:
+                exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
+                raise
 
-        # Populate page count as fallback usage (only if no real usage was reported)
-        if (extract_tokens_usage := extract_job.job_report.extract_tokens_usage) and not extract_tokens_usage.nb_tokens_by_category:
-            nb_tokens: NbTokensByCategoryDict = {
-                TokenCategory.INPUT: len(result.pages) * 1_000_000,
-                TokenCategory.OUTPUT: len(result.pages) * 1_000_000,
-            }
-            extract_tokens_usage.nb_tokens_by_category = nb_tokens
+            # Populate page count as fallback usage (only if no real usage was reported)
+            if (extract_tokens_usage := extract_job.job_report.extract_tokens_usage) and not extract_tokens_usage.nb_tokens_by_category:
+                nb_tokens: NbTokensByCategoryDict = {
+                    TokenCategory.INPUT: len(result.pages) * 1_000_000,
+                    TokenCategory.OUTPUT: len(result.pages) * 1_000_000,
+                }
+                extract_tokens_usage.nb_tokens_by_category = nb_tokens
+                # Those counts are pages, priced as tokens: the summary event keeps their cost and not the counts.
+                call_summary.withhold_token_counts()
 
-        # Report job
-        extract_job.extract_job_after_complete()
-        if self.reporting_delegate:
-            self.reporting_delegate.report_inference_job(inference_job=extract_job)
+            # Report job
+            extract_job.extract_job_after_complete()
+            if self.reporting_delegate:
+                self.reporting_delegate.report_inference_job(inference_job=extract_job)
 
         return result
 

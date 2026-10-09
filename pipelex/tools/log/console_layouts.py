@@ -22,6 +22,7 @@ The registry is one table in code. Rich is imported only where a layout is rende
 
 from __future__ import annotations
 
+import math
 import string
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
@@ -29,7 +30,9 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, ConfigDict, field_validator
 from typing_extensions import override
 
+from pipelex.system.telemetry.otel_constants import GenAISpanAttr
 from pipelex.tools.log.console_fields import FIELD_STYLES, format_layout_value, one_line_text
+from pipelex.tools.log.summary_fields import COST_USD_FIELD, DURATION_MS_FIELD, OUTCOME_FIELD, Outcome
 from pipelex.tools.misc.rich_extra import require_rich
 
 if TYPE_CHECKING:
@@ -43,6 +46,8 @@ class LogLayout(StrEnum):
     """The layouts a log call can name with ``layout=``."""
 
     PIPE_RUN = "pipe_run"
+    PIPE_RUN_END = "pipe_run_end"
+    INFERENCE_CALL_END = "inference_call_end"
 
 
 class ConsoleLayout(BaseModel):
@@ -170,9 +175,170 @@ PIPE_RUN_LAYOUT = PipeRunLayout(
     presented_fields=frozenset({"pipe_type", "pipe_code", "output_concept", "pipe_depth"}),
 )
 
+#: What a summary event says before its duration, by how the work ended.
+SUCCESS_ENDING = "done in"
+ERROR_ENDING = "failed after"
+#: Below this many milliseconds a duration is written in milliseconds, and in seconds from it on.
+MILLISECONDS_PER_SECOND = 1000
+#: How many decimals of a dollar a cost is written to, before its trailing zeros are dropped.
+COST_DECIMALS = 6
+
+
+def _endings(*, outcome: Any) -> dict[str, str]:
+    """The success ending and the error ending of a summary event, one of them empty, so each takes its own style.
+
+    Raises:
+        ValueError: If the outcome is neither ``success`` nor ``error``.
+    """
+    match Outcome(outcome):
+        case Outcome.SUCCESS:
+            return {"success_ending": SUCCESS_ENDING, "error_ending": ""}
+        case Outcome.ERROR:
+            return {"success_ending": "", "error_ending": ERROR_ENDING}
+
+
+def _is_number(*, value: Any) -> bool:
+    """Whether a value is a finite number, a boolean, which is an integer to Python, excluded."""
+    return not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value)
+
+
+def format_duration(*, duration_ms: Any) -> str:
+    """A duration in milliseconds as a person reads it: ``840 ms`` under a second, ``1.25 s`` from a second on.
+
+    Raises:
+        TypeError: If the duration is not a number.
+        ValueError: If the duration is negative or not finite.
+    """
+    if not _is_number(value=duration_ms):
+        msg = f"A duration must be a finite number of milliseconds, not {type(duration_ms).__name__}"
+        raise TypeError(msg)
+    if duration_ms < 0:
+        msg = "A duration cannot be negative"
+        raise ValueError(msg)
+    if round(duration_ms) < MILLISECONDS_PER_SECOND:
+        return f"{duration_ms:.0f} ms"
+    return f"{duration_ms / MILLISECONDS_PER_SECOND:.2f} s"
+
+
+def format_cost(*, cost_usd: Any) -> str:
+    """A cost in US dollars to the millionth of a dollar, its trailing zeros dropped: ``$0.0123``, ``$0``.
+
+    Raises:
+        TypeError: If the cost is not a number.
+    """
+    if not _is_number(value=cost_usd):
+        msg = f"A cost must be a finite number of dollars, not {type(cost_usd).__name__}"
+        raise TypeError(msg)
+    return f"${cost_usd:.{COST_DECIMALS}f}".rstrip("0").rstrip(".")
+
+
+def _format_token_count(*, nb_tokens: Any) -> str:
+    """A token count with its thousands separated: ``12,288``.
+
+    Raises:
+        TypeError: If the count is not an integer.
+    """
+    if isinstance(nb_tokens, bool) or not isinstance(nb_tokens, int):
+        msg = f"A token count must be an integer, not {type(nb_tokens).__name__}"
+        raise TypeError(msg)
+    return f"{nb_tokens:,}"
+
+
+class PipeRunEndLayout(PipeRunLayout):
+    """The end of a pipe run, drawn in the pipe tree under the line that announced it.
+
+    ``PipeLLM: describe_company done in 1.25 s``, indented and behind ``↳`` at the depth of its announcement. It reads
+    the pipe-run layout's depth, ``duration_ms`` and ``outcome``; a failure says ``failed after`` in red, and its
+    ``error.type`` follows as the suffix.
+    """
+
+    @override
+    def derived_values(self, *, fields: Mapping[str, Any]) -> dict[str, Any]:
+        """The tree's indentation and branch mark, the ending the outcome calls for, and the duration as a person reads it.
+
+        Raises:
+            TypeError: If the depth or the duration is of the wrong type.
+            ValueError: If the depth is out of range, the duration negative or the outcome unknown.
+        """
+        return {
+            **super().derived_values(fields=fields),
+            **_endings(outcome=fields[OUTCOME_FIELD]),
+            "duration": format_duration(duration_ms=fields[DURATION_MS_FIELD]),
+        }
+
+
+PIPE_RUN_END_LAYOUT = PipeRunEndLayout(
+    template=(
+        "{indent}[yellow]{branch}[/yellow]{branch_gap}"
+        f"{_styled_placeholder(field='pipe_type', suffix=':')} {_styled_placeholder(field='pipe_code')} "
+        "[dim]{success_ending}[/dim][bold red]{error_ending}[/bold red] {duration}"
+    ),
+    presented_fields=frozenset({"pipe_type", "pipe_code", "output_concept", "pipe_depth", DURATION_MS_FIELD, OUTCOME_FIELD}),
+)
+
+
+class InferenceCallEndLayout(ConsoleLayout):
+    """The end of an inference call, on one compact line: the model, the operation, the tokens, the cost and the duration.
+
+    ``claude-5.5-sonnet chat · 2,048 → 512 tokens · $0.009216 · done in 1.23 s``, the tokens in before the arrow and out
+    after it. A count or a cost the call did not report is left out with its separator. The model is drawn by its
+    handle, and the keys that name the same model otherwise, ``gen_ai.request.model``, ``gen_ai.response.model``,
+    ``backend_name`` and ``sdk``, are left off the line, which the ``json`` sink writes in full. A failure says
+    ``failed after`` in red, and its ``error.type`` follows as the suffix.
+    """
+
+    @override
+    def derived_values(self, *, fields: Mapping[str, Any]) -> dict[str, Any]:
+        """The operation, the usage with its separators, the ending the outcome calls for and the duration.
+
+        Raises:
+            TypeError: If a token count, the cost or the duration is of the wrong type.
+            ValueError: If the duration is negative or the outcome unknown.
+        """
+        input_tokens = fields.get(GenAISpanAttr.USAGE_INPUT_TOKENS)
+        output_tokens = fields.get(GenAISpanAttr.USAGE_OUTPUT_TOKENS)
+        usage_parts: list[str] = []
+        if input_tokens is not None and output_tokens is not None:
+            usage_parts.append(f"{_format_token_count(nb_tokens=input_tokens)} → {_format_token_count(nb_tokens=output_tokens)} tokens")
+        elif input_tokens is not None:
+            usage_parts.append(f"{_format_token_count(nb_tokens=input_tokens)} tokens in")
+        elif output_tokens is not None:
+            usage_parts.append(f"{_format_token_count(nb_tokens=output_tokens)} tokens out")
+        cost_usd = fields.get(COST_USD_FIELD)
+        if cost_usd is not None:
+            usage_parts.append(format_cost(cost_usd=cost_usd))
+        return {
+            "operation": fields[GenAISpanAttr.OPERATION_NAME],
+            "usage": "".join(f" · {part}" for part in usage_parts),
+            **_endings(outcome=fields[OUTCOME_FIELD]),
+            "duration": format_duration(duration_ms=fields[DURATION_MS_FIELD]),
+        }
+
+
+INFERENCE_CALL_END_LAYOUT = InferenceCallEndLayout(
+    template="[cyan]{model_handle}[/cyan] [dim]{operation}[/dim]{usage} · [dim]{success_ending}[/dim][bold red]{error_ending}[/bold red] {duration}",
+    presented_fields=frozenset(
+        {
+            GenAISpanAttr.OPERATION_NAME,
+            "model_handle",
+            "backend_name",
+            "sdk",
+            GenAISpanAttr.REQUEST_MODEL,
+            GenAISpanAttr.RESPONSE_MODEL,
+            GenAISpanAttr.USAGE_INPUT_TOKENS,
+            GenAISpanAttr.USAGE_OUTPUT_TOKENS,
+            COST_USD_FIELD,
+            DURATION_MS_FIELD,
+            OUTCOME_FIELD,
+        }
+    ),
+)
+
 #: Every layout a call can name, by its name.
 CONSOLE_LAYOUTS: dict[LogLayout, ConsoleLayout] = {
     LogLayout.PIPE_RUN: PIPE_RUN_LAYOUT,
+    LogLayout.PIPE_RUN_END: PIPE_RUN_END_LAYOUT,
+    LogLayout.INFERENCE_CALL_END: INFERENCE_CALL_END_LAYOUT,
 }
 
 

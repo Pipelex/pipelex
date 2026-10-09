@@ -2288,7 +2288,7 @@ rationale = "Transforms/renders the aggregated; single operand."
 param = "records"
 rationale = "Cost report op on the records; single operand."
 
-["pipelex/cogt/usage/cost_registry.py::compute_tokens_usage_cost"]
+["pipelex/cogt/usage/usage_cost.py::compute_tokens_usage_cost"]
 param = "tokens_usage"
 rationale = "Verb-object: compute the cost of one usage record; the single obvious operand is the usage."
 

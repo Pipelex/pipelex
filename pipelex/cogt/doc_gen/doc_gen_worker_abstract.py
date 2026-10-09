@@ -4,6 +4,7 @@ from typing_extensions import override
 
 from pipelex.cogt.doc_gen.render_job import RenderedDocument, RenderJob, RenderResources
 from pipelex.cogt.doc_gen.template_check import TemplateCheckRequest, TemplateFinding
+from pipelex.cogt.inference.inference_call_summary import InferenceCallSummary, InferenceOperation
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -29,6 +30,18 @@ class DocGenWorkerAbstract(InferenceWorkerAbstract):
     @override
     def desc(self) -> str:
         return f"Document generation using {self.inference_model.desc}"
+
+    def print_document(self, *, job: RenderJob, resources: RenderResources) -> RenderedDocument:
+        """Print the job with `render`, ending the call with the summary event every inference call ends with.
+
+        This is how Pipelex prints, and an engine overrides `render` alone. A document engine reports no usage, so the
+        event carries no tokens and no cost, never a zero standing for either.
+
+        Raises:
+            DocGenRenderError: the engine cannot print this job.
+        """
+        with InferenceCallSummary(operation=InferenceOperation.DOC_GEN, inference_model=self.inference_model, read_tokens_usage=None):
+            return self.render(job=job, resources=resources)
 
     @abstractmethod
     def render(self, *, job: RenderJob, resources: RenderResources) -> RenderedDocument:

@@ -5,6 +5,7 @@ from typing_extensions import override
 from pipelex.cogt.exceptions import CogtError, ImgGenParameterError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
+from pipelex.cogt.inference.inference_call_summary import InferenceCallSummary, InferenceOperation
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -48,6 +49,14 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
             )
             raise ImgGenParameterError(msg)
 
+    def _call_summary(self, *, img_gen_job: ImgGenJob) -> InferenceCallSummary:
+        """The event the call ends with, its usage read off the job it reports."""
+        return InferenceCallSummary(
+            operation=InferenceOperation.IMG_GEN,
+            inference_model=self.inference_model,
+            read_tokens_usage=lambda: img_gen_job.job_report.img_gen_tokens_usage,
+        )
+
     async def gen_image(
         self,
         img_gen_job: ImgGenJob,
@@ -64,17 +73,18 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
         # Prepare job
         img_gen_job.img_gen_job_before_start(inference_model=self.inference_model)
 
-        # Execute job
-        try:
-            result = await self._gen_image(img_gen_job=img_gen_job)
-        except CogtError as exc:
-            exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
-            raise
+        # Execute and report the job, which ends with its summary event whichever way it ends
+        with self._call_summary(img_gen_job=img_gen_job):
+            try:
+                result = await self._gen_image(img_gen_job=img_gen_job)
+            except CogtError as exc:
+                exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
+                raise
 
-        # Report job
-        img_gen_job.img_gen_job_after_complete()
-        if self.reporting_delegate:
-            self.reporting_delegate.report_inference_job(inference_job=img_gen_job)
+            # Report job
+            img_gen_job.img_gen_job_after_complete()
+            if self.reporting_delegate:
+                self.reporting_delegate.report_inference_job(inference_job=img_gen_job)
 
         return result
 
@@ -103,17 +113,18 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
         # Prepare job
         img_gen_job.img_gen_job_before_start(inference_model=self.inference_model)
 
-        # Execute job
-        try:
-            result = await self._gen_image_list(img_gen_job=img_gen_job, nb_images=nb_images)
-        except CogtError as exc:
-            exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
-            raise
+        # Execute and report the job, which ends with its summary event whichever way it ends
+        with self._call_summary(img_gen_job=img_gen_job):
+            try:
+                result = await self._gen_image_list(img_gen_job=img_gen_job, nb_images=nb_images)
+            except CogtError as exc:
+                exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
+                raise
 
-        # Report job
-        img_gen_job.img_gen_job_after_complete()
-        if self.reporting_delegate:
-            self.reporting_delegate.report_inference_job(inference_job=img_gen_job)
+            # Report job
+            img_gen_job.img_gen_job_after_complete()
+            if self.reporting_delegate:
+                self.reporting_delegate.report_inference_job(inference_job=img_gen_job)
 
         return result
 

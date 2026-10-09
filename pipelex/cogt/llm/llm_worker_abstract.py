@@ -10,6 +10,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import CogtError, LLMCapabilityError
+from pipelex.cogt.inference.inference_call_summary import InferenceCallSummary, InferenceOperation
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.inference.prompt_file_checks import check_prompt_documents_are_read, check_prompt_images_are_images
@@ -170,6 +171,16 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
     def _get_response_model_name(self) -> str:
         """Get the response model name from the inference model."""
         return self.inference_model.model_id
+
+    def _call_summary(self, *, llm_job: LLMJob) -> InferenceCallSummary:
+        """The event the call ends with, its model named as the span names it and its usage read off the reported job."""
+        return InferenceCallSummary(
+            operation=InferenceOperation.CHAT,
+            inference_model=self.inference_model,
+            read_tokens_usage=lambda: llm_job.job_report.llm_tokens_usage,
+            request_model=self._get_request_model_name(),
+            response_model=self._get_response_model_name(),
+        )
 
     def _start_otel_span_llm(self, llm_job: LLMJob, *, output_type: InferenceOutputType, output_class_name: str | None = None) -> Span | None:
         """Start an OTel span for the LLM job and return it.
@@ -493,8 +504,9 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         # The span is the Pipelex span active here until it ends, whichever way it ends, so a log line
         # during the call, a provider SDK's included, names it under `pipelex.*`; OpenTelemetry's current
-        # context is left alone, and it is what the line's standard trace fields name.
-        with pipelex_span_active(span=span):
+        # context is left alone, and it is what the line's standard trace fields name. The call ends with
+        # its summary event, logged while the span is still the active one.
+        with pipelex_span_active(span=span), self._call_summary(llm_job=llm_job):
             try:
                 self.check_request(inference_model=self.inference_model, job_params=self._sent_job_params(llm_job=llm_job), is_structured=False)
                 text_result = await self._gen_text(llm_job=llm_job)
@@ -534,8 +546,9 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         # The span is the Pipelex span active here until it ends, whichever way it ends, so a log line
         # during the call, a provider SDK's included, names it under `pipelex.*`; OpenTelemetry's current
-        # context is left alone, and it is what the line's standard trace fields name.
-        with pipelex_span_active(span=span):
+        # context is left alone, and it is what the line's standard trace fields name. The call ends with
+        # its summary event, logged while the span is still the active one.
+        with pipelex_span_active(span=span), self._call_summary(llm_job=llm_job):
             try:
                 self.check_request(inference_model=self.inference_model, job_params=self._sent_job_params(llm_job=llm_job), is_structured=True)
                 object_result = await self._gen_object(llm_job=llm_job, schema=schema)

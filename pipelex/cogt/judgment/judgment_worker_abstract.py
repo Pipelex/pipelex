@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import CogtError, JudgmentAnswerMismatchError, JudgmentCapabilityError
+from pipelex.cogt.inference.inference_call_summary import InferenceCallSummary, InferenceOperation
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.inference.prompt_file_checks import check_prompt_documents_are_read, check_prompt_images_are_images
 from pipelex.cogt.judgment.judgment_job import JudgmentJob
@@ -37,6 +38,14 @@ class JudgmentWorkerAbstract(InferenceWorkerAbstract):
     def desc(self) -> str:
         return f"Judgment using {self.inference_model.desc}"
 
+    def _call_summary(self, *, judgment_job: JudgmentJob) -> InferenceCallSummary:
+        """The event the call ends with, its usage read off the job it reports."""
+        return InferenceCallSummary(
+            operation=InferenceOperation.JUDGMENT,
+            inference_model=self.inference_model,
+            read_tokens_usage=lambda: judgment_job.job_report.judgment_tokens_usage,
+        )
+
     async def judge(
         self,
         judgment_job: JudgmentJob,
@@ -46,23 +55,25 @@ class JudgmentWorkerAbstract(InferenceWorkerAbstract):
         judgment_job.job_metadata.unit_job_id = UnitJobId.JUDGMENT_ANSWER
         judgment_job.judgment_job_before_start(inference_model=self.inference_model)
 
-        try:
-            self._check_can_read_files(judgment_job=judgment_job)
-            answers = await self._judge(judgment_job=judgment_job)
-            _check_answers_match_questions(judgment_job=judgment_job, answers=answers)
-        except CogtError as exc:
-            exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
-            raise
-        finally:
-            # Completion and reporting belong on *every* way out, not just the happy one. The
-            # answer-shape guard above raises after the provider already answered and after usage was
-            # recorded, so that call is billed — reporting only on success would make the spend vanish
-            # from the run's cost report. A failure that never reached the provider recorded no tokens
-            # (`judgment_job_before_start` initialises `nb_tokens_by_category` empty), so it reports as
-            # the zero-cost attempt it was rather than inventing a charge.
-            judgment_job.judgment_job_after_complete()
-            if self.reporting_delegate:
-                self.reporting_delegate.report_inference_job(inference_job=judgment_job)
+        with self._call_summary(judgment_job=judgment_job):
+            try:
+                self._check_can_read_files(judgment_job=judgment_job)
+                answers = await self._judge(judgment_job=judgment_job)
+                _check_answers_match_questions(judgment_job=judgment_job, answers=answers)
+            except CogtError as exc:
+                exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
+                raise
+            finally:
+                # Completion and reporting belong on *every* way out, not just the happy one. The
+                # answer-shape guard above raises after the provider already answered and after usage was
+                # recorded, so that call is billed — reporting only on success would make the spend vanish
+                # from the run's cost report. A failure that never reached the provider recorded no tokens
+                # (`judgment_job_before_start` initialises `nb_tokens_by_category` empty), so it reports as
+                # the zero-cost attempt it was rather than inventing a charge. The summary event the call
+                # ends with reads the same usage, so a billed failure carries its tokens and cost there too.
+                judgment_job.judgment_job_after_complete()
+                if self.reporting_delegate:
+                    self.reporting_delegate.report_inference_job(inference_job=judgment_job)
 
         return answers
 

@@ -47,6 +47,7 @@ from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_identity import make_run_identity_span_attributes
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.log.console_layouts import LogLayout
+from pipelex.tools.log.summary_fields import DURATION_MS_FIELD, elapsed_ms, outcome_fields, start_clock
 from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path, is_snake_case
 from pipelex.validation_error_types import PipeValidationErrorType
@@ -58,6 +59,36 @@ PipeAbstractType = type["PipeAbstract"]
 
 #: The message every live pipe run announces itself with; the pipe is in the fields, and the console draws it as the pipe tree.
 PIPE_RUN_STARTS_MESSAGE = "Pipe run starts"
+
+#: The message every live pipe run ends with, whichever way it ends; the pipe, its duration and its outcome are in the fields.
+PIPE_RUN_ENDS_MESSAGE = "Pipe run ends"
+
+
+class PipeRunEnd:
+    """Times a live pipe run and logs the event it ends with, when it ends, however it ends.
+
+    The pair of the run's announcement: entered with it, under the run's `pipe_run_id`, and left once the run returns
+    or raises, so every announced run ends with one event and a dry run, which announces nothing, with none. The event
+    carries the announcement's fields, then `duration_ms`, `outcome`, and `error.type` on failure. It never handles
+    the exception it reads the outcome from, which goes on as it came.
+    """
+
+    def __init__(self, *, pipe_fields: dict[str, Any]) -> None:
+        self._pipe_fields = pipe_fields
+        self._started_at = start_clock()
+
+    def __enter__(self) -> Self:
+        self._started_at = start_clock()
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        exc_traceback: object,
+    ) -> None:
+        fields = {**self._pipe_fields, DURATION_MS_FIELD: elapsed_ms(started_at=self._started_at), **outcome_fields(error=exc_value)}
+        log.info(PIPE_RUN_ENDS_MESSAGE, fields=fields, layout=LogLayout.PIPE_RUN_END)
 
 
 class AbsentInput(NamedTuple):
@@ -997,7 +1028,8 @@ class PipeAbstract(ABC, BaseModel):
         # names the pipe run it belongs to, a nested pipe's until it binds its own. The outer binding
         # comes back when the pipe returns, however it returns. A pipe lifted for absent optional
         # inputs never gets here: it has no run and no id, and its skip line carries the enclosing binding.
-        with log.context(pipe_run_id=this_pipe_run_id):
+        # The run ends with its summary event, under the same binding, whichever way it ends.
+        with log.context(pipe_run_id=this_pipe_run_id), PipeRunEnd(pipe_fields=self._pipe_run_fields(pipe_run_params=pipe_run_params)):
             # A fixed message, the pipe in the fields: the console draws the pipe tree from them through
             # the pipe-run layout, and every other sink writes them as keys a query can select on.
             log.info(PIPE_RUN_STARTS_MESSAGE, fields=self._pipe_run_fields(pipe_run_params=pipe_run_params), layout=LogLayout.PIPE_RUN)
