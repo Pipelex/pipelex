@@ -19,7 +19,7 @@ Colour follows the name the field was given, from ``FIELD_STYLES``, wherever the
 collision prefix it landed under; a field outside the map renders dimmed. The map is one table in code, the
 colours the pipe announcement has always used. Nothing here imports Rich: the suffix is a list of
 ``(text, style)`` segments the sink turns into a Rich ``Text``, never a markup string, so a value carrying
-``[red]`` prints as written whatever the handler's markup setting.
+``[red]`` prints as written.
 """
 
 from __future__ import annotations

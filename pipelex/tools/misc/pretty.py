@@ -56,8 +56,9 @@ RICH_RENDERING_MISSING_MESSAGE = (
 )
 
 # Rich's own console-markup tag pattern, ``rich.markup.RE_TAGS``: a run of backslashes, then a bracketed tag
-# whose name starts with a lowercase letter, ``#``, ``/`` or ``@``.
-_MARKUP_TAG_PATTERN = re.compile(r"((\\*)\[([a-z#/@][^[]*?)])")
+# whose name starts with a lowercase letter, ``#``, ``/`` or ``@``. Public because it is also what a log
+# message must never match: the runtime check that no message carries markup reads it from here.
+MARKUP_TAG_PATTERN = re.compile(r"((\\*)\[([a-z#/@][^[]*?)])")
 
 
 def require_rich_for_rendering() -> None:
@@ -96,7 +97,7 @@ def plain_markup_text(*, markup: str) -> str | None:
     pieces: list[str] = []
     open_depth = 0
     position = 0
-    for match in _MARKUP_TAG_PATTERN.finditer(markup):
+    for match in MARKUP_TAG_PATTERN.finditer(markup):
         full_text, escapes, tag_text = match.groups()
         start, end = match.span()
         if start > position:

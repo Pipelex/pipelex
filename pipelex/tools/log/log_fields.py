@@ -39,13 +39,11 @@ FORMATTER_OWNED_ATTRIBUTES = frozenset({"message", "asctime"})
 # the marker and cost the whole record its delivery.
 FORWARDED_MARK = "_pipelex_forwarded"
 
-# Rich's own per-record override of its handler's markup setting, which it reads as
-# ``getattr(record, "markup", self.markup)``, and so the one way to put one record on the console verbatim
-# while the handler goes on interpreting markup for every other. A message assembled from an exception is
-# what needs it: text like ``[Errno 2]`` is a markup tag to Rich, which swallows the span, or raises on an
-# unbalanced one. The name is Rich's rather than ours, but stamping it is a console concern that rides no
-# wire, and reserving it is what stops a caller steering the console through a field of that name.
-VERBATIM_MARK = "markup"
+# Rich's per-record override of its handler's markup setting, which ``RichHandler.render_message`` reads as
+# ``getattr(record, "markup", self.markup)``. The console sink reads no message as markup, and a caller's
+# field landing on this name would turn markup back on for its line, where a tag-shaped span of the message,
+# a ``list[int]`` or a bracketed path, is swallowed or raises.
+RICH_MARKUP_ATTRIBUTE = "markup"
 
 # Rich's per-record override of its handler's highlighter, which ``RichHandler.render_message`` reads as
 # ``getattr(record, "highlighter", self.highlighter)`` and then calls on the line. A caller's field landing
@@ -55,8 +53,8 @@ RICH_HIGHLIGHTER_ATTRIBUTE = "highlighter"
 # Every attribute Rich's handler reads off a record ahead of its own setting: ``render_message`` reads these
 # two, and nothing else ``emit`` or ``render`` reads is outside the stdlib's own attributes. Each steers the
 # console alone and means nothing on a wire, so neither is a field a caller can land on nor one a sink is
-# handed as something the record carries.
-RICH_RECORD_OVERRIDES = frozenset({VERBATIM_MARK, RICH_HIGHLIGHTER_ATTRIBUTE})
+# handed as something the record carries, whoever stamped it.
+RICH_RECORD_OVERRIDES = frozenset({RICH_MARKUP_ATTRIBUTE, RICH_HIGHLIGHTER_ATTRIBUTE})
 
 # The attribute the redaction stamps on a record it could not strip, and takes back off the moment it
 # has. It is the fail-closed half of the scrub: a record still carrying it reaches no sink, because what
@@ -82,7 +80,7 @@ LAYOUT_MARK = "_pipelex_layout"
 # and so a fresh record owns none of them: a caller's field spelling ``FORWARDED_MARK`` would be read as
 # the forwarding marker and cost the whole record its delivery, and one spelling ``UNSCRUBBED_MARK`` would
 # have a perfectly ordinary record read as one the scrub could not strip, and dropped.
-PIPELEX_OWNED_ATTRIBUTES = frozenset({FORWARDED_MARK, VERBATIM_MARK, UNSCRUBBED_MARK, FIELD_NAMES_MARK, LAYOUT_MARK})
+PIPELEX_OWNED_ATTRIBUTES = frozenset({FORWARDED_MARK, UNSCRUBBED_MARK, FIELD_NAMES_MARK, LAYOUT_MARK})
 
 # Reserved whether or not the record carries the name yet, which is exactly what the stdlib's own refusal
 # cannot cover: the formatter's and Pipelex's are stamped after the entries are attached, and Rich's are

@@ -36,7 +36,6 @@ _GUARD_SCRIPT = textwrap.dedent(
             is_show_level=True,
             is_link_path_enabled=True,
             highlighter_name=HighlighterName.JSON,
-            is_markup_enabled=True,
             is_rich_tracebacks=True,
             is_tracebacks_word_wrap=True,
             is_tracebacks_show_locals=False,
