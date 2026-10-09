@@ -128,6 +128,31 @@ class TestCheckLogCallsCmd:
         lines = [line.strip() for line in console_buffer.getvalue().splitlines() if line.strip()]
         assert lines[1:4] == ["pipelex/core  3 call(s)", "api/pipelex_api  1 call(s)", "Total baselined calls: 4"]
 
+    def test_the_two_trusted_revisions_are_exclusive(self, mocker: MockerFixture, console_buffer: io.StringIO) -> None:
+        mocker.patch.object(cmd_mod, "collect_offending_calls", return_value=[OFFENDING_CALL])
+        mocker.patch.object(cmd_mod, "load_baseline", return_value={LISTED_KEY: [LISTED_SIGNATURE]})
+
+        with pytest.raises(SystemExit) as exit_info:
+            check_log_calls_cmd(quiet=True, against="origin/dev", against_merge_base="origin/dev")
+
+        assert exit_info.value.code == 1
+        assert "Give `--against` or `--against-merge-base`, not both" in console_buffer.getvalue()
+
+    def test_a_signature_added_since_the_trusted_revision_exits_1_naming_it(self, mocker: MockerFixture, console_buffer: io.StringIO) -> None:
+        """The tree and the working baseline agree, so only the trusted revision's baseline says the entry is new."""
+        mocker.patch.object(cmd_mod, "collect_offending_calls", return_value=[OFFENDING_CALL])
+        mocker.patch.object(cmd_mod, "load_baseline", return_value={LISTED_KEY: [LISTED_SIGNATURE]})
+        mocker.patch.object(cmd_mod, "load_trusted_baseline", return_value={})
+
+        with pytest.raises(SystemExit) as exit_info:
+            check_log_calls_cmd(quiet=True, against="abc123")
+
+        assert exit_info.value.code == 1
+        output = console_buffer.getvalue()
+        assert "0 call(s) break the conventions, 0 baseline signature(s) are stale, 1 baseline signature(s) were added since 'abc123'" in output
+        assert f"{LISTED_KEY}  listed 1 time(s), 0 at the base" in output
+        assert LISTED_SIGNATURE in output
+
     def test_a_guard_error_exits_1_even_when_quiet(self, mocker: MockerFixture, console_buffer: io.StringIO) -> None:
         mocker.patch.object(cmd_mod, "collect_offending_calls", return_value=[])
         mocker.patch.object(cmd_mod, "load_baseline", side_effect=LogCallGuardError("The baseline log_call_baseline.toml was not found"))

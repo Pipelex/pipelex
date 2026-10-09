@@ -157,6 +157,17 @@ class TestLogCallGuard:
         [
             ("the facade from its own module", "from pipelex.tools.log.log import log\n", 'log.info(f"{alias}")'),
             ("the facade under an alias", "from pipelex import log as pipelex_log\n", 'pipelex_log.info(f"{alias}")'),
+            ("the facade from its own module under an alias", "from pipelex.tools.log.log import log as plog\n", 'plog.info(f"{alias}")'),
+            ("the package imported", "import pipelex\n", 'pipelex.log.warning(f"{alias}")'),
+            ("the package imported under an alias", "import pipelex as px\n", 'px.log.info(f"{alias}")'),
+            ("the facade's module imported from its package", "from pipelex.tools.log import log as m\n", 'm.log.info(f"{alias}")'),
+            ("the facade's module imported under an alias", "import pipelex.tools.log.log as x\n", 'x.log.info(f"{alias}")'),
+            ("the facade's module imported by its full path", "import pipelex.tools.log.log\n", 'pipelex.tools.log.log.log.info(f"{alias}")'),
+            ("a parent package imported", "from pipelex.tools import log as log_package\n", 'log_package.log.log.info(f"{alias}")'),
+            ("a relative import of the facade", "from ..tools.log.log import log\n", 'log.info(f"{alias}")'),
+            ("a relative import of the package's re-export", "from .. import log\n", 'log.info(f"{alias}")'),
+            ("a star import from the package", "from pipelex import *\n", 'log.info(f"{alias}")'),
+            ("an import inside the function", "", 'from pipelex import log as local_log\n    local_log.info(f"{alias}")'),
         ],
     )
     def test_the_facade_is_found_under_the_name_it_is_imported_as(self, topic: str, header: str, call: str) -> None:
@@ -169,6 +180,8 @@ class TestLogCallGuard:
             ("a logger attribute", "", 'self._logger.warning(f"{alias}")'),
             ("a log the module never imported from pipelex", "", 'log.info(f"{alias}")'),
             ("a facade method that does not log", FACADE_IMPORT, 'log.context(request_id=f"{alias}")'),
+            ("the facade's module, not the facade", "from pipelex.tools.log import log\n", 'log.info(f"{alias}")'),
+            ("another package's log", "from somewhere import log\n", 'log.info(f"{alias}")'),
         ],
     )
     def test_a_call_that_is_not_the_facade_s_is_not_read(self, topic: str, header: str, call: str) -> None:
@@ -202,7 +215,103 @@ class TestLogCallGuard:
                 )
             """
         )
-        assert offending[0].signature == 'warning: f"Could not load \'{alias}\': {exc!r:>10}", title=f"Load of {alias}"'
+        assert offending[0].signature == 'warning: f"Could not load \'{alias}\': {exc!r:>10}", title=f"Load of {alias}" [f-string]'
+
+    @pytest.mark.parametrize(
+        ("topic", "body", "expected_signature"),
+        [
+            (
+                "a name bound to an f-string",
+                'def load(alias):\n    msg = f"Loaded {alias}"\n    log.warning(msg)\n',
+                'warning: msg [f-string] where msg = f"Loaded {alias}"',
+            ),
+            (
+                "a name bound twice",
+                'def load(alias, cached):\n    msg = f"Loaded {alias}"\n    if cached:\n        msg = f"Reused {alias}"\n    log.warning(msg)\n',
+                'warning: msg [f-string] where msg = f"Loaded {alias}"; msg = f"Reused {alias}"',
+            ),
+            ("a parameter", "def load(msg):\n    log.info(msg)\n", "info: msg [non-literal] where msg = <parameter>"),
+            (
+                "a module constant read through a concatenation",
+                'PREFIX = "Loaded "\n\ndef load(alias):\n    log.info(PREFIX + alias)\n',
+                "info: PREFIX + alias [concatenation] where PREFIX = 'Loaded '; alias = <parameter>",
+            ),
+            (
+                "a name captured from an enclosing function",
+                'def load(alias):\n    msg = "Loaded"\n    def inner():\n        log.info(msg)\n',
+                "info: msg [non-literal] where msg = <enclosing function>",
+            ),
+        ],
+    )
+    def test_a_named_message_s_signature_carries_its_bindings_and_its_rules(self, topic: str, body: str, expected_signature: str) -> None:
+        """The bindings are source text, sorted, never a line: what the call logs is its identity."""
+        assert [call.signature for call in _offending(body)] == [expected_signature], topic
+
+    @pytest.mark.parametrize(
+        ("topic", "before", "after"),
+        [
+            (
+                "the bound f-string is reworded",
+                'def load(alias):\n    msg = f"Loaded {alias}"\n    log.warning(msg)\n',
+                'def load(alias):\n    msg = f"Loaded the dependency {alias}"\n    log.warning(msg)\n',
+            ),
+            (
+                "the bound f-string gains markup",
+                'def load(alias):\n    msg = f"Loaded {alias}"\n    log.warning(msg)\n',
+                'def load(alias):\n    msg = f"[red]Loaded[/red] {alias}"\n    log.warning(msg)\n',
+            ),
+            (
+                "a module constant the message concatenates gains markup",
+                'PREFIX = "Loaded "\n\ndef load(alias):\n    log.info(PREFIX + alias)\n',
+                'PREFIX = "[red]Loaded[/red] "\n\ndef load(alias):\n    log.info(PREFIX + alias)\n',
+            ),
+        ],
+    )
+    def test_editing_what_a_grandfathered_call_logs_changes_its_signature(self, topic: str, before: str, after: str) -> None:
+        """The call's own source is unchanged, so only the bindings and the rules in its signature tell the exemption is spent."""
+        before_calls = _offending(before)
+        after_calls = _offending(after)
+        assert len(before_calls) == len(after_calls) == 1, topic
+        assert before_calls[0].signature != after_calls[0].signature, topic
+
+    def test_new_markup_is_named_in_the_signature_s_rules(self) -> None:
+        offending = _offending('PREFIX = "[red]Loaded[/red] "\n\ndef load(alias):\n    log.info(PREFIX + alias)\n')
+        assert offending[0].signature == "info: PREFIX + alias [concatenation, markup] where PREFIX = '[red]Loaded[/red] '; alias = <parameter>"
+
+    @pytest.mark.parametrize(
+        ("topic", "body", "expected_tag"),
+        [
+            ("two literals", 'log.info("[" + "red]Loaded")', "[red]"),
+            ("a named literal operand", 'log.info(OPENING + "red]Loaded")', "[red]"),
+            ("a literal extended with +=", 'msg = "["\n    msg += "red]Loaded"\n    log.verbose(msg)', "[red]"),
+            ("a conditional between literals", 'log.debug(("[" if flag else "(") + "red]Loaded")', "[red]"),
+            ("an f-string's literal edge", 'log.debug("[" + f"red]Loaded {flag}")', "[red]"),
+        ],
+    )
+    def test_markup_split_across_a_concatenation_is_refused(self, topic: str, body: str, expected_tag: str) -> None:
+        offending = _offending(f'OPENING = "["\n\ndef load(flag):\n    {body}\n')
+        markup_details = [breach.detail for call in offending for breach in call.breaches if breach.rule == LogCallRule.MARKUP]
+        assert markup_details == [f"the message holds the markup tag `{expected_tag}`"], topic
+
+    def test_a_value_between_two_literals_keeps_their_brackets_apart(self) -> None:
+        """The guard cannot read the value, so it never joins the texts around it into a tag."""
+        assert _offending('def load(alias):\n    log.debug("[" + alias + "red]")\n') == []
+
+    @pytest.mark.parametrize(
+        ("topic", "body"),
+        [
+            ("a None title", 'log.info("Loaded", title=None)'),
+            ("a None inline title", 'log.warning("Loaded", inline=None)'),
+            ("a title that is None or a literal", 'log.info("Loaded", title=None if alias else "Library")'),
+            ("a title bound to None or a literal", 'title = None\n    if alias:\n        title = "Library"\n    log.info("Loaded", title=title)'),
+        ],
+    )
+    def test_a_title_that_is_statically_none_is_no_message(self, topic: str, body: str) -> None:
+        assert _offending(f"def load(alias):\n    {body}\n") == [], topic
+
+    def test_a_none_title_stays_out_of_the_signature(self) -> None:
+        offending = _offending('def load(alias):\n    log.info(f"Loaded {alias}", title=None)\n')
+        assert [call.signature for call in offending] == ['info: f"Loaded {alias}" [f-string]']
 
     def test_moving_a_call_down_its_function_keeps_its_signature_and_key(self) -> None:
         """Lines never enter the identity, so an edit above a call moves nothing in the baseline."""

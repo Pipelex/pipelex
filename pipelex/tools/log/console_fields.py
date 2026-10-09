@@ -11,7 +11,8 @@ content the message already renders, which is why the dispatch never stamps a la
 A value renders on one line: a string bare unless it is empty or holds a space, an equals sign, a quote, a
 backslash or a character a terminal would act on, in which case it is quoted, with a backslash and a quote
 escaped by a backslash and that character written as its escape; anything else as compact JSON; and the
-whole cut short past ``FIELD_VALUE_MAX_LENGTH``. A key is written the same way, so a field name holding a
+whole cut short past ``FIELD_VALUE_MAX_LENGTH``, except a field of ``UNCUT_FIELDS``, a handled exception's text,
+which is written in full, quoted and escaped the same way. A key is written the same way, so a field name holding a
 line break, a space, an equals sign or an escape sequence can forge neither a line nor a pair. Redaction has
 already run when the console renders a record, so what is rendered is what the scrub left.
 
@@ -31,6 +32,7 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
+from pipelex.tools.log.error_fields import ERROR_MESSAGE_FIELD
 from pipelex.tools.log.log_context import PIPE_RUN_ID_FIELD, PIPELINE_RUN_ID_FIELD, REQUEST_ID_FIELD
 from pipelex.tools.log.log_fields import DATA_FIELD, attached_field_names, given_field_name
 from pipelex.tools.log.log_sink import json_fallback, spell_non_finite
@@ -63,6 +65,10 @@ CONSOLE_HIDDEN_FIELDS = frozenset({REQUEST_ID_FIELD, PIPELINE_RUN_ID_FIELD, PIPE
 # The longest a rendered value gets, the truncation mark included.
 FIELD_VALUE_MAX_LENGTH = 80
 TRUNCATION_MARK = "…"
+
+# The fields the console writes in full, by the name the caller gave them: a handled exception's text, whose
+# diagnosis, a cause chain or a parse error's location, is lost to a fragment cut at the length above.
+UNCUT_FIELDS = frozenset({ERROR_MESSAGE_FIELD})
 
 FIELD_SEPARATOR = " "
 KEY_VALUE_SEPARATOR = "="
@@ -112,13 +118,22 @@ def field_suffix_segments(*, fields: Mapping[str, Any], presented_fields: frozen
         # The key is written like a value: a name a caller chose can hold a line break that would forge a
         # line, a space that would read as two pairs or an escape sequence the terminal would act on.
         segments.append((f"{format_field_value(value=name)}{KEY_VALUE_SEPARATOR}", FIELD_KEY_STYLE))
-        segments.append((format_field_value(value=value), field_style(name=name)))
+        segments.append((format_field_value(value=value, is_cut_short=is_field_cut_short(name=name)), field_style(name=name)))
     return segments
 
 
-def format_field_value(*, value: Any) -> str:
-    """A field's value as the suffix prints it: one line, a string quoted when it could forge a pair, cut short when long."""
-    return _truncated(text=_one_line(value=value, is_quoting_strings=True))
+def is_field_cut_short(*, name: str) -> bool:
+    """Whether the console cuts a field's value short when it is long: every field but those of ``UNCUT_FIELDS``.
+
+    Read off the name the caller gave rather than the one it landed on, as the style is.
+    """
+    return given_field_name(name=name) not in UNCUT_FIELDS
+
+
+def format_field_value(*, value: Any, is_cut_short: bool = True) -> str:
+    """A field's value as the suffix prints it: one line, a string quoted when it could forge a pair, cut short when long unless told not to."""
+    text = _one_line(value=value, is_quoting_strings=True)
+    return _truncated(text=text) if is_cut_short else text
 
 
 def format_layout_value(*, value: Any) -> str:

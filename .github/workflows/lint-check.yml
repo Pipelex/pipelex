@@ -213,7 +213,9 @@ jobs:
 #     call's signature the same on every supported Python). A message at INFO
 #     and above is a literal with its values in fields, and no message holds
 #     Rich markup, against the committed log_call_baseline.toml, which only
-#     shrinks.
+#     shrinks: the check compares it with the baseline at the pull request's
+#     base, fetched here since the checkout holds only the merge commit, and
+#     refuses an entry the base does not list.
 # --------------------------------------------------------------------------
   lint-log-calls:
     name: Lint (log calls)
@@ -233,8 +235,11 @@ jobs:
       - name: Install dependencies
         run: PYTHON_VERSION=3.11 TEST_PROFILE=ci make install
 
+      - name: Fetch the pull request's base
+        run: git fetch --no-tags --depth=1 origin "${{ github.event.pull_request.base.sha }}"
+
       - name: Run log-call check
-        run: make check-log-calls
+        run: make check-log-calls LOG_CALL_BASELINE_REF="${{ github.event.pull_request.base.sha }}"
 
 # --------------------------------------------------------------------------
 # 7.  Drift contracts — single job, version-independent

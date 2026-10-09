@@ -435,10 +435,26 @@ def check_log_calls_command(
     quiet: Annotated[
         bool, typer.Option("--quiet", "-q", help="Light output on success (single line); the full violation list still prints on failure")
     ] = False,
+    against: Annotated[
+        str | None,
+        typer.Option(
+            "--against",
+            metavar="REF",
+            help="Fail when the baseline lists a signature more times than the one committed at REF does (REF must resolve)",
+        ),
+    ] = None,
+    against_merge_base: Annotated[
+        str | None,
+        typer.Option(
+            "--against-merge-base",
+            metavar="REF",
+            help="Like --against, at the merge base of HEAD and REF; when that merge base does not resolve, say so and skip the comparison",
+        ),
+    ] = None,
 ) -> None:
     """Hold log calls to the log-call conventions against the committed baseline, which only shrinks."""
     try:
-        check_log_calls_cmd(prune=prune, report=report, quiet=quiet)
+        check_log_calls_cmd(prune=prune, report=report, quiet=quiet, against=against, against_merge_base=against_merge_base)
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise

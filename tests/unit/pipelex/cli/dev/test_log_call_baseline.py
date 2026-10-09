@@ -1,23 +1,30 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
+from pipelex.cli.dev_cli.commands import log_call_guard as guard_mod
 from pipelex.cli.dev_cli.commands.log_call_guard import (
     BASELINE_FILE,
+    BaselineGrowth,
     LogCallGuardError,
     OffendingCall,
     StaleEntry,
     build_baseline,
     collect_offending_calls,
     compare_with_baseline,
+    compare_with_trusted_baseline,
     find_offending_calls_in_source,
     load_baseline,
     prune_baseline,
     render_baseline,
     write_baseline,
 )
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 #: Anchored on `tests/` by name rather than by a parent count, for the reason `test_hub_layering_guard.py` gives.
 _REPO_ROOT = next(parent for parent in Path(__file__).resolve().parents if parent.name == "tests").parent
@@ -31,7 +38,7 @@ MOVED = 'from pipelex import log\n\ndef fetch(alias):\n    log.warning(f"Loaded 
 REWORDED = 'from pipelex import log\n\ndef load(alias):\n    log.warning(f"Loaded the dependency {alias}")\n'
 TWICE = 'from pipelex import log\n\ndef load(alias):\n    log.warning(f"Loaded {alias}")\n    log.warning(f"Loaded {alias}")\n'
 
-LISTED_SIGNATURE = 'warning: f"Loaded {alias}"'
+LISTED_SIGNATURE = 'warning: f"Loaded {alias}" [f-string]'
 LISTED_KEY = f"{SAMPLE_PATH}::load"
 
 
@@ -61,7 +68,7 @@ class TestLogCallBaseline:
         [
             ("the call now complies", CONVERTED, []),
             ("the call moved to another function", MOVED, [(f"{SAMPLE_PATH}::fetch", LISTED_SIGNATURE)]),
-            ("the call's message changed", REWORDED, [(LISTED_KEY, 'warning: f"Loaded the dependency {alias}"')]),
+            ("the call's message changed", REWORDED, [(LISTED_KEY, 'warning: f"Loaded the dependency {alias}" [f-string]')]),
         ],
     )
     def test_a_listed_call_no_call_matches_any_more_is_stale_until_its_entry_is_removed(
@@ -88,6 +95,46 @@ class TestLogCallBaseline:
     def test_pruning_keeps_what_still_matches(self) -> None:
         baseline = {LISTED_KEY: [LISTED_SIGNATURE, LISTED_SIGNATURE]}
         assert prune_baseline(baseline=baseline, offending=_offending(INTERPOLATED)) == {LISTED_KEY: [LISTED_SIGNATURE]}
+
+    def test_adding_a_violation_together_with_its_entry_fails_against_the_trusted_baseline(self) -> None:
+        """The tree and its own baseline agree, so only the comparison with the base refuses the exemption the change gave itself."""
+        offending = _offending(INTERPOLATED)
+        working = build_baseline(offending=offending)
+        assert compare_with_baseline(offending=offending, baseline=working).is_clean
+        assert compare_with_trusted_baseline(baseline=working, trusted={}) == [
+            BaselineGrowth(key=LISTED_KEY, signature=LISTED_SIGNATURE, trusted_count=0, working_count=1)
+        ]
+
+    def test_a_signature_listed_more_often_than_at_the_base_fails(self) -> None:
+        working = build_baseline(offending=_offending(TWICE))
+        assert compare_with_trusted_baseline(baseline=working, trusted={LISTED_KEY: [LISTED_SIGNATURE]}) == [
+            BaselineGrowth(key=LISTED_KEY, signature=LISTED_SIGNATURE, trusted_count=1, working_count=2)
+        ]
+
+    @pytest.mark.parametrize(
+        ("topic", "trusted", "working"),
+        [
+            ("the entry was removed", {LISTED_KEY: [LISTED_SIGNATURE]}, {}),
+            ("the baseline is unchanged", {LISTED_KEY: [LISTED_SIGNATURE]}, {LISTED_KEY: [LISTED_SIGNATURE]}),
+            ("one of two identical entries was removed", {LISTED_KEY: [LISTED_SIGNATURE, LISTED_SIGNATURE]}, {LISTED_KEY: [LISTED_SIGNATURE]}),
+        ],
+    )
+    def test_a_baseline_that_shrank_or_stayed_passes_against_the_trusted_one(
+        self, topic: str, trusted: dict[str, list[str]], working: dict[str, list[str]]
+    ) -> None:
+        assert compare_with_trusted_baseline(baseline=working, trusted=trusted) == [], topic
+
+    def test_the_baseline_is_written_through_the_repo_s_toml_writer(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        save_toml = mocker.spy(guard_mod, "save_toml_to_path")
+        write_baseline(baseline={LISTED_KEY: [LISTED_SIGNATURE]}, repo_root=tmp_path)
+        save_toml.assert_called_once()
+        assert save_toml.call_args.kwargs["path"] == tmp_path / BASELINE_FILE
+        assert (tmp_path / BASELINE_FILE).read_text(encoding="utf-8") == render_baseline(baseline={LISTED_KEY: [LISTED_SIGNATURE]})
+
+    def test_the_committed_baseline_is_exactly_what_the_writer_writes(self) -> None:
+        """With `make format`'s plxt check in CI, this pins the writer to what `plxt fmt` leaves, so a prune moves nothing else."""
+        committed = (_REPO_ROOT / BASELINE_FILE).read_text(encoding="utf-8")
+        assert render_baseline(baseline=load_baseline(repo_root=_REPO_ROOT)) == committed
 
     def test_the_rendered_baseline_loads_back_as_written(self, tmp_path: Path) -> None:
         baseline = {

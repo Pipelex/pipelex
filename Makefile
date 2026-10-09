@@ -185,7 +185,7 @@ make check-rich-imports       - Refuse a module-level Rich import or reach outsi
 make cri                      - Shorthand -> check-rich-imports
 make check-actions-allowlist  - Refuse a workflow action outside the committed Actions allowlist
 make caa                      - Shorthand -> check-actions-allowlist
-make check-log-calls          - Refuse an interpolated log message at INFO+ and Rich markup in any log message, against a shrinking baseline
+make check-log-calls          - Refuse an interpolated log message at INFO+ and Rich markup in any log message, against a baseline that only shrinks from origin/dev's merge base (LOG_CALL_BASELINE_REF=<ref> to compare with another)
 make clc                      - Shorthand -> check-log-calls
 make check-TODOs              - Check for TODOs
 
@@ -419,9 +419,13 @@ check-actions-allowlist: env
 caa: check-actions-allowlist
 	@echo "> done: caa = check-actions-allowlist"
 
+# The revision the log-call baseline may only shrink from. Empty, the default, it is the merge base of HEAD and
+# origin/dev, and the check says so when that does not resolve; CI sets it to the pull request's base.
+LOG_CALL_BASELINE_REF ?=
+
 check-log-calls: env
 	$(call PRINT_TITLE,"Holding log calls to the log-call conventions against the shrinking baseline")
-	$(VENV_PIPELEX_DEV) check-log-calls --quiet
+	$(VENV_PIPELEX_DEV) check-log-calls --quiet $(if $(LOG_CALL_BASELINE_REF),--against "$(LOG_CALL_BASELINE_REF)",--against-merge-base origin/dev)
 
 clc: check-log-calls
 	@echo "> done: clc = check-log-calls"

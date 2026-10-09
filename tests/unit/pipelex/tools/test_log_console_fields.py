@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from pipelex.tools.log.console_fields import FIELD_KEY_STYLE, FIELD_STYLES, FIELD_VALUE_MAX_LENGTH, TRUNCATION_MARK, UNMAPPED_FIELD_STYLE
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.log.log_fields import (
     COLLIDING_FIELD_PREFIX,
     FIELD_NAMES_MARK,
@@ -138,6 +139,21 @@ class TestConsoleFields:
         rendered = buffer.getvalue()
         assert f"excerpt={'x' * (FIELD_VALUE_MAX_LENGTH - len(TRUNCATION_MARK))}{TRUNCATION_MARK}" in rendered
         assert "x" * FIELD_VALUE_MAX_LENGTH not in rendered
+
+    def test_an_error_message_is_written_in_full_while_other_fields_stay_cut_short(self) -> None:
+        """The cause chain of an unresolved package outgrows the cut, and a fragment ending in an ellipsis loses the diagnosis."""
+        causes = "PackageFetchError: could not clone 'github.com/acme/methods' <- GitError: " + "fatal: repository not found; " * 6
+        text = rendered_text(
+            record=record_with_fields(
+                message="A method package could not be resolved",
+                extra={"package_address": "github.com/acme/methods", **error_fields(exc=RuntimeError("boom"), text=causes), "excerpt": "x" * 500},
+            ),
+        )
+
+        quoted_causes = '"' + causes.replace('"', '\\"') + '"'
+        assert f"error.message={quoted_causes}" in text.plain
+        assert TRUNCATION_MARK + " excerpt=" not in text.plain
+        assert f"excerpt={'x' * (FIELD_VALUE_MAX_LENGTH - len(TRUNCATION_MARK))}{TRUNCATION_MARK}" in text.plain
 
     def test_a_field_is_styled_by_its_name_and_a_field_outside_the_map_is_dimmed(self) -> None:
         text = rendered_text(

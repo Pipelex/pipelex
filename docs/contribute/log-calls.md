@@ -9,7 +9,7 @@ Pipelex's log calls follow the [log-call conventions](../tools/logging.md#log-ca
 
 ## What it reads
 
-The guard parses every Python module in `pipelex/`, except the facade's own package `pipelex/tools/log/`, and in the API server's `api/pipelex_api/`, which logs through the same facade. It reads the calls of the `log` facade: a method call on the name a module imports `log` under, from `pipelex` or from `pipelex.tools.log.log`, an alias included. A call's message is its first positional argument, or its `content=` keyword, and its `title=` and `inline=` keywords count as part of it, since the dispatch renders both into the message.
+The guard parses every Python module in `pipelex/`, except the facade's own package `pipelex/tools/log/`, and in the API server's `api/pipelex_api/`, which logs through the same facade. It reads the calls of the `log` facade, however a module reaches it: the name it imports `log` under, from `pipelex` or from `pipelex.tools.log.log`, an alias, a relative import and a star import included, or an attribute path through a module it imports, `pipelex.log.warning(...)` after `import pipelex`, `m.log.info(...)` after `from pipelex.tools.log import log as m`, `x.log.info(...)` after `import pipelex.tools.log.log as x`. A call's message is its first positional argument, or its `content=` keyword, and its `title=` and `inline=` keywords count as part of it, since the dispatch renders both into the message. A title or an inline title that is statically `None`, `title=None` or a name bound only to `None` and literals, is no message text at all.
 
 ## The rules
 
@@ -20,19 +20,21 @@ On `log.info`, `log.warning`, `log.error` and `log.critical`, the message is a l
 - a string constant, implicit concatenation of constants included;
 - an f-string without a placeholder;
 - a `+` between literals, or a conditional expression between literals;
-- a name whose every binding, in the enclosing function or at module level, is one of the above.
+- a name whose every binding is one of the above, `msg += " the library"` and `msg = msg + " the library"` included when what is added is a literal.
 
 Anything else is refused, under the name of its form:
 
 | Rule | What it refuses |
 | --- | --- |
 | `f-string` | An f-string with a placeholder, `f"Loaded '{alias}'"` |
-| `percent-format` | A `%` format, `"Loaded %s" % alias` |
-| `concatenation` | A `+` with a side that is not a literal, `"Loaded " + alias`, or a name extended with `+=` |
+| `percent-format` | A `%` format, `"Loaded %s" % alias`, or a name formatted with `%=` |
+| `concatenation` | A `+` with a side that is not a literal, `"Loaded " + alias`, or a name extended with `+=` by something that is not |
 | `format-call` | A `.format()` call, `"Loaded {}".format(alias)` |
 | `non-literal` | Any other expression: a parameter, an attribute, a call's result, a mapping or a model |
 
-A name is read through its bindings in the function that makes the call, then at module level when the function does not bind it. A name bound to an f-string is refused as an `f-string`, the report naming the line of the binding; a name the function receives as a parameter, binds in a loop or a `with`, or does not bind at all is `non-literal`. A variable captured from an enclosing function is not followed, and is `non-literal` too.
+A name is resolved by Python's own scoping. The scope the call is made in comes first, a comprehension reading as part of the scope it is written in; then the enclosing functions, a class body never being one; then the module. A `global` or `nonlocal` assignment counts as a binding of the scope that owns the name. One index of every scope's bindings is built per module, in one walk, so a lookup never reads a scope again.
+
+A binding is what Python counts as one: an assignment to the name itself or through a tuple, a list or a starred target, an annotated or augmented assignment, a `:=`, a `for`, `with` or `except ... as` target, a comprehension target, a `match` capture, a parameter of a function or a lambda, an import and a definition. An assignment that only mentions the name, `cache[msg] = 1` or `msg.attr = value`, does not rebind it. A name bound to an f-string is refused as an `f-string`, the report naming the line of the binding; a name bound by anything the guard does not read, a parameter, a loop or comprehension target, a `with` or `except` target, a `match` capture, an unpacking, an import, or not bound at all, is `non-literal`. A name bound in an enclosing function is not followed, and is `non-literal` too, whatever the module binds under the same name.
 
 The `non-literal` rule is the guard's choice rather than the conventions' letter: it refuses a message built elsewhere and passed in, by a helper or a caller, because nothing can tell that such a message is fixed, and every one the first census found was in fact built from values. A message that must vary is a fixed message with fields. A structured content, a mapping or a model logged as the message, is `non-literal` at INFO and above for the same reason: its values belong in fields, and its payload belongs nowhere.
 
@@ -40,7 +42,7 @@ The `non-literal` rule is the guard's choice rather than the conventions' letter
 
 ### No markup at any level
 
-On every method, `log.verbose` and `log.debug` included, no literal text of a message, its title or its inline title holds a Rich markup tag. The literal text is the string constants written at the call, the literal parts of an f-string, the format string of a `%` or a `.format()`, and the literals a name read as above is bound to.
+On every method, `log.verbose` and `log.debug` included, no literal text of a message, its title or its inline title holds a Rich markup tag. The literal text is the string constants written at the call, the literal parts of an f-string, the format string of a `%` or a `.format()`, and the literals a name read as above is bound to. It is read the way it reaches the console: a `+` whose operands are known, named literals and `+=` extensions included, is folded into one text before the scan, so `"[" + "red]Loaded"` holds `[red]`, while a value the guard cannot read keeps the texts around it apart.
 
 A markup tag is what Rich reads as one, matched with Rich's own tag pattern:
 
@@ -52,40 +54,53 @@ A bracketed word that is no style, `list[int]`, `[Errno 2]` or `items[index]`, i
 
 ## The baseline
 
-`log_call_baseline.toml`, at the repo root, lists every call that broke a rule when the guard arrived. Its key is the call's file and enclosing qualified name, `<relative_path>::<qualified_name>`, the classes and functions joined by dots, or `<module>` for a call made at module level. Under the key, each call is listed by its **signature**, its method and its message's source text, once per call that carries it:
+`log_call_baseline.toml`, at the repo root, lists every call that broke a rule when the guard arrived. Its key is the call's file and enclosing qualified name, `<relative_path>::<qualified_name>`, the classes and functions joined by dots, or `<module>` for a call made at module level. Under the key, each call is listed by its **signature**, once per call that carries it. A signature is the call's method, its message's source text, the rules it breaks between brackets, and, after `where`, every binding the guard read to judge it, sorted, a binding it does not read written as what binds it (`<parameter>`, `<for target>`, `<enclosing function>`, `<unbound>`):
 
 ```toml
 version = 1
 
 ["pipelex/methods/fetch_on_miss.py::resolve_address_based_method"]
 calls = [
-  "info: f\"Fetched method '{fetched.full_address}' at commit {fetched.commit_sha} and installed it into '{installed.path}'\"",
+  "info: f\"Fetched method '{fetched.full_address}' at commit {fetched.commit_sha} and installed it into '{installed.path}'\" [f-string]",
+]
+
+["pipelex/pipe_run/pipe_run.py::PipeRun._build_pipe_io_artifacts_on_output"]
+calls = [
+  "warning: message [f-string] where message = f\"Failed to build the I/O artifacts for pipeline_run_id={pipeline_run_id}: {build_error}\"",
 ]
 ```
 
-A line number never enters the baseline, so an edit elsewhere in a file moves nothing. A signature is rendered the same on every Python the check runs on: `ast.unparse` writes an f-string by quoting rules that changed with Python 3.12, so the guard writes f-strings itself, and everything else through `ast.unparse`, whose output for other expressions does not move.
+So the identity of a call is what it logs, not only how the call is written: rewording the f-string a grandfathered `log.warning(message)` is bound to, or adding markup to a module constant its message concatenates, changes its signature, and the exemption is spent. A line number never enters the baseline, so an edit elsewhere in a file moves nothing. A signature is rendered the same on every Python the check runs on: `ast.unparse` writes an f-string by quoting rules that changed with Python 3.12, so the guard writes f-strings itself, and everything else through `ast.unparse`, whose output for other expressions does not move. The file is written through the repo's TOML writer (`pipelex/tools/misc/toml_utils.py`, tomlkit), laid out exactly as `make format` leaves it, so a prune moves nothing else.
 
 The comparison is exact, both ways:
 
 - **A call the baseline does not list fails the check.** That is every new call that breaks a rule, and a second identical call beside a listed one.
-- **A listed signature no call carries any more fails the check too**, until it is removed from the file: the call now complies, or it moved to another function, or its message changed. The check names the stale signature.
+- **A listed signature no call carries any more fails the check too**, until it is removed from the file: the call now complies, or it moved to another function, or its message, a binding of it or the rules it breaks changed. The check names the stale signature.
 
-So changing a listed call's message, or moving the call, is converting it: its old signature goes stale, and the new form must comply, since nothing lists it. The baseline is never added to. It is the debt the conversion of the existing calls pays off, and it ends empty.
+So changing a listed call's message, or moving the call, is converting it: its old signature goes stale, and the new form must comply, since nothing lists it.
+
+### It only shrinks
+
+Agreeing with the tree is not enough, since a change could add a violating call and its entry together. So the check also holds the baseline to the one committed at a trusted revision, the base the change merges into, read with `git show <ref>:log_call_baseline.toml`: a signature the working baseline lists more times than the trusted one, a new entry or a higher count, fails, named under its key with both counts. Removing an entry, or a call, always passes. A trusted revision that runs the guard but holds no baseline file has an empty one; a revision from before the guard existed has nothing to compare with, and the check says so and runs against the tree alone. A trusted revision that does not resolve, or whose baseline is of another `version`, fails the check: a gate that cannot compare does not pass. A future change to the signature's format bumps `version` and has to teach the comparison to read the previous one.
+
+The baseline is never added to. It is the debt the conversion of the existing calls pays off, and it ends empty.
 
 ## Running it
 
-`make check-log-calls`, alias `make clc`, runs `pipelex-dev check-log-calls --quiet`. It is part of `make agent-check` and `make check`, and CI runs it as the `Lint (log calls)` job, which `Lint (all)` requires, and in the pre-main fresh check. Run directly, the command takes three options:
+`make check-log-calls`, alias `make clc`, runs `pipelex-dev check-log-calls --quiet --against-merge-base origin/dev`, so a local run holds the baseline to the one at the merge base of `HEAD` and `origin/dev`, and says plainly when that merge base does not resolve, `origin/dev` not fetched for instance. `make check-log-calls LOG_CALL_BASELINE_REF=<ref>` compares with another revision. It is part of `make agent-check` and `make check`. CI runs it as the `Lint (log calls)` job, which `Lint (all)` requires, fetching the pull request's base and passing it as `LOG_CALL_BASELINE_REF`, and in the pre-main fresh check the same way; a manual run of the fresh check has no pull request base, and says it checks the tree alone. Run directly, the command takes these options:
 
-- `--quiet` keeps a pass to one line, which says how many calls the baseline still lists; a failure always prints in full.
+- `--quiet` keeps a pass to one line, which says how many calls the baseline still lists and, when it compared, that it adds nothing to the trusted revision; a failure always prints in full.
 - `--prune` removes the stale signatures from the baseline, then checks. It never adds one, so a call the baseline does not list still fails.
 - `--report` prints the baseline's calls by package area, the largest first, and gates nothing: the measure of what is left to convert.
+- `--against <ref>` holds the baseline to the one committed at `<ref>`, which must resolve.
+- `--against-merge-base <ref>` holds it to the one at the merge base of `HEAD` and `<ref>`, and skips the comparison, saying so, when that merge base does not resolve. It and `--against` are exclusive.
 
-A failure lists each call the baseline does not list, at its file and line, with its enclosing qualified name and every rule it breaks, then each rule's remedy, then each stale signature under its key.
+A failure lists each call the baseline does not list, at its file and line, with its enclosing qualified name and every rule it breaks, then each rule's remedy, then each stale signature under its key, then each signature added since the trusted revision.
 
 ## Converting a call
 
 1. Rewrite the call by the [conventions](../tools/logging.md#log-call-conventions): a fixed message, its values in `fields` under the names of the vocabulary table, a handled exception through `error_fields` at WARNING and below or `include_exception=True` at ERROR and above.
-2. Run `make check-log-calls`. It reports the call's signature as stale.
+2. Run `make check-log-calls`. It reports the call's signature as stale; editing what a listed call logs without converting it reports the old signature as stale and the new one as unlisted.
 3. Remove the signature, by hand or with `.venv/bin/pipelex-dev check-log-calls --prune`, and commit the file with the change.
 
 `pipelex/libraries/library_manager.py` is the worked example: every one of its calls follows the conventions, its warnings as fixed messages with fields, and it has no baseline entry.
