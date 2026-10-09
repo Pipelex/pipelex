@@ -34,6 +34,7 @@ from typing import Any, NamedTuple, cast
 import tomlkit
 from tomlkit.exceptions import TOMLKitError
 
+from pipelex import log
 from pipelex.migration.exceptions import MigrationLedgerError
 from pipelex.migration.ledger import MigrationLedger, load_ledger_cached, packaged_migration_dir
 from pipelex.migration.plan import MigrationPlan
@@ -237,44 +238,85 @@ def _is_within(*, plan: MigrationPlan, directories: Sequence[Path]) -> bool:
     return any(parent == (directory / subdirectory).resolve() for directory in directories)
 
 
-def _quoted_files(*, plans: Sequence[MigrationPlan]) -> str:
-    return ", ".join(f"'{plan.file_path}'" for plan in plans)
+class StaleConfigurationFile(NamedTuple):
+    """One configuration file a boot carried forward in memory, as its warning line names it.
+
+    Everything here but the path is ledger knowledge: the titles of the steps the replay carried
+    and whether one of them is blocked. A value read from the user's file has no business in a
+    boot warning, by the same rule the migration report obeys.
+    """
+
+    file_path: Path
+    is_reached_by_migrate: bool
+    """Whether `pipelex migrate`'s walk reaches the file, which decides the remedy its line names."""
+    migration_steps: list[str]
+    """The titles of the ledger steps the replay carried forward, sorted."""
+    has_blocked_steps: bool
+    """Whether some of what the file needs cannot be applied for the user."""
+
+    def log_fields(self) -> dict[str, Any]:
+        return {
+            "file.path": str(self.file_path),
+            "migration_steps": self.migration_steps,
+            "has_blocked_steps": self.has_blocked_steps,
+        }
 
 
-def stale_configuration_warning(*, plans: Sequence[MigrationPlan], walked_dirs: Sequence[Path]) -> str:
+class StaleConfigurationWarning(NamedTuple):
+    """What a boot owes the user when it carried a stale configuration forward rather than dying.
+
+    A loader builds it when its retry succeeds and either emits it there or parks it for the caller
+    that owes the user the one copy of it (`take_stale_configuration_warning` on the main
+    configuration's loader and on the inference backend library). **It is emitted as one line per
+    stale file**, each a fixed message naming that file's remedy with the file in `file.path`: the
+    file list is a value, a value rides a field, and a field the console cuts at its width cannot
+    carry a list of paths a person has to read. A load that spans files in and out of the walk
+    therefore gets both remedies, each on the lines of its own files.
+    """
+
+    files: list[StaleConfigurationFile]
+
+    def emit(self) -> None:
+        for stale_file in self.files:
+            if stale_file.is_reached_by_migrate:
+                log.warning(
+                    "A configuration file is out of date and was read as if it had been migrated, without being rewritten; "
+                    "run `pipelex migrate` to update it",
+                    fields=stale_file.log_fields(),
+                )
+            else:
+                log.warning(
+                    "A configuration file is out of date and was read as if it had been migrated, without being rewritten; "
+                    "`pipelex migrate` does not reach it, so update it where it lives",
+                    fields=stale_file.log_fields(),
+                )
+
+
+def stale_configuration_warning(*, plans: Sequence[MigrationPlan], walked_dirs: Sequence[Path]) -> StaleConfigurationWarning:
     """What a boot says when it carried a stale configuration forward in memory rather than dying.
 
-    Names the files and the remedy, and takes everything else it says from the ledger — the same
-    rule the migration report obeys, because a boot warning is read in the same places a report is
-    and a value read from a user's file has no business in either.
+    Names each stale file and its remedy, and takes everything else it says from the ledger — the
+    same rule the migration report obeys, because a boot warning is read in the same places a
+    report is and a value read from a user's file has no business in either.
 
     **`pipelex migrate` is named only for a file it would reach**, which is what `walked_dirs` is
     for. Boot tolerance replays exactly the files the loader merged, and a loader pointed at a
     directory of its own — `Pipelex.make(config_dir=…)`, or this repository's own
     `tests/pipelex_{run_mode}.toml` — merges files the command's fixed walk will never touch. A
-    warning that closed on "run `pipelex migrate`" there would name, on every boot, a command that
-    then reports nothing to do. The same rule as the migration report's: a remedy is named only
-    where it would write. Pass the walk (`config_manager.existing_config_dirs`); an embedder's
-    directory is theirs to update, and `--config-dir` is deliberately not the answer.
+    warning that said "run `pipelex migrate`" there would name, on every boot, a command that then
+    reports nothing to do. The same rule as the migration report's: a remedy is named only where
+    it would write. Pass the walk (`config_manager.existing_config_dirs`); an embedder's directory
+    is theirs to update, and `--config-dir` is deliberately not the answer.
     """
-    stale = [plan for plan in plans if not plan.is_clean]
-    in_reach = [plan for plan in stale if _is_within(plan=plan, directories=walked_dirs)]
-    out_of_reach = [plan for plan in stale if not _is_within(plan=plan, directories=walked_dirs)]
-    carried = sorted({step.title for plan in stale for step in plan.steps})
-    sentences = [f"Your configuration is out of date, and pipelex read it as if it had been migrated: {_quoted_files(plans=stale)}."]
-    if carried:
-        sentences.append(f"What the ledger carried forward: {'; '.join(carried)}.")
-    if any(plan.blocked for plan in stale):
-        blocked_note = "Some of what these files need cannot be applied for you"
-        sentences.append(f"{blocked_note} — `pipelex migrate` reports it." if in_reach else f"{blocked_note}.")
-    sentences.append("Nothing was written.")
-    if in_reach:
-        subject = _quoted_files(plans=in_reach) if out_of_reach else "the files"
-        sentences.append(f"Run `pipelex migrate` to bring {subject} up to date.")
-    if out_of_reach:
-        sentences.append(
-            f"`pipelex migrate` does not reach {_quoted_files(plans=out_of_reach)} — "
-            f"{'that file is' if len(out_of_reach) == 1 else 'those files are'} yours to update where "
-            f"{'it lives' if len(out_of_reach) == 1 else 'they live'}."
-        )
-    return " ".join(sentences)
+    return StaleConfigurationWarning(
+        files=[
+            StaleConfigurationFile(
+                file_path=plan.file_path,
+                is_reached_by_migrate=_is_within(plan=plan, directories=walked_dirs),
+                migration_steps=sorted({step.title for step in plan.steps}),
+                has_blocked_steps=bool(plan.blocked),
+            )
+            for plan in plans
+            if not plan.is_clean
+        ]
+    )

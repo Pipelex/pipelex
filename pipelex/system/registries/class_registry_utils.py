@@ -7,6 +7,7 @@ from typing import Any
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.runtime_hub import get_class_registry
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.typing.exceptions import ModuleFileError
 from pipelex.tools.typing.module_inspector import (
@@ -124,7 +125,7 @@ class ClassRegistryUtils:
                 pass
             except SyntaxError as exc:
                 # Potentially problematic: invalid Python syntax may indicate broken code
-                log.warning(f"Syntax error in {python_file}: {exc}")
+                log.warning("A Python file has a syntax error and was not imported", fields={"file.path": str(python_file), **error_fields(exc=exc)})
 
     @classmethod
     def auto_register_all_subclasses(

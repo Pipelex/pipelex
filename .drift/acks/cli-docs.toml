@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:33069c67291228668d0f75b69195fb898918372b58dd416dc57d5f75cc9be789"
-reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-10-09T20:06:34Z"
-rationale = "clean-pass: doctor_cmd.py now escapes the credentials advice at its print, and backend_credentials.py writes the table as [openai] instead of the Rich escape, so the doctor's Backend Credentials row prints the same [openai] it did before; graph_cmd.py's refused-spec branch keeps its console print and only turns its log line into a fixed message with file.path, error.type and error.message fields. Re-read doctor.md (the Backend Credentials row's advice, still accurate), run.md (no graph render failure wording) and agent_cli/CLAUDE.md (the agent doctor's envelope, which does not carry the comprehensive advice text, verified by grepping agent_cli for its factory): nothing stale."
+digest = "sha256:48e60f60905d871f18364bd1611d622726911b6d92b1e6789e73432baccbc1af"
+reviewed_by = "Louis Choquel"
+reviewed_at = "2026-10-09T23:08:00Z"
+rationale = "clean-pass: doctor_cmd.py's setup_doctor_runtime now emits the parked stale-configuration warning through StaleConfigurationWarning.emit, a line per stale file, instead of logging one composed text. Re-read docs/tools/cli (doctor.md and agent-cli.md, which say a stale configuration boots with a warning and point agents at the pending_migrations row) and pipelex/cli/agent_cli/CLAUDE.md: none quotes the warning's text or its shape, so nothing is stale."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -74,7 +74,7 @@ rationale = "clean-pass: doctor_cmd.py now escapes the credentials advice at its
 "pipelex/cli/commands/codegen/inputs_cmd.py" = "blob:28b22cfbca717d3f5ee75162b68e132439655deb"
 "pipelex/cli/commands/codegen/types_cmd.py" = "blob:27d7a06d571ad832b449d21b6f9eb66c017fb197"
 "pipelex/cli/commands/crate_loading.py" = "blob:3d7d651931ecf1a15a3e2d72411b3212b55d74ef"
-"pipelex/cli/commands/doctor_cmd.py" = "blob:ba2b1f3985b09aea8430410dad6c6bdbf0a2c599"
+"pipelex/cli/commands/doctor_cmd.py" = "blob:a991d210787c0df68d9cc6bac29361df89e8e9c7"
 "pipelex/cli/commands/fix/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/fix/_diff_sandbox.py" = "blob:d39c0df92b95567f74881deb01f8c1b3119fc8ef"
 "pipelex/cli/commands/fix/_fix_core.py" = "blob:aa698305e6b60dfb7caf133698dc1d5c1f5f68f1"

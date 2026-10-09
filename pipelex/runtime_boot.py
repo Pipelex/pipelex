@@ -251,7 +251,7 @@ class RuntimeBoot(metaclass=MetaSingleton):
         log.configure(log_config=log_config)
         self.runtime_hub.set_pretty_print_mode(mode=log_config.pretty_print_mode)
         if (stale_warning := config_manager.take_stale_configuration_warning()) is not None:
-            log.warning(stale_warning)
+            stale_warning.emit()
 
         # tools
         self.class_registry: ClassRegistryAbstract | None = None

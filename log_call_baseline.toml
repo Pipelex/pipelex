@@ -6,53 +6,9 @@
 
 version = 1
 
-["api/pipelex_api/bundle.py::_entries_from_zip"]
-calls = [
-  "warning: f\"bundle: corrupt zip ({zip_error})\" [f-string]",
-  "warning: f\"bundle: invalid base64 ({decode_error})\" [f-string]",
-]
-
-["api/pipelex_api/exception_handlers.py::_emit_api_error"]
-calls = [
-  "error: summary [non-literal] where summary = _error_summary(attributes)",
-  "warning: summary [non-literal] where summary = _error_summary(attributes)",
-]
-
-["api/pipelex_api/limits.py::_read_positive_int"]
-calls = [
-  "warning: f\"Invalid {env_var}={raw!r}, falling back to {default}\" [f-string]",
-  "warning: f\"{env_var} must be positive (got {parsed}), falling back to {default}\" [f-string]",
-]
-
-["api/pipelex_api/method_source.py::_fetch_package"]
-calls = [
-  "info: f\"Resolved method_ref '{ref.ref_str}': address={package.provenance.address} tag={package.provenance.tag} commit_sha={package.provenance.commit_sha}\" [f-string]",
-]
-
-["api/pipelex_api/security.py::get_auth_mode"]
-calls = [
-  "warning: f\"Unknown AUTH_MODE '{raw}', falling back to 'none'\" [f-string]",
-]
-
-["api/pipelex_api/security.py::no_auth"]
-calls = [
-  "warning: f\"Forwarded X-User-Id is not a path-safe segment, rejecting: {user_id!r}\" [f-string]",
-]
-
-["api/pipelex_api/security.py::verify_jwt"]
-calls = [
-  "warning: f\"JWT user_id claim is not a path-safe segment: {user_id!r}\" [f-string]",
-  "warning: f\"JWT validation failed: {exc!s}\" [f-string]",
-]
-
 ["pipelex/cli/agent_cli/commands/run/_run_core.py::run_pipeline_core"]
 calls = [
   "warning: f\"Cost summary generation failed (run succeeded): {cost_summary_error}\" [f-string]",
-]
-
-["pipelex/cli/commands/doctor_cmd.py::setup_doctor_runtime"]
-calls = [
-  "warning: stale_warning [non-literal] where stale_warning = config_manager.take_stale_configuration_warning()",
 ]
 
 ["pipelex/cli/commands/graph_cmd.py::graph_render_cmd"]
@@ -161,11 +117,6 @@ calls = [
   "warning: f\"Judgment handle not found: {exc}\" [f-string]",
   "warning: f\"LLM handle not found: {exc}\" [f-string]",
   "warning: f\"Search handle not found: {exc}\" [f-string]",
-]
-
-["pipelex/cogt/models/model_manager.py::ModelManager.setup"]
-calls = [
-  "warning: stale_warning [non-literal] where stale_warning = self.inference_backend_library.take_stale_configuration_warning()",
 ]
 
 ["pipelex/cogt/usage/cost_registry.py::CostRegistry.generate_report"]
@@ -425,11 +376,6 @@ calls = [
   "warning: f\"ReportingManager does not support reporting for inference job type: {type(inference_job).__name__}\" [f-string]",
 ]
 
-["pipelex/runtime_boot.py::RuntimeBoot.__init__"]
-calls = [
-  "warning: stale_warning [non-literal] where stale_warning = config_manager.take_stale_configuration_warning()",
-]
-
 ["pipelex/runtime_boot.py::RuntimeBoot._release_after_failed_boot"]
 calls = [
   "error: f\"Telemetry teardown failed while releasing a failed boot: {telemetry_exc}\" [f-string]",
@@ -440,104 +386,10 @@ calls = [
   "error: f\"A plugin teardown callback failed and was skipped: {teardown_exc}\" [f-string]",
 ]
 
-["pipelex/system/registries/class_registry_utils.py::ClassRegistryUtils.import_modules_in_folder"]
-calls = [
-  "warning: f\"Syntax error in {python_file}: {exc}\" [f-string]",
-]
-
-["pipelex/system/registries/func_registry_utils.py::FuncRegistryUtils._register_funcs_in_file"]
-calls = [
-  "warning: f\"Could not import '{file_path}' while registering PipeFuncs; its functions are unavailable: {exc}\" [f-string]",
-  "warning: f\"Function '{func_name}' in '{file_path}' has @pipe_func() decorator but is not eligible: {eligibility_error}\" [f-string]",
-  "warning: f\"Syntax error in {file_path}: {exc}\" [f-string]",
-]
-
-["pipelex/system/registries/func_registry_utils.py::FuncRegistryUtils.register_pipe_funcs_from_package"]
-calls = [
-  "warning: f\"Function '{func_name}' in '{modname}' has @pipe_func() decorator but is not eligible: {eligibility_error}\" [f-string]",
-  "warning: f\"Package {package_name} has no __path__ attribute, cannot walk modules\" [f-string]",
-]
-
-["pipelex/system/telemetry/telemetry_loader.py::_telemetry_config_the_ledger_can_explain"]
-calls = [
-  "warning: stale_configuration_warning(plans=replayed.plans, walked_dirs=config_manager.existing_config_dirs) [non-literal]",
-]
-
-["pipelex/system/telemetry/telemetry_manager.py::TelemetryManager._handle_transmission_error"]
-calls = [
-  "error: f\"Telemetry transmission error: {error}\" [f-string]",
-]
-
-["pipelex/system/telemetry/telemetry_manager.py::TelemetryManager.is_custom_portkey_logging_enabled"]
-calls = [
-  "warning: f\"Disabling Custom Portkey logging (debug mode) because '{OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY}' is set and that setting takes precedence\" [f-string]",
-]
-
-["pipelex/system/telemetry/telemetry_manager.py::TelemetryManager.track_event"]
-calls = [
-  "error: f\"Could not track event '{event_name}' as identified because user_id is not set, tracking as anonymous\" [f-string]",
-]
-
 ["pipelex/tools/misc/dict_utils.py::substitute_nested_in_context"]
 calls = [
   "error: extra_params, title='extra_params' [non-literal] where extra_params = <parameter>",
   "error: extra_params, title='extra_params' [non-literal] where extra_params = <parameter>",
   "error: original_context, title='original_context' [non-literal] where original_context = context.copy()",
   "error: original_context, title='original_context' [non-literal] where original_context = context.copy()",
-]
-
-["pipelex/tracing/activity_event_log.py::ActivityEventLogCache.log_once_runner_fallback_engaged"]
-calls = [
-  "info: f\"Activity-side usage event emission engaged (workflow_id={workflow_id}, writer_id={writer_id}). Activities always emit through the per-process activity event log, by design: activity emissions must never land in the workflow's replay-rebuilt buffer (replay determinism), whether the activity runs co-located with the workflow router or on a separate worker pool.\" [f-string]",
-]
-
-["pipelex/tracing/dynamodb_event_log.py::DynamoDBEventLog.read_events"]
-calls = [
-  "warning: f\"Skipping DynamoDB item with missing payload: PK={item.get('PK')}, SK={item.get('SK')}\" [f-string]",
-  "warning: f\"Skipping unparseable DynamoDB item PK={item.get('PK')} SK={item.get('SK')}: {format_pydantic_validation_error(exc)}\" [f-string]",
-]
-
-["pipelex/tracing/graphspec_assembler.py::_AssemblerState._attribute_usage"]
-calls = [
-  "warning: f\"UsageReportEvent for unknown node: {reported_node_id}\" [f-string]",
-]
-
-["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_controller_output"]
-calls = [
-  "warning: f\"ControllerOutputEvent for unknown node: {event.node_id}\" [f-string]",
-]
-
-["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_execution_data"]
-calls = [
-  "warning: f\"ExecutionDataEvent for unknown node: {event.node_id}\" [f-string]",
-]
-
-["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_pipe_end_error"]
-calls = [
-  "warning: f\"PipeEndErrorEvent for unknown node: {event.node_id}\" [f-string]",
-]
-
-["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_pipe_end_skipped"]
-calls = [
-  "warning: f\"PipeEndSkippedEvent for unknown node: {event.node_id}\" [f-string]",
-]
-
-["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_pipe_end_success"]
-calls = [
-  "warning: f\"PipeEndSuccessEvent for unknown node: {event.node_id}\" [f-string]",
-]
-
-["pipelex/tracing/graphspec_assembler.py::_AssemblerState.pass_one"]
-calls = [
-  "warning: f\"Unknown event type: {type(event).__name__}\" [f-string]",
-]
-
-["pipelex/tracing/ndjson_event_log.py::NdjsonEventLog.read_events"]
-calls = [
-  "warning: f\"Skipping corrupt line in {ndjson_path}:{line_number} — {validation_error}\" [f-string]",
-]
-
-["pipelex/tracing/usage_attribution.py::_walk_subtree"]
-calls = [
-  "warning: f\"Cycle in graph node parentage at '{node_id}'; subtree usage rollup will be incomplete\" [f-string]",
 ]

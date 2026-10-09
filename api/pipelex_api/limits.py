@@ -35,13 +35,16 @@ def _read_positive_int(env_var: str, default: int) -> int:
     raw = get_optional_env(env_var)
     if not raw:
         return default
+    parsed: int | None
     try:
         parsed = int(raw)
     except ValueError:
-        log.warning(f"Invalid {env_var}={raw!r}, falling back to {default}")
-        return default
-    if parsed <= 0:
-        log.warning(f"{env_var} must be positive (got {parsed}), falling back to {default}")
+        parsed = None
+    if parsed is None or parsed <= 0:
+        log.warning(
+            "A limit's environment variable is not a positive integer, so its default applies",
+            fields={"env_var": env_var, "default_value": default},
+        )
         return default
     return parsed
 

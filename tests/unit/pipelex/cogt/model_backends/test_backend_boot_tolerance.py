@@ -190,11 +190,10 @@ class TestAStaleBackendDirectory:
 
         warning = library.take_stale_configuration_warning()
         assert warning is not None
-        assert str(openai_file) in warning
-        assert str(portkey_file) in warning
-        assert "Drop prompting_target from every backend definition" in warning
-        assert "Run `pipelex migrate`" in warning
-        assert "Nothing was written" in warning
+        assert sorted(stale_file.file_path for stale_file in warning.files) == sorted([openai_file, portkey_file])
+        for stale_file in warning.files:
+            assert stale_file.migration_steps == ["Drop prompting_target from every backend definition"]
+            assert stale_file.is_reached_by_migrate
         assert library.take_stale_configuration_warning() is None, "a warning is handed over once"
 
     def test_the_warning_carries_no_value_read_from_the_users_file(self, machine: Path) -> None:
@@ -205,8 +204,9 @@ class TestAStaleBackendDirectory:
 
         warning = library.take_stale_configuration_warning()
         assert warning is not None
-        assert "gemini" not in warning
-        assert "gpt-4o" not in warning
+        logged = repr([stale_file.log_fields() for stale_file in warning.files])
+        assert "gemini" not in logged
+        assert "gpt-4o" not in logged
 
     def test_nothing_is_written_to_disk(self, machine: Path) -> None:
         """Boot never writes — no rewrite, and no backup beside the file either."""
