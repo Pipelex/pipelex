@@ -8,7 +8,6 @@ from openai import (
 from openai.types.chat import ChatCompletionReasoningEffort
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, SdkTypeError
 from pipelex.cogt.inference.error_classification import (
     UserAction,
@@ -90,13 +89,6 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
         cls._resolve_reasoning_effort(inference_model=inference_model, job_params=job_params)
 
     @classmethod
-    def _log_reasoning_effort_sent(cls, *, reasoning_effort: ChatCompletionReasoningEffort | None) -> None:
-        """Say the reasoning effort a call sends, once per call: `check_request` resolves it before the call, so the resolver says nothing."""
-        if reasoning_effort is None:
-            return
-        log.verbose(f"OpenAI Chat Completions request sends reasoning_effort={reasoning_effort}")
-
-    @classmethod
     def _resolve_reasoning_effort(cls, *, inference_model: InferenceModelSpec, job_params: LLMJobParams) -> ChatCompletionReasoningEffort | None:
         """Resolve reasoning parameters to an OpenAI Chat Completions reasoning_effort value.
 
@@ -145,7 +137,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
         messages = await self.openai_completions_factory.make_simple_messages(llm_job=llm_job)
 
         openai_reasoning_effort = self._resolve_reasoning_effort(inference_model=self.inference_model, job_params=job_params)
-        self._log_reasoning_effort_sent(reasoning_effort=openai_reasoning_effort)
+        self._log_reasoning_sent(api_name="OpenAI Chat Completions", settings={"reasoning_effort": openai_reasoning_effort})
 
         try:
             extra_headers, extra_body = self.openai_completions_factory.make_extras(
@@ -223,7 +215,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
         openai_reasoning_effort = self._resolve_reasoning_effort(inference_model=self.inference_model, job_params=job_params)
-        self._log_reasoning_effort_sent(reasoning_effort=openai_reasoning_effort)
+        self._log_reasoning_sent(api_name="OpenAI Chat Completions", settings={"reasoning_effort": openai_reasoning_effort})
         messages = await self.openai_completions_factory.make_simple_messages(llm_job=llm_job)
         # Deferred import: avoid pulling heavy SDK at module-load time
         from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]

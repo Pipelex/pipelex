@@ -328,7 +328,7 @@ Two of those keys chose a behaviour their deletion undoes, and no operation in t
 
 ## Migrating From the DEV Level
 
-The `DEV` level, which sat between `DEBUG` and `INFO`, is gone, and so is `log.dev()`. Run `pipelex migrate`: ledger entry `pipelex-config@6` rewrites `DEV` to `DEBUG` wherever a file names it, as `default_log_level` or as a level under `[runtime.log.package_log_levels]`. `DEBUG` shows everything `DEV` showed; set `INFO` instead where that is too much. A file that still names `DEV` stops the boot on the invalid level, and the message names this migration and `pipelex migrate`.
+The `DEV` level, which sat between `DEBUG` and `INFO`, is gone, and so is `log.dev()`. Ledger entry `pipelex-config@6` reads `DEV` as `DEBUG` wherever a file names it, as `default_log_level` or as a level under `[runtime.log.package_log_levels]`. A file that still names `DEV` does not stop the boot: Pipelex migrates it in memory, starts at `DEBUG`, writes nothing, and warns that the configuration is out of date. Run `pipelex migrate` to rewrite the file on disk, which also ends the warning. `DEBUG` shows everything `DEV` showed; set `INFO` instead where that is too much.
 
 ## Best Practices
 

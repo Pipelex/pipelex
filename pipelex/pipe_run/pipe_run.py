@@ -105,6 +105,7 @@ class PipeRun(PipeRunProtocol):
                     self._build_pipe_io_artifacts_on_output(pipe_output=pipe_output, pipeline_run_id=pipeline_run_id)
 
             if delivery_assignment is not None:
+                log.debug("Executing the delivery", fields={"delivery_status": status})
                 try:
                     await self._delivery_executor.execute(
                         pipe_output=pipe_output,

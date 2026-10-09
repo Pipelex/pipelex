@@ -33,6 +33,8 @@ from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManager
 from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from pydantic import BaseModel
 
     from pipelex.cogt.llm.llm_job import LLMJob
@@ -119,6 +121,20 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         if ListedConstraint.TEMPERATURE_MUST_BE_MULTIPLIED_BY_2 in inference_model.listed_constraints:
             return temperature * 2
         return temperature
+
+    @classmethod
+    def _log_reasoning_sent(cls, *, api_name: str, settings: Mapping[str, object]) -> None:
+        """Say the reasoning settings an LLM call sends, once per call, at VERBOSE.
+
+        `check_request` resolves the same settings before the call, so a provider's resolvers and builders say
+        nothing and each call site says it here. A setting the call does not send is passed as `None` and left
+        out, and a call that sends none logs nothing.
+        """
+        sent = {name: value for name, value in settings.items() if value is not None}
+        if not sent:
+            return
+        details = ", ".join(f"{name}={value}" for name, value in sent.items())
+        log.verbose(f"{api_name} request sends {details}")
 
     #########################################################
     # Instance methods

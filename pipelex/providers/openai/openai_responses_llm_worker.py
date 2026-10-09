@@ -10,7 +10,6 @@ from openai import (
 from openai.types.shared_params import Reasoning
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import (
     InferenceErrorCategory,
     LLMCapabilityError,
@@ -95,13 +94,6 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
         cls._resolve_reasoning(inference_model=inference_model, job_params=job_params)
 
     @classmethod
-    def _log_reasoning_sent(cls, *, reasoning: Reasoning | None) -> None:
-        """Say the reasoning a call sends, once per call: `check_request` resolves it before the call, so the resolver says nothing."""
-        if reasoning is None:
-            return
-        log.verbose(f"OpenAI Responses request sends reasoning={reasoning}")
-
-    @classmethod
     def _resolve_reasoning(cls, *, inference_model: InferenceModelSpec, job_params: LLMJobParams) -> Reasoning | None:
         """Resolve reasoning parameters to an OpenAI Responses API reasoning dict.
 
@@ -153,7 +145,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
         input_items = await self.openai_responses_factory.make_input_items(llm_job=llm_job)
 
         openai_reasoning = self._resolve_reasoning(inference_model=self.inference_model, job_params=job_params)
-        self._log_reasoning_sent(reasoning=openai_reasoning)
+        self._log_reasoning_sent(api_name="OpenAI Responses", settings={"reasoning": openai_reasoning})
 
         try:
             extra_headers, extra_body = self.openai_responses_factory.make_extras(
@@ -205,7 +197,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
         openai_reasoning = self._resolve_reasoning(inference_model=self.inference_model, job_params=job_params)
-        self._log_reasoning_sent(reasoning=openai_reasoning)
+        self._log_reasoning_sent(api_name="OpenAI Responses", settings={"reasoning": openai_reasoning})
         from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]
 
         if not hasattr(self.instructor_for_objects, "responses"):

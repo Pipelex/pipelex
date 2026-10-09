@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:0dcf4278293e52e34df729a2ebddbdeb212835cfbf907e5254d7735ff0558696"
+digest = "sha256:da981a7560d55779afc3d749b23978386605f9333bd8e9c2d25954b7cad15243"
 reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-10-09T17:39:57Z"
-rationale = "real-catch: the trigger, aws_config.py, only moves two credential-source log lines from VERBOSE to DEBUG and deletes two others, which touches no setting. The review covered this branch's config-model change that no trigger names, the retirement of LogLevel.DEV, which default_log_level and package_log_levels are typed with: logging-config.md listed DEV among the valid values and in the gcp severity note, both now fixed, and gains a section on migrating from DEV; the ledger gains pipelex-config@6, a safe remap of DEV to DEBUG at both paths, with its goldens. configs.py and config_cogt.py name no level and are unchanged."
+reviewed_at = "2026-10-09T18:11:07Z"
+rationale = "real-catch: log_levels.py joins the triggers because the LogLevel enum is what the config docs list. Re-derived from the enum its members VERBOSE, DEBUG, INFO, WARNING, ERROR, CRITICAL and OFF, which match the valid values logging-config.md gives for default_log_level and its gcp severity note naming VERBOSE as the only custom level; removing LogLevel.from_int touches no setting. The review caught logging-config.md's Migrating From the DEV Level section claiming a file naming DEV stops the boot: ConfigLoader.load_config_validated replays the ledger in memory on a validation failure and pipelex-config@6 is a safe remap, so such a file boots at DEBUG with a stale-configuration warning, now said there and pinned by a test through the loader. The ledger entry, configs.py and config_cogt.py name no level beyond that and are unchanged."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:02f71cb4a6b01aebda59c2e31f262ef9c865e17b"
@@ -22,6 +22,7 @@ rationale = "real-catch: the trigger, aws_config.py, only moves two credential-s
 "pipelex/system/telemetry/telemetry_config.py" = "blob:068a785d97a2d52ee43e82e723cd944b8b6601bc"
 "pipelex/tools/aws/aws_config.py" = "blob:e27dc96bf0b2ef98a45354712421252fe0b893b5"
 "pipelex/tools/log/log_config.py" = "blob:63dd9f81fdbafc1a095aec6cde1b047d0ebdd2d4"
+"pipelex/tools/log/log_levels.py" = "blob:12b94e4d4793a70156ac547ee20c9d483910ecae"
 "pipelex/tools/network/network_config.py" = "blob:e12d1d0e4a40d04859f10a77addeaf8fe2b00414"
 "pipelex/tools/secrets/secrets_config.py" = "blob:cf30aaec1c76c9cabc0531a5b9fe681e153d7024"
 "pipelex/tools/storage/storage_config.py" = "blob:3ba0fee5282937e2639d2707ee8ab61aad7bf206"

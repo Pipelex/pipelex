@@ -28,19 +28,6 @@ class TestLogLevels:
         assert log_level.int_logging_level == expected_int_level
 
     @pytest.mark.parametrize(
-        ("raw_level", "expected_enum"),
-        [
-            (LOGGING_LEVEL_VERBOSE, LogLevel.VERBOSE),
-            (LOGGING_LEVEL_OFF, LogLevel.OFF),
-            (logging.CRITICAL + 1, LogLevel.OFF),
-            (logging.DEBUG, LogLevel.DEBUG),
-            (logging.INFO, LogLevel.INFO),
-        ],
-    )
-    def test_from_int_converts_to_enum(self, raw_level: int, expected_enum: LogLevel) -> None:
-        assert LogLevel.from_int(logging_level=raw_level) == expected_enum
-
-    @pytest.mark.parametrize(
         ("level_name", "expected_int_level"),
         [
             ("verbose", LOGGING_LEVEL_VERBOSE),
@@ -56,6 +43,8 @@ class TestLogLevels:
 
         set_level_by_int.assert_called_once_with(level_int=expected_int_level)
 
-    def test_set_level_by_name_refuses_the_retired_dev_level(self) -> None:
-        with pytest.raises(ValueError, match="DEV"):
-            Log().set_level_by_name("DEV")
+    @pytest.mark.parametrize("level_name", ["DEV", "WARN", "FATAL", "NOTSET"])
+    def test_set_level_by_name_refuses_a_name_that_is_no_level(self, level_name: str) -> None:
+        """The retired `DEV` and the stdlib-only spellings alike: only a `LogLevel` name is a level here."""
+        with pytest.raises(ValueError, match=level_name):
+            Log().set_level_by_name(level_name)

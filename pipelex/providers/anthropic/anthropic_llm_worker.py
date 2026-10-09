@@ -11,7 +11,6 @@ from anthropic.types import OutputConfigParam, ThinkingConfigParam
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, SdkTypeError
 from pipelex.cogt.inference.error_classification import (
     UserAction,
@@ -174,16 +173,6 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         )
 
     @classmethod
-    def _log_thinking_sent(cls, *, thinking_params: _ThinkingParams) -> None:
-        """Say the thinking a call sends, once per call: `check_request` builds the same params before it, so the builders say nothing."""
-        if thinking_params.thinking is None:
-            return
-        details = f"thinking={thinking_params.thinking}"
-        if thinking_params.output_config is not None:
-            details += f", output_config={thinking_params.output_config}"
-        log.verbose(f"Anthropic request sends {details}")
-
-    @classmethod
     def _build_thinking_params_for_effort(
         cls,
         *,
@@ -283,7 +272,9 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         max_tokens = self._sent_max_tokens(requested_max_tokens=job_params.max_tokens or self.default_max_tokens, is_structured=False)
 
         thinking_params = self._build_thinking_params(inference_model=self.inference_model, job_params=job_params, max_tokens=max_tokens)
-        self._log_thinking_sent(thinking_params=thinking_params)
+        self._log_reasoning_sent(
+            api_name="Anthropic", settings={"thinking": thinking_params.thinking, "output_config": thinking_params.output_config}
+        )
         sends_temperature = self.inference_model.accepts_temperature and not thinking_params.suppress_temperature
 
         try:
@@ -408,7 +399,9 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
 
         # The thinking budget is fitted against the max_tokens this call actually sends
         thinking_params = self._build_thinking_params(inference_model=self.inference_model, job_params=job_params, max_tokens=effective_max_tokens)
-        self._log_thinking_sent(thinking_params=thinking_params)
+        self._log_reasoning_sent(
+            api_name="Anthropic", settings={"thinking": thinking_params.thinking, "output_config": thinking_params.output_config}
+        )
         sends_temperature = self.inference_model.accepts_temperature and not thinking_params.suppress_temperature
 
         # Deferred import: avoid pulling heavy SDK at module-load time

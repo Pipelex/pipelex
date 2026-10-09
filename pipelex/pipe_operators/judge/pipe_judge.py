@@ -182,7 +182,6 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeJudgeOutput:
-
         # Resolved per run into a local and never cached onto `self`, for the reason `pipe_llm.py`
         # states about its own settings.
         judgment_setting = resolve_judgment_setting(judgment_choice=self.judgment_choice, pipe_code=self.code, is_dry=pipe_run_params.run_mode.is_dry)

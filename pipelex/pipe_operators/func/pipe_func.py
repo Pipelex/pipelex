@@ -185,7 +185,6 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeFuncOutput:
-
         try:
             execution_result = await get_pipe_func_executor().run_pipe_func(
                 job_metadata=job_metadata,

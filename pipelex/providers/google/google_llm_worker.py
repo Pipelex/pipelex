@@ -143,13 +143,6 @@ class GoogleLLMWorker(LLMWorkerAbstract):
         return None
 
     @classmethod
-    def _log_thinking_sent(cls, *, thinking_config: genai_types.ThinkingConfig | None) -> None:
-        """Say the thinking a call sends, once per call: `check_request` builds the same config before it, so the builders say nothing."""
-        if thinking_config is None:
-            return
-        log.verbose(f"Google request sends thinking_budget={thinking_config.thinking_budget}, thinking_level={thinking_config.thinking_level}")
-
-    @classmethod
     def _build_thinking_config_for_effort(
         cls,
         *,
@@ -231,7 +224,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
         contents = await GoogleFactory.prepare_user_contents(llm_prompt=llm_job.llm_prompt)
 
         thinking_config = self._build_thinking_config(inference_model=self.inference_model, job_params=job_params, max_tokens=job_params.max_tokens)
-        self._log_thinking_sent(thinking_config=thinking_config)
+        self._log_reasoning_sent(api_name="Google", settings=thinking_config.model_dump(exclude_none=True) if thinking_config is not None else {})
 
         # Build generation config
         generation_config = genai_types.GenerateContentConfig(
@@ -299,7 +292,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
         """Generate structured output using Google Gemini API with instructor."""
         job_params = llm_job.applied_job_params or llm_job.job_params
         thinking_config = self._build_thinking_config(inference_model=self.inference_model, job_params=job_params, max_tokens=job_params.max_tokens)
-        self._log_thinking_sent(thinking_config=thinking_config)
+        self._log_reasoning_sent(api_name="Google", settings=thinking_config.model_dump(exclude_none=True) if thinking_config is not None else {})
         # instructor's genai handlers read the system prompt only from `system`, and pop it only when it is not
         # None: a `system=None` reaches `generate_content`, which refuses the unknown keyword
         system_kwargs: dict[str, Any] = {"system": system_text} if (system_text := llm_job.llm_prompt.system_text) else {}
