@@ -25,7 +25,7 @@ from typing_extensions import override
 from pipelex.tools.log.console_fields import attached_fields, field_suffix_segments
 from pipelex.tools.log.console_layouts import console_layout
 from pipelex.tools.log.log_config import HighlighterName
-from pipelex.tools.log.log_fields import DATA_FIELD, LAYOUT_MARK
+from pipelex.tools.log.log_fields import LAYOUT_MARK
 from pipelex.tools.log.log_formatter import EmojiLogFormatter, channel_prefix
 from pipelex.tools.log.log_sink import LogSink, LogSinkMethod, stream_for_target
 from pipelex.tools.misc.rich_extra import require_rich
@@ -59,7 +59,6 @@ class ConsoleLogSink(LogSink):
     def make_handler(self) -> logging.Handler:
         require_rich(message=CONSOLE_SINK_MISSING_MESSAGE)
         from rich.console import Console
-        from rich.errors import MarkupError
         from rich.highlighter import Highlighter, JSONHighlighter, ReprHighlighter
         from rich.logging import RichHandler
         from rich.text import Text
@@ -86,9 +85,9 @@ class ConsoleLogSink(LogSink):
 
                 The suffix is assembled as ``Text`` from styled segments and appended after the highlighter has
                 run on the message, so neither the markup setting nor the highlighter ever reads a field's value.
-                A layout that cannot be filled, a field missing or a value its derivation refuses, falls back to
-                the message, and every field then goes to the suffix. So does a record carrying structured
-                content, which only its message renders and which a layout would hide.
+                A layout that cannot be filled, whatever it raises, falls back to the message, and every field
+                then goes to the suffix. The dispatch stamps a layout only on a call whose content is a string,
+                so a structured content, which only its message renders, never meets one.
 
                 With Rich tracebacks off, what Rich hands over is the formatter's whole output: the message line,
                 then the exception's text and any stack text. That tail is split off the line and printed under
@@ -105,13 +104,17 @@ class ConsoleLogSink(LogSink):
                 message_text: ConsoleRenderable | None = None
                 layout_name = record.__dict__.get(LAYOUT_MARK)
                 layout = console_layout(name=layout_name) if isinstance(layout_name, str) else None
-                if layout is not None and DATA_FIELD not in fields:
+                if layout is not None:
                     try:
                         layout_markup = layout.render_markup(fields=fields)
                         # No emoji codes either: a value spelled `:fire:` is a value, not a picture.
                         message_text = Text.assemble(channel_prefix(logger_name=record.name), Text.from_markup(layout_markup, emoji=False))
                         presented_fields = layout.presented_fields
-                    except (KeyError, TypeError, ValueError, MarkupError):
+                    except Exception:  # ruff: ignore[blind-except]
+                        # A layout's derivation is code each layout brings, filled with values each call
+                        # chooses, so what it can raise is open-ended: a missing field, a refused value, a
+                        # template Rich refuses, or arithmetic on a value nobody bounded. A layout costs
+                        # nothing but itself, so whatever it raised, the line falls back to its message.
                         message_text = None
                 if message_text is None:
                     message_text = super().render_message(record, message_line)
@@ -120,6 +123,10 @@ class ConsoleLogSink(LogSink):
                     if segments:
                         message_text.append_text(Text.assemble(*segments))
                     if appended_text:
+                        # The formatter puts a line break before the exception text only when the message does
+                        # not already end in one, and the suffix or a layout now stands between the two.
+                        if not message_text.plain.endswith("\n") and not appended_text.startswith("\n"):
+                            message_text.append("\n")
                         message_text.append_text(Text(appended_text))
                 return message_text
 

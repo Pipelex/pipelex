@@ -201,6 +201,36 @@ class TestConsoleLogSink:
         assert not any("attempt=" in line for line in lines_under)
 
     @pytest.mark.parametrize(
+        ("layout", "fields"),
+        [
+            (None, {"files": 7}),
+            (LogLayout.PIPE_RUN, {**PIPE_RUN_FIELDS, "files": 7}),
+        ],
+        ids=["the message", "a layout"],
+    )
+    def test_with_tracebacks_as_text_a_message_ending_in_a_line_break_still_has_its_traceback_start_a_line(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        layout: LogLayout | None,
+        fields: dict[str, Any],
+    ) -> None:
+        """The formatter adds a line break before the exception text only when the message lacks one, so it ran on straight after the suffix."""
+        caplog.set_level(logging.INFO, logger=__name__)
+        buffer = io.StringIO()
+        sink = console_sink_on_buffer(buffer=buffer, rich_log_config=package_rich_log_config_without_rich_tracebacks())
+        with installed_log(sink=sink) as fresh:
+            try:
+                msg = "boom"
+                raise ValueError(msg)
+            except ValueError:
+                fresh.error("Pipe run failed\n", include_exception=True, fields=fields, layout=layout)
+
+        lines = buffer.getvalue().splitlines()
+        (suffix_line,) = [line for line in lines if "files=7" in line]
+        assert "Traceback" not in suffix_line
+        assert any(line.strip() == "Traceback (most recent call last):" for line in lines)
+
+    @pytest.mark.parametrize(
         "message",
         [
             "expected list[int], got str",

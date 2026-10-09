@@ -2,12 +2,18 @@ from __future__ import annotations
 
 import io
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
 from pipelex.tools.log.console_fields import FIELD_KEY_STYLE, FIELD_STYLES, FIELD_VALUE_MAX_LENGTH, TRUNCATION_MARK, UNMAPPED_FIELD_STYLE
-from pipelex.tools.log.log_fields import FIELD_NAMES_MARK, VERBATIM_MARK
+from pipelex.tools.log.log_fields import (
+    COLLIDING_FIELD_PREFIX,
+    FIELD_NAMES_MARK,
+    RICH_HIGHLIGHTER_ATTRIBUTE,
+    VERBATIM_MARK,
+    attach_log_record_extra,
+)
 from tests.helpers.console_log_rendering import (
     console_sink_on_buffer,
     installed_log,
@@ -60,6 +66,37 @@ class TestConsoleFields:
         fresh.info("Renamed", fields={"name": "alpha", VERBATIM_MARK: True})
 
         assert "Renamed field_name=alpha field_markup=true" in buffer.getvalue()
+
+    def test_a_field_named_like_rich_s_highlighter_override_keeps_the_line(self, console_log: tuple[Log, io.StringIO]) -> None:
+        """Rich calls whatever the record carries as ``highlighter``, so a string field of that name raised inside the handler and lost the line."""
+        fresh, buffer = console_log
+
+        fresh.info("Highlighted", fields={RICH_HIGHLIGHTER_ATTRIBUTE: "pygments"})
+
+        assert f"Highlighted {COLLIDING_FIELD_PREFIX}{RICH_HIGHLIGHTER_ATTRIBUTE}=pygments" in buffer.getvalue()
+
+    @pytest.mark.parametrize(
+        ("fields", "expected"),
+        [
+            ({"x=1": 2}, 'Paired "x=1"=2'),
+            ({"a": "b=c"}, 'Paired a="b=c"'),
+            ({'say"': 'it"s'}, 'Paired "say\\""="it\\"s"'),
+            ({"path": "C:\\dir"}, 'Paired path="C:\\\\dir"'),
+        ],
+        ids=["an equals sign in a key", "an equals sign in a value", "a quote", "a backslash"],
+    )
+    def test_a_key_or_value_that_could_forge_a_pair_is_quoted(
+        self, console_log: tuple[Log, io.StringIO], fields: dict[str, Any], expected: str
+    ) -> None:
+        """Printed bare, ``{"x=1": 2}`` read as ``x=1=2`` and ``{"a": "b=c"}`` as ``a=b=c``.
+
+        An unescaped backslash could also end a quoted value early.
+        """
+        fresh, buffer = console_log
+
+        fresh.info("Paired", fields=fields)
+
+        assert expected in buffer.getvalue()
 
     @pytest.mark.parametrize(
         ("name", "expected"),
@@ -116,6 +153,19 @@ class TestConsoleFields:
         assert styles_of(text=text, fragment="PipeLLM") == [FIELD_STYLES["pipe_type"]] == ["white"]
         assert styles_of(text=text, fragment="2") == [UNMAPPED_FIELD_STYLE]
         assert styles_of(text=text, fragment="pipe_code=") == [FIELD_KEY_STYLE]
+
+    def test_a_field_a_record_factory_pushed_under_the_prefix_keeps_its_colour(self) -> None:
+        """The style used to be looked up by the name the field landed on, so ``field_pipe_code`` printed dimmed."""
+        record = logging.LogRecord(
+            name="pipelex.tools.demo", level=logging.INFO, pathname="/repo/pipelex/module.py", lineno=42, msg="Running", args=(), exc_info=None
+        )
+        record.pipe_code = "from-factory"
+        attach_log_record_extra(record=record, extra={"pipe_code": "compose_company"})
+
+        text = rendered_text(record=record)
+
+        assert text.plain == f"🧠: Running {COLLIDING_FIELD_PREFIX}pipe_code=compose_company"
+        assert styles_of(text=text, fragment="compose_company") == [FIELD_STYLES["pipe_code"]]
 
     def test_what_a_record_factory_or_the_runtime_stamped_is_not_shown(self) -> None:
         record = record_with_fields(message="Stamped", extra={"files": 7})

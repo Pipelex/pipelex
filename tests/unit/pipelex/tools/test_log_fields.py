@@ -22,6 +22,7 @@ from pipelex.tools.log.log_fields import (
     FIELD_NAMES_MARK,
     FORWARDED_MARK,
     LAYOUT_MARK,
+    RICH_HIGHLIGHTER_ATTRIBUTE,
     VERBATIM_MARK,
     attached_field_names,
     carried_attributes,
@@ -40,6 +41,13 @@ def _own_records(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
 def _field(record: logging.LogRecord, *, name: str) -> Any:
     """A field carried on the record: an attribute the stdlib does not declare, read the way a sink reads it."""
     return getattr(record, name)
+
+
+def _circular_mapping() -> dict[str, Any]:
+    """A mapping that contains itself, which JSON refuses outright."""
+    circular: dict[str, Any] = {}
+    circular["self"] = circular
+    return circular
 
 
 class TestLogFields:
@@ -248,23 +256,38 @@ class TestLogFields:
         assert FORWARDED_MARK not in carried
         assert carried[f"{COLLIDING_FIELD_PREFIX}{FORWARDED_MARK}"] is True
 
-    def test_a_field_named_like_the_verbatim_mark_is_prefixed_and_reaches_no_sink(self, caplog: pytest.LogCaptureFixture) -> None:
-        """The mark is Rich's per-record markup override, which the console handler reads ahead of its own setting.
+    @pytest.mark.parametrize("name", [VERBATIM_MARK, RICH_HIGHLIGHTER_ATTRIBUTE])
+    def test_a_field_named_like_a_rich_per_record_override_is_prefixed_and_reaches_no_sink(self, caplog: pytest.LogCaptureFixture, name: str) -> None:
+        """``markup`` and ``highlighter`` are what Rich's console handler reads off a record ahead of its own settings.
 
-        Left unreserved, a caller naming it would decide whether the console interprets markup for that
-        line, and the value would ride into the `json` and `otlp` payloads as a field, where it means
-        nothing. Reserved, the caller's value is carried under the prefix and is not a carried attribute.
+        Left unreserved, a caller naming ``markup`` would decide whether the console interprets markup for
+        that line, and one naming ``highlighter`` would have its value called as the highlighter, which
+        raises for a string and loses the line. Either value would also ride into the `json` and `otlp`
+        payloads as a field, where it means nothing. Reserved, the caller's value is carried under the
+        prefix and is not a carried attribute.
         """
         with caplog.at_level(logging.INFO):
-            log.info("not the console's business", fields={VERBATIM_MARK: True, "safe": 1})
+            log.info("not the console's business", fields={name: True, "safe": 1})
 
         (record,) = _own_records(caplog)
-        assert not hasattr(record, VERBATIM_MARK)
-        assert getattr(record, f"{COLLIDING_FIELD_PREFIX}{VERBATIM_MARK}") is True
+        assert not hasattr(record, name)
+        assert getattr(record, f"{COLLIDING_FIELD_PREFIX}{name}") is True
         carried = carried_attributes(record=record)
-        assert VERBATIM_MARK not in carried
-        assert carried[f"{COLLIDING_FIELD_PREFIX}{VERBATIM_MARK}"] is True
+        assert name not in carried
+        assert carried[f"{COLLIDING_FIELD_PREFIX}{name}"] is True
         assert carried["safe"] == 1
+
+    def test_what_a_third_party_stamped_as_rich_s_highlighter_is_no_carried_field(self, caplog: pytest.LogCaptureFixture) -> None:
+        """A library steering the console through ``extra`` puts an object there that means nothing on a wire.
+
+        Carried, the scrub would also turn that object into text, which Rich would then fail to call.
+        """
+        with caplog.at_level(logging.INFO):
+            log.info("a line", fields={"safe": 1})
+
+        (record,) = _own_records(caplog)
+        setattr(record, RICH_HIGHLIGHTER_ATTRIBUTE, object())
+        assert carried_attributes(record=record) == {"safe": 1}
 
     def test_a_record_the_error_path_stamped_verbatim_hands_no_such_field_to_a_sink(self, caplog: pytest.LogCaptureFixture) -> None:
         """`TracebackMessageError` stamps the mark itself, and a structured sink must not write it as a field."""
@@ -293,6 +316,20 @@ class TestLogFields:
         assert getattr(laid_out, LAYOUT_MARK) == LogLayout.PIPE_RUN
         assert not hasattr(plain, LAYOUT_MARK)
         assert carried_attributes(record=laid_out) == {"pipe_code": "main"}
+
+    @pytest.mark.parametrize(
+        "make_content",
+        [lambda: {"key": "value"}, lambda: ["a", "b"], lambda: None, _circular_mapping],
+        ids=["a mapping", "a list", "none", "a mapping JSON refuses"],
+    )
+    def test_a_layout_rides_a_string_content_only(self, caplog: pytest.LogCaptureFixture, make_content: Callable[[], Any]) -> None:
+        """Any other content renders in the message alone, which a layout replaces, so the dispatch drops the layout there."""
+        with caplog.at_level(logging.INFO):
+            log.info(make_content(), fields={"pipe_code": "main"}, layout=LogLayout.PIPE_RUN)
+
+        (record,) = _own_records(caplog)
+        assert not hasattr(record, LAYOUT_MARK)
+        assert _field(record, name="pipe_code") == "main"
 
     @pytest.mark.parametrize("mark", [FIELD_NAMES_MARK, LAYOUT_MARK])
     def test_a_field_named_like_a_console_mark_is_prefixed_and_steers_nothing(self, caplog: pytest.LogCaptureFixture, mark: str) -> None:

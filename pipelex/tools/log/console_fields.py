@@ -6,19 +6,20 @@ reaches the person at the terminal. It renders the fields ``attach_log_record_ex
 attribute, so neither the stdlib's own attributes nor Pipelex's marks nor what a record factory or a
 third-party library stamped ever shows. The run identifiers and ``data`` are left out as well: the
 identifiers are the same on every line of a run and would drown the message, and ``data`` is the structured
-content the message already renders, which is why a record carrying it never renders through a layout.
+content the message already renders, which is why the dispatch never stamps a layout on a call carrying it.
 
-A value renders on one line: a string bare unless it is empty, holds a space or holds a character a
-terminal would act on, in which case it is quoted with that character escaped; anything else as compact
-JSON; and the whole cut short past ``FIELD_VALUE_MAX_LENGTH``. A key is written the same way, so a field
-name holding a line break, a space or an escape sequence can forge neither a line nor a pair. Redaction has
+A value renders on one line: a string bare unless it is empty or holds a space, an equals sign, a quote, a
+backslash or a character a terminal would act on, in which case it is quoted, with a backslash and a quote
+escaped by a backslash and that character written as its escape; anything else as compact JSON; and the
+whole cut short past ``FIELD_VALUE_MAX_LENGTH``. A key is written the same way, so a field name holding a
+line break, a space, an equals sign or an escape sequence can forge neither a line nor a pair. Redaction has
 already run when the console renders a record, so what is rendered is what the scrub left.
 
-Colour follows the field's name, from ``FIELD_STYLES``, wherever the field appears; a field outside the map
-renders dimmed. The map is one table in code, the colours the pipe announcement has always used. Nothing
-here imports Rich: the suffix is a list of ``(text, style)`` segments the sink turns into a Rich ``Text``,
-never a markup string, so a value carrying ``[red]`` prints as written whatever the handler's markup
-setting.
+Colour follows the name the field was given, from ``FIELD_STYLES``, wherever the field appears, and whatever
+collision prefix it landed under; a field outside the map renders dimmed. The map is one table in code, the
+colours the pipe announcement has always used. Nothing here imports Rich: the suffix is a list of
+``(text, style)`` segments the sink turns into a Rich ``Text``, never a markup string, so a value carrying
+``[red]`` prints as written whatever the handler's markup setting.
 """
 
 from __future__ import annotations
@@ -31,7 +32,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel
 
 from pipelex.tools.log.log_context import PIPE_RUN_ID_FIELD, PIPELINE_RUN_ID_FIELD, REQUEST_ID_FIELD
-from pipelex.tools.log.log_fields import DATA_FIELD, attached_field_names
+from pipelex.tools.log.log_fields import DATA_FIELD, attached_field_names, given_field_name
 from pipelex.tools.log.log_sink import json_fallback, spell_non_finite
 
 if TYPE_CHECKING:
@@ -55,8 +56,8 @@ UNMAPPED_FIELD_STYLE = "dim"
 FIELD_KEY_STYLE = "dim"
 
 # What the console never repeats after a message: the run identifiers, bound once for a whole run, and
-# ``data``, the structured content the message already renders. A record carrying ``data`` is never drawn
-# through a layout, which would hide that content, so the message is always there to render it.
+# ``data``, the structured content the message already renders. The dispatch stamps a layout only on a
+# call whose content is a string, so a layout never hides the message that renders that content.
 CONSOLE_HIDDEN_FIELDS = frozenset({REQUEST_ID_FIELD, PIPELINE_RUN_ID_FIELD, PIPE_RUN_ID_FIELD, DATA_FIELD})
 
 # The longest a rendered value gets, the truncation mark included.
@@ -65,6 +66,12 @@ TRUNCATION_MARK = "…"
 
 FIELD_SEPARATOR = " "
 KEY_VALUE_SEPARATOR = "="
+QUOTE = '"'
+ESCAPE = "\\"
+
+# What makes a printable string quoted rather than bare: the empty string aside, a character that would
+# otherwise read as the end of a pair, the start of the next or an escape, so the suffix cannot be forged.
+QUOTED_CHARACTERS = frozenset({FIELD_SEPARATOR, KEY_VALUE_SEPARATOR, QUOTE, ESCAPE})
 
 # A segment of the suffix: its text, and the Rich style it is printed in.
 StyledSegment = tuple[str, str]
@@ -84,8 +91,12 @@ def attached_fields(*, record: logging.LogRecord) -> dict[str, Any]:
 
 
 def field_style(*, name: str) -> str:
-    """The style a field's value is printed in: its entry in ``FIELD_STYLES``, else dimmed."""
-    return FIELD_STYLES.get(name, UNMAPPED_FIELD_STYLE)
+    """The style a field's value is printed in: the entry in ``FIELD_STYLES`` for the name it was given, else dimmed.
+
+    Read off the name the caller gave rather than the one it landed on, so a ``pipe_code`` that a record
+    factory pushed to ``field_pipe_code`` keeps its colour.
+    """
+    return FIELD_STYLES.get(given_field_name(name=name), UNMAPPED_FIELD_STYLE)
 
 
 def field_suffix_segments(*, fields: Mapping[str, Any], presented_fields: frozenset[str]) -> list[StyledSegment]:
@@ -106,13 +117,13 @@ def field_suffix_segments(*, fields: Mapping[str, Any], presented_fields: frozen
 
 
 def format_field_value(*, value: Any) -> str:
-    """A field's value as the suffix prints it: one line, a spaced string quoted, cut short when long."""
-    return _truncated(text=_one_line(value=value, is_quoting_spaced_strings=True))
+    """A field's value as the suffix prints it: one line, a string quoted when it could forge a pair, cut short when long."""
+    return _truncated(text=_one_line(value=value, is_quoting_strings=True))
 
 
 def format_layout_value(*, value: Any) -> str:
     """A field's value as a layout substitutes it: one line, a string as itself, cut short when long."""
-    return _truncated(text=_one_line(value=value, is_quoting_spaced_strings=False))
+    return _truncated(text=_one_line(value=value, is_quoting_strings=False))
 
 
 def one_line_text(*, text: str) -> str:
@@ -120,15 +131,15 @@ def one_line_text(*, text: str) -> str:
     return "".join(character if character.isprintable() else _escaped_character(character=character) for character in text)
 
 
-def _one_line(*, value: Any, is_quoting_spaced_strings: bool) -> str:
+def _one_line(*, value: Any, is_quoting_strings: bool) -> str:
     if isinstance(value, str):
-        return _string_text(text=value, is_quoting_spaced_strings=is_quoting_spaced_strings)
+        return _string_text(text=value, is_quoting_strings=is_quoting_strings)
     if isinstance(value, float) and not math.isfinite(value):
         # ``NaN``, ``Infinity`` or ``-Infinity``, bare, as the wire sinks spell it.
         return str(spell_non_finite(value=value))
     if _renders_as_json(value=value):
         return one_line_text(text=_compact_json(value=value))
-    return _string_text(text=str(value), is_quoting_spaced_strings=is_quoting_spaced_strings)
+    return _string_text(text=str(value), is_quoting_strings=is_quoting_strings)
 
 
 def _renders_as_json(*, value: Any) -> bool:
@@ -136,13 +147,15 @@ def _renders_as_json(*, value: Any) -> bool:
     return value is None or isinstance(value, (bool, int, float, Mapping, list, tuple, BaseModel))
 
 
-def _string_text(*, text: str, is_quoting_spaced_strings: bool) -> str:
-    if not is_quoting_spaced_strings:
+def _string_text(*, text: str, is_quoting_strings: bool) -> str:
+    if not is_quoting_strings:
         return one_line_text(text=text)
-    if text and text.isprintable() and " " not in text:
+    if text and text.isprintable() and QUOTED_CHARACTERS.isdisjoint(text):
         return text
-    escaped = one_line_text(text=text.replace('"', '\\"'))
-    return f'"{escaped}"'
+    # The backslashes first, so the ones escaping a quote, and the ones the terminal escapes bring, are
+    # never doubled: a backslash in the text reads ``\\`` and a quote ``\"``, and neither ends the value.
+    escaped = one_line_text(text=text.replace(ESCAPE, f"{ESCAPE}{ESCAPE}").replace(QUOTE, f"{ESCAPE}{QUOTE}"))
+    return f"{QUOTE}{escaped}{QUOTE}"
 
 
 def _compact_json(*, value: object) -> str:

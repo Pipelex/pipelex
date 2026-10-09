@@ -123,7 +123,8 @@ class LogDispatch:
                 ``exc_info``, for every sink to render its own way. Nothing is spliced into the message.
             fields: Named values carried as attributes of the record, never rendered into the message.
             layout: The console layout the record is rendered through, carried under ``LAYOUT_MARK``,
-                which only the console sink reads.
+                which only the console sink reads. It is carried only for a string content; any other
+                content renders in the message alone, which a layout would replace.
 
         """
         caller_frame = _caller_frame()
@@ -138,9 +139,18 @@ class LogDispatch:
             caller_info_str = self._caller_info(frame=caller_frame, module_name=module_name, log_config=log_config)
             message = f"{caller_info_str}: {message}"
         exc_info = _active_exc_info() if include_exception else None
+        # A layout renders in place of the message, so it is kept only where the message is a string the
+        # call gave. Any other content renders in the message alone: the console's suffix never repeats
+        # ``data``, a content JSON refused carries no ``data`` and lives only in the message's ``repr``, and
+        # an installed record factory that owns ``data`` sends the content to a prefixed name the suffix cuts
+        # short. Only here is the content's kind known, so the layout is dropped here rather than guessed at
+        # by the sink from what the record happens to carry.
+        record_layout = layout if isinstance(content, str) else None
 
         extra = build_log_record_extra(context=get_log_context(), fields=fields, data=data)
-        self._emit_record(message=message, severity=severity, logger=logger, caller_frame=caller_frame, exc_info=exc_info, extra=extra, layout=layout)
+        self._emit_record(
+            message=message, severity=severity, logger=logger, caller_frame=caller_frame, exc_info=exc_info, extra=extra, layout=record_layout
+        )
 
     ########################################################
     # Private methods

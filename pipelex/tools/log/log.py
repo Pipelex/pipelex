@@ -350,7 +350,7 @@ class Log:
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
             fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
-            layout (LogLayout | None, optional): The console layout to render the record through; every other sink ignores it.
+            layout (LogLayout | None, optional): The console layout to render a string content through; every other sink ignores it.
 
         """
         severity = LOGGING_LEVEL_VERBOSE
@@ -373,7 +373,7 @@ class Log:
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
             fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
-            layout (LogLayout | None, optional): The console layout to render the record through; every other sink ignores it.
+            layout (LogLayout | None, optional): The console layout to render a string content through; every other sink ignores it.
 
         """
         severity = logging.DEBUG
@@ -396,7 +396,7 @@ class Log:
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
             fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
-            layout (LogLayout | None, optional): The console layout to render the record through; every other sink ignores it.
+            layout (LogLayout | None, optional): The console layout to render a string content through; every other sink ignores it.
 
         """
         severity = LOGGING_LEVEL_DEV
@@ -419,7 +419,7 @@ class Log:
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
             fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
-            layout (LogLayout | None, optional): The console layout to render the record through; every other sink ignores it.
+            layout (LogLayout | None, optional): The console layout to render a string content through; every other sink ignores it.
 
         """
         severity = logging.INFO
@@ -443,7 +443,7 @@ class Log:
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
             fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
-            layout (LogLayout | None, optional): The console layout to render the record through; every other sink ignores it.
+            layout (LogLayout | None, optional): The console layout to render a string content through; every other sink ignores it.
             problem_id (str | None, optional): A problem ID to associate with the warning. Defaults to None.
 
         """
@@ -471,7 +471,7 @@ class Log:
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
             fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
-            layout (LogLayout | None, optional): The console layout to render the record through; every other sink ignores it.
+            layout (LogLayout | None, optional): The console layout to render a string content through; every other sink ignores it.
             include_exception (bool, optional): Whether to include exception information. Defaults to False.
             problem_id (str | None, optional): A problem ID to associate with the error. Defaults to None.
 
@@ -508,7 +508,7 @@ class Log:
             inline (str | None, optional): Inline title for the log message. Defaults to None.
                 Used to display the title inline, only if the title arg is None.
             fields (Mapping[str, Any] | None, optional): Named values carried as attributes of the record, never rendered into the message.
-            layout (LogLayout | None, optional): The console layout to render the record through; every other sink ignores it.
+            layout (LogLayout | None, optional): The console layout to render a string content through; every other sink ignores it.
             include_exception (bool, optional): Whether to include exception information. Defaults to False.
             problem_id (str | None, optional): A problem ID to associate with the critical message. Defaults to None.
 
