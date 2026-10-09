@@ -2,7 +2,8 @@
 
 The handler renders a record's fields after its message as a styled ``key=value`` suffix, and a record that
 names a layout through that layout's template; what is shown and how it is coloured is in
-``console_fields`` and ``console_layouts``.
+``console_fields`` and ``console_layouts``. A traceback printed as text, with Rich tracebacks off, goes
+under the line, after the suffix.
 
 Rich is the ``cli`` extra. It is imported when the handler is built and nowhere else in this module, so
 this module asks for Rich only where this sink is the one selected; a process that selects another sink
@@ -24,7 +25,7 @@ from typing_extensions import override
 from pipelex.tools.log.console_fields import attached_fields, field_suffix_segments
 from pipelex.tools.log.console_layouts import console_layout
 from pipelex.tools.log.log_config import HighlighterName
-from pipelex.tools.log.log_fields import LAYOUT_MARK
+from pipelex.tools.log.log_fields import DATA_FIELD, LAYOUT_MARK
 from pipelex.tools.log.log_formatter import EmojiLogFormatter, channel_prefix
 from pipelex.tools.log.log_sink import LogSink, LogSinkMethod, stream_for_target
 from pipelex.tools.misc.rich_extra import require_rich
@@ -81,19 +82,30 @@ class ConsoleLogSink(LogSink):
 
             @override
             def render_message(self, record: logging.LogRecord, message: str) -> ConsoleRenderable:
-                """The message, or the layout the call named, followed by the fields as a styled ``key=value`` suffix.
+                """The message, or the layout the call named, then the fields as a styled ``key=value`` suffix, then any traceback text.
 
                 The suffix is assembled as ``Text`` from styled segments and appended after the highlighter has
                 run on the message, so neither the markup setting nor the highlighter ever reads a field's value.
                 A layout that cannot be filled, a field missing or a value its derivation refuses, falls back to
-                the message, and every field then goes to the suffix.
+                the message, and every field then goes to the suffix. So does a record carrying structured
+                content, which only its message renders and which a layout would hide.
+
+                With Rich tracebacks off, what Rich hands over is the formatter's whole output: the message line,
+                then the exception's text and any stack text. That tail is split off the line and printed under
+                it, after the suffix, so the fields stay on the line they describe and a layout keeps the
+                traceback. It is printed as plain text, so nothing in a traceback is ever read as markup. A record
+                with no such text renders exactly as before.
                 """
+                formatter = self.formatter
+                formatted_line = formatter.formatMessage(record) if formatter is not None else message
+                message_line = formatted_line if message.startswith(formatted_line) else message
+                appended_text = message[len(message_line) :]
                 fields = attached_fields(record=record)
                 presented_fields: frozenset[str] = frozenset()
                 message_text: ConsoleRenderable | None = None
                 layout_name = record.__dict__.get(LAYOUT_MARK)
                 layout = console_layout(name=layout_name) if isinstance(layout_name, str) else None
-                if layout is not None:
+                if layout is not None and DATA_FIELD not in fields:
                     try:
                         layout_markup = layout.render_markup(fields=fields)
                         # No emoji codes either: a value spelled `:fire:` is a value, not a picture.
@@ -102,10 +114,13 @@ class ConsoleLogSink(LogSink):
                     except (KeyError, TypeError, ValueError, MarkupError):
                         message_text = None
                 if message_text is None:
-                    message_text = super().render_message(record, message)
-                segments = field_suffix_segments(fields=fields, presented_fields=presented_fields)
-                if segments and isinstance(message_text, Text):
-                    message_text.append_text(Text.assemble(*segments))
+                    message_text = super().render_message(record, message_line)
+                if isinstance(message_text, Text):
+                    segments = field_suffix_segments(fields=fields, presented_fields=presented_fields)
+                    if segments:
+                        message_text.append_text(Text.assemble(*segments))
+                    if appended_text:
+                        message_text.append_text(Text(appended_text))
                 return message_text
 
         config = self._rich_log_config

@@ -14,7 +14,7 @@ from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.system.console_target import ConsoleTarget
 from pipelex.tools.log.console_log_sink import ConsoleLogSink
 from pipelex.tools.log.log import Log
-from pipelex.tools.log.log_config import LogConfig
+from pipelex.tools.log.log_config import LogConfig, RichLogConfig
 from pipelex.tools.log.log_fields import LAYOUT_MARK, attach_log_record_extra
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
@@ -26,6 +26,15 @@ if TYPE_CHECKING:
     from pipelex.tools.log.log_sink import LogSink
 
 CONSOLE_WIDTH = 200
+
+# The fields the pipe-run layout presents, for a top-level run that is not a dry run.
+PIPE_RUN_FIELDS: dict[str, Any] = {
+    "pipe_type": "PipeCompose",
+    "pipe_code": "compose_company",
+    "output_concept": "Company",
+    "pipe_depth": 0,
+    "is_dry_run": False,
+}
 
 
 def package_log_config() -> LogConfig:
@@ -79,9 +88,17 @@ def installed_log(*, sink: LogSink) -> Generator[Log]:
         fresh.reset()
 
 
-def console_sink_on_buffer(*, buffer: io.StringIO) -> ConsoleLogSink:
-    """A console sink whose handler writes to the buffer, wide and colourless, so a line is read as plain text."""
-    sink = ConsoleLogSink(rich_log_config=package_log_config().rich_log, target=ConsoleTarget.STDERR)
+def package_rich_log_config_without_rich_tracebacks() -> RichLogConfig:
+    """The package's console settings with Rich tracebacks off, so a traceback reaches the handler as text after the message."""
+    return package_log_config().rich_log.model_copy(update={"is_rich_tracebacks": False})
+
+
+def console_sink_on_buffer(*, buffer: io.StringIO, rich_log_config: RichLogConfig | None = None) -> ConsoleLogSink:
+    """A console sink whose handler writes to the buffer, wide and colourless, so a line is read as plain text.
+
+    The handler takes the package's console settings unless others are given.
+    """
+    sink = ConsoleLogSink(rich_log_config=rich_log_config or package_log_config().rich_log, target=ConsoleTarget.STDERR)
     handler = sink.handler
     assert isinstance(handler, RichHandler)
     handler.console = Console(file=buffer, width=CONSOLE_WIDTH, force_terminal=False, color_system=None, legacy_windows=False)

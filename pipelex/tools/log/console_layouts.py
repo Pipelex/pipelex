@@ -12,7 +12,8 @@ one line and escaped with Rich's own escape before it is substituted, the derive
 can never be read as markup: a field carrying ``[red]`` prints as written. The fields a layout presents are
 left out of the suffix that follows it; any other field the call gave still renders there. A layout whose
 fields are missing, or whose template Rich refuses, costs nothing but itself: the console falls back to the
-message and the suffix.
+message and the suffix. A record carrying structured content falls back the same way, since only its message
+renders that content. A traceback the record carries prints under the line either way.
 
 The registry is one table in code. Rich is imported only where a layout is rendered, after asking for it.
 """

@@ -19,11 +19,18 @@ from rich.logging import RichHandler
 
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.system.console_target import ConsoleTarget
+from pipelex.tools.log.console_layouts import LogLayout
 from pipelex.tools.log.console_log_sink import ConsoleLogSink
 from pipelex.tools.log.log_config import HighlighterName, LogConfig, RichLogConfig
 from pipelex.tools.log.log_fields import VERBATIM_MARK, attach_log_record_extra
 from pipelex.tools.log.log_formatter import EmojiLogFormatter
 from pipelex.tools.misc.toml_utils import load_toml_from_path
+from tests.helpers.console_log_rendering import (
+    PIPE_RUN_FIELDS,
+    console_sink_on_buffer,
+    installed_log,
+    package_rich_log_config_without_rich_tracebacks,
+)
 
 CONSOLE_WIDTH = 100
 
@@ -113,9 +120,14 @@ def _render(handler: logging.Handler, *, is_with_call_fields: bool = True) -> st
 
 
 class TestConsoleLogSink:
-    def test_output_is_byte_identical_to_the_handler_configure_used_to_build_when_no_call_gave_a_field(self) -> None:
-        """The run identifier and the structured content's ``data`` are attached too, and neither adds anything to the line."""
-        config = _package_rich_log_config()
+    @pytest.mark.parametrize("is_rich_tracebacks", [True, False], ids=["rich tracebacks", "tracebacks as text"])
+    def test_output_is_byte_identical_to_the_handler_configure_used_to_build_when_no_call_gave_a_field(self, is_rich_tracebacks: bool) -> None:
+        """The run identifier and the structured content's ``data`` are attached too, and neither adds anything to the line.
+
+        With Rich tracebacks off, the traceback reaches the handler as text after the message, which the sink
+        splits off and prints under the line: a traceback with nothing Rich would read as markup prints as it did.
+        """
+        config = _package_rich_log_config().model_copy(update={"is_rich_tracebacks": is_rich_tracebacks})
         reference = _render(_reference_handler(config=config), is_with_call_fields=False)
         sink = ConsoleLogSink(rich_log_config=config, target=ConsoleTarget.STDERR)
 
@@ -149,6 +161,44 @@ class TestConsoleLogSink:
 
         assert "🧠: Failed" in rendered
         assert "ValueError: boom" in rendered
+
+    @pytest.mark.parametrize(
+        ("layout", "fields", "expected_line"),
+        [
+            (None, {"attempt": 2}, "Pipe run failed attempt=2"),
+            (LogLayout.PIPE_RUN, {**PIPE_RUN_FIELDS, "attempt": 2}, "PipeCompose: compose_company → Company attempt=2"),
+        ],
+        ids=["the message", "a layout"],
+    )
+    def test_with_tracebacks_as_text_the_fields_stay_on_the_line_and_the_traceback_prints_under_it(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        layout: LogLayout | None,
+        fields: dict[str, Any],
+        expected_line: str,
+    ) -> None:
+        """With Rich tracebacks off, the formatter appends the traceback to the message the handler receives.
+
+        The suffix used to follow that text, so the fields read as part of the exception, and a layout, which
+        replaces the message, dropped the traceback whole. The exception's message is shaped like markup,
+        which the traceback text must never be read as.
+        """
+        caplog.set_level(logging.INFO, logger=__name__)
+        buffer = io.StringIO()
+        sink = console_sink_on_buffer(buffer=buffer, rich_log_config=package_rich_log_config_without_rich_tracebacks())
+        with installed_log(sink=sink) as fresh:
+            try:
+                msg = "no such file: [/etc/pipelex.toml]"
+                raise ValueError(msg)
+            except ValueError:
+                fresh.error("Pipe run failed", include_exception=True, fields=fields, layout=layout)
+
+        lines = buffer.getvalue().splitlines()
+        (index_line,) = [index_candidate for index_candidate, line in enumerate(lines) if expected_line in line]
+        lines_under = lines[index_line + 1 :]
+        assert any("Traceback (most recent call last):" in line for line in lines_under)
+        assert any("ValueError: no such file: [/etc/pipelex.toml]" in line for line in lines_under)
+        assert not any("attempt=" in line for line in lines_under)
 
     @pytest.mark.parametrize(
         "message",

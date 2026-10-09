@@ -61,6 +61,28 @@ class TestConsoleFields:
 
         assert "Renamed field_name=alpha field_markup=true" in buffer.getvalue()
 
+    @pytest.mark.parametrize(
+        ("name", "expected"),
+        [
+            ("hello\nFORGED", 'Keyed "hello\\nFORGED"=1'),
+            ("two words", 'Keyed "two words"=1'),
+            ("\x1b[2J", 'Keyed "\\x1b[2J"=1'),
+        ],
+        ids=["a line break", "a space", "an escape sequence"],
+    )
+    def test_a_key_is_written_like_a_value_so_it_forges_neither_a_line_nor_a_pair(
+        self, console_log: tuple[Log, io.StringIO], name: str, expected: str
+    ) -> None:
+        """A field's name is the caller's text too: unescaped, a line break printed a forged ``FORGED=1`` line of its own."""
+        fresh, buffer = console_log
+
+        fresh.info("Keyed", fields={name: 1})
+
+        rendered = buffer.getvalue()
+        assert expected in rendered
+        assert "\x1b" not in rendered
+        assert not any(line.lstrip().startswith("FORGED") for line in rendered.splitlines())
+
     def test_a_value_carrying_markup_prints_as_written_while_the_message_still_reads_markup(self, console_log: tuple[Log, io.StringIO]) -> None:
         assert package_log_config().rich_log.is_markup_enabled, "the suffix must hold whatever the setting it runs beside"
         fresh, buffer = console_log

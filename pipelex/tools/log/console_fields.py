@@ -6,12 +6,13 @@ reaches the person at the terminal. It renders the fields ``attach_log_record_ex
 attribute, so neither the stdlib's own attributes nor Pipelex's marks nor what a record factory or a
 third-party library stamped ever shows. The run identifiers and ``data`` are left out as well: the
 identifiers are the same on every line of a run and would drown the message, and ``data`` is the structured
-content the message already renders.
+content the message already renders, which is why a record carrying it never renders through a layout.
 
 A value renders on one line: a string bare unless it is empty, holds a space or holds a character a
 terminal would act on, in which case it is quoted with that character escaped; anything else as compact
-JSON; and the whole cut short past ``FIELD_VALUE_MAX_LENGTH``. Redaction has already run when the console
-renders a record, so what is rendered is what the scrub left.
+JSON; and the whole cut short past ``FIELD_VALUE_MAX_LENGTH``. A key is written the same way, so a field
+name holding a line break, a space or an escape sequence can forge neither a line nor a pair. Redaction has
+already run when the console renders a record, so what is rendered is what the scrub left.
 
 Colour follows the field's name, from ``FIELD_STYLES``, wherever the field appears; a field outside the map
 renders dimmed. The map is one table in code, the colours the pipe announcement has always used. Nothing
@@ -54,7 +55,8 @@ UNMAPPED_FIELD_STYLE = "dim"
 FIELD_KEY_STYLE = "dim"
 
 # What the console never repeats after a message: the run identifiers, bound once for a whole run, and
-# ``data``, the structured content the message already renders.
+# ``data``, the structured content the message already renders. A record carrying ``data`` is never drawn
+# through a layout, which would hide that content, so the message is always there to render it.
 CONSOLE_HIDDEN_FIELDS = frozenset({REQUEST_ID_FIELD, PIPELINE_RUN_ID_FIELD, PIPE_RUN_ID_FIELD, DATA_FIELD})
 
 # The longest a rendered value gets, the truncation mark included.
@@ -96,7 +98,9 @@ def field_suffix_segments(*, fields: Mapping[str, Any], presented_fields: frozen
         if name in CONSOLE_HIDDEN_FIELDS or name in presented_fields:
             continue
         segments.append((FIELD_SEPARATOR, ""))
-        segments.append((f"{name}{KEY_VALUE_SEPARATOR}", FIELD_KEY_STYLE))
+        # The key is written like a value: a name a caller chose can hold a line break that would forge a
+        # line, a space that would read as two pairs or an escape sequence the terminal would act on.
+        segments.append((f"{format_field_value(value=name)}{KEY_VALUE_SEPARATOR}", FIELD_KEY_STYLE))
         segments.append((format_field_value(value=value), field_style(name=name)))
     return segments
 

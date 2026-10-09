@@ -11,15 +11,14 @@ from pipelex.tools.log.console_fields import FIELD_STYLES
 from pipelex.tools.log.console_layouts import CONSOLE_LAYOUTS, ConsoleLayout, LogLayout
 from pipelex.tools.log.json_log_sink import LOGGER_KEY, MESSAGE_KEY, JsonLogSink
 from pipelex.tools.log.log_fields import FIELD_NAMES_MARK, LAYOUT_MARK
-from tests.helpers.console_log_rendering import console_sink_on_buffer, installed_log, record_with_fields, rendered_text, styles_of
-
-PIPE_RUN_FIELDS: dict[str, Any] = {
-    "pipe_type": "PipeCompose",
-    "pipe_code": "compose_company",
-    "output_concept": "Company",
-    "pipe_depth": 0,
-    "is_dry_run": False,
-}
+from tests.helpers.console_log_rendering import (
+    PIPE_RUN_FIELDS,
+    console_sink_on_buffer,
+    installed_log,
+    record_with_fields,
+    rendered_text,
+    styles_of,
+)
 
 
 class TestConsoleLayouts:
@@ -77,6 +76,19 @@ class TestConsoleLayouts:
         text = rendered_text(record=record_with_fields(message="Pipe run starts", extra=extra, layout=LogLayout.PIPE_RUN))
 
         assert text.plain == expected
+
+    def test_a_record_carrying_structured_content_keeps_its_message_and_every_field_follows_it(self, caplog: pytest.LogCaptureFixture) -> None:
+        """The console never repeats ``data`` in the suffix because the message renders it, so a layout must not replace that message."""
+        caplog.set_level(logging.INFO, logger=__name__)
+        buffer = io.StringIO()
+        with installed_log(sink=console_sink_on_buffer(buffer=buffer)) as fresh:
+            fresh.info({"the_content_key": 1}, title="Pipe run starts", fields={**PIPE_RUN_FIELDS, "attempt": 2}, layout=LogLayout.PIPE_RUN)
+
+        rendered = buffer.getvalue()
+        assert "Pipe run starts:" in rendered
+        assert '"the_content_key": 1' in rendered
+        assert "} pipe_type=PipeCompose pipe_code=compose_company output_concept=Company pipe_depth=0 is_dry_run=false attempt=2" in rendered
+        assert "→" not in rendered
 
     def test_a_layout_name_nobody_registered_renders_the_message(self) -> None:
         text = rendered_text(record=record_with_fields(message="Plain", extra={"files": 7}, layout="no_such_layout"))
