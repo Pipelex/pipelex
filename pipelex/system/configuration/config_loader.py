@@ -8,6 +8,7 @@ from pydantic import BaseModel, ValidationError
 from pipelex.kit.template_copy import can_fill_directory, copy_file_atomically, copy_kit_templates
 from pipelex.system.configuration.config_surface import (
     PIPELEX_CONFIG_SURFACE_ID,
+    StaleConfigurationWarning,
     replay_surface_files_in_memory,
     stale_configuration_warning,
     strip_reserved_meta,
@@ -61,16 +62,17 @@ MODEL_DECKS_DIR_NAME = "deck"
 
 class ConfigLoader:
     def __init__(self) -> None:
-        self._stale_warning: str | None = None
+        self._stale_warning: StaleConfigurationWarning | None = None
 
-    def take_stale_configuration_warning(self) -> str | None:
+    def take_stale_configuration_warning(self) -> StaleConfigurationWarning | None:
         """The warning a tolerated boot owes the user, once — or ``None`` when the load was clean.
 
         The loader parks it rather than logging it because the main configuration is what
         *configures logging*: at the moment the retry succeeds no handler is installed yet, and a
         line emitted then goes to the stdlib's default handling, where an ``INFO`` is dropped and a
         warning lands on stderr unformatted, ahead of the console about to be configured. The boot
-        emits it right after ``log.configure``, where it reads like every other line.
+        emits it (``StaleConfigurationWarning.emit``) right after ``log.configure``, where it reads
+        like every other line.
         """
         warning, self._stale_warning = self._stale_warning, None
         return warning
@@ -564,8 +566,8 @@ class ConfigLoader:
         This is the boot's entry point, and the tolerance is the whole reason it exists. A file
         left behind by a schema change should not stop the world: when validation fails, the
         surface's ledger is replayed over the same files **in memory**, the result is validated
-        again, and a boot that succeeds says so in a warning naming the files and the
-        ``pipelex migrate`` remedy — parked on the loader (``take_stale_configuration_warning``)
+        again, and a boot that succeeds says so in a warning naming each file and its remedy, the
+        ``pipelex migrate`` command where its walk reaches the file — parked on the loader (``take_stale_configuration_warning``)
         for the boot to emit once logging exists. Nothing is written — only the explicit command
         writes.
 

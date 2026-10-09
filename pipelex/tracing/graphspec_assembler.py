@@ -222,7 +222,7 @@ class _AssemblerState:
             elif isinstance(event, UsageReportEvent):
                 self._handle_usage_report(event)
             else:
-                log.warning(f"Unknown event type: {type(event).__name__}")
+                log.warning("A trace event of a type the assembler does not handle was dropped", fields={"trace_event_type": type(event).__name__})
 
         # Mark any still-running nodes as CANCELED
         self._mark_canceled_nodes()
@@ -289,7 +289,10 @@ class _AssemblerState:
     def _handle_pipe_end_success(self, event: PipeEndSuccessEvent) -> None:
         node_data = self._nodes.get(event.node_id)
         if node_data is None:
-            log.warning(f"PipeEndSuccessEvent for unknown node: {event.node_id}")
+            log.warning(
+                "A trace event names a node the trace never started, and was dropped",
+                fields={"trace_event_type": type(event).__name__, "node_id": event.node_id},
+            )
             return
 
         node_data.ended_at = event.ended_at
@@ -317,7 +320,10 @@ class _AssemblerState:
     def _handle_pipe_end_error(self, event: PipeEndErrorEvent) -> None:
         node_data = self._nodes.get(event.node_id)
         if node_data is None:
-            log.warning(f"PipeEndErrorEvent for unknown node: {event.node_id}")
+            log.warning(
+                "A trace event names a node the trace never started, and was dropped",
+                fields={"trace_event_type": type(event).__name__, "node_id": event.node_id},
+            )
             return
 
         node_data.ended_at = event.ended_at
@@ -327,7 +333,10 @@ class _AssemblerState:
     def _handle_pipe_end_skipped(self, event: PipeEndSkippedEvent) -> None:
         node_data = self._nodes.get(event.node_id)
         if node_data is None:
-            log.warning(f"PipeEndSkippedEvent for unknown node: {event.node_id}")
+            log.warning(
+                "A trace event names a node the trace never started, and was dropped",
+                fields={"trace_event_type": type(event).__name__, "node_id": event.node_id},
+            )
             return
 
         node_data.ended_at = event.ended_at
@@ -369,7 +378,10 @@ class _AssemblerState:
     def _handle_controller_output(self, event: ControllerOutputEvent) -> None:
         node_data = self._nodes.get(event.node_id)
         if node_data is None:
-            log.warning(f"ControllerOutputEvent for unknown node: {event.node_id}")
+            log.warning(
+                "A trace event names a node the trace never started, and was dropped",
+                fields={"trace_event_type": type(event).__name__, "node_id": event.node_id},
+            )
             return
 
         node_data.output_specs.append(event.output_spec)
@@ -388,7 +400,10 @@ class _AssemblerState:
     def _handle_execution_data(self, event: ExecutionDataEvent) -> None:
         node_data = self._nodes.get(event.node_id)
         if node_data is None:
-            log.warning(f"ExecutionDataEvent for unknown node: {event.node_id}")
+            log.warning(
+                "A trace event names a node the trace never started, and was dropped",
+                fields={"trace_event_type": type(event).__name__, "node_id": event.node_id},
+            )
             return
         node_data.execution_data.update(event.execution_data)
 
@@ -588,7 +603,9 @@ class _AssemblerState:
             own_usages = own_usages_by_node.get(reported_node_id)
             if own_usages is None:
                 if reported_node_id != UNATTRIBUTED_NODE_ID:
-                    log.warning(f"UsageReportEvent for unknown node: {reported_node_id}")
+                    log.warning(
+                        "A usage report names a node the trace never started, so its usage is left unattributed", fields={"node_id": reported_node_id}
+                    )
                 unattributed_usages.extend(usages)
                 continue
             own_usages.extend(usages)

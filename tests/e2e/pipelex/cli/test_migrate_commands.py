@@ -127,9 +127,9 @@ gemini = { tag_style = "xml" }
 RETIRED_BACKEND_KEY = "prompting_target"
 PLANTED_BACKEND_VALUE = "a_prompting_target_no_report_may_ever_render"
 
-# How `stale_configuration_warning` opens. Matched in full rather than on a fragment: the same boot
-# also prints a deck-staleness notice, and "out of date" appears in both.
-STALE_CONFIGURATION_OPENING = "Your configuration is out of date"
+# How each line of `stale_configuration_warning` opens. Matched in full rather than on a fragment: the
+# same boot also prints a deck-staleness notice, and "out of date" appears in both.
+STALE_CONFIGURATION_OPENING = "A configuration file is out of date and was read as if it had been migrated"
 
 
 def _old_shape_telemetry_document() -> str:

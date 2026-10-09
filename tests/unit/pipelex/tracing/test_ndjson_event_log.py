@@ -136,6 +136,32 @@ class TestNdjsonEventLog:
         assert len(result) == 2
         assert any("corrupt" in record.message.lower() or "skipping" in record.message.lower() for record in caplog.records)
 
+    def test_a_skipped_line_is_named_by_its_place_and_never_quoted(self, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+        """The warning says where the line is and where its parse stopped, and carries none of the line itself.
+
+        A half-written line is a traced event cut short, so it holds the run's values; pydantic's own text
+        for the failure quotes it whole. The warning takes the parse error's message instead, which only
+        says where the parse stopped.
+        """
+        event_log = NdjsonEventLog(traces_dir=str(tmp_path))
+        event_log.emit(make_trace_event(sequence=0))
+        event_log.close()
+        ndjson_file = tmp_path / "run_001" / "wf_wf_abc.ndjson"
+        with open(ndjson_file, "a", encoding="utf-8") as fhandle:
+            fhandle.write('{"event_kind": "pipe_start", "traced_value": "a_value_from_the_run\n')
+
+        with caplog.at_level(logging.WARNING):
+            event_log.read_events("run_001")
+
+        (record,) = [record for record in caplog.records if record.levelno == logging.WARNING]
+        assert record.getMessage() == "A corrupt line of a trace event log, not valid JSON, was skipped"
+        attributes = vars(record)
+        assert attributes["file.path"] == str(ndjson_file)
+        assert attributes["line_number"] == 2
+        assert attributes["error.type"] == "ValidationError"
+        assert attributes["error.message"].startswith("Invalid JSON")
+        assert "a_value_from_the_run" not in repr(attributes)
+
     def test_a_line_the_event_models_refuse_raises_instead_of_vanishing(self, tmp_path: Path) -> None:
         """A line that parses as JSON and is then refused was written whole, by a version whose event shape
         this one no longer accepts. Skipping those returned an old run's log as an empty list, which every

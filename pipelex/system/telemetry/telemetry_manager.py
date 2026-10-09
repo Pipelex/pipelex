@@ -21,6 +21,7 @@ from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_config import PostHogMode, TelemetryConfig, TelemetryRedactionConfig
 from pipelex.system.telemetry.telemetry_identity import RunIdentityPolicy, StreamIdentityRule, TelemetryIdentity
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
+from pipelex.tools.log.error_fields import error_fields
 
 if TYPE_CHECKING:
     from opentelemetry.sdk.trace import TracerProvider as OTelTracerProvider
@@ -109,16 +110,21 @@ class TelemetryManager(TelemetryManagerAbstract):
         )
 
     def _handle_transmission_error(  # kw-only: ignore — PostHog on_error callback, invoked positionally as (error, items)
-        self, error: Exception | None, _items: list[dict[str, Any]]
+        self, error: Exception | None, items: list[dict[str, Any]]
     ) -> None:
         """Handle errors that occur during custom telemetry transmission.
 
+        A warning rather than an error: the run the events describe is unaffected, and what was
+        lost is the operator's own telemetry, whose endpoint or key is what to check. The callback
+        runs outside any `except` block, so the exception rides as fields; the items are counted,
+        never logged, since they are the events' own properties.
+
         Args:
             error: The transmission error that occurred
-            _items: List of telemetry items that failed to send
+            items: List of telemetry items that failed to send
         """
         if error:
-            log.error(f"Telemetry transmission error: {error}")
+            log.warning("Telemetry events could not be sent to PostHog", fields={"event_count": len(items), **error_fields(exc=error)})
 
     def _wrap_capture_exception(self, client: Posthog) -> None:
         """Wrap a PostHog client's capture_exception method to sanitize exception messages.
@@ -375,7 +381,10 @@ class TelemetryManager(TelemetryManagerAbstract):
                 self._capture_custom_event(event_name, properties=tracked_properties, identity=TelemetryIdentity.make_anonymous())
             case PostHogMode.IDENTIFIED:
                 if not self.telemetry_config.custom_posthog.user_id:
-                    log.error(f"Could not track event '{event_name}' as identified because user_id is not set, tracking as anonymous")
+                    log.warning(
+                        "An event could not be tracked as identified because no user_id is set, and was tracked as anonymous",
+                        fields={"event_name": event_name},
+                    )
                     self._capture_custom_event(event_name, properties=tracked_properties, identity=TelemetryIdentity.make_anonymous())
                 else:
                     self._capture_custom_event(
@@ -442,9 +451,11 @@ class TelemetryManager(TelemetryManagerAbstract):
             log.verbose("Force-enabling Portkey logging (debug mode) because custom_portkey.force_debug_enabled is set in telemetry configuration")
             is_debug = True
         if is_debug and is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY):
-            log.warning(
-                f"Disabling Custom Portkey logging (debug mode) "
-                f"because '{OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY}' is set and that setting takes precedence"
+            # DEBUG rather than WARNING: honouring DO_NOT_TRACK over every other setting is the documented rule, not a
+            # degradation, and this runs on every Portkey call.
+            log.debug(
+                "Portkey logging (debug mode) is off because DO_NOT_TRACK takes precedence",
+                fields={"env_var": OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY},
             )
             is_debug = False
         return is_debug
@@ -452,7 +463,8 @@ class TelemetryManager(TelemetryManagerAbstract):
     @override
     def is_custom_portkey_tracing_enabled(self) -> bool:
         if self.telemetry_config.custom_portkey.force_tracing_enabled and not is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY):
-            log.info("Force-enabling Portkey tracing because custom_portkey.force_tracing_enabled is set in telemetry configuration")
+            # DEBUG, not INFO: this is asked on every Portkey inference call, and a setting the user chose is no milestone.
+            log.debug("Force-enabling Portkey tracing because custom_portkey.force_tracing_enabled is set in telemetry configuration")
             return True
         else:
             return False

@@ -7,12 +7,12 @@ The server writes structured logs: one JSON object per line, on **stderr**, with
 An error response produces exactly one line. A caller mistake:
 
 ```json
-{"time": "2026-09-18T13:53:17.919Z", "severity": "WARNING", "logger": "pipelex_api.exception_handlers", "message": "API error 422: InvalidModelCategory", "request_id": "01M2TCP02W04RZG6DTM8AR508C", "event": "api_error", "route": "/v1/models", "error_type": "InvalidModelCategory", "error_domain": "input", "retryable": false, "status": 422, "detail": "Invalid model category. Valid values: extract, img_gen, judgment, llm, search"}
+{"time": "2026-09-18T13:53:17.919Z", "severity": "WARNING", "logger": "pipelex_api.exception_handlers", "message": "A request ended in an error response", "request_id": "01M2TCP02W04RZG6DTM8AR508C", "url.path": "/v1/models", "error.type": "InvalidModelCategory", "error_domain": "input", "retryable": false, "http.response.status_code": 422, "detail": "Invalid model category. Valid values: extract, img_gen, judgment, llm, search"}
 ```
 
 A server fault looks the same at `ERROR`, and carries the traceback under an `exception` key.
 
-The `message` is a short, stable sentence built from the HTTP status and the error type — both of them values the server chose. Nothing a caller supplied ever reaches it: the caller-facing explanation rides the `detail` field instead, so a body crafted with newlines or quotes cannot break the line or forge a key. Two layers keep the `detail` value safe to write. Before any sink sees a record, the Pipelex runtime's redaction processor replaces a control character in a field's value with its printable escape, so a newline a caller sent reads as `\n` in `detail`, and replaces a credential it recognises, an `Authorization` header's token or an API key, with `[REDACTED]`. The sink then escapes what it writes, so a quote or an `=` stays inside its value. The processor is configured under `[runtime.log.redaction]` and is on by default.
+The `message` is the same sentence on every error line, `A request ended in an error response`, whichever failure it reports, so it is the key a query or an alert selects this server's error stream by, following the [log-call conventions](../tools/logging.md#log-call-conventions). Everything about the failure, the HTTP status and the error type included, rides a field of its own, and nothing a caller supplied ever reaches the message: the caller-facing explanation rides the `detail` field instead, so a body crafted with newlines or quotes cannot break the line or forge a key. Two layers keep the `detail` value safe to write. Before any sink sees a record, the Pipelex runtime's redaction processor replaces a control character in a field's value with its printable escape, so a newline a caller sent reads as `\n` in `detail`, and replaces a credential it recognises, an `Authorization` header's token or an API key, with `[REDACTED]`. The sink then escapes what it writes, so a quote or an `=` stays inside its value. The processor is configured under `[runtime.log.redaction]` and is on by default.
 
 ## The fields a line carries
 
@@ -32,28 +32,28 @@ The two pairs name different traces. Pipelex's spans belong to a trace of their 
 
 `request_id` reaches a line in one of two ways, depending on which process writes it. In this server's own process, the request-id middleware binds it on the runtime's log context for the whole request, so every record emitted there while the request is in flight carries it: the server's own lines, like the example above, and the lines the Pipelex runtime emits from inside a run executed in-process (`orchestration_mode = "direct"`), without any call site passing it along. A run dispatched to a worker, under a distributed `orchestration_mode` such as `temporal`, happens in another process, which that binding does not reach, so the id travels with the run instead: both run routes, `POST /v1/execute` and `POST /v1/start`, put it on the run's metadata, and the worker binds it from there while it runs the run's workflow and activities, so the lines written inside them carry the same id. A line the worker writes outside those bindings does not, such as the one the orchestration SDK logs after an activity has failed. One path does not carry it at all yet: when `POST /v1/validate` dispatches its dry run to a worker, the lines that worker writes for it have no `request_id`. The value is the one echoed in the response's `X-Request-ID` header and in the problem document's `request_id` member, so a caller reporting a failure hands you the key to its log lines.
 
-The remaining keys are what the error handlers attach to an `event: "api_error"` record:
+The remaining keys are what the error handlers attach to an error line. The ones OpenTelemetry's semantic conventions define keep their keys verbatim, and the rest are spelled as the runtime's own lines spell them, so a query written for the runtime's lines finds these too:
 
 | Key | What it is |
 | --- | --- |
-| `event` | Always `api_error` on an error line — the one key a query filters this server's error stream on |
-| `route` | The request's URL path |
-| `status` | The HTTP status actually sent, including any API-level override |
-| `error_type` | The class or `ErrorType` name the response reports |
+| `url.path` | The request's URL path |
+| `http.response.status_code` | The HTTP status actually sent, including any API-level override |
+| `error.type` | The class or `ErrorType` name the response reports, which the response body carries as `error_type` |
 | `error_domain` | `input`, `config`, `runtime`, … — who fixes it |
 | `error_category` | A Pipelex classification, on the failures it classifies; `unknown` on the catch-all 500 |
 | `retryable` | Whether a blind retry can help, when the failure says |
 | `detail` | The operator-facing explanation, the same text the response body carries — on an API-authored failure only, see below |
-| `user_id` | The authenticated caller, when auth bound one |
+| `user.id` | The authenticated caller, when auth bound one |
 | `pipe_code` | The pipe the request named, on a run route whose body parsed |
 | `pipeline_run_id` | The run the request named, on a run route whose body parsed |
-| `provider`, `model`, `provider_status_code`, `provider_request_id` | The inference provider's own identifiers, on a failure that reached one |
+| `backend_name`, `model_handle` | The inference backend that served the model and the handle the pipe named it by, on a failure that reached one; the response body carries them as `provider` and `model` |
+| `provider_status_code`, `provider_request_id` | The inference provider's own status and request id, on a failure that reached one |
 
 A key whose value is not set for this request is **absent** from the line rather than written as `null`, so a query filtering on presence gets an honest answer.
 
-`detail` is the one field whose absence follows the failure's origin rather than the request's shape, and it is worth knowing which way round. A failure this API authored itself — a validation error, an unknown model category — carries `detail` on the record. A failure that arrives as a Pipelex `ErrorReport`, which is most `5xx` and every domain error, does not: the response body still carries a `detail`, but the record does not, because the body's text has been through disclosure redaction and the cause has not. So a `4xx` from that path logs as `API error 422: SomeError` with no explanation and no traceback, and the response is where the explanation is. Build an operator query on `error_type` and `route`, which every line carries, rather than on `detail`.
+`detail` is the one field whose absence follows the failure's origin rather than the request's shape, and it is worth knowing which way round. A failure this API authored itself — a validation error, an unknown model category — carries `detail` on the record. A failure that arrives as a Pipelex `ErrorReport`, which is most `5xx` and every domain error, does not: the response body still carries a `detail`, but the record does not, because the body's text has been through disclosure redaction and the cause has not. So a `4xx` from that path logs its `error.type` with no explanation and no traceback, and the response is where the explanation is. Build an operator query on `error.type` and `url.path`, which every line carries, rather than on `detail`.
 
-Every field in that table is a **record attribute**, which is a different thing from the message. A structured sink — `json` here, and the OTLP sink — writes them beside the message as keys. The Rich console sink shows them after the message as a `key=value` suffix, each value on one line and cut short when long, a handled exception's `error.message` at a far more generous length, and leaves out the run identifiers (`request_id`, `pipeline_run_id`), which a person at a terminal does not need on every line, so `API error 500: PipelexConfigError` is followed by the route, the status and the rest of the fields above. That rendering is for a person reading a terminal; keep `sink = "json"` wherever the lines are read by anything else.
+Every field in that table is a **record attribute**, which is a different thing from the message. A structured sink — `json` here, and the OTLP sink — writes them beside the message as keys. The Rich console sink shows them after the message as a `key=value` suffix, each value on one line and cut short when long, a handled exception's `error.message` at a far more generous length, and leaves out the run identifiers (`request_id`, `pipeline_run_id`), which a person at a terminal does not need on every line, so `A request ended in an error response` is followed by the path, the status, the error type and the rest of the fields above. That rendering is for a person reading a terminal; keep `sink = "json"` wherever the lines are read by anything else.
 
 Disposition follows the HTTP status, not the error domain: a `4xx` is a caller mistake and logs at `WARNING` without a traceback; a `5xx` is a server fault and logs at `ERROR` with one. See [Error Responses](error-responses.md) for the response side of the same failure.
 

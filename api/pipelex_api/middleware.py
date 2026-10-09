@@ -204,6 +204,6 @@ class RequestIdMiddleware:
         # The runtime's own context, not an API-owned one: `request_id` is one of the three run
         # identifiers it reserves, so every record emitted underneath carries it as an attribute.
         # The route path is deliberately not bound here — it is not a run identifier, and the API
-        # ships it as a `route` field on the lines that want it (see `pipelex_api.exception_handlers`).
+        # ships it as a `url.path` field on the lines that want it (see `pipelex_api.exception_handlers`).
         with log.context(request_id=request_id):
             await self.app(scope, receive, send_with_request_id)

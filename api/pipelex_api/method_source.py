@@ -95,8 +95,8 @@ def _fetch_package(method_ref: str) -> FetchedMethodPackage:
     ref = parse_method_ref(method_ref)
     package = get_method_clone_cache().get_or_fetch(ref=ref)
     log.info(
-        f"Resolved method_ref '{ref.ref_str}': address={package.provenance.address} "
-        f"tag={package.provenance.tag} commit_sha={package.provenance.commit_sha}"
+        "A method_ref was resolved to a package",
+        fields={"method_ref": ref.ref_str, "package_address": package.provenance.address, "commit_sha": package.provenance.commit_sha},
     )
     return package
 

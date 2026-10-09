@@ -92,13 +92,12 @@ class ActivityEventLogCache:
             if cls._fallback_logged:
                 return
             cls._fallback_logged = True
+        # Activities always emit through the per-process activity event log, by design: activity emissions must never
+        # land in the workflow's replay-rebuilt buffer (replay determinism), whether the activity runs co-located with
+        # the workflow router or on a separate worker pool.
         log.info(
-            f"Activity-side usage event emission engaged "
-            f"(workflow_id={workflow_id}, writer_id={writer_id}). "
-            "Activities always emit through the per-process activity event log, by design: "
-            "activity emissions must never land in the workflow's replay-rebuilt buffer "
-            "(replay determinism), whether the activity runs co-located with the workflow "
-            "router or on a separate worker pool."
+            "Activity-side usage event emission engaged, through this process's activity event log",
+            fields={"writer_id": writer_id, "workflow_id": workflow_id},
         )
 
     @classmethod

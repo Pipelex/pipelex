@@ -45,6 +45,7 @@ from pipelex.plugins.plugin_model_declarations import PluginModelDeclarations
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_surface import (
     INFERENCE_BACKEND_CONFIG_SURFACE_ID,
+    StaleConfigurationWarning,
     replay_surface_files_in_memory,
     stale_configuration_warning,
 )
@@ -109,7 +110,7 @@ def backend_toml_path(*, backends_dir_path: str, backend_name: str) -> Path:
 class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
     root: InferenceBackendLibraryRoot = Field(default_factory=dict)
 
-    _stale_warning: str | None = PrivateAttr(default=None)
+    _stale_warning: StaleConfigurationWarning | None = PrivateAttr(default=None)
 
     def reset(self):
         self.root = {}
@@ -119,14 +120,14 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
     def make_empty(cls) -> Self:
         return cls(root={})
 
-    def take_stale_configuration_warning(self) -> str | None:
+    def take_stale_configuration_warning(self) -> StaleConfigurationWarning | None:
         """The warning a tolerated load owes the user, once — or `None` when every file was current.
 
         Parked rather than logged, and the reason is a caller rather than boot order: `pipelex
         doctor` probes the backend files by loading the whole library once per backend, so a loader
         that logged for itself would repeat the same warning a dozen times over one stale directory.
-        Handing it over instead lets each caller decide — `ModelManager.setup` emits it (one boot,
-        one warning), and the doctor's per-backend probe simply never asks.
+        Handing it over instead lets each caller decide — `ModelManager.setup` emits it once per
+        boot, a line per stale file, and the doctor's per-backend probe simply never asks.
         """
         warning, self._stale_warning = self._stale_warning, None
         return warning
@@ -145,10 +146,11 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         **A file left behind by a schema change is carried forward rather than fatal.** When a local
         per-backend TOML is refused, the `inference-backend` ledger is replayed over that one file
         **in memory** and the loader's own steps re-run over what comes back; a load that then
-        succeeds parks a warning (`take_stale_configuration_warning`) naming the files and the
-        `pipelex migrate` remedy. Nothing is written — only the explicit command writes, which is
-        why the warning keeps coming back until it is run. A file the ledger cannot explain raises
-        exactly what it raised before: the retry either recovers or gets out of the way.
+        succeeds parks a warning (`take_stale_configuration_warning`) naming each file and its
+        remedy, `pipelex migrate` where the command reaches the file. Nothing is written — only the
+        explicit command writes, which is why the warning keeps coming back until it is run. A file
+        the ledger cannot explain raises exactly what it raised before: the retry either recovers or
+        gets out of the way.
 
         The warning names the files *this* load merged, which is not always every file the command
         would repair: `backends_dir_path` picks one directory (a project's `.pipelex/` wins the whole
@@ -333,9 +335,8 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             )
             self.root[backend_name] = backend
 
-        # One warning for the whole load rather than one per backend: a schema change lands on every
-        # file of the directory at once, and a user reading a dozen warnings would learn nothing the
-        # first did not already say.
+        # One warning parked for the whole load, emitted once by the caller that owes it to the user:
+        # the doctor's per-backend probe loads this directory once per backend and never asks for it.
         self._stale_warning = stale_configuration_warning(plans=stale_plans, walked_dirs=config_manager.existing_config_dirs) if stale_plans else None
 
     @classmethod
