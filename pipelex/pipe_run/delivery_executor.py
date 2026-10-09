@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 from typing import TYPE_CHECKING, Any, Awaitable, NamedTuple, cast
+from urllib.parse import urlsplit
 
 import httpx
 from kajson.exceptions import KajsonException
@@ -28,6 +29,7 @@ from pipelex.pipe_run.exceptions import PipeJobError, StorageDeliveryError, Webh
 from pipelex.reporting.usage_records import dump_tokens_usage_records
 from pipelex.runtime_bridge.primitives.hydration import hydrate_content
 from pipelex.runtime_hub import get_class_registry, get_storage_provider
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.json_utils import clean_json_dumps
 from pipelex.tools.network.ssrf_guard import SsrfGuardedTransport
 
@@ -36,6 +38,21 @@ if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_io_artifacts import PipeIOArtifacts
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus, StorageTarget, WebhookTarget
+
+
+def _hydration_error_text(*, exc: Exception) -> str:
+    """The text a hydration failure is logged with: where and why, never the refused values.
+
+    A pydantic ``ValidationError`` quotes each value it refused, and here those values are the run's own
+    result, which no log line carries. Its errors are written without their input instead, each as its
+    location and its reason; any other exception keeps its own text.
+    """
+    if isinstance(exc, ValidationError):
+        located_reasons = [
+            f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}" for error in exc.errors(include_url=False, include_input=False)
+        ]
+        return "; ".join(located_reasons)
+    return str(exc)
 
 
 class ResultFile(NamedTuple):
@@ -61,31 +78,32 @@ class DeliveryExecutor:
     ) -> None:
         """Execute a full delivery: generate result files, store them, then notify webhooks.
 
-        ``request_id`` is the originating API request id (when set). It is threaded
-        into the storage / webhook completion log lines so the delivery phase can be
-        correlated with the workflow logs and the inbound request.
+        ``request_id`` is the originating API request id (when set). The delivery binds it
+        with ``pipeline_run_id`` onto the log context, so every record the delivery emits,
+        its storage and webhook completion lines included, carries both and correlates
+        with the workflow logs and the inbound request, whether or not the caller bound
+        them already. A ``None`` request id inherits whatever the caller bound.
         """
-        # Step 1: Persist the result files to storage (only on success with output)
-        result_url: str | None = None
-        if delivery_assignment.storage is not None and pipe_output is not None:
-            result_url = await self._store_results(
-                pipe_output,
-                storage_scope=storage_scope,
-                pipeline_run_id=pipeline_run_id,
-                storage=delivery_assignment.storage,
-                request_id=request_id,
-            )
+        with log.context(request_id=request_id, pipeline_run_id=pipeline_run_id):
+            # Step 1: Persist the result files to storage (only on success with output)
+            result_url: str | None = None
+            if delivery_assignment.storage is not None and pipe_output is not None:
+                result_url = await self._store_results(
+                    pipe_output,
+                    storage_scope=storage_scope,
+                    pipeline_run_id=pipeline_run_id,
+                    storage=delivery_assignment.storage,
+                )
 
-        # Step 2: Notify webhooks with status + result_url (always, even on failure)
-        for webhook in delivery_assignment.webhooks:
-            await self._notify_webhook(
-                pipeline_run_id=pipeline_run_id,
-                status=status,
-                result_url=result_url,
-                webhook=webhook,
-                error_report=error_report,
-                request_id=request_id,
-            )
+            # Step 2: Notify webhooks with status + result_url (always, even on failure)
+            for webhook in delivery_assignment.webhooks:
+                await self._notify_webhook(
+                    pipeline_run_id=pipeline_run_id,
+                    status=status,
+                    result_url=result_url,
+                    webhook=webhook,
+                    error_report=error_report,
+                )
 
     # ---- Result file generation ----
 
@@ -208,8 +226,9 @@ class DeliveryExecutor:
             return None
         try:
             return AbsenceRecord.model_validate(candidate)
-        except ValidationError as exc:
-            log.warning(f"Malformed main-output absence record in raw working memory, treating as missing: {exc}")
+        except ValidationError:
+            # Treated as missing, the caller then fails the delivery: the record is lost, and this line says why.
+            log.error("The absence record of the main output is malformed, so the delivery has no result to render", include_exception=True)
             return None
 
     @classmethod
@@ -244,19 +263,25 @@ class DeliveryExecutor:
             try:
                 return get_concept_library().resolve_wire_concept_ref(concept_ref=concept_ref)
             except ConceptRefAmbiguousError as exc:
-                log.warning(f"Concept ref '{concept_ref}' is ambiguous in the current library, rendering the delivery raw: {exc}")
+                log.warning(
+                    "A concept ref is ambiguous in the current library; the delivery renders the result raw",
+                    fields={"concept_ref": concept_ref, **error_fields(exc=exc)},
+                )
                 return None
             except (LibraryError, ConceptLibraryConceptNotFoundError):
                 return None
             except RuntimeError as exc:
                 # The contextvar still names a library, but the hub that held it is gone. A delivery
                 # outlives the run it renders, so this is a race to survive, not a state to assert.
-                log.warning(f"The current library is no longer reachable, rendering the delivery raw: {exc}")
+                log.warning("The current library is no longer reachable; the delivery renders the result raw", fields=error_fields(exc=exc))
                 return None
         try:
             is_native_ref = NativeConceptCode.is_valid_native_concept_ref(concept_ref=concept_ref)
         except QualifiedRefError as exc:
-            log.warning(f"Concept ref '{concept_ref}' is not a valid concept ref, rendering the delivery raw: {exc}")
+            log.warning(
+                "A concept ref is malformed; the delivery renders the result raw",
+                fields={"concept_ref": concept_ref, **error_fields(exc=exc)},
+            )
             return None
         if not is_native_ref:
             return None
@@ -278,22 +303,22 @@ class DeliveryExecutor:
         try:
             concept_ref = stuff_raw["concept"]
             if not isinstance(concept_ref, str):
-                log.warning(
-                    f"Local hydration failed for delivery main stuff, falling back to raw render: "
-                    f"'concept' must be the concept ref string, got {type(concept_ref).__name__}"
-                )
+                # A stale runtime dumped the whole concept object here: worth a redeploy, so a warning.
+                log.warning("The delivered result does not name its concept by a concept ref string; the delivery renders it raw")
                 return None
             concept = cls._resolve_concept_locally(concept_ref=concept_ref)
             if concept is None:
-                log.warning(f"Local hydration failed for delivery main stuff, falling back to raw render: concept '{concept_ref}' not known locally")
+                # A crate-free delivery worker does not know a method's own concepts by design, so this is the
+                # expected path for most hosted results: worth a debug line, not a warning nobody can act on.
+                log.debug("The delivered result's concept is not known here; the delivery renders it raw", fields={"concept_ref": concept_ref})
                 return None
             # A structureless concept (`native.Anything`) names no class to look up: its content carries its own.
             if concept.declares_a_structure_class:
                 item_class = get_class_registry().get_class(name=concept.structure_class_name)
                 if item_class is None or not issubclass(item_class, StuffContent):
                     log.warning(
-                        f"Local hydration failed for delivery main stuff, falling back to raw render: "
-                        f"class '{concept.structure_class_name}' not registered locally"
+                        "The structure class of the delivered result's concept is not registered here; the delivery renders it raw",
+                        fields={"concept_ref": concept_ref, "structure_class_name": concept.structure_class_name},
                     )
                     return None
             content = hydrate_content(concept=concept, raw_content=stuff_raw["content"])
@@ -304,7 +329,10 @@ class DeliveryExecutor:
                 content=content,
             )
         except (PipeJobError, ValidationError, KajsonException, KeyError, TypeError) as exc:
-            log.warning(f"Local hydration failed for delivery main stuff, falling back to raw render: {exc}")
+            log.warning(
+                "The delivered result could not be hydrated; the delivery renders it raw",
+                fields=error_fields(exc=exc, text=_hydration_error_text(exc=exc)),
+            )
             return None
 
     @classmethod
@@ -358,9 +386,9 @@ class DeliveryExecutor:
             self._add_optional_text_file(files=files, filename="mermaidflow.mmd", text=graph_outputs.mermaidflow_mmd, content_type="text/plain")
             self._add_optional_text_file(files=files, filename="mermaidflow.html", text=graph_outputs.mermaidflow_html, content_type="text/html")
             self._add_optional_text_file(files=files, filename="reactflow.html", text=graph_outputs.reactflow_html, content_type="text/html")
-        except Exception:  # ruff: ignore[blind-except]
+        except Exception as exc:  # ruff: ignore[blind-except]
             # Best-effort: graph generation spans a deep mermaid/reactflow render tree; a graph failure must never fail result delivery.
-            log.warning("Failed to generate graph outputs")
+            log.warning("Failed to generate graph outputs", fields=error_fields(exc=exc))
 
     @classmethod
     async def _try_add_rendered_file(
@@ -374,9 +402,12 @@ class DeliveryExecutor:
         """Await a render coroutine and store the encoded result; log a warning on failure."""
         try:
             text = await render
-        except Exception:  # ruff: ignore[blind-except]
+        except Exception as exc:  # ruff: ignore[blind-except]
             # Best-effort: per-format rendering (incl. jinja2 viewer); a single render failure must not drop the other result files.
-            log.warning(f"Failed to render {filename}")
+            log.warning(
+                "A result file could not be rendered; the delivery goes on without it",
+                fields={"file.name": filename, **error_fields(exc=exc)},
+            )
             return
         files[filename] = ResultFile(data=text.encode("utf-8"), content_type=content_type)
 
@@ -395,7 +426,6 @@ class DeliveryExecutor:
         storage_scope: str,
         pipeline_run_id: str,
         storage: StorageTarget,
-        request_id: str | None = None,
     ) -> str:
         """Generate all result files and store them. Returns the base result URL.
 
@@ -404,8 +434,8 @@ class DeliveryExecutor:
         which is what made a run's outputs unreadable by anyone else on the same
         team. `storage_scope` already identifies the run (the host composes it
         from whatever its tenancy model is), so `pipeline_run_id` no longer
-        appears in the key; it stays a parameter because the log line below
-        correlates on it.
+        appears in the key; it stays a parameter because the failure below
+        names it.
         """
         try:
             storage_provider = get_storage_provider()
@@ -422,8 +452,7 @@ class DeliveryExecutor:
             # TODO: include the full S3 URI (s3://bucket/key/) so result_url is
             # self-contained and doesn't depend on knowing the bucket externally.
             result_url: str = f"{base_key}/"
-            request_id_suffix = f", request_id={request_id}" if request_id else ""
-            log.info(f"Storage delivery completed: pipeline_run_id={pipeline_run_id}, files={len(result_files)}{request_id_suffix}")
+            log.info("Storage delivery completed", fields={"file_count": len(result_files)})
             return result_url
         except Exception as exc:
             # Delivery boundary: any failure across result-file generation or storage is converted to StorageDeliveryError. Re-raises, never swallows.
@@ -440,7 +469,6 @@ class DeliveryExecutor:
         result_url: str | None,
         webhook: WebhookTarget,
         error_report: ErrorReport | None = None,
-        request_id: str | None = None,
     ) -> None:
         """POST status, optional result_url, and optional VERBOSE error report to a webhook URL.
 
@@ -478,8 +506,8 @@ class DeliveryExecutor:
                     timeout=30.0,
                 )
                 response.raise_for_status()
-            request_id_suffix = f", request_id={request_id}" if request_id else ""
-            log.info(f"Webhook delivery completed: pipeline_run_id={pipeline_run_id}, url={webhook.url}{request_id_suffix}")
+            # The receiver's host and not its URL: a webhook URL is the caller's, and its path or query may carry a credential.
+            log.info("Webhook delivery completed", fields={"server.address": urlsplit(webhook.url).hostname})
         except httpx.HTTPStatusError as exc:
             msg = f"Webhook delivery failed for pipeline_run_id={pipeline_run_id}: HTTP {exc.response.status_code}"
             raise WebhookDeliveryError(msg) from exc

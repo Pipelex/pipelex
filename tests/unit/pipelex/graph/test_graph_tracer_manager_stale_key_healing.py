@@ -24,6 +24,13 @@ _DATA_INCLUSION_OFF = DataInclusionConfig(
 
 _TRACER_KEY = "run_under_test"
 
+_STALE_TRACER_MESSAGE = "Replacing a graph tracer left over by an interrupted execution whose cleanup never ran"
+_STALE_TEARDOWN_MESSAGE = "The teardown of a stale graph tracer raised; replacing it anyway"
+
+
+def _records_with_message(*, caplog: pytest.LogCaptureFixture, message: str) -> list[logging.LogRecord]:
+    return [record for record in caplog.records if record.getMessage() == message]
+
 
 class TestGraphTracerManagerStaleKeyHealing:
     @pytest.fixture(autouse=True)
@@ -57,7 +64,8 @@ class TestGraphTracerManagerStaleKeyHealing:
         fresh_tracer = manager.get_tracer(_TRACER_KEY)
         assert fresh_tracer is not None
         assert fresh_tracer is not stale_tracer, "the stale tracer must be evicted, not reused"
-        assert "already exists" in caplog.text
+        (stale_record,) = _records_with_message(caplog=caplog, message=_STALE_TRACER_MESSAGE)
+        assert vars(stale_record).get("tracer_key") == _TRACER_KEY
 
     def test_open_tracer_heals_even_when_stale_teardown_raises(self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture) -> None:
         """A stale tracer's raising teardown must not fail the fresh run's setup.
@@ -79,11 +87,15 @@ class TestGraphTracerManagerStaleKeyHealing:
         fresh_tracer = manager.get_tracer(_TRACER_KEY)
         assert fresh_tracer is not None
         assert fresh_tracer is not stale_tracer, "the stale tracer must be evicted even when its teardown raises"
+        (teardown_record,) = _records_with_message(caplog=caplog, message=_STALE_TEARDOWN_MESSAGE)
+        assert vars(teardown_record).get("tracer_key") == _TRACER_KEY
+        assert vars(teardown_record).get("error.type") == "RuntimeError"
+        assert vars(teardown_record).get("error.message") == "half-built state"
 
     def test_open_tracer_fresh_key_does_not_warn(self, caplog: pytest.LogCaptureFixture) -> None:
         """The healing warning must be gated on key membership: a fresh key opens silently."""
         manager = GraphTracerManager.get_or_create_instance()
         with caplog.at_level(logging.WARNING):
             self._open_tracer(manager)
-        assert "already exists" not in caplog.text
+        assert not _records_with_message(caplog=caplog, message=_STALE_TRACER_MESSAGE)
         assert manager.get_tracer(_TRACER_KEY) is not None

@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, Any, Literal
 from pydantic import BaseModel, ConfigDict
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -461,7 +460,7 @@ class PipeCondition(PipeController):
                 template_source=self.expression,
             )
         except Jinja2DetectVariablesError as exc:
-            log.error(f"Dry run failed: could not detect required variables from expression template: {exc}")
+            # Nothing is logged here: the refusal raised below is the failure, and whoever handles it reports it.
             # The expression is the caller's own method. The message quotes neither the expression nor the parser's
             # diagnosis, which names the token it stopped at: the condition may be a host library's, whose text
             # must not reach the caller. The line locates the fault. It is raised from the parser's own error,

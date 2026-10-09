@@ -204,7 +204,10 @@ def save_graph_outputs_to_dir(
             # directory would describe this graph's data with another method's declarations. Said out
             # loud, because the agent CLI's directory is the user's own bundle directory.
             file_path.unlink()
-            log.warning(f"Removed {file_name} at {file_path}: the graphspec written beside it carries no I/O artifacts of its own")
+            log.warning(
+                "Removed an I/O artifact an earlier run left beside the graphspec, which carries none of its own",
+                fields={"file.path": str(file_path)},
+            )
 
     if graph_outputs.mermaidflow_mmd is not None:
         file_path = output_dir / "mermaidflow.mmd"

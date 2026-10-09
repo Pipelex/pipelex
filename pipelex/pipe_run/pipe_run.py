@@ -14,6 +14,7 @@ from pipelex.pipe_run.exceptions import DeliveryError
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipe_run.tracing_assembly import assemble_tracing_on_output
 from pipelex.pipeline.build_pipe_io_artifacts import build_pipe_io_artifacts
+from pipelex.tools.log.error_fields import error_fields
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_output import PipeOutput
@@ -71,19 +72,18 @@ class PipeRun(PipeRunProtocol):
                 error_report = exc.to_error_report()
             else:
                 error_report = PipelexUnexpectedError(str(exc) or repr(exc)).to_error_report()
-            log.error(f"Pipe execution failed for pipeline_run_id={pipeline_run_id}: {exc}")
+            log.error("Pipe execution failed", fields={"pipe_code": pipe_job.pipe.pipe_ref}, include_exception=True)
         finally:
             tracer_manager = GraphTracerManager.get_instance()
             if tracer_manager is not None:
                 try:
                     tracer_manager.close_tracer(pipeline_run_id)
-                except OSError as tracer_close_error:
+                except OSError:
                     if execution_error is None:
                         raise
                     log.error(
-                        f"close_tracer also failed for pipeline_run_id={pipeline_run_id} "
-                        f"after pipe execution failure; raising original execution error. "
-                        f"Suppressed tracer close error: {tracer_close_error}"
+                        "Closing the graph tracer also failed after the pipe execution failed; the execution error is raised",
+                        include_exception=True,
                     )
 
             # Assemble graph and/or usage onto pipe_output from the single trace-event read. The two
@@ -116,13 +116,12 @@ class PipeRun(PipeRunProtocol):
                         error_report=error_report,
                         request_id=pipe_job.job_metadata.run_metadata.request_id,
                     )
-                except DeliveryError as delivery_error:
+                except DeliveryError:
                     if execution_error is None:
                         raise
                     log.error(
-                        f"Delivery also failed for pipeline_run_id={pipeline_run_id} "
-                        f"after pipe execution failure; raising original execution error. "
-                        f"Suppressed delivery error: {delivery_error}"
+                        "The delivery also failed after the pipe execution failed; the execution error is raised",
+                        include_exception=True,
                     )
 
         if execution_error is not None:
@@ -150,6 +149,5 @@ class PipeRun(PipeRunProtocol):
         try:
             pipe_output.pipe_io_artifacts = build_pipe_io_artifacts(get_own_pipes())
         except Exception as build_error:  # ruff: ignore[blind-except]
-            message = f"Failed to build the I/O artifacts for pipeline_run_id={pipeline_run_id}: {build_error}"
-            log.warning(message)
-            pipe_output.pipe_io_artifacts_error = message
+            log.warning("The I/O artifacts of the run could not be built; the run keeps its result", fields=error_fields(exc=build_error))
+            pipe_output.pipe_io_artifacts_error = f"Failed to build the I/O artifacts for pipeline_run_id={pipeline_run_id}: {build_error}"

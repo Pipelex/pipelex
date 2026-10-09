@@ -30,6 +30,7 @@ from pipelex.runtime_hub import scoped_content_generator, scoped_event_log
 from pipelex.system.caller_identity import CallerIdentity, scoped_caller_identity
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.storage_scope import DRY_RUN_STORAGE_SCOPE, DRY_RUN_USER_ID
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 
 
@@ -51,7 +52,7 @@ async def best_effort_graph_spec(*, pipe_ref: str | None, library_id: str | None
     Args:
         pipe_ref: The namespaced ref of the pipe to dry-run, or ``None`` for no graph.
         library_id: The id of the already-open library to run against, or ``None`` for no graph.
-        log_context: Caller tag prefixed to the degrade warning (e.g. ``"act_dry_validate"``).
+        log_context: Caller tag the degrade warning carries in its ``log_context`` field (e.g. ``"act_dry_validate"``).
 
     Returns:
         The assembled GraphSpec, or ``None`` when skipped or degraded.
@@ -71,8 +72,8 @@ async def best_effort_graph_spec(*, pipe_ref: str | None, library_id: str | None
         if foreign_fault is not None and not isinstance(foreign_fault, (FactoryException, ValueError)):
             raise
         log.warning(
-            f"{log_context}: graph dry-run of '{pipe_ref}' did not produce a graph "
-            f"({type(graph_error).__name__}: {graph_error}); returning validation result without graph_spec"
+            "The graph dry run produced no graph; the validation result carries none",
+            fields={"log_context": log_context, "pipe_code": pipe_ref, **error_fields(exc=graph_error)},
         )
         return None
 

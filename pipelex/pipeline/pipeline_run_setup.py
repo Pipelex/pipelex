@@ -482,11 +482,10 @@ async def pipeline_run_setup(
                     if tracer_manager is not None:
                         try:
                             tracer_manager.close_tracer(pipeline_run_id)
-                        except OSError as tracer_close_error:
+                        except OSError:
                             log.error(
-                                f"close_tracer also failed for pipeline_run_id={pipeline_run_id} "
-                                f"during setup-failure cleanup; raising original setup error. "
-                                f"Suppressed tracer close error: {tracer_close_error}"
+                                "Closing the graph tracer also failed while cleaning up after the setup failed; the setup error is raised",
+                                include_exception=True,
                             )
             finally:
                 if event_log is not None:

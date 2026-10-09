@@ -133,11 +133,17 @@ class PipeBatch(PipeController):
         # `PipeRunParams.batch_max_concurrency`.
         max_concurrency = pipe_run_params.batch_max_concurrency
         if item_count > LARGE_BATCH_ADVISORY_THRESHOLD:
+            # `max_concurrency` is spelled as the configuration spells it, "unbounded" included, so the reader
+            # finds the setting the line is about.
             log.warning(
-                f"PipeBatch '{self.code}' is fanning out over {item_count} items. Bounded fan-out "
-                f"(max_concurrency={max_concurrency if max_concurrency is not None else 'unbounded'}) is a basic backpressure "
-                f"effort, not durable execution — for a workload this size, consider a durable execution backend for "
-                f"rate-limited, resumable runs: {URLs.durable_execution}"
+                "A PipeBatch fans out over a large list with bounded fan-out, which is backpressure and not durable execution; "
+                "for a workload this size, consider a durable execution backend for rate-limited, resumable runs",
+                fields={
+                    "pipe_code": self.code,
+                    "item_count": item_count,
+                    "max_concurrency": max_concurrency if max_concurrency is not None else "unbounded",
+                    "url.full": URLs.durable_execution,
+                },
             )
 
         item_concept = self.inputs.get_required_stuff_spec(input_list_stuff_name).concept
