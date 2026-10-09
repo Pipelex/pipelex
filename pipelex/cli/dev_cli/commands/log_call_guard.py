@@ -7,7 +7,7 @@ and in the ``api/`` member's ``api/pipelex_api/``:
 
 1. **The interpolation rule, at INFO and above** (``info``, ``warning``, ``error``, ``critical``). The message is a
    literal written at the call: a string constant, an f-string without a placeholder, a ``+`` of literals, a
-   conditional between literals, or a name bound only to literals in its own scope or at module level, a ``+=`` of a
+   conditional between literals, or a name whose bindings that can reach the call are all literals, a ``+=`` of a
    literal included. A message built by an f-string, by ``%``, by ``+`` or by ``.format()`` is refused under that
    form's name, and so is a name bound to one of those, the binding's line given. Any other expression, a parameter,
    an attribute, a call's result, a mapping, a name captured from an enclosing function, is refused as
@@ -20,17 +20,22 @@ and in the ``api/`` member's ``api/pipelex_api/``:
    bracketed word that is no style, ``list[int]``, is text and passes. A tag escaped with a backslash passes.
 
 The title and the inline title join the message (the dispatch renders them into it), so both rules read them too,
-and a title or an inline title that is statically ``None`` is no text at all. DEBUG and VERBOSE may keep an
-f-string; the markup rule holds there as everywhere.
+and a title or an inline title that is statically ``None`` is no text at all. A ``**`` expansion of a dict literal
+with string keys passes its entries as keywords; any other ``**`` expansion could carry the message, so it is refused
+as ``non-literal`` at every level. DEBUG and VERBOSE may keep an f-string; the markup rule holds there as everywhere.
 
 **Names** are read by Python's own scoping: the scope the call is made in (a comprehension reading as part of the
-scope it is written in), then the enclosing functions, class bodies never among them, then the module. One index of
-every scope's bindings is built per module, in one walk. A name bound in an enclosing function is not followed.
+scope it is written in), then the enclosing functions, class bodies never among them, then the module. Of a name's
+bindings there, only those that can reach the read count, by the scope's control flow: the nearest along
+straight-line code, the nearest on each path through an ``if``, a ``try`` or a ``match``, those a loop's later passes
+carry back, and none past a ``return``, a ``raise``, a ``break`` or a ``continue``. A name bound in an enclosing
+function is not followed. The facade itself is found the same way: a call's receiver is the facade where an import
+of the facade reaches it. One index of every scope's bindings and flow is built per module, in one walk.
 
 **The baseline.** The calls that broke the rules when the guard arrived are listed in the committed
 ``log_call_baseline.toml`` at the repo root, under the key ``<relative_path>::<qualified_name>`` of the function that
 makes them, ``<module>`` for a module-level call, each by its signature: the method, the message's source text, the
-rules the call breaks and every binding the guard read to judge it
+rules the call breaks and every binding that reaches the names the guard read to judge it
 (``warning: msg [f-string] where msg = f"Loaded {alias}"``), rendered the same on every supported Python. Line
 numbers never enter it. The comparison with the tree is exact both ways: a call the baseline does not list fails,
 and so does a listed signature no call matches any more, whether the call now complies, moved to another function,
@@ -57,6 +62,7 @@ import re
 import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import tomllib
 from collections import Counter
+from contextlib import contextmanager
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, cast
@@ -70,7 +76,7 @@ from typing_extensions import override
 from pipelex.tools.misc.toml_utils import save_toml_to_path
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator, Mapping, Sequence
+    from collections.abc import Generator, Iterable, Iterator, Mapping, Sequence
 
 #: The trees the guard scans, relative to the repo root: the runtime and the API server, which logs through the same facade.
 SCAN_ROOTS: tuple[Path, ...] = (Path("pipelex"), Path("api") / "pipelex_api")
@@ -316,7 +322,7 @@ def _operator_symbol(*, operator: ast.operator) -> str:
 
 
 # --------------------------------------------------------------------------------------
-# Scopes and bindings, indexed once per module
+# Scopes, bindings and the flow between them, indexed once per module
 # --------------------------------------------------------------------------------------
 
 
@@ -350,6 +356,15 @@ class _ScopeKind(StrEnum):
             case _ScopeKind.MODULE | _ScopeKind.FUNCTION | _ScopeKind.CLASS:
                 return False
 
+    @property
+    def runs_when_called(self) -> bool:
+        """Whether the scope's code runs whenever it is called, rather than once, where it is written."""
+        match self:
+            case _ScopeKind.FUNCTION:
+                return True
+            case _ScopeKind.MODULE | _ScopeKind.CLASS | _ScopeKind.COMPREHENSION:
+                return False
+
 
 class _OpaqueBinding(StrEnum):
     """What binds a name to a value the guard does not read, each written in a signature as ``<kind>``."""
@@ -376,24 +391,44 @@ _CAPTURED_PLACEHOLDER = "<enclosing function>"
 _UNBOUND_PLACEHOLDER = "<unbound>"
 
 
-class _Binding(NamedTuple):
+class _Binding:
     """One binding of a name: the value bound, the scope that value is read in, and how it binds.
 
+    Compared by identity: two bindings of the same text on two lines are two bindings.
+
     Attributes:
+        serial: The binding's rank in the walk, which orders the bindings of one line.
         value: The bound expression, ``None`` for an opaque binding.
         scope: The scope the value is evaluated in, which is where the names it reads resolve: the function a
             ``global`` assignment is written in, or the comprehension holding a ``:=``, rather than the scope the
             name lands in.
         lineno: The line, for the report only.
         operator: The operator of an augmented assignment, ``None`` for a plain one.
+        prior: The target of an augmented assignment, the read of the value it updates.
         opaque: What binds the name when the guard does not read the value: a parameter, a loop target, an import.
+        import_path: The dotted path an import binds the name to, which tells the facade apart.
     """
 
-    value: ast.expr | None
-    scope: _Scope
-    lineno: int
-    operator: ast.operator | None
-    opaque: _OpaqueBinding | None
+    def __init__(
+        self,
+        *,
+        serial: int,
+        value: ast.expr | None,
+        scope: _Scope,
+        lineno: int,
+        operator: ast.operator | None = None,
+        prior: ast.Name | None = None,
+        opaque: _OpaqueBinding | None = None,
+        import_path: str | None = None,
+    ) -> None:
+        self.serial = serial
+        self.value = value
+        self.scope = scope
+        self.lineno = lineno
+        self.operator = operator
+        self.prior = prior
+        self.opaque = opaque
+        self.import_path = import_path
 
     def render(self, *, name: str) -> str:
         """The binding as a signature writes it: its source text, never its line."""
@@ -404,8 +439,20 @@ class _Binding(NamedTuple):
         return f"{name} = {render_source(expr=self.value)}"
 
 
+class _EntryPoint:
+    """Where a scope written in the module starts to run in the module's flow, and the module bindings it can see.
+
+    A class body runs once, where its statement stands, and sees ``at_entry``. A function may be called at any time
+    once it is defined, and also sees ``after``: every module binding made from then on, in any order.
+    """
+
+    def __init__(self) -> None:
+        self.at_entry: dict[str, set[_Binding]] = {}
+        self.after: dict[str, set[_Binding]] = {}
+
+
 class _Scope:
-    """One scope of a module and the index of the names it binds, by Python's rules."""
+    """One scope of a module: the names it binds, by Python's rules, and the flow of its statements."""
 
     def __init__(self, *, kind: _ScopeKind, parent: _Scope | None) -> None:
         self.kind = kind
@@ -416,6 +463,15 @@ class _Scope:
         self.bound_names: set[str] = set()
         self.global_names: set[str] = set()
         self.nonlocal_names: set[str] = set()
+        # The bindings another scope makes here through `global` or `nonlocal`, which run whenever it is called.
+        self.moved_bindings: dict[str, list[_Binding]] = {}
+        # The flow of a scope that is not a comprehension: the events of its statements, and the stack of event lists
+        # the walk is filling. A comprehension's flow is part of the scope it is written in.
+        self.events: list[_Event] = []
+        self.sinks: list[list[_Event]] = [self.events]
+        # Where the scope starts to run in the module's flow, and whether it runs there or whenever it is called.
+        self.entry: _EntryPoint | None = None
+        self.runs_later = False
 
     def bind(self, *, name: str, binding: _Binding) -> None:
         self.bindings.setdefault(name, []).append(binding)
@@ -424,9 +480,6 @@ class _Scope:
     def owns(self, *, name: str) -> bool:
         """Whether the name is local to this scope: bound here and declared neither ``global`` nor ``nonlocal``."""
         return name in self.bound_names and name not in self.global_names and name not in self.nonlocal_names
-
-    def bindings_of(self, *, name: str) -> list[_Binding]:
-        return sorted(self.bindings.get(name, []), key=lambda binding: binding.lineno)
 
     @property
     def statement_scope(self) -> _Scope:
@@ -440,24 +493,377 @@ class _Scope:
 #: Where a name read in a scope resolves: the scope whose bindings it reads, or the placeholder of a name not followed.
 _Location: TypeAlias = _Scope | str
 
+#: What a name read resolves to: the placeholder of a name not followed, or the bindings that can reach the read, in
+#: source order, none when no binding does.
+_Reach: TypeAlias = str | list[_Binding]
+
+
+# ---- the flow of a scope, as events ------------------------------------------------
+
+
+class _JumpKind(StrEnum):
+    RETURN = "return"
+    RAISE = "raise"
+    BREAK = "break"
+    CONTINUE = "continue"
+
+
+class _Read(NamedTuple):
+    """A name read: the bindings that reach it are recorded against its node."""
+
+    node: ast.Name
+    name: str
+
+
+class _Bind(NamedTuple):
+    """A name bound, replacing whatever it held."""
+
+    name: str
+    binding: _Binding
+
+
+class _Kill(NamedTuple):
+    """A name deleted, or an except target cleared as its handler ends."""
+
+    name: str
+
+
+class _Enter(NamedTuple):
+    """The point of the module's flow a scope written there starts to run from."""
+
+    point: _EntryPoint
+
+
+class _Branch(NamedTuple):
+    """Paths of which exactly one runs; an empty path is the way around the others."""
+
+    paths: tuple[list[_Event], ...]
+
+
+class _Loop(NamedTuple):
+    """A loop: its test runs before each pass and before it ends, its body any number of times, its ``else`` on a normal end."""
+
+    test: list[_Event]
+    body: list[_Event]
+    orelse: list[_Event]
+
+
+class _Try(NamedTuple):
+    """A ``try``, or a ``with`` statement, whose context manager may swallow what its body raises."""
+
+    body: list[_Event]
+    handlers: tuple[list[_Event], ...]
+    orelse: list[_Event]
+    final: list[_Event]
+
+
+class _Match(NamedTuple):
+    """A ``match``: each case's pattern and guard, then its body, and whether its last case always matches."""
+
+    cases: tuple[tuple[list[_Event], list[_Event]], ...]
+    is_exhaustive: bool
+
+
+class _Jump(NamedTuple):
+    """A ``return``, ``raise``, ``break`` or ``continue``: nothing after it in its block runs."""
+
+    kind: _JumpKind
+
+
+_Event: TypeAlias = _Read | _Bind | _Kill | _Enter | _Branch | _Loop | _Try | _Match | _Jump
+
+#: The bindings that can reach a point for one name, ``None`` standing for a path on which the name holds nothing.
+_Reaching: TypeAlias = frozenset[_Binding | None]
+
+_NOTHING: _Reaching = frozenset({None})
+
+
+def _union(*, sets: Iterable[_Reaching]) -> _Reaching:
+    merged: set[_Binding | None] = set()
+    for reaching in sets:
+        merged.update(reaching)
+    return frozenset(merged)
+
+
+class _FlowState:
+    """What reaches one point of a scope's flow: each name's bindings, and the entry points already passed."""
+
+    def __init__(self, *, names: dict[str, _Reaching], active: frozenset[_EntryPoint]) -> None:
+        self.names = names
+        self.active = active
+
+    def reaching(self, *, name: str) -> _Reaching:
+        return self.names.get(name, _NOTHING)
+
+    def copy(self) -> _FlowState:
+        return _FlowState(names=dict(self.names), active=self.active)
+
+    def is_same_as(self, *, other: _FlowState) -> bool:
+        return self.names == other.names and self.active == other.active
+
+
+def _joined(*, states: Iterable[_FlowState | None]) -> _FlowState | None:
+    """The state where paths meet: each name holding what it holds on any of them; ``None`` when no path gets there."""
+    live = [state for state in states if state is not None]
+    if not live:
+        return None
+    if len(live) == 1:
+        return live[0].copy()
+    every_name: set[str] = set()
+    for state in live:
+        every_name.update(state.names)
+    names = {name: _union(sets=(state.reaching(name=name) for state in live)) for name in every_name}
+    active: set[_EntryPoint] = set()
+    for state in live:
+        active.update(state.active)
+    return _FlowState(names=names, active=frozenset(active))
+
+
+class _LoopFrame:
+    """A loop being run: the states its ``break`` and ``continue`` statements leave with."""
+
+    def __init__(self) -> None:
+        self.jumps: dict[_JumpKind, list[_FlowState]] = {}
+
+
+class _RaiseFrame:
+    """A region whose exceptions a handler or a ``finally`` takes over: every state reached in it, joined.
+
+    A ``finally`` region also keeps the jumps that leave through it, which resume once the ``finally`` has run.
+    """
+
+    def __init__(self, *, state: _FlowState, has_finally: bool) -> None:
+        self.state = state.copy()
+        self.has_finally = has_finally
+        self.jumps: dict[_JumpKind, list[_FlowState]] = {}
+
+    def note(self, *, name: str, reaching: _Reaching) -> None:
+        self.state.names[name] = self.state.reaching(name=name) | reaching
+
+
+class _FlowRunner:
+    """Runs one scope's flow, recording at each name read every binding that can reach it.
+
+    A loop runs until the state at its head stops growing, so a binding later in its body reaches a read earlier in it.
+    """
+
+    def __init__(self, *, recorded: dict[ast.Name, set[_Binding | None]]) -> None:
+        self._recorded = recorded
+        self._frames: list[_LoopFrame | _RaiseFrame] = []
+
+    def run(self, *, events: Sequence[_Event], state: _FlowState | None) -> _FlowState | None:
+        """The state after the events, ``None`` when no path gets through them. The state given is consumed."""
+        for event in events:
+            if state is None:
+                return None
+            state = self._step(event=event, state=state)
+        return state
+
+    def _step(self, *, event: _Event, state: _FlowState) -> _FlowState | None:
+        match event:
+            case _Read(node=node, name=name):
+                self._recorded.setdefault(node, set()).update(state.reaching(name=name))
+                return state
+            case _Bind(name=name, binding=binding):
+                state.names[name] = frozenset({binding})
+                for point in state.active:
+                    point.after.setdefault(name, set()).add(binding)
+                self._note(name=name, reaching=frozenset({binding}))
+                return state
+            case _Kill(name=name):
+                state.names.pop(name, None)
+                self._note(name=name, reaching=_NOTHING)
+                return state
+            case _Enter(point=point):
+                for name, reaching in state.names.items():
+                    point.at_entry.setdefault(name, set()).update(binding for binding in reaching if binding is not None)
+                state.active |= {point}
+                for frame in self._raise_frames():
+                    frame.state.active |= {point}
+                return state
+            case _Branch(paths=paths):
+                return _joined(states=[self.run(events=path, state=state.copy()) for path in paths])
+            case _Loop():
+                return self._run_loop(loop=event, state=state)
+            case _Try():
+                return self._run_try(statement=event, state=state)
+            case _Match():
+                return self._run_match(statement=event, state=state)
+            case _Jump(kind=kind):
+                self._jump(kind=kind, state=state)
+                return None
+
+    def _raise_frames(self) -> list[_RaiseFrame]:
+        return [frame for frame in self._frames if isinstance(frame, _RaiseFrame)]
+
+    def _note(self, *, name: str, reaching: _Reaching) -> None:
+        """An exception may be raised once a name changes: every enclosing handler and ``finally`` may see it."""
+        for frame in self._raise_frames():
+            frame.note(name=name, reaching=reaching)
+
+    def _jump(self, *, kind: _JumpKind, state: _FlowState) -> None:
+        """Hand a jump's state to what it resumes at: the innermost ``finally`` it leaves through, else its loop."""
+        match kind:
+            case _JumpKind.RAISE:
+                # Every state a region reaches is already noted in the frames that take its exceptions over.
+                return
+            case _JumpKind.RETURN:
+                frames = [frame for frame in self._raise_frames() if frame.has_finally]
+                if frames:
+                    frames[-1].jumps.setdefault(kind, []).append(state.copy())
+            case _JumpKind.BREAK | _JumpKind.CONTINUE:
+                for frame in reversed(self._frames):
+                    if isinstance(frame, _LoopFrame) or frame.has_finally:
+                        frame.jumps.setdefault(kind, []).append(state.copy())
+                        return
+
+    def _run_loop(self, *, loop: _Loop, state: _FlowState) -> _FlowState | None:
+        head = state.copy()
+        while True:
+            frame = _LoopFrame()
+            self._frames.append(frame)
+            tested = self.run(events=loop.test, state=head.copy())
+            body_end = self.run(events=loop.body, state=tested.copy() if tested is not None else None)
+            self._frames.pop()
+            next_head = _joined(states=[state, body_end, *frame.jumps.get(_JumpKind.CONTINUE, [])])
+            if next_head is None or next_head.is_same_as(other=head):
+                break
+            head = next_head
+        finished = self.run(events=loop.orelse, state=tested)
+        return _joined(states=[finished, *frame.jumps.get(_JumpKind.BREAK, [])])
+
+    def _run_try(self, *, statement: _Try, state: _FlowState) -> _FlowState | None:
+        """The handlers start from any state the body reached, and a ``finally`` runs on every way out."""
+        finally_frame = _RaiseFrame(state=state, has_finally=True) if statement.final else None
+        if finally_frame is not None:
+            self._frames.append(finally_frame)
+        body_frame = _RaiseFrame(state=state, has_finally=False)
+        self._frames.append(body_frame)
+        body_end = self.run(events=statement.body, state=state)
+        self._frames.pop()
+        handler_ends = [self.run(events=handler, state=body_frame.state.copy()) for handler in statement.handlers]
+        finished = _joined(states=[self.run(events=statement.orelse, state=body_end), *handler_ends])
+        if finally_frame is None:
+            return finished
+        self._frames.pop()
+        # After an exception the `finally` runs and the exception goes on; after a jump it runs and the jump resumes.
+        self.run(events=statement.final, state=finally_frame.state.copy())
+        for kind, jump_states in finally_frame.jumps.items():
+            resumed = self.run(events=statement.final, state=_joined(states=jump_states))
+            if resumed is not None:
+                self._jump(kind=kind, state=resumed)
+        return self.run(events=statement.final, state=finished)
+
+    def _run_match(self, *, statement: _Match, state: _FlowState) -> _FlowState | None:
+        """Each case is tried from what the failed ones left: a pattern may bind its captures and still fail."""
+        trying = state
+        ends: list[_FlowState | None] = []
+        for pattern, body in statement.cases:
+            matched = self.run(events=pattern, state=trying.copy())
+            if matched is None:
+                continue
+            ends.append(self.run(events=body, state=matched.copy()))
+            trying = _joined(states=[trying, matched]) or trying
+        if not statement.is_exhaustive:
+            ends.append(trying)
+        return _joined(states=ends)
+
+
+def _is_irrefutable(*, case: ast.match_case) -> bool:
+    """Whether a case always matches: a bare capture or ``_``, with no guard."""
+    return case.guard is None and isinstance(case.pattern, ast.MatchAs) and case.pattern.pattern is None
+
+
+# ---- the index -------------------------------------------------------------------------
+
 
 class _ScopeIndex:
-    """Every scope of one module with the names each binds, and the scope each call is made in, built in one walk."""
+    """Every scope of one module with the names it binds and the flow of its statements, built in one walk, then
+    each flow run once, which records the bindings that can reach each name read.
 
-    def __init__(self, *, module: ast.Module) -> None:
+    The flow follows Python's control flow: a binding reaches a read along straight-line code until another
+    replaces it, the branches of an ``if``, a ``try`` or a ``match`` each bring theirs, a loop brings the bindings
+    of its later passes, and code after a ``return``, a ``raise``, a ``break`` or a ``continue`` is reached by
+    nothing.
+    """
+
+    def __init__(self, *, module: ast.Module, package: str) -> None:
         self.module_scope = _Scope(kind=_ScopeKind.MODULE, parent=None)
         self.call_scopes: dict[ast.Call, _Scope] = {}
+        self._package = package
         self._scopes: list[_Scope] = [self.module_scope]
+        self._serials = itertools.count()
+        self._recorded: dict[ast.Name, set[_Binding | None]] = {}
         for statement in module.body:
             self._visit(node=statement, scope=self.module_scope)
         self._apply_declarations()
+        for scope in self._scopes:
+            if not scope.kind.is_comprehension:
+                _FlowRunner(recorded=self._recorded).run(events=scope.events, state=_FlowState(names={}, active=frozenset()))
 
     # ---- the walk ---------------------------------------------------------------------
 
-    def _new_scope(self, *, kind: _ScopeKind, parent: _Scope) -> _Scope:
+    def _new_binding(
+        self,
+        *,
+        value: ast.expr | None,
+        scope: _Scope,
+        lineno: int,
+        operator: ast.operator | None = None,
+        prior: ast.Name | None = None,
+        opaque: _OpaqueBinding | None = None,
+        import_path: str | None = None,
+    ) -> _Binding:
+        return _Binding(
+            serial=next(self._serials),
+            value=value,
+            scope=scope,
+            lineno=lineno,
+            operator=operator,
+            prior=prior,
+            opaque=opaque,
+            import_path=import_path,
+        )
+
+    def _nested_scope(self, *, kind: _ScopeKind, parent: _Scope) -> _Scope:
+        """A scope written in ``parent``, with the point of the module's flow it starts to run from."""
         scope = _Scope(kind=kind, parent=parent)
         self._scopes.append(scope)
+        flow = parent.statement_scope
+        if flow.kind.is_module and not kind.is_comprehension:
+            point = _EntryPoint()
+            self._emit(scope=flow, event=_Enter(point=point))
+            scope.entry = point
+        else:
+            scope.entry = flow.entry
+        scope.runs_later = flow.runs_later or kind.runs_when_called
         return scope
+
+    @staticmethod
+    def _emit(*, scope: _Scope, event: _Event) -> None:
+        scope.statement_scope.sinks[-1].append(event)
+
+    @contextmanager
+    def _sink(self, *, scope: _Scope) -> Generator[list[_Event]]:
+        """Collect the events the walk emits in a scope's flow, for one block of a compound statement."""
+        events: list[_Event] = []
+        flow = scope.statement_scope
+        flow.sinks.append(events)
+        try:
+            yield events
+        finally:
+            flow.sinks.pop()
+
+    def _collected(self, *, nodes: Iterable[ast.AST | None], scope: _Scope) -> list[_Event]:
+        with self._sink(scope=scope) as events:
+            self._visit_all(nodes=nodes, scope=scope)
+        return events
+
+    def _bind(self, *, name: str, owner: _Scope, binding: _Binding) -> None:
+        """Bind a name in the scope that owns it and, unless that is a comprehension, in that scope's flow."""
+        owner.bind(name=name, binding=binding)
+        if not owner.kind.is_comprehension:
+            self._emit(scope=owner, event=_Bind(name=name, binding=binding))
 
     def _visit_all(self, *, nodes: Iterable[ast.AST | None], scope: _Scope) -> None:
         for node in nodes:
@@ -467,23 +873,23 @@ class _ScopeIndex:
     def _visit(self, *, node: ast.AST, scope: _Scope) -> None:
         match node:
             case ast.FunctionDef() | ast.AsyncFunctionDef():
-                self._bind_opaque(name=node.name, kind=_OpaqueBinding.DEFINITION, scope=scope, lineno=node.lineno)
                 self._visit_all(nodes=node.decorator_list, scope=scope)
                 self._visit_signature_outside(arguments=node.args, scope=scope)
                 self._visit_all(nodes=[node.returns, *getattr(node, "type_params", [])], scope=scope)
-                function_scope = self._new_scope(kind=_ScopeKind.FUNCTION, parent=scope)
+                function_scope = self._nested_scope(kind=_ScopeKind.FUNCTION, parent=scope)
                 self._bind_parameters(arguments=node.args, scope=function_scope)
                 self._visit_all(nodes=node.body, scope=function_scope)
+                self._bind_opaque(name=node.name, kind=_OpaqueBinding.DEFINITION, scope=scope, lineno=node.lineno)
             case ast.Lambda():
                 self._visit_signature_outside(arguments=node.args, scope=scope)
-                lambda_scope = self._new_scope(kind=_ScopeKind.FUNCTION, parent=scope)
+                lambda_scope = self._nested_scope(kind=_ScopeKind.FUNCTION, parent=scope)
                 self._bind_parameters(arguments=node.args, scope=lambda_scope)
                 self._visit(node=node.body, scope=lambda_scope)
             case ast.ClassDef():
-                self._bind_opaque(name=node.name, kind=_OpaqueBinding.DEFINITION, scope=scope, lineno=node.lineno)
                 self._visit_all(nodes=[*node.decorator_list, *node.bases, *node.keywords, *getattr(node, "type_params", [])], scope=scope)
-                class_scope = self._new_scope(kind=_ScopeKind.CLASS, parent=scope)
+                class_scope = self._nested_scope(kind=_ScopeKind.CLASS, parent=scope)
                 self._visit_all(nodes=node.body, scope=class_scope)
+                self._bind_opaque(name=node.name, kind=_OpaqueBinding.DEFINITION, scope=scope, lineno=node.lineno)
             case ast.ListComp(elt=elt, generators=generators) | ast.SetComp(elt=elt, generators=generators):
                 self._visit_comprehension(generators=generators, results=[elt], scope=scope)
             case ast.GeneratorExp(elt=elt, generators=generators):
@@ -491,50 +897,86 @@ class _ScopeIndex:
             case ast.DictComp(key=key, value=value, generators=generators):
                 self._visit_comprehension(generators=generators, results=[key, value], scope=scope)
             case ast.Assign(targets=targets, value=value):
+                self._visit(node=value, scope=scope)
                 for target in targets:
                     if isinstance(target, ast.Name):
-                        scope.bind(name=target.id, binding=_Binding(value=value, scope=scope, lineno=node.lineno, operator=None, opaque=None))
+                        self._bind(name=target.id, owner=scope, binding=self._new_binding(value=value, scope=scope, lineno=node.lineno))
                     else:
                         self._bind_target(target=target, kind=_OpaqueBinding.UNPACKING, scope=scope)
-                self._visit(node=value, scope=scope)
             case ast.AnnAssign(target=target, annotation=annotation, value=value):
+                self._visit_all(nodes=[annotation, value], scope=scope)
                 if isinstance(target, ast.Name):
                     if value is None:
                         # A bare annotation binds no value but makes the name local, by Python's rules.
                         scope.bound_names.add(target.id)
                     else:
-                        scope.bind(name=target.id, binding=_Binding(value=value, scope=scope, lineno=node.lineno, operator=None, opaque=None))
+                        self._bind(name=target.id, owner=scope, binding=self._new_binding(value=value, scope=scope, lineno=node.lineno))
                 else:
                     self._visit(node=target, scope=scope)
-                self._visit_all(nodes=[annotation, value], scope=scope)
-            case ast.AugAssign(target=target, op=operator, value=value):
-                if isinstance(target, ast.Name):
-                    scope.bind(name=target.id, binding=_Binding(value=value, scope=scope, lineno=node.lineno, operator=operator, opaque=None))
-                else:
-                    self._visit(node=target, scope=scope)
+            case ast.AugAssign(target=ast.Name(id=name) as target, op=operator, value=value):
+                # The value updated is read where the update stands.
+                self._emit(scope=scope, event=_Read(node=target, name=name))
                 self._visit(node=value, scope=scope)
+                binding = self._new_binding(value=value, scope=scope, lineno=node.lineno, operator=operator, prior=target)
+                self._bind(name=name, owner=scope, binding=binding)
             case ast.NamedExpr(target=ast.Name(id=name), value=value):
-                # A `:=` in a comprehension binds in the scope the comprehension is written in, its value read where it stands.
-                scope.statement_scope.bind(name=name, binding=_Binding(value=value, scope=scope, lineno=node.lineno, operator=None, opaque=None))
                 self._visit(node=value, scope=scope)
-            case ast.For(target=target) | ast.AsyncFor(target=target):
-                self._bind_target(target=target, kind=_OpaqueBinding.FOR_TARGET, scope=scope)
-                self._visit_all(nodes=[node.iter, *node.body, *node.orelse], scope=scope)
+                # A `:=` in a comprehension binds in the scope the comprehension is written in, its value read where it stands.
+                self._bind(name=name, owner=scope.statement_scope, binding=self._new_binding(value=value, scope=scope, lineno=node.lineno))
+            case ast.If(test=test, body=body, orelse=orelse):
+                self._visit(node=test, scope=scope)
+                self._emit(scope=scope, event=_Branch(paths=(self._collected(nodes=body, scope=scope), self._collected(nodes=orelse, scope=scope))))
+            case ast.While(test=test, body=body, orelse=orelse):
+                loop = _Loop(
+                    test=self._collected(nodes=[test], scope=scope),
+                    body=self._collected(nodes=body, scope=scope),
+                    orelse=self._collected(nodes=orelse, scope=scope),
+                )
+                self._emit(scope=scope, event=loop)
+            case (
+                ast.For(target=target, iter=iterable, body=body, orelse=orelse) | ast.AsyncFor(target=target, iter=iterable, body=body, orelse=orelse)
+            ):
+                self._visit(node=iterable, scope=scope)
+                with self._sink(scope=scope) as loop_body:
+                    self._bind_target(target=target, kind=_OpaqueBinding.FOR_TARGET, scope=scope)
+                    self._visit_all(nodes=body, scope=scope)
+                self._emit(scope=scope, event=_Loop(test=[], body=loop_body, orelse=self._collected(nodes=orelse, scope=scope)))
             case ast.With(items=items, body=body) | ast.AsyncWith(items=items, body=body):
                 for item in items:
                     self._visit(node=item.context_expr, scope=scope)
                     if item.optional_vars is not None:
                         self._bind_target(target=item.optional_vars, kind=_OpaqueBinding.WITH_TARGET, scope=scope)
-                self._visit_all(nodes=body, scope=scope)
-            case ast.ExceptHandler(type=exception_type, name=handler_name, body=body):
-                if handler_name is not None:
-                    self._bind_opaque(name=handler_name, kind=_OpaqueBinding.EXCEPT_TARGET, scope=scope, lineno=node.lineno)
-                self._visit_all(nodes=[exception_type, *body], scope=scope)
-            case ast.Import(names=aliases) | ast.ImportFrom(names=aliases):
-                for alias in aliases:
-                    if alias.name != "*":
-                        bound_name = alias.asname or alias.name.partition(".")[0]
-                        self._bind_opaque(name=bound_name, kind=_OpaqueBinding.IMPORT, scope=scope, lineno=node.lineno)
+                # A context manager may swallow what its body raises, so what follows may see any state the body reached.
+                self._emit(scope=scope, event=_Try(body=self._collected(nodes=body, scope=scope), handlers=([],), orelse=[], final=[]))
+            case (
+                ast.Try(body=body, handlers=handlers, orelse=orelse, finalbody=finalbody)
+                | ast.TryStar(body=body, handlers=handlers, orelse=orelse, finalbody=finalbody)
+            ):
+                statement = _Try(
+                    body=self._collected(nodes=body, scope=scope),
+                    handlers=tuple(self._handler_events(handler=handler, scope=scope) for handler in handlers),
+                    orelse=self._collected(nodes=orelse, scope=scope),
+                    final=self._collected(nodes=finalbody, scope=scope),
+                )
+                self._emit(scope=scope, event=statement)
+            case ast.Match(subject=subject, cases=cases):
+                self._visit(node=subject, scope=scope)
+                match_cases = tuple(
+                    (self._collected(nodes=[case.pattern, case.guard], scope=scope), self._collected(nodes=case.body, scope=scope)) for case in cases
+                )
+                self._emit(scope=scope, event=_Match(cases=match_cases, is_exhaustive=bool(cases) and _is_irrefutable(case=cases[-1])))
+            case ast.Return(value=value):
+                self._visit_all(nodes=[value], scope=scope)
+                self._emit(scope=scope, event=_Jump(kind=_JumpKind.RETURN))
+            case ast.Raise(exc=exception, cause=cause):
+                self._visit_all(nodes=[exception, cause], scope=scope)
+                self._emit(scope=scope, event=_Jump(kind=_JumpKind.RAISE))
+            case ast.Break():
+                self._emit(scope=scope, event=_Jump(kind=_JumpKind.BREAK))
+            case ast.Continue():
+                self._emit(scope=scope, event=_Jump(kind=_JumpKind.CONTINUE))
+            case ast.Import() | ast.ImportFrom():
+                self._bind_imports(statement=node, scope=scope)
             case ast.Global(names=names):
                 # A module-level `global` changes nothing.
                 if not scope.kind.is_module:
@@ -542,27 +984,58 @@ class _ScopeIndex:
             case ast.Nonlocal(names=names):
                 scope.nonlocal_names.update(names)
             case ast.MatchAs(pattern=pattern, name=capture_name):
-                if capture_name is not None:
-                    self._bind_opaque(name=capture_name, kind=_OpaqueBinding.MATCH_CAPTURE, scope=scope, lineno=node.lineno)
                 if pattern is not None:
                     self._visit(node=pattern, scope=scope)
+                if capture_name is not None:
+                    self._bind_opaque(name=capture_name, kind=_OpaqueBinding.MATCH_CAPTURE, scope=scope, lineno=node.lineno)
             case ast.MatchStar(name=capture_name):
                 if capture_name is not None:
                     self._bind_opaque(name=capture_name, kind=_OpaqueBinding.MATCH_CAPTURE, scope=scope, lineno=node.lineno)
             case ast.MatchMapping(keys=keys, patterns=patterns, rest=rest):
+                self._visit_all(nodes=[*keys, *patterns], scope=scope)
                 if rest is not None:
                     self._bind_opaque(name=rest, kind=_OpaqueBinding.MATCH_CAPTURE, scope=scope, lineno=node.lineno)
-                self._visit_all(nodes=[*keys, *patterns], scope=scope)
+            case ast.BoolOp(values=values):
+                # Each operand after the first runs only when the ones before it did not decide.
+                self._visit(node=values[0], scope=scope)
+                self._visit_short_circuit(values=values[1:], scope=scope)
+            case ast.IfExp(test=test, body=body, orelse=orelse):
+                self._visit(node=test, scope=scope)
+                self._emit(
+                    scope=scope, event=_Branch(paths=(self._collected(nodes=[body], scope=scope), self._collected(nodes=[orelse], scope=scope)))
+                )
+            case ast.Name(id=name, ctx=ast.Load()):
+                self._emit(scope=scope, event=_Read(node=node, name=name))
             case ast.Name(id=name, ctx=ast.Store()):
                 self._bind_opaque(name=name, kind=_OpaqueBinding.ASSIGNMENT_TARGET, scope=scope, lineno=node.lineno)
             case ast.Name(id=name, ctx=ast.Del()):
-                # `del` makes a name local without giving it a value, by Python's rules.
+                # `del` makes a name local without giving it a value, by Python's rules, and empties it.
                 scope.bound_names.add(name)
+                self._emit(scope=scope, event=_Kill(name=name))
             case ast.Call():
                 self.call_scopes[node] = scope
                 self._visit_all(nodes=ast.iter_child_nodes(node), scope=scope)
             case _:
                 self._visit_all(nodes=ast.iter_child_nodes(node), scope=scope)
+
+    def _visit_short_circuit(self, *, values: list[ast.expr], scope: _Scope) -> None:
+        if not values:
+            return
+        with self._sink(scope=scope) as evaluated:
+            self._visit(node=values[0], scope=scope)
+            self._visit_short_circuit(values=values[1:], scope=scope)
+        self._emit(scope=scope, event=_Branch(paths=(evaluated, [])))
+
+    def _handler_events(self, *, handler: ast.ExceptHandler, scope: _Scope) -> list[_Event]:
+        with self._sink(scope=scope) as events:
+            self._visit_all(nodes=[handler.type], scope=scope)
+            if handler.name is not None:
+                self._bind_opaque(name=handler.name, kind=_OpaqueBinding.EXCEPT_TARGET, scope=scope, lineno=handler.lineno)
+            self._visit_all(nodes=handler.body, scope=scope)
+            if handler.name is not None:
+                # Python deletes an except target as its handler ends.
+                self._emit(scope=scope, event=_Kill(name=handler.name))
+        return events
 
     def _visit_signature_outside(self, *, arguments: ast.arguments, scope: _Scope) -> None:
         """A signature's defaults and annotations, which are evaluated in the scope the definition is written in."""
@@ -576,15 +1049,20 @@ class _ScopeIndex:
                 self._bind_opaque(name=argument.arg, kind=_OpaqueBinding.PARAMETER, scope=scope, lineno=argument.lineno)
 
     def _visit_comprehension(self, *, generators: list[ast.comprehension], results: list[ast.expr], scope: _Scope) -> None:
-        """A comprehension: its first iterable is read in the enclosing scope, everything else in a scope of its own."""
+        """A comprehension: its first iterable is read in the enclosing scope, everything else in a scope of its own.
+
+        Its body runs any number of times, as a loop of the flow it is written in, where its `:=` bind.
+        """
         self._visit(node=generators[0].iter, scope=scope)
-        comprehension_scope = self._new_scope(kind=_ScopeKind.COMPREHENSION, parent=scope)
-        for index_generator, generator in enumerate(generators):
-            if index_generator > 0:
-                self._visit(node=generator.iter, scope=comprehension_scope)
-            self._bind_target(target=generator.target, kind=_OpaqueBinding.COMPREHENSION_TARGET, scope=comprehension_scope)
-            self._visit_all(nodes=generator.ifs, scope=comprehension_scope)
-        self._visit_all(nodes=results, scope=comprehension_scope)
+        comprehension_scope = self._nested_scope(kind=_ScopeKind.COMPREHENSION, parent=scope)
+        with self._sink(scope=scope) as body:
+            for index_generator, generator in enumerate(generators):
+                if index_generator > 0:
+                    self._visit(node=generator.iter, scope=comprehension_scope)
+                self._bind_target(target=generator.target, kind=_OpaqueBinding.COMPREHENSION_TARGET, scope=comprehension_scope)
+                self._visit_all(nodes=generator.ifs, scope=comprehension_scope)
+            self._visit_all(nodes=results, scope=comprehension_scope)
+        self._emit(scope=scope, event=_Loop(test=[], body=body, orelse=[]))
 
     def _bind_target(self, *, target: ast.expr, kind: _OpaqueBinding, scope: _Scope) -> None:
         """The names an assignment target binds: a name, reached through tuples, lists and starred parts.
@@ -602,9 +1080,36 @@ class _ScopeIndex:
             case _:
                 self._visit(node=target, scope=scope)
 
-    @staticmethod
-    def _bind_opaque(*, name: str, kind: _OpaqueBinding, scope: _Scope, lineno: int) -> None:
-        scope.bind(name=name, binding=_Binding(value=None, scope=scope, lineno=lineno, operator=None, opaque=kind))
+    def _bind_opaque(self, *, name: str, kind: _OpaqueBinding, scope: _Scope, lineno: int, import_path: str | None = None) -> None:
+        self._bind(name=name, owner=scope, binding=self._new_binding(value=None, scope=scope, lineno=lineno, opaque=kind, import_path=import_path))
+
+    def _bind_imports(self, *, statement: ast.Import | ast.ImportFrom, scope: _Scope) -> None:
+        """The names an import binds, each with the dotted path it binds them to.
+
+        ``import a.b`` binds ``a`` to ``a``, ``import a.b as x`` binds ``x`` to ``a.b``, ``from a import b as c`` binds
+        ``c`` to ``a.b``, a relative import resolves against the module's package, and a star import from a module that
+        exports the facade binds its name.
+        """
+        match statement:
+            case ast.Import(names=aliases):
+                for alias in aliases:
+                    bound_name = alias.asname or alias.name.partition(".")[0]
+                    module_path = alias.name if alias.asname else bound_name
+                    self._bind_opaque(name=bound_name, kind=_OpaqueBinding.IMPORT, scope=scope, lineno=statement.lineno, import_path=module_path)
+            case ast.ImportFrom(module=module, level=level, names=aliases):
+                base = _absolute_module(module=module, level=level, package=self._package)
+                for alias in aliases:
+                    if alias.name == "*":
+                        if base in FACADE_STAR_MODULES:
+                            star_path = f"{base}.{FACADE_NAME}"
+                            self._bind_opaque(
+                                name=FACADE_NAME, kind=_OpaqueBinding.IMPORT, scope=scope, lineno=statement.lineno, import_path=star_path
+                            )
+                        continue
+                    imported_path = f"{base}.{alias.name}" if base else None
+                    self._bind_opaque(
+                        name=alias.asname or alias.name, kind=_OpaqueBinding.IMPORT, scope=scope, lineno=statement.lineno, import_path=imported_path
+                    )
 
     def _apply_declarations(self) -> None:
         """Move the bindings of a ``global`` or ``nonlocal`` name to the scope that owns it."""
@@ -612,12 +1117,14 @@ class _ScopeIndex:
             for name in sorted(scope.global_names):
                 for binding in scope.bindings.pop(name, []):
                     self.module_scope.bind(name=name, binding=binding)
+                    self.module_scope.moved_bindings.setdefault(name, []).append(binding)
             for name in sorted(scope.nonlocal_names):
                 owner = self._nonlocal_owner(scope=scope, name=name)
                 moved = scope.bindings.pop(name, [])
                 if owner is not None:
                     for binding in moved:
                         owner.bind(name=name, binding=binding)
+                        owner.moved_bindings.setdefault(name, []).append(binding)
 
     @staticmethod
     def _nonlocal_owner(*, scope: _Scope, name: str) -> _Scope | None:
@@ -661,6 +1168,48 @@ class _ScopeIndex:
     def _module_location(self, *, name: str) -> _Location:
         return self.module_scope if self.module_scope.owns(name=name) else _UNBOUND_PLACEHOLDER
 
+    def reaching(self, *, node: ast.Name, scope: _Scope) -> _Reach:
+        """The bindings that can reach a name read in a scope, or the placeholder of a name the guard does not follow.
+
+        A read of its own flow's name gets what the flow's run recorded there. A read of a module name from a scope
+        written in the module gets what the module held where that scope starts to run, and, from a function, every
+        module binding made once it is defined. A comprehension's target is any of its bindings. A binding another
+        scope makes through ``global`` or ``nonlocal`` runs whenever that scope is called, so it reaches every read.
+        """
+        name = node.id
+        location = self.locate(scope=scope, name=name)
+        if isinstance(location, str):
+            return location
+        flow = scope.statement_scope
+        found: set[_Binding] = set()
+        if location.kind.is_comprehension:
+            found.update(location.bindings.get(name, []))
+        else:
+            # A function that declares a module name `global` tracks its own bindings of it, in its flow.
+            is_read_in_own_flow = location is flow or name in flow.global_names
+            recorded: set[_Binding | None] = self._recorded.get(node, set()) if is_read_in_own_flow else {None}
+            found.update(binding for binding in recorded if binding is not None)
+            if None in recorded and location is not flow and flow.entry is not None:
+                found.update(flow.entry.at_entry.get(name, set()))
+                if flow.runs_later:
+                    found.update(flow.entry.after.get(name, set()))
+        found.update(binding for binding in location.moved_bindings.get(name, []) if binding.scope.statement_scope is not flow)
+        return sorted(found, key=lambda binding: (binding.lineno, binding.serial))
+
+    def receiver_bindings(self, *, node: ast.Name, scope: _Scope) -> list[_Binding]:
+        """The bindings a call's receiver may hold where the call is made, a captured name's every binding included."""
+        reach = self.reaching(node=node, scope=scope)
+        if not isinstance(reach, str):
+            return reach
+        if reach != _CAPTURED_PLACEHOLDER:
+            return []
+        enclosing = scope.statement_scope.parent
+        while enclosing is not None and not enclosing.kind.is_module:
+            if not enclosing.kind.is_class and enclosing.owns(name=node.id):
+                return list(enclosing.bindings.get(node.id, []))
+            enclosing = enclosing.parent
+        return []
+
 
 # --------------------------------------------------------------------------------------
 # Reading a message
@@ -680,8 +1229,8 @@ _UNKNOWN_SHAPE: _Shape = ("", "")
 #: The most shapes a `+` folds its operands into; past it, the operands are scanned apart, as they would be unread.
 _MAX_FOLDED_SHAPES = 256
 
-#: What a name already followed is keyed by: its owning scope and itself.
-_SeenKey: TypeAlias = tuple[int, str]
+#: The bindings a reading is inside of, so a binding a loop feeds back into itself is read once.
+_Seen: TypeAlias = frozenset[_Binding]
 
 
 def _folded(*, left: set[_Shape], right: set[_Shape]) -> set[_Shape]:
@@ -701,7 +1250,7 @@ def _is_none(*, expr: ast.expr) -> bool:
 
 
 class _MessageReader:
-    """Reads a message expression in the scope it is written in, through the bindings of the names it holds.
+    """Reads a message expression in the scope it is written in, through the bindings that reach the names it holds.
 
     Every binding it reads is recorded in ``trace``, as a signature writes it, so the identity of a call that breaks
     a rule changes whenever what it logs does.
@@ -711,9 +1260,20 @@ class _MessageReader:
         self._index = index
         self.trace = trace
 
+    def _reach(self, *, node: ast.Name, scope: _Scope) -> _Reach:
+        """The bindings that reach a name, the placeholder of one not followed recorded in the trace."""
+        reach = self._index.reaching(node=node, scope=scope)
+        if isinstance(reach, str):
+            self.trace.add(f"{node.id} = {reach}")
+        elif not reach:
+            self.trace.add(f"{node.id} = {_UNBOUND_PLACEHOLDER}")
+        else:
+            self.trace.update(binding.render(name=node.id) for binding in reach)
+        return reach
+
     # ---- the form, for the interpolation rule -----------------------------------------
 
-    def form(self, *, expr: ast.expr, scope: _Scope, seen: frozenset[_SeenKey], allows_none: bool) -> _Form:
+    def form(self, *, expr: ast.expr, scope: _Scope, seen: _Seen, allows_none: bool) -> _Form:
         """Whether a message expression is fixed, and if not, the rule it breaks.
 
         The outermost form names the rule: ``f"{x}" + "!"`` is a concatenation. A title may be statically ``None``.
@@ -742,46 +1302,44 @@ class _MessageReader:
                 body_form = self.form(expr=body, scope=scope, seen=seen, allows_none=allows_none)
                 orelse_form = self.form(expr=orelse, scope=scope, seen=seen, allows_none=allows_none)
                 return body_form or orelse_form
-            case ast.Name(id=name):
-                return self._name_form(name=name, scope=scope, seen=seen, allows_none=allows_none)
+            case ast.Name():
+                return self._name_form(node=expr, scope=scope, seen=seen, allows_none=allows_none)
             case _:
                 return RuleBreach(rule=LogCallRule.NON_LITERAL, detail=f"`{_short_source(expr=expr)}`, not a literal")
 
-    def _name_form(self, *, name: str, scope: _Scope, seen: frozenset[_SeenKey], allows_none: bool) -> _Form:
-        location = self._index.locate(scope=scope, name=name)
-        if isinstance(location, str):
-            self.trace.add(f"{name} = {location}")
-            if location == _CAPTURED_PLACEHOLDER:
+    def _name_form(self, *, node: ast.Name, scope: _Scope, seen: _Seen, allows_none: bool) -> _Form:
+        name = node.id
+        reach = self._reach(node=node, scope=scope)
+        if isinstance(reach, str):
+            if reach == _CAPTURED_PLACEHOLDER:
                 return RuleBreach(rule=LogCallRule.NON_LITERAL, detail=f"`{name}`, captured from an enclosing function")
             return RuleBreach(rule=LogCallRule.NON_LITERAL, detail=f"`{name}`, bound to no literal in its scope or at module level")
-        key = (id(location), name)
-        if key in seen:
-            # A name read inside its own binding, `msg = msg + "!"`: the name's other bindings decide.
-            return None
-        seen |= {key}
-        bindings = location.bindings_of(name=name)
-        if not bindings:
-            self.trace.add(f"{name} = {_UNBOUND_PLACEHOLDER}")
+        if not reach:
             return RuleBreach(rule=LogCallRule.NON_LITERAL, detail=f"`{name}`, bound to no literal in its scope or at module level")
         first_form: _Form = None
-        for binding in bindings:
-            self.trace.add(binding.render(name=name))
-            binding_form = self._binding_form(name=name, binding=binding, seen=seen, allows_none=allows_none)
+        for binding in reach:
+            if binding in seen:
+                # A binding a loop feeds back into itself, `msg = msg + "!"`: the bindings it started from decide.
+                continue
+            binding_form = self._binding_form(name=name, binding=binding, seen=seen | {binding}, allows_none=allows_none)
             first_form = first_form or binding_form
         return first_form
 
-    def _binding_form(self, *, name: str, binding: _Binding, seen: frozenset[_SeenKey], allows_none: bool) -> _Form:
+    def _binding_form(self, *, name: str, binding: _Binding, seen: _Seen, allows_none: bool) -> _Form:
         if binding.opaque is not None or binding.value is None:
             kind = binding.opaque or _OpaqueBinding.ASSIGNMENT_TARGET
             return RuleBreach(rule=LogCallRule.NON_LITERAL, detail=f"`{name}`, bound at line {binding.lineno} as a {kind}, not to a literal")
-        if binding.operator is None:
-            value_form = self.form(expr=binding.value, scope=binding.scope, seen=seen, allows_none=allows_none)
-            if value_form is None:
-                return None
-            return RuleBreach(rule=value_form.rule, detail=f"`{name}`, bound at line {binding.lineno} to {value_form.detail}")
         match binding.operator:
+            case None:
+                value_form = self.form(expr=binding.value, scope=binding.scope, seen=seen, allows_none=allows_none)
+                if value_form is None:
+                    return None
+                return RuleBreach(rule=value_form.rule, detail=f"`{name}`, bound at line {binding.lineno} to {value_form.detail}")
             case ast.Add():
-                # `msg += "!"` keeps a literal literal; extending it by anything else is a concatenation.
+                # `msg += "!"` keeps a literal literal: the value it extends decides, then what extends it.
+                prior_form = None if binding.prior is None else self._name_form(node=binding.prior, scope=binding.scope, seen=seen, allows_none=False)
+                if prior_form is not None:
+                    return prior_form
                 if self.form(expr=binding.value, scope=binding.scope, seen=seen, allows_none=False) is None:
                     return None
                 return RuleBreach(rule=LogCallRule.CONCATENATION, detail=f"`{name}`, extended with `+=` at line {binding.lineno}")
@@ -793,7 +1351,7 @@ class _MessageReader:
 
     # ---- the shapes, for the markup rule ----------------------------------------------
 
-    def shapes(self, *, expr: ast.expr, scope: _Scope, seen: frozenset[_SeenKey]) -> set[_Shape]:
+    def shapes(self, *, expr: ast.expr, scope: _Scope, seen: _Seen) -> set[_Shape]:
         """The texts a message expression can reach the console as, its statically known concatenations folded."""
         match expr:
             case ast.Constant(value=str() as text):
@@ -816,40 +1374,45 @@ class _MessageReader:
                 return self.shapes(expr=receiver, scope=scope, seen=seen)
             case ast.IfExp(body=body, orelse=orelse):
                 return self.shapes(expr=body, scope=scope, seen=seen) | self.shapes(expr=orelse, scope=scope, seen=seen)
-            case ast.Name(id=name):
-                return self._name_shapes(name=name, scope=scope, seen=seen)
+            case ast.Name():
+                return self._name_shapes(node=expr, scope=scope, seen=seen)
             case _:
                 return {_UNKNOWN_SHAPE}
 
-    def _name_shapes(self, *, name: str, scope: _Scope, seen: frozenset[_SeenKey]) -> set[_Shape]:
-        """The texts a name can hold: each plain binding's, alone and extended by every later ``+=`` in source order."""
-        location = self._index.locate(scope=scope, name=name)
-        if isinstance(location, str):
-            self.trace.add(f"{name} = {location}")
+    def _name_shapes(self, *, node: ast.Name, scope: _Scope, seen: _Seen) -> set[_Shape]:
+        """The texts a name can hold where it is read: those of each binding that can reach it."""
+        reach = self._reach(node=node, scope=scope)
+        if isinstance(reach, str) or not reach:
             return {_UNKNOWN_SHAPE}
-        key = (id(location), name)
-        if key in seen:
-            return {_UNKNOWN_SHAPE}
-        seen |= {key}
-        bindings = location.bindings_of(name=name)
         result: set[_Shape] = set()
-        for index_binding, binding in enumerate(bindings):
-            self.trace.add(binding.render(name=name))
-            if binding.value is None:
+        for binding in reach:
+            if binding in seen:
                 result.add(_UNKNOWN_SHAPE)
                 continue
-            if binding.operator is not None:
-                if isinstance(binding.operator, ast.Add):
-                    result |= self.shapes(expr=binding.value, scope=binding.scope, seen=seen)
-                continue
-            base = self.shapes(expr=binding.value, scope=binding.scope, seen=seen)
-            result |= base
-            extended = base
-            for later in bindings[index_binding + 1 :]:
-                if isinstance(later.operator, ast.Add) and later.value is not None:
-                    extended = _folded(left=extended, right=self.shapes(expr=later.value, scope=later.scope, seen=seen))
-            result |= extended
-        return result or {_UNKNOWN_SHAPE}
+            result |= self._binding_shapes(binding=binding, seen=seen | {binding})
+        return result
+
+    def _binding_shapes(self, *, binding: _Binding, seen: _Seen) -> set[_Shape]:
+        """The texts a binding gives its name: an augmented one updates the text that reaches it."""
+        if binding.opaque is not None or binding.value is None:
+            return {_UNKNOWN_SHAPE}
+        match binding.operator:
+            case None:
+                return self.shapes(expr=binding.value, scope=binding.scope, seen=seen)
+            case ast.Add():
+                return _folded(
+                    left=self._prior_shapes(binding=binding, seen=seen), right=self.shapes(expr=binding.value, scope=binding.scope, seen=seen)
+                )
+            case ast.Mod():
+                return self._prior_shapes(binding=binding, seen=seen)
+            case _:
+                return {_UNKNOWN_SHAPE}
+
+    def _prior_shapes(self, *, binding: _Binding, seen: _Seen) -> set[_Shape]:
+        """The texts an augmented assignment updates: those reaching its target where it stands."""
+        if binding.prior is None:
+            return {_UNKNOWN_SHAPE}
+        return self._name_shapes(node=binding.prior, scope=binding.scope, seen=seen)
 
 
 def markup_tags_of(*, shapes: Iterable[_Shape]) -> list[str]:
@@ -889,47 +1452,54 @@ def _absolute_module(*, module: str | None, level: int, package: str) -> str | N
     return ".".join(base_parts) or None
 
 
-def imported_paths(*, tree: ast.Module, package: str) -> dict[str, set[str]]:
-    """The dotted path each name a module imports is bound to, wherever it imports it.
-
-    ``import a.b`` binds ``a`` to ``a``, ``import a.b as x`` binds ``x`` to ``a.b``, ``from a import b as c`` binds
-    ``c`` to ``a.b``, a relative import resolves against the module's package, and a star import from a module that
-    exports the facade binds its name. A name imported more than once keeps every path.
-    """
-    paths: dict[str, set[str]] = {}
-    for node in ast.walk(tree):
-        match node:
-            case ast.Import(names=aliases):
-                for alias in aliases:
-                    if alias.asname:
-                        paths.setdefault(alias.asname, set()).add(alias.name)
-                    else:
-                        top_level = alias.name.partition(".")[0]
-                        paths.setdefault(top_level, set()).add(top_level)
-            case ast.ImportFrom(module=module, level=level, names=aliases):
-                base = _absolute_module(module=module, level=level, package=package)
-                if base is None:
-                    continue
-                for alias in aliases:
-                    if alias.name == "*":
-                        if base in FACADE_STAR_MODULES:
-                            paths.setdefault(FACADE_NAME, set()).add(f"{base}.{FACADE_NAME}")
-                        continue
-                    paths.setdefault(alias.asname or alias.name, set()).add(f"{base}.{alias.name}")
-            case _:
-                pass
-    return paths
-
-
-def _dotted_parts(*, expr: ast.expr) -> list[str] | None:
-    """``a.b.c`` as ``["a", "b", "c"]``, or ``None`` when the expression is not a dotted name."""
+def _receiver_root(*, expr: ast.expr) -> tuple[ast.Name, list[str]] | None:
+    """``a.b.c`` as the name ``a`` and the attributes ``["b", "c"]``, or ``None`` when the expression is not a dotted name."""
     attributes: list[str] = []
     while isinstance(expr, ast.Attribute):
         attributes.append(expr.attr)
         expr = expr.value
     if not isinstance(expr, ast.Name):
         return None
-    return [expr.id, *reversed(attributes)]
+    return expr, list(reversed(attributes))
+
+
+def _expanded_entries(*, expr: ast.expr) -> list[tuple[str, ast.expr]] | None:
+    """The keywords a ``**`` expansion passes, when it expands a dict literal whose keys are all strings, else ``None``."""
+    if not isinstance(expr, ast.Dict):
+        return None
+    entries: list[tuple[str, ast.expr]] = []
+    for key, value in zip(expr.keys, expr.values, strict=True):
+        if not isinstance(key, ast.Constant) or not isinstance(key.value, str):
+            return None
+        entries.append((key.value, value))
+    return entries
+
+
+def message_parts_of(*, call: ast.Call) -> tuple[list[tuple[str | None, ast.expr]], list[ast.expr]]:
+    """The parts of a call's message, the message labelled ``None`` and a title by its keyword, and the ``**``
+    expansions whose keywords cannot be read.
+
+    A ``**`` of a dict literal with string keys passes its ``content``, ``title`` and ``inline`` entries as keywords;
+    any other expansion may carry any of them, so the message cannot be read through it.
+    """
+    keywords: list[tuple[str, ast.expr]] = []
+    unread: list[ast.expr] = []
+    for keyword in call.keywords:
+        if keyword.arg is not None:
+            keywords.append((keyword.arg, keyword.value))
+            continue
+        entries = _expanded_entries(expr=keyword.value)
+        if entries is None:
+            unread.append(keyword.value)
+        else:
+            keywords.extend(entries)
+    parts: list[tuple[str | None, ast.expr]] = []
+    content = call.args[0] if call.args else next((value for name, value in keywords if name == CONTENT_KEYWORD), None)
+    if content is not None:
+        parts.append((None, content))
+    # A title or inline title that is statically `None` is no text at all.
+    parts.extend((name, value) for name, value in keywords if name in TITLE_KEYWORDS and not _is_none(expr=value))
+    return parts, unread
 
 
 # --------------------------------------------------------------------------------------
@@ -943,8 +1513,7 @@ class _LogCallCollector(ast.NodeVisitor):
     def __init__(self, *, relative_path: str, module: ast.Module) -> None:
         self.relative_path = relative_path
         self.offending_calls: list[OffendingCall] = []
-        self._index = _ScopeIndex(module=module)
-        self._imported_paths = imported_paths(tree=module, package=module_package_of(relative_path=relative_path))
+        self._index = _ScopeIndex(module=module, package=module_package_of(relative_path=relative_path))
         self._qualified_parts: list[str] = []
 
     # ---- qualified names --------------------------------------------------------------
@@ -990,28 +1559,33 @@ class _LogCallCollector(ast.NodeVisitor):
         self.generic_visit(node)
 
     def _facade_method(self, *, node: ast.Call) -> str | None:
-        """The facade method a call invokes, under whatever name or module path the module reaches the facade by."""
+        """The facade method a call invokes, its receiver read where the call is made.
+
+        The receiver's name is the facade when a binding that can reach the call imports the facade, under whatever
+        name or module path: a parameter or a local of that name, or an import made in another function, is not.
+        """
         if not isinstance(node.func, ast.Attribute) or node.func.attr not in MARKUP_BOUND_METHODS:
             return None
-        receiver_parts = _dotted_parts(expr=node.func.value)
-        if receiver_parts is None:
+        receiver = _receiver_root(expr=node.func.value)
+        if receiver is None:
             return None
-        root_name, *attributes = receiver_parts
-        for root_path in self._imported_paths.get(root_name, set()):
-            if ".".join([root_path, *attributes]) in FACADE_PATHS:
+        root, attributes = receiver
+        for binding in self._index.receiver_bindings(node=root, scope=self._index.call_scopes[node]):
+            if binding.import_path is not None and ".".join([binding.import_path, *attributes]) in FACADE_PATHS:
                 return node.func.attr
         return None
 
     def _check_call(self, *, node: ast.Call, method: str) -> None:
         scope = self._index.call_scopes[node]
-        content = node.args[0] if node.args else next((keyword.value for keyword in node.keywords if keyword.arg == CONTENT_KEYWORD), None)
-        parts: list[tuple[str | None, ast.expr]] = [(None, content)] if content is not None else []
-        # A title or inline title that is statically `None` is no text at all.
-        parts.extend((keyword.arg, keyword.value) for keyword in node.keywords if keyword.arg in TITLE_KEYWORDS and not _is_none(expr=keyword.value))
+        parts, unread_expansions = message_parts_of(call=node)
 
         trace: set[str] = set()
         reader = _MessageReader(index=self._index, trace=trace)
-        breaches: list[RuleBreach] = []
+        # A `**` expansion the guard cannot read may carry the message or a title, so neither rule can be checked.
+        breaches = [
+            RuleBreach(rule=LogCallRule.NON_LITERAL, detail=f"`**{_short_source(expr=expansion)}` is an expansion whose keywords cannot be read")
+            for expansion in unread_expansions
+        ]
         if method in INTERPOLATION_BOUND_METHODS:
             for label, expr in parts:
                 form = reader.form(expr=expr, scope=scope, seen=frozenset(), allows_none=label is not None)
@@ -1028,7 +1602,13 @@ class _LogCallCollector(ast.NodeVisitor):
                 relative_path=self.relative_path,
                 qualified_name=self._qualified_name,
                 lineno=node.lineno,
-                signature=call_signature(method=method, parts=parts, rules={breach.rule for breach in breaches}, bindings=trace),
+                signature=call_signature(
+                    method=method,
+                    parts=parts,
+                    rules={breach.rule for breach in breaches},
+                    bindings=trace,
+                    expansions=unread_expansions,
+                ),
                 breaches=tuple(breaches),
             )
         )
@@ -1045,13 +1625,16 @@ def call_signature(
     parts: Sequence[tuple[str | None, ast.expr]],
     rules: Iterable[LogCallRule],
     bindings: Iterable[str] = (),
+    expansions: Sequence[ast.expr] = (),
 ) -> str:
     """A call's identity in the baseline, never a line.
 
-    Its method, its message's source and any title's, the rules it breaks in their declared order, and every binding
-    the guard read to judge it, sorted: ``warning: msg [f-string] where msg = f"Loaded {alias}"``.
+    Its method, its message's source and any title's, the ``**`` expansions it cannot read, the rules it breaks in
+    their declared order, and every binding the guard read to judge it, sorted:
+    ``warning: msg [f-string] where msg = f"Loaded {alias}"``.
     """
     rendered = [render_source(expr=expr) if label is None else f"{label}={render_source(expr=expr)}" for label, expr in parts]
+    rendered.extend(f"**{render_source(expr=expansion)}" for expansion in expansions)
     broken = set(rules)
     rule_names = [str(rule) for rule in LogCallRule if rule in broken]
     signature = f"{method}: {', '.join(rendered) or '<no message>'} [{', '.join(rule_names)}]"
@@ -1208,7 +1791,8 @@ def compare_with_baseline(*, offending: Sequence[OffendingCall], baseline: Mappi
             unlisted.extend(calls[listed[signature] :])
         for signature, count in sorted(listed.items()):
             found = len(calls_by_signature.get(signature, []))
-            stale.extend(StaleEntry(key=key, signature=signature) for _ in range(count - found))
+            # A signature listed more times than calls carry it is stale once per extra listing, the entry being immutable.
+            stale.extend([StaleEntry(key=key, signature=signature)] * (count - found))
     return BaselineComparison(
         unlisted=sorted(unlisted, key=lambda call: (call.relative_path, call.lineno, call.signature)),
         stale=stale,

@@ -11,9 +11,9 @@ content the message already renders, which is why the dispatch never stamps a la
 A value renders on one line: a string bare unless it is empty or holds a space, an equals sign, a quote, a
 backslash or a character a terminal would act on, in which case it is quoted, with a backslash and a quote
 escaped by a backslash and that character written as its escape; anything else as compact JSON; and the
-whole cut short past ``FIELD_VALUE_MAX_LENGTH``, except a field of ``UNCUT_FIELDS``, a handled exception's text,
-which is written in full, quoted and escaped the same way. A key is written the same way, so a field name holding a
-line break, a space, an equals sign or an escape sequence can forge neither a line nor a pair. Redaction has
+whole cut short past ``FIELD_VALUE_MAX_LENGTH``, or past the generous length ``FIELD_MAX_LENGTHS`` gives a field of
+its own, a handled exception's text. A key is written the same way, so a field name holding a line break, a space, an
+equals sign or an escape sequence can forge neither a line nor a pair. Redaction has
 already run when the console renders a record, so what is rendered is what the scrub left.
 
 Colour follows the name the field was given, from ``FIELD_STYLES``, wherever the field appears, and whatever
@@ -66,9 +66,13 @@ CONSOLE_HIDDEN_FIELDS = frozenset({REQUEST_ID_FIELD, PIPELINE_RUN_ID_FIELD, PIPE
 FIELD_VALUE_MAX_LENGTH = 80
 TRUNCATION_MARK = "…"
 
-# The fields the console writes in full, by the name the caller gave them: a handled exception's text, whose
-# diagnosis, a cause chain or a parse error's location, is lost to a fragment cut at the length above.
-UNCUT_FIELDS = frozenset({ERROR_MESSAGE_FIELD})
+# The longest a handled exception's text gets, the truncation mark included. Its diagnosis, a cause chain or a parse
+# error's location, is lost to a fragment cut at the length above, yet a dependency's raw output, a validation
+# error's every line or git's stderr, would flood the console uncut.
+ERROR_MESSAGE_MAX_LENGTH = 2000
+
+# The fields the console cuts at a length of their own, by the name the caller gave them.
+FIELD_MAX_LENGTHS: dict[str, int] = {ERROR_MESSAGE_FIELD: ERROR_MESSAGE_MAX_LENGTH}
 
 FIELD_SEPARATOR = " "
 KEY_VALUE_SEPARATOR = "="
@@ -118,27 +122,26 @@ def field_suffix_segments(*, fields: Mapping[str, Any], presented_fields: frozen
         # The key is written like a value: a name a caller chose can hold a line break that would forge a
         # line, a space that would read as two pairs or an escape sequence the terminal would act on.
         segments.append((f"{format_field_value(value=name)}{KEY_VALUE_SEPARATOR}", FIELD_KEY_STYLE))
-        segments.append((format_field_value(value=value, is_cut_short=is_field_cut_short(name=name)), field_style(name=name)))
+        segments.append((format_field_value(value=value, max_length=field_max_length(name=name)), field_style(name=name)))
     return segments
 
 
-def is_field_cut_short(*, name: str) -> bool:
-    """Whether the console cuts a field's value short when it is long: every field but those of ``UNCUT_FIELDS``.
+def field_max_length(*, name: str) -> int:
+    """The longest the console writes a field's value: its entry in ``FIELD_MAX_LENGTHS``, else ``FIELD_VALUE_MAX_LENGTH``.
 
     Read off the name the caller gave rather than the one it landed on, as the style is.
     """
-    return given_field_name(name=name) not in UNCUT_FIELDS
+    return FIELD_MAX_LENGTHS.get(given_field_name(name=name), FIELD_VALUE_MAX_LENGTH)
 
 
-def format_field_value(*, value: Any, is_cut_short: bool = True) -> str:
-    """A field's value as the suffix prints it: one line, a string quoted when it could forge a pair, cut short when long unless told not to."""
-    text = _one_line(value=value, is_quoting_strings=True)
-    return _truncated(text=text) if is_cut_short else text
+def format_field_value(*, value: Any, max_length: int = FIELD_VALUE_MAX_LENGTH) -> str:
+    """A field's value as the suffix prints it: one line, a string quoted when it could forge a pair, cut short past ``max_length``."""
+    return _truncated(text=_one_line(value=value, is_quoting_strings=True), max_length=max_length)
 
 
 def format_layout_value(*, value: Any) -> str:
     """A field's value as a layout substitutes it: one line, a string as itself, cut short when long."""
-    return _truncated(text=_one_line(value=value, is_quoting_strings=False))
+    return _truncated(text=_one_line(value=value, is_quoting_strings=False), max_length=FIELD_VALUE_MAX_LENGTH)
 
 
 def one_line_text(*, text: str) -> str:
@@ -188,7 +191,7 @@ def _escaped_character(*, character: str) -> str:
     return character.encode("unicode_escape").decode("ascii")
 
 
-def _truncated(*, text: str) -> str:
-    if len(text) <= FIELD_VALUE_MAX_LENGTH:
+def _truncated(*, text: str, max_length: int) -> str:
+    if len(text) <= max_length:
         return text
-    return f"{text[: FIELD_VALUE_MAX_LENGTH - len(TRUNCATION_MARK)]}{TRUNCATION_MARK}"
+    return f"{text[: max_length - len(TRUNCATION_MARK)]}{TRUNCATION_MARK}"

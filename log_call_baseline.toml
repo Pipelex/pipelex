@@ -88,7 +88,7 @@ calls = [
 
 ["pipelex/cogt/img_gen/img_gen_gpt_mapping.py::ImgGenGptMapping.validate_gpt_image_2_size"]
 calls = [
-  "warning: msg [f-string] where msg = f\"Size '{size_string}' is invalid for OpenAI image model '{model_name}': long-to-short edge ratio must be at most 3:1\"; msg = f\"Size '{size_string}' is invalid for OpenAI image model '{model_name}': max edge must be less than 3840 pixels\"; msg = f\"Size '{size_string}' is invalid for OpenAI image model '{model_name}': total pixels must be at least {cls.GPT_IMAGE_2_MIN_PIXELS}\"; msg = f\"Size '{size_string}' is invalid for OpenAI image model '{model_name}': total pixels must be at most {cls.GPT_IMAGE_2_MAX_PIXELS}\"; msg = f\"Size '{size_string}' is invalid for OpenAI image model '{model_name}': width and height must be multiples of 16\"; msg = f\"Size '{size_string}' is valid for OpenAI image model '{model_name}', but it is above the 2560x1440 reliability boundary.\"",
+  "warning: msg [f-string] where msg = f\"Size '{size_string}' is valid for OpenAI image model '{model_name}', but it is above the 2560x1440 reliability boundary.\"",
 ]
 
 ["pipelex/cogt/llm/llm_prompt.py::LLMPrompt.validate_before_execution"]
@@ -125,7 +125,7 @@ calls = [
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck._resolve_waterfall"]
 calls = [
-  "info: msg [f-string] where msg += f\" Please see our docs for more details about setting up inference backends:\\n{URLs.backend_provider_docs}\"; msg = f\"Inference model fallback: '{ideal_model_handle}' was not found in the model deck, so it was replaced by '{fallback}'. As a consequence, the results of the method may not have the expected quality, and the method might fail due to feature limitations such as context window size, etc. Consider getting access to '{ideal_model_handle}'.\"; msg = f\"Model handle '{waterfall_name}' is a waterfall (i.e. a list of models to try in order) but none of the fallback models were found in the model deck\"; msg = f\"Model handle '{waterfall_name}' is a waterfall (i.e. a list of models to try in order), which resolves to •[ {fallback_list_str} ]•, but model fallbacks are disabled so only the first item in the list, '{ideal_model_handle}', is acceptable but it was not found in the deck. You must enable model fallback in your .pipelex/pipelex.toml file to permit the following fallbacks, or enable a backend that supports '{ideal_model_handle}'. \"",
+  "info: msg [f-string] where msg += f\" Please see our docs for more details about setting up inference backends:\\n{URLs.backend_provider_docs}\"; msg = f\"Inference model fallback: '{ideal_model_handle}' was not found in the model deck, so it was replaced by '{fallback}'. As a consequence, the results of the method may not have the expected quality, and the method might fail due to feature limitations such as context window size, etc. Consider getting access to '{ideal_model_handle}'.\"",
   "warning: f\"Circular model reference detected: waterfall '{waterfall_name}' leads back to itself\" [f-string]",
 ]
 
@@ -386,8 +386,8 @@ calls = [
 
 ["pipelex/pipe_run/tracing_assembly.py::assemble_tracing"]
 calls = [
-  "warning: message [f-string] where message = f\"Graph assembly failed for pipeline_run_id={pipeline_run_id}: {validation_error}\"; message = f\"Tracing assembly failed to read events for pipeline_run_id={pipeline_run_id}: {read_error}\"",
-  "warning: message [f-string] where message = f\"Graph assembly failed for pipeline_run_id={pipeline_run_id}: {validation_error}\"; message = f\"Tracing assembly failed to read events for pipeline_run_id={pipeline_run_id}: {read_error}\"",
+  "warning: message [f-string] where message = f\"Graph assembly failed for pipeline_run_id={pipeline_run_id}: {validation_error}\"",
+  "warning: message [f-string] where message = f\"Tracing assembly failed to read events for pipeline_run_id={pipeline_run_id}: {read_error}\"",
 ]
 
 ["pipelex/pipeline/pipeline_run_setup.py::pipeline_run_setup"]

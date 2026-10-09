@@ -6,7 +6,14 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from pipelex.tools.log.console_fields import FIELD_KEY_STYLE, FIELD_STYLES, FIELD_VALUE_MAX_LENGTH, TRUNCATION_MARK, UNMAPPED_FIELD_STYLE
+from pipelex.tools.log.console_fields import (
+    ERROR_MESSAGE_MAX_LENGTH,
+    FIELD_KEY_STYLE,
+    FIELD_STYLES,
+    FIELD_VALUE_MAX_LENGTH,
+    TRUNCATION_MARK,
+    UNMAPPED_FIELD_STYLE,
+)
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.log.log_fields import (
     COLLIDING_FIELD_PREFIX,
@@ -140,8 +147,8 @@ class TestConsoleFields:
         assert f"excerpt={'x' * (FIELD_VALUE_MAX_LENGTH - len(TRUNCATION_MARK))}{TRUNCATION_MARK}" in rendered
         assert "x" * FIELD_VALUE_MAX_LENGTH not in rendered
 
-    def test_an_error_message_is_written_in_full_while_other_fields_stay_cut_short(self) -> None:
-        """The cause chain of an unresolved package outgrows the cut, and a fragment ending in an ellipsis loses the diagnosis."""
+    def test_an_error_message_gets_a_generous_cut_while_other_fields_stay_cut_short(self) -> None:
+        """The cause chain of an unresolved package outgrows the common cut, and a fragment ending in an ellipsis loses the diagnosis."""
         causes = "PackageFetchError: could not clone 'github.com/acme/methods' <- GitError: " + "fatal: repository not found; " * 6
         text = rendered_text(
             record=record_with_fields(
@@ -154,6 +161,14 @@ class TestConsoleFields:
         assert f"error.message={quoted_causes}" in text.plain
         assert TRUNCATION_MARK + " excerpt=" not in text.plain
         assert f"excerpt={'x' * (FIELD_VALUE_MAX_LENGTH - len(TRUNCATION_MARK))}{TRUNCATION_MARK}" in text.plain
+
+    def test_an_error_message_past_its_own_cut_is_cut_short(self) -> None:
+        """A dependency's raw output, a validation error's every line, never floods the console."""
+        flood = "y" * (2 * ERROR_MESSAGE_MAX_LENGTH)
+        text = rendered_text(record=record_with_fields(message="A method package could not be resolved", extra=error_fields(exc=RuntimeError(flood))))
+
+        assert text.plain.endswith(f"error.message={'y' * (ERROR_MESSAGE_MAX_LENGTH - len(TRUNCATION_MARK))}{TRUNCATION_MARK}")
+        assert "y" * ERROR_MESSAGE_MAX_LENGTH not in text.plain
 
     def test_a_field_is_styled_by_its_name_and_a_field_outside_the_map_is_dimmed(self) -> None:
         text = rendered_text(

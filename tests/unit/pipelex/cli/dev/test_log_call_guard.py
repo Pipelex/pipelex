@@ -188,6 +188,94 @@ class TestLogCallGuard:
         assert _offending(f"def load(self, alias):\n    {call}\n", header=header) == [], topic
 
     @pytest.mark.parametrize(
+        ("topic", "header", "body", "expected"),
+        [
+            ("a parameter named like the facade", FACADE_IMPORT, 'def load(log, alias):\n    log.info(f"{alias}")\n', []),
+            (
+                "a local named like the facade",
+                FACADE_IMPORT,
+                'def load(alias):\n    log = logging.getLogger(__name__)\n    log.info(f"{alias}")\n',
+                [],
+            ),
+            (
+                "the facade imported in another function",
+                "",
+                'def setup():\n    from pipelex import log\n\ndef load(alias):\n    log.info(f"{alias}")\n',
+                [],
+            ),
+            (
+                "the facade imported in the same function",
+                "",
+                'def setup():\n    from pipelex import log\n    log.info(f"{__name__}")\n\ndef load(alias):\n    log.info(f"{alias}")\n',
+                [[LogCallRule.F_STRING]],
+            ),
+            (
+                "the facade imported in an enclosing function",
+                "",
+                'def load(alias):\n    from pipelex import log\n    def inner():\n        log.info(f"{alias}")\n',
+                [[LogCallRule.F_STRING]],
+            ),
+            (
+                "the facade imported after a function that calls it",
+                "",
+                'def load(alias):\n    log.info(f"{alias}")\n\nfrom pipelex import log\n',
+                [[LogCallRule.F_STRING]],
+            ),
+        ],
+    )
+    def test_a_receiver_is_the_facade_where_a_facade_import_reaches_the_call(
+        self, topic: str, header: str, body: str, expected: list[list[LogCallRule]]
+    ) -> None:
+        """The receiver's name is read in the call's own scope, by the same bindings a message is read through."""
+        assert _rules(body, header=header) == expected, topic
+
+    @pytest.mark.parametrize(
+        ("topic", "call", "expected_details"),
+        [
+            ("an expanded message", 'log.warning(**{"content": f"Value {alias}"})', ["the message is an f-string"]),
+            ("an expanded title", 'log.warning("Loaded", **{"title": f"Load of {alias}"})', ["`title=` is an f-string"]),
+            ("an expanded inline title", 'log.warning("Loaded", **{"inline": f"Load of {alias}"})', ["`inline=` is an f-string"]),
+            (
+                "expanded markup below INFO",
+                'log.debug(**{"content": "[red]Loaded[/red]"})',
+                ["the message holds the markup tag `[red]`", "the message holds the markup tag `[/red]`"],
+            ),
+            ("an expanded literal with fields", 'log.info(**{"content": "Loaded", "fields": {"alias": alias}})', []),
+        ],
+    )
+    def test_a_dict_literal_expanded_into_a_call_is_read_as_its_keywords(self, topic: str, call: str, expected_details: list[str]) -> None:
+        offending = _offending(f"def load(alias):\n    {call}\n")
+        assert [breach.detail for call_found in offending for breach in call_found.breaches] == expected_details, topic
+
+    @pytest.mark.parametrize(
+        ("topic", "call", "expected_detail"),
+        [
+            ("a mapping", "log.warning(**params)", "`**params` is an expansion whose keywords cannot be read"),
+            ("a mapping below INFO", 'log.debug("Loaded", **params)', "`**params` is an expansion whose keywords cannot be read"),
+            (
+                "a dict literal with a computed key",
+                'log.info(**{key: "Loaded"})',
+                "`**{key: 'Loaded'}` is an expansion whose keywords cannot be read",
+            ),
+            (
+                "a dict literal expanding another",
+                'log.info(**{**params, "content": "Loaded"})',
+                "`**{**params, 'content': 'Loaded'}` is an expansion whose keywords cannot be read",
+            ),
+        ],
+    )
+    def test_an_expansion_that_cannot_be_read_is_refused_at_every_level(self, topic: str, call: str, expected_detail: str) -> None:
+        """A `**` the guard cannot read may carry the message or a title, so neither rule could be checked through it."""
+        offending = _offending(f"def load(params, key):\n    {call}\n")
+        assert [[(breach.rule, breach.detail) for breach in call_found.breaches] for call_found in offending] == [
+            [(LogCallRule.NON_LITERAL, expected_detail)]
+        ], topic
+
+    def test_an_expansion_that_cannot_be_read_is_named_in_the_signature(self) -> None:
+        offending = _offending("def load(params):\n    log.warning(**params)\n")
+        assert [call.signature for call in offending] == ["warning: **params [non-literal]"]
+
+    @pytest.mark.parametrize(
         ("topic", "body", "expected_qualified_name"),
         [
             ("a module-level call", 'log.info(f"{ALIAS}")\n', MODULE_SCOPE_NAME),
@@ -241,6 +329,19 @@ class TestLogCallGuard:
                 'def load(alias):\n    msg = "Loaded"\n    def inner():\n        log.info(msg)\n',
                 "info: msg [non-literal] where msg = <enclosing function>",
             ),
+            (
+                "a binding that cannot reach the call stays out",
+                (
+                    'def load(alias):\n    msg = f"Loaded {alias}"\n    log.warning(msg)\n'
+                    '    msg = f"Could not load {alias}"\n    raise ValueError(msg)\n'
+                ),
+                'warning: msg [f-string] where msg = f"Loaded {alias}"',
+            ),
+            (
+                "a name rebuilt from itself",
+                'def load():\n    msg = "["\n    msg = msg + "red]Loaded"\n    log.debug(msg)\n',
+                "debug: msg [markup] where msg = '['; msg = msg + 'red]Loaded'",
+            ),
         ],
     )
     def test_a_named_message_s_signature_carries_its_bindings_and_its_rules(self, topic: str, body: str, expected_signature: str) -> None:
@@ -286,6 +387,7 @@ class TestLogCallGuard:
             ("a literal extended with +=", 'msg = "["\n    msg += "red]Loaded"\n    log.verbose(msg)', "[red]"),
             ("a conditional between literals", 'log.debug(("[" if flag else "(") + "red]Loaded")', "[red]"),
             ("an f-string's literal edge", 'log.debug("[" + f"red]Loaded {flag}")', "[red]"),
+            ("a name rebuilt from itself", 'msg = "["\n    msg = msg + "red]Loaded"\n    log.debug(msg)', "[red]"),
         ],
     )
     def test_markup_split_across_a_concatenation_is_refused(self, topic: str, body: str, expected_tag: str) -> None:

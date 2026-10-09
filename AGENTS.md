@@ -202,7 +202,7 @@
   pretty_print(output_object, title="Your first Pipelex output")
   ```
 - Both handle formatting json using Rich, pretty_print makes it prettier.
-- A log message is a fixed sentence with its values in `fields=`, never interpolated at INFO and above, and never holding Rich markup: `log.warning("A dependency holds no valid bundle", fields={"dependency_alias": alias})`. A handled exception at WARNING and below rides as `**error_fields(exc=exc)` (`pipelex.tools.log.error_fields`), at ERROR as `include_exception=True`, never as `{exc}` in the text. Field names come from the vocabulary table in `docs/tools/logging.md` ("Log-call conventions"), and `make check-log-calls` holds the calls to it.
+- A log message is a fixed sentence with its values in `fields=`, never interpolated at INFO and above, and never holding Rich markup: `log.warning("A dependency holds no valid bundle", fields={"dependency_alias": alias})`. A handled exception at WARNING and below rides in `fields=` as `**error_fields(exc=exc)` (`pipelex.tools.log.error_fields`), at ERROR as `include_exception=True`, never as `{exc}` in the text. Field names come from the vocabulary table in `docs/tools/logging.md` ("Log-call conventions"), which review holds the calls to: `make check-log-calls` reads the messages, never the `fields=` keys.
 
 #### StrEnum and Self type
 
