@@ -16,6 +16,7 @@ from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.kernel.llm_ops import check_llm_setting_with_served_model
 from pipelex.plugins.inference_backend_registry import LLMRequestCheck
 from pipelex.system.exceptions import MissingDependencyError
+from pipelex.system.telemetry.otel_constants import GenAISpanAttr
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -125,5 +126,11 @@ class TestCheckLLMSettingWithServedModel:
         check.assert_called_once()
         log_spy.verbose.assert_called_once_with(
             "The model's settings were not checked: its backend's SDK is not installed",
-            fields={"model_handle": "some-model", "backend_name": "some_backend", "sdk": "some_sdk"},
+            fields={
+                "model_handle": "some-model",
+                "backend_name": "some_backend",
+                "sdk": "some_sdk",
+                GenAISpanAttr.REQUEST_MODEL: "some-model",
+                GenAISpanAttr.RESPONSE_MODEL: "some-model-id",
+            },
         )

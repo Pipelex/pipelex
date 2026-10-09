@@ -93,8 +93,9 @@ class TestConstrainedJobParams:
     def test_a_replaced_temperature_is_warned_with_the_model_and_both_temperatures_as_fields(
         self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """The warning names the model as its description used to, the provider's model id and the requested temperature under
-        their OpenTelemetry keys, which the json sink writes as the plain keys.
+        """The warning names the model as its description used to, with the model keys meaning what they mean on the LLM span:
+        the handle requested under `gen_ai.request.model` and the provider's model id under `gen_ai.response.model`. The json sink
+        writes these OpenTelemetry keys, and the requested temperature's, as plain keys.
         """
         inference_model = _make_model(thinking_mode=ThinkingMode.MANUAL, valued_constraints={ValuedConstraint.FIXED_TEMPERATURE: 1})
         worker = _ProviderlessLLMWorker(inference_model=inference_model)
@@ -108,12 +109,21 @@ class TestConstrainedJobParams:
         JsonLogSink(stream=buffer).handler.handle(record)
         line: dict[str, Any] = json.loads(buffer.getvalue())
         assert line[MESSAGE_KEY] == FIXED_TEMPERATURE_WARNING
-        field_names = ("model_handle", "backend_name", "sdk", "gen_ai.request.model", "gen_ai.request.temperature", "fixed_temperature")
+        field_names = (
+            "model_handle",
+            "backend_name",
+            "sdk",
+            "gen_ai.request.model",
+            "gen_ai.response.model",
+            "gen_ai.request.temperature",
+            "fixed_temperature",
+        )
         assert {name: line[name] for name in field_names} == {
             "model_handle": "gpt-test",
             "backend_name": "openai",
             "sdk": "openai",
-            "gen_ai.request.model": "gpt-test-id",
+            "gen_ai.request.model": "gpt-test",
+            "gen_ai.response.model": "gpt-test-id",
             "gen_ai.request.temperature": 0.2,
             "fixed_temperature": 1,
         }

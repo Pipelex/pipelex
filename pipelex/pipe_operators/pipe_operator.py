@@ -77,7 +77,9 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
                 list_content: ListContent[StuffContent] = main_stuff.as_list_content()  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
                 nb_items = len(list_content.items)
                 if nb_items == 0:
-                    output_concept_with_multiplicity += " [empty list]"
+                    # Escaped, since the title is markup and Rich would read `[empty list]` as a tag and drop it; a count
+                    # opens with a digit, which no tag does, so the two suffixes below print as written unescaped
+                    output_concept_with_multiplicity += " \\[empty list]"
                 elif nb_items == 1:
                     output_concept_with_multiplicity += " [1 item]"
                 else:

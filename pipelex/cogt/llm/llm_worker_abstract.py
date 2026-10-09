@@ -407,7 +407,9 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
                     "model_handle": self.inference_model.name,
                     "backend_name": self.inference_model.backend_name,
                     "sdk": self.inference_model.sdk,
-                    GenAISpanAttr.REQUEST_MODEL: self.inference_model.model_id,
+                    # The model keys mean what they mean on the LLM span: the handle requested, then the provider's id serving it
+                    GenAISpanAttr.REQUEST_MODEL: self._get_request_model_name(),
+                    GenAISpanAttr.RESPONSE_MODEL: self._get_response_model_name(),
                     GenAISpanAttr.REQUEST_TEMPERATURE: requested_temperature,
                     "fixed_temperature": fixed_temperature,
                 },

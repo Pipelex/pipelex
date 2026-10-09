@@ -5,8 +5,7 @@ a ``[cycle]`` marker and a backend's table, ``[openai]``, yet none of them names
 one is plain text that prints as written. So a tag counts as markup only when Rich would style with it: a closing
 tag, ``[/]`` or ``[/red]``; an ``@`` handler, ``[@click=app.bell]``; or an opening tag whose text Rich parses as a
 style, ``[bold]``, ``[on blue]``, ``[link=https://pipelex.com]``, or that names a style of Rich's default theme,
-``[repr.number]``. A tag escaped with a backslash is text. It is the rule the log-call guard holds the literals of
-Pipelex's log calls to, applied here to what a run actually logged.
+``[repr.number]``. A tag escaped with a backslash is text, since Rich prints it as written.
 """
 
 from __future__ import annotations
