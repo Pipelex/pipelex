@@ -7,7 +7,7 @@ description: "Explore Pipelex logging: named fields, the run-scoped context, mod
 
 ## Overview
 
-Pipelex logs through one facade, `from pipelex import log`, built on Python's standard `logging`. A call takes a message, optional named fields and the usual presentation options; the run-scoped identifiers are bound once at a process entry and stamped onto every record emitted in scope. Fields and identifiers ride the stdlib `LogRecord` as attributes, never spliced into the message text, so a structured sink renders them as fields while the console keeps a narrative line. Where the records go is one config key, `sink` under `[runtime.log]`: `console` renders them through Rich, `json` writes one JSON object per line, `otlp` ships them to an OpenTelemetry collector, and a plugin can register another. The keys are in [Logging Configuration](../configuration/config-practical/logging-config.md) and the seam itself in [Log Sink Plugins](../under-the-hood/log-sink-plugins.md).
+Pipelex logs through one facade, `from pipelex import log`, built on Python's standard `logging`. A call takes a message, optional named fields and the usual presentation options; the run-scoped identifiers are bound once at a process entry and stamped onto every record emitted in scope. Fields and identifiers ride the stdlib `LogRecord` as attributes, never spliced into the message text, so a structured sink writes them as keys while the console shows the fields after the message, coloured by name. Where the records go is one config key, `sink` under `[runtime.log]`: `console` renders them through Rich, `json` writes one JSON object per line, `otlp` ships them to an OpenTelemetry collector, and a plugin can register another. The keys are in [Logging Configuration](../configuration/config-practical/logging-config.md) and the seam itself in [Log Sink Plugins](../under-the-hood/log-sink-plugins.md).
 
 ## Log Levels
 
@@ -35,6 +35,15 @@ log.info("Simple message")
 # Named fields ride the record as attributes; the message stays narrative
 log.info("Scanned the inputs", fields={"files": 7, "bytes": 12_288})
 
+# A named console layout; every sink but the console writes the plain message and the fields
+from pipelex.tools.log.console_layouts import LogLayout
+
+log.info(
+    "Pipe run starts",
+    fields={"pipe_type": "PipeCompose", "pipe_code": "compose_company", "output_concept": "Company", "pipe_depth": 1, "is_dry_run": False},
+    layout=LogLayout.PIPE_RUN,
+)
+
 # Logging with title
 log.info("Detailed message", title="Process Status")
 
@@ -58,13 +67,13 @@ log.dev("Testing new feature")
 log.verbose("Detailed debug information")
 ```
 
-Every one of the seven methods (`verbose`, `debug`, `dev`, `info`, `warning`, `error`, `critical`) takes the same keyword-only `fields`. `title`, `inline`, `problem_id` and `include_exception` keep their meaning beside it. `include_exception=True` carries the exception being handled as the record's `exc_info`, with nothing spliced into the message: the `console` sink renders the traceback under the line, the `json` sink writes it under the `exception` key and the `otlp` sink under the `exception.*` attributes. Outside an `except` block it carries nothing.
+Every one of the seven methods (`verbose`, `debug`, `dev`, `info`, `warning`, `error`, `critical`) takes the same keyword-only `fields` and `layout`, the second naming a [console layout](#layouts). `title`, `inline`, `problem_id` and `include_exception` keep their meaning beside them. `include_exception=True` carries the exception being handled as the record's `exc_info`, with nothing spliced into the message: the `console` sink renders the traceback under the line, the `json` sink writes it under the `exception` key and the `otlp` sink under the `exception.*` attributes. Outside an `except` block it carries nothing.
 
 ## Fields
 
 `fields` is a mapping of named values. Each entry becomes an attribute of the emitted `LogRecord`, which is where a formatter or a sink reads it: `record.files` for the example above, or `%(files)s` in a stdlib format string. Nothing from `fields` is written into the message, so `record.getMessage()` is exactly the text you passed.
 
-A value can be anything. It rides the record by reference and the sink serializes it on emit, on the calling thread, so what leaves the process is the value as it was at the call, and mutating it afterwards changes nothing already emitted. The `console` sink ignores it, the `json` sink dumps a pydantic model in JSON mode and falls back to `str` for a value JSON does not know, and the `otlp` sink carries a scalar or a sequence of scalars as an attribute and anything else as JSON text; prefer plain JSON-ready values (strings, numbers, booleans, lists and dictionaries of those) for anything meant to be queried later. A value JSON refuses outright, a circular reference or a mapping with a non-string key, is written by the `json` sink as its `repr`, and that costs the value alone: every other field on the line keeps its JSON type, so a number or a boolean beside it is still queried as one.
+A value can be anything. It rides the record by reference and the sink serializes it on emit, on the calling thread, so what leaves the process is the value as it was at the call, and mutating it afterwards changes nothing already emitted. The `console` sink shows it after the message on one line, as [Fields after the message](#fields-after-the-message) describes, the `json` sink dumps a pydantic model in JSON mode and falls back to `str` for a value JSON does not know, and the `otlp` sink carries a scalar or a sequence of scalars as an attribute and anything else as JSON text; prefer plain JSON-ready values (strings, numbers, booleans, lists and dictionaries of those) for anything meant to be queried later. A value JSON refuses outright, a circular reference or a mapping with a non-string key, is written by the `json` sink as its `repr`, and that costs the value alone: every other field on the line keeps its JSON type, so a number or a boolean beside it is still queried as one.
 
 ### Naming convention
 
@@ -76,7 +85,9 @@ A value can be anything. It rides the record by reference and the sink serialize
 
 The stdlib refuses an `extra` key that would overwrite one of the record's own attributes (`name`, `message`, `lineno`, `module`, `args`, `asctime` and the rest), and a library's log call never raises. An entry of such a name is therefore carried under the prefix `field_`: `fields={"name": "alpha"}` lands as `record.field_name`. What counts as owned is read off the record actually built, through whatever record factory is installed, so an attribute an OpenTelemetry or tracing instrumentation stamps on every record is a collision too, for a field, a context identifier and `data` alike. The prefix is applied until the name lands on an attribute nobody owns, and entries attach in order, so a call that gives both `name` and `field_name` keeps both values whatever their order: the one that arrives second lands on `field_field_name`.
 
-Two kinds of name are reserved though nothing on a fresh record owns them yet, because both are stamped after the entries are attached and the stdlib's refusal therefore cannot cover them: what the formatter sets (`message`, `asctime`) and what Pipelex's own logging machinery sets — `_pipelex_forwarded`, the marker that tells the sink's handler a record reached it through the boot's holding handler already. Both take the same `field_` prefix, and the marker is never handed to a sink as something the record carries. Without that reservation, `fields={"_pipelex_forwarded": True}` would have the sink's own filter read the record as one already delivered and drop it whole.
+Two kinds of name are reserved though nothing on a fresh record owns them yet, because both are stamped after the entries are attached and the stdlib's refusal therefore cannot cover them: what the formatter sets (`message`, `asctime`) and what Pipelex's own logging machinery sets — `_pipelex_forwarded`, the marker that tells the sink's handler a record reached it through the boot's holding handler already, `_pipelex_field_names`, the names the call's entries landed on, which is what the console renders, and `_pipelex_layout`, the [layout](#layouts) a call named. Both kinds take the same `field_` prefix, and no mark is ever handed to a sink as something the record carries. Without that reservation, `fields={"_pipelex_forwarded": True}` would have the sink's own filter read the record as one already delivered and drop it whole, and `fields={"_pipelex_layout": "pipe_run"}` would pick the line's layout.
+
+The names Rich's console handler reads off each record ahead of its own settings, `markup` and `highlighter`, are reserved the same way and for the same reason: a field landing on `markup` would decide whether the console reads that line's markup, and one landing on `highlighter` would be called in the highlighter's place, so `fields={"highlighter": "pygments"}` would raise inside the handler and lose the whole line. Such a field rides under `field_markup` or `field_highlighter`, and neither name is handed to a sink as something the record carries.
 
 ## The run-scoped context
 
@@ -172,7 +183,7 @@ In place, because what the processor does is *remove* something. A record that h
 
 `log.install_sink` is what puts the processor in front of the sink's own, so every sink gets it — the built-in ones, an out-of-tree one, and the console sink `pipelex doctor` falls back to — and no sink knows about it. A boot that dies before its sink arrives runs the same processor, behind the same guard, over every record it held before handing them to the stdlib's last resort on stderr, so the trail a failed boot leaves is scrubbed too. `[runtime.log.redaction] is_enabled = false` installs nothing at all.
 
-The processor fails closed. A sink processor that raises is reported on stderr and the record is handed on, which is the right rule for a processor that enriches; for one that removes, it would mean the secret ships. So when the scrub itself fails, a value nested past the interpreter's recursion limit for one, the record is stripped before the failure is reported: its message becomes `[REDACTION FAILED: <exception type>]`, every field and the `data` attribute become `[REDACTED]`, and the exception text is dropped. The line says the scrub failed, and nothing of the call leaves with it.
+The processor fails closed. A sink processor that raises is reported on stderr and the record is handed on, which is the right rule for a processor that enriches; for one that removes, it would mean the secret ships. So when the scrub itself fails, a value nested past the interpreter's recursion limit for one, the record is stripped before the failure is reported: its message becomes `[REDACTION FAILED: <exception type>]`, every field and the `data` attribute become `[REDACTED]`, the exception text is dropped, and so is any [console layout](#layouts) the call named, which would otherwise draw the redacted fields in place of the notice. The line says the scrub failed, and nothing of the call leaves with it.
 
 The stripping can fail in its turn, and that case is closed too. The commonest reason the scrub fails is a stack that has run out — a `log.<level>(...)` call made a few frames from the limit, by a recursive walker or by an `except RecursionError:` handler — and a stack that could not take the scrub cannot always take the stripping of what it left behind a line later. So the record is marked before the stripping starts, by a plain assignment into its own dictionary that pushes no frame, and unmarked only once the stripping has gone all the way through; a record still carrying the mark when the processors are done is **dropped** rather than emitted. A notice saying the record was quarantined while it still carried the field the scrub never read would be worse than no line at all.
 
@@ -202,6 +213,61 @@ Logging is configured in two steps at boot. `log.configure` sets the levels and 
 ## Console rendering
 
 The default sink, `console`, renders through Rich with every `[runtime.log.rich_log]` setting. Rich is the `cli` extra (`pipelex[cli]`), which the command-line tools install. The sink imports Rich when it is built, so a process that selects `json` or `otlp` never loads it through the sink, and one that selects `console` without Rich installed stops at boot naming the extra to install and the `json` alternative. That refusal is not what keeps a server off the console: `typer` and `instructor`, both core dependencies, require Rich, so it is installed even where the extra is not, and a server that forgot to select `json` boots on the `console` sink. A server therefore selects `json` in its own configuration, and sets `pretty_print_mode` to `"poor"` or `"silent"` beside it, since the boot makes neither choice for it (see [Pretty-Print Mode](../configuration/config-practical/logging-config.md#pretty-print-mode)).
+
+### Fields after the message
+
+The console shows the fields a call gave after its message, as a `key=value` suffix, the way structlog's console renderer and pino-pretty do:
+
+```python
+log.info("Scanned the inputs", fields={"files": 7, "source": "inbox/march"})
+```
+
+```text
+INFO     🧠: Scanned the inputs files=7 source=inbox/march
+```
+
+- **What is shown.** The fields the call attached, in the order it gave them, under the name each landed on (`field_name` for a field called `name`). The run identifiers (`request_id`, `pipeline_run_id`, `pipe_run_id`) are left out, since they are the same on every line of a run and would drown the message, and so is `data`, the structured content the message already renders. Nothing else on the record is shown: neither the stdlib's own attributes, nor Pipelex's marks, nor what a record factory or a third-party library stamped on it.
+- **How a value is written.** On one line: a string bare, or quoted when it is empty or holds a space, an `=`, a `"`, a `\` or a character a terminal would act on. Inside the quotes a backslash is written `\\`, a quote `\"` and any character a terminal would act on as its escape (`"line\nbreak"`), so `fields={"a": "b=c"}` prints `a="b=c"` rather than a second pair. A number, a boolean, `None`, a mapping, a list or a pydantic model is written as compact JSON (`true`, `null`, `{"key":"value"}`, `["a","b"]`), and anything else as its text. A value longer than 80 characters is cut short and ends with `…`. A key is written the same way, so a field whose name holds a line break, a space, an `=` or an escape sequence is quoted and escaped rather than forging a line or a second pair: `fields={"x=1": 2}` prints `"x=1"=2`. The [redaction](#redaction) has run before the console renders, so a secret is already `[REDACTED]`.
+- **Never markup.** The suffix is built as styled Rich `Text`, not as a markup string, so a value carrying `[red]x[/red]` prints exactly that, whatever `is_markup_enabled` says about the message.
+
+There is no setting to hide the suffix: it carries the values a message used to interpolate, so hiding it would hide what the line is about.
+
+### The style map
+
+A field's value is coloured by the field's name, wherever it appears, from one table in `pipelex/tools/log/console_fields.py` (`FIELD_STYLES`): a pipe code red, a concept (`output_concept`, `concept_ref`, `concept_code`) bold green, a pipe type white, a stuff name cyan and a domain bold magenta, the colours the pipe announcement and the stuff renderings have always used. A field outside the map, and every key, is dimmed. The colour follows the name the field was given, so a `pipe_code` that landed on `field_pipe_code` because a record factory owns `pipe_code` is still red. So a call is coloured by naming its fields, never by writing markup into its message. The map lives in code, with no configuration key; extending it is a one-line change beside the sink.
+
+### Layouts
+
+A few lines have a shape that matters on a terminal, the pipe-run tree above all. For those, a call names a layout, a Rich template over the record's fields registered in `pipelex/tools/log/console_layouts.py`:
+
+```python
+from pipelex.tools.log.console_layouts import LogLayout
+
+log.info(
+    "Pipe run starts",
+    fields={"pipe_type": "PipeCompose", "pipe_code": "compose_company", "output_concept": "Company", "pipe_depth": 1, "is_dry_run": False},
+    layout=LogLayout.PIPE_RUN,
+)
+```
+
+```text
+INFO     🧠:    ↳ PipeCompose: compose_company → Company
+```
+
+- **The console renders the layout in place of the message**, after the logger's emoji, and every other sink ignores it: the `json`, `otlp` and `gcp` sinks write the plain message, `Pipe run starts`, and the fields, and never the layout's name, which rides the record under a reserved mark. The name is explicit at the call, so rewording the message cannot lose the layout, and it is a `LogLayout` member, so a misspelt one is a type error.
+- **Every value is escaped** with Rich's own escape before it is substituted, the values the layout derives included, so a field carrying `[red]x[/red]` prints literally. A value is written on one line and cut short past 80 characters, as in the suffix, except that a string is never quoted.
+- **The fields a layout presents are not repeated after it**; any other field the call gave still follows as the suffix, and the run identifiers stay hidden.
+- **A layout that cannot be filled costs nothing but itself.** A field it needs is missing, a value its derivation refuses, or anything else the layout raises: the console falls back to the message and shows every field after it.
+- **A layout is for a string message.** A call whose content is anything else, a mapping, a list or a model, keeps its layout off the record, and the console renders its message: the message is the only place that content renders, since the suffix never repeats `data`, and a content JSON refuses, a circular one for instance, lives only in the message's `repr`. A record whose [redaction](#redaction) failed loses its layout too, so the notice saying the scrub failed is what prints.
+- **A layout replaces the whole message.** A line rendered through a layout shows neither the title nor the inline text the call gave, nor any [caller information](#caller-information), all of which belong to the message it replaces. A traceback the record carries still prints under the line, as it does under a message, and the fields stay on the line above it, whether Rich renders the traceback or `is_rich_tracebacks = false` has it printed as plain text.
+
+The registry holds these layouts:
+
+| Layout | Fields it presents | What it draws |
+| --- | --- | --- |
+| `LogLayout.PIPE_RUN` | `pipe_type`, `pipe_code`, `output_concept`, `pipe_depth` (an integer, `0` at the top level and at most `100`), `is_dry_run` (a boolean) | `PipeCompose: compose_company → Company`, indented three spaces per level of depth and behind `↳` when nested, with `Dry run:` before the pipe type for a dry run, in the style map's colours. A depth or a flag of another type, or a depth out of range, falls back to the message |
+
+A layout is a `ConsoleLayout`: a `template` of Rich markup whose placeholders are bare field names (`{pipe_code}`, never an attribute, an index or a format spec, which registration refuses), the `presented_fields` the suffix leaves out, and, for a shape a template cannot express alone, a subclass whose `derived_values` computes presentation values such as an indentation from the fields.
 
 ### Rich Formatting
 
@@ -242,7 +308,7 @@ Optional inclusion of caller information in logs, prefixed to the console line:
 
 2. **Fields over interpolation**:
 
-    - Put a value a reader might filter or aggregate on in `fields`, and keep the message a sentence
+    - Put a value a reader might filter or aggregate on in `fields`, and keep the message a sentence; the console shows it after the message, coloured by its name
     - Name a field after the thing it carries, in `snake_case`, or after its OpenTelemetry key when one exists
     - Leave the run identifiers to the context; bind them at the process entry, never per call
 

@@ -1,8 +1,9 @@
-"""The ``console`` sink renders byte for byte what the Rich handler rendered before it existed.
+"""The ``console`` sink renders byte for byte what the Rich handler rendered before it existed, plus the fields.
 
 The reference is the handler ``log.configure`` used to build inline: a ``RichHandler`` fed every
 ``[runtime.log.rich_log]`` setting and the emoji formatter. Both handlers are pointed at the same kind
-of non-terminal console and handed the same fixed record set, and their output must be identical.
+of non-terminal console and handed the same fixed record set. A record whose call gave no field renders
+identically through both; a record with fields renders the same line with the fields after the message.
 """
 
 from __future__ import annotations
@@ -18,11 +19,18 @@ from rich.logging import RichHandler
 
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.system.console_target import ConsoleTarget
+from pipelex.tools.log.console_layouts import LogLayout
 from pipelex.tools.log.console_log_sink import ConsoleLogSink
 from pipelex.tools.log.log_config import HighlighterName, LogConfig, RichLogConfig
 from pipelex.tools.log.log_fields import VERBATIM_MARK, attach_log_record_extra
 from pipelex.tools.log.log_formatter import EmojiLogFormatter
 from pipelex.tools.misc.toml_utils import load_toml_from_path
+from tests.helpers.console_log_rendering import (
+    PIPE_RUN_FIELDS,
+    console_sink_on_buffer,
+    installed_log,
+    package_rich_log_config_without_rich_tracebacks,
+)
 
 CONSOLE_WIDTH = 100
 
@@ -57,9 +65,13 @@ def _reference_handler(*, config: RichLogConfig) -> logging.Handler:
     return handler
 
 
-def _fixed_record_set() -> list[logging.LogRecord]:
-    """Every shape a record takes: a bare line, a warning with fields, structured content, an error with a traceback, a foreign logger."""
+def _fixed_record_set(*, is_with_call_fields: bool = True) -> list[logging.LogRecord]:
+    """Every shape a record takes: a bare line, a warning with fields, structured content, an error with a traceback, a foreign logger.
+
+    Without call fields, the warning carries the run identifier alone, which the console never shows.
+    """
     records: list[logging.LogRecord] = []
+    warning_extra: dict[str, Any] = {"files": 7, "request_id": "r1"} if is_with_call_fields else {"request_id": "r1"}
 
     def record(*, name: str, level: int, message: str, exc_info: Any = None, extra: dict[str, Any] | None = None) -> None:
         built = logging.LogRecord(name=name, level=level, pathname="/repo/pipelex/module.py", lineno=42, msg=message, args=(), exc_info=exc_info)
@@ -70,7 +82,7 @@ def _fixed_record_set() -> list[logging.LogRecord]:
         records.append(built)
 
     record(name="pipelex.pipe_operators.pipe_llm", level=logging.INFO, message="Running the pipe")
-    record(name="pipelex.pipe_operators.pipe_llm", level=logging.WARNING, message="Slow backend", extra={"files": 7, "request_id": "r1"})
+    record(name="pipelex.pipe_operators.pipe_llm", level=logging.WARNING, message="Slow backend", extra=warning_extra)
     record(name="pipelex.pipeline.pipe_run", level=logging.INFO, message='Config:\n{\n    "key": "value"\n}', extra={"data": {"key": "value"}})
     try:
         msg = "boom"
@@ -97,28 +109,47 @@ def _render_one(*, config: RichLogConfig, message: str, extra: dict[str, Any] | 
     return buffer.getvalue()
 
 
-def _render(handler: logging.Handler) -> str:
+def _render(handler: logging.Handler, *, is_with_call_fields: bool = True) -> str:
     buffer = io.StringIO()
     rich_handler = handler
     assert isinstance(rich_handler, RichHandler)
     rich_handler.console = Console(file=buffer, width=CONSOLE_WIDTH, force_terminal=False, color_system=None, legacy_windows=False)
-    for record in _fixed_record_set():
+    for record in _fixed_record_set(is_with_call_fields=is_with_call_fields):
         handler.handle(record)
     return buffer.getvalue()
 
 
 class TestConsoleLogSink:
-    def test_output_is_byte_identical_to_the_handler_configure_used_to_build(self) -> None:
+    @pytest.mark.parametrize("is_rich_tracebacks", [True, False], ids=["rich tracebacks", "tracebacks as text"])
+    def test_output_is_byte_identical_to_the_handler_configure_used_to_build_when_no_call_gave_a_field(self, is_rich_tracebacks: bool) -> None:
+        """The run identifier and the structured content's ``data`` are attached too, and neither adds anything to the line.
+
+        With Rich tracebacks off, the traceback reaches the handler as text after the message, which the sink
+        splits off and prints under the line: a traceback with nothing Rich would read as markup prints as it did.
+        """
+        config = _package_rich_log_config().model_copy(update={"is_rich_tracebacks": is_rich_tracebacks})
+        reference = _render(_reference_handler(config=config), is_with_call_fields=False)
+        sink = ConsoleLogSink(rich_log_config=config, target=ConsoleTarget.STDERR)
+
+        rendered = _render(sink.handler, is_with_call_fields=False)
+
+        assert rendered
+        assert "🧠: Running the pipe" in rendered
+        assert "ValueError" in rendered
+        assert rendered == reference
+
+    def test_a_record_with_fields_gets_them_after_the_message_and_every_other_line_is_unchanged(self) -> None:
         config = _package_rich_log_config()
         reference = _render(_reference_handler(config=config))
         sink = ConsoleLogSink(rich_log_config=config, target=ConsoleTarget.STDERR)
 
         rendered = _render(sink.handler)
 
-        assert rendered
-        assert "🧠: Running the pipe" in rendered
-        assert "ValueError" in rendered
-        assert rendered == reference
+        assert "🧠: Slow backend files=7" in rendered
+        assert "r1" not in rendered
+        # The suffix takes the padding the message column had after the message, so the line keeps its width.
+        suffix = " files=7"
+        assert rendered == reference.replace(f"🧠: Slow backend{' ' * len(suffix)}", f"🧠: Slow backend{suffix}")
 
     def test_the_prefix_stays_on_a_line_that_carries_a_traceback(self) -> None:
         """The Rich handler renders such a line from ``formatMessage`` alone, and the emoji must survive that path too."""
@@ -130,6 +161,74 @@ class TestConsoleLogSink:
 
         assert "🧠: Failed" in rendered
         assert "ValueError: boom" in rendered
+
+    @pytest.mark.parametrize(
+        ("layout", "fields", "expected_line"),
+        [
+            (None, {"attempt": 2}, "Pipe run failed attempt=2"),
+            (LogLayout.PIPE_RUN, {**PIPE_RUN_FIELDS, "attempt": 2}, "PipeCompose: compose_company → Company attempt=2"),
+        ],
+        ids=["the message", "a layout"],
+    )
+    def test_with_tracebacks_as_text_the_fields_stay_on_the_line_and_the_traceback_prints_under_it(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        layout: LogLayout | None,
+        fields: dict[str, Any],
+        expected_line: str,
+    ) -> None:
+        """With Rich tracebacks off, the formatter appends the traceback to the message the handler receives.
+
+        The suffix used to follow that text, so the fields read as part of the exception, and a layout, which
+        replaces the message, dropped the traceback whole. The exception's message is shaped like markup,
+        which the traceback text must never be read as.
+        """
+        caplog.set_level(logging.INFO, logger=__name__)
+        buffer = io.StringIO()
+        sink = console_sink_on_buffer(buffer=buffer, rich_log_config=package_rich_log_config_without_rich_tracebacks())
+        with installed_log(sink=sink) as fresh:
+            try:
+                msg = "no such file: [/etc/pipelex.toml]"
+                raise ValueError(msg)
+            except ValueError:
+                fresh.error("Pipe run failed", include_exception=True, fields=fields, layout=layout)
+
+        lines = buffer.getvalue().splitlines()
+        (index_line,) = [index_candidate for index_candidate, line in enumerate(lines) if expected_line in line]
+        lines_under = lines[index_line + 1 :]
+        assert any("Traceback (most recent call last):" in line for line in lines_under)
+        assert any("ValueError: no such file: [/etc/pipelex.toml]" in line for line in lines_under)
+        assert not any("attempt=" in line for line in lines_under)
+
+    @pytest.mark.parametrize(
+        ("layout", "fields"),
+        [
+            (None, {"files": 7}),
+            (LogLayout.PIPE_RUN, {**PIPE_RUN_FIELDS, "files": 7}),
+        ],
+        ids=["the message", "a layout"],
+    )
+    def test_with_tracebacks_as_text_a_message_ending_in_a_line_break_still_has_its_traceback_start_a_line(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        layout: LogLayout | None,
+        fields: dict[str, Any],
+    ) -> None:
+        """The formatter adds a line break before the exception text only when the message lacks one, so it ran on straight after the suffix."""
+        caplog.set_level(logging.INFO, logger=__name__)
+        buffer = io.StringIO()
+        sink = console_sink_on_buffer(buffer=buffer, rich_log_config=package_rich_log_config_without_rich_tracebacks())
+        with installed_log(sink=sink) as fresh:
+            try:
+                msg = "boom"
+                raise ValueError(msg)
+            except ValueError:
+                fresh.error("Pipe run failed\n", include_exception=True, fields=fields, layout=layout)
+
+        lines = buffer.getvalue().splitlines()
+        (suffix_line,) = [line for line in lines if "files=7" in line]
+        assert "Traceback" not in suffix_line
+        assert any(line.strip() == "Traceback (most recent call last):" for line in lines)
 
     @pytest.mark.parametrize(
         "message",
