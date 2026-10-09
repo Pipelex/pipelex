@@ -314,7 +314,7 @@ export PIPELEX_API_KEY=plx_sk_...
 
 ## Prefer to run it yourself?
 
-The Pipelex runtime runs your methods on your own machine, against the model providers you choose. [Run It Yourself](./run-it-yourself.md) installs it, and [The MTHDS Language Tutorial](./mthds-language-tutorial.md) walks through writing a method by hand.
+The Pipelex runtime runs your methods from your terminal, either on the hosted Pipelex API once `pipelex login` has saved your key, or on your own machine against the model providers you choose. [Run It Yourself](./run-it-yourself.md) installs it, and [The MTHDS Language Tutorial](./mthds-language-tutorial.md) walks through writing a method by hand.
 
 
 ## Run It Yourself
@@ -811,7 +811,7 @@ Now that you have your backend configured:
 
 # CV Batch Screening, Step by Step
 
-A production method that takes a stack of CVs and a job offer PDF, extracts and analyzes each, then scores how well each candidate matches the role. This page reads it part by part and runs it on your own machine with the Pipelex runtime, from the CLI and from Python, once you have followed [Run It Yourself](./run-it-yourself.md).
+A production method that takes a stack of CVs and a job offer PDF, extracts and analyzes each, then scores how well each candidate matches the role. This page reads it part by part and runs it with the Pipelex runtime, from the CLI and from Python, once you have followed [Run It Yourself](./run-it-yourself.md).
 
 ## What it demonstrates
 
@@ -1069,6 +1069,8 @@ flowchart LR
 pipelex run bundle cv_batch_screening.mthds --inputs inputs.json
 ```
 
+The command runs where your setup says. After the default answer to `pipelex init`, it runs on the hosted Pipelex API with your Pipelex API key, and a local file named in the inputs, such as `inputs/Jane-Smith-CV.pdf` below, is uploaded before the run. Add `--local` to run it on this machine instead, which needs the provider keys of a local setup (see [Configure AI Providers](./configure-ai-providers.md)).
+
 Create an `inputs.json` file with your PDF URLs:
 
 ```json
@@ -1090,6 +1092,8 @@ Create an `inputs.json` file with your PDF URLs:
 ```
 
 ### From Python
+
+This code runs the method in your own process, so it always runs on this machine, whatever `[run] execution` says, and it needs the provider keys of a local setup (see [Configure AI Providers](./configure-ai-providers.md)). To run the method on the hosted Pipelex API from Python, use pipelex-sdk's `PipelexAPIClient`, as [Running on the Hosted API from Python](../building-methods/pipes/running-on-the-hosted-api.md) shows.
 
 ```python
 import asyncio
@@ -1139,7 +1143,7 @@ asyncio.run(run_pipeline())
 
 The [Pipelex Cookbook](https://github.com/Pipelex/pipelex-cookbook) holds Pipelex's example methods. Each one is a package that runs by its address on the hosted Pipelex API, `github.com/Pipelex/pipelex-cookbook/<method>@<release>`, so there is nothing to clone and nothing to install before you try it. Each method's page gives its address at the cookbook's latest release.
 
-Every method has its own page in the cookbook, and every page shows the same ways to use it: in your chatbot through the Pipelex MCP, in your coding agent through the Pipelex plugin, in your code through the TypeScript or Python SDK or over HTTP, as a web app made from the method-app template, and how to make it yours by copying it, changing it and saving it to your account. The [list of methods](https://github.com/Pipelex/pipelex-cookbook#methods-you-can-run-by-address) on the cookbook's front page links to each page, and the page for [Gantt chart extraction](https://github.com/Pipelex/pipelex-cookbook/tree/main/methods/extract_gantt) is a good one to start with.
+Every method has its own page in the cookbook, and every page shows the same ways to use it: in your chatbot through the Pipelex MCP, in your coding agent through the Pipelex plugin, in your code through the TypeScript or Python SDK or over HTTP, as a web app made from the method-app template, and how to make it yours by copying it, changing it and saving it to your account. The [list of methods](https://github.com/Pipelex/pipelex-cookbook#methods-you-can-run-by-address) on the cookbook's front page links to each page, and the page for [Gantt chart extraction](https://github.com/Pipelex/pipelex-cookbook/tree/main/methods/extract_gantt) is a good one to start with. From your terminal, `pipelex run method <address> --hosted` runs any of them on the hosted Pipelex API once [`pipelex login`](../tools/cli/login.md) has saved your key (see [Running on the Hosted API](../tools/cli/run.md#running-on-the-hosted-api)).
 
 The cookbook also has [recipes](https://github.com/Pipelex/pipelex-cookbook/tree/main/recipes), each of which takes one way of using a method further on a real case, such as a FastAPI endpoint, a Next.js server action or a web app you deploy. Its [tutorial](https://github.com/Pipelex/pipelex-cookbook/tree/main/tutorial) teaches you to write methods in MTHDS by hand and to run them on your own machine.
 
@@ -1867,7 +1871,7 @@ The tools the skills call to validate a method, prepare its inputs, run it, gene
 
 - [Quick Start](../get-started/quick-start.md) — sign up, install the plugin and run your first method, then run it from your chatbot, as a webapp or via API
 - [MTHDS Language](mthds-language.md) — the language the plugin's skills write
-- [Run It Yourself](../get-started/run-it-yourself.md) — the Pipelex runtime on your own machine
+- [Run It Yourself](../get-started/run-it-yourself.md) — the Pipelex runtime in your terminal, running methods on the hosted Pipelex API or on your own machine
 
 
 ## CLI
@@ -1887,11 +1891,12 @@ The `pipelex` CLI is the primary tool for working with Pipelex methods. It cover
 | **`pipelex init`** | Initialize configuration, choose where runs execute (the hosted Pipelex API or this machine), and set up backends, credentials, routing, and telemetry |
 | **`pipelex login`** | Get a Pipelex API key through your browser, or paste one with `--paste`, and save it for runs on the hosted Pipelex API |
 | **`pipelex update`** | Refresh the model deck and `backends/internal.toml` to match the installed pipelex version |
+| **`pipelex migrate`** | Bring your configuration files up to the schema the installed version expects, and clean up what a former release left |
 | **`pipelex doctor`** | Check configuration health and suggest fixes; a setup whose runs execute on the hosted Pipelex API needs its Pipelex API key and no provider key |
 | **`pipelex build`** | Generate the structures of your concepts and example inputs and outputs for a pipe |
 | **`pipelex validate`** | Check pipeline syntax, structure, and run dry-run validation |
 | **`pipelex fix`** | Apply deterministic safe fixes to a bundle and re-validate (with `--diff` preview) |
-| **`pipelex run`** | Execute pipelines from bundle files or libraries |
+| **`pipelex run`** | Execute pipelines from bundle files, libraries or methods, on this machine or on the hosted Pipelex API |
 | **`pipelex graph`** | Generate and render execution graphs |
 | **`pipelex show`** | Display configuration, pipes, and list AI models |
 | **`pipelex which`** | Locate where a pipe is defined, similar to `which` for executables |
@@ -1906,6 +1911,7 @@ Package manifest management is currently exposed through the lowercase `mthds` C
 
 ## Execution Options
 
+- **Where it runs** — `--hosted` runs on the hosted Pipelex API, with only a Pipelex API key, and `--local` on this machine, with your own provider keys; without either, the run follows `[run] execution`. `--base-url` points a hosted run at another origin. See [Running on the Hosted API](../tools/cli/run.md#running-on-the-hosted-api)
 - **Dry run** — `--dry-run` executes with mocked LLM responses to test pipeline logic without API calls
 - **Mock inputs** — `--mock-inputs` generates synthetic inputs so you can test a pipeline without preparing real data (requires `--dry-run`)
 - **Graph generation** — `--graph`, `--graph-full-data`, `--graph-no-data` for visual execution inspection
@@ -5621,7 +5627,7 @@ Use the client directly: it has no Pipelex wrapper, and it needs no `Pipelex.mak
 
 ## The Key and the Origin
 
-The client reads its key from `PIPELEX_API_KEY` and its origin from `PIPELEX_BASE_URL`, falling back to `https://api.pipelex.com`. Both can also be passed to the constructor, as `api_key=` and `base_url=`. The client reads the process environment only. To use a key saved in `~/.pipelex/.env`, as `pipelex run --hosted` does, import `pipelex.system.environment` before creating the client: importing it loads `~/.pipelex/.env` (or the one in `PIPELEX_HOME`), then a `.env` in the working directory.
+The client reads its key from `PIPELEX_API_KEY` and its origin from `PIPELEX_BASE_URL`, falling back to `https://api.pipelex.com`. Both can also be passed to the constructor, as `api_key=` and `base_url=`. The client reads the process environment only. To use a key saved in `~/.pipelex/.env`, as `pipelex run --hosted` does, import `pipelex.system.environment` before creating the client: importing it loads `~/.pipelex/.env` (or the one in `PIPELEX_HOME`), then a `.env` in the working directory. Each of those files replaces the variables it sets, so a `PIPELEX_API_KEY` or `PIPELEX_BASE_URL` set in one of them wins over the same variable already in the process environment, whether exported in your shell or set by your program before the import. To use a key of your own whatever the files say, pass it to the constructor as `api_key=`.
 
 ## Running a Method
 
@@ -5686,13 +5692,36 @@ Two cases where `pipelex run --hosted` goes further than `prepare_inputs`:
 
 ## Errors
 
-A failure is one of the SDK's typed errors, from `pipelex_sdk.errors`, all subclasses of the protocol's `PipelineRequestError`, with one exception: `start` and `execute`, which the client inherits from the MTHDS protocol client, let httpx's transport errors through. A `ConnectError` or a `ConnectTimeout` means the request never left your machine. A `ReadError`, a `RemoteProtocolError` or a `ReadTimeout` can come after the hosted API received it, so a run may exist with no id returned: check the run history on app.pipelex.com before starting it again.
+A failure is one of the SDK's typed errors, from `pipelex_sdk.errors`, all subclasses of the protocol's `PipelineRequestError`:
 
 - `ApiResponseError` is a refusal the hosted API answered: `status`, the reason in `server_message`, the next step in `user_action.detail` when the server advised one, and `validation_errors` locating the faults of a bundle it refused to load.
 - `RunFailedError` is a run that started and failed; `error` holds its stored report, with the runner's `error_type`, `message`, `error_domain` and `user_action`.
 - `RunTimeoutError` is a run that outlived the wait; it keeps running, and `run_id` reads its result later with `wait_for_result`.
-- `ApiUnreachableError` is a hosted API that could not be reached at all, on the routes the SDK owns: the signature read, the uploads, and the polling of a started run.
+- `ApiUnreachableError` is a request that got no answer, on every route, `start` and `execute` included. Its `__cause__` is httpx's exception, and its `code` names the failure: `ABORT_TIMEOUT` for a read or a write that timed out, otherwise httpx's class name, such as `ConnectError`, `ConnectTimeout`, `ReadError` or `RemoteProtocolError`.
 - `InputPreparationError` and its subclasses are a local file that could not be read or uploaded.
+
+### A Start That Got No Answer
+
+An `ApiUnreachableError` raised by `start` does not say by itself whether the run was created, but its cause does. A `ConnectError`, `ConnectTimeout`, `PoolTimeout`, `UnsupportedProtocol` or `ProxyError` means the request never left your machine, so no run exists and starting again is safe. Any other cause, such as a `ReadError`, a `WriteError`, a `RemoteProtocolError` or a timeout coded `ABORT_TIMEOUT`, can come after the hosted API received the request, so a run may exist with no id returned: check the run history on app.pipelex.com before starting it again.
+
+```python
+import httpx
+from pipelex_sdk.errors import ApiUnreachableError
+
+NEVER_SENT = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout, httpx.UnsupportedProtocol, httpx.ProxyError)
+
+try:
+    started = await client.start(method_ref="github.com/Pipelex/methods/text_stats@v0.1.7", inputs={"text": "Hello world."})
+except ApiUnreachableError as exc:
+    if isinstance(exc.__cause__, NEVER_SENT):
+        ...  # No run was created: check the network and the origin, then start again.
+    else:
+        ...  # A run may exist: look it up in the run history before starting again.
+```
+
+`start_and_wait` sends more than the start, so tell its requests apart with its two callbacks. `on_starting` is called right before each request that may create a run is sent, and `on_started` with the acknowledgement once the run exists. A failure before `on_starting` was called started nothing, a failure after `on_started` concerns a run whose id you hold, which `wait_for_result` follows, and only a failure in between needs its cause read as above.
+
+`pipelex run --hosted` and `pipelex-agent run --runner hosted` draw the same line, and report the second case as pipelex's own [`HostedRunOutcomeUnknownError`](../../errors/hosted-run-outcome-unknown-error.md). `PipelexAPIClient` never raises that error, so a program that calls the client directly reads the cause itself.
 
 ## Related Documentation
 
@@ -6067,6 +6096,8 @@ How does data get from `generate_tagline` to `extract_keywords_from_tagline`? Th
 3.  Subsequent pipes can then reference this data by its name in their `inputs` field (e.g., `inputs = { tagline = "Tagline" }`).
 
 This mechanism allows you to chain pipes together, creating a flow of information through your pipeline.
+
+Because a later pipe reads a stored value through an input, every name a value is stored under is a plain input name, like `tagline`: a `result`, a `batch_as` or a `PipeBatch`'s `input_item_name` written in any other form, such as `Tagline` or `marketing.tagline`, is refused with `invalid_input_name` (see [Stored names](pipe-controllers/PipeSequence.md#stored-names)).
 
 ## Working Memory Lifecycle
 
@@ -8794,11 +8825,17 @@ A pipe step is a table with the following keys:
 | Key      | Type   | Description                                                        | Required |
 | -------- | ------ | ------------------------------------------------------------------ | -------- |
 | `pipe`   | string | The name of the pipe to execute for this step.                     | Yes      |
-| `result` | string | The name to give to this step's output in the working memory. When omitted, the output is stored only in the unnamed `main_stuff` slot (the default output), so later steps can pick it up as their implicit input but cannot reference it by a dedicated name. | No       |
+| `result` | string | The name to give to this step's output in the working memory, a plain `snake_case` input name such as `pages` (see [Stored names](#stored-names)). When omitted, the output is stored only in the unnamed `main_stuff` slot (the default output), so later steps can pick it up as their implicit input but cannot reference it by a dedicated name. | No       |
 | `nb_output` | integer | Request a fixed number of outputs from this step's pipe. Cannot be combined with `multiple_output`. | No       |
 | `multiple_output` | boolean | Request a variable number of outputs from this step's pipe (the model decides how many). Cannot be combined with `nb_output`. | No       |
 | `batch_over` | string | The list in the working memory to batch this step over, running the pipe once per item: a name, or a dotted path to a list held in a field, such as `catalog.pages`, which is a binding followed by a batch (see [Batching over a field](#batching-over-a-field)). Must be provided together with `batch_as`. See [Understanding Multiplicity](../understanding-multiplicity.md). | No       |
-| `batch_as` | string | The name each item takes in the working memory during a `batch_over` run. Must differ from `batch_over` (e.g. `batch_over = "items"`, `batch_as = "item"`). Like `result` and `batch_over`, it never starts with `_bound_`, a prefix reserved for the bound list of a dotted `batch_over`. | No       |
+| `batch_as` | string | The name each item takes in the working memory during a `batch_over` run, under which the step's pipe reads it through an input: a plain `snake_case` input name, like `result` (see [Stored names](#stored-names)). Must differ from `batch_over` (e.g. `batch_over = "items"`, `batch_as = "item"`). | No       |
+
+#### Stored names
+
+A step's `result` and `batch_as` are **stored names**: the step stores a value in the working memory under each, for a later pipe to read through an input. An input name is always a plain `snake_case` identifier matching `[a-z][a-z0-9_]*`, so a stored name takes the same form, and every value a step stores can be read. A `result` or a `batch_as` in any other form, such as `Pages`, a dotted `doc.pages` or an underscore-led `_pages`, is refused with `invalid_input_name`, which the schema catches too, and the message suggests a plain name. Rename it, such as to `pages`, along with every input, binding path and `batch_over` that reads it. The same rule holds a [`PipeParallel`](PipeParallel.md) branch's `result` and `batch_as`, a [`PipeBatch`](PipeBatch.md)'s `input_item_name` and a binding step's `result`, which a binding step that breaks it reports as `binding_step_invalid`.
+
+A plain `batch_over` reads a name rather than storing one, so it is not held to this form, but it never starts with `_bound_`, a prefix reserved for the list a dotted `batch_over` binds (see [Batching over a field](#batching-over-a-field)), and one that does is refused with `invalid_input_name` too.
 
 #### Binding steps
 
@@ -8952,7 +8989,7 @@ So a dotted `batch_over` shares everything a binding does:
 -   A path outside the path grammar, such as `catalog..pages`, is refused with `binding_step_invalid`, which the schema catches too.
 -   In the execution graph, the binding is a node of kind `binding`, fed by the root's producer, and it feeds the batch.
 
-The private name starts with an underscore, `_bound_catalog_pages` for `catalog.pages`, so no template or input can read it: it shows only in the working memory the run leaves and in the graph. The `_bound_` prefix is reserved for these names. A nested `PipeSequence` binds in the working memory of the sequence calling it, so a name of the caller taking the prefix could be overwritten by the list a sequence it calls binds: a pipe step's `result`, `batch_as` or plain `batch_over`, on a sequence step or a `PipeParallel` branch, and a [`PipeBatch`](PipeBatch.md)'s `input_item_name` that starts with `_bound_` are refused with `invalid_input_name`, which the schema catches too, and the message asks for another name. Only a sequence's steps bind, so a [`PipeParallel`](PipeParallel.md) branch carries a plain `batch_over` only, and a dotted one there is refused with `binding_step_invalid`: bind the list in a step before the `PipeParallel`, and batch the branch over the bound name.
+The private name starts with an underscore, `_bound_catalog_pages` for `catalog.pages`, so no template or input can read it: it shows only in the working memory the run leaves and in the graph. The `_bound_` prefix is reserved for these names. A nested `PipeSequence` binds in the working memory of the sequence calling it, so a name of the caller taking the prefix could be overwritten by the list a sequence it calls binds. No name a step stores a value under can take it, since a [stored name](#stored-names) is a plain input name, which never starts with an underscore, and a plain `batch_over` that starts with `_bound_`, on a sequence step or a `PipeParallel` branch, is refused with `invalid_input_name`, which the schema catches too, and the message asks for another name. Only a sequence's steps bind, so a [`PipeParallel`](PipeParallel.md) branch carries a plain `batch_over` only, and a dotted one there is refused with `binding_step_invalid`: bind the list in a step before the `PipeParallel`, and batch the branch over the bound name.
 
 ### Example
 
@@ -9062,7 +9099,9 @@ Each entry in the `branches` array is a table with the following keys:
 | Key      | Type   | Description                                                                              | Required |
 | -------- | ------ | ---------------------------------------------------------------------------------------- | -------- |
 | `pipe`   | string | The name of the pipe to execute for this branch.                                         | Yes      |
-| `result` | string | The name for this branch's output. Must be unique within the `PipeParallel` definition. | Yes      |
+| `result` | string | The name for this branch's output, a plain `snake_case` input name such as `sentiment`. Must be unique within the `PipeParallel` definition. | Yes      |
+
+A branch's `result` and `batch_as` are [stored names](PipeSequence.md#stored-names), as on a sequence step: the branch stores a value under each for a pipe to read through an input, so each is a plain input name matching `[a-z][a-z0-9_]*`, and one in any other form, such as `Sentiment` or `text.sentiment`, is refused with `invalid_input_name`. Since the combined output holds each branch result under its `result` name, the fields of a structured output concept that the branches fill have plain names too.
 
 A branch is always a pipe step. A [binding step](PipeSequence.md#binding-steps), `{ from = "invoice.total", result = "total_amount" }`, is refused in `branches` with `binding_step_invalid`: the branches run at once, and a binding orders a value before the steps that read it, so bind the value in the calling sequence, in a step before the `PipeParallel`, and have the branch read the bound name. A branch may carry `batch_over` and `batch_as`, but its `batch_over` is a plain name: a dotted one, such as `catalog.pages`, binds before it batches (see [Batching over a field](PipeSequence.md#batching-over-a-field)), so it is refused with `binding_step_invalid` too, and the calling sequence binds the list before the `PipeParallel`.
 
@@ -9184,7 +9223,7 @@ This is the batch arm of the "route or skip" pattern: batch over items with a co
 | `output`           | string       | The output concept produced by the batch operation.                                                | Yes      |
 | `branch_pipe_code` | string       | The name of the single pipe to execute for each item in the input list.                                                                          | Yes      |
 | `input_list_name`  | string       | The name of the input list to iterate over. Must match one of the keys in `inputs`, so it is a plain input name, a `snake_case` identifier matching `[a-z][a-z0-9_]*`, and never a path into a field: a dotted name such as `catalog.pages` is refused as `invalid_input_name`. To map a pipe over a list held in a field, have the calling sequence bind it to the batch's list with a binding step, or run the branch pipe in a sequence step whose dotted `batch_over` binds the list and batches over it (see [Batching over a field](PipeSequence.md#batching-over-a-field)). Typically a plural noun (e.g. `articles`). | Yes      |
-| `input_item_name`  | string       | The name that an individual item from the list will have inside its execution branch — this is how the branch pipe finds its input. Must differ from `input_list_name` and from every key in `inputs`, and never starts with `_bound_`, a prefix reserved for the bound list of a dotted `batch_over` (see [Batching over a field](PipeSequence.md#batching-over-a-field)), which is refused as `invalid_input_name`. Typically the singular form of the list name (e.g. `article`). | Yes      |
+| `input_item_name`  | string       | The name that an individual item from the list will have inside its execution branch — this is how the branch pipe finds its input. It is a [stored name](PipeSequence.md#stored-names), so a plain input name like `input_list_name`, a `snake_case` identifier matching `[a-z][a-z0-9_]*`: a name in any other form, such as `Article`, `issue.article` or `_bound_article`, is refused as `invalid_input_name`. Must differ from `input_list_name` and from every key in `inputs`. Typically the singular form of the list name (e.g. `article`). | Yes      |
 
 ### Example: Summarizing a list of articles
 
@@ -9943,6 +9982,7 @@ The Pipelex CLI is organized into several command groups:
 | [**login**](login.md) | Get a Pipelex API key through your browser, or paste one, and save it for runs on the hosted Pipelex API |
 | [**update**](update.md) | Refresh the model deck and `backends/internal.toml` to match the installed pipelex version |
 | [**migrate**](migrate.md) | Bring your configuration files up to the schema the installed version expects |
+| [**doctor**](doctor.md) | Check configuration health, judged by where your runs execute, and fix what can be fixed |
 | [**validate**](validate.md) | Validate configuration and pipelines |
 | [**fix**](fix.md) | Apply deterministic safe fixes to a bundle and re-validate |
 | [**show**](show.md) | Inspect configuration, pipes, and AI models |
@@ -10006,6 +10046,7 @@ Package manifest management currently lives in the `mthds` CLI:
 
 4. **Configuration Management**
 
+    - Use `pipelex doctor` to check that your configuration is healthy, and `pipelex doctor --fix` to fix what can be fixed
     - Use `pipelex show config` to verify current settings
     - Use `pipelex show backends` to check inference backend setup
     - Use `pipelex show models backend_name` to see available models
@@ -10108,12 +10149,12 @@ When you run `pipelex init`, Pipelex can guide you through:
 1. **What a former release left** - On a machine set up by a release that ran models through the Pipelex Gateway, the cleanup that release's files need, offered first (see [below](#a-machine-a-former-release-set-up))
 2. **Config reset** - Recreate the selected config files
 3. **Where your runs execute** - The hosted Pipelex API (the default) or this machine
-4. On the hosted Pipelex API: **sign-in** - [`pipelex login`](login.md) gets a Pipelex API key, unless one is already set. It runs last, once every file is written
-5. On this machine:
+4. On this machine:
     1. **Backend selection** - Choose which AI providers to enable. The prompt pre-selects OpenAI, whose one key serves every default language-model and image-generation tier of the shipped model deck
     2. **Routing configuration** - Set up how models are routed to backends
     3. **Credential prompts** - Fill in missing keys when relevant
-6. **Telemetry setup** - Configure observability and analytics
+5. **Telemetry setup** - Configure observability and analytics
+6. On the hosted Pipelex API: **sign-in** - [`pipelex login`](login.md) gets a Pipelex API key, unless one is already set. It runs last, once every file is written
 
 ## A Machine a Former Release Set Up
 
@@ -10133,7 +10174,7 @@ Yes runs the cleanup that [`pipelex migrate`](migrate.md#a-configuration-a-forme
 
 `pipelex doctor --fix` installs missing configuration files with nobody there to answer, and never moves runs off this machine. On a first setup it keeps the `[run] execution` the target `pipelex.toml` already sets; a `pipelex.toml` that sets none, such as one written before the setting existed, runs on this machine, as the package default says, and stays there. Only a brand-new home, with no `pipelex.toml` yet, takes the hosted Pipelex API, writing `execution = "hosted"` and printing `pipelex login` instead of opening a browser.
 
-**A project can override the global choice.** A project's `.pipelex/pipelex.toml` wins over the one in `~/.pipelex/`, and the one `pipelex init --local` copies sets `execution = "local"`. When you set up the home configuration from inside a project whose own file sets the other value, `pipelex init` warns you, naming that file: runs started in that project execute where it says, until you change it there or pass `--hosted` or `--local` on a run.
+**A project can override the global choice.** A project's `.pipelex/pipelex.toml` wins over the one in `~/.pipelex/`. `pipelex init --local` asks the same question and writes your answer to the project's file, Enter meaning the hosted Pipelex API there too. When you set up the home configuration from inside a project whose own file sets the other value, `pipelex init` warns you, naming that file: runs started in that project execute where it says, until you change it there or pass `--hosted` or `--local` on a run.
 
 ## Non-Interactive Init (`pipelex-agent init`)
 
@@ -10167,6 +10208,8 @@ All fields are optional:
 | `execution` | `"hosted"` or `"local"` | Where runs execute by default, written to `[run] execution`. `"hosted"` configures no backend or routing, leaves the kit's inference files as written, and cannot be combined with `backends` or `primary_backend`. `"local"`, or no `execution` at all, configures the backends below. |
 | `backends` | `list[str]` | Backend keys to enable (e.g. `openai`, `anthropic`, `openrouter`). Omit to keep the template's enabled backends and its routing profile, which sends each model to the first of them that serves it. |
 | `primary_backend` | `str` | Required when 2+ backends are named. Named without `backends`, it routes the template's backends to it first. |
+
+`pipelex-agent init` writes `execution = "local"` when its config names no `execution`, and by default it writes it to the project's `.pipelex/pipelex.toml`, which wins over the home one. A project set up this way therefore runs on this machine even when `~/.pipelex/pipelex.toml` says `"hosted"`, and no warning says so, since the file written is the project's own: pass `"execution": "hosted"` to keep the project's runs on the hosted Pipelex API.
 
 **Output:** `success`, `target_dir`, `config_files_copied` and `execution`. A local setup adds `backends_enabled` and `routing_profile`; a hosted one adds `api_key_set`, whether a Pipelex API key is set in `PIPELEX_API_KEY` or saved in `~/.pipelex/.env`, never the key itself. A `warnings` list is added when the project around the working directory sets another `[run] execution` in its own `.pipelex/pipelex.toml`, which wins over the one just written.
 
@@ -10221,10 +10264,10 @@ The key is never printed. The `.env` file is readable and writable by you only (
 
 - When the hosted API accepts the key, it is saved, and the command says which account it belongs to.
 - When the hosted API refuses it (HTTP 401 or 403), nothing is saved and the command exits with code `1`, naming the status.
-- When the key cannot be checked, because the hosted API cannot be reached or answers anything else, it is saved anyway, with a warning saying why it was not checked.
+- When the key cannot be checked, because the hosted API cannot be reached, answers anything else, or `PIPELEX_BASE_URL` is not an origin, it is saved anyway, with a warning saying why it was not checked.
 - A value that does not start with `plx_sk_` is refused before any check.
 
-**A `.env` in the working directory wins.** Pipelex loads the `.env` of the directory a command runs in after `~/.pipelex/.env`, so a `PIPELEX_API_KEY` line there, even an empty one, is what commands run in that directory send. When that file sets another value than the key just saved, `pipelex login` names it, without printing either value: remove the line from it.
+**A `.env` in the working directory wins.** Pipelex loads the `.env` of the directory a command runs in after `~/.pipelex/.env`, so a `PIPELEX_API_KEY` line there, even an empty one, is what commands run in that directory send. When that file sets another value than the key just saved, `pipelex login` names it, without printing either value: remove the line from it. Both files also win over your shell, since each `.env` Pipelex loads replaces the variables it sets: a `PIPELEX_API_KEY` exported in your shell is read only when neither file sets it.
 
 **The handover is protected.** Each login sends the app a random `state` value along with the port, and the app sends it back with the key. A request to the port that does not carry this login's `state` is refused and its key discarded: any page open in your browser can send a request to a local port, so a key that arrives without it did not come from the page this login opened. The command says so in the terminal and keeps waiting.
 
@@ -10238,7 +10281,7 @@ pipelex login --paste
 
 On a machine where no browser can reach a local port, such as a remote server over SSH or a CI job, create a key in the Pipelex app on any machine, then paste it at the prompt. The key is not shown as you type. It goes through the same check and is saved the same way.
 
-In CI, you can also skip the file entirely and set `PIPELEX_API_KEY` as a secret of the job.
+In CI, you can also skip the file entirely and set `PIPELEX_API_KEY` as a secret of the job. The job's value is read as long as no `.env` file Pipelex loads, in the home configuration directory or in the working directory, sets the variable.
 
 ## Other Apps and APIs
 
@@ -10247,13 +10290,15 @@ In CI, you can also skip the file entirely and set `PIPELEX_API_KEY` as a secret
 | `PIPELEX_APP_URL` | The Pipelex app the browser opens, given as an origin (`scheme://host[:port]`, no path) | `https://app.pipelex.com` |
 | `PIPELEX_BASE_URL` | The hosted API the key is checked against, and that hosted runs go to | `https://api.pipelex.com` |
 
-A value that is not an origin is refused before anything opens. Most people never set either; they point the command at a development or staging plane, for instance:
+A `PIPELEX_APP_URL` that is not an origin is refused before anything opens. A `PIPELEX_BASE_URL` that is not one is only met when the key is checked, after the browser has handed it back or the key was pasted: the key cannot be checked, so it is saved anyway, with a warning that names `PIPELEX_BASE_URL` and what an origin looks like, and the command exits with code `0`. Correct the value before a hosted run uses it.
+
+Most people never set either; they point the command at a development or staging plane, for instance:
 
 ```bash
 PIPELEX_APP_URL=https://app-dev.pipelex.com PIPELEX_BASE_URL=https://api-dev.pipelex.com pipelex login
 ```
 
-Set them in `~/.pipelex/.env` to keep them for every command.
+Set them in `~/.pipelex/.env` to keep them for every command. Once a `.env` file Pipelex loads sets one of them, that file wins over a value given on the command line as above, which is then ignored: change the value in the file instead.
 
 ## Exit Codes
 
@@ -10282,7 +10327,7 @@ When a new `pipelex` release ships changes to the model deck — new models, new
 
 ## When to run it
 
-Pipelex prints a one-line yellow advisory on most CLI invocations when it detects that the installed deck is older than the running package, or when no deck manifest is present yet. It is suppressed for `init`, `doctor`, `update`, `migrate`, and `which`, and `pipelex run` prints it only for a run that executes on this machine, since a run on the hosted API reads no local deck:
+Pipelex prints a one-line yellow advisory on most CLI invocations when it detects that the installed deck is older than the running package, or when no deck manifest is present yet. It is suppressed for `init`, `login`, `doctor`, `update`, `migrate`, and `which`, and `pipelex run` prints it only for a run that executes on this machine, since a run on the hosted API reads no local deck:
 
 ```text
 ⚠ Pipelex model deck may be out of date — run pipelex update to refresh
@@ -10464,8 +10509,76 @@ An agent usually meets this command through a failure rather than by choosing it
 
 ## See also
 
-- [`pipelex doctor`](index.md) — check configuration health
+- [`pipelex doctor`](doctor.md) — check configuration health
 - [`pipelex init`](init.md) — create configuration files from scratch
+
+
+## Doctor
+
+# Doctor Command
+
+`pipelex doctor` checks your Pipelex configuration and says what to fix. It reads your configuration files and your environment, and it changes nothing unless you pass `--fix`.
+
+```bash
+pipelex doctor
+pipelex doctor --fix
+```
+
+## What It Checks
+
+The doctor checks the configuration a command run in the current directory would use: the project's `.pipelex/` when the project around the working directory has one, else the home configuration directory (`~/.pipelex/`, or the directory `PIPELEX_HOME` names; see [Configuration](../../configuration/index.md#the-home-configuration-directory-pipelex_home)). The report opens with an overall status, then gives one row per check:
+
+- **Configuration Location** - Which configuration directory is used, the project's or the global one.
+- **Configuration Files** - Whether every configuration file the kit ships is present, and whether `pipelex.toml` is valid.
+- **Configuration Migrations** - What [`pipelex migrate`](migrate.md) would change: the files a migration would bring up to the current schema, the files that need a look from you, and what a former release left for the Pipelex Gateway, which the migration cleans up first. This row covers the home configuration directory and the project's `.pipelex/` together, as `pipelex migrate` does.
+- **Telemetry Configuration** - Whether `telemetry.toml` is present and valid.
+- **Plugins**, **Secrets Provider** and **Log Sink** - Whether the plugins, the secrets provider and the log sink your configuration names can be set up. These rows appear once the configuration loads.
+- **Pipelex API Key** - Whether hosted runs have a key to send. This row appears only when your runs execute on the hosted Pipelex API, as described below.
+- **Backend Credentials** - Whether the provider keys of the enabled inference backends are set. When some are missing, the row says how to set them, how to disable a backend you do not need, and that a run on the hosted Pipelex API needs none of them.
+- **Models** - Whether the inference backends and the models they declare load.
+- **Model Deck** - Whether the model deck and `backends/internal.toml` match the installed pipelex version; [`pipelex update`](update.md) refreshes them.
+
+## Where Your Runs Execute
+
+What a setup needs depends on where its runs execute, so the doctor reads the effective `[run] execution` setting (see [Run Configuration](../../configuration/config-practical/run-config.md)), and takes `"local"` when the configuration does not load.
+
+- **On this machine** (`"local"`), every row counts toward the overall status.
+- **On the hosted Pipelex API** (`"hosted"`), a run boots nothing on this machine and uses no provider key. The **Pipelex API Key** row appears and counts: it is healthy when a Pipelex API key is set, in `PIPELEX_API_KEY` or saved in the home `.env` by [`pipelex login`](login.md), and starts with `plx_sk_`; otherwise it names `pipelex login`. The row looks at the key only, without calling the hosted API, and never prints it. The **Backend Credentials** and **Models** rows are then shown as information, needed only for runs you start with `--local`, and they count neither toward the overall status nor toward the exit code.
+
+## Fix Mode
+
+```bash
+pipelex doctor --fix
+```
+
+With `--fix` (`-f`), the doctor offers each fix it can make, one question at a time, with yes as the default answer:
+
+- **Missing configuration files** are installed by running `pipelex init config` without its confirmation and without asking where runs execute. It never moves runs off this machine: it keeps the `[run] execution` the target `pipelex.toml` already sets, and a `pipelex.toml` that sets none stays on this machine. Only a brand-new home, with no `pipelex.toml` yet, takes the hosted Pipelex API, and it then prints `pipelex login` rather than opening a browser.
+- **Configuration migrations** run the write pass of `pipelex migrate`: the cleanup of what a former release left, then the migration of the files that can be brought up to date, each file backed up beside itself first.
+- **A missing telemetry configuration** is set up through `pipelex init telemetry`.
+- **An outdated model deck or `backends/internal.toml`** is refreshed through `pipelex update`.
+- **A backend file in an outdated format** is replaced by the kit's template, for a backend the kit ships, when your runs execute on this machine.
+
+What no command can fix is listed under **Manual Fixes Required**: a missing or malformed Pipelex API key (run `pipelex login`, or `pipelex login --paste` on a machine without a browser), a `pipelex.toml` or `telemetry.toml` that does not validate, and, when your runs execute on this machine, the provider keys to set, shown as `.env` lines and as shell commands. A variable set in a `.env` file Pipelex loads wins over one exported in your shell (see [Running on the Hosted API](run.md#running-on-the-hosted-api)).
+
+The report is measured before the fixes run, so run `pipelex doctor` again to see where things stand.
+
+## Exit Codes
+
+- `0`: every row that counts is healthy.
+- `1`: something needs fixing. This is also the exit code of a `--fix` run that found something to fix, whatever it fixed.
+
+## Machine-Readable Output
+
+`pipelex-agent doctor` runs the same checks and answers in Markdown or JSON: `execution` at the top level, the Pipelex API key under `checks.pipelex_api_key` with a `finding` of `set`, `not_a_pipelex_key` or `missing`, and `informational: true` on the provider credentials and models rows of a hosted setup. See [Agent CLI](agent-cli.md).
+
+## Related Documentation
+
+- [Init](init.md): the first-run setup, and what `pipelex doctor --fix` runs to install missing files
+- [Migrate](migrate.md): bring configuration files up to the current schema
+- [Update](update.md): refresh the model deck and `backends/internal.toml`
+- [Login](login.md): get the Pipelex API key a hosted setup needs
+- [Init CLI Flows](../../under-the-hood/init-cli-flows.md): how the setup and the health check work inside
 
 
 ## Validate
@@ -10746,7 +10859,7 @@ Runs a pipe by code from your project's pipe library.
 
 **Options:**
 
-- `--inputs`, `-i` - Path to a JSON or TOML file containing inputs (discriminated by file extension — see [Input File Formats](#input-file-formats))
+- `--inputs`, `-i` - Path to a JSON or TOML file containing inputs (discriminated by file extension), or inline JSON starting with `{` — see [Input File Formats](#input-file-formats)
 - `--output-dir`, `-o` - Directory to save outputs (defaults to `results/`)
 - `--save-main-stuff` / `--no-save-main-stuff` - Whether to save the main output to a file
 - `--save-working-memory` / `--no-save-working-memory` - Whether to save the full working memory
@@ -10757,6 +10870,9 @@ Runs a pipe by code from your project's pipe library.
 - `--graph-full-data` / `--graph-no-data` - Include full data in the graph visualization
 - `--dry-run` - Dry-run the pipeline without calling AI providers; no inference credentials are needed
 - `--mock-inputs` - Use mock inputs for the pipeline (requires `--dry-run`)
+- `--costs` / `--no-costs` - Emit usage (cost) tracing events and render the end-of-run cost report, on by default (see [Cost Tracking](../../features/cost-tracking.md))
+- `--orchestrator NAME` - Boot this process under the named orchestrator plugin, such as `temporal`; without it, the run executes in-process (see [Durable Execution](../../reliability/durable-execution.md))
+- `--dynamic-output-concept`, `-O` - The concept ref, such as `document_qa.ReferenceCount`, that resolves a pipe whose output is declared `Dynamic`
 - `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
 - `--hosted` / `--local` - Run on the hosted Pipelex API or on this machine. Defaults to `[run] execution` (see [Running on the Hosted API](#running-on-the-hosted-api)), else local
 - `--base-url` - The origin a hosted run calls, `scheme://host[:port]`. Overrides `PIPELEX_BASE_URL`, which overrides `https://api.pipelex.com`
@@ -10804,7 +10920,7 @@ Runs a pipeline from a bundle file (`.mthds`) or a pipeline directory. When a di
 **Options:**
 
 - `--pipe PIPE_CODE` - Run a specific pipe from the bundle (defaults to the bundle's main pipe)
-- `--inputs`, `-i` - Path to a JSON or TOML file containing inputs (discriminated by file extension — see [Input File Formats](#input-file-formats))
+- `--inputs`, `-i` - Path to a JSON or TOML file containing inputs (discriminated by file extension), or inline JSON starting with `{` — see [Input File Formats](#input-file-formats)
 - `--output-dir`, `-o` - Directory to save outputs
 - `--save-main-stuff` / `--no-save-main-stuff` - Whether to save the main output
 - `--save-working-memory` / `--no-save-working-memory` - Whether to save the full working memory
@@ -10815,6 +10931,9 @@ Runs a pipeline from a bundle file (`.mthds`) or a pipeline directory. When a di
 - `--graph-full-data` / `--graph-no-data` - Include full data in the graph visualization
 - `--dry-run` - Dry-run the pipeline without calling AI providers; no inference credentials are needed
 - `--mock-inputs` - Use mock inputs for the pipeline (requires `--dry-run`)
+- `--costs` / `--no-costs` - Emit usage (cost) tracing events and render the end-of-run cost report, on by default (see [Cost Tracking](../../features/cost-tracking.md))
+- `--orchestrator NAME` - Boot this process under the named orchestrator plugin, such as `temporal`; without it, the run executes in-process (see [Durable Execution](../../reliability/durable-execution.md))
+- `--dynamic-output-concept`, `-O` - The concept ref, such as `document_qa.ReferenceCount`, that resolves a pipe whose output is declared `Dynamic`
 - `--library-dir`, `-L` - Directory to search for additional pipe definitions. Can be specified multiple times.
 - `--hosted` / `--local` - Run on the hosted Pipelex API or on this machine. Defaults to `[run] execution` (see [Running on the Hosted API](#running-on-the-hosted-api)), else local
 - `--base-url` - The origin a hosted run calls, `scheme://host[:port]`. Overrides `PIPELEX_BASE_URL`, which overrides `https://api.pipelex.com`
@@ -10847,17 +10966,17 @@ pipelex run bundle my_bundle.mthds --hosted
 pipelex run method <NAME> [OPTIONS]
 ```
 
-Runs a pipeline from an installed method package.
+Runs a pipeline from a method package: an installed one, one in a local directory, one published at an address, or, on a hosted run, one stored on the hosted platform.
 
 **Arguments:**
 
-- `NAME` - The name of the installed method to run, a method address (`github.com/owner/repo[/name][@tag]`), or a GitHub URL — see [Run a Method by Address](run-by-address.md). On a hosted run, also a stored method's catalog id (`mt_…`)
+- `NAME` - The name of the installed method to run, the path of a local method directory, a method address (`github.com/owner/repo[/name][@tag]`), or a GitHub URL — see [Run a Method by Address](run-by-address.md). On a hosted run, also a stored method's catalog id (`mt_…`)
 
 **Options:**
 
 - `--pipe PIPE_CODE` - Run a specific pipe within the method (defaults to the method's main pipe)
-- `--inputs`, `-i` - Path to a JSON or TOML file containing inputs (discriminated by file extension — see [Input File Formats](#input-file-formats))
-- `--output-dir`, `-o` - Directory to save outputs (defaults to `results/` inside the method's directory; for a method fetched by address, `results/` under your current working directory — see [Run a Method by Address](run-by-address.md))
+- `--inputs`, `-i` - Path to a JSON or TOML file containing inputs (discriminated by file extension), or inline JSON starting with `{` — see [Input File Formats](#input-file-formats)
+- `--output-dir`, `-o` - Directory to save outputs (defaults to `results/` inside the method's directory; for a method fetched by address, and on a hosted run for an address or a catalog id, `results/` under your current working directory — see [Run a Method by Address](run-by-address.md))
 - `--save-main-stuff` / `--no-save-main-stuff` - Whether to save the main output
 - `--save-working-memory` / `--no-save-working-memory` - Whether to save the full working memory
 - `--working-memory-path` - Custom path for the working memory output file
@@ -10867,6 +10986,9 @@ Runs a pipeline from an installed method package.
 - `--graph-full-data` / `--graph-no-data` - Include full data in the graph visualization
 - `--dry-run` - Dry-run the pipeline without calling AI providers; no inference credentials are needed
 - `--mock-inputs` - Use mock inputs for the pipeline (requires `--dry-run`)
+- `--costs` / `--no-costs` - Emit usage (cost) tracing events and render the end-of-run cost report, on by default (see [Cost Tracking](../../features/cost-tracking.md))
+- `--orchestrator NAME` - Boot this process under the named orchestrator plugin, such as `temporal`; without it, the run executes in-process (see [Durable Execution](../../reliability/durable-execution.md))
+- `--dynamic-output-concept`, `-O` - The concept ref, such as `document_qa.ReferenceCount`, that resolves a pipe whose output is declared `Dynamic`
 - `--library-dir`, `-L` - Directory to search for additional pipe definitions. Can be specified multiple times.
 - `--hosted` / `--local` - Run on the hosted Pipelex API or on this machine. Defaults to `[run] execution` (see [Running on the Hosted API](#running-on-the-hosted-api)), else local
 - `--base-url` - The origin a hosted run calls, `scheme://host[:port]`. Overrides `PIPELEX_BASE_URL`, which overrides `https://api.pipelex.com`
@@ -10895,7 +11017,7 @@ pipelex run method mt_abc123 --hosted --inputs data.json
 
 ## Running on the Hosted API
 
-A run executes on this machine by default, with the inference backends configured in `.pipelex/inference/` and your own provider keys. It can execute on the hosted Pipelex API instead, which needs only a Pipelex API key: no provider key and no inference configuration on this machine, since a hosted run boots nothing locally.
+Without a `[run] execution` setting, a run executes on this machine, with the inference backends configured in `.pipelex/inference/` and your own provider keys. It can execute on the hosted Pipelex API instead, which needs only a Pipelex API key: no provider key and no inference configuration on this machine, since a hosted run boots nothing locally. [`pipelex init`](init.md#where-your-runs-execute) writes the setting from your answer, and the answer Enter takes is the hosted Pipelex API.
 
 Where a run executes is decided in this order:
 
@@ -10903,7 +11025,11 @@ Where a run executes is decided in this order:
 2. `[run] execution` in `.pipelex/pipelex.toml` (`"local"` or `"hosted"`; the project's file over the one in `~/.pipelex/`), which [`pipelex init`](init.md#where-your-runs-execute) writes from your answer, see [Run Configuration](../../configuration/config-practical/run-config.md).
 3. Local.
 
-The key is read from `PIPELEX_API_KEY`, exported in your shell or saved in `~/.pipelex/.env` (or a `.env` in the working directory), which Pipelex loads at startup. [`pipelex login`](login.md) gets a key through your browser and saves it there. The run goes to `--base-url` when given, else to `PIPELEX_BASE_URL`, else to `https://api.pipelex.com`. Either value must be an origin, `scheme://host[:port]` with `http` or `https` and no path such as `/v1`; anything else is refused before a request is sent, naming the setting it came from. A self-hosted Pipelex API server is reached the same way, by pointing the base URL at it. Every request a hosted run sends names its client in its `User-Agent` as `pipelex-cli/<version>`, followed by the versions of the pipelex-sdk and mthds clients it runs on, so the hosted API counts it as a CLI run; the header carries no key and nothing that identifies you.
+The key is read from `PIPELEX_API_KEY`. [`pipelex login`](login.md) gets a key through your browser and saves it in `~/.pipelex/.env` (or in the `.env` of the directory `PIPELEX_HOME` names), which Pipelex loads at startup, followed by the `.env` of the working directory when there is one. The run goes to `--base-url` when given, else to `PIPELEX_BASE_URL`, else to `https://api.pipelex.com`. Either value must be an origin, `scheme://host[:port]` with `http` or `https` and no path such as `/v1`; anything else is refused before a request is sent, naming the setting it came from.
+
+**The `.env` files win over your shell.** Each `.env` file Pipelex loads replaces the variables it sets, so for `PIPELEX_API_KEY`, `PIPELEX_BASE_URL` or any other variable, the working directory's `.env` wins over `~/.pipelex/.env`, which wins over a value exported in your shell: an exported value is read only when neither file sets the variable. To replace the saved key, run `pipelex login` again; to use another key, or another origin, in one directory, set it in that directory's `.env`.
+
+Every request a hosted run sends names its client in its `User-Agent` as `pipelex-cli/<version>`, followed by the versions of the pipelex-sdk and mthds clients it runs on and by this machine's Python version, operating system and processor architecture (`python/<x.y.z> (<os>; <arch>)`), so the hosted API counts it as a CLI run; the header carries no key and nothing that identifies you.
 
 **What a hosted run sends** is what a local run would load:
 
@@ -10911,17 +11037,25 @@ The key is read from `PIPELEX_API_KEY`, exported in your shell or saved in `~/.p
 - `run pipe` sends every `.mthds` file of its library directories: the installed method exporting the pipe and `-L`, else `PIPELEXPATH`. With none of them, the run is refused and asks for `-L`.
 - `run method` sends an installed or local method's files. A published address goes as a reference and a catalog id (`mt_…`) as an id, both resolved by the hosted API: nothing is fetched or read locally, `-L` is refused with them, and a relative `--inputs` path resolves against the working directory rather than the method's. A method installed under a name spelled like a catalog id, such as `mt_reports`, is that installed method, not an id.
 
-**Local files in the inputs** are uploaded before the run. A path at a document or image input (compact, as `"invoice.pdf"`, or as the `url` of a document or image object, in a list or nested in a structure) is uploaded, and the run receives its storage URI instead. A relative path written in an inputs file resolves against that file's directory, as on a local run, and a `file://` URI is read as the path it names. A text that reads like a file name at any other input is left as text, `http(s)://` URLs, whatever the case of the scheme, are passed through for the hosted API to fetch, and an explicit `null`, such as an optional image left out, reaches the run as `null`.
+Only the contents of the `.mthds` files are sent. A PipeFunc's Python function, Python structure classes, the package manifest `METHODS.toml` and the packages a bundle calls through a dependency alias (`alias->domain.pipe_code`) stay on this machine, and the hosted runner does not have them, so a local bundle or method that relies on any of them runs with `--local`. A published method run by its address is not limited this way: the hosted runner fetches the whole package itself (see [Python in fetched methods](run-by-address.md#python-in-fetched-methods-the-hosted-rule)).
+
+**Local files in the inputs** are uploaded before the run. A path at a document or image input (compact, as `"invoice.pdf"`, or as the `url` of a document or image object, in a list or nested in a structure) is uploaded, and the run receives its storage URI instead. A relative path written in an inputs file resolves against that file's directory, as on a local run, and a `file://` URI is read as the path it names. A text that reads like a file name at any other input is left as text, and that includes a `.csv` path given to a structured-list input: it is not uploaded, the hosted runner receives a path it cannot read, so give the rows as a JSON list instead, or run with `--local`. `http(s)://` URLs, whatever the case of the scheme, are passed through for the hosted API to fetch, and an explicit `null`, such as an optional image left out, reaches the run as `null`.
 
 The method's signature, which says where a file sits, is read from the hosted API only when some value of the inputs, at any depth, names an existing file on this machine (from the inputs file's directory or the working directory). Inputs naming none go straight to the run. When the signature is read, a method that does not load is refused there, before any run starts, with validation errors that name the file each fault is in. A method that calls another method by its address (`github.com/…`) cannot have its signature read yet, so a local file cannot be uploaded for it: the run is refused before it starts, and the file has to be given as an `https://` URL instead. The same method runs with inputs that name no local file.
 
-**What it saves** goes where a local run saves its outputs, in `<output-dir>/<pipe>_output_NN/`: `main_stuff.json` (and `main_stuff.md` when the main output is text), `working_memory.json`, and `graphspec.json` when the hosted API returned the run's graph, which [`pipelex graph render`](../../features/execution-graph.md) turns into a viewer. The run id is printed as soon as the hosted API acknowledges the run, as `Run <id> started on the hosted API`, and again with the recap.
+**What it saves** goes where a local run saves its outputs, in `<output-dir>/<label>_output_NN/`: `main_stuff.json` (and `main_stuff.md` when the main output is text), `working_memory.json`, and `graphspec.json` when the hosted API returned the run's graph, which [`pipelex graph render`](../../features/execution-graph.md) turns into a viewer. The label is the pipe that ran, or, for a method run by its address or its catalog id without `--pipe`, the last segment of the address or the id itself, as in `mt_abc123_output_01/`. The run id is printed as soon as the hosted API acknowledges the run, as `Run <id> started on the hosted API`, and again with the recap.
 
 **When you interrupt it** with Ctrl-C, the command stops waiting, but a run the hosted API acknowledged keeps going and is paid for: the command prints its run id, so you can look it up on app.pipelex.com, and exits with `130`. Interrupted before the acknowledgement, it says that a run may have started if the request had reached the hosted API, and to check the run history before running again.
 
-**What it refuses**: `--dry-run`, `--mock-inputs`, `--mock-usage`, `--orchestrator`, `--save-csv`, `--costs` / `--no-costs` and `--graph-full-data` / `--graph-no-data` steer this machine's runtime, which a hosted run never boots, so each is refused with a message pointing at `--local`. `--base-url` on a run that executes locally is refused too.
+**What it refuses**: `--dry-run`, `--mock-inputs`, `--orchestrator`, `--save-csv`, `--costs` / `--no-costs` and `--graph-full-data` / `--graph-no-data` steer this machine's runtime, which a hosted run never boots, so each is refused with a message pointing at `--local`. `--base-url` on a run that executes locally is refused too.
 
 **When it fails**, the message gives the hosted API's reason and a next step: the one the server advised when it gave one, else one that follows the status (a refused key points at `PIPELEX_API_KEY` and `pipelex login`, an unknown method or route at the method's address and the base URL, a rate limit says to wait). A bundle the hosted API refuses lists its validation errors, and so does a run that started and failed on them. Once the hosted API has acknowledged the run, the failure also prints the run id: a run that failed, one that outlived the wait, one that completed without a main output, and one whose result could not be read, because the network or the hosted API failed while the run was being followed. That last one may still be running and is paid for, so look it up by its id on app.pipelex.com rather than running the command again. A connection lost after the request that runs the method was sent is not reported as a network failure either: the hosted API may have created the run before the connection failed, and its id never arrived, so check the run history before running again. Only a failure before the request left this machine, a connection that could not be made, points at the network and the base URL. A server that keeps no runs to poll, such as a self-hosted runner, is run on the blocking route, and when the connection is cut before its result comes back, the run may still be going there: running the command again runs the method again, so raise the timeout of the proxy in front of that server, or point the base URL at a server that keeps runs. The exit code is `1`.
+
+**A self-hosted Pipelex API server**, such as the [Pipelex API server](../../api-server/index.md) run from its Docker image, is reached the same way, by pointing `--base-url` or `PIPELEX_BASE_URL` at its origin (`http://localhost:8081`, without `/v1`). `PIPELEX_API_KEY` is sent to it as the bearer token, so set it to the key that server expects when it requires one. Such a server runs your methods, but it does less than the hosted Pipelex API:
+
+- It keeps no runs, so the run goes through its blocking route, and the run id is printed only with the recap, never at the start.
+- It takes no uploads, so a local file named in the inputs is refused, with a next step saying to give it as an `http(s)://` URL.
+- It has no catalog, so a catalog id (`mt_…`) is refused. A published address is fetched by the server itself.
 
 ## Input File Formats
 
@@ -11067,7 +11201,7 @@ pipelex run method github.com/Pipelex/methods/text_stats@v0.1.7 --hosted --input
 What decides whether Python in a method is acceptable is **where it would execute**:
 
 - `.mthds` content is data — always fine.
-- **PipeFunc `.py`** is supported: on hosted deployments it executes in a network-blocked sandbox, never in the runner's process.
+- **PipeFunc `.py`** is supported: on hosted deployments it executes in a network-blocked sandbox, never in the runner's process. This holds for a package the hosted runner fetches by its address; a local bundle sent with `--hosted` carries only its `.mthds` files, so its PipeFuncs stay behind (see [Running on the Hosted API](run.md#running-on-the-hosted-api)).
 - **Python structure classes** (`StructuredContent` subclasses) would have to be imported into the runner's own process to back a concept, so *hosted execution accepts MTHDS concepts and sandboxed PipeFuncs, not in-process Python*. A fetched method declaring structure classes runs locally, but the CLI prints a hosted-parity warning with the route: declare the types as MTHDS concepts with inline structures, and have a PipeFunc import the classes the sandbox generates from them (`from structures import <domain>__<Concept>`). The module `pipelex build structures` writes is accepted as long as it is left as generated.
 
 ## Bounds
@@ -11898,7 +12032,7 @@ It ships in the same `cli` extra as the main CLI, `uv tool install "pipelex[cli]
 There is no `--log-level` flag: `pipelex-agent` is machine-consumed, so logging is cut off process-wide by design.
 
 !!! warning "`--runner api` is gone"
-    The global `--runner pipelex|api` option and its MTHDS API runner path are removed. Where a run executes is now a `run` subcommand option, `--runner local|hosted`, and the hosted value runs on the hosted Pipelex API through pipelex-sdk, with the key in `PIPELEX_API_KEY` rather than `MTHDS_API_KEY`. A self-hosted runner is reached with `--runner hosted --base-url <origin>`. To target an arbitrary MTHDS runner, use the vendor-neutral `mthds-agent` CLI.
+    The global `--runner pipelex|api` option and its MTHDS API runner path are removed. Where a run executes is now a `run` subcommand option, `--runner local|hosted`, and the hosted value runs on the hosted Pipelex API through pipelex-sdk, with the key in `PIPELEX_API_KEY` rather than `MTHDS_API_KEY`. A self-hosted runner is reached with `--runner hosted --base-url <origin>`; it keeps no runs, takes no uploads and has no catalog, as [Running on the Hosted API](run.md#running-on-the-hosted-api) describes. To target an arbitrary MTHDS runner, use the vendor-neutral `mthds-agent` CLI.
 
 ## Commands Overview
 
@@ -11932,7 +12066,7 @@ For `bundle` and `method`, use `--pipe` to target a specific pipe.
 
 #### Running on the hosted API
 
-With `--runner hosted` (or `--hosted`, or `[run] execution = "hosted"`), the run executes on the hosted Pipelex API and nothing local is booted: no provider key or inference configuration is needed on this machine, only a Pipelex API key in `PIPELEX_API_KEY` (in the shell, or in `~/.pipelex/.env`). What the run sends is what a local run would load. `run bundle` sends the bundle, then every `.mthds` file of its library directories. `run pipe` sends its library directories' files (the installed method exporting the pipe and `-L`, else `PIPELEXPATH`) and is refused when it has none. `run method` sends an installed or local method's files, but a published address (`github.com/owner/repo[/name][@tag]`) goes as a `method_ref` and a stored method's catalog id (`mt_…`) as a `method_id`, both resolved by the hosted API, so nothing is fetched or read locally and `-L` is refused with them. A local file named at a document or image input is uploaded first (a relative path in an inputs file resolves against that file's directory, and a `file://` URI is read as its path), and the run's inputs carry its storage URI; an explicit `null`, such as an optional image left out, reaches the run as `null`. The method's signature is read only when some value of the inputs names an existing file on this machine, so inputs naming none go straight to the run, a method calling another one by its address included. Such a method cannot have a local file uploaded yet: give the file as an `https://` URL. `run bundle` on a bundle file with no `-L` sends `PIPELEXPATH`'s files too, as a local run loads them, and `run method` takes a method installed under a name spelled like a catalog id (`mt_reports`) as that method. `--dry-run` and `--mock-inputs` are refused on a hosted run. Its requests name their client in the `User-Agent` as `pipelex-cli/<version>`, as `pipelex run --hosted` does, so the hosted API counts them as CLI runs.
+With `--runner hosted` (or `--hosted`, or `[run] execution = "hosted"`), the run executes on the hosted Pipelex API and nothing local is booted: no provider key or inference configuration is needed on this machine, only a Pipelex API key in `PIPELEX_API_KEY`, saved in `~/.pipelex/.env` by `pipelex login` or exported in the shell. A `.env` file Pipelex loads wins over the shell, and the working directory's wins over `~/.pipelex/.env`, so an exported key is read only when neither file sets the variable. What the run sends is what a local run would load, and only the contents of its `.mthds` files: a PipeFunc's Python, structure classes, `METHODS.toml` and the packages a dependency alias names stay on this machine, so a local bundle relying on them runs with `--runner local`. `run bundle` sends the bundle, then every `.mthds` file of its library directories. `run pipe` sends its library directories' files (the installed method exporting the pipe and `-L`, else `PIPELEXPATH`) and is refused when it has none. `run method` sends an installed or local method's files, but a published address (`github.com/owner/repo[/name][@tag]`) goes as a `method_ref` and a stored method's catalog id (`mt_…`) as a `method_id`, both resolved by the hosted API, so nothing is fetched or read locally and `-L` is refused with them. A local file named at a document or image input is uploaded first (a relative path in an inputs file resolves against that file's directory, and a `file://` URI is read as its path), and the run's inputs carry its storage URI, while a `.csv` path at a structured-list input is not uploaded, so give its rows as a JSON list; an explicit `null`, such as an optional image left out, reaches the run as `null`. The method's signature is read only when some value of the inputs names an existing file on this machine, so inputs naming none go straight to the run, a method calling another one by its address included. Such a method cannot have a local file uploaded yet: give the file as an `https://` URL. `run bundle` on a bundle file with no `-L` sends `PIPELEXPATH`'s files too, as a local run loads them, and `run method` takes a method installed under a name spelled like a catalog id (`mt_reports`) as that method. `--dry-run` and `--mock-inputs` are refused on a hosted run, while `--graph` / `--no-graph` and `--costs` / `--no-costs` are accepted and have no effect there, since a hosted run writes nothing to disk and emits no cost events on this machine (`pipelex run --hosted` refuses `--costs`). Its requests name their client in the `User-Agent` as `pipelex-cli/<version>`, as `pipelex run --hosted` does, so the hosted API counts them as CLI runs.
 
 The success envelope has the shape of a local run's. Compact, it is the main output's content. With `--with-memory`, `main_stuff.json` is that content (the hosted API renders no Markdown, so the markdown output shows the JSON), `working_memory` is the whole working memory, `pipeline_run_id` names the run on the hosted API, and `uploads` lists the files uploaded for it. A hosted run writes nothing to disk.
 
@@ -12125,7 +12259,7 @@ pipelex init config --local  # creates the project config at {project_root}/.pip
 !!! important "Configuration Setup Notes"
     1. By default `pipelex init config` targets the **global** `~/.pipelex/` directory, or the one `PIPELEX_HOME` names (see [below](#the-home-configuration-directory-pipelex_home)); pass `--local` to create the project-level `.pipelex/` instead.
     2. `pipelex init config` creates a **template** configuration file with sample settings. It does not include all possible configuration options - it's meant as a starting point.
-    3. Running `pipelex init config` will **overwrite** your existing `pipelex.toml` file without warning. Make sure to backup your configuration before running this command.
+    3. Running `pipelex init config` **replaces** your existing `pipelex.toml` with the template once you confirm, keeping only its `[run] execution` setting, so back up anything else you changed first. On a first setup, where no `inference/backends.toml` exists yet, it asks where your runs execute instead, and for the hosted Pipelex API it signs you in through your browser unless a Pipelex API key is already set (see [Init](../tools/cli/init.md#where-your-runs-execute)).
     4. Credentials (the `.env` in `~/.pipelex/`) always remain in the global directory regardless of `--local` — only config, inference, and telemetry files are written to the project `.pipelex/`.
 
 For a complete list of all possible configuration options, refer to the configuration group documentation below.
@@ -12529,7 +12663,7 @@ keywords_to_hilight = []
 
 ## The `json` Sink
 
-No section of its own: the sink writes to `console_log_target`, one JSON object per line and no ANSI ever. Each line carries `time` (ISO 8601, UTC, milliseconds, `Z`), `severity` (the level name), `logger` (the module-named logger), `message`, `exception` when the record carries one, `trace_id`, `span_id` and `trace_flags` when OpenTelemetry's current span names a trace, `pipelex.trace_id` and `pipelex.span_id` when a Pipelex span is active, and then every field, the run-scoped identifiers and the `data` attribute flat beside them, under their own names. The three standard trace keys are the ones OpenTelemetry specifies for trace context in a JSON log that is not OTLP, lowercase hex at their full widths (32, 16 and 2 digits), and they name OpenTelemetry's current span, your own code's, which Pipelex reads and never changes, so a collector or an error tracker joins the line to your trace. The two `pipelex.*` keys, 32 and 16 hex digits, name the Pipelex span active at the log call, the pipe's own or the LLM call's during a run. The two sets are independent, so a line in a run under no span of yours carries only the `pipelex.*` keys (see [Logging](../../tools/logging.md#the-trace-context)). Every key the sink writes, the trace keys included, is reserved on every line, so a field named like one of them is carried under a `field_` prefix whether or not the line carries an exception or a span, and a non-finite float is written as the string `"NaN"`, `"Infinity"` or `"-Infinity"`. The key names are the ones the CloudWatch agent, the Google Cloud Logging agent and any OTLP collector ingest without a parser.
+No section of its own: the sink writes to `console_log_target`, one JSON object per line and no ANSI ever. Each line carries `time` (ISO 8601, UTC, milliseconds, `Z`), `severity` (the level name), `logger` (the module-named logger), `message`, `exception` when the record carries one, `trace_id`, `span_id` and `trace_flags` when OpenTelemetry's current span names a trace, `pipelex.trace_id` and `pipelex.span_id` when a Pipelex span is active, and then every field, the run-scoped identifiers and the `data` attribute flat beside them, under their own names. The three standard trace keys are the ones OpenTelemetry specifies for trace context in a JSON log that is not OTLP, lowercase hex at their full widths (32, 16 and 2 digits), and they name OpenTelemetry's current span, your own code's, which Pipelex reads and never changes, so a collector or an error tracker joins the line to your trace. The two `pipelex.*` keys, 32 and 16 hex digits, name the Pipelex span active at the log call, the pipe's own or the LLM call's during a run. The two sets are independent, so a line in a run under no span of yours carries only the `pipelex.*` keys (see [Logging](../../tools/logging.md#the-trace-context)). Every key the sink writes, the trace keys included, is reserved on every line, so a field named like one of them is carried under a `field_` prefix whether or not the line carries an exception or a span, and a non-finite float is written as the string `"NaN"`, `"Infinity"` or `"-Infinity"`. A value JSON refuses outright, a circular reference or a mapping with a non-string key, is written as its `repr`, and every other field on the same line keeps its JSON type, so a number or a boolean beside it stays queryable as one. The key names are the ones the CloudWatch agent, the Google Cloud Logging agent and any OTLP collector ingest without a parser.
 
 ```json
 {"time": "2026-09-16T10:12:03.417Z", "severity": "INFO", "logger": "pipelex.pipe_operators.pipe_llm", "message": "Running the pipe", "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736", "span_id": "00f067aa0ba902b7", "trace_flags": "01", "pipelex.trace_id": "0af7651916cd43dd8448eb211c80319c", "pipelex.span_id": "b7ad6b7169203331", "request_id": "req-7f3a", "pipeline_run_id": "plr-01", "pipe_run_id": "pr-9c", "model": "gpt-5"}
@@ -12892,12 +13026,12 @@ class RunConfig(ConfigModel):
 ### Fields
 
 - `execution`: where a run executes when the command passes neither `--hosted` nor `--local` (nor `--runner` on the agent CLI).
-    - `"local"` (the default) runs on this machine, with the inference backends configured in `.pipelex/inference/` and your own provider keys.
+    - `"local"`, the package default that applies when no configuration file sets `execution`, runs on this machine, with the inference backends configured in `.pipelex/inference/` and your own provider keys.
     - `"hosted"` runs on the hosted Pipelex API, with the Pipelex API key in `PIPELEX_API_KEY`, at the origin in `PIPELEX_BASE_URL` (`https://api.pipelex.com` when unset). Nothing is booted locally, so no provider key or inference configuration is needed on this machine.
 
 A flag on the command always wins: with `execution = "hosted"`, `pipelex run … --local` still runs on this machine, and with `"local"`, `--hosted` sends that one run to the hosted API.
 
-[`pipelex init`](../../tools/cli/init.md#where-your-runs-execute) writes this setting from your answer to "Where should your runs execute?", and `pipelex-agent init` from the `execution` of its `--config`.
+[`pipelex init`](../../tools/cli/init.md#where-your-runs-execute) writes this setting from your answer to "Where should your runs execute?", whose default answer is `"hosted"`, and `pipelex-agent init` from the `execution` of its `--config`, `"local"` when the config names none.
 
 ## Example Configuration
 
@@ -12912,8 +13046,10 @@ Put it in your project's `.pipelex/pipelex.toml` to make hosted runs the default
 
 A hosted run reads its key and its origin from the environment, never from this file:
 
-- `PIPELEX_API_KEY` holds the Pipelex API key (`plx_sk_…`). [`pipelex login`](../../tools/cli/login.md) gets one through your browser and saves it in `~/.pipelex/.env`, which Pipelex loads at startup; you can also export it in your shell.
+- `PIPELEX_API_KEY` holds the Pipelex API key (`plx_sk_…`). [`pipelex login`](../../tools/cli/login.md) gets one through your browser and saves it in `~/.pipelex/.env`, which Pipelex loads at startup.
 - `PIPELEX_BASE_URL` overrides the origin, for a staging plane or a self-hosted Pipelex API server. `--base-url` on the command overrides it in turn. Either must be `scheme://host[:port]`, with no path such as `/v1`.
+
+Pipelex loads `~/.pipelex/.env`, then the `.env` of the working directory, and each file replaces the variables it sets. So for either variable, the working directory's `.env` wins over `~/.pipelex/.env`, which wins over a value exported in your shell: an exported value is read only when neither file sets the variable.
 
 ## Related Documentation
 
@@ -13523,7 +13659,7 @@ The Inference Backend Configuration System manages how Pipelex handles AI model 
 
 ## Configuration Approaches
 
-Pipelex calls AI models through backends you configure with your own provider API keys.
+Pipelex calls AI models through backends you configure with your own provider API keys. This is how runs on this machine reach their models: a run on the hosted Pipelex API uses none of this configuration and no provider key, only a Pipelex API key (see [Running on the Hosted API](../../tools/cli/run.md#running-on-the-hosted-api)).
 
 ### Bring Your Own Keys
 
@@ -15063,7 +15199,7 @@ Every one of the seven methods (`verbose`, `debug`, `dev`, `info`, `warning`, `e
 
 `fields` is a mapping of named values. Each entry becomes an attribute of the emitted `LogRecord`, which is where a formatter or a sink reads it: `record.files` for the example above, or `%(files)s` in a stdlib format string. Nothing from `fields` is written into the message, so `record.getMessage()` is exactly the text you passed.
 
-A value can be anything. It rides the record by reference and the sink serializes it on emit, on the calling thread, so what leaves the process is the value as it was at the call, and mutating it afterwards changes nothing already emitted. The `console` sink ignores it, the `json` sink dumps a pydantic model in JSON mode and falls back to `str` for a value JSON does not know, and the `otlp` sink carries a scalar or a sequence of scalars as an attribute and anything else as JSON text; prefer plain JSON-ready values (strings, numbers, booleans, lists and dictionaries of those) for anything meant to be queried later.
+A value can be anything. It rides the record by reference and the sink serializes it on emit, on the calling thread, so what leaves the process is the value as it was at the call, and mutating it afterwards changes nothing already emitted. The `console` sink ignores it, the `json` sink dumps a pydantic model in JSON mode and falls back to `str` for a value JSON does not know, and the `otlp` sink carries a scalar or a sequence of scalars as an attribute and anything else as JSON text; prefer plain JSON-ready values (strings, numbers, booleans, lists and dictionaries of those) for anything meant to be queried later. A value JSON refuses outright, a circular reference or a mapping with a non-string key, is written by the `json` sink as its `repr`, and that costs the value alone: every other field on the line keeps its JSON type, so a number or a boolean beside it is still queried as one.
 
 ### Naming convention
 
@@ -19573,7 +19709,7 @@ These two categories are managed by separate steps. `init_config()` copies only 
 
 | Command | Focus | What It Does |
 |---------|-------|--------------|
-| `pipelex init` | `all` | Full setup: config, where runs execute, then inference + routing + credentials (this machine) or sign-in (hosted), then telemetry |
+| `pipelex init` | `all` | Full setup: config, where runs execute, then inference + routing + credentials (this machine), then telemetry, then sign-in (hosted) |
 | `pipelex init config` | `config` | Copy config templates, then ask where runs execute and set it up if first-time |
 | `pipelex init inference` | `inference` | Interactive backend selection + routing for runs on this machine; never asks where runs execute |
 | `pipelex init routing` | `routing` | Routing profile customization only |
@@ -25499,6 +25635,8 @@ Once deployed locally, the API is available at:
 ```
 http://localhost:8081/v1
 ```
+
+To run methods on it from the `pipelex` CLI, give its origin, without `/v1`, to `--base-url` or `PIPELEX_BASE_URL`: `http://localhost:8081`. A value with a path is refused before any request is sent. See [Running on the Hosted API](../tools/cli/run.md#running-on-the-hosted-api) for what such a server does and does not do for a CLI run.
 
 ## Authentication
 
