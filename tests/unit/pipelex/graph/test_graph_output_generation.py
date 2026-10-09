@@ -287,14 +287,13 @@ class TestGraphspecCompanions:
 
         assert set(saved) == {"graphspec_json"}
         assert {path.name for path in tmp_path.iterdir()} == {"graphspec.json"}
-        removed = [str(call.args[0]) for call in warning_spy.call_args_list if "Removed" in str(call.args[0])]
-        assert {
-            name for name in (PIPE_IO_CONTRACTS_FILE_NAME, INPUT_FORM_FILE_NAME, OUTPUT_FORM_FILE_NAME) if any(name in msg for msg in removed)
-        } == {
+        removed_paths = [Path(call.kwargs["fields"]["file.path"]) for call in warning_spy.call_args_list if "Removed" in str(call.args[0])]
+        assert {path.name for path in removed_paths} == {
             PIPE_IO_CONTRACTS_FILE_NAME,
             INPUT_FORM_FILE_NAME,
             OUTPUT_FORM_FILE_NAME,
         }
+        assert {path.parent for path in removed_paths} == {tmp_path}
 
     async def test_a_fresh_directory_removes_nothing_and_says_nothing(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """The removal warning names a file that was there: a directory with no companions gets no warning."""

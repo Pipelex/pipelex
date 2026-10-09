@@ -24,6 +24,7 @@ from pipelex.runtime_hub import get_event_log_override
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.system.job_metadata import RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tracing.event_log_factory import make_event_log
 from pipelex.tracing.exceptions import EventLogError
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
@@ -142,7 +143,7 @@ def assemble_tracing(
                 event_log.close()
     except (OSError, json.JSONDecodeError, ValidationError, PipelexConfigError, MissingDependencyError, EventLogError) as read_error:
         message = f"Tracing assembly failed to read events for pipeline_run_id={pipeline_run_id}: {read_error}"
-        log.warning(message)
+        log.warning("Tracing assembly could not read the run's trace events", fields=error_fields(exc=read_error))
         if assemble_graph:
             result.graph_assembly_error = message
         if assemble_usage:
@@ -166,11 +167,10 @@ def assemble_tracing(
                 ),
                 mode=run_mode.graphspec_mode,
             )
-            log.debug(f"Graph assembled from {len(events)} events for pipeline_run_id={pipeline_run_id}")
+            log.debug("Assembled the graph from the trace events", fields={"event_count": len(events)})
         except ValidationError as validation_error:
-            message = f"Graph assembly failed for pipeline_run_id={pipeline_run_id}: {validation_error}"
-            log.warning(message)
-            result.graph_assembly_error = message
+            log.warning("The graph could not be assembled from the trace events", fields=error_fields(exc=validation_error))
+            result.graph_assembly_error = f"Graph assembly failed for pipeline_run_id={pipeline_run_id}: {validation_error}"
 
     return result
 

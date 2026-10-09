@@ -223,7 +223,7 @@ class PipeAbstract(ABC, BaseModel):
         # comes from the bundle's domain field, not from the pipe code itself.
         if "." in code:
             bare_code = code.rsplit(".", maxsplit=1)[1]
-            log.warning(f"Runtime pipe code '{code}' contains a namespace prefix, stripped to '{bare_code}'")
+            log.warning("A pipe code carries a namespace prefix, which was stripped: write the pipe code bare", fields={"pipe_code": code})
             code = bare_code
         if not is_snake_case(code):
             msg = f"Invalid pipe code syntax '{code}'. Must be in snake_case."
@@ -927,9 +927,9 @@ class PipeAbstract(ABC, BaseModel):
         the same way, so no downstream consumer meets a neither-value-nor-record hard miss.
         """
         lifted_input = liftable[0]
-        absent_names = ", ".join(absent.named_stuff_spec.variable_name for absent in liftable)
+        absent_names = [absent.named_stuff_spec.variable_name for absent in liftable]
         output_slot_name = output_name or MAIN_STUFF_NAME
-        log.info(f"Skipping {self.type} '{self.code}': absent input(s): {absent_names}")
+        log.info("Pipe run skipped for absent inputs", fields={"pipe_type": self.pipe_type, "pipe_code": self.code, "variable_names": absent_names})
 
         skip_reason = self._make_skip_reason(liftable=liftable)
         skip_record = AbsenceRecord(

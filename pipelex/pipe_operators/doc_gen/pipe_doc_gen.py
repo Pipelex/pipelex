@@ -298,8 +298,10 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         errors = [finding for finding in findings if finding.severity.is_error]
         for finding in findings:
             if not finding.severity.is_error:
-                location = f" ({finding.location})" if finding.location else ""
-                log.warning(f"PipeDocGen '{self.code}', template file '{self.template_file}'{location}: {finding.message}")
+                finding_fields: dict[str, str] = {"pipe_code": self.code, "template_file": self.template_file, "finding_message": finding.message}
+                if finding.location:
+                    finding_fields["finding_location"] = finding.location
+                log.warning("The template check of a PipeDocGen found a warning in its template file", fields=finding_fields)
         if errors:
             listed = "\n".join(f"- {finding.message}" + (f" ({finding.location})" if finding.location else "") for finding in errors)
             msg = f"PipeDocGen '{self.code}': the template file '{self.template_file}' does not fit the step's inputs:\n{listed}"

@@ -1,7 +1,9 @@
 from pathlib import Path
 
 import pytest
+from pytest_mock import MockerFixture
 
+from pipelex import log
 from pipelex.cogt.doc_gen.input_shape import InputShapeKind
 from pipelex.cogt.doc_gen.template_check import TemplateFinding, TemplateFindingSeverity
 from pipelex.pipeline.exceptions import ValidateBundleError
@@ -80,13 +82,28 @@ class TestPipeDocGenTemplateFiles:
         assert request.inputs["thing"].kind == InputShapeKind.ANY
         assert request.inputs["invoice"].kind == InputShapeKind.STRUCTURE
 
-    async def test_warnings_alone_pass_and_print_nothing(self, tmp_path: Path, stub_engines: StubEngines) -> None:
-        """A warning is logged, not raised, and the dry run prints nothing."""
+    async def test_warnings_alone_pass_and_print_nothing(self, tmp_path: Path, stub_engines: StubEngines, mocker: MockerFixture) -> None:
+        """A warning is logged, not raised, and the dry run prints nothing.
+
+        The line is the same for every finding, and the finding's own words and place ride as fields beside the step and its file.
+        """
+        warning_spy = mocker.spy(log, "warning")
         (tmp_path / "invoice.docx").write_bytes(b"docx bytes")
         bundle_path = write_bundle(directory=tmp_path, step_fields=_DOCX_TEMPLATE_STEP)
-        stub_engines.findings = [TemplateFinding(severity=TemplateFindingSeverity.WARNING, message="The notes are never printed")]
+        stub_engines.findings = [
+            TemplateFinding(severity=TemplateFindingSeverity.WARNING, message="The notes are never printed", location="the field notes on page 2")
+        ]
 
         await validate_bundle(mthds_file_path=bundle_path)
 
         assert len(stub_engines.check_requests) == 1
         assert stub_engines.engine.jobs == []
+        (finding_call,) = [
+            call for call in warning_spy.call_args_list if call.args[0] == "The template check of a PipeDocGen found a warning in its template file"
+        ]
+        assert finding_call.kwargs["fields"] == {
+            "pipe_code": "print_invoice",
+            "template_file": "invoice.docx",
+            "finding_message": "The notes are never printed",
+            "finding_location": "the field notes on page 2",
+        }

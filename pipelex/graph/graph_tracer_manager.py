@@ -11,6 +11,7 @@ from pipelex.graph.graphspec import GraphSpec, GraphSpecMode, IOSpec, NodeKind
 from pipelex.system.data_inclusion_config import DataInclusionConfig
 from pipelex.system.registries.singleton import ABCSingletonMeta, MetaSingleton
 from pipelex.system.trace_context import TraceContext
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # ruff: ignore[typing-only-first-party-import] - used in open_tracer signature
 
 
@@ -145,7 +146,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         # value is ambiguous (None both when no tracer existed and when a costs-only tracer
         # legitimately tears down without a GraphSpec).
         if key in self._tracers:
-            log.warning(f"Tracer for key '{key}' already exists; replacing stale tracer left by a prior interrupted execution")
+            log.warning("Replacing a graph tracer left over by an interrupted execution whose cleanup never ran", fields={"tracer_key": key})
             try:
                 self.close_tracer(key)
             except Exception as stale_teardown_exc:  # ruff: ignore[blind-except]
@@ -154,7 +155,10 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
                 # fail the fresh run's setup (that would be the M1 class again: worker-local
                 # leak state deciding setup success). close_tracer pops before tearing down,
                 # so the key is free either way.
-                log.warning(f"Stale tracer teardown for key '{key}' failed; replacing anyway: {stale_teardown_exc}")
+                log.warning(
+                    "The teardown of a stale graph tracer raised; replacing it anyway",
+                    fields={"tracer_key": key, **error_fields(exc=stale_teardown_exc)},
+                )
 
         tracer = GraphTracer()
 
