@@ -1,0 +1,12 @@
+name = "invalid_input_name_branch_result_not_plain"
+description = "The shopping list and the cooking card of a recipe written in parallel, one branch storing its list under a name that is not a plain input name"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.invalid_input_name",
+]
+
+expected_error = "invalid_input_name"

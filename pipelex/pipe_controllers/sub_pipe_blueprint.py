@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, model_validator
 
 from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.pipe_controllers.binding.binding_step_blueprint import PATH_GRAMMAR_DESCRIPTION
-from pipelex.pipe_machinery.validation import check_name_is_not_reserved
+from pipelex.pipe_machinery.validation import check_name_is_not_reserved, check_stored_name
 from pipelex.tools.misc.string_utils import is_field_path
 from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_list
 from pipelex.validation_error_types import PipeValidationErrorType
@@ -68,16 +68,19 @@ class SubPipeBlueprint(BaseModel):
         raise PipeValidationError(message=msg, error_type=PipeValidationErrorType.BINDING_STEP_INVALID, variable_names=[self.batch_over])
 
     @model_validator(mode="after")
-    def validate_reserved_names(self) -> Self:
-        """Refuse a name taking the prefix the runtime reserves for the bound list of a dotted `batch_over`, on a sequence step and a
-        parallel branch alike.
+    def validate_stored_names(self) -> Self:
+        """Hold the names the step stores values under to the input-name form, and keep a plain `batch_over` off the reserved
+        prefix, on a sequence step and a parallel branch alike.
 
-        A step stores its `result` and hands each item to its pipe under `batch_as`, both in working memory, and batches over a
-        plain `batch_over` by name. A nested sequence binds in its caller's working memory, so a name of the caller taking the
-        prefix could be overwritten by a list the nested sequence binds, and read back as another value.
+        A step stores its `result` and hands each item to its pipe under `batch_as`, both in working memory, for a pipe to read
+        through an input, so each is a stored name and takes the plain input-name form. A plain `batch_over` reads a name rather
+        than storing one, and only stays off the prefix the runtime reserves for the bound list of a dotted `batch_over`: a nested
+        sequence binds in its caller's working memory, so a step batching over a name taking the prefix could read a list a
+        sequence it calls binds. A dotted `batch_over` follows the path grammar, whose segments are never underscore-led.
         """
-        named_fields = (("result", self.result), ("batch_as", self.batch_as), ("batch_over", self.batch_over))
-        for field_name, name in named_fields:
+        for field_name, name in (("result", self.result), ("batch_as", self.batch_as)):
             if name is not None:
-                check_name_is_not_reserved(name=name, field_label=f"The `{field_name}` of the step running pipe '{self.pipe}'")
+                check_stored_name(name=name, field_label=f"The `{field_name}` of the step running pipe '{self.pipe}'")
+        if self.batch_over is not None:
+            check_name_is_not_reserved(name=self.batch_over, field_label=f"The `batch_over` of the step running pipe '{self.pipe}'")
         return self

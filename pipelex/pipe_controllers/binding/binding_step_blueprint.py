@@ -4,7 +4,7 @@ from typing import Any, cast
 from pydantic import BaseModel, ConfigDict, Field, SerializerFunctionWrapHandler, field_validator, model_serializer
 
 from pipelex.core.pipes.exceptions import PipeValidationError
-from pipelex.pipe_machinery.validation import BINDING_PATH_PATTERN, BINDING_RESULT_PATTERN
+from pipelex.pipe_machinery.validation import BINDING_PATH_PATTERN, STORED_NAME_PATTERN
 from pipelex.tools.misc.string_utils import FIELD_PATH_SEGMENT_REGEX, SNAKE_CASE_IDENTIFIER_REGEX, is_field_path, is_snake_case
 from pipelex.validation_error_types import PipeValidationErrorType
 
@@ -81,7 +81,7 @@ class BindingStepBlueprint(BaseModel):
     )
     result: str = Field(
         description="The name under which the bound value is stored in working memory: a plain input name.",
-        json_schema_extra={"pattern": BINDING_RESULT_PATTERN},
+        json_schema_extra={"pattern": STORED_NAME_PATTERN},
     )
 
     @field_validator("from_path", mode="after")

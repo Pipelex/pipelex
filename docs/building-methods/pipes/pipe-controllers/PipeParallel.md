@@ -62,7 +62,9 @@ Each entry in the `branches` array is a table with the following keys:
 | Key      | Type   | Description                                                                              | Required |
 | -------- | ------ | ---------------------------------------------------------------------------------------- | -------- |
 | `pipe`   | string | The name of the pipe to execute for this branch.                                         | Yes      |
-| `result` | string | The name for this branch's output. Must be unique within the `PipeParallel` definition. | Yes      |
+| `result` | string | The name for this branch's output, a plain `snake_case` input name such as `sentiment`. Must be unique within the `PipeParallel` definition. | Yes      |
+
+A branch's `result` and `batch_as` are [stored names](PipeSequence.md#stored-names), as on a sequence step: the branch stores a value under each for a pipe to read through an input, so each is a plain input name matching `[a-z][a-z0-9_]*`, and one in any other form, such as `Sentiment` or `text.sentiment`, is refused with `invalid_input_name`. Since the combined output holds each branch result under its `result` name, the fields of a structured output concept that the branches fill have plain names too.
 
 A branch is always a pipe step. A [binding step](PipeSequence.md#binding-steps), `{ from = "invoice.total", result = "total_amount" }`, is refused in `branches` with `binding_step_invalid`: the branches run at once, and a binding orders a value before the steps that read it, so bind the value in the calling sequence, in a step before the `PipeParallel`, and have the branch read the bound name. A branch may carry `batch_over` and `batch_as`, but its `batch_over` is a plain name: a dotted one, such as `catalog.pages`, binds before it batches (see [Batching over a field](PipeSequence.md#batching-over-a-field)), so it is refused with `binding_step_invalid` too, and the calling sequence binds the list before the `PipeParallel`.
 
