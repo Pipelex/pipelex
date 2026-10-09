@@ -115,9 +115,9 @@ class Pypdfium2Worker(ExtractWorkerAbstract):
                     elif len(page_images) > remaining_slots:
                         original_count = len(page_images)
                         page_images = page_images[:remaining_slots]
-                        log.warning(
-                            f"Pypdfium2 extracted {original_count} images on page {page_number}, "
-                            f"truncated to {len(page_images)} (max_nb_images={max_nb_images})"
+                        log.debug(
+                            "Truncated the images extracted from a page to the requested maximum",
+                            fields={"page_number": page_number, "image_count": original_count, "kept_image_count": len(page_images)},
                         )
                 total_images_count += len(page_images)
                 pages[page_number] = Page(text=page_text, extracted_images=page_images)
@@ -125,6 +125,7 @@ class Pypdfium2Worker(ExtractWorkerAbstract):
                 pages[page_number] = Page(text=page_text)
 
         if max_nb_images is not None and total_images_count < sum(len(imgs) for imgs in all_page_images.values()):
-            log.warning(f"Pypdfium2 does not support native image limiting. Extracted all images then truncated to {max_nb_images}.")
+            # The caller gets the number of images it asked for: Pypdfium2 cannot limit them natively, so they are all extracted then truncated
+            log.debug("Extracted every image of the document, then truncated them to the requested maximum", fields={"max_nb_images": max_nb_images})
 
         return ExtractOutput(pages=pages)

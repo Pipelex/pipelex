@@ -140,8 +140,9 @@ class TestBackendLibraryOverrides:
 
         override_path.write_text("[acme]\nenabled = true\n")
         self._load(paths=[base_path, override_path], backends_dir=backends_dir)
-        logged = " ".join(str(call.args[0]) for call in logger.info.call_args_list)
-        assert str(override_path) in logged
+        # The merged files ride as fields, base then overrides, never spliced into the message
+        logger.info.assert_called_once()
+        assert logger.info.call_args.kwargs["fields"] == {"file.path": str(base_path), "override_paths": [str(override_path)]}
 
     @pytest.mark.parametrize("credentials", [CredentialResolution.REQUIRE, CredentialResolution.SKIP])
     def test_a_scalar_where_a_table_was_meant_is_refused_in_both_modes(self, tmp_path: Path, credentials: CredentialResolution) -> None:

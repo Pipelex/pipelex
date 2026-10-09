@@ -45,8 +45,11 @@ def load_active_routing_profile(
     except TomlError as toml_exc:
         msg = f"Invalid routing profile library {library_description}: {toml_exc}"
         raise RoutingProfileLibraryError(msg) from toml_exc
-    if present_toml_override_paths(paths=routing_profile_library_paths):
-        log.info(f"Routing profiles read from {library_description}")
+    if override_paths := present_toml_override_paths(paths=routing_profile_library_paths):
+        log.info(
+            "The routing profiles were read with override files merged over the base",
+            fields={"file.path": str(routing_profile_library_paths[0]), "override_paths": [str(override_path) for override_path in override_paths]},
+        )
 
     # Validate the routing profile library configuration
     try:

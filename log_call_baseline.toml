@@ -70,107 +70,9 @@ calls = [
   "info: f\"No library directories to load ({source_label})\" [f-string]",
 ]
 
-["pipelex/cogt/content_generation/generated_content_factory.py::GeneratedContentFactory.make_image_content"]
-calls = [
-  "warning: f\"Failed to fetch a remote image: {exc}\" [f-string]",
-]
-
-["pipelex/cogt/img_gen/img_gen_args_factory.py::ImgGenArgsFactory.make_args_from_inference"]
-calls = [
-  "warning: f\"Number of inference steps {num_inference_steps} for SDXL Lightning must be one of {acceptable_steps}\" [f-string]",
-]
-
-["pipelex/cogt/img_gen/img_gen_args_factory.py::ImgGenArgsFactory.make_args_from_prompt"]
-calls = [
-  "warning: f\"A negative prompt was provided but the model's prompt taxonomy is '{PromptTaxonomy.POSITIVE_ONLY}', which does not support negative prompts. The negative prompt will be silently ignored.\" [f-string]",
-]
-
-["pipelex/cogt/img_gen/img_gen_gpt_mapping.py::ImgGenGptMapping.validate_gpt_image_2_size"]
-calls = [
-  "warning: msg [f-string] where msg = f\"Size '{size_string}' is valid for OpenAI image model '{model_name}', but it is above the 2560x1440 reliability boundary.\"",
-]
-
-["pipelex/cogt/llm/llm_prompt.py::LLMPrompt.validate_before_execution"]
-calls = [
-  "error: f\"Prompt template system_text should be None or contain text. system_text = '{self.system_text}'\" [f-string]",
-  "warning: f\"system_text should be None or contain text. system_text = '{self.system_text}'\" [f-string]",
-  "warning: f\"system_text should be None or contain text. system_text = '{self.system_text}'\" [f-string]",
-]
-
-["pipelex/cogt/model_backends/backend_library.py::InferenceBackendLibrary.load"]
-calls = [
-  "info: f\"Inference backends read from {library_paths_description}\" [f-string]",
-]
-
-["pipelex/cogt/model_routing/routing_profile_loader.py::load_active_routing_profile"]
-calls = [
-  "info: f\"Routing profiles read from {library_description}\" [f-string]",
-]
-
-["pipelex/cogt/models/model_deck.py::ModelDeck._get_optional_inference_model"]
-calls = [
-  "warning: f\"Model handle '{ref.name}' is served as {served_types_description} but was requested as '{model_type}'. Skipping.\" [f-string]",
-]
-
-["pipelex/cogt/models/model_deck.py::ModelDeck._resolve_alias"]
-calls = [
-  "warning: f\"Circular model reference detected: alias '{alias_name}' leads back to itself\" [f-string]",
-]
-
-["pipelex/cogt/models/model_deck.py::ModelDeck._resolve_waterfall"]
-calls = [
-  "info: msg [f-string] where msg += f\" Please see our docs for more details about setting up inference backends:\\n{URLs.backend_provider_docs}\"; msg = f\"Inference model fallback: '{ideal_model_handle}' was not found in the model deck, so it was replaced by '{fallback}'. As a consequence, the results of the method may not have the expected quality, and the method might fail due to feature limitations such as context window size, etc. Consider getting access to '{ideal_model_handle}'.\"",
-  "warning: f\"Circular model reference detected: waterfall '{waterfall_name}' leads back to itself\" [f-string]",
-]
-
-["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_doc_gen"]
-calls = [
-  "warning: f\"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity.\" [f-string]",
-]
-
-["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_extract"]
-calls = [
-  "warning: f\"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity.\" [f-string]",
-]
-
-["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_img_gen"]
-calls = [
-  "warning: f\"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity.\" [f-string]",
-]
-
-["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_judgment"]
-calls = [
-  "warning: f\"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity.\" [f-string]",
-]
-
-["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_llm"]
-calls = [
-  "warning: f\"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity.\" [f-string]",
-]
-
-["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_search"]
-calls = [
-  "warning: f\"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity.\" [f-string]",
-]
-
-["pipelex/cogt/models/model_deck.py::ModelDeck.validate_registered_models"]
-calls = [
-  "warning: f\"DocGen handle not found: {exc}\" [f-string]",
-  "warning: f\"Extract handle not found: {exc}\" [f-string]",
-  "warning: f\"ImgGen handle not found: {exc}\" [f-string]",
-  "warning: f\"Judgment handle not found: {exc}\" [f-string]",
-  "warning: f\"LLM handle not found: {exc}\" [f-string]",
-  "warning: f\"Search handle not found: {exc}\" [f-string]",
-]
-
 ["pipelex/cogt/models/model_manager.py::ModelManager.setup"]
 calls = [
   "warning: stale_warning [non-literal] where stale_warning = self.inference_backend_library.take_stale_configuration_warning()",
-]
-
-["pipelex/cogt/usage/cost_registry.py::CostRegistry.generate_report"]
-calls = [
-  "warning: f\"No report to generate for pipeline '{pipeline_run_id}'\" [f-string]",
 ]
 
 ["pipelex/config.py::is_method_fetch_on_miss_enabled"]
@@ -215,17 +117,6 @@ calls = [
 calls = [
   "warning: f\"Stale tracer teardown for key '{key}' failed; replacing anyway: {stale_teardown_exc}\" [f-string]",
   "warning: f\"Tracer for key '{key}' already exists; replacing stale tracer left by a prior interrupted execution\" [f-string]",
-]
-
-["pipelex/kernel/judgment_ops.py::run_judgment"]
-calls = [
-  "warning: f\"Judgment '{job_metadata.pipe_code or 'unnamed step'}' declares a threshold of {threshold}, but model '{judgment_setting.model}' reported no probability, so its own verdict stands.\" [f-string]",
-]
-
-["pipelex/kernel/llm_ops.py::concrete_llm_model_handle"]
-calls = [
-  "warning: f\"Cycle resolving model reference '{model}' at '{current}'; reporting it unresolved\" [f-string]",
-  "warning: f\"Model reference '{model}' did not resolve within {_MAX_MODEL_RESOLUTION_HOPS} hops\" [f-string]",
 ]
 
 ["pipelex/libraries/domain/domain_metadata_merge.py::merge_domain_metadata_field"]
@@ -392,37 +283,6 @@ calls = [
 ["pipelex/plugins/discovery.py::_skip_if_disabled"]
 calls = [
   "info: f\"Plugin '{name}' is disabled via runtime.plugins.disabled; skipping.\" [f-string]",
-]
-
-["pipelex/providers/pypdfium2/pypdfium2_worker.py::Pypdfium2Worker._extract_pages"]
-calls = [
-  "warning: f\"Pypdfium2 does not support native image limiting. Extracted all images then truncated to {max_nb_images}.\" [f-string]",
-  "warning: f\"Pypdfium2 extracted {original_count} images on page {page_number}, truncated to {len(page_images)} (max_nb_images={max_nb_images})\" [f-string]",
-]
-
-["pipelex/providers/typesafe/typesafe_judgment_worker.py::TypesafeJudgmentWorker._warn_if_another_model_answered"]
-calls = [
-  "warning: f\"TypeSafe was asked for judgment model '{self.inference_model.model_id}' and answered as '{response.model}': verdicts and their thresholds may not mean what they meant under the pinned model\" [f-string]",
-]
-
-["pipelex/reporting/cost_report_renderer.py::render_run_cost_report"]
-calls = [
-  "warning: f\"Cost report generation failed (run succeeded): {cost_report_error}\" [f-string]",
-]
-
-["pipelex/reporting/reporting_manager.py::ReportingManager._emit_best_effort"]
-calls = [
-  "warning: f\"Usage event emit failed; dropping: {exc}\" [f-string]",
-]
-
-["pipelex/reporting/reporting_manager.py::ReportingManager._emit_usage_event_runner_fallback"]
-calls = [
-  "warning: f\"Runner-side activity event log construction failed; dropping usage event: {exc}\" [f-string]",
-]
-
-["pipelex/reporting/reporting_manager.py::ReportingManager.report_inference_job"]
-calls = [
-  "warning: f\"ReportingManager does not support reporting for inference job type: {type(inference_job).__name__}\" [f-string]",
 ]
 
 ["pipelex/runtime_boot.py::RuntimeBoot.__init__"]

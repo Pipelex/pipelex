@@ -285,8 +285,8 @@ class TestCostRegistry:
 
     def test_generate_report_with_empty_data(self, mocker: MockerFixture):
         """Test proper handling when no usage data."""
-        # Mock logging
-        mock_log_warning = mocker.patch("pipelex.cogt.usage.cost_registry.log.warning")
+        # Mock logging: a run with no usage is not something an operator acts on, so it is noted at DEBUG
+        mock_log_debug = mocker.patch("pipelex.cogt.usage.cost_registry.log.debug")
 
         # Test with non-untitled pipeline
         CostRegistry.generate_report(
@@ -295,16 +295,16 @@ class TestCostRegistry:
             unit_scale=1.0,
             cost_report_file_path=None,
         )
-        mock_log_warning.assert_called_once()
+        mock_log_debug.assert_called_once()
 
-        # Test with untitled pipeline: nothing more is warned
+        # Test with untitled pipeline: nothing more is noted
         CostRegistry.generate_report(
             pipeline_run_id="untitled",
             tokens_usages=[],
             unit_scale=1.0,
             cost_report_file_path=None,
         )
-        mock_log_warning.assert_called_once()
+        mock_log_debug.assert_called_once()
 
     def test_generate_report_with_file_output(self, job_metadata: JobMetadata, tmp_path: Path, mocker: MockerFixture):
         """Test that CSV file is created when file path is provided."""

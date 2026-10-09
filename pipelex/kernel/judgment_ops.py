@@ -160,8 +160,8 @@ async def run_judgment(
         content, threshold_applied = make_verdict_content(answer=answer, threshold=threshold, is_dry=cogt_run_params.run_mode.is_dry)
         if threshold_applied is False:
             log.warning(
-                f"Judgment '{job_metadata.pipe_code or 'unnamed step'}' declares a threshold of {threshold}, but model "
-                f"'{judgment_setting.model}' reported no probability, so its own verdict stands."
+                "A judgment declares a threshold, but its model reported no probability, so the model's own verdict stands",
+                fields={"pipe_code": job_metadata.pipe_code, "threshold": threshold, "model_handle": judgment_setting.model},
             )
         return JudgmentResult(
             memory=store_result(memory=memory, concept=concept, content=content, result_name=result_name, result_code=result_code),
