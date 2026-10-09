@@ -6,6 +6,18 @@
 
 - **The console shows a log call's fields and renders named layouts**: the `console` sink prints a record's fields after its message as a `key=value` suffix, `Scanned the inputs files=7`, each value on one line and cut short when long, leaving out the run identifiers, and colours a value by its field's name, a pipe code red and a concept bold green, with any other field dimmed. A call can name a console layout with `layout=`, a Rich template over its fields in which every value is escaped, starting with `LogLayout.PIPE_RUN` for the pipe-run tree; every other sink writes the plain message and the fields.
 
+### Changed
+
+- **The pipe announcement is a plain message with fields**: every live pipe run logs `Pipe run starts` with `pipe_type`, `pipe_code`, `output_concept`, `pipe_depth` and `is_dry_run` as fields, where the `json`, `otlp` and `gcp` sinks used to receive Rich markup inside the message, and the console draws the same coloured pipe tree from those fields through `LogLayout.PIPE_RUN`. The warning that a model's fixed temperature replaced the requested one names the model and both temperatures as fields in the same way.
+
+### Fixed
+
+- **Model descriptions carry no backslashes**: a model's description in an error message or a log line, such as `gpt-5 → SDK[openai]•Backend[openai]•Model[gpt-5-2025]`, no longer has a backslash before each bracket, and `pipelex run` prints a failed run's message exactly as written rather than reading it as markup.
+
+### Removed
+
+- **`is_markup_enabled` (Breaking)**: the console reads no log message as Rich markup, so the `[runtime.log.rich_log]` key that switched it is gone, along with `VERBATIM_MARK` in `pipelex.tools.log.log_fields`. A message now prints exactly as written, so a `list[int]`, a bracketed path, the `[myapp.jobs.nightly]: ` prefix of a logger named in lowercase and the `[cycle]` marker of a circular content no longer vanish, while a message of your own that relied on markup for its colour shows its tags and should put its values in `fields`. **Migration:** run `pipelex migrate`, which deletes the key from the file on disk (ledger entry `pipelex-config@7`).
+
 ## [v0.80.0] - 2026-10-09
 
 ### Changed

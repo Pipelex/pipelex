@@ -134,9 +134,17 @@ class TestExecuteRunWrapper:
         assert exc_info.value.exit_code == 1
         wrapper_mocks["teardown"].assert_called_once()
 
-    def test_pipelex_error_prints_message_and_exits(self, wrapper_mocks: dict[str, Any]) -> None:
-        """A PipelexError prints the friendly failure message and exits 1."""
-        wrapper_mocks["core"].side_effect = PipelexError("the pipe blew up")
+    @pytest.mark.parametrize(
+        "message",
+        [
+            "the pipe blew up",
+            "Model 'gpt-5 → SDK[openai]•Backend[openai]•Model[gpt-5-2025]' does not support documents",
+            "Expected list[int], got [red]str[/red]",
+        ],
+    )
+    def test_pipelex_error_prints_message_and_exits(self, wrapper_mocks: dict[str, Any], message: str) -> None:
+        """A PipelexError prints the friendly failure message, its own message exactly as written, and exits 1."""
+        wrapper_mocks["core"].side_effect = PipelexError(message)
 
         with pytest.raises(typer.Exit) as exc_info:
             _call_execute_run()
@@ -144,7 +152,7 @@ class TestExecuteRunWrapper:
         assert exc_info.value.exit_code == 1
         output = wrapper_mocks["console"].export_text()
         assert "Failed to execute pipeline" in output
-        assert "the pipe blew up" in output
+        assert message in output
 
     def test_unexpected_error_prints_exception_and_exits(self, wrapper_mocks: dict[str, Any]) -> None:
         """An unexpected exception prints the rich traceback and exits 1."""

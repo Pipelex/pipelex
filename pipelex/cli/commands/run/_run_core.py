@@ -560,7 +560,8 @@ def execute_run(
         console = get_console()
         print_traceback_if_requested(console=console)
         console.print("\n[bold red]Failed to execute pipeline[/bold red]\n")
-        console.print(f"  {exc.message}\n")
+        # The message is plain text, a model's description such as `SDK[openai]` or a type such as `list[int]` included
+        console.print(f"  {escape(exc.message)}\n")
         raise typer.Exit(1) from exc
 
     except Exception as exc:

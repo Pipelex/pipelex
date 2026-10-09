@@ -1,5 +1,7 @@
 from typing import ClassVar
 
+from mthds.protocol.pipeline_inputs import PipelineInputs
+
 
 class LocatedRunFailureTestData:
     """Bundles whose runs fail at a nested pipe, one per way a run failure is located."""
@@ -418,7 +420,7 @@ class LogMarkupTestData:
 
     MAIN_PIPE: ClassVar[str] = "profile_company"
 
-    INPUTS: ClassVar[dict[str, str]] = {"brief": "Acme builds reusable rockets in Toulouse and sells launches to research labs."}
+    INPUTS: ClassVar[PipelineInputs] = {"brief": "Acme builds reusable rockets in Toulouse and sells launches to research labs."}
 
     MTHDS: ClassVar[str] = """
 domain = "log_markup_check"

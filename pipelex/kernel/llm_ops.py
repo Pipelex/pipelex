@@ -108,7 +108,10 @@ def check_llm_setting_with_served_model(*, llm_setting: LLMSetting, is_structure
         check_request(inference_model=inference_model, job_params=job_params, is_structured=is_structured)
     except MissingDependencyError:
         # The backend's SDK is not installed here, so no worker for the model can be built: the run says so
-        log.verbose(f"Model '{inference_model.desc}' was not checked: its backend's SDK is not installed")
+        log.verbose(
+            "The model's settings were not checked: its backend's SDK is not installed",
+            fields={"model_handle": inference_model.name, "backend": inference_model.backend_name, "sdk": inference_model.sdk},
+        )
     except LLMCapabilityError as refusal:
         if registered_check and not registered_check.is_builtin:
             # An external plugin's text may carry what it keeps private: it reaches the caller only if the plugin vouched for it

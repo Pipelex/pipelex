@@ -34,7 +34,7 @@ from pipelex.tools.misc.pretty import MARKUP_TAG_PATTERN
 from tests.integration.pipelex.pipeline.test_data import LogMarkupTestData
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Generator
 
     from pytest_mock import MockerFixture
 
@@ -74,7 +74,7 @@ def _stand_in_worker() -> StandInLLMWorker:
 
 
 @contextmanager
-def _json_sink_on_root(*, buffer: io.StringIO) -> Iterator[None]:
+def _json_sink_on_root(*, buffer: io.StringIO) -> Generator[None]:
     """The ``json`` sink's handler on the root logger, beside whatever the session installed, for as long as the block runs."""
     handler = JsonLogSink(stream=buffer).handler
     root_logger = logging.getLogger()
@@ -115,7 +115,5 @@ class TestLogMessagesCarryNoMarkup:
             ("route_report", 1),
             ("compose_report", 2),
         }
-        carrying_markup = [
-            f"{line[LOGGER_KEY]}: {line[MESSAGE_KEY]!r}" for line in lines if MARKUP_TAG_PATTERN.search(line[MESSAGE_KEY]) is not None
-        ]
+        carrying_markup = [f"{line[LOGGER_KEY]}: {line[MESSAGE_KEY]!r}" for line in lines if MARKUP_TAG_PATTERN.search(line[MESSAGE_KEY]) is not None]
         assert not carrying_markup, "These log messages carry what Rich reads as a markup tag:\n" + "\n".join(carrying_markup)
