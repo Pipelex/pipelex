@@ -17,6 +17,7 @@ from pipelex.core.memory.absence_render import build_absence_html, build_absence
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.json_utils import clean_json_dumps
 
 if TYPE_CHECKING:
@@ -167,7 +168,10 @@ async def run_pipeline_core(
         try:
             cost_summary = CostRegistry.build_cost_summary(tokens_usages=pipe_output.tokens_usages)
         except PipelexError as cost_summary_error:
-            log.warning(f"Cost summary generation failed (run succeeded): {cost_summary_error}")
+            log.warning(
+                "The run succeeded but its cost summary could not be built, so the output carries no cost report",
+                fields=error_fields(exc=cost_summary_error),
+            )
         else:
             if cost_summary is not None:
                 side_effects["cost_report"] = cost_summary

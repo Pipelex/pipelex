@@ -21,10 +21,11 @@ def _read_positive_int(*, env_var: str, default: int) -> int:
     try:
         parsed = int(raw)
     except ValueError:
-        log.warning(f"Invalid {env_var}={raw!r}, falling back to {default}")
-        return default
+        parsed = 0
     if parsed <= 0:
-        log.warning(f"{env_var} must be positive (got {parsed}), falling back to {default}")
+        log.warning(
+            "An environment variable holds no positive integer, so the default ceiling applies", fields={"env_var": env_var, "default_value": default}
+        )
         return default
     return parsed
 

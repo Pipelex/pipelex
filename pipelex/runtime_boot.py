@@ -685,10 +685,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         for teardown_callback in reversed(self._plugin_registrar.teardown_callbacks):
             try:
                 teardown_callback()
-            except Exception as teardown_exc:  # ruff: ignore[blind-except]
+            except Exception:  # ruff: ignore[blind-except]
                 # (2) a plugin-registered callback is unbounded third-party code; its exception surface
                 # cannot be enumerated, and the remaining callbacks still have resources to release.
-                log.error(f"A plugin teardown callback failed and was skipped: {teardown_exc}")
+                log.error("A plugin teardown callback failed, and the remaining callbacks still run", include_exception=True)
 
     def _teardown_runtime(self) -> None:
         """Release what the runtime boot acquired, and the process-global *state* with it.
@@ -848,10 +848,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             if self.telemetry_manager is not None:
                 try:
                     self.telemetry_manager.teardown()
-                except Exception as telemetry_exc:  # ruff: ignore[blind-except]
+                except Exception:  # ruff: ignore[blind-except]
                     # (2) an injected telemetry manager is unbounded code; its exception surface cannot
                     # be enumerated, and the releases below must happen regardless.
-                    log.error(f"Telemetry teardown failed while releasing a failed boot: {telemetry_exc}")
+                    log.error("The telemetry teardown failed while a failed boot was being released", include_exception=True)
             self.runtime_hub.reset_boot_state()
             class_registry_scoping.reset()
             KajsonManager.teardown()
@@ -929,7 +929,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # and the delete-on-failure handler above is behind us, so a reader can never adopt an instance
         # that is about to be removed from the registry.
         runtime_boot.is_ready = True
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} runtime ready")
+        log.info("The Pipelex runtime is ready", fields={"pipelex_version": PACKAGE_VERSION, "integration_mode": integration_mode})
         return runtime_boot
 
     @classmethod

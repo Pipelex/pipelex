@@ -45,6 +45,7 @@ from pipelex.runtime_hub import get_console, get_telemetry_manager
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.exceptions import JsonTypeError, TomlError
 from pipelex.tools.misc.file_utils import get_incremental_directory_path
 from pipelex.tools.misc.json_utils import save_as_json_to_path
@@ -566,10 +567,13 @@ def execute_run(
 
     except Exception as exc:
         # CLI command root: any unexpected failure is reported to the user and exits non-zero via typer.Exit.
-        log.error(f"Error executing pipeline: {exc}")
+        # The log line carries the error's class and text as fields rather than the exception itself, whose chain
+        # every sink would write and which can quote the run's inputs or a model's response, as a validation error
+        # does. The traceback is the console's to print, and it prints no locals, which hold the run's working memory.
+        log.error("The pipeline could not be executed", fields=error_fields(exc=exc))
         console = get_console()
         console.print("\n[bold red]Failed to execute pipeline[/bold red]\n")
-        console.print_exception(show_locals=True)
+        console.print_exception()
         raise typer.Exit(1) from exc
 
     finally:

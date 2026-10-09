@@ -85,7 +85,7 @@ class LibraryCrateFactory:
                 existing.description = (
                     merge_domain_metadata_field(
                         domain_code=domain_code,
-                        field_label="description",
+                        metadata_field="description",
                         established=existing.description,
                         incoming=blueprint.description,
                         show_values_on_conflict=True,
@@ -94,14 +94,14 @@ class LibraryCrateFactory:
                 )
                 existing.system_prompt = merge_domain_metadata_field(
                     domain_code=domain_code,
-                    field_label="system_prompt",
+                    metadata_field="system_prompt",
                     established=existing.system_prompt,
                     incoming=blueprint.system_prompt,
                     show_values_on_conflict=False,
                 )
                 existing.main_pipe = merge_domain_metadata_field(
                     domain_code=domain_code,
-                    field_label="main_pipe",
+                    metadata_field="main_pipe",
                     established=existing.main_pipe,
                     incoming=blueprint.main_pipe,
                     show_values_on_conflict=True,

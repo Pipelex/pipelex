@@ -95,10 +95,12 @@ class TestVendoredMethodsDirs:
             assert _helper_description(library=library, alias=pinned_alias) == VENDORED_HELPER
         finally:
             get_library_manager().teardown(library_id=library_id)
-        warnings = [record.message for record in caplog.records if record.levelno == logging.WARNING and "@v9.9.9" in record.message]
-        assert len(warnings) == 1, warnings
-        assert PROBE_ALIAS in warnings[0]
-        assert "1.0.0" in warnings[0]
+        pin_warnings = [
+            (record.__dict__["method_ref"], record.__dict__["package_version"])
+            for record in caplog.records
+            if record.getMessage() == "A method reference pins a tag, and the copy shipped with the request is another version, which is used"
+        ]
+        assert pin_warnings == [(pinned_alias, "1.0.0")]
 
     @pytest.mark.asyncio(loop_scope="class")
     async def test_the_runner_protocol_runs_the_shipped_dependency(self, tmp_path: Path, mocker: MockerFixture) -> None:
