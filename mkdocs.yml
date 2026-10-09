@@ -368,6 +368,7 @@ plugins:
         - contribute/hub-layering.md: "Hub Layering"
         - contribute/rich-imports.md: "Rich Imports"
         - contribute/actions-allowlist.md: "Actions Allowlist"
+        - contribute/log-calls.md: "Log-Call Guard"
         - contribute/test-duration-map.md: "Test Duration Map"
         - contribute/registration-surface.md: "Registration Surface"
         - contribute/inference-family-surface.md: "Inference Family Surface"
@@ -626,6 +627,7 @@ nav:
     - Hub Layering: contribute/hub-layering.md
     - Rich Imports: contribute/rich-imports.md
     - Actions Allowlist: contribute/actions-allowlist.md
+    - Log-Call Guard: contribute/log-calls.md
     - Test Duration Map: contribute/test-duration-map.md
     - Registration Surface: contribute/registration-surface.md
     - Inference Family Surface: contribute/inference-family-surface.md

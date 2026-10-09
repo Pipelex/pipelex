@@ -5,6 +5,11 @@
 ### Added
 
 - **The console shows a log call's fields and renders named layouts**: the `console` sink prints a record's fields after its message as a `key=value` suffix, `Scanned the inputs files=7`, each value on one line and cut short when long, leaving out the run identifiers, and colours a value by its field's name, a pipe code red and a concept bold green, with any other field dimmed. A call can name a console layout with `layout=`, a Rich template over its fields in which every value is escaped, starting with `LogLayout.PIPE_RUN` for the pipe-run tree; every other sink writes the plain message and the fields.
+- **Log-call conventions and their guard**: the logging documentation states how Pipelex's own log calls are written, a fixed message with its values in `fields` named from a shared vocabulary, an exception carried by the record rather than spliced into the text, no run identifier, payload, markup or emoji, and what each level promises. `make check-log-calls` (`pipelex-dev check-log-calls`), part of `make agent-check` and CI, refuses an interpolated or non-literal message at `INFO` and above and a Rich markup tag in a message at any level, against a committed baseline of the existing calls that only shrinks. `pipelex.tools.log.error_fields` gives a handled exception's class and text as the `error.type` and `error.message` fields of a warning, which carries no traceback.
+
+### Changed
+
+- **Library-loading warnings carry their values as fields**: the warnings logged while a library loads, for an unparseable `METHODS.toml`, an unsatisfied or unparseable `mthds_version`, a dependency with no valid bundle or a pipe that would not load, an unresolvable method package and the teardown of a stale library, each have one fixed message and carry the package address, the dependency alias, the pipe code and the error as fields, where they used to splice those values into the text.
 
 ## [v0.80.0] - 2026-10-09
 

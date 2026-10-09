@@ -1,6 +1,6 @@
 ---
 title: "Logging"
-description: "Explore Pipelex logging: named fields, the run-scoped context, module-named loggers, custom log levels, the console, json and otlp sinks and structured data logging."
+description: "Explore Pipelex logging: named fields, the run-scoped context, module-named loggers, custom log levels, the console, json and otlp sinks, structured data logging and the log-call conventions."
 ---
 
 # Pipelex Logging System
@@ -34,7 +34,7 @@ from pipelex import log
 log.info("Simple message")
 
 # Named fields ride the record as attributes; the message stays narrative
-log.info("Scanned the inputs", fields={"files": 7, "bytes": 12_288})
+log.info("Scanned the inputs", fields={"file_count": 7, "byte_count": 12_288})
 
 # A named console layout; every sink but the console writes the plain message and the fields
 from pipelex.tools.log.console_layouts import LogLayout
@@ -69,7 +69,7 @@ Each level's method (`verbose`, `debug`, `info`, `warning`, `error`, `critical`)
 
 ## Fields
 
-`fields` is a mapping of named values. Each entry becomes an attribute of the emitted `LogRecord`, which is where a formatter or a sink reads it: `record.files` for the example above, or `%(files)s` in a stdlib format string. Nothing from `fields` is written into the message, so `record.getMessage()` is exactly the text you passed.
+`fields` is a mapping of named values. Each entry becomes an attribute of the emitted `LogRecord`, which is where a formatter or a sink reads it: `record.file_count` for the example above, or `%(file_count)s` in a stdlib format string. Nothing from `fields` is written into the message, so `record.getMessage()` is exactly the text you passed.
 
 A value can be anything. It rides the record by reference and the sink serializes it on emit, on the calling thread, so what leaves the process is the value as it was at the call, and mutating it afterwards changes nothing already emitted. The `console` sink shows it after the message on one line, as [Fields after the message](#fields-after-the-message) describes, the `json` sink dumps a pydantic model in JSON mode and falls back to `str` for a value JSON does not know, and the `otlp` sink carries a scalar or a sequence of scalars as an attribute and anything else as JSON text; prefer plain JSON-ready values (strings, numbers, booleans, lists and dictionaries of those) for anything meant to be queried later. A value JSON refuses outright, a circular reference or a mapping with a non-string key, is written by the `json` sink as its `repr`, and that costs the value alone: every other field on the line keeps its JSON type, so a number or a boolean beside it is still queried as one.
 
@@ -217,11 +217,11 @@ The default sink, `console`, renders through Rich with every `[runtime.log.rich_
 The console shows the fields a call gave after its message, as a `key=value` suffix, the way structlog's console renderer and pino-pretty do:
 
 ```python
-log.info("Scanned the inputs", fields={"files": 7, "source": "inbox/march"})
+log.info("Scanned the inputs", fields={"file_count": 7, "source": "inbox/march"})
 ```
 
 ```text
-INFO     🧠: Scanned the inputs files=7 source=inbox/march
+INFO     🧠: Scanned the inputs file_count=7 source=inbox/march
 ```
 
 - **What is shown.** The fields the call attached, in the order it gave them, under the name each landed on (`field_name` for a field called `name`). The run identifiers (`request_id`, `pipeline_run_id`, `pipe_run_id`) are left out, since they are the same on every line of a run and would drown the message, and so is `data`, the structured content the message already renders. Nothing else on the record is shown: neither the stdlib's own attributes, nor Pipelex's marks, nor what a record factory or a third-party library stamped on it.
@@ -292,38 +292,88 @@ Optional inclusion of caller information in logs, prefixed to the console line:
 - Module name
 - Customizable format templates
 
-## Best Practices
+## Log-call conventions
 
-1. **Log Level Selection**:
+Pipelex's own log calls, in `pipelex/` and in the API server's `api/pipelex_api/`, follow these conventions, so that a line written today can be grouped, counted and filtered in a log store tomorrow. The [log-call guard](../contribute/log-calls.md), `make check-log-calls`, holds every call to the ones that can be read off the source, the fixed message at INFO and above and the absence of markup; the rest is for review. Code of your own that logs through `log` is welcome to follow them too.
 
-    - Use VERBOSE for step-level tracing only Pipelex's own developers read
-    - Use DEBUG for what a diagnosis from a user's log would need
-    - Use INFO for the few lifecycle milestones
-    - Use WARNING for a handled degradation or a misconfiguration the user can fix
-    - Use ERROR when a run failed or data was lost
-    - Use CRITICAL when the process cannot go on
-    - Log what a value is about, never the value's payload: no base64 data, prompt or raw response
+### A fixed message
 
-2. **Fields over interpolation**:
+A message is a sentence that reads the same on every emission. A log store groups and counts lines by their message, and an interpolated value makes a different string of every line, so a question as plain as "how many of these today" needs a regular expression. The message is the key a query, a dashboard or an alert selects a line by, and Pipelex carries no separate `event` field beside it, so rewording a message is a change made on purpose.
 
-    - Put a value a reader might filter or aggregate on in `fields`, and keep the message a sentence; the console shows it after the message, coloured by its name
-    - Name a field after the thing it carries, in `snake_case`, or after its OpenTelemetry key when one exists
-    - Leave the run identifiers to the context; bind them at the process entry, never per call
+At INFO and above, the message is a literal written at the call: no f-string, no `%`, no `+` and no `.format()`, and no message built elsewhere and passed in, since nothing can tell that one is fixed. DEBUG and VERBOSE may keep an f-string, because a person at a terminal reads them; fields are welcome there too.
 
-3. **Structured Data**:
+```python
+# Not this: the alias makes every line a different message, and the exception is buried in the text
+log.warning(f"Could not load dependency '{alias}' pipe '{pipe_code}': {exc}")
 
-    - Log complex data structures directly; they reach the console as JSON and a sink as `data`
-    - Use titles for context
-    - Include problem IDs for trackable issues
+# This: one message, the values in fields, the exception's class and text as fields of their own
+log.warning(
+    "A pipe of a dependency could not be loaded",
+    fields={"dependency_alias": alias, "pipe_code": pipe_code, **error_fields(exc=exc)},
+)
+```
 
-4. **Exception Handling**:
+### Values in fields
 
-    - Use `include_exception=True` inside the `except` block, and let the sink render the traceback its own way
-    - Include relevant data in error logs
-    - Use appropriate log levels for exceptions
+What varies goes in `fields`, named by the [naming convention](#naming-convention), and one concept has one name across the codebase, so that a query written for one line finds every line about the same thing. Pipelex's own concepts take the names in the table below. A concept the OpenTelemetry semantic conventions define takes their key verbatim: `file.path` for a path on disk, `url.full` for a URL, `user.id` for a user, `error.type` for the class of an error, and the `gen_ai.*` keys for inference, such as `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.operation.name`, `gen_ai.usage.input_tokens` and `gen_ai.usage.output_tokens`. A count is named `<what>_count` (`concept_count`) and a duration `duration_ms`, in milliseconds.
+
+| Field | What it names |
+| --- | --- |
+| `pipe_code` | The pipe a line is about, bare or qualified by its domain, as the call site holds it: `compose_company`, `company.compose_company` |
+| `pipe_type` | The pipe's class: `PipeLLM`, `PipeCompose` |
+| `pipe_depth` | How deep a pipe run is nested, `0` at the top level |
+| `is_dry_run` | Whether the run is a dry run |
+| `output_concept` | The concept a pipe produces |
+| `concept_ref` | A concept's qualified reference, `<domain>.<Code>`: `company.Company` |
+| `concept_code` | A concept's code alone, where the call site has no domain for it: `Company` |
+| `domain_code` | A domain's code: `company` |
+| `stuff_name` | The name a stuff has in working memory |
+| `variable_path` | A dotted path into working memory, as a pipe's inputs name it: `invoice.total` |
+| `library_id` | The library a load or a lookup runs in |
+| `package_address` | A method package's address, as its manifest declares it or a bundle's reference names it: `github.com/acme/methods/invoices` |
+| `dependency_alias` | The alias under which a package's manifest declares a dependency; a dependency a bundle names by address has its address as its alias |
+| `method_ref` | The address a caller names a method by, selector and tag included, as the run routes and the CLI take it: `github.com/acme/methods/invoices@v1.2.0` |
+| `commit_sha` | The commit a fetched method package was cloned at |
+| `mthds_version_constraint` | The MTHDS standard versions a package accepts, as the `mthds_version` of its `METHODS.toml` declares them: `^4.0.0` |
+| `mthds_standard_version` | The MTHDS standard version this runtime implements |
+| `mthds_paths` | The `.mthds` files a load reads, as a list of paths |
+| `crate_fingerprint` | The fingerprint that identifies a normalized crate in the library it is loaded into |
+| `model_handle` | The handle a pipe or the model deck names a model by, an alias included: `gpt-image-2`, `@default-premium` |
+| `backend_name` | The inference backend serving a model, as the backends configuration names it: `anthropic`, `bedrock` |
+| `node_id` | A node of a run's execution graph, as the graph tracer names it |
+| `env_var` | The name of an environment variable, never its value |
+| `error.type`, `error.message` | A handled exception's class name and its text, as [Exceptions](#exceptions) describes |
+
+`pipe_code`, `pipe_type`, `output_concept`, `concept_ref`, `concept_code`, `domain_code` and `stuff_name` are in the console's [style map](#the-style-map), which colours their values wherever they appear. A concept missing from the table is added to it in the change that first logs it.
+
+### Exceptions
+
+An exception rides the record, never the message. Spliced into the text, `{exc}` makes the message vary, loses the exception's type and traceback, and gets only the pattern half of the [redaction](#redaction), where a field also has its control characters escaped. So:
+
+- **At ERROR and CRITICAL**, inside the `except` block, pass `include_exception=True`: the record carries the exception, and each sink writes its type and its traceback its own way.
+- **At WARNING and below**, an exception the code expected and handled rides as two fields, `error.type`, its class's name, and `error.message`, its text, with no traceback, through `error_fields` (`pipelex.tools.log.error_fields`): `fields={"package_address": address, **error_fields(exc=exc)}`. A warning promises a degradation that was handled, and a traceback of Pipelex's own frames repeated on every emission of an expected failure says nothing a reader can act on; the facade's `warning` takes no `include_exception` for that reason. Where the diagnosis is the cause chain rather than the exception's own text, as when a fetch fails in git underneath, `error_fields(exc=exc, text=...)` carries the chain instead.
+
+`error.type` is the OpenTelemetry key for the class of error an operation ended with. `error.message` is the key OpenTelemetry gave an error's text before deprecating that general attribute in favour of domain-specific ones; Pipelex keeps it as `error.type`'s companion because the `exception.*` keys belong to the sinks, which write them for a record that carries the exception itself and prefix a field spelling one.
+
+### What a line never carries
+
+- **No run identifier in the text.** `request_id`, `pipeline_run_id` and `pipe_run_id` are stamped on every record by the [run-scoped context](#the-run-scoped-context); a message repeating one is noise, and a field passing one is only for a call that speaks about a run it is not running under.
+- **No payload contents, at any level.** No prompt text, no base64 data, no raw response and no whole object: a size, a count, a hash or a code instead, as the [level table](#log-levels) already says of every level.
+- **No markup and no emoji in a message.** Colour is the console sink's job: it colours a value by its field's name and draws the few [layouts](#layouts), and its emoji are its own per-logger decoration. Markup in a message travels to every sink as literal tags, and on the console turns a bracketed word into styling. Markup keeps its place in the CLI's own output and in the pretty-print channel, which are presentation to a person and not log records.
+
+### Choosing a level
+
+The [level table](#log-levels) states what a line at each level means, and choosing the level of a call follows from it. There is no DEV level.
+
+- **ERROR** says a run failed or data was lost, and that somebody should look; it carries the exception with `include_exception=True` when there is one.
+- **WARNING** must be actionable: a degradation that was handled, or a misconfiguration the user can fix. A warning nobody can act on moves down to DEBUG, or up to ERROR when something was in fact lost.
+- **INFO** marks a lifecycle milestone, and there are few of them, because Pipelex is also a library and a library is quiet at INFO.
+- **DEBUG** answers a question you would ask on reading a log a user sent: which file was read, which fallback was taken, why a model was left out.
+- **VERBOSE** follows the runtime step by step, for Pipelex's own developers.
 
 ## Related Documentation
 
 - [Logging Configuration](../configuration/config-practical/logging-config.md) - Configure log behavior and select the sink in `pipelex.toml`
 - [Log Sink Plugins](../under-the-hood/log-sink-plugins.md) - The sink seam, the built-in sinks and how to write one
 - [CLI](./cli/index.md) - Commands that surface runtime logs during development
+- [Log-Call Guard](../contribute/log-calls.md) - The check that holds Pipelex's own log calls to the conventions above, and its baseline

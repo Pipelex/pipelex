@@ -3,7 +3,7 @@ from collections.abc import Generator
 from contextlib import ExitStack, contextmanager
 from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
-from typing import TYPE_CHECKING, ForwardRef, Literal, get_args, get_origin
+from typing import TYPE_CHECKING, Any, ForwardRef, Literal, get_args, get_origin
 
 from kajson.class_registry import ClassRegistry
 from kajson.kajson_manager import KajsonManager
@@ -66,6 +66,7 @@ from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.runtime_hub import get_class_registry
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.semver import SemVerError, parse_constraint, parse_version, version_satisfies
 from pipelex.validation_error_types import PipeValidationErrorType
 
@@ -462,15 +463,12 @@ class LibraryManager(LibraryManagerAbstract):
             # (worker-local leak state deciding setup success would be the M1 class again).
             # _pop_and_teardown_library forgets the entry pop-first, so the id is free either way.
             log.warning(
-                f"open_fresh_library: stale teardown of pre-existing library '{library_id}' raised; "
-                f"continuing with a fresh library: {stale_teardown_exc}"
+                "The teardown of a stale library raised; continuing with a fresh library",
+                fields={"library_id": library_id, **error_fields(exc=stale_teardown_exc)},
             )
         else:
             if removed_existing:
-                log.warning(
-                    f"open_fresh_library: tore down pre-existing library '{library_id}' — "
-                    f"leftover of an interrupted execution whose cleanup never ran"
-                )
+                log.warning("Tore down a library left over by an interrupted execution whose cleanup never ran", fields={"library_id": library_id})
         _library_id, the_library = self.open_library(library_id=library_id)
         return the_library
 
@@ -641,10 +639,13 @@ class LibraryManager(LibraryManagerAbstract):
             num_registered = ClassRegistryUtils.auto_register_all_subclasses(
                 base_class=StructuredContent,
             )
-            log.verbose(f"Auto-registered {num_registered} StructuredContent classes from loaded modules")
+            log.verbose("Auto-registered the StructuredContent classes of the loaded modules", fields={"class_count": num_registered})
 
             # Load MTHDS files into the specific library
-            log.verbose(f"Loading MTHDS files from: {[str(p) for p in valid_mthds_paths]}")
+            log.verbose(
+                "Loading the MTHDS files into the library",
+                fields={"library_id": library_id, "mthds_paths": [str(mthds_path) for mthds_path in valid_mthds_paths]},
+            )
             return self._load_mthds_files_into_library(library_id=library_id, valid_mthds_paths=valid_mthds_paths)
 
     @override
@@ -725,7 +726,7 @@ class LibraryManager(LibraryManagerAbstract):
             fingerprint = crate.fingerprint
             loaded_set = self._loaded_fingerprints.setdefault(library_id, set())
             if fingerprint in loaded_set:
-                log.verbose(f"Crate with fingerprint {fingerprint[:12]}... already loaded into '{library_id}', skipping")
+                log.verbose("Skipped a crate already loaded into the library", fields={"library_id": library_id, "crate_fingerprint": fingerprint})
                 return []
             library = self.get_library(library_id=library_id)
 
@@ -1133,14 +1134,20 @@ class LibraryManager(LibraryManagerAbstract):
             constraint = parse_constraint(mthds_version_constraint)
             current_version = parse_version(MTHDS_STANDARD_VERSION)
         except SemVerError as exc:
-            log.warning(f"Could not parse mthds_version constraint '{mthds_version_constraint}' for package '{package_address}': {exc}")
+            log.warning(
+                "The mthds_version constraint of a package could not be parsed",
+                fields={"package_address": package_address, "mthds_version_constraint": mthds_version_constraint, **error_fields(exc=exc)},
+            )
             return
 
         if not version_satisfies(current_version, constraint=constraint):
             log.warning(
-                f"Package '{package_address}' requires MTHDS standard version "
-                f"'{mthds_version_constraint}', but the current version is "
-                f"'{MTHDS_STANDARD_VERSION}'. Some features may not work correctly."
+                "A package requires another MTHDS standard version than this runtime's; some features may not work correctly",
+                fields={
+                    "package_address": package_address,
+                    "mthds_version_constraint": mthds_version_constraint,
+                    "mthds_standard_version": MTHDS_STANDARD_VERSION,
+                },
             )
 
     def _check_package_visibility(
@@ -1168,7 +1175,7 @@ class LibraryManager(LibraryManagerAbstract):
         try:
             manifest = find_package_manifest(mthds_paths[0])
         except ManifestError as exc:
-            log.warning(f"Could not parse METHODS.toml: {exc.message}")
+            log.warning("The package's METHODS.toml could not be parsed", fields=error_fields(exc=exc))
             # Still enforce reserved domains even when manifest is unparseable
             checker = make_visibility_checker(manifest=None, blueprints=blueprints)
             reserved_errors = checker.validate_reserved_domains()
@@ -1307,7 +1314,7 @@ class LibraryManager(LibraryManagerAbstract):
             dep_blueprints.append(blueprint)
 
         if not dep_blueprints:
-            log.warning(f"No valid blueprints found for dependency '{alias}'")
+            log.warning("A dependency holds no valid bundle", fields={"dependency_alias": alias, "package_address": package_address})
             return
 
         # Warn if the dependency requires a newer MTHDS standard version
@@ -1428,7 +1435,10 @@ class LibraryManager(LibraryManagerAbstract):
                         )
                     child_library.pipe_library.add_new_pipe(pipe=pipe)
                 except ValidationError as exc:
-                    log.warning(f"Could not load dependency '{alias}' pipe '{pipe_code}': {exc}")
+                    log.warning(
+                        "A pipe of a dependency could not be loaded",
+                        fields={"dependency_alias": alias, "pipe_code": pipe_code, **error_fields(exc=exc)},
+                    )
                     unbuilt_pipe_reasons[pipe_ref] = "; ".join(str(error["msg"]) for error in exc.errors()) or str(exc)
         finally:
             # Remove temporary concept entries from main library
@@ -1448,7 +1458,10 @@ class LibraryManager(LibraryManagerAbstract):
         for pipe_ref, reason in unbuilt_pipe_reasons.items():
             library.pipe_library.add_unbuilt_dependency_pipe(alias=alias, pipe_ref=pipe_ref, reason=reason)
 
-        log.verbose(f"Loaded dependency '{alias}': {len(dep_concepts)} concepts, pipes from {len(dep_blueprints)} bundles")
+        log.verbose(
+            "Loaded a dependency",
+            fields={"dependency_alias": alias, "concept_count": len(dep_concepts), "bundle_count": len(dep_blueprints)},
+        )
 
     def _load_address_based_dependencies(
         self,
@@ -1516,7 +1529,7 @@ class LibraryManager(LibraryManagerAbstract):
                 # The item carries the caller-facing text; the host's log keeps the whole cause chain, git's raw output
                 # included, since a cause on the host (git missing, an unwritable clone directory) becomes an item too.
                 causes = " <- ".join(f"{type(cause).__name__}: {cause}" for cause in iter_cause_chain(exc))
-                log.warning(f"Method package '{full_address}' could not be resolved: {causes}")
+                log.warning("A method package could not be resolved", fields={"package_address": full_address, **error_fields(exc=exc, text=causes)})
                 unresolved_items.append(
                     PipesAndConceptValidationErrorData(
                         error_type=PipeValidationErrorType.UNRESOLVED_PACKAGE_DEPENDENCY,
@@ -1712,7 +1725,10 @@ class LibraryManager(LibraryManagerAbstract):
                 }
             )
             if not (is_generated and refuses_unresolved_structures and missing_names):
-                log.debug(f"The structure class of {concept.concept_ref} stays incomplete, and will fail at first use: {rebuild_error}")
+                incomplete_fields: dict[str, Any] = {"concept_ref": concept.concept_ref}
+                if rebuild_error is not None:
+                    incomplete_fields.update(error_fields(exc=rebuild_error))
+                log.debug("The structure class of a concept stays incomplete, and will fail at first use", fields=incomplete_fields)
                 continue
             source = concept_sources.get(concept.concept_ref)
             where = f" (declared in '{source}')" if source else ""

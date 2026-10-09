@@ -1,0 +1,553 @@
+# The log calls that broke the log-call conventions when the guard arrived (pipelex-dev check-log-calls).
+# Keyed by <relative_path>::<qualified_name>, each call listed by its method and its message's source.
+# It only shrinks: convert a call, then remove its signature (pipelex-dev check-log-calls --prune).
+# Never add an entry. See docs/contribute/log-calls.md.
+
+version = 1
+
+["api/pipelex_api/bundle.py::_entries_from_zip"]
+calls = [
+  "warning: f\"bundle: corrupt zip ({zip_error})\"",
+  "warning: f\"bundle: invalid base64 ({decode_error})\"",
+]
+
+["api/pipelex_api/exception_handlers.py::_emit_api_error"]
+calls = [
+  "error: summary",
+  "warning: summary",
+]
+
+["api/pipelex_api/limits.py::_read_positive_int"]
+calls = [
+  "warning: f\"Invalid {env_var}={raw!r}, falling back to {default}\"",
+  "warning: f\"{env_var} must be positive (got {parsed}), falling back to {default}\"",
+]
+
+["api/pipelex_api/method_source.py::_fetch_package"]
+calls = [
+  "info: f\"Resolved method_ref '{ref.ref_str}': address={package.provenance.address} tag={package.provenance.tag} commit_sha={package.provenance.commit_sha}\"",
+]
+
+["api/pipelex_api/security.py::get_auth_mode"]
+calls = [
+  "warning: f\"Unknown AUTH_MODE '{raw}', falling back to 'none'\"",
+]
+
+["api/pipelex_api/security.py::no_auth"]
+calls = [
+  "warning: f\"Forwarded X-User-Id is not a path-safe segment, rejecting: {user_id!r}\"",
+]
+
+["api/pipelex_api/security.py::verify_jwt"]
+calls = [
+  "warning: f\"JWT user_id claim is not a path-safe segment: {user_id!r}\"",
+  "warning: f\"JWT validation failed: {exc!s}\"",
+]
+
+["pipelex/cli/agent_cli/commands/run/_run_core.py::run_pipeline_core"]
+calls = [
+  "warning: f\"Cost summary generation failed (run succeeded): {cost_summary_error}\"",
+]
+
+["pipelex/cli/commands/doctor_cmd.py::setup_doctor_runtime"]
+calls = [
+  "warning: stale_warning",
+]
+
+["pipelex/cli/commands/graph_cmd.py::graph_render_cmd"]
+calls = [
+  "error: escaped_message",
+  "error: f\"Error rendering graph: {exc}\"",
+]
+
+["pipelex/cli/commands/run/_run_core.py::execute_run"]
+calls = [
+  "error: f\"Error executing pipeline: {exc}\"",
+]
+
+["pipelex/cli/commands/which_cmd.py::which_cmd"]
+calls = [
+  "info: f\"No library directories to load ({source_label})\"",
+]
+
+["pipelex/cogt/content_generation/generated_content_factory.py::GeneratedContentFactory.make_image_content"]
+calls = [
+  "warning: f\"Failed to fetch a remote image: {exc}\"",
+]
+
+["pipelex/cogt/img_gen/img_gen_args_factory.py::ImgGenArgsFactory.make_args_from_inference"]
+calls = [
+  "warning: f\"Number of inference steps {num_inference_steps} for SDXL Lightning must be one of {acceptable_steps}\"",
+]
+
+["pipelex/cogt/img_gen/img_gen_args_factory.py::ImgGenArgsFactory.make_args_from_prompt"]
+calls = [
+  "warning: f\"A negative prompt was provided but the model's prompt taxonomy is '{PromptTaxonomy.POSITIVE_ONLY}', which does not support negative prompts. The negative prompt will be silently ignored.\"",
+]
+
+["pipelex/cogt/img_gen/img_gen_gpt_mapping.py::ImgGenGptMapping.validate_gpt_image_2_size"]
+calls = [
+  "warning: msg",
+]
+
+["pipelex/cogt/llm/llm_prompt.py::LLMPrompt.validate_before_execution"]
+calls = [
+  "error: f\"Prompt template system_text should be None or contain text. system_text = '{self.system_text}'\"",
+  "warning: f\"system_text should be None or contain text. system_text = '{self.system_text}'\"",
+  "warning: f\"system_text should be None or contain text. system_text = '{self.system_text}'\"",
+]
+
+["pipelex/cogt/llm/llm_worker_abstract.py::LLMWorkerAbstract._apply_constraints"]
+calls = [
+  "warning: f\"Model {self.inference_model.desc} used with temperature {requested_temperature}, but it must be {fixed_temperature} for this model so we forced it to {fixed_temperature}\"",
+]
+
+["pipelex/cogt/model_backends/backend_library.py::InferenceBackendLibrary.load"]
+calls = [
+  "info: f\"Inference backends read from {library_paths_description}\"",
+]
+
+["pipelex/cogt/model_routing/routing_profile_loader.py::load_active_routing_profile"]
+calls = [
+  "info: f\"Routing profiles read from {library_description}\"",
+]
+
+["pipelex/cogt/models/model_deck.py::ModelDeck._get_optional_inference_model"]
+calls = [
+  "warning: f\"Model handle '{ref.name}' is served as {served_types_description} but was requested as '{model_type}'. Skipping.\"",
+]
+
+["pipelex/cogt/models/model_deck.py::ModelDeck._resolve_alias"]
+calls = [
+  "warning: f\"Circular model reference detected: alias '{alias_name}' leads back to itself\"",
+]
+
+["pipelex/cogt/models/model_deck.py::ModelDeck._resolve_waterfall"]
+calls = [
+  "info: msg",
+  "warning: f\"Circular model reference detected: waterfall '{waterfall_name}' leads back to itself\"",
+]
+
+["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_doc_gen"]
+calls = [
+  "warning: f\"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity.\"",
+]
+
+["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_extract"]
+calls = [
+  "warning: f\"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity.\"",
+]
+
+["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_img_gen"]
+calls = [
+  "warning: f\"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity.\"",
+]
+
+["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_judgment"]
+calls = [
+  "warning: f\"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity.\"",
+]
+
+["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_llm"]
+calls = [
+  "warning: f\"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity.\"",
+]
+
+["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_search"]
+calls = [
+  "warning: f\"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity.\"",
+]
+
+["pipelex/cogt/models/model_deck.py::ModelDeck.validate_registered_models"]
+calls = [
+  "warning: f\"DocGen handle not found: {exc}\"",
+  "warning: f\"Extract handle not found: {exc}\"",
+  "warning: f\"ImgGen handle not found: {exc}\"",
+  "warning: f\"Judgment handle not found: {exc}\"",
+  "warning: f\"LLM handle not found: {exc}\"",
+  "warning: f\"Search handle not found: {exc}\"",
+]
+
+["pipelex/cogt/models/model_manager.py::ModelManager.setup"]
+calls = [
+  "warning: stale_warning",
+]
+
+["pipelex/cogt/usage/cost_registry.py::CostRegistry.generate_report"]
+calls = [
+  "warning: f\"No report to generate for pipeline '{pipeline_run_id}'\"",
+]
+
+["pipelex/config.py::is_method_fetch_on_miss_enabled"]
+calls = [
+  "warning: f\"Unrecognized {METHODS_FETCH_ON_MISS_ENV_VAR}={raw_env!r} (expected 1/0, true/false); falling back to the config\"",
+]
+
+["pipelex/core/concepts/concept_factory.py::_is_valid_structure_class"]
+calls = [
+  "warning: f\"Concept class '{structure_class_name}' is registered but it's not a subclass of StuffContent\"",
+]
+
+["pipelex/core/memory/working_memory.py::WorkingMemory.add_new_stuff"]
+calls = [
+  "warning: f\"Key '{name}' already exists in WorkingMemory and will be replaced by something different\"",
+  "warning: f\"Key '{name}' already exists in WorkingMemory with the same stuff\"",
+]
+
+["pipelex/core/memory/working_memory.py::WorkingMemory.validate_stuff_names"]
+calls = [
+  "warning: f\"Stuff key '{key}' starts with '_', which is reserved for params\"",
+  "warning: f\"Stuff name '{stuff.stuff_name}' does not match the key '{key}'\"",
+  "warning: f\"Stuff name '{stuff.stuff_name}' starts with '_', which is reserved for params\"",
+]
+
+["pipelex/core/memory/working_memory_factory.py::WorkingMemoryFactory.convert_to_working_memory_format"]
+calls = [
+  "warning: f\"Error getting structure class for concept '{named_stuff_spec.concept.code}': {exc}, falling back to TextContent\"",
+]
+
+["pipelex/core/memory/working_memory_factory.py::WorkingMemoryFactory.make_mock_inputs"]
+calls = [
+  "warning: f\"Failed to create mock for '{typed_named_stuff_spec.variable_name}' ({typed_named_stuff_spec.concept.code}): {exc}. Using fallback text content.\"",
+]
+
+["pipelex/graph/graph_factory.py::save_graph_outputs_to_dir"]
+calls = [
+  "warning: f\"Removed {file_name} at {file_path}: the graphspec written beside it carries no I/O artifacts of its own\"",
+]
+
+["pipelex/graph/graph_tracer_manager.py::GraphTracerManager.open_tracer"]
+calls = [
+  "warning: f\"Stale tracer teardown for key '{key}' failed; replacing anyway: {stale_teardown_exc}\"",
+  "warning: f\"Tracer for key '{key}' already exists; replacing stale tracer left by a prior interrupted execution\"",
+]
+
+["pipelex/kernel/judgment_ops.py::run_judgment"]
+calls = [
+  "warning: f\"Judgment '{job_metadata.pipe_code or 'unnamed step'}' declares a threshold of {threshold}, but model '{judgment_setting.model}' reported no probability, so its own verdict stands.\"",
+]
+
+["pipelex/kernel/llm_ops.py::concrete_llm_model_handle"]
+calls = [
+  "warning: f\"Cycle resolving model reference '{model}' at '{current}'; reporting it unresolved\"",
+  "warning: f\"Model reference '{model}' did not resolve within {_MAX_MODEL_RESOLUTION_HOPS} hops\"",
+]
+
+["pipelex/libraries/domain/domain_metadata_merge.py::merge_domain_metadata_field"]
+calls = [
+  "warning: f\"Domain '{domain_code}' declared with different {field_label}s. Keeping the first.\"",
+  "warning: f\"Domain '{domain_code}' declared with different {field_label}s: '{established}' vs '{incoming}'. Keeping the first.\"",
+]
+
+["pipelex/libraries/library_utils.py::get_pipelex_mthds_files_from_package._find_mthds_in_traversable"]
+calls = [
+  "warning: f\"Could not access {traversable}: {exc}\"",
+]
+
+["pipelex/libraries/library_utils.py::get_pipelex_package_dir_for_imports"]
+calls = [
+  "warning: f\"Could not convert importlib.resources Traversable to filesystem Path: {exc}\"",
+]
+
+["pipelex/methods/fetch_limits.py::_read_positive_int"]
+calls = [
+  "warning: f\"Invalid {env_var}={raw!r}, falling back to {default}\"",
+  "warning: f\"{env_var} must be positive (got {parsed}), falling back to {default}\"",
+]
+
+["pipelex/methods/fetch_on_miss.py::_warn_on_tag_mismatch"]
+calls = [
+  "warning: f\"Method '{ref.address}' is already installed at '{installed.path}' ({installed_desc}) while the reference pins '@{ref.tag}'; using the installed copy. Remove '{installed.path}' to re-fetch at the pinned tag.\"",
+]
+
+["pipelex/methods/fetch_on_miss.py::find_vendored_method"]
+calls = [
+  "warning: f\"Method '{lookup.ref.address}' is shipped with the request at version {version} while the reference pins '@{lookup.ref.tag}'; using the shipped copy.\"",
+]
+
+["pipelex/methods/fetch_on_miss.py::resolve_address_based_method"]
+calls = [
+  "info: f\"Fetched method '{fetched.full_address}' at commit {fetched.commit_sha} and installed it into '{installed.path}'\"",
+  "warning: f\"Method '{fetched.full_address}' declares Python structure classes ({details}). It runs locally, but {STRUCTURES_REFUSAL_RULE} — hosted execution would refuse it. {STRUCTURES_REFUSAL_REMEDY}\"",
+]
+
+["pipelex/migration/runner.py::_discard_backup"]
+calls = [
+  "warning: f\"the backup '{backup.path}' was made for a write that did not happen and could not be removed: {exc.strerror or exc}\"",
+]
+
+["pipelex/migration/runner.py::_discard_created_backup"]
+calls = [
+  "warning: f\"the backup '{backup.path}' was made for a removal that did not happen and could not be removed: {exc.strerror or exc}\"",
+]
+
+["pipelex/migration/runner.py::_prune_older_backups"]
+calls = [
+  "warning: f\"'{snapshot.path}' was migrated and backed up to '{backup.path}', but an older backup could not be pruned: {exc.strerror or exc}\"",
+]
+
+["pipelex/migration/runner.py::write_file_with_backup"]
+calls = [
+  "warning: f\"'{snapshot.path}' was migrated, but the write left something behind: {exc}\"",
+]
+
+["pipelex/pipe_controllers/batch/pipe_batch.py::PipeBatch._live_run_controller_pipe"]
+calls = [
+  "warning: f\"PipeBatch '{self.code}' is fanning out over {item_count} items. Bounded fan-out (max_concurrency={max_concurrency if max_concurrency is not None else 'unbounded'}) is a basic backpressure effort, not durable execution — for a workload this size, consider a durable execution backend for rate-limited, resumable runs: {URLs.durable_execution}\"",
+]
+
+["pipelex/pipe_controllers/condition/pipe_condition.py::PipeCondition._dry_run_controller_pipe"]
+calls = [
+  "error: f\"Dry run failed: could not detect required variables from expression template: {exc}\"",
+]
+
+["pipelex/pipe_machinery/pipe_abstract.py::PipeAbstract._make_lifted_output"]
+calls = [
+  "info: f\"Skipping {self.type} '{self.code}': absent input(s): {absent_names}\"",
+]
+
+["pipelex/pipe_machinery/pipe_abstract.py::PipeAbstract.live_run_pipe"]
+calls = [
+  "info: self._format_pipe_run_info(pipe_run_params=pipe_run_params)",
+]
+
+["pipelex/pipe_machinery/pipe_abstract.py::PipeAbstract.validate_pipe_code_syntax"]
+calls = [
+  "warning: f\"Runtime pipe code '{code}' contains a namespace prefix, stripped to '{bare_code}'\"",
+]
+
+["pipelex/pipe_operators/doc_gen/pipe_doc_gen.py::PipeDocGen.check_template_file"]
+calls = [
+  "warning: f\"PipeDocGen '{self.code}', template file '{self.template_file}'{location}: {finding.message}\"",
+]
+
+["pipelex/pipe_operators/func/pipe_func.py::PipeFunc._dry_run_operator_pipe"]
+calls = [
+  "info: f\"🚨 For your information, the dry run of PipeFunc '{self.code}' is not actually running the python function             but only validating the inputs and return type.\"",
+]
+
+["pipelex/pipe_run/delivery_executor.py::DeliveryExecutor._get_raw_main_absence"]
+calls = [
+  "warning: f\"Malformed main-output absence record in raw working memory, treating as missing: {exc}\"",
+]
+
+["pipelex/pipe_run/delivery_executor.py::DeliveryExecutor._notify_webhook"]
+calls = [
+  "info: f\"Webhook delivery completed: pipeline_run_id={pipeline_run_id}, url={webhook.url}{request_id_suffix}\"",
+]
+
+["pipelex/pipe_run/delivery_executor.py::DeliveryExecutor._resolve_concept_locally"]
+calls = [
+  "warning: f\"Concept ref '{concept_ref}' is ambiguous in the current library, rendering the delivery raw: {exc}\"",
+  "warning: f\"Concept ref '{concept_ref}' is not a valid concept ref, rendering the delivery raw: {exc}\"",
+  "warning: f\"The current library is no longer reachable, rendering the delivery raw: {exc}\"",
+]
+
+["pipelex/pipe_run/delivery_executor.py::DeliveryExecutor._store_results"]
+calls = [
+  "info: f\"Storage delivery completed: pipeline_run_id={pipeline_run_id}, files={len(result_files)}{request_id_suffix}\"",
+]
+
+["pipelex/pipe_run/delivery_executor.py::DeliveryExecutor._try_add_rendered_file"]
+calls = [
+  "warning: f\"Failed to render {filename}\"",
+]
+
+["pipelex/pipe_run/delivery_executor.py::DeliveryExecutor.try_local_hydrate_stuff"]
+calls = [
+  "warning: f\"Local hydration failed for delivery main stuff, falling back to raw render: 'concept' must be the concept ref string, got {type(concept_ref).__name__}\"",
+  "warning: f\"Local hydration failed for delivery main stuff, falling back to raw render: class '{concept.structure_class_name}' not registered locally\"",
+  "warning: f\"Local hydration failed for delivery main stuff, falling back to raw render: concept '{concept_ref}' not known locally\"",
+  "warning: f\"Local hydration failed for delivery main stuff, falling back to raw render: {exc}\"",
+]
+
+["pipelex/pipe_run/dry_run_in_process.py::best_effort_graph_spec"]
+calls = [
+  "warning: f\"{log_context}: graph dry-run of '{pipe_ref}' did not produce a graph ({type(graph_error).__name__}: {graph_error}); returning validation result without graph_spec\"",
+]
+
+["pipelex/pipe_run/pipe_run.py::PipeRun._build_pipe_io_artifacts_on_output"]
+calls = [
+  "warning: message",
+]
+
+["pipelex/pipe_run/pipe_run.py::PipeRun._run_bound"]
+calls = [
+  "error: f\"Delivery also failed for pipeline_run_id={pipeline_run_id} after pipe execution failure; raising original execution error. Suppressed delivery error: {delivery_error}\"",
+  "error: f\"Pipe execution failed for pipeline_run_id={pipeline_run_id}: {exc}\"",
+  "error: f\"close_tracer also failed for pipeline_run_id={pipeline_run_id} after pipe execution failure; raising original execution error. Suppressed tracer close error: {tracer_close_error}\"",
+]
+
+["pipelex/pipe_run/pipe_run_params.py::PipeRunParams.pop_pipe_from_stack"]
+calls = [
+  "error: f\"Pipe code '{pipe_code}' was not the last pipe in the stack, it was '{popped_pipe_code}'\"",
+]
+
+["pipelex/pipe_run/tracing_assembly.py::assemble_tracing"]
+calls = [
+  "warning: message",
+  "warning: message",
+]
+
+["pipelex/pipeline/pipeline_run_setup.py::pipeline_run_setup"]
+calls = [
+  "error: f\"close_tracer also failed for pipeline_run_id={pipeline_run_id} during setup-failure cleanup; raising original setup error. Suppressed tracer close error: {tracer_close_error}\"",
+]
+
+["pipelex/pipeline/validate_in_process.py::_validate_bundles_in_scope"]
+calls = [
+  "error: f\"{log_context}: library teardown also failed after a body error; raising the original error. Suppressed teardown error: {teardown_error}\"",
+]
+
+["pipelex/plugins/discovery.py::_skip_if_disabled"]
+calls = [
+  "info: f\"Plugin '{name}' is disabled via runtime.plugins.disabled; skipping.\"",
+]
+
+["pipelex/providers/pypdfium2/pypdfium2_worker.py::Pypdfium2Worker._extract_pages"]
+calls = [
+  "warning: f\"Pypdfium2 does not support native image limiting. Extracted all images then truncated to {max_nb_images}.\"",
+  "warning: f\"Pypdfium2 extracted {original_count} images on page {page_number}, truncated to {len(page_images)} (max_nb_images={max_nb_images})\"",
+]
+
+["pipelex/providers/typesafe/typesafe_judgment_worker.py::TypesafeJudgmentWorker._warn_if_another_model_answered"]
+calls = [
+  "warning: f\"TypeSafe was asked for judgment model '{self.inference_model.model_id}' and answered as '{response.model}': verdicts and their thresholds may not mean what they meant under the pinned model\"",
+]
+
+["pipelex/reporting/cost_report_renderer.py::render_run_cost_report"]
+calls = [
+  "warning: f\"Cost report generation failed (run succeeded): {cost_report_error}\"",
+]
+
+["pipelex/reporting/reporting_manager.py::ReportingManager._emit_best_effort"]
+calls = [
+  "warning: f\"Usage event emit failed; dropping: {exc}\"",
+]
+
+["pipelex/reporting/reporting_manager.py::ReportingManager._emit_usage_event_runner_fallback"]
+calls = [
+  "warning: f\"Runner-side activity event log construction failed; dropping usage event: {exc}\"",
+]
+
+["pipelex/reporting/reporting_manager.py::ReportingManager.report_inference_job"]
+calls = [
+  "warning: f\"ReportingManager does not support reporting for inference job type: {type(inference_job).__name__}\"",
+]
+
+["pipelex/runtime_boot.py::RuntimeBoot.__init__"]
+calls = [
+  "warning: stale_warning",
+]
+
+["pipelex/runtime_boot.py::RuntimeBoot._release_after_failed_boot"]
+calls = [
+  "error: f\"Telemetry teardown failed while releasing a failed boot: {telemetry_exc}\"",
+]
+
+["pipelex/runtime_boot.py::RuntimeBoot._teardown_plugin_callbacks"]
+calls = [
+  "error: f\"A plugin teardown callback failed and was skipped: {teardown_exc}\"",
+]
+
+["pipelex/system/registries/class_registry_utils.py::ClassRegistryUtils.import_modules_in_folder"]
+calls = [
+  "warning: f\"Syntax error in {python_file}: {exc}\"",
+]
+
+["pipelex/system/registries/func_registry_utils.py::FuncRegistryUtils._register_funcs_in_file"]
+calls = [
+  "warning: f\"Could not import '{file_path}' while registering PipeFuncs; its functions are unavailable: {exc}\"",
+  "warning: f\"Function '{func_name}' in '{file_path}' has @pipe_func() decorator but is not eligible: {eligibility_error}\"",
+  "warning: f\"Syntax error in {file_path}: {exc}\"",
+]
+
+["pipelex/system/registries/func_registry_utils.py::FuncRegistryUtils.register_pipe_funcs_from_package"]
+calls = [
+  "warning: f\"Function '{func_name}' in '{modname}' has @pipe_func() decorator but is not eligible: {eligibility_error}\"",
+  "warning: f\"Package {package_name} has no __path__ attribute, cannot walk modules\"",
+]
+
+["pipelex/system/telemetry/telemetry_loader.py::_telemetry_config_the_ledger_can_explain"]
+calls = [
+  "warning: stale_configuration_warning(plans=replayed.plans, walked_dirs=config_manager.existing_config_dirs)",
+]
+
+["pipelex/system/telemetry/telemetry_manager.py::TelemetryManager._handle_transmission_error"]
+calls = [
+  "error: f\"Telemetry transmission error: {error}\"",
+]
+
+["pipelex/system/telemetry/telemetry_manager.py::TelemetryManager.is_custom_portkey_logging_enabled"]
+calls = [
+  "warning: f\"Disabling Custom Portkey logging (debug mode) because '{OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY}' is set and that setting takes precedence\"",
+]
+
+["pipelex/system/telemetry/telemetry_manager.py::TelemetryManager.track_event"]
+calls = [
+  "error: f\"Could not track event '{event_name}' as identified because user_id is not set, tracking as anonymous\"",
+]
+
+["pipelex/tools/misc/dict_utils.py::substitute_nested_in_context"]
+calls = [
+  "error: extra_params, title='extra_params'",
+  "error: extra_params, title='extra_params'",
+  "error: original_context, title='original_context'",
+  "error: original_context, title='original_context'",
+]
+
+["pipelex/tracing/activity_event_log.py::ActivityEventLogCache.log_once_runner_fallback_engaged"]
+calls = [
+  "info: f\"Activity-side usage event emission engaged (workflow_id={workflow_id}, writer_id={writer_id}). Activities always emit through the per-process activity event log, by design: activity emissions must never land in the workflow's replay-rebuilt buffer (replay determinism), whether the activity runs co-located with the workflow router or on a separate worker pool.\"",
+]
+
+["pipelex/tracing/dynamodb_event_log.py::DynamoDBEventLog.read_events"]
+calls = [
+  "warning: f\"Skipping DynamoDB item with missing payload: PK={item.get('PK')}, SK={item.get('SK')}\"",
+  "warning: f\"Skipping unparseable DynamoDB item PK={item.get('PK')} SK={item.get('SK')}: {format_pydantic_validation_error(exc)}\"",
+]
+
+["pipelex/tracing/graphspec_assembler.py::_AssemblerState._attribute_usage"]
+calls = [
+  "warning: f\"UsageReportEvent for unknown node: {reported_node_id}\"",
+]
+
+["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_controller_output"]
+calls = [
+  "warning: f\"ControllerOutputEvent for unknown node: {event.node_id}\"",
+]
+
+["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_execution_data"]
+calls = [
+  "warning: f\"ExecutionDataEvent for unknown node: {event.node_id}\"",
+]
+
+["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_pipe_end_error"]
+calls = [
+  "warning: f\"PipeEndErrorEvent for unknown node: {event.node_id}\"",
+]
+
+["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_pipe_end_skipped"]
+calls = [
+  "warning: f\"PipeEndSkippedEvent for unknown node: {event.node_id}\"",
+]
+
+["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_pipe_end_success"]
+calls = [
+  "warning: f\"PipeEndSuccessEvent for unknown node: {event.node_id}\"",
+]
+
+["pipelex/tracing/graphspec_assembler.py::_AssemblerState.pass_one"]
+calls = [
+  "warning: f\"Unknown event type: {type(event).__name__}\"",
+]
+
+["pipelex/tracing/ndjson_event_log.py::NdjsonEventLog.read_events"]
+calls = [
+  "warning: f\"Skipping corrupt line in {ndjson_path}:{line_number} — {validation_error}\"",
+]
+
+["pipelex/tracing/usage_attribution.py::_walk_subtree"]
+calls = [
+  "warning: f\"Cycle in graph node parentage at '{node_id}'; subtree usage rollup will be incomplete\"",
+]

@@ -70,6 +70,9 @@ jobs:
       - name: Run Rich import check
         run: make check-rich-imports
 
+      - name: Run log-call check
+        run: make check-log-calls
+
       - name: Run drift contracts check
         run: make drift-check
 
