@@ -13,6 +13,7 @@ from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCateg
 from pipelex.providers.typesafe.typesafe_error_classification import classify_typesafe_error
 from pipelex.providers.typesafe.typesafe_translation import from_typesafe_response, to_typesafe_questions
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.system.telemetry.otel_constants import GenAISpanAttr
 
 
 class TypesafeJudgmentWorker(JudgmentWorkerAbstract):
@@ -101,8 +102,17 @@ class TypesafeJudgmentWorker(JudgmentWorkerAbstract):
         """
         if response.model != self.inference_model.model_id:
             log.warning(
-                f"TypeSafe was asked for judgment model '{self.inference_model.model_id}' and answered as "
-                f"'{response.model}': verdicts and their thresholds may not mean what they meant under the pinned model"
+                "The provider answered under another model than the pinned one, so verdicts and their thresholds may not mean what "
+                "they meant under the pinned model",
+                fields={
+                    "model_handle": self.inference_model.name,
+                    "backend_name": self.inference_model.backend_name,
+                    "sdk": self.inference_model.sdk,
+                    # The model keys mean what they mean on the LLM span: the handle, then the provider's id the deck pins
+                    GenAISpanAttr.REQUEST_MODEL: self.inference_model.name,
+                    GenAISpanAttr.RESPONSE_MODEL: self.inference_model.model_id,
+                    "answered_model_id": response.model,
+                },
             )
 
     def _record_usage(self, *, judgment_job: JudgmentJob, response: SystemOneResponse) -> None:

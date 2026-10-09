@@ -191,9 +191,12 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             # the boot's own clause for that names the file; a raw parse error would not reach it.
             msg = f"Invalid inference backend library {library_paths_description}: {toml_exc}"
             raise InferenceBackendLibraryValidationError(msg) from toml_exc
-        if present_toml_override_paths(paths=backends_library_paths):
+        if override_paths := present_toml_override_paths(paths=backends_library_paths):
             # The one trace a machine-wide override leaves: which files this boot actually merged.
-            log.info(f"Inference backends read from {library_paths_description}")
+            log.info(
+                "The inference backends were read with override files merged over the base",
+                fields={"file.path": str(backends_library_paths[0]), "override_paths": [str(override_path) for override_path in override_paths]},
+            )
 
         # Create a partial function with the secrets provider bound
         substitute_vars_with_provider = partial(substitute_vars, secrets_provider=secrets_provider)

@@ -165,5 +165,6 @@ class TestRoutingProfileOverrides:
 
         override_path.write_text('active = "on_other"\n')
         load_active_routing_profile(routing_profile_library_paths=[base_path, override_path], enabled_backends=["acme", "other"])
-        logged = " ".join(str(call.args[0]) for call in logger.info.call_args_list)
-        assert str(override_path) in logged
+        # The merged files ride as fields, base then overrides, never spliced into the message
+        logger.info.assert_called_once()
+        assert logger.info.call_args.kwargs["fields"] == {"file.path": str(base_path), "override_paths": [str(override_path)]}

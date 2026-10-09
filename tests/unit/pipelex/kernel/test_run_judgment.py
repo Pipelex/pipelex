@@ -91,8 +91,7 @@ class TestRunJudgment:
 
         assert result.threshold_applied is False
         warning.assert_called_once()
-        assert "is_urgent" in warning.call_args.args[0]
-        assert "judgment-ops-model" in warning.call_args.args[0]
+        assert warning.call_args.kwargs["fields"] == {"pipe_code": "is_urgent", "threshold": 0.8, "model_handle": "judgment-ops-model"}
 
     async def test_a_dry_threshold_without_a_probability_neither_warns_nor_records(self, mocker: MockerFixture) -> None:
         warning = mocker.patch("pipelex.kernel.judgment_ops.log.warning")
