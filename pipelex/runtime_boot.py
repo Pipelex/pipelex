@@ -547,7 +547,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 backend_name=backend_name,
                 var_name=var_name,
                 # A person at either CLI can run on the hosted Pipelex API instead; a server's operator cannot.
-                suggest_hosted_runs=integration_mode is IntegrationMode.CLI,
+                suggest_hosted_runs=integration_mode.is_pipelex_command_line,
             )
             raise PipelexSetupError(error_msg) from credentials_exc
 
