@@ -5,6 +5,7 @@ from pathlib import Path
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
+from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.file_utils import find_files_in_dir
 
@@ -38,7 +39,7 @@ def get_pipelex_mthds_files_from_package() -> list[Path]:
         except (PermissionError, OSError) as exc:
             log.warning(
                 "A directory of the pipelex package could not be read, so its MTHDS files are left out",
-                fields={"file.path": str(traversable), **error_fields(exc=exc)},
+                fields={OTelLogAttr.FILE_PATH: str(traversable), **error_fields(exc=exc)},
             )
 
     _find_mthds_in_traversable(pipelex_package, collected=mthds_files)

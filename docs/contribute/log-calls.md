@@ -5,7 +5,7 @@ description: "The guard that holds Pipelex's own log calls to the log-call conve
 
 # Log-call guard
 
-Pipelex's log calls follow the [log-call conventions](../tools/logging.md#log-call-conventions): a fixed message, its values in `fields`, no markup. Most of them are for review; the ones that can be read off the source are held by `make check-log-calls` on every call: a message at INFO and above is a literal written at the call, and no message holds Rich markup at any level. This page is the guard's specification. The calls that broke the rules when the guard arrived are listed in a committed baseline that can only shrink, so that new code is held to the conventions from the start while the existing calls are converted.
+Pipelex's log calls follow the [log-call conventions](../tools/logging.md#log-call-conventions): a fixed message, its values in `fields`, no markup. Most of them are for review; the ones that can be read off the source are held by `make check-log-calls` on every call: a message at INFO and above is a literal written at the call, and no message holds Rich markup at any level. This page is the guard's specification. The calls that broke the rules when the guard arrived were listed in a committed baseline that can only shrink, so that new code was held to the conventions from the start while the existing calls were converted. Every one of them has been converted since: the baseline lists no call, and since it can only shrink, it stays empty, so every log call is held to the rules.
 
 ## What it reads
 
@@ -56,19 +56,19 @@ A bracketed word that is no style, `list[int]`, `[Errno 2]` or `items[index]`, i
 
 ## The baseline
 
-`log_call_baseline.toml`, at the repo root, lists every call that broke a rule when the guard arrived. Its key is the call's file and enclosing qualified name, `<relative_path>::<qualified_name>`, the classes and functions joined by dots, or `<module>` for a call made at module level. Under the key, each call is listed by its **signature**, once per call that carries it. A signature is the call's method, its message's source text with any `**` expansion it cannot read, the rules it breaks between brackets, and, after `where`, every binding the guard read to judge it, sorted, which is every binding that can reach the names it read, a binding it does not read written as what binds it (`<parameter>`, `<for target>`, `<enclosing function>`, `<unbound>`):
+`log_call_baseline.toml`, at the repo root, lists the calls exempted from the rules until they are converted. It started with every call that broke one when the guard arrived, and lists none now that they are all converted. Its key is the call's file and enclosing qualified name, `<relative_path>::<qualified_name>`, the classes and functions joined by dots, or `<module>` for a call made at module level. Under the key, each call is listed by its **signature**, once per call that carries it. A signature is the call's method, its message's source text with any `**` expansion it cannot read, the rules it breaks between brackets, and, after `where`, every binding the guard read to judge it, sorted, which is every binding that can reach the names it read, a binding it does not read written as what binds it (`<parameter>`, `<for target>`, `<enclosing function>`, `<unbound>`). In a baseline that still listed calls, two entries would read like these, made up for the example:
 
 ```toml
 version = 1
 
-["pipelex/methods/fetch_on_miss.py::resolve_address_based_method"]
+["pipelex/example/bundle_loader.py::BundleLoader.load"]
 calls = [
-  "info: f\"Fetched method '{fetched.full_address}' at commit {fetched.commit_sha} and installed it into '{installed.path}'\" [f-string]",
+  "info: f\"Loaded the bundle '{bundle_path}' with {pipe_count} pipes\" [f-string]",
 ]
 
-["pipelex/pipe_run/pipe_run.py::PipeRun._build_pipe_io_artifacts_on_output"]
+["pipelex/example/bundle_loader.py::report_load_failure"]
 calls = [
-  "warning: message [f-string] where message = f\"Failed to build the I/O artifacts for pipeline_run_id={pipeline_run_id}: {build_error}\"",
+  "warning: message [f-string] where message = f\"Could not load the bundle '{bundle_path}': {load_error}\"",
 ]
 ```
 

@@ -115,6 +115,7 @@ The context is a `LogContext` with three optional identifiers, `request_id`, `pi
 The identifiers travel in the payload, and the contextvar is in-process plumbing bound after deserialization and nothing else; it never crosses a process boundary. Each process entry binds from the payload it received:
 
 - **A direct-mode run**: `PipeRun.run` binds `request_id` and `pipeline_run_id` from the job's `JobMetadata` for the whole run, delivery included, through `JobMetadata.log_context()`, and releases the binding when the run returns. The metadata a submission builds carries no `pipe_run_id` yet.
+- **A delivery**: `DeliveryExecutor.execute` binds `request_id` and `pipeline_run_id` for the length of a delivery, so its storage and webhook lines name the run whether or not its caller bound them, a durable-execution activity delivering a run included; a `request_id` of `None` inherits the one the caller bound.
 - **Every pipe run**: `live_run_pipe` mints the pipe run's id and binds `pipe_run_id` around the whole of the run, the line announcing it, its span lines and its failure included, so every record emitted during a pipe's run names the run it belongs to, a nested pipe rebinding its own and the outer id coming back when it returns, however it returns. A pipe lifted for absent optional inputs does not run and has no id: its skip line carries the enclosing binding, the parent pipe's or none. This is the binding every orchestration shares, direct or distributed.
 - **Every kernel step**: each kernel function that takes a `job_metadata` — `run_llm_text`, `run_llm_object`, `generate_object_content`, `run_extract`, `run_search` and `run_img_gen` — binds it for the length of its call, so a program driving the kernel directly gets lines naming the run and the step. Inside the interpreter the operator hands the kernel the `pipe_run_id` that `live_run_pipe` already bound, so this nested binding changes nothing there.
 - **A kernel-driven run**: the host wraps its run in `PipelexKernel.log_context()`, which binds `request_id` and `pipeline_run_id` and no step. The kernel has no run boundary of its own, so this binding is the host's, and each step's binding merges over it. See [The Pipelex Kernel](../under-the-hood/pipelex-kernel.md#the-log-context).
@@ -241,7 +242,7 @@ INFO     🧠: Scanned the inputs file_count=7 source=inbox/march
 ```
 
 - **What is shown.** The fields the call attached, in the order it gave them, under the name each landed on (`field_name` for a field called `name`). The run identifiers (`request_id`, `pipeline_run_id`, `pipe_run_id`) are left out, since they are the same on every line of a run and would drown the message, and so is `data`, the structured content the message already renders. Nothing else on the record is shown: neither the stdlib's own attributes, nor Pipelex's marks, nor what a record factory or a third-party library stamped on it.
-- **How a value is written.** On one line: a string bare, or quoted when it is empty or holds a space, an `=`, a `"`, a `\` or a character a terminal would act on. Inside the quotes a backslash is written `\\`, a quote `\"` and any character a terminal would act on as its escape (`"line\nbreak"`), so `fields={"a": "b=c"}` prints `a="b=c"` rather than a second pair. A number, a boolean, `None`, a mapping, a list or a pydantic model is written as compact JSON (`true`, `null`, `{"key":"value"}`, `["a","b"]`), and anything else as its text. A value longer than 80 characters is cut short and ends with `…`, except `error.message`, a handled exception's text, which is cut only past 2000 characters, quoted and escaped the same way: its diagnosis, a cause chain or a parse error's location, is what a fragment would lose, while a dependency's raw output, a validation error's every line or git's stderr, would flood the terminal uncut. A key is written the same way, so a field whose name holds a line break, a space, an `=` or an escape sequence is quoted and escaped rather than forging a line or a second pair: `fields={"x=1": 2}` prints `"x=1"=2`. The [redaction](#redaction) has run before the console renders, so a secret is already `[REDACTED]`.
+- **How a value is written.** On one line: a string bare, or quoted when it is empty or holds a space, an `=`, a `"`, a `\` or a character a terminal would act on. Inside the quotes a backslash is written `\\`, a quote `\"` and any character a terminal would act on as its escape (`"line\nbreak"`), so `fields={"a": "b=c"}` prints `a="b=c"` rather than a second pair. A number, a boolean, `None`, a mapping, a list or a pydantic model is written as compact JSON (`true`, `null`, `{"key":"value"}`, `["a","b"]`), and anything else as its text. A value longer than 80 characters is cut short and ends with `…`, except `error.message`, a handled exception's text, which is cut only past 2000 characters, quoted and escaped the same way: its diagnosis, a cause chain or a parse error's location, is what a fragment would lose, while a dependency's raw output, a validation error's every line or git's stderr, would flood the terminal uncut. `finding_message`, the text of a PipeDocGen template finding, gets the same generous cut, being the part of its warning a reader acts on. A path, in `file.path`, `file.name`, `backup_path` or `template_file`, is cut at its start instead and begins with `…`, so the file's name stays on the line while the directory every line of a run shares goes. These cuts are the console's alone: every other sink writes each value whole. A key is written the same way, so a field whose name holds a line break, a space, an `=` or an escape sequence is quoted and escaped rather than forging a line or a second pair: `fields={"x=1": 2}` prints `"x=1"=2`. The [redaction](#redaction) has run before the console renders, so a secret is already `[REDACTED]`.
 - **Never markup.** The suffix is built as styled Rich `Text`, not as a markup string, so a value carrying `[red]x[/red]` prints exactly that.
 
 There is no setting to hide the suffix: it carries the values a message used to interpolate, so hiding it would hide what the line is about.
@@ -331,36 +332,84 @@ log.warning(
 
 ### Values in fields
 
-What varies goes in `fields`, named by the [naming convention](#naming-convention), and one concept has one name across the codebase, so that a query written for one line finds every line about the same thing. Pipelex's own concepts take the names in the table below. A concept the OpenTelemetry semantic conventions define takes their key verbatim: `file.path` for a path on disk, `url.full` for a URL, `user.id` for a user, `error.type` for the class of an error, and the `gen_ai.*` keys for inference, such as `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.request.temperature`, `gen_ai.operation.name`, `gen_ai.usage.input_tokens` and `gen_ai.usage.output_tokens`. A `gen_ai.*` key means on a log line what it means on Pipelex's LLM span: `gen_ai.request.model` is the model's handle and `gen_ai.response.model` the provider's id of the model serving it. A line about an inference call carries them beside `model_handle`, `backend_name` and `sdk`, so it joins its span in a log store, while `model_handle` names the handle on every line about a model, inference or not. A count is named `<what>_count` (`concept_count`) and a duration `duration_ms`, in milliseconds.
+What varies goes in `fields`, named by the [naming convention](#naming-convention), and one concept has one name across the codebase, so that a query written for one line finds every line about the same thing. Pipelex's own concepts take the names in the table below. A concept the OpenTelemetry semantic conventions define takes their key verbatim: `file.path` for a path on disk and `file.name` for a file's name alone, `url.full` for a URL and `url.path` for the path of a request's URL, `server.address` for the host a request is sent to, `http.response.status_code` for the status of an HTTP response, `user.id` for a user, `error.type` for the class of an error, and the `gen_ai.*` keys for inference, such as `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.request.temperature`, `gen_ai.operation.name`, `gen_ai.usage.input_tokens` and `gen_ai.usage.output_tokens`. A `gen_ai.*` key means on a log line what it means on Pipelex's LLM span: `gen_ai.request.model` is the model's handle and `gen_ai.response.model` the provider's id of the model serving it. A line about an inference call carries them beside `model_handle`, `backend_name` and `sdk`, so it joins its span in a log store, while `model_handle` names the handle on every line about a model, inference or not. An OpenTelemetry key that more than one call site uses is spelled through a constant, so a misspelt one is an error the type checker reports rather than a field no query finds: `OTelLogAttr` in `pipelex/system/telemetry/otel_constants.py` holds those keys, `GenAISpanAttr` beside it the `gen_ai.*` ones, and `pipelex.tools.log.error_fields` the two error keys. A count is named `<what>_count` (`concept_count`) and a duration `duration_ms`, in milliseconds. A field carries one JSON type on every line that has it, `null` aside, so a query compares it one way: where the value would be an integer on some lines and a word on others, `unbounded` for instance, the field is left out of the lines the word would name, and the table says so.
 
-| Field | What it names |
-| --- | --- |
-| `pipe_code` | The pipe a line is about, bare or qualified by its domain, as the call site holds it: `compose_company`, `company.compose_company` |
-| `pipe_type` | The pipe's class: `PipeLLM`, `PipeCompose` |
-| `pipe_depth` | How deep a pipe run is nested, `0` at the top level |
-| `is_dry_run` | Whether the run is a dry run |
-| `output_concept` | The concept a pipe produces |
-| `concept_ref` | A concept's qualified reference, `<domain>.<Code>`: `company.Company` |
-| `concept_code` | A concept's code alone, where the call site has no domain for it: `Company` |
-| `domain_code` | A domain's code: `company` |
-| `stuff_name` | The name a stuff has in working memory |
-| `variable_path` | A dotted path into working memory, as a pipe's inputs name it: `invoice.total` |
-| `library_id` | The library a load or a lookup runs in |
-| `package_address` | A method package's address, as its manifest declares it or a bundle's reference names it: `github.com/acme/methods/invoices` |
-| `dependency_alias` | The alias under which a package's manifest declares a dependency; a dependency a bundle names by address has its address as its alias |
-| `method_ref` | The address a caller names a method by, selector and tag included, as the run routes and the CLI take it: `github.com/acme/methods/invoices@v1.2.0` |
-| `commit_sha` | The commit a fetched method package was cloned at |
-| `mthds_version_constraint` | The MTHDS standard versions a package accepts, as the `mthds_version` of its `METHODS.toml` declares them: `^4.0.0` |
-| `mthds_standard_version` | The MTHDS standard version this runtime implements |
-| `mthds_paths` | The `.mthds` files a load reads, as a list of paths |
-| `crate_fingerprint` | The fingerprint that identifies a normalized crate in the library it is loaded into |
-| `model_handle` | The handle a pipe or the model deck names a model by, an alias included: `gpt-image-2`, `@default-premium` |
-| `backend_name` | The inference backend serving a model, as the backends configuration names it: `anthropic`, `bedrock` |
-| `sdk` | The SDK a backend reaches a model through, as the backends configuration names it: `openai`, `bedrock_anthropic` |
-| `fixed_temperature` | The one temperature a model accepts, as its constraints declare it, used in place of the one requested |
-| `node_id` | A node of a run's execution graph, as the graph tracer names it |
-| `env_var` | The name of an environment variable, never its value |
-| `error.type`, `error.message` | A handled exception's class name and its text, as [Exceptions](#exceptions) describes |
+| Field | Type | What it names |
+| --- | --- | --- |
+| `pipe_code` | string | The pipe a line is about, bare or qualified by its domain, as the call site holds it: `compose_company`, `company.compose_company` |
+| `popped_pipe_code` | string | The pipe taken off a run's pipe stack where the line's `pipe_code` was expected |
+| `pipe_type` | string | The pipe's class: `PipeLLM`, `PipeCompose` |
+| `pipe_depth` | integer | How deep a pipe run is nested, `0` at the top level |
+| `is_dry_run` | boolean | Whether the run is a dry run |
+| `item_count` | integer | The number of items a `PipeBatch` fans out over |
+| `max_concurrency` | integer | The bound on the branches a `PipeBatch` runs at once; absent when the configuration's `"unbounded"` sets none |
+| `threshold` | number | The probability threshold a judgment declares, between `0` and `1` |
+| `template_file` | string | A PipeDocGen's template file, as the pipe declares it |
+| `finding_message`, `finding_location` | string | The text of a PipeDocGen template finding, and where in the template it was found |
+| `function_name` | string | A function PipeFunc registers or calls, by its name |
+| `module_name` | string | A Python module's dotted name, as the PipeFunc registry imports or walks it: `myapp.functions` |
+| `eligibility_error` | string | Why a function cannot be registered for PipeFunc |
+| `output_concept` | string | The concept a pipe produces |
+| `concept_ref` | string | A concept's qualified reference, `<domain>.<Code>`: `company.Company` |
+| `concept_code` | string | A concept's code alone, where the call site has no domain for it: `Company` |
+| `structure_class_name` | string | The Python class a concept's content is structured by, by its name |
+| `structure_classes` | string | The Python structure classes a fetched method package declares, as one text naming each file and the classes it defines |
+| `domain_code` | string | A domain's code: `company` |
+| `metadata_field` | string | A field of a domain's metadata that two declarations of the domain give different values: `description` |
+| `established_value`, `incoming_value` | string | The value a domain's metadata field already holds, which is kept, and the different one a later declaration gives |
+| `stuff_name` | string | The name a stuff has in working memory |
+| `variable_path` | string | A dotted path into working memory, as a pipe's inputs name it: `invoice.total` |
+| `variable_names` | list of strings | The names a pipe's inputs give their variables, as a list: the absent inputs a pipe run was skipped for |
+| `library_id` | string | The library a load or a lookup runs in |
+| `caller` | string | The entry point a shared helper logs on behalf of, as the label it passes: `API validate` |
+| `package_address` | string | A method package's address, as its manifest declares it or a bundle's reference names it: `github.com/acme/methods/invoices` |
+| `package_version` | string | A method package's version, as its manifest declares it |
+| `installed_tag` | string or `null` | The tag an installed method package was fetched at, `null` when it was fetched with no tag |
+| `dependency_alias` | string | The alias under which a package's manifest declares a dependency; a dependency a bundle names by address has its address as its alias |
+| `method_ref` | string | The address a caller names a method by, selector and tag included, as the run routes and the CLI take it: `github.com/acme/methods/invoices@v1.2.0` |
+| `commit_sha` | string | The commit a fetched method package was cloned at |
+| `mthds_version_constraint` | string | The MTHDS standard versions a package accepts, as the `mthds_version` of its `METHODS.toml` declares them: `^4.0.0` |
+| `mthds_standard_version` | string | The MTHDS standard version this runtime implements |
+| `mthds_paths` | list of strings | The `.mthds` files a load reads, as a list of paths |
+| `crate_fingerprint` | string | The fingerprint that identifies a normalized crate in the library it is loaded into |
+| `model_handle` | string | The handle a pipe or the model deck names a model by, an alias included: `gpt-image-2`, `@default-premium` |
+| `ideal_model_handle`, `fallback_model_handle` | string | A waterfall's first model, which the model deck lacks, and the model that replaces it, by their handles |
+| `preset_id` | string | A preset of the model deck, by its id |
+| `model_type` | string | The kind of model a line is about, as the model deck names it: `llm`, `img_gen`, `text_extractor` |
+| `served_model_types` | list of strings | The kinds of model a model serves, as a list of `model_type` values |
+| `matching_reference_kinds` | list of strings | The kinds of model reference a bare model name also names, as a list: `preset`, `alias`, `waterfall` |
+| `backend_name` | string | The inference backend serving a model, as the backends configuration names it: `anthropic`, `bedrock` |
+| `sdk` | string | The SDK a backend reaches a model through, as the backends configuration names it: `openai`, `bedrock_anthropic` |
+| `answered_model_id` | string | The provider's id of the model that answered a call, where it is not the pinned one `gen_ai.response.model` names |
+| `fixed_temperature` | number | The one temperature a model accepts, as its constraints declare it, used in place of the one requested |
+| `inference_job_type` | string | An inference job's class: `LLMJob`, `ImgGenJob` |
+| `image_size` | string | An image size as a generation request spells it, width by height: `2560x1440` |
+| `nb_steps` | integer | The number of inference steps an image generation job requests, spelled as its parameters spell it |
+| `node_id` | string | A node of a run's execution graph, as the graph tracer names it |
+| `trace_event_type` | string | A trace event's class: `PipeStartEvent` |
+| `writer_id`, `workflow_id` | string | The writer and the workflow a trace event names, as the event log records them |
+| `tracer_key` | string | The key a graph tracer is registered under |
+| `sort_key` | string | The sort key of a trace event's item in DynamoDB |
+| `event_count` | integer | The number of events a line is about, telemetry events or trace events |
+| `event_name` | string | A telemetry event, by its name |
+| `pipelex_version` | string | The version of the Pipelex runtime |
+| `integration_mode` | string | How the runtime is run, as the caller declares it: `cli`, `python`, `fastapi` |
+| `plugin_name` | string | A plugin, by the name it is registered under |
+| `override_paths` | list of strings | The override files merged over the base configuration file in `file.path`, as a list of paths |
+| `backup_path` | string | The backup a migration writes before it rewrites the file in `file.path` |
+| `migration_steps` | list of strings | The titles of the migration ledger's steps a stale configuration file was read through, as a list |
+| `has_blocked_steps` | boolean | Whether a stale configuration file needs a migration step that cannot be applied for the user |
+| `file_count` | integer | The number of result files a delivery stored |
+| `env_var` | string | The name of an environment variable, never its value |
+| `default_value` | integer | The value a setting falls back to when its environment variable holds none it can use |
+| `auth_mode` | string | The authentication mode the API server's `AUTH_MODE` names |
+| `error.type`, `error.message` | string | A handled exception's class name and its text, as [Exceptions](#exceptions) describes |
+| `error_domain` | string | Who fixes a failure, as an error report classifies it: `input`, `config`, `runtime` |
+| `error_category` | string | A failure's Pipelex classification, as an error report carries it |
+| `retryable` | boolean | Whether retrying the failed call as it was can help, as an error report says |
+| `detail` | string | The explanation an API error response gives its caller |
+| `provider_status_code` | integer | The HTTP status an inference provider answered a failed call with |
+| `provider_request_id` | string | The id an inference provider gave a failed call |
 
 `pipe_code`, `pipe_type`, `output_concept`, `concept_ref`, `concept_code`, `domain_code` and `stuff_name` are in the console's [style map](#the-style-map), which colours their values wherever they appear. A concept missing from the table is added to it in the change that first logs it.
 
@@ -369,7 +418,9 @@ What varies goes in `fields`, named by the [naming convention](#naming-conventio
 An exception rides the record, never the message. Spliced into the text, `{exc}` makes the message vary, loses the exception's type and traceback, and gets only the pattern half of the [redaction](#redaction), where a field also has its control characters escaped. So:
 
 - **At ERROR and CRITICAL**, inside the `except` block, pass `include_exception=True`: the record carries the exception, and each sink writes its type and its traceback its own way.
+- **An exception logged and then re-raised carries no traceback, at ERROR too**: it rides as `error_fields`, since whoever catches it owns its traceback, and a line that carried it as well would print it a second time, ahead of the catcher's own report. `include_exception=True` is for an exception the code handles where it logs it, a secondary failure swallowed while another error propagates included, whose traceback nobody else will see.
 - **At WARNING and below**, an exception the code expected and handled rides as two fields, `error.type`, its class's name, and `error.message`, its text, with no traceback, through `error_fields` (`pipelex.tools.log.error_fields`): `fields={"package_address": address, **error_fields(exc=exc)}`. A warning promises a degradation that was handled, and a traceback of Pipelex's own frames repeated on every emission of an expected failure says nothing a reader can act on; the facade's `warning` takes no `include_exception` for that reason. Where the diagnosis is the cause chain rather than the exception's own text, as when a fetch fails in git underneath, `error_fields(exc=exc, text=...)` carries the chain instead. The console cuts `error.message` only past 2000 characters, where it cuts every other field's value at 80, so the chain reaches the terminal whole without a dependency's raw output flooding it.
+- **A pydantic `ValidationError` never reaches a field as its own text**, which quotes every value it refused, a run's input or a model's response among them: `error_fields` writes it as its locations and reasons alone, `limits.burst: Input should be a valid integer`, whichever line logs it. A `text=` given in its place is carried as given.
 
 `error.type` is the OpenTelemetry key for the class of error an operation ended with. `error.message` is the key OpenTelemetry gave an error's text before deprecating that general attribute in favour of domain-specific ones; Pipelex keeps it as `error.type`'s companion because the `exception.*` keys belong to the sinks, which write them for a record that carries the exception itself and prefix a field spelling one.
 
@@ -383,7 +434,7 @@ An exception rides the record, never the message. Spliced into the text, `{exc}`
 
 The [level table](#log-levels) states what a line at each level means, and choosing the level of a call follows from it. There is no DEV level.
 
-- **ERROR** says a run failed or data was lost, and that somebody should look; it carries the exception with `include_exception=True` when there is one.
+- **ERROR** says a run failed or data was lost, and that somebody should look; it carries an exception it handles with `include_exception=True`, and one it re-raises as `error_fields`.
 - **WARNING** must be actionable: a degradation that was handled, or a misconfiguration the user can fix. A warning nobody can act on moves down to DEBUG, or up to ERROR when something was in fact lost.
 - **INFO** marks a lifecycle milestone, and there are few of them, because Pipelex is also a library and a library is quiet at INFO.
 - **DEBUG** answers a question you would ask on reading a log a user sent: which file was read, which fallback was taken, why a model was left out.

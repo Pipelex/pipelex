@@ -47,6 +47,7 @@ from pipelex.cogt.search.search_setting import SearchModelChoice, SearchSetting
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.exceptions import ConfigValidationError
 from pipelex.system.runtime import ProblemReaction
+from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.urls import URLs
 
@@ -1105,7 +1106,7 @@ class ModelDeck(ConfigModel):
                             "model_handle": waterfall_key,
                             "ideal_model_handle": ideal_model_handle,
                             "fallback_model_handle": fallback,
-                            "docs_url": URLs.backend_provider_docs,
+                            OTelLogAttr.URL_FULL: URLs.backend_provider_docs,
                         },
                     )
                     # Mark this warning as logged for this waterfall_name

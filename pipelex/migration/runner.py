@@ -32,6 +32,7 @@ from pipelex.migration.ledger import MigrationLedger, load_ledger_cached
 from pipelex.migration.plan import FileBlockedReason, MigrationPlan, MigrationReport, UnexplainedPath
 from pipelex.migration.surfaces import Surface, SurfaceRegistry
 from pipelex.system.configuration.config_surface import version_declared_below_the_floor
+from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.log.error_fields import error_fields
 
 
@@ -235,7 +236,7 @@ def write_file_with_backup(*, snapshot: FileSnapshot, new_content: str, moment: 
             )
         log.warning(
             "A configuration file was migrated, but the write left temporary files behind",
-            fields={"file.path": str(snapshot.path), **error_fields(exc=exc)},
+            fields={OTelLogAttr.FILE_PATH: str(snapshot.path), **error_fields(exc=exc)},
         )
 
     _prune_older_backups(snapshot=snapshot, backup=backup)
@@ -289,7 +290,7 @@ def _prune_older_backups(*, snapshot: FileSnapshot, backup: WrittenBackup) -> No
         # migrated and already backed up. Not the plan's to report as a failure of the file.
         log.warning(
             "A change to a configuration file was backed up, but an older backup of the file could not be pruned",
-            fields={"file.path": str(snapshot.path), "backup_path": str(backup.path), **error_fields(exc=exc, text=exc.strerror)},
+            fields={OTelLogAttr.FILE_PATH: str(snapshot.path), "backup_path": str(backup.path), **error_fields(exc=exc, text=exc.strerror)},
         )
 
 
@@ -314,7 +315,7 @@ def _discard_created_backup(*, backup: WrittenBackup, snapshot: FileSnapshot) ->
     except OSError as exc:
         log.warning(
             "A backup made for a removal that did not happen could not be removed, so it stays beside the file",
-            fields={"file.path": str(snapshot.path), "backup_path": str(backup.path), **error_fields(exc=exc, text=exc.strerror)},
+            fields={OTelLogAttr.FILE_PATH: str(snapshot.path), "backup_path": str(backup.path), **error_fields(exc=exc, text=exc.strerror)},
         )
     return None
 
@@ -376,7 +377,7 @@ def _discard_backup(*, backup: WrittenBackup, snapshot: FileSnapshot, new_conten
     except OSError as exc:
         log.warning(
             "A backup made for a write that did not happen could not be removed, so it stays beside the file",
-            fields={"file.path": str(snapshot.path), "backup_path": str(backup.path), **error_fields(exc=exc, text=exc.strerror)},
+            fields={OTelLogAttr.FILE_PATH: str(snapshot.path), "backup_path": str(backup.path), **error_fields(exc=exc, text=exc.strerror)},
         )
 
 

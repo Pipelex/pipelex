@@ -20,6 +20,7 @@ from pipelex.core.pipes.pipe_io_artifacts import (
 from pipelex.graph.mermaidflow.mermaid_html import render_mermaid_html_async, render_mermaid_html_with_data_async
 from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
 from pipelex.graph.reactflow.reactflow_html import generate_reactflow_html_async
+from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.misc.string_utils import snake_to_title_case
 
 if TYPE_CHECKING:
@@ -206,7 +207,7 @@ def save_graph_outputs_to_dir(
             file_path.unlink()
             log.warning(
                 "Removed an I/O artifact an earlier run left beside the graphspec, which carries none of its own",
-                fields={"file.path": str(file_path)},
+                fields={OTelLogAttr.FILE_PATH: str(file_path)},
             )
 
     if graph_outputs.mermaidflow_mmd is not None:

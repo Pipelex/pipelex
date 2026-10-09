@@ -38,6 +38,7 @@ from pipelex import log
 from pipelex.migration.exceptions import MigrationLedgerError
 from pipelex.migration.ledger import MigrationLedger, load_ledger_cached, packaged_migration_dir
 from pipelex.migration.plan import MigrationPlan
+from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.misc.json_utils import deep_update
 
 # The reserved in-file table and key. Every configuration-surface reader tolerates them and
@@ -256,7 +257,7 @@ class StaleConfigurationFile(NamedTuple):
 
     def log_fields(self) -> dict[str, Any]:
         return {
-            "file.path": str(self.file_path),
+            OTelLogAttr.FILE_PATH: str(self.file_path),
             "migration_steps": self.migration_steps,
             "has_blocked_steps": self.has_blocked_steps,
         }

@@ -12,8 +12,9 @@ A value renders on one line: a string bare unless it is empty or holds a space, 
 backslash or a character a terminal would act on, in which case it is quoted, with a backslash and a quote
 escaped by a backslash and that character written as its escape; anything else as compact JSON; and the
 whole cut short past ``FIELD_VALUE_MAX_LENGTH``, or past the generous length ``FIELD_MAX_LENGTHS`` gives a field of
-its own, a handled exception's text. A key is written the same way, so a field name holding a line break, a space, an
-equals sign or an escape sequence can forge neither a line nor a pair. Redaction has
+its own, a handled exception's text and a template finding's. A value is cut at its end, except a path's, from
+``LEFT_CUT_FIELDS``, which is cut at its start so the file's name stays. A key is written the same way, so a field name
+holding a line break, a space, an equals sign or an escape sequence can forge neither a line nor a pair. Redaction has
 already run when the console renders a record, so what is rendered is what the scrub left.
 
 Colour follows the name the field was given, from ``FIELD_STYLES``, wherever the field appears, and whatever
@@ -71,8 +72,17 @@ TRUNCATION_MARK = "…"
 # error's every line or git's stderr, would flood the console uncut.
 ERROR_MESSAGE_MAX_LENGTH = 2000
 
+# The text of a PipeDocGen template finding, which is the actionable part of its warning, as a handled exception's
+# text is the actionable part of its line.
+FINDING_MESSAGE_FIELD = "finding_message"
+
 # The fields the console cuts at a length of their own, by the name the caller gave them.
-FIELD_MAX_LENGTHS: dict[str, int] = {ERROR_MESSAGE_FIELD: ERROR_MESSAGE_MAX_LENGTH}
+FIELD_MAX_LENGTHS: dict[str, int] = {ERROR_MESSAGE_FIELD: ERROR_MESSAGE_MAX_LENGTH, FINDING_MESSAGE_FIELD: ERROR_MESSAGE_MAX_LENGTH}
+
+# The fields carrying a path on disk, by the name the caller gave them, which the console cuts at their start rather
+# than at their end: what tells one file from another is its name, at the end, while the start is the directory most
+# lines of a run share.
+LEFT_CUT_FIELDS = frozenset({"file.path", "file.name", "backup_path", "template_file"})
 
 FIELD_SEPARATOR = " "
 KEY_VALUE_SEPARATOR = "="
@@ -122,7 +132,8 @@ def field_suffix_segments(*, fields: Mapping[str, Any], presented_fields: frozen
         # The key is written like a value: a name a caller chose can hold a line break that would forge a
         # line, a space that would read as two pairs or an escape sequence the terminal would act on.
         segments.append((f"{format_field_value(value=name)}{KEY_VALUE_SEPARATOR}", FIELD_KEY_STYLE))
-        segments.append((format_field_value(value=value, max_length=field_max_length(name=name)), field_style(name=name)))
+        rendered_value = format_field_value(value=value, max_length=field_max_length(name=name), is_cut_at_start=field_is_cut_at_start(name=name))
+        segments.append((rendered_value, field_style(name=name)))
     return segments
 
 
@@ -134,9 +145,24 @@ def field_max_length(*, name: str) -> int:
     return FIELD_MAX_LENGTHS.get(given_field_name(name=name), FIELD_VALUE_MAX_LENGTH)
 
 
-def format_field_value(*, value: Any, max_length: int = FIELD_VALUE_MAX_LENGTH) -> str:
-    """A field's value as the suffix prints it: one line, a string quoted when it could forge a pair, cut short past ``max_length``."""
-    return _truncated(text=_one_line(value=value, is_quoting_strings=True), max_length=max_length)
+def field_is_cut_at_start(*, name: str) -> bool:
+    """Whether the console cuts a field's value at its start, keeping its end: a path's, from ``LEFT_CUT_FIELDS``.
+
+    Read off the name the caller gave rather than the one it landed on, as the style is.
+    """
+    return given_field_name(name=name) in LEFT_CUT_FIELDS
+
+
+def format_field_value(*, value: Any, max_length: int = FIELD_VALUE_MAX_LENGTH, is_cut_at_start: bool = False) -> str:
+    """A field's value as the suffix prints it: one line, a string quoted when it could forge a pair, cut short past ``max_length``.
+
+    The cut drops the end of the value and marks it with a trailing ``TRUNCATION_MARK``, or, with ``is_cut_at_start``,
+    drops its start and marks it with a leading one.
+    """
+    text = _one_line(value=value, is_quoting_strings=True)
+    if is_cut_at_start:
+        return _truncated_at_start(text=text, max_length=max_length)
+    return _truncated(text=text, max_length=max_length)
 
 
 def format_layout_value(*, value: Any) -> str:
@@ -195,3 +221,9 @@ def _truncated(*, text: str, max_length: int) -> str:
     if len(text) <= max_length:
         return text
     return f"{text[: max_length - len(TRUNCATION_MARK)]}{TRUNCATION_MARK}"
+
+
+def _truncated_at_start(*, text: str, max_length: int) -> str:
+    if len(text) <= max_length:
+        return text
+    return f"{TRUNCATION_MARK}{text[len(text) - max_length + len(TRUNCATION_MARK) :]}"

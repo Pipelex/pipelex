@@ -51,6 +51,21 @@ The remaining keys are what the error handlers attach to an error line. The ones
 
 A key whose value is not set for this request is **absent** from the line rather than written as `null`, so a query filtering on presence gets an honest answer.
 
+The record took these keys when the server's lines were brought to the log-call conventions, and it dropped two things it carried before: the `event` key, whose one value, `api_error`, the fixed message now plays the part of, and the message built from the status and the error type, `API error 422: InvalidModelCategory`. A query, a dashboard or an alert written for the earlier record moves to the keys of this one:
+
+| Earlier record | This record |
+| --- | --- |
+| `event` = `api_error` | `message` = `A request ended in an error response` |
+| `message` = `API error <status>: <error type>` | `message` = `A request ended in an error response`, with `http.response.status_code` and `error.type` |
+| `route` | `url.path` |
+| `user_id` | `user.id` |
+| `error_type` | `error.type` |
+| `status` | `http.response.status_code` |
+| `provider` | `backend_name` |
+| `model` | `model_handle` |
+
+The other keys, `error_domain`, `error_category`, `retryable`, `detail`, `pipe_code`, `pipeline_run_id`, `provider_status_code` and `provider_request_id`, kept their names.
+
 `detail` is the one field whose absence follows the failure's origin rather than the request's shape, and it is worth knowing which way round. A failure this API authored itself — a validation error, an unknown model category — carries `detail` on the record. A failure that arrives as a Pipelex `ErrorReport`, which is most `5xx` and every domain error, does not: the response body still carries a `detail`, but the record does not, because the body's text has been through disclosure redaction and the cause has not. So a `4xx` from that path logs its `error.type` with no explanation and no traceback, and the response is where the explanation is. Build an operator query on `error.type` and `url.path`, which every line carries, rather than on `detail`.
 
 Every field in that table is a **record attribute**, which is a different thing from the message. A structured sink — `json` here, and the OTLP sink — writes them beside the message as keys. The Rich console sink shows them after the message as a `key=value` suffix, each value on one line and cut short when long, a handled exception's `error.message` at a far more generous length, and leaves out the run identifiers (`request_id`, `pipeline_run_id`), which a person at a terminal does not need on every line, so `A request ended in an error response` is followed by the path, the status, the error type and the rest of the fields above. That rendering is for a person reading a terminal; keep `sink = "json"` wherever the lines are read by anything else.

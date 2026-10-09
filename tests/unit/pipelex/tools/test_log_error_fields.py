@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING
 
 import pytest
+from pydantic import BaseModel, RootModel, ValidationError
 
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.tools.log.error_fields import ERROR_MESSAGE_FIELD, ERROR_TYPE_FIELD, error_fields
@@ -19,6 +20,15 @@ if TYPE_CHECKING:
 
 
 class _ManifestParseError(ValueError):
+    pass
+
+
+class _Settings(BaseModel):
+    retries: int
+    limits: dict[str, int]
+
+
+class _Retries(RootModel[int]):
     pass
 
 
@@ -38,6 +48,36 @@ class TestLogErrorFields:
     )
     def test_the_fields_name_the_class_and_carry_the_text(self, topic: str, exc: BaseException, text: str | None, expected: tuple[str, str]) -> None:
         assert error_fields(exc=exc, text=text) == {ERROR_TYPE_FIELD: expected[0], ERROR_MESSAGE_FIELD: expected[1]}, topic
+
+    def test_a_validation_error_is_written_as_its_locations_and_reasons_never_its_input(self) -> None:
+        """A pydantic error's own text quotes every value it refused, which is payload: a run's input or a model's response."""
+        secret_looking = "sk-live-4f9a8b7c6d5e4f3a2b1c"
+        with pytest.raises(ValidationError) as caught:
+            _Settings.model_validate({"retries": secret_looking, "limits": {"burst": secret_looking}})
+        assert secret_looking in str(caught.value)
+
+        fields = error_fields(exc=caught.value)
+
+        assert fields == {
+            ERROR_TYPE_FIELD: "ValidationError",
+            ERROR_MESSAGE_FIELD: (
+                "retries: Input should be a valid integer, unable to parse string as an integer; "
+                "limits.burst: Input should be a valid integer, unable to parse string as an integer"
+            ),
+        }
+        assert secret_looking not in fields[ERROR_MESSAGE_FIELD]
+
+    def test_a_validation_error_at_the_root_names_its_reason_alone(self) -> None:
+        with pytest.raises(ValidationError) as caught:
+            _Retries.model_validate("sk-live-4f9a8b7c6d5e4f3a2b1c")
+
+        assert error_fields(exc=caught.value)[ERROR_MESSAGE_FIELD] == "Input should be a valid integer, unable to parse string as an integer"
+
+    def test_a_text_given_for_a_validation_error_is_carried_as_given(self) -> None:
+        with pytest.raises(ValidationError) as caught:
+            _Retries.model_validate("not a number")
+
+        assert error_fields(exc=caught.value, text="line 3: invalid JSON")[ERROR_MESSAGE_FIELD] == "line 3: invalid JSON"
 
     @pytest.fixture
     def json_buffer(self, caplog: pytest.LogCaptureFixture) -> Iterator[tuple[Log, io.StringIO]]:

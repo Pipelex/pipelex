@@ -52,7 +52,7 @@ async def best_effort_graph_spec(*, pipe_ref: str | None, library_id: str | None
     Args:
         pipe_ref: The namespaced ref of the pipe to dry-run, or ``None`` for no graph.
         library_id: The id of the already-open library to run against, or ``None`` for no graph.
-        log_context: Caller tag the degrade warning carries in its ``log_context`` field (e.g. ``"act_dry_validate"``).
+        log_context: Caller tag the degrade warning carries in its ``caller`` field (e.g. ``"act_dry_validate"``).
 
     Returns:
         The assembled GraphSpec, or ``None`` when skipped or degraded.
@@ -73,7 +73,7 @@ async def best_effort_graph_spec(*, pipe_ref: str | None, library_id: str | None
             raise
         log.warning(
             "The graph dry run produced no graph; the validation result carries none",
-            fields={"log_context": log_context, "pipe_code": pipe_ref, **error_fields(exc=graph_error)},
+            fields={"caller": log_context, "pipe_code": pipe_ref, **error_fields(exc=graph_error)},
         )
         return None
 

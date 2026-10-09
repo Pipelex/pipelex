@@ -74,7 +74,7 @@ async def validate_bundles_in_process(
             When omitted, the graph arm keeps the existing default of targeting the
             selected bundle `main_pipe`. Bare and qualified refs are accepted according
             to the loaded pipe library's normal resolution rules.
-        log_context: Label the graph-arm degradation and teardown-failure lines carry in their ``log_context`` field.
+        log_context: Label the graph-arm degradation and teardown-failure lines carry in their ``caller`` field.
         caller_identity: Who asked for the validation, when the host knows it. It is the
             ambient caller for the whole pass — the sweep's telemetry event and every dry run,
             the graph arm's included — so none of it falls back to the telemetry stream's
@@ -180,7 +180,7 @@ async def _validate_bundles_in_scope(
                     raise
                 log.error(
                     "The teardown of the validation library also failed after the validation failed; the original error is raised",
-                    fields={"log_context": log_context, "library_id": validation_library_id},
+                    fields={"caller": log_context, "library_id": validation_library_id},
                     include_exception=True,
                 )
     return build_validation_report(

@@ -8,6 +8,7 @@ from typing import Any
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.system.registries.func_registry import func_registry, pipe_func
+from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.typing.exceptions import ModuleFileError
@@ -31,7 +32,7 @@ class FuncRegistryUtils:
 
         if not hasattr(package, "__path__"):
             log.warning(
-                "A PipeFunc package is a plain module with no submodules to walk, so nothing was registered", fields={"package_name": package_name}
+                "A PipeFunc package is a plain module with no submodules to walk, so nothing was registered", fields={"module_name": package_name}
             )
             return 0
 
@@ -203,7 +204,7 @@ class FuncRegistryUtils:
                     )
                     log.warning(
                         "A function decorated with @pipe_func is not eligible, and was not registered",
-                        fields={"function_name": func_name, "file.path": str(file_path), "eligibility_error": eligibility_error},
+                        fields={"function_name": func_name, OTelLogAttr.FILE_PATH: str(file_path), "eligibility_error": eligibility_error},
                     )
         except ModuleFileError:
             # Expected: file validation issues (directories with .py extension, etc.)
@@ -216,13 +217,13 @@ class FuncRegistryUtils:
             # actual cause) otherwise swallowed here and invisible.
             log.warning(
                 "A Python file could not be imported while registering PipeFuncs, so its functions are unavailable",
-                fields={"file.path": str(file_path), **error_fields(exc=exc)},
+                fields={OTelLogAttr.FILE_PATH: str(file_path), **error_fields(exc=exc)},
             )
         except SyntaxError as exc:
             # Potentially problematic: invalid Python syntax may indicate broken code
             log.warning(
                 "A Python file has a syntax error, so its PipeFuncs are unavailable",
-                fields={"file.path": str(file_path), **error_fields(exc=exc)},
+                fields={OTelLogAttr.FILE_PATH: str(file_path), **error_fields(exc=exc)},
             )
 
     @classmethod

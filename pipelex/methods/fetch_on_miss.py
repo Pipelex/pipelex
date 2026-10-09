@@ -31,6 +31,7 @@ from pipelex.methods.exceptions import (
 from pipelex.methods.fetching import fetch_method_package
 from pipelex.methods.method_ref import MethodRef, looks_like_method_ref, parse_method_ref
 from pipelex.methods.structures_check import describe_structured_content_violations, scan_structured_content_classes
+from pipelex.system.telemetry.otel_constants import OTelLogAttr
 
 # The remedy every refusal ends with. It names no directory: on a host, the runtime's own store is not the caller's to write.
 MANUAL_INSTALL_HINT = "install the package where this runtime runs (for example with `mthds install <address>`)"
@@ -94,7 +95,7 @@ def _warn_on_tag_mismatch(*, installed: InstalledMethod, ref: MethodRef | None) 
         return
     if installed.provenance is not None and installed.provenance.tag == ref.tag:
         return
-    mismatch_fields: dict[str, str | None] = {"method_ref": ref.ref_str, "file.path": str(installed.path)}
+    mismatch_fields: dict[str, str | None] = {"method_ref": ref.ref_str, OTelLogAttr.FILE_PATH: str(installed.path)}
     if installed.provenance is not None:
         # Absent when the copy's provenance was never recorded, and None when the copy was fetched with no tag.
         mismatch_fields["installed_tag"] = installed.provenance.tag
@@ -208,6 +209,6 @@ def resolve_address_based_method(
 
     log.info(
         "Fetched a method package and installed it",
-        fields={"package_address": fetched.full_address, "commit_sha": fetched.commit_sha, "file.path": str(installed.path)},
+        fields={"package_address": fetched.full_address, "commit_sha": fetched.commit_sha, OTelLogAttr.FILE_PATH: str(installed.path)},
     )
     return installed

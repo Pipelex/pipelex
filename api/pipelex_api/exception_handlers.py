@@ -36,6 +36,8 @@ from fastapi.responses import JSONResponse
 from pipelex import log
 from pipelex.base_exceptions import DisclosureMode, ErrorDomain, ErrorReport, PipelexError
 from pipelex.plugins.registrar import HttpErrorMapperFn
+from pipelex.system.telemetry.otel_constants import OTelLogAttr
+from pipelex.tools.log.error_fields import ERROR_TYPE_FIELD
 from starlette.requests import ClientDisconnect
 
 from pipelex_api.error_types import ErrorType
@@ -127,7 +129,7 @@ def _request_fields(request: Request) -> dict[str, Any]:
     """
     return {
         "url.path": request.url.path,
-        "user.id": _user_id_of(request),
+        OTelLogAttr.USER_ID: _user_id_of(request),
         "pipe_code": _pipe_code_of(request),
         "pipeline_run_id": _pipeline_run_id_of(request),
     }
@@ -218,11 +220,11 @@ def _log_error_report(report: ErrorReport, *, request: Request, status: int | No
     effective_status = status if status is not None else report.http_status
     fields: dict[str, Any] = {
         **_request_fields(request),
-        "error.type": report.error_type,
+        ERROR_TYPE_FIELD: report.error_type,
         "error_category": report.error_category,
         "error_domain": report.error_domain,
         "retryable": report.retryable,
-        "http.response.status_code": effective_status,
+        OTelLogAttr.HTTP_RESPONSE_STATUS_CODE: effective_status,
         # A report's `provider` is the backend that served the model and its `model` the handle the pipe named.
         "backend_name": report.provider,
         "model_handle": report.model,
@@ -264,10 +266,10 @@ def _log_api_authored_error(*, document: dict[str, Any], status: int, request: R
     """
     fields: dict[str, Any] = {
         **_request_fields(request),
-        "error.type": document.get("error_type"),
+        ERROR_TYPE_FIELD: document.get("error_type"),
         "error_domain": document.get("error_domain"),
         "retryable": document.get("retryable"),
-        "http.response.status_code": status,
+        OTelLogAttr.HTTP_RESPONSE_STATUS_CODE: status,
         "detail": document.get("detail"),
     }
     _emit_api_error(fields=fields, as_error=_emit_at_error_level(status))
@@ -473,10 +475,10 @@ async def handle_unexpected_error(request: Request, exc: Exception) -> Response:
     _emit_api_error(
         fields={
             **_request_fields(request),
-            "error.type": type(exc).__name__,
+            ERROR_TYPE_FIELD: type(exc).__name__,
             "error_category": "unknown",
             "error_domain": ErrorDomain.RUNTIME,
-            "http.response.status_code": 500,
+            OTelLogAttr.HTTP_RESPONSE_STATUS_CODE: 500,
         },
         as_error=True,
     )

@@ -14,6 +14,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pipelex import log
 from pipelex.system.environment import get_optional_env
 from pipelex.system.storage_scope import SINGLE_TENANT_USER_ID
+from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.log.error_fields import error_fields
 from pydantic import BaseModel, Field
 
@@ -166,7 +167,7 @@ async def verify_jwt(
             log.warning("JWT missing user_id claim")
             raise_unauthenticated("Invalid token: missing user_id claim", error_type=ErrorType.INVALID_TOKEN)
         if not isinstance(user_id, str) or not is_safe_user_id(user_id):
-            log.warning("A JWT's user_id claim is not a path-safe segment", fields={"user.id": user_id})
+            log.warning("A JWT's user_id claim is not a path-safe segment", fields={OTelLogAttr.USER_ID: user_id})
             raise_unauthenticated("Invalid token: user_id claim must be a single path-safe segment", error_type=ErrorType.INVALID_TOKEN)
         if user_id == SINGLE_TENANT_USER_ID:
             # Path-safe, but reserved for the no-user-model deployment. An
@@ -248,7 +249,7 @@ async def no_auth(request: Request) -> None:
     if not is_safe_user_id(user_id):
         # A non-empty but path-unsafe id: the proxy intended to authenticate
         # someone and sent a malformed value. Fail closed.
-        log.warning("A forwarded X-User-Id is not a path-safe segment, and the request is refused", fields={"user.id": user_id})
+        log.warning("A forwarded X-User-Id is not a path-safe segment, and the request is refused", fields={OTelLogAttr.USER_ID: user_id})
         raise_bad_request("Forwarded X-User-Id must be a single path-safe segment", error_type=ErrorType.BAD_REQUEST)
 
     _set_request_user(request, user_id=user_id)
@@ -263,7 +264,7 @@ async def get_request_user(request: Request) -> RequestUser | None:
     Usage in route handlers:
         async def my_endpoint(user: Annotated[RequestUser | None, Depends(get_request_user)]):
             if user:
-                log.debug("Serving a request", fields={"user.id": user.user_id})
+                log.debug("Serving a request", fields={OTelLogAttr.USER_ID: user.user_id})
     """
     return getattr(request.state, "user", None)
 

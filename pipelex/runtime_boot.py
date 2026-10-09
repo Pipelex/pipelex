@@ -929,7 +929,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # and the delete-on-failure handler above is behind us, so a reader can never adopt an instance
         # that is about to be removed from the registry.
         runtime_boot.is_ready = True
-        log.info("The Pipelex runtime is ready", fields={"pipelex_version": PACKAGE_VERSION, "integration_mode": integration_mode})
+        log.debug("The Pipelex runtime is ready", fields={"pipelex_version": PACKAGE_VERSION, "integration_mode": integration_mode})
         return runtime_boot
 
     @classmethod

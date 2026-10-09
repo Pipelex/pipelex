@@ -50,6 +50,7 @@ from pipelex.system.configuration.config_surface import (
     stale_configuration_warning,
 )
 from pipelex.system.runtime import runtime_manager
+from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.misc.dict_utils import (
     apply_to_strings_recursive,
 )
@@ -197,7 +198,10 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             # The one trace a machine-wide override leaves: which files this boot actually merged.
             log.info(
                 "The inference backends were read with override files merged over the base",
-                fields={"file.path": str(backends_library_paths[0]), "override_paths": [str(override_path) for override_path in override_paths]},
+                fields={
+                    OTelLogAttr.FILE_PATH: str(backends_library_paths[0]),
+                    "override_paths": [str(override_path) for override_path in override_paths],
+                },
             )
 
         # Create a partial function with the secrets provider bound

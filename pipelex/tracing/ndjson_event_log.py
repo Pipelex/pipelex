@@ -13,6 +13,7 @@ from pydantic import TypeAdapter, ValidationError
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.tracing.event_log_protocol import EventLogProtocol
@@ -166,7 +167,7 @@ class NdjsonEventLog(EventLogProtocol):
                             log.warning(
                                 "A corrupt line of a trace event log, not valid JSON, was skipped",
                                 fields={
-                                    "file.path": str(ndjson_path),
+                                    OTelLogAttr.FILE_PATH: str(ndjson_path),
                                     "line_number": line_number,
                                     **error_fields(exc=validation_error, text=json_error),
                                 },

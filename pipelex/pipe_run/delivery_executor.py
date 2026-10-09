@@ -40,21 +40,6 @@ if TYPE_CHECKING:
     from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus, StorageTarget, WebhookTarget
 
 
-def _hydration_error_text(*, exc: Exception) -> str:
-    """The text a hydration failure is logged with: where and why, never the refused values.
-
-    A pydantic ``ValidationError`` quotes each value it refused, and here those values are the run's own
-    result, which no log line carries. Its errors are written without their input instead, each as its
-    location and its reason; any other exception keeps its own text.
-    """
-    if isinstance(exc, ValidationError):
-        located_reasons = [
-            f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}" for error in exc.errors(include_url=False, include_input=False)
-        ]
-        return "; ".join(located_reasons)
-    return str(exc)
-
-
 class ResultFile(NamedTuple):
     """A generated result file with its bytes and MIME type, ready to store."""
 
@@ -331,7 +316,7 @@ class DeliveryExecutor:
         except (PipeJobError, ValidationError, KajsonException, KeyError, TypeError) as exc:
             log.warning(
                 "The delivered result could not be hydrated; the delivery renders it raw",
-                fields=error_fields(exc=exc, text=_hydration_error_text(exc=exc)),
+                fields=error_fields(exc=exc),
             )
             return None
 

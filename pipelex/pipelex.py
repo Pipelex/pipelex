@@ -341,5 +341,5 @@ class Pipelex(RuntimeBoot):
         # and the delete-on-failure handler above is behind us, so a reader can never adopt an instance
         # that is about to be removed from the registry.
         pipelex_instance.is_ready = True
-        log.info("Pipelex is ready", fields={"pipelex_version": PACKAGE_VERSION, "integration_mode": integration_mode})
+        log.debug("Pipelex is ready", fields={"pipelex_version": PACKAGE_VERSION, "integration_mode": integration_mode})
         return pipelex_instance

@@ -62,6 +62,20 @@ class GenAISpanAttr(StrEnum):
     COMPLETION_CONTENT = "gen_ai.completion.0.content"
 
 
+class OTelLogAttr(StrEnum):
+    """OpenTelemetry semantic-convention attribute keys that name a log line's fields, written verbatim so an OTLP sink emits them untranslated.
+
+    Only the keys more than one call site uses are here; a key used once is spelled at its call. The handled
+    exception's `error.type` and `error.message` are `pipelex.tools.log.error_fields`'s, and the `gen_ai.*` keys
+    are `GenAISpanAttr`'s.
+    """
+
+    FILE_PATH = "file.path"
+    URL_FULL = "url.full"
+    USER_ID = "user.id"
+    HTTP_RESPONSE_STATUS_CODE = "http.response.status_code"
+
+
 class PostHogAttr(StrEnum):
     """PostHog AI analytics attribute keys."""
 

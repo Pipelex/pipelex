@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:3fbfe1ce21f3634f53c042276e7087c4031e985f19b22a2280871d83c08933b6"
+digest = "sha256:206d5c0591bedce16bea59128118ee56ffd08d4691873fe78161385d9d7b5930"
 reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-10-09T23:32:11Z"
-rationale = "clean-pass: reviewed the merged CLI changes of the tracing-api and rest slices together: doctor_cmd.py emits the parked stale-configuration warning through StaleConfigurationWarning.emit, graph_cmd.py and run/_run_core.py log fixed messages with error fields and their unexpected-failure branches print the traceback without locals, the agent run core logs a fixed cost-summary warning, and which_cmd.py demotes the no-library-directories line to VERBOSE. Re-read docs/tools/cli/ (index.md's --traceback flag, run.md, doctor.md, agent-cli.md's stale-configuration paragraph) and pipelex/cli/agent_cli/CLAUDE.md (cost_report absent when aggregation fails): none quotes a changed message, the locals or the warning's shape, so nothing is stale."
+reviewed_at = "2026-10-09T23:47:53Z"
+rationale = "clean-pass: graph_cmd.py only spells its file.path key through OTelLogAttr.FILE_PATH, the same key and value on its two error lines. Grepped docs/tools/cli/ for the graph command, which only run.md mentions (pipelex graph render over a saved graphspec), and re-read pipelex/cli/agent_cli/CLAUDE.md: none quotes the graph command's log lines or their field names, so nothing is stale."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -80,7 +80,7 @@ rationale = "clean-pass: reviewed the merged CLI changes of the tracing-api and 
 "pipelex/cli/commands/fix/_fix_core.py" = "blob:aa698305e6b60dfb7caf133698dc1d5c1f5f68f1"
 "pipelex/cli/commands/fix/app.py" = "blob:6f019930e8e3e0043ee46d87493ba4602eb33a76"
 "pipelex/cli/commands/fix/bundle_cmd.py" = "blob:427364cc453957dfe0cec879f019050329c13b3c"
-"pipelex/cli/commands/graph_cmd.py" = "blob:a019d6d3e5ac8a98fd4012bf431271a6e2a386b9"
+"pipelex/cli/commands/graph_cmd.py" = "blob:4ead4d715a2475e2de53040b511045b17eb0f3cf"
 "pipelex/cli/commands/init/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/init/backends.py" = "blob:04a1a06f1003ed0c7157ec4ca6c8659e4e09fe6b"
 "pipelex/cli/commands/init/command.py" = "blob:f5cbca22f8ea19957f271af2d9844d9191263520"
