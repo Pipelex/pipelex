@@ -1,3 +1,4 @@
+from enum import StrEnum
 from typing import Literal
 
 import pytest
@@ -23,6 +24,22 @@ class TestFormatPydanticValidationError:
         formatted = format_pydantic_validation_error(exc.value)
         assert "Missing required fields: 'b'" in formatted
         assert "Extra forbidden fields: 'c'" in formatted
+
+    def test_an_enum_error_names_the_valid_members(self) -> None:
+        """Without them the reader of a refused value has no way to tell what to write instead."""
+
+        class Color(StrEnum):
+            RED = "red"
+            GREEN = "green"
+
+        class Painted(BaseModel):
+            color: Color
+
+        with pytest.raises(ValidationError) as exc:
+            Painted.model_validate({"color": "blue"})
+
+        formatted = format_pydantic_validation_error(exc.value)
+        assert "Enum errors: 'color': invalid enum value 'blue', expected 'red' or 'green'" in formatted
 
     def test_multiple_missing_fields(self) -> None:
         """Test formatting with multiple missing required fields displayed as comma-separated list."""

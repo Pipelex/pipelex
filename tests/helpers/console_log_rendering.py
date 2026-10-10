@@ -41,16 +41,19 @@ def package_log_config() -> LogConfig:
     return LogConfig.model_validate(config_dict["runtime"]["log"])
 
 
-def console_handler() -> RichHandler:
-    handler = ConsoleLogSink(rich_log_config=package_log_config().rich_log, target=ConsoleTarget.STDERR).handler
+def console_handler(*, rich_log_config: RichLogConfig | None = None) -> RichHandler:
+    """The console sink's handler, with the package's console settings unless others are given."""
+    handler = ConsoleLogSink(rich_log_config=rich_log_config or package_log_config().rich_log, target=ConsoleTarget.STDERR).handler
     assert isinstance(handler, RichHandler)
     return handler
 
 
-def record_with_fields(*, message: str, extra: dict[str, Any] | None = None, layout: LogLayout | str | None = None) -> logging.LogRecord:
+def record_with_fields(
+    *, message: str, extra: dict[str, Any] | None = None, layout: LogLayout | str | None = None, logger_name: str = "pipelex.tools.demo"
+) -> logging.LogRecord:
     """A record as the dispatch builds it: the extra attached through the fields channel, the layout under its mark."""
     record = logging.LogRecord(
-        name="pipelex.tools.demo", level=logging.INFO, pathname="/repo/pipelex/module.py", lineno=42, msg=message, args=(), exc_info=None
+        name=logger_name, level=logging.INFO, pathname="/repo/pipelex/module.py", lineno=42, msg=message, args=(), exc_info=None
     )
     attach_log_record_extra(record=record, extra=extra or {})
     if layout is not None:
@@ -58,9 +61,12 @@ def record_with_fields(*, message: str, extra: dict[str, Any] | None = None, lay
     return record
 
 
-def rendered_text(*, record: logging.LogRecord) -> Text:
-    """The ``Text`` the console sink's handler renders for the record's message line, styles and all."""
-    handler = console_handler()
+def rendered_text(*, record: logging.LogRecord, rich_log_config: RichLogConfig | None = None) -> Text:
+    """The ``Text`` the console sink's handler renders for the record's message line, styles and all.
+
+    The handler takes the package's console settings unless others are given.
+    """
+    handler = console_handler(rich_log_config=rich_log_config)
     record.message = record.getMessage()
     assert handler.formatter is not None
     rendered = handler.render_message(record, handler.formatter.formatMessage(record))

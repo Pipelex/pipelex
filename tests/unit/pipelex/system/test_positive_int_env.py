@@ -19,7 +19,7 @@ class TestPositiveIntEnv:
         assert get_positive_int_env(env_var=ENV_VAR, default=256) == 256
 
         warning_spy.assert_called_once_with(
-            "An environment variable holds no positive integer, so its default applies",
+            "An environment variable holding no positive integer was ignored for its default",
             fields={"env_var": ENV_VAR, "default_value": 256},
         )
 

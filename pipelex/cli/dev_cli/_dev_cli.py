@@ -425,7 +425,10 @@ def check_rich_imports_command(
         sys.exit(1)
 
 
-@app.command(name="check-log-calls", help="Refuse an interpolated log message at INFO and above, and Rich markup in any log message")
+@app.command(
+    name="check-log-calls",
+    help="Refuse an interpolated log message at INFO and above, Rich markup, a message worded against the conventions, and a spliced exception",
+)
 def check_log_calls_command(
     prune: Annotated[
         bool,

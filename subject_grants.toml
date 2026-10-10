@@ -3544,6 +3544,14 @@ rationale = "One post-processing pass of the schema pipeline, called as a verb o
 param = "schema"
 rationale = "Schema-pipeline stage transforming the schema dict; single operand."
 
+["pipelex/language/mthds_schema_generator.py::_constrain_judge_questions"]
+param = "schema"
+rationale = "One post-processing pass of the schema pipeline, called as a verb on the schema it rewrites, like its sibling passes."
+
+["pipelex/language/mthds_schema_generator.py::_constrain_rating_levels"]
+param = "schema"
+rationale = "One post-processing pass of the schema pipeline, called as a verb on the schema it rewrites, like its sibling passes."
+
 ["pipelex/language/mthds_schema_generator.py::_constrain_stored_names"]
 param = "schema"
 rationale = "One post-processing pass of the schema pipeline, called as a verb on the schema it rewrites, like its sibling passes."
@@ -4248,15 +4256,15 @@ rationale = "Verb-object: formats the exception; context stays keyword."
 param = "pipe_run_params"
 rationale = "Derivation from the run params; context stays keyword."
 
-["pipelex/pipe_operators/llm/template_document_analyzer.py::TemplateDocumentAnalyzer._resolve_concept"]
+["pipelex/pipe_operators/shared/template_document_analyzer.py::TemplateDocumentAnalyzer._resolve_concept"]
 param = "concept_ref_or_code"
 rationale = "Verb-object: resolves the ref-or-code; single operand."
 
-["pipelex/pipe_operators/llm/template_document_analyzer.py::TemplateDocumentAnalyzer._resolve_variable_type"]
+["pipelex/pipe_operators/shared/template_document_analyzer.py::TemplateDocumentAnalyzer._resolve_variable_type"]
 param = "var_path"
 rationale = "Query accessor keyed by the variable path; context stays keyword."
 
-["pipelex/pipe_operators/llm/template_document_analyzer.py::TemplateDocumentAnalyzer.analyze_template_for_documents"]
+["pipelex/pipe_operators/shared/template_document_analyzer.py::TemplateDocumentAnalyzer.analyze_template_for_documents"]
 param = "template_source"
 rationale = "Verb-object: analyzes the template source; context stays keyword."
 
@@ -5332,22 +5340,6 @@ rationale = "Verb-object: searches upward from the start dir; single operand."
 param = "relative_path"
 rationale = "Verb-object: resolves the relative path; single operand."
 
-["pipelex/system/configuration/config_model.py::ConfigModel.transform_dict_keys_str_to_enum"]
-param = "input_dict"
-rationale = "Verb-object: transforms the input dict; enum class stays keyword."
-
-["pipelex/system/configuration/config_model.py::ConfigModel.transform_dict_of_floats_str_to_enum"]
-param = "input_dict"
-rationale = "Verb-object: transforms the input dict; enum class stays keyword."
-
-["pipelex/system/configuration/config_model.py::ConfigModel.transform_dict_str_to_enum"]
-param = "input_dict"
-rationale = "Verb-object: transforms the input dict; enum class stays keyword."
-
-["pipelex/system/configuration/config_model.py::ConfigModel.transform_list_of_str_to_enum"]
-param = "input_list"
-rationale = "Verb-object: transforms the input list; enum class stays keyword."
-
 ["pipelex/system/environment.py::all_env_vars_are_set"]
 param = "keys"
 rationale = "Predicate on the given env-var keys; single operand."
@@ -5951,10 +5943,6 @@ rationale = "Setter: installs the log_config; single operand."
 ["pipelex/tools/log/log_dispatch.py::LogDispatch.dispatch"]
 param = "content"
 rationale = "Logs the content; single operand (formatting keyword-only)."
-
-["pipelex/tools/log/log_formatter.py::emoji_for_channel"]
-param = "channel_name"
-rationale = "Renders the channel_name; single operand."
 
 ["pipelex/tools/markdown/markdown_parser.py::_join_text_fragments"]
 param = "state"
@@ -6675,10 +6663,6 @@ rationale = "Keyed accessor by the uri; single operand."
 ["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract.store"]
 param = "data"
 rationale = "Keyed accessor by the data; single operand."
-
-["pipelex/tools/tabular/csv_codec.py::_annotation_allows_none"]
-param = "annotation"
-rationale = "Validates/checks the annotation; single operand."
 
 ["pipelex/tools/tabular/csv_codec.py::_assert_single_char_delimiter"]
 param = "delimiter"

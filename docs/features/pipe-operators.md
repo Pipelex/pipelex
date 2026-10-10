@@ -43,7 +43,7 @@ See [PipeSearch reference](../building-methods/pipes/pipe-operators/PipeSearch.m
 
 ## PipeJudge
 
-One closed question asked of a judgment model about the step's inputs: yes or no, one option out of a set, or a level on a scale. The verdict comes back as a typed `YesNo`, `Choice` or `Rating` carrying the probabilities the model measured, ready to route a `PipeCondition` or gate a step on a threshold.
+A closed question asked of a judgment model about the evidence the step's prompt renders: yes or no, one option out of a set, or a level on a scale. The verdict comes back as a typed `YesNo`, `Choice` or `Rating` carrying the probabilities the model measured, ready to route a `PipeCondition` or gate a step on a threshold. A step may also ask several such questions about the same evidence in one request, and fill a structure with one verdict per question.
 
 See [PipeJudge reference](../building-methods/pipes/pipe-operators/PipeJudge.md).
 

@@ -26,6 +26,7 @@ from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.search.search_setting import SearchSetting
+from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
@@ -39,6 +40,7 @@ from pipelex.kernel.judgment_ops import run_judgment
 from pipelex.kernel.llm_ops import generate_object_content, run_llm_object, run_llm_text
 from pipelex.kernel.llm_prompt_content import LlmPromptContent
 from pipelex.kernel.pipelex_kernel import PipelexKernel
+from pipelex.kernel.prompt_assembly import UserPromptContent
 from pipelex.kernel.search_ops import run_search
 from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -213,8 +215,8 @@ class TestKernelLogContext:
 
         await run_judgment(
             memory=WorkingMemoryFactory.make_empty(),
+            prompt_content=UserPromptContent(template=TemplateBlueprint(template="No evidence at all.", category=TemplateCategory.LLM_PROMPT)),
             question=YesNoQuestion(instructions="Does the log context bind?"),
-            input_names=[],
             judgment_setting=JudgmentSetting(model="kernel-log-context-judgment-model"),
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.YES_NO),
             job_metadata=step,

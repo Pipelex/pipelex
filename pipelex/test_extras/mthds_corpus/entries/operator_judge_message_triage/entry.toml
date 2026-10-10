@@ -1,0 +1,11 @@
+name = "operator_judge_message_triage"
+description = "Several questions about one inbox message asked in one judgment, their verdicts filling the fields of a triage named after them"
+
+validity = "valid"
+tier = "inference"
+granularity = "focused"
+
+covers = [
+  "operator.judge",
+  "feature.structured_output",
+]

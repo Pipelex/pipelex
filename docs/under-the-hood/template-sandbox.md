@@ -5,7 +5,7 @@ description: "Every Jinja2 template Pipelex renders runs under one sandbox polic
 
 # Template Sandbox
 
-A method's templates are code. PipeLLM prompts, PipeCompose templates and construct templates, PipeImgGen and PipeSearch prompts, PipeJudge questions, and PipeCondition expressions are all Jinja2 templates, and they render inside the process that runs the method. When that process is shared, as it is on a hosted runner, a template must not be able to reach anything but the data it was given.
+A method's templates are code. PipeLLM prompts, PipeCompose templates and construct templates, PipeImgGen and PipeSearch prompts, PipeJudge prompts and questions, and PipeCondition expressions are all Jinja2 templates, and they render inside the process that runs the method. When that process is shared, as it is on a hosted runner, a template must not be able to reach anything but the data it was given.
 
 Pipelex therefore renders every template, its own included, under one policy: **a template reads data and calls methods of plain values, and nothing else.** And because a template that only reads data can still ask for a billion-character string, every render also spends from a [budget of work](#the-render-budget), and a render that would overdraw it is refused before it allocates.
 

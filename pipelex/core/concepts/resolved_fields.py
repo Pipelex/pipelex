@@ -22,7 +22,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
+from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType, field_may_hold_nothing
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.qualified_ref import QualifiedRef
 
@@ -75,6 +75,11 @@ class ResolvedField(BaseModel):
     required: bool
     default_value: Any | None = None
     resolved_type: ResolvedType
+
+    @property
+    def may_hold_nothing(self) -> bool:
+        """Whether a value of this field may hold nothing, by `field_may_hold_nothing`."""
+        return field_may_hold_nothing(required=self.required, default_value=self.default_value)
 
 
 def resolve_structure_fields(

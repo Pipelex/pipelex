@@ -34,6 +34,7 @@ class TemplateDocumentAnalyzer:
         *,
         input_specs: dict[str, str],
         domain_code: str,
+        template_category: TemplateCategory = TemplateCategory.LLM_PROMPT,
     ) -> list[DocumentReference]:
         """Analyze a template to find document references.
 
@@ -41,6 +42,7 @@ class TemplateDocumentAnalyzer:
             template_source: The Jinja2 template source
             input_specs: Mapping of variable names to concept codes (e.g., {"doc": "Document"})
             domain_code: The domain code for resolving concepts
+            template_category: The template category, a prompt's by default
 
         Returns:
             List of DocumentReference objects describing how to extract documents
@@ -50,7 +52,7 @@ class TemplateDocumentAnalyzer:
 
         # Parse template to get variable references with filters
         variable_refs = detect_jinja2_variable_references(
-            template_category=TemplateCategory.LLM_PROMPT,
+            template_category=template_category,
             template_source=preprocessed,
         )
 

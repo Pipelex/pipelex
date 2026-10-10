@@ -206,7 +206,7 @@ def save_graph_outputs_to_dir(
             # loud, because the agent CLI's directory is the user's own bundle directory.
             file_path.unlink()
             log.warning(
-                "Removed an I/O artifact an earlier run left beside the graphspec, which carries none of its own",
+                "An I/O artifact an earlier run left beside the graphspec was removed",
                 fields={OTelLogAttr.FILE_PATH: str(file_path)},
             )
 

@@ -164,6 +164,36 @@ class TestPluginModelMerge:
         with pytest.raises(PluginModelDeclarationError, match="Plugin 'doc-gen' declares the internal model 'pipelex-xlsx'"):
             self._setup(inference_dir=inference_dir, plugin_model_declarations=declarations)
 
+    def test_a_plugin_model_may_set_costs_to_none(self, inference_dir: Path) -> None:
+        """A plugin builds its table in Python, where an absent price list is naturally `None`."""
+        declarations = _declarations(internal_models={"pipelex-xlsx": {**PIPELEX_XLSX_SPEC, "costs": None}}, doc_gen_defaults={})
+
+        model_deck = self._setup(inference_dir=inference_dir, plugin_model_declarations=declarations).get_model_deck()
+
+        assert model_deck.get_required_inference_model(model_handle="pipelex-xlsx", model_type=ModelType.DOC_GEN).costs == {}
+
+    @pytest.mark.parametrize(
+        ("field_name", "value"),
+        [
+            pytest.param("costs", "free", id="costs_as_a_string"),
+            pytest.param("costs", {"input": None}, id="costs_with_a_none_price"),
+            pytest.param("listed_constraints", None, id="listed_constraints_as_none"),
+            pytest.param("valued_constraints", None, id="valued_constraints_as_none"),
+            pytest.param("rules", [], id="rules_as_a_list"),
+        ],
+    )
+    def test_a_plugin_member_of_the_wrong_type_fails_the_boot_naming_the_plugin(self, inference_dir: Path, field_name: str, value: Any) -> None:
+        """These used to escape the merge as a bare `AttributeError` or `TypeError` naming no plugin."""
+        declarations = _declarations(internal_models={"pipelex-xlsx": {**PIPELEX_XLSX_SPEC, field_name: value}}, doc_gen_defaults={})
+
+        with pytest.raises(PluginModelDeclarationError) as exc_info:
+            self._setup(inference_dir=inference_dir, plugin_model_declarations=declarations)
+
+        assert exc_info.value.plugin == "doc-gen"
+        message = str(exc_info.value)
+        assert "Plugin 'doc-gen' declares the internal model 'pipelex-xlsx'" in message
+        assert field_name in message
+
     def test_a_plugin_default_no_step_uses_fails_the_boot_naming_the_plugin(self, inference_dir: Path) -> None:
         declarations = _declarations(internal_models={}, doc_gen_defaults={(DocGenFormat.PPTX, DocGenSource.LAYOUT): "pipelex-pptx"})
 

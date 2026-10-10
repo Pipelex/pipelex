@@ -10,7 +10,7 @@ from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
-from pipelex.cogt.judgment.judgment_models import JudgmentAnswer
+from pipelex.cogt.judgment.judgment_models import JudgmentOutcome
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.core.stuffs.document_content import DocumentContent
@@ -169,4 +169,4 @@ class ContentGeneratorProtocol(Protocol):
     def make_judgment_answers(
         self,
         judgment_assignment: JudgmentAssignment,
-    ) -> Coroutine[Any, Any, dict[str, JudgmentAnswer]]: ...
+    ) -> Coroutine[Any, Any, dict[str, JudgmentOutcome]]: ...

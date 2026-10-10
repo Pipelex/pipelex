@@ -1,4 +1,4 @@
-from typing import Annotated, Literal, Self, Union
+from typing import Annotated, Any, Self, Union
 
 from pydantic import BeforeValidator, Field, WithJsonSchema, field_validator, model_validator
 
@@ -26,11 +26,11 @@ class LLMSetting(ConfigModel):
 
     @field_validator("max_tokens", mode="before")
     @classmethod
-    def validate_max_tokens(cls, value: int | Literal["auto"] | None) -> int | None:
-        if value is None or (isinstance(value, str) and value == "auto"):
+    def validate_max_tokens(cls, value: Any) -> Any:
+        """`"auto"` means the model's default; any other value is left to the field's own type to accept or refuse."""
+        if value == "auto":
             return None
-        if isinstance(value, int):  # pyright: ignore[reportUnnecessaryIsInstance]
-            return value
+        return value
 
     @model_validator(mode="after")
     def validate_reasoning_effort_or_budget(self) -> Self:

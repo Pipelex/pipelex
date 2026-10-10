@@ -1,0 +1,33 @@
+{
+  "model": "jev-1.13.0",
+  "state": "A message from a customer:\n<message>\nI asked for a password reset an hour ago and the email never came. I'll try again tomorrow if it doesn't show up.\n</message>",
+  "questions": {
+    "urgent": {
+      "type": "noul",
+      "instructions": "Is the message urgent?",
+      "criteria": {
+        "true": "The customer needs an answer today",
+        "false": "The message can wait for the normal queue"
+      }
+    },
+    "team": {
+      "type": "choice",
+      "instructions": "Which team should handle this message?",
+      "criteria": {
+        "payments": "Charges, invoices, payment processing failures",
+        "shipping": "Delivery status, delays, lost packages",
+        "accounts": "Sign-in, passwords, account settings",
+        "other": "None of the above"
+      }
+    },
+    "severity": {
+      "type": "score",
+      "instructions": "How severe is the reported issue?",
+      "criteria": [
+        "Cosmetic: Appearance only; no lost functionality",
+        "Workaround available: A task fails, but another way works",
+        "Fully blocked: A task fails with no workaround"
+      ]
+    }
+  }
+}

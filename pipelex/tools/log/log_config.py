@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import re
 from enum import StrEnum
-from typing import cast
 
 from pydantic import Field, field_validator
 
-from pipelex.system.configuration.config_model import ConfigModel
+from pipelex.system.configuration.config_model import ConfigModel, LaxEnum
 from pipelex.system.console_target import ConsoleTarget
 from pipelex.tools.log.log_levels import LogLevel
 from pipelex.tools.misc.pretty import PrettyPrintMode
@@ -49,11 +48,25 @@ class CallerInfoTemplate(StrEnum):
                 return "{func} {module} {line}"
 
 
+class PackagePrefix(StrEnum):
+    """Which lines the ``console`` sink starts with their logger's top-level package name.
+
+    ``LIBRARIES`` names another library's package and leaves a line from ``pipelex`` or a ``pipelex_`` package bare,
+    ``ALL`` names the package of every line logged under a named logger, and ``NONE`` names none. A line logged on the
+    root logger names no package under any value.
+    """
+
+    LIBRARIES = "libraries"
+    ALL = "all"
+    NONE = "none"
+
+
 class RichLogConfig(ConfigModel):
     """The settings of the ``console`` sink's Rich handler. Read by the sink; this module imports no Rich."""
 
     is_show_time: bool
     is_show_level: bool
+    is_show_path: bool
     is_link_path_enabled: bool
     highlighter_name: HighlighterName = Field(strict=False)
     is_rich_tracebacks: bool
@@ -61,6 +74,7 @@ class RichLogConfig(ConfigModel):
     is_tracebacks_show_locals: bool
     tracebacks_suppress: list[str]
     keywords_to_hilight: list[str]
+    package_prefix: PackagePrefix = Field(strict=False)
 
 
 class OtlpLogSinkConfig(ConfigModel):
@@ -140,7 +154,7 @@ class LogRedactionConfig(ConfigModel):
 
 class LogConfig(ConfigModel):
     default_log_level: LogLevel = Field(strict=False)
-    package_log_levels: dict[str, LogLevel]
+    package_log_levels: dict[str, LaxEnum[LogLevel]]
     # The registered log-sink token boot selects: an open string, validated at the registry lookup.
     sink: str
     pretty_print_mode: PrettyPrintMode = Field(strict=False)
@@ -158,11 +172,3 @@ class LogConfig(ConfigModel):
     rich_log: RichLogConfig
     otlp: OtlpLogSinkConfig
     gcp: GcpLogSinkConfig
-
-    @field_validator("package_log_levels", mode="before")
-    @classmethod
-    def validate_package_log_levels(cls, value: dict[str, str]) -> dict[str, LogLevel]:
-        return cast(
-            "dict[str, LogLevel]",
-            ConfigModel.transform_dict_str_to_enum(input_dict=value, value_enum_cls=LogLevel),
-        )

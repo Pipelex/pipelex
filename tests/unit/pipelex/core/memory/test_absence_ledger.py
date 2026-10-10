@@ -150,6 +150,21 @@ class TestAbsenceLedger:
         assert working_memory.resolve_stuff("draft_alias") == record
         assert working_memory.list_missing_names({"draft_alias"}) == []
 
+    def test_is_variable_present_answers_whether_a_stuff_is_held(self):
+        """Presence follows `get_optional_stuff`: a name, or an alias whose target, holds a stuff; an alias to a resolved-absent slot does not."""
+        working_memory = WorkingMemory()
+        working_memory.set_stuff(name="note", stuff=_make_text_stuff("note"))
+        working_memory.add_alias("note_alias", target="note")
+        working_memory.set_stuff(name="draft", stuff=_make_text_stuff("draft"))
+        working_memory.add_alias("draft_alias", target="draft")
+        working_memory.record_resolved_absence(_make_record("draft"))
+
+        assert working_memory.is_variable_present(name="note") is True
+        assert working_memory.is_variable_present(name="note_alias") is True
+        assert working_memory.is_variable_present(name="draft") is False
+        assert working_memory.is_variable_present(name="draft_alias") is False
+        assert working_memory.is_variable_present(name="never_declared") is False
+
     def test_record_absence_is_a_note_beside_a_value(self):
         """The plain record_absence stays a ledger NOTE: a value under the same name is kept and
         wins in resolve_stuff (the D4 plural empty-list note depends on this).

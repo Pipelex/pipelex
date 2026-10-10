@@ -2,6 +2,11 @@
 
 The family speaks yes/no, choice and rating; this vendor speaks *noul*, *choice* and *score*. The
 mapping is one-to-one, and it lives here alone — nothing outside this module knows a vendor word.
+The evidence is the rendered prompt, which the worker sends as the vendor's state, a string.
+
+**A level is one string on this wire.** A labelled level goes out as `label: description`, or as
+whichever of the two it declares, and the vendor answers with the level's index, so the label never
+needs reading back: the operator looks it up on the declared scale.
 
 **The vendor's bounds are enforced here, not in the blueprint.** A rating scale longer than this
 API answers is legal MTHDS that this one backend refuses, exactly as the design's Part 5 says: the
@@ -47,6 +52,7 @@ from pipelex.cogt.judgment.judgment_models import (
     JudgmentAnswer,
     JudgmentQuestion,
     RatingAnswer,
+    RatingLevel,
     RatingQuestion,
     YesNoAnswer,
     YesNoQuestion,
@@ -91,24 +97,35 @@ def to_typesafe_question(*, question_key: str, question: JudgmentQuestion) -> Ty
                     ),
                     provider_metadata=None,
                 )
-            return TypesafeScore(instructions=question.instructions, criteria=list(question.levels))
+            return TypesafeScore(instructions=question.instructions, criteria=[_score_criterion(level=level) for level in question.levels])
         case _:
             assert_never(question)
 
 
 def _noul_criteria(*, question: YesNoQuestion) -> TypesafeNoulCriteria | None:
-    """The vendor's yes/no criteria, or nothing at all when the question declared neither side.
+    """The vendor's yes/no criteria, both sides, or nothing at all when the question declared none.
 
-    Both sides are individually optional and an absent map is legal as long as the instructions are
-    there. A key the vendor does not know is accepted and silently ignored, so only the two names
-    it does know are ever sent.
+    The family's question carries both sides or none, so a lone side never reaches this vendor. A key
+    the vendor does not know is accepted and silently ignored, so only the two names it does know are
+    ever sent.
     """
-    criteria: TypesafeNoulCriteria = {}
-    if question.yes_criterion is not None:
-        criteria["true"] = question.yes_criterion
-    if question.no_criterion is not None:
-        criteria["false"] = question.no_criterion
-    return criteria or None
+    if question.criteria is None:
+        return None
+    return {"true": question.criteria.yes, "false": question.criteria.no}
+
+
+def _score_criterion(*, level: RatingLevel) -> str:
+    """One level as the vendor's one string: `label: description` when both are declared, else the one that is."""
+    if level.label is not None and level.description is not None:
+        return f"{level.label}: {level.description}"
+    if level.label is not None:
+        return level.label
+    if level.description is not None:
+        return level.description
+    # `RatingLevel`'s own validator refuses a level carrying neither, so a validated level never reaches
+    # this; it is stated for the type checker, which cannot see a validator.
+    msg = "A rating level carries neither a label nor a description"
+    raise TypesafeQuestionUnsupportedError(msg, error_category=InferenceErrorCategory.CONTENT, provider_metadata=None)
 
 
 def from_typesafe_response(*, questions: dict[str, JudgmentQuestion], response: SystemOneResponse) -> dict[str, JudgmentAnswer]:

@@ -21,7 +21,7 @@ class TestConfigCoverageJudgment:
         inference_model = get_model_deck().get_required_inference_model(model_handle=judgment_combo.handle, model_type=ModelType.JUDGMENT)
         worker = JudgmentWorkerFactory.make_judgment_worker(inference_model)
         judgment_job = JudgmentJobFactory.make_judgment_job(
-            state=JudgmentTestCases.STATE,
+            prompt=JudgmentTestCases.PROMPT,
             questions={"is_urgent": JudgmentTestCases.IS_URGENT},
             judgment_setting=JudgmentSetting(model=judgment_combo.handle),
             job_metadata=job_metadata,

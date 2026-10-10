@@ -40,7 +40,7 @@ from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, Extrac
 from pipelex.cogt.image.prompt_image import PromptImageUri
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
-from pipelex.cogt.judgment.judgment_models import YesNoQuestion
+from pipelex.cogt.judgment.judgment_models import JudgmentPrompt, YesNoQuestion
 from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
@@ -65,7 +65,7 @@ URL_FIELD_INVENTORY: dict[type[BaseModel], set[str]] = {
     RenderDocumentAssignment: {"composition.layout.blocks.url", "composition.layout.blocks.blocks.url"},
     SearchAssignment: set(),
     SearchObjectAssignment: set(),
-    JudgmentAssignment: {"images.uri", "documents.uri"},
+    JudgmentAssignment: {"prompt.images.uri", "prompt.documents.uri"},
 }
 
 
@@ -202,9 +202,11 @@ URL_BEARING_SAMPLES: dict[type[BaseModel], tuple[_DeclaresReads, set[str]]] = {
         JudgmentAssignment(
             job_metadata=_job_metadata(),
             cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
-            state={"message": "the url https://example.com/in-the-state is data, never read"},
-            images={"before": [PromptImageUri(uri="pipelex-storage://s/before.png")], "after": [PromptImageUri(uri="pipelex-storage://s/after.png")]},
-            documents={"claim": [PromptDocumentUri(uri="pipelex-storage://s/claim.pdf")]},
+            prompt=JudgmentPrompt(
+                text="Before: [Image 1] After: [Image 2] Claim: [Document 1], and the url https://example.com/in-the-text is data, never read",
+                images=[PromptImageUri(uri="pipelex-storage://s/before.png"), PromptImageUri(uri="pipelex-storage://s/after.png")],
+                documents=[PromptDocumentUri(uri="pipelex-storage://s/claim.pdf")],
+            ),
             questions={"is_urgent": YesNoQuestion(instructions="Is it urgent?")},
             judgment_setting=JudgmentSetting(model="h"),
         ),

@@ -371,7 +371,7 @@ from typing import Any, Literal
 class WithDefault(StructuredContent):
     """Generated WithDefault class"""
 
-    field_with_default: str | None = Field(default="Example: \\"quoted text\\"", description="A field with quoted default")
+    field_with_default: str = Field(default="Example: \\"quoted text\\"", description="A field with quoted default")
 '''
 
         assert generated_code == expected_code
@@ -419,7 +419,7 @@ from typing import Any, Literal
 class DefaultPath(StructuredContent):
     """Generated DefaultPath class"""
 
-    path: str | None = Field(default="C:\\\\Program Files\\\\App", description="Default path")
+    path: str = Field(default="C:\\\\Program Files\\\\App", description="Default path")
 '''
 
         assert generated_code == expected_code
@@ -670,7 +670,7 @@ class AnimalRecord(StructuredContent):
 
     animal_type: str = Field(..., description="The species or type of animal (e.g., \\"fox\\", \\"penguin\\", \\"octopus\\")")
     owner_name: str | None = Field(default=None, description="The owner\'s full name")
-    file_path: str | None = Field(default="C:\\\\default\\\\path", description="Location on disk (e.g., C:\\\\Animals\\\\data.txt)")
+    file_path: str = Field(default="C:\\\\default\\\\path", description="Location on disk (e.g., C:\\\\Animals\\\\data.txt)")
     notes: str | None = Field(default=None, description="Notes with \\"quotes\\" and\\nnewlines")
 '''
 

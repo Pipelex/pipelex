@@ -50,6 +50,7 @@ description = "Judges whether a price looks too low to be true"
 inputs      = { cheapest_price = "Number" }
 output      = "YesNo"
 model       = "@default-judgment"
+prompt      = "The cheapest price printed in a furniture catalog, in euros: $cheapest_price"
 question    = "Does this price, in euros, look too low to be true for furniture?"
 criteria    = { yes = "The price is below five euros", no = "The price is five euros or more" }
 threshold   = 0.7

@@ -31,7 +31,7 @@ from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
-from pipelex.cogt.judgment.judgment_models import JudgmentAnswer
+from pipelex.cogt.judgment.judgment_models import JudgmentOutcome
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.config import get_config
@@ -324,5 +324,5 @@ class ContentGenerator(ContentGeneratorProtocol):
     async def make_judgment_answers(
         self,
         judgment_assignment: JudgmentAssignment,
-    ) -> dict[str, JudgmentAnswer]:
+    ) -> dict[str, JudgmentOutcome]:
         return await judgment_gen_answers(judgment_assignment)

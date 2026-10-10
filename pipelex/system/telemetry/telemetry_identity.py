@@ -52,6 +52,7 @@ from pipelex.system.caller_identity import CallerIdentity
 from pipelex.system.storage_scope import DRY_RUN_USER_ID, LOCAL_USER_ID, SINGLE_TENANT_USER_ID
 from pipelex.system.telemetry.otel_constants import LangfuseSpanAttr, PipelexSpanAttr
 from pipelex.system.telemetry.telemetry_config import PostHogMode
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.log.log import log
 from pipelex.tools.misc.json_utils import pure_json_str
 
@@ -273,22 +274,22 @@ class TelemetryIdentity(BaseModel):
         if raw is None:
             return {}
         if not isinstance(raw, str):
-            log.debug(f"Ignoring span attribute '{PipelexSpanAttr.RUN_EXTRAS}': expected a JSON string, got {type(raw).__name__}")
+            log.debug(f"The span attribute '{PipelexSpanAttr.RUN_EXTRAS}' holds a {type(raw).__name__}, not a JSON string, and was ignored")
             return {}
         try:
             decoded = json.loads(raw)
         except ValueError as exc:
-            log.debug(f"Ignoring span attribute '{PipelexSpanAttr.RUN_EXTRAS}': not decodable JSON ({exc})")
+            log.debug(f"The span attribute '{PipelexSpanAttr.RUN_EXTRAS}' is not decodable JSON and was ignored", fields=error_fields(exc=exc))
             return {}
         if not isinstance(decoded, dict):
-            log.debug(f"Ignoring span attribute '{PipelexSpanAttr.RUN_EXTRAS}': expected a JSON object, got {type(decoded).__name__}")
+            log.debug(f"The span attribute '{PipelexSpanAttr.RUN_EXTRAS}' holds a {type(decoded).__name__}, not a JSON object, and was ignored")
             return {}
         extras: dict[str, str] = {}
         for extras_key, extras_value in decoded.items():  # type: ignore[union-attr]
             if isinstance(extras_key, str) and isinstance(extras_value, str):
                 extras[extras_key] = extras_value
             else:
-                log.debug(f"Ignoring a non-string entry in span attribute '{PipelexSpanAttr.RUN_EXTRAS}'")
+                log.debug(f"An entry of the span attribute '{PipelexSpanAttr.RUN_EXTRAS}' that is not a string was ignored")
         return extras
 
 

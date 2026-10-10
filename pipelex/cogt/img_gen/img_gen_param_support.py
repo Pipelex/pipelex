@@ -10,10 +10,9 @@ Used by:
 - `PipeImgGen` blueprint validation, to surface config errors at load time.
 
 Unknown-taxonomy policy: if a rule value cannot be parsed into the expected
-taxonomy enum, the check abstains (returns supported=True). Some backends
-(e.g. the Pipelex gateway) carry rules whose taxonomy strings predate this
-factory, and those rules are consumed by a different worker — abstaining
-prevents false negatives in those cases.
+taxonomy enum, the check abstains (returns supported=True). A backend file
+written before this factory may carry rules whose taxonomy strings it cannot
+parse, and abstaining prevents false negatives in that case.
 """
 
 from typing import NamedTuple
@@ -71,7 +70,7 @@ class ImgGenParamSupport:
         try:
             taxonomy = AspectRatioTaxonomy(taxonomy_value)
         except ValueError:
-            log.debug(f"Abstaining: unknown AspectRatioTaxonomy '{taxonomy_value}' for model '{model_name}'")
+            log.debug(f"An unknown AspectRatioTaxonomy '{taxonomy_value}' of model '{model_name}' was not checked")
             return _SUPPORTED
         try:
             ImgGenArgsFactory.make_args_from_aspect_ratio(
@@ -98,7 +97,7 @@ class ImgGenParamSupport:
         try:
             taxonomy = BackgroundTaxonomy(taxonomy_value)
         except ValueError:
-            log.debug(f"Abstaining: unknown BackgroundTaxonomy '{taxonomy_value}' for model '{model_name}'")
+            log.debug(f"An unknown BackgroundTaxonomy '{taxonomy_value}' of model '{model_name}' was not checked")
             return _SUPPORTED
         try:
             ImgGenArgsFactory.make_args_from_background(
@@ -123,7 +122,7 @@ class ImgGenParamSupport:
         try:
             taxonomy = OutputFormatTaxonomy(taxonomy_value)
         except ValueError:
-            log.debug(f"Abstaining: unknown OutputFormatTaxonomy '{taxonomy_value}'")
+            log.debug(f"An unknown OutputFormatTaxonomy '{taxonomy_value}' was not checked")
             return _SUPPORTED
         try:
             ImgGenArgsFactory.make_args_from_output_format(
@@ -151,7 +150,7 @@ class ImgGenParamSupport:
         try:
             taxonomy = InputFidelityTaxonomy(taxonomy_value)
         except ValueError:
-            log.debug(f"Abstaining: unknown InputFidelityTaxonomy '{taxonomy_value}' for model '{model_name}'")
+            log.debug(f"An unknown InputFidelityTaxonomy '{taxonomy_value}' of model '{model_name}' was not checked")
             return _SUPPORTED
         try:
             ImgGenArgsFactory.make_args_from_input_fidelity(

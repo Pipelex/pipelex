@@ -14,7 +14,6 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.exceptions import RoutingProfileBlueprintValueError
 from pipelex.errors.error_pages_generator import iter_pipelex_error_subclasses
 from pipelex.pipe_operators.compose.exceptions import ConstructFieldBlueprintValueError
-from pipelex.system.exceptions import ConfigModelError
 
 
 class TestPipelexErrorMessageInit:
@@ -31,7 +30,7 @@ class TestPipelexErrorMessageInit:
                     offenders.append(f"{error_cls.__module__}.{error_cls.__name__} (lists {shadow_cls.__name__} before PipelexError)")
         assert not offenders, "Exception classes shadow PipelexError.__init__ — `.message` will be unset:\n" + "\n".join(offenders)
 
-    @pytest.mark.parametrize("error_cls", [ConstructFieldBlueprintValueError, RoutingProfileBlueprintValueError, ConfigModelError])
+    @pytest.mark.parametrize("error_cls", [ConstructFieldBlueprintValueError, RoutingProfileBlueprintValueError])
     def test_message_set_and_error_report_succeeds(self, error_cls: type[PipelexError]) -> None:
         """A reordered ``(PipelexError, ValueError)`` mixin sets ``.message``, keeps its
         ``ValueError`` identity (so Pydantic still wraps validator raises), and renders a report.

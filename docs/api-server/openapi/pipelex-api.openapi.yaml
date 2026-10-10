@@ -12,7 +12,7 @@ info:
   license:
     name: Elastic License 2.0
     identifier: Elastic-2.0
-  version: 0.81.1
+  version: 0.82.0
 paths:
   /health:
     get:
@@ -3164,27 +3164,96 @@ components:
         has no effect on this arm (unlike `rendered_markdown`, which rides both arms because failure
 
         text is exactly what a human surface wants).'
+    JudgeQuestionBlueprint:
+      properties:
+        question:
+          type: string
+          title: Question
+        options:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          title: Options
+        levels:
+          anyOf:
+          - items:
+              anyOf:
+              - type: string
+              - $ref: '#/components/schemas/JudgeRatingLevel'
+            type: array
+          - type: 'null'
+          title: Levels
+        criteria:
+          anyOf:
+          - $ref: '#/components/schemas/JudgeYesNoCriteria'
+          - type: 'null'
+        threshold:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Threshold
+      additionalProperties: false
+      type: object
+      required:
+      - question
+      title: JudgeQuestionBlueprint
+      description: 'One question of a PipeJudge asking several: what it asks, and the fields the single form sets on the pipe.
+
+
+        Closed, as the standard requires: `question` is the instruction, a plain text template, and the kind
+
+        is decided by which of `options` and `levels` the question declares, under the single form''s rules,
+
+        which `PipeJudgeBlueprint` checks, since a refusal names the question and only its key in `questions`
+
+        does. That key also names the output field holding its verdict.'
+    JudgeRatingLevel:
+      properties:
+        label:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Label
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+      additionalProperties: false
+      type: object
+      title: JudgeRatingLevel
+      description: 'A rating level written as a table: a `label` naming it in a few words, a `description` of the situation
+        it stands for, or both.
+
+
+        Closed, as the standard requires. A level written as a plain string is its description.'
     JudgeYesNoCriteria:
       properties:
         'yes':
-          anyOf:
-          - type: string
-          - type: 'null'
+          type: string
           title: 'Yes'
         'no':
-          anyOf:
-          - type: string
-          - type: 'null'
+          type: string
           title: 'No'
       additionalProperties: false
       type: object
+      required:
+      - 'yes'
+      - 'no'
       title: JudgeYesNoCriteria
-      description: 'What a yes and a no mean, for a yes/no question. Closed: a key other than `yes` or `no` is refused.
+      description: 'What a yes and a no mean, for a yes/no question: both sides, each non-empty. Closed: a key other than
+        `yes` or `no` is refused.
 
 
-        The judging vendor silently ignores a criterion key it does not know, so this model is the only
+        The judging vendors silently ignore a criterion key they do not know, so this model is the only
 
-        place a typo in one is caught.'
+        place a typo in one is caught. Both sides are required because a lone side cannot be carried with
+
+        its meaning on every backend: one sends a single criterion as one of a pair of options, where the
+
+        side left out would be a blank.'
     JudgmentSetting:
       properties:
         model:
@@ -5167,11 +5236,6 @@ components:
 
         Closed shape (`extra="forbid"`).'
     PipeJudgeBlueprint:
-      oneOf:
-      - required:
-        - question
-      - required:
-        - prompt
       properties:
         source:
           anyOf:
@@ -5203,9 +5267,21 @@ components:
         output:
           type: string
           title: Output
-        question:
+        prompt:
           type: string
+          title: Prompt
+        question:
+          anyOf:
+          - type: string
+          - type: 'null'
           title: Question
+        questions:
+          anyOf:
+          - additionalProperties:
+              $ref: '#/components/schemas/JudgeQuestionBlueprint'
+            type: object
+          - type: 'null'
+          title: Questions
         model:
           anyOf:
           - $ref: '#/components/schemas/JudgmentSetting'
@@ -5223,7 +5299,9 @@ components:
         levels:
           anyOf:
           - items:
-              type: string
+              anyOf:
+              - type: string
+              - $ref: '#/components/schemas/JudgeRatingLevel'
             type: array
           - type: 'null'
           title: Levels
@@ -5236,26 +5314,29 @@ components:
           - type: number
           - type: 'null'
           title: Threshold
-        prompt:
-          type: string
-          title: Prompt
-          description: A synonym of `question`, read exactly as it.
       additionalProperties: false
       type: object
       required:
       - description
       - output
+      - prompt
       title: PipeJudgeBlueprint
-      description: 'Asks a judging model one closed question about its inputs: yes/no, a choice, or a rating.
+      description: 'Asks a judging model closed questions about the evidence its prompt presents: yes/no, a choice, or a rating.
 
 
-        The kind is decided by which of `options` and `levels` the pipe declares, never by a field of its
+        `prompt` is the evidence template, rendered and checked as a PipeLLM''s prompt is, the images and
 
-        own. `prompt` is accepted in place of `question` and read exactly as it, so nothing after parsing
+        documents it reads presented to the model as files. The single form asks one `question`, a plain
 
-        sees the synonym. Every declared input is material to judge, so an input the question never names
+        text template, and produces its verdict native; the multi form asks the several `questions` of a
 
-        is still read; only a variable the question names must be declared.'
+        table keyed by name over the same evidence in one request, and fills a structure whose fields are
+
+        those names with one verdict each. A question''s kind is decided by which of `options` and `levels`
+
+        it declares, never by a field of its own, and the single form declares them on the pipe. Every
+
+        declared input is read by the prompt or by a question.'
     PipeLLMBlueprint:
       properties:
         source:
