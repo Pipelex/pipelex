@@ -82,6 +82,11 @@ botocore-credentials = "WARNING"
 google = "INFO"
 httpx = "WARNING"
 httpcore = "INFO"
+# openai 3.x sends its requests through the httpx2 and httpcore2 forks, which log under their own
+# names, so they get the levels of the packages they fork: otherwise every inference call prints an
+# INFO line carrying the provider's endpoint URL and the HTTP status.
+httpx2 = "WARNING"
+httpcore2 = "INFO"
 openai = "INFO"
 instructor = "INFO"
 urllib3-connectionpool = "INFO"

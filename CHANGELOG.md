@@ -18,6 +18,7 @@
 ### Fixed
 
 - **Model descriptions and credential errors carry no backslashes**: a model's description in an error message or a log line, such as `gpt-5 → SDK[openai]•Backend[openai]•Model[gpt-5-2025]`, no longer has a backslash before each bracket, and the error naming a backend's missing credentials tells you to add `enabled = false` under `[openai]` rather than `\[openai]`. `pipelex run` prints a failed run's message exactly as written rather than reading it as markup.
+- **No HTTP request line per inference call**: at the default `INFO` level an inference call made through openai 3.x no longer logs an `HTTP Request: POST https://… "HTTP/1.1 200 OK"` line, carrying the provider's endpoint URL and the HTTP status, on the console or in the `json` sink. The defaults under `[runtime.log.package_log_levels]` now give `httpx2` and `httpcore2`, the HTTP client forks openai 3.x sends its requests through, the levels `httpx` and `httpcore` already had, `WARNING` and `INFO`; set `httpx2 = "INFO"` there to see the line again.
 - **An empty list's output panel says so**: the title of the panel showing an operator pipe's output ends with `[empty list]` when the pipe produced an empty list, a label the console used to drop, as it already showed `[1 item]` or `[3 items]`.
 
 ### Removed
