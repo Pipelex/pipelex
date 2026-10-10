@@ -118,3 +118,43 @@ review = [
   "docs/under-the-hood/pipelex-kernel.md",
 ]
 verify_commands = []
+
+[contracts.log-call-convention]
+description = "The log-calls doc is the log-call guard's specification and must track the guard's behavior."
+# The page states what the guard reads (the scanned trees, every way a module reaches the facade, a
+# message and its titles), each rule it refuses a call under, how a name is resolved through the
+# bindings and control flow of its scope, what counts as a Rich tag, and the baseline's key,
+# signature and shrink-only comparison. A reading, a rule or a signature changed in the guard
+# silently falsifies the page a contributor converts a call by, which is the staleness this contract
+# exists to catch. No verify command: `check-log-calls` already gates `make check`, `make
+# agent-check` and CI, so re-running it here would only add the unstaged-file hard error without
+# adding a guarantee.
+triggers = [
+  "pipelex/cli/dev_cli/commands/log_call_guard.py",
+]
+review = [
+  "docs/contribute/log-calls.md",
+]
+verify_commands = []
+
+[contracts.logging-docs]
+description = "The logging doc restates the console's field rules and the handled-exception fields and must track the two modules that decide them."
+# The page restates, rule by rule, what the two modules decide: the style map (`FIELD_STYLES`) and
+# the fields it colours, the cut lengths (`FIELD_VALUE_MAX_LENGTH` and the generous ones in
+# `FIELD_MAX_LENGTHS`), the field names whose value is cut at its start (`LEFT_CUT_FIELD_SUFFIXES`,
+# `LEFT_CUT_FIELDS`), when a pydantic message is kept rather than its error type
+# (`SCHEMA_CONTEXT_KEYS`), and where an `extra_forbidden` error is located. A name added to one of
+# those sets, or a length moved, silently falsifies a sentence quantifying over it, which is the
+# staleness this contract exists to catch. The field-vocabulary table on the same page stays
+# outside any contract on purpose: its entries come from call sites everywhere, which no trigger
+# list could name, and a field joins the table in the change that first logs it. No verify
+# command: no gate checks these rules apart from the modules' own tests, which `make agent-test`
+# and CI already run.
+triggers = [
+  "pipelex/tools/log/console_fields.py",
+  "pipelex/tools/log/error_fields.py",
+]
+review = [
+  "docs/tools/logging.md",
+]
+verify_commands = []

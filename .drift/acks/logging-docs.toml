@@ -1,0 +1,9 @@
+contract = "logging-docs"
+digest = "sha256:c71dfa3a95786f1b21782d9861d0814743b539c9041d599beb09fa58fc173a00"
+reviewed_by = "Claude (Opus 5.5)"
+reviewed_at = "2026-10-10T08:53:50Z"
+rationale = "real-catch: initial review of docs/tools/logging.md against console_fields.py and error_fields.py, each set re-derived from the code. The style-map section and the sentence under the vocabulary table name exactly the FIELD_STYLES keys and their colours, with a field outside the map and every key dimmed; the hidden fields are the three run identifiers and data; the cut lengths are 80 for FIELD_VALUE_MAX_LENGTH, the mark included, and 2000 for both FIELD_MAX_LENGTHS entries, error.message and finding_message; the left-cut rule lists every LEFT_CUT_FIELD_SUFFIXES ending and both LEFT_CUT_FIELDS names, file.name and storage_key; the quoting rule matches QUOTED_CHARACTERS and the printable test, and the cut runs before quoting; the pydantic rule matches _pydantic_own_reason (a built-in type, the message pydantic renders, a context within SCHEMA_CONTEXT_KEYS), and an extra_forbidden location stops at its parent or is dropped at the root. One claim was stale: the Exceptions section said the console cuts every other field's value at 80, which finding_message, given the 2000 cut when the log calls were converted, falsified; it now says a field with no length of its own is cut at 80 and points to the section naming the ones that have one. The field-vocabulary table stays outside this contract by design and was not audited here."
+
+[trigger_files]
+"pipelex/tools/log/console_fields.py" = "blob:60128f1d377cab1fc516a9c88790968c69344011"
+"pipelex/tools/log/error_fields.py" = "blob:515b7649ddd22dceb192faa21713732ec61cd6e0"
