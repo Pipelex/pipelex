@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from pipelex.cogt.doc_gen import formatted_markdown
 from pipelex.cogt.doc_gen.exceptions import MarkdownFormattingBudgetError
-from pipelex.cogt.doc_gen.formatted_markdown import FormattedHeading, FormattedParagraph, TextSpan, format_markdown
+from pipelex.cogt.doc_gen.formatted_markdown import FormattedHeading, FormattedParagraph, TextSpan, format_markdown, spans_text
 from pipelex.tools.jinja2.jinja2_render_budget import (
     DEFAULT_RENDER_BUDGET_UNITS,
     MARKDOWN_UNITS_PER_CHARACTER,
@@ -45,6 +45,20 @@ class TestFormattedMarkdown:
             FormattedHeading(level=1, spans=[TextSpan(text="Report")]),
             FormattedParagraph(spans=[TextSpan(text="See "), TextSpan(text="the site", link="https://pipelex.com"), TextSpan(text=".")]),
         ]
+
+    @pytest.mark.parametrize(
+        ("markdown", "expected_text"),
+        [
+            (MarkdownFormattingTestData.DEEP_EMPHASIS, MarkdownFormattingTestData.DEEP_EMPHASIS_TEXT),
+            (MarkdownFormattingTestData.DEEP_MIXED_EMPHASIS, MarkdownFormattingTestData.DEEP_MIXED_EMPHASIS_TEXT),
+        ],
+    )
+    def test_emphasis_nested_hundreds_deep_formats_rather_than_overflowing_the_stack(self, markdown: str, expected_text: str) -> None:
+        blocks = format_markdown(markdown=markdown).blocks
+        assert len(blocks) == 1
+        paragraph = blocks[0]
+        assert isinstance(paragraph, FormattedParagraph)
+        assert spans_text(spans=paragraph.spans) == expected_text
 
     def test_outside_a_render_its_own_budget_refuses_a_padded_table_before_parsing_it(self) -> None:
         tracemalloc.start()

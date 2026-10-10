@@ -190,6 +190,18 @@ class TestMarkdownFormatting:
         spans = _only_block_spans(markdown="Before ![a *chart* of sales](https://example.com/chart.png) after")
         assert spans == [TextSpan(text="Before "), TextSpan(text="[image: a chart of sales]", italic=True), TextSpan(text=" after")]
 
+    @pytest.mark.parametrize(
+        ("markdown", "expected_text"),
+        [
+            (MarkdownFormattingTestData.DEEP_EMPHASIS, MarkdownFormattingTestData.DEEP_EMPHASIS_TEXT),
+            (MarkdownFormattingTestData.DEEP_MIXED_EMPHASIS, MarkdownFormattingTestData.DEEP_MIXED_EMPHASIS_TEXT),
+        ],
+    )
+    def test_emphasis_nested_hundreds_deep_prints_its_text_emphasized(self, markdown: str, expected_text: str) -> None:
+        spans = _only_block_spans(markdown=markdown)
+        assert spans_text(spans=spans) == expected_text
+        assert all(isinstance(span, TextSpan) and span.italic for span in spans)
+
     def test_str_is_the_plain_text(self) -> None:
         assert str(_formatted(markdown=MarkdownFormattingTestData.EVERY_BLOCK)) == MarkdownFormattingTestData.EVERY_BLOCK_PLAIN_TEXT
 

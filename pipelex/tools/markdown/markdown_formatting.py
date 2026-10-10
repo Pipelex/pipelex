@@ -17,8 +17,8 @@ data: an ordered list of blocks, each holding the spans it prints.
   result is true when it holds a block, so a template's `{% if notes | markdown %}` is false for an empty or a blank
   text.
 
-It parses with the one parser Pipelex reads Markdown with (`get_markdown_parser`), and reads it by the rules the
-built-in PDF engine follows:
+It parses with the one parser Pipelex reads Markdown with (`get_markdown_parser`), its inline nesting capped
+(`markdown_syntax_tree`), and reads it by the rules the built-in PDF engine follows:
 
 - CommonMark with tables and strikethrough, and raw HTML shown as text;
 - a soft line break read as a space, and a hard one, two trailing spaces or a backslash, as a line break;
@@ -40,7 +40,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import override
 
 from pipelex.tools.jinja2.jinja2_render_budget import RenderBudget
-from pipelex.tools.markdown.markdown_parser import charged_parse
+from pipelex.tools.markdown.markdown_parser import charged_parse, markdown_syntax_tree
 from pipelex.tools.markdown.markdown_rules import (
     CellAlignment,
     cell_alignment,
@@ -251,7 +251,7 @@ def format_markdown_within_budget(*, markdown_text: str, budget: RenderBudget) -
     """
     parsed = charged_parse(markdown_text=markdown_text, budget=budget, operation=_FORMATTING, output_bound=_formatted_size_bound)
     formatter = _MarkdownFormatter()
-    formatter.blocks(nodes=SyntaxTreeNode(parsed.tokens).children, list_depth=0, quote_depth=0)
+    formatter.blocks(nodes=markdown_syntax_tree(tokens=parsed.tokens).children, list_depth=0, quote_depth=0)
     budget.charge(units=formatter.units, operation=_FORMATTING)
     return FormattedMarkdown(blocks=formatter.formatted)
 

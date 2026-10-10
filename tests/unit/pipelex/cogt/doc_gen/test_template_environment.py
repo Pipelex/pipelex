@@ -90,6 +90,16 @@ class TestPlainDataTemplateEnvironment:
         template = make_plain_data_template_environment().from_string("{% if notes | markdown %}yes{% else %}no{% endif %}")
         assert template.render(notes=notes) == expected
 
+    @pytest.mark.parametrize(
+        ("notes", "expected_text"),
+        [
+            (MarkdownFormattingTestData.DEEP_EMPHASIS, MarkdownFormattingTestData.DEEP_EMPHASIS_TEXT),
+            (MarkdownFormattingTestData.DEEP_MIXED_EMPHASIS, MarkdownFormattingTestData.DEEP_MIXED_EMPHASIS_TEXT),
+        ],
+    )
+    def test_markdown_of_emphasis_nested_hundreds_deep_prints_its_text(self, notes: str, expected_text: str) -> None:
+        assert make_plain_data_template_environment().from_string("{{ notes | markdown }}").render(notes=notes) == expected_text
+
     def test_markdown_of_a_missing_value_fails_the_render(self) -> None:
         template = make_plain_data_template_environment().from_string("{{ invoice.notes | markdown }}")
         with pytest.raises(UndefinedError):

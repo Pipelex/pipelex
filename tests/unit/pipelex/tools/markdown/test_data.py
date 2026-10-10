@@ -38,6 +38,13 @@ class MarkdownFormattingTestData:
     # A report section repeated into about thirty thousand characters: an ordinary long text, well within one budget.
     LONG_REPORT: ClassVar[str] = "## Findings\n\nSome *text* with a [link](https://a.co), `code` and more.\n\n- one\n- two\n\n" * 300
 
+    # Emphasis nested four hundred deep, and emphasis and strong emphasis alternating four hundred deep: markdown-it
+    # pairs emphasis up without capping its depth, and a syntax tree that deep overflows Python's stack.
+    DEEP_EMPHASIS: ClassVar[str] = "*a " * 400 + "b" + " c*" * 400
+    DEEP_EMPHASIS_TEXT: ClassVar[str] = "a " * 400 + "b" + " c" * 400
+    DEEP_MIXED_EMPHASIS: ClassVar[str] = "*a **b " * 200 + "middle" + " b** a*" * 200
+    DEEP_MIXED_EMPHASIS_TEXT: ClassVar[str] = "a b " * 200 + "middle" + " b a" * 200
+
     # The text an invoice's notes hold, and its plain text.
     NOTES: ClassVar[str] = "Payment by **bank transfer** within 30 days.\n\n- *Late* fees apply\n- IBAN on request"
     NOTES_PLAIN_TEXT: ClassVar[str] = "Payment by bank transfer within 30 days.\n• Late fees apply\n• IBAN on request"

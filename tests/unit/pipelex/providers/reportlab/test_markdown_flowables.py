@@ -22,6 +22,7 @@ from tests.unit.pipelex.providers.reportlab.reportlab_test_helpers import (
     render_markdown,
 )
 from tests.unit.pipelex.providers.reportlab.test_data import MarkdownFlowablesTestData
+from tests.unit.pipelex.tools.markdown.test_data import MarkdownFormattingTestData
 
 
 def _list_lines(*, text: str) -> list[str]:
@@ -86,6 +87,17 @@ class TestMarkdownFlowables:
         assert "Some bold, some italic, some both, struck and code." in document_text(pdf_data=pdf_data)
         expected_fonts = {"OpenSans-Regular", "OpenSans-Bold", "OpenSans-Italic", "OpenSans-BoldItalic", "RobotoMono-Regular"}
         assert expected_fonts <= embedded_font_names(pdf_data=pdf_data)
+
+    @pytest.mark.parametrize(
+        ("markdown_text", "expected_text"),
+        [
+            (MarkdownFormattingTestData.DEEP_EMPHASIS, MarkdownFormattingTestData.DEEP_EMPHASIS_TEXT),
+            (MarkdownFormattingTestData.DEEP_MIXED_EMPHASIS, MarkdownFormattingTestData.DEEP_MIXED_EMPHASIS_TEXT),
+        ],
+    )
+    def test_emphasis_nested_hundreds_deep_prints_its_text(self, markdown_text: str, expected_text: str) -> None:
+        text = document_text(pdf_data=render_markdown(markdown_text=markdown_text))
+        assert expected_text in " ".join(text.split())
 
     def test_markup_in_markdown_text_prints_as_written(self) -> None:
         text = document_text(pdf_data=render_markdown(markdown_text="Tom & Jerry say <b>hello</b> &amp; <br/> bye"))

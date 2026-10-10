@@ -22,6 +22,11 @@ row with empty cells; and its output, bounded from the parsed tokens (`html_leng
 left before it renders, since a reference link's destination and title are written once and printed at
 every link that uses the reference. The formatting a document engine prints from (`markdown_formatting.py`) is
 charged the same way, so both parse through `charged_parse`, which holds that order.
+
+A converter that walks the syntax tree rather than the flat tokens, the built-in PDF engine and that formatting,
+builds it with `markdown_syntax_tree`, which caps how deep inline markup nests first (`cap_inline_nesting`):
+markdown-it caps the nesting of blocks, but not that of emphasis, and the tree and every walk of it recurse once
+per level, so four hundred nested `*a ` would overflow Python's stack.
 """
 
 import re
@@ -30,6 +35,7 @@ from functools import cache
 from typing import TYPE_CHECKING, Any, Final, NamedTuple, Protocol
 
 from markdown_it import MarkdownIt
+from markdown_it.tree import SyntaxTreeNode
 
 from pipelex.tools.jinja2.jinja2_render_budget import MARKDOWN_UNITS_PER_CHARACTER, RenderBudget, active_render_budget
 
@@ -52,6 +58,10 @@ _LINE_ENDING: Final = re.compile(r"\r\n?|\n")
 
 # What a table's delimiter row is made of, once its container's indentation and `>` markers are left out.
 _DELIMITER_ROW_CHARACTERS: Final = frozenset("|-: \t")
+
+# How deep inline markup may nest in a syntax tree, emphasis inside emphasis inside a link, an image's alt text one
+# level below the image: far beyond what a written text nests, and far within Python's stack for a walk of the tree.
+MAX_INLINE_NESTING: Final = 50
 
 
 @cache
@@ -144,6 +154,47 @@ def charged_parse(*, markdown_text: str, budget: RenderBudget, operation: str, o
     tokens = get_markdown_parser().parse(markdown_text, env)
     budget.afford(units=output_bound(tokens=tokens), operation=operation)
     return ParsedMarkdown(tokens=tokens, env=env)
+
+
+def markdown_syntax_tree(*, tokens: Sequence["Token"]) -> SyntaxTreeNode:
+    """The syntax tree of parsed tokens, their inline nesting capped first (`cap_inline_nesting`)."""
+    cap_inline_nesting(tokens=tokens)
+    return SyntaxTreeNode(tokens)
+
+
+def cap_inline_nesting(*, tokens: Sequence["Token"]) -> None:
+    """Drop the inline markup of `tokens` that nests deeper than `MAX_INLINE_NESTING`, keeping its text.
+
+    markdown-it caps the nesting of blocks at twenty, but emphasis is paired up after its delimiters are read, so it
+    nests as deep as the text asks: four hundred `*a ` before a word and four hundred ` c*` after it nest four hundred
+    deep. The cap walks the flat tokens, each inline token's children and each image's, the alt text, one level below
+    the image; past it, an opening token is dropped with its closing one, and an image keeps no children, printing its
+    alt text as written. The tokens are changed in place.
+    """
+    pending: list[tuple[Token, int]] = [(token, 0) for token in tokens if token.children]
+    while pending:
+        parent, depth = pending.pop()
+        kept: list[Token] = []
+        # For each opening token not yet closed, whether it was dropped, so its closing token is dropped with it.
+        open_dropped: list[bool] = []
+        for child in parent.children or []:
+            if child.nesting > 0:
+                is_dropped = depth >= MAX_INLINE_NESTING
+                open_dropped.append(is_dropped)
+                if is_dropped:
+                    continue
+                depth += 1
+            elif child.nesting < 0 and open_dropped:
+                if open_dropped.pop():
+                    continue
+                depth -= 1
+            if child.children:
+                if depth + 1 > MAX_INLINE_NESTING:
+                    child.children = None
+                else:
+                    pending.append((child, depth + 1))
+            kept.append(child)
+        parent.children = kept
 
 
 def table_cells_bound(*, markdown_text: str) -> int:

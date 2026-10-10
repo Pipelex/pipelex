@@ -2,10 +2,11 @@
 
 The Markdown is parsed by the one parser Pipelex formats Markdown with (`get_markdown_parser`), so a PDF reads it
 as the `markdown` filter of HTML templates parses it, and the converter walks markdown-it's syntax tree rather than
-its flat token stream, so a nested list lives inside its item and each list numbers its own items. The rules it
-shares with the formatting the engines of the other formats print from, the link rule, the bullets by depth, a list's
-start, a heading's level, a code block's text, a table cell's alignment and the plain text of nodes, are in
-`pipelex/tools/markdown/markdown_rules.py`.
+its flat token stream, so a nested list lives inside its item and each list numbers its own items. The tree is built
+with its inline nesting capped (`markdown_syntax_tree`), so emphasis nested hundreds deep prints its text rather than
+overflowing the stack. The rules it shares with the formatting the engines of the other formats print from, the link
+rule, the bullets by depth, a list's start, a heading's level, a code block's text, a table cell's alignment and the
+plain text of nodes, are in `pipelex/tools/markdown/markdown_rules.py`.
 
 What it prints:
 
@@ -44,7 +45,7 @@ from pipelex.providers.reportlab.pdf_elements import (
     heading_break,
     measure_column,
 )
-from pipelex.tools.markdown.markdown_parser import get_markdown_parser
+from pipelex.tools.markdown.markdown_parser import get_markdown_parser, markdown_syntax_tree
 from pipelex.tools.markdown.markdown_rules import (
     CellAlignment,
     cell_alignment,
@@ -64,7 +65,7 @@ _MINIMUM_CODE_LINE_LENGTH = 20
 
 def markdown_to_flowables(*, markdown_text: str, styles: PdfStyles, available_width: float) -> list[Flowable]:
     """The flowables that print a Markdown text in a frame `available_width` points wide."""
-    tree = SyntaxTreeNode(get_markdown_parser().parse(markdown_text))
+    tree = markdown_syntax_tree(tokens=get_markdown_parser().parse(markdown_text))
     return markdown_nodes_to_flowables(nodes=tree.children, styles=styles, available_width=available_width)
 
 
