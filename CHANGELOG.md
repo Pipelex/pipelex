@@ -4,7 +4,6 @@
 
 ### Added
 
-- **Formatted Markdown for document engines, and a `markdown` filter for plain-data templates**: the document engine contract gains `format_markdown` in `pipelex.cogt.doc_gen.formatted_markdown`, which reads a Markdown text by the rules the built-in PDF engine prints it by and returns a `FormattedMarkdown`, plain data of paragraphs, headings, list items with their marker and the paragraph or heading they open with, code blocks, rules and tables whose cells carry their column's alignment, every block with the list depth and the quote depth it sits at and holding text spans with their bold, italic, strikethrough, code and link, whose `str()` is its plain text and which is false when the text formats into nothing, so an engine prints Markdown formatted in its own format. `make_plain_data_template_environment()` registers a `markdown` filter that returns one, `{{ invoice.notes | markdown }}`, which is false for an empty or a blank text, so `{% set notes = invoice.notes | markdown %}{% if notes %}…{{ notes }}…{% endif %}` converts the text once to test and print it, and takes an optional `finalize` through which an engine prints it, a value printing its plain text without one. Inside a template render the conversion is charged to the render's budget; called from an engine's own code it spends from a budget of its own, as large as one render's, and an overdraft raises `MarkdownFormattingBudgetError`.
 - **A log line's advice in `user_action`**: a log call puts what its reader should do in a `user_action` field, one imperative sentence, and the `console` sink prints it whole on a line of its own under the record, after `→ `, in cyan, while every other sink writes it as a field like any other. Pipelex's own warnings carry their advice there, such as `Run pipelex migrate to update it` on a stale configuration file, so their message says only what happened.
 
 ### Changed
@@ -17,12 +16,21 @@
 
 ### Fixed
 
-- **A PDF of deeply nested emphasis prints**: the built-in PDF engine no longer fails with a `RecursionError` on a Markdown text whose emphasis nests hundreds deep, such as four hundred `*a ` before a word and four hundred ` c*` after it; inline markup nested past fifty levels is dropped and its text printed.
 - **A Google client's close at teardown is no longer garbage-collected**: when a Google LLM or image-generation worker was torn down inside a running event loop, nothing but the loop referenced the background task closing its async client, and a loop holds its tasks weakly, so the task could be collected before the client was closed, with the `asyncio` error `Task was destroyed but it is pending!`. Each close task is now held until it is done.
 
 ### Security
 
 - **The API server refuses to start on an unknown `AUTH_MODE` (Breaking)**: a value that is not exactly `none`, `jwt` or `api_key`, such as `jwtt` or `JWT`, now stops the server at startup with `InvalidAuthModeError`, whose message names the valid modes, where the server used to log a warning and serve every `/v1` route without authentication. An unset or empty `AUTH_MODE` still means `none`. A deployment that booted on a mistyped mode sets it to the mode it meant.
+
+## [v0.81.1] - 2026-10-10
+
+### Added
+
+- **Formatted Markdown for document engines, and a `markdown` filter for plain-data templates**: the document engine contract gains `format_markdown` in `pipelex.cogt.doc_gen.formatted_markdown`, which reads a Markdown text by the rules the built-in PDF engine prints it by and returns a `FormattedMarkdown`, plain data of paragraphs, headings, list items with their marker and the paragraph or heading they open with, code blocks, rules and tables whose cells carry their column's alignment, every block with the list depth and the quote depth it sits at and holding text spans with their bold, italic, strikethrough, code and link, whose `str()` is its plain text and which is false when the text formats into nothing, so an engine prints Markdown formatted in its own format. `make_plain_data_template_environment()` registers a `markdown` filter that returns one, `{{ invoice.notes | markdown }}`, which is false for an empty or a blank text, so `{% set notes = invoice.notes | markdown %}{% if notes %}…{{ notes }}…{% endif %}` converts the text once to test and print it, and takes an optional `finalize` through which an engine prints it, a value printing its plain text without one. Inside a template render the conversion is charged to the render's budget; called from an engine's own code it spends from a budget of its own, as large as one render's, and an overdraft raises `MarkdownFormattingBudgetError`.
+
+### Fixed
+
+- **A PDF of deeply nested emphasis prints**: the built-in PDF engine no longer fails with a `RecursionError` on a Markdown text whose emphasis nests hundreds deep, such as four hundred `*a ` before a word and four hundred ` c*` after it; inline markup nested past fifty levels is dropped and its text printed.
 
 ## [v0.81.0] - 2026-10-10
 
