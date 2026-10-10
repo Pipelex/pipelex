@@ -34,6 +34,12 @@ if TYPE_CHECKING:
 # ``InputShapeKind``). Two modules joined it with v6, as additions that would have needed no bump of their own: the
 # rules by which every engine shows the tree's values (``layout_display``: ``display_scalar``, ``is_numeric_column``,
 # ``markdown_as_html``) and the environment an engine fills a template of plain data in (``template_environment``).
+# More joined under v6 on the same reasoning, as additions: the structure an engine prints a Markdown text from in its
+# own format (``formatted_markdown``: ``format_markdown`` and ``FormattedMarkdown`` with its blocks and spans, plus the
+# rules it shares with the built-in engine), the error it raises when a conversion outside a template render
+# overdraws the budget it gets of its own (``MarkdownFormattingBudgetError``), and, in the plain-data environment, the
+# ``markdown`` filter, which returns a ``FormattedMarkdown``, and the optional ``finalize`` keyword an engine prints one
+# through.
 #
 # ``add_internal_model`` and ``add_doc_gen_default`` — plain data a plugin declares for the model manager to merge at
 # boot: a model of the internal backend, as the table a backend file would hold, and the model deck's default engine for
