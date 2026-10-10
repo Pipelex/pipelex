@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -12,9 +13,9 @@ from pipelex.tools.log.console_fields import (
     FIELD_STYLES,
     FIELD_VALUE_MAX_LENGTH,
     FINDING_MESSAGE_FIELD,
-    LEFT_CUT_FIELDS,
     TRUNCATION_MARK,
     UNMAPPED_FIELD_STYLE,
+    field_is_cut_at_start,
 )
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.log.log_fields import (
@@ -168,7 +169,35 @@ class TestConsoleFields:
         assert text.plain.endswith(f"error.message={'y' * (ERROR_MESSAGE_MAX_LENGTH - len(TRUNCATION_MARK))}{TRUNCATION_MARK}")
         assert "y" * ERROR_MESSAGE_MAX_LENGTH not in text.plain
 
-    @pytest.mark.parametrize("path_field", sorted(LEFT_CUT_FIELDS))
+    @pytest.mark.parametrize(
+        ("name", "is_cut_at_start"),
+        [
+            ("file.path", True),
+            ("url.path", True),
+            ("root_path", True),
+            ("backup_path", True),
+            ("override_paths", True),
+            ("mthds_paths", True),
+            ("library_dirs", True),
+            ("target_dir", True),
+            ("template_file", True),
+            ("include_files", True),
+            ("file.name", True),
+            ("storage_key", True),
+            (f"{COLLIDING_FIELD_PREFIX}override_paths", True),
+            ("file_count", False),
+            ("structure_classes", False),
+            ("url.full", False),
+            ("module_name", False),
+            ("error.message", False),
+            ("excerpt", False),
+        ],
+    )
+    def test_a_field_is_taken_for_a_path_by_its_name(self, name: str, is_cut_at_start: bool) -> None:
+        """Only the names listed one by one were cut at their start, so ``override_paths`` and every other path field lost the file's name."""
+        assert field_is_cut_at_start(name=name) is is_cut_at_start
+
+    @pytest.mark.parametrize("path_field", ["file.path", "file.name", "backup_path", "template_file", "root_path", "storage_key"])
     def test_a_long_path_is_cut_at_its_start_so_the_file_name_stays(self, path_field: str) -> None:
         """Cut at its end, a long path kept the directory every line of a run shares and lost the file's name."""
         long_path = "/Users/someone/projects/acme/" + "nested-directory/" * 8 + "invoice_template_v2.docx"
@@ -179,6 +208,47 @@ class TestConsoleFields:
         assert kept_tail.endswith("/invoice_template_v2.docx")
         assert "/Users/someone" not in text.plain
         assert text.plain.endswith(f"excerpt={'x' * (FIELD_VALUE_MAX_LENGTH - len(TRUNCATION_MARK))}{TRUNCATION_MARK}")
+
+    @pytest.mark.parametrize(
+        ("path_field", "paths", "file_name"),
+        [
+            (
+                "override_paths",
+                ["/private/tmp/scratch/-Users-someone-projects-acme/8c7e235e-b5d9-4299-9cca-4821d85192a0/.pipelex/backends_override.toml"],
+                "backends_override.toml",
+            ),
+            (
+                "library_dirs",
+                ["/Users/someone/projects/acme/methods", "/Users/someone/projects/acme/shared/libraries", "/Users/someone/My methods/a b=c/invoices"],
+                "invoices",
+            ),
+        ],
+        ids=["one long override file", "several library directories"],
+    )
+    def test_a_long_list_of_paths_is_cut_at_its_start_so_the_last_file_name_stays(self, path_field: str, paths: list[str], file_name: str) -> None:
+        """Cut at its end, the boot's backends line kept a temporary directory and lost the override file's name.
+
+        The rendering is cut before it is quoted and escaped, so the cut list is one quoted value, and neither a space
+        nor an equals sign in its last path reads as a pair of its own.
+        """
+        text = rendered_text(record=record_with_fields(message="Read", extra={path_field: paths, "attempt": 2}))
+
+        rendering = json.dumps(paths, ensure_ascii=False, separators=(",", ":"))
+        kept_tail = rendering[len(rendering) - FIELD_VALUE_MAX_LENGTH + len(TRUNCATION_MARK) :]
+        quoted = '"' + f"{TRUNCATION_MARK}{kept_tail}".replace("\\", "\\\\").replace('"', '\\"') + '"'
+        assert len(rendering) > FIELD_VALUE_MAX_LENGTH
+        assert kept_tail.endswith(f'/{file_name}"]')
+        assert text.plain.endswith(f"{path_field}={quoted} attempt=2")
+        # The value is one quoted span: every quote inside it is escaped, so nothing after a space reads as a pair.
+        assert '"' not in quoted[1:-1].replace('\\"', "")
+
+    def test_a_long_value_of_a_field_not_named_as_a_path_is_still_cut_at_its_end(self) -> None:
+        """Only a path field is cut at its start: a text naming files, by a name no path ending reaches, keeps its start."""
+        structure_classes = "invoices/structures.py: Invoice, Line; " * 4
+        text = rendered_text(record=record_with_fields(message="Fetched", extra={"structure_classes": structure_classes, "attempt": 2}))
+
+        kept_head = structure_classes[: FIELD_VALUE_MAX_LENGTH - len(TRUNCATION_MARK)]
+        assert text.plain.endswith(f'structure_classes="{kept_head}{TRUNCATION_MARK}" attempt=2')
 
     @pytest.mark.parametrize(
         ("topic", "file_name"),

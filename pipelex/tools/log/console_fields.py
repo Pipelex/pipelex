@@ -13,12 +13,14 @@ it is empty or holds a space, an equals sign, a quote, a backslash or a characte
 case it is quoted, with a backslash and a quote escaped by a backslash and that character written as its escape. So a
 list of strings, whose JSON holds quotes, is always quoted, while a number or a list of numbers stays bare. The text
 is cut short past ``FIELD_VALUE_MAX_LENGTH``, or past the generous length ``FIELD_MAX_LENGTHS`` gives a field of its
-own, a handled exception's text and a template finding's. A value is cut at its end, except a path's, from
-``LEFT_CUT_FIELDS``, which is cut at its start so the file's name stays. The text is cut before it is quoted and
-escaped, so a quoted value keeps both its quotes and no escape is split, and the cut can never leave an unbalanced
-quote or bracket whose tail reads as another pair. A key is written the same way, so a field name
-holding a line break, a space, an equals sign or an escape sequence can forge neither a line nor a pair. Redaction has
-already run when the console renders a record, so what is rendered is what the scrub left.
+own, a handled exception's text and a template finding's. A value is cut at its end, except a path's, or a list of
+paths', which is cut at its start so the last file's name stays: a field is taken for a path by its name, one ending
+in ``LEFT_CUT_FIELD_SUFFIXES`` (``file.path``, ``root_path``, ``override_paths``, ``library_dirs``, ``template_file``)
+or one of ``LEFT_CUT_FIELDS`` (``file.name``). The text is cut before it is quoted and escaped, a string's own or a
+JSON rendering alike, so a quoted value keeps both its quotes and no escape is split, and the cut can never leave an
+unbalanced quote or bracket whose tail reads as another pair. A key is written the same way, so a field name holding a
+line break, a space, an equals sign or an escape sequence can forge neither a line nor a pair. Redaction has already
+run when the console renders a record, so what is rendered is what the scrub left.
 
 Colour follows the name the field was given, from ``FIELD_STYLES``, wherever the field appears, and whatever
 collision prefix it landed under; a field outside the map renders dimmed. The map is one table in code, the
@@ -82,10 +84,17 @@ FINDING_MESSAGE_FIELD = "finding_message"
 # The fields the console cuts at a length of their own, by the name the caller gave them.
 FIELD_MAX_LENGTHS: dict[str, int] = {ERROR_MESSAGE_FIELD: ERROR_MESSAGE_MAX_LENGTH, FINDING_MESSAGE_FIELD: ERROR_MESSAGE_MAX_LENGTH}
 
-# The fields carrying a path on disk, by the name the caller gave them, which the console cuts at their start rather
-# than at their end: what tells one file from another is its name, at the end, while the start is the directory most
-# lines of a run share.
-LEFT_CUT_FIELDS = frozenset({"file.path", "file.name", "backup_path", "template_file"})
+# The endings of a field's name that say it carries a path or a list of paths, which the console cuts at its start
+# rather than at its end: what tells one file from another is its name, at the end, while the start is the directory
+# most lines of a run share. ``file.path`` ends in the first, and the vocabulary names a path ``<what>_path``, a list
+# of paths ``<what>_paths``, a directory ``<what>_dir`` and a file ``<what>_file``, with their plurals. A list of paths
+# is cut the same way, its rendering at its start, so the last path's file name stays. A path that is not on disk,
+# ``url.path`` or a ``variable_path`` into working memory, is cut at its start too, its end being what tells it apart.
+LEFT_CUT_FIELD_SUFFIXES: tuple[str, ...] = (".path", "_path", "_paths", "_dir", "_dirs", "_file", "_files")
+
+# The fields the console cuts at their start that no ending above reaches, by the name the caller gave them: a file's
+# name alone, and a storage key, whose end is the name of the file stored under it.
+LEFT_CUT_FIELDS = frozenset({"file.name", "storage_key"})
 
 FIELD_SEPARATOR = " "
 KEY_VALUE_SEPARATOR = "="
@@ -149,11 +158,13 @@ def field_max_length(*, name: str) -> int:
 
 
 def field_is_cut_at_start(*, name: str) -> bool:
-    """Whether the console cuts a field's value at its start, keeping its end: a path's, from ``LEFT_CUT_FIELDS``.
+    """Whether the console cuts a field's value at its start, keeping its end: a path's, or a list of paths'.
 
+    A field is taken for a path by its name: one ending in ``LEFT_CUT_FIELD_SUFFIXES``, or one of ``LEFT_CUT_FIELDS``.
     Read off the name the caller gave rather than the one it landed on, as the style is.
     """
-    return given_field_name(name=name) in LEFT_CUT_FIELDS
+    given_name = given_field_name(name=name)
+    return given_name in LEFT_CUT_FIELDS or given_name.endswith(LEFT_CUT_FIELD_SUFFIXES)
 
 
 def format_field_value(*, value: Any, max_length: int = FIELD_VALUE_MAX_LENGTH, is_cut_at_start: bool = False) -> str:
