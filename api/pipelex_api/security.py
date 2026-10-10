@@ -165,14 +165,14 @@ async def verify_jwt(
         # is configured with `auto_error=False` so this branch (rather than
         # FastAPI's default `HTTPException`) shapes the response — same RFC
         # 7807 `application/problem+json` as every other 401.
-        log.debug(
-            CREDENTIALS_REFUSED_MESSAGE, fields={"auth_mode": AuthMode.JWT, "auth_refusal_reason": AuthRefusalReason.MISSING_BEARER_TOKEN}
-        )
+        log.debug(CREDENTIALS_REFUSED_MESSAGE, fields={"auth_mode": AuthMode.JWT, "auth_refusal_reason": AuthRefusalReason.MISSING_BEARER_TOKEN})
         raise_unauthenticated("Missing or malformed Authorization header")
 
     jwt_secret = get_optional_env("JWT_SECRET_KEY")
     if not jwt_secret:
-        log.error("An environment variable the authentication mode requires is not set", fields={"env_var": "JWT_SECRET_KEY", "auth_mode": AuthMode.JWT})
+        log.error(
+            "An environment variable the authentication mode requires is not set", fields={"env_var": "JWT_SECRET_KEY", "auth_mode": AuthMode.JWT}
+        )
         raise_internal_server_error("Server configuration error: JWT_SECRET_KEY not configured", error_type=ErrorType.SERVER_MISCONFIGURED)
 
     token = credentials.credentials
@@ -236,9 +236,7 @@ async def verify_api_key(credentials: Annotated[HTTPAuthorizationCredentials | N
         # Missing, empty, or non-Bearer `Authorization` header. See the
         # matching branch in `verify_jwt` for why this lives here and not
         # in `HTTPBearer`'s default `auto_error=True` behavior.
-        log.debug(
-            CREDENTIALS_REFUSED_MESSAGE, fields={"auth_mode": AuthMode.API_KEY, "auth_refusal_reason": AuthRefusalReason.MISSING_BEARER_TOKEN}
-        )
+        log.debug(CREDENTIALS_REFUSED_MESSAGE, fields={"auth_mode": AuthMode.API_KEY, "auth_refusal_reason": AuthRefusalReason.MISSING_BEARER_TOKEN})
         raise_unauthenticated("Missing or malformed Authorization header")
 
     api_key = get_optional_env("API_KEY")

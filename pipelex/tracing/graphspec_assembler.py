@@ -603,9 +603,7 @@ class _AssemblerState:
             own_usages = own_usages_by_node.get(reported_node_id)
             if own_usages is None:
                 if reported_node_id != UNATTRIBUTED_NODE_ID:
-                    log.warning(
-                        "The usage of a node the trace never started was left unattributed", fields={"node_id": reported_node_id}
-                    )
+                    log.warning("The usage of a node the trace never started was left unattributed", fields={"node_id": reported_node_id})
                 unattributed_usages.extend(usages)
                 continue
             own_usages.extend(usages)

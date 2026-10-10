@@ -48,9 +48,9 @@ from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 from pipelex.system.telemetry.telemetry_config import PostHogMode, TelemetryConfig
 from pipelex.system.telemetry.telemetry_loader import load_telemetry_config
 from pipelex.tools.log.log_dispatch import LogDispatch
+from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pipelex.tools.log.log_levels import LogLevel
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
-from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -350,9 +350,8 @@ class TestWhatTheWarningSays:
     def test_every_file_is_one_event_and_its_advice_says_its_remedy(
         self, tmp_path: Path, mocker: MockerFixture, topic: str, is_reached_by_migrate: bool, has_blocked_steps: bool, expected_remedy: str
     ) -> None:
-        """The warning used to be one text that said nothing was written, and that some of what a file needs cannot be applied for
-        the user, with `pipelex migrate` reporting it. The four remedies were then four messages, so a log store counted one event
-        as four: the message is one, saying the file was migrated in memory only, and the remedy is its advice.
+        """Whatever its remedy, a stale file is one event, so a log store counts it under one message: the message says the file
+        was migrated in memory only, and the remedy, `pipelex migrate` or an edit where the file lives, is its advice.
         """
         stale_file = StaleConfigurationFile(
             file_path=tmp_path / "pipelex.toml",

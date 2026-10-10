@@ -6,9 +6,9 @@ from pipelex.cogt.document.prompt_document import PromptDocument, PromptDocument
 from pipelex.cogt.exceptions import LLMPromptParameterError
 from pipelex.cogt.image.prompt_image import PromptImage, PromptImageUri
 from pipelex.system.runtime import ProblemReaction, runtime_manager
+from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pipelex.tools.misc.string_utils import is_none_or_has_text, is_not_none_and_has_text
 from pipelex.tools.uri.uri_read_scope import UriReference
-from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 
 
 class LLMPrompt(BaseModel):
@@ -51,7 +51,10 @@ class LLMPrompt(BaseModel):
                     if self.system_text == "":
                         log.debug("The prompt's system text is empty, so it is treated as absent")
                     else:
-                        log.error("The system text of a prompt has no letter or digit in it", fields={USER_ACTION_FIELD: "Leave the system text out or give it some text"})
+                        log.error(
+                            "The system text of a prompt has no letter or digit in it",
+                            fields={USER_ACTION_FIELD: "Leave the system text out or give it some text"},
+                        )
                 if not is_not_none_and_has_text(text=self.user_text):
                     log.error("The user text of a prompt has no letter or digit in it")
 

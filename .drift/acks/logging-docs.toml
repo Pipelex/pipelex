@@ -1,9 +1,9 @@
 contract = "logging-docs"
-digest = "sha256:26e4b90b98c1001b981f1d060d55c18383d988ec2704b2efa1f98f4af51c811d"
+digest = "sha256:e07625d49f20a9f7774a858dd562a2c2154801cb8cbe33a62ab26676e5b7176c"
 reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-10-10T09:16:44Z"
-rationale = "clean-pass: the only change to the triggers is console_fields.py's module docstring, which still gave LEFT_CUT_FIELDS as file.name alone after storage_key joined the set and now names the constant instead of listing its members; no constant or code moved, and error_fields.py is the blob the last ack reviewed. Re-derived the page's left-cut sentence from the code: it gives every LEFT_CUT_FIELD_SUFFIXES ending and both LEFT_CUT_FIELDS names, file.name and storage_key, so the page was already right where the docstring was not. Rechecked against the code the FIELD_STYLES keys and colours with unmapped fields and keys dimmed, the hidden run identifiers and data, the 80 cut and the 2000 cut of both FIELD_MAX_LENGTHS entries, the layout cut, the quoting characters, and the pydantic and extra_forbidden rules against SCHEMA_CONTEXT_KEYS and _pydantic_own_reason; all still hold. The page needed no change."
+reviewed_at = "2026-10-10T11:30:21Z"
+rationale = "real-catch: console_fields.py adds advice_segments, which prints a user_action field whole on a line of its own after the arrow mark in cyan, a string as itself and anything else as compact JSON with terminal characters escaped, and leaves user_action out of the suffix; FIELD_STYLES, the cut lengths, the left-cut sets, SCHEMA_CONTEXT_KEYS and error_fields.py did not move. Checked the page against the code and test_log_console_sink.py: the new advice section holds (whole, one line, before a text traceback, a field on every other sink). Three sentences quantifying over what the console shows were stale: the What is shown bullet listed the run identifiers and data as the only fields left out of the suffix, and the layout bullet said every field not presented follows as the suffix, both now naming the advice line; Logger names and levels said the console links to the calling line, which it now shows only with is_show_path on. Another library's lines said a Pipelex plugin's line has no prefix, while console_prefix.py exempts only a top-level package named pipelex or starting with pipelex_, so a plugin named otherwise gets one: the page now states the rule by package name, as do the module's docstrings."
 
 [trigger_files]
-"pipelex/tools/log/console_fields.py" = "blob:cb51c6004ad7704f80f1753043180fb8e34b517c"
+"pipelex/tools/log/console_fields.py" = "blob:10c4516405dfdfe889590ef0d8e1914f56600a2f"
 "pipelex/tools/log/error_fields.py" = "blob:515b7649ddd22dceb192faa21713732ec61cd6e0"

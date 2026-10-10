@@ -37,9 +37,9 @@ from pipelex.cogt.img_gen.img_gen_model_rules import (
     SpecificTaxonomy,
 )
 from pipelex.config import get_config
+from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl
-from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 
 ImageFileTuple: TypeAlias = tuple[str, bytes, str]
 """httpx-style multipart file part: (filename, content_bytes, mime_type)."""

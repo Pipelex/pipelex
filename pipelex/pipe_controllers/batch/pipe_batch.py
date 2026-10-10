@@ -18,9 +18,9 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.telemetry.otel_constants import OTelLogAttr
+from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pipelex.tools.misc.async_utils import gather_bounded
 from pipelex.urls import URLs
-from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable

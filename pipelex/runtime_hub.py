@@ -47,11 +47,11 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.class_registry_access import get_class_registry as _get_active_class_registry
 from pipelex.system.registries.func_registry import FuncRegistry
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
+from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
 from pipelex.tools.misc.rich_extra import require_rich
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
-from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 
 if TYPE_CHECKING:
     # Deferred import: avoid pulling heavy SDK at module-load time

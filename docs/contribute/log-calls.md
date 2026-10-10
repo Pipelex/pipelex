@@ -60,13 +60,13 @@ The text of a message is held to the rules of [Wording a message](../tools/loggi
 
 | Rule | Where | What it refuses |
 | --- | --- | --- |
-| `lowercase-start` | Every level | A message whose first letter is lowercase, `"loaded the library"`, leading whitespace skipped |
+| `lowercase-start` | Every level | A message whose first character is a lowercase letter, `"loaded the library"`, leading whitespace skipped; one that starts with a quote or a digit passes |
 | `trailing-period` | Every level | A message that ends with a period or an ellipsis, `.`, `...` or `…`, trailing whitespace skipped |
 | `backtick` | Every level | A backtick anywhere in the message |
 | `identifier` | INFO and above | A word holding an underscore, `needs_inference` or `PIPELEX_API_KEY`, or a call written with empty parentheses, `setup()` or `Loader.load()` |
 | `length` | INFO and above | A message of more than 80 characters |
 
-A word of Pipelex's own vocabulary is a word like any other, so `PipeBatch`, `METHODS.toml` and a plural written `model(s)` pass. On `log.debug` and `log.verbose`, which a person at a terminal reads, a message may name an identifier and run long, but it still starts with a capital, ends with no period and holds no backtick.
+A word of Pipelex's own vocabulary is a word like any other, so `PipeBatch`, `METHODS.toml` and a plural written `model(s)` pass. On `log.debug` and `log.verbose`, which a person at a terminal reads, a message may name an identifier and run long, but it still starts with no lowercase letter, ends with no period and holds no backtick.
 
 The rules read the text the markup rule reads: the literal text of the message, of its title and of its inline title, each as a text of its own, folded across concatenations, named literals and `+=` extensions the way it reaches the console, the format string of a `%` or a `.format()` read as written. A message can reach the console as several texts, a conditional between two literals or a name bound to a different literal on each branch, and each of them is read: one that breaks a rule is enough, so `"Loaded" if cached else "loading..."` breaks `lowercase-start` and `trailing-period`.
 

@@ -48,11 +48,11 @@ from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_identity import make_run_identity_span_attributes
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.log.console_layouts import LogLayout
+from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pipelex.tools.log.summary_event import SummaryEvent
 from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path, is_snake_case
 from pipelex.validation_error_types import PipeValidationErrorType
-from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 
 if TYPE_CHECKING:
     from pipelex.system.trace_context import TraceContext

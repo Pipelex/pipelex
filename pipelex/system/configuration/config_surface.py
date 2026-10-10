@@ -39,8 +39,8 @@ from pipelex.migration.exceptions import MigrationLedgerError
 from pipelex.migration.ledger import MigrationLedger, load_ledger_cached, packaged_migration_dir
 from pipelex.migration.plan import MigrationPlan
 from pipelex.system.telemetry.otel_constants import OTelLogAttr
-from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.log.log_fields import USER_ACTION_FIELD
+from pipelex.tools.misc.json_utils import deep_update
 
 # The reserved in-file table and key. Every configuration-surface reader tolerates them and
 # strips them before validation; **nothing writes them**. The reason not to write is team skew
@@ -283,8 +283,8 @@ class StaleConfigurationWarning(NamedTuple):
 
         The remedy is the command where it reaches the file, with the changes it reports it cannot apply where some
         steps are blocked, and the file's own place where it does not. The message says that the file was migrated in
-        memory only, which is why the same warning comes back at the next boot. The four remedies are one event, so a
-        log store counts every stale file under the one message whatever its remedy.
+        memory only, which is why the same warning comes back at the next boot. Whatever its remedy, a stale file is one
+        event, so a log store counts every stale file under the one message.
         """
         for stale_file in self.files:
             if stale_file.is_reached_by_migrate and stale_file.has_blocked_steps:

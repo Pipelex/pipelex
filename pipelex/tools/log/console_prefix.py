@@ -11,14 +11,16 @@ ROOT_LOGGER_NAME = "root"
 #: The top-level package of the runtime's own loggers.
 PIPELEX_PACKAGE = "pipelex"
 
-#: What starts the top-level package of a Pipelex distribution beside the runtime, ``pipelex_api`` or a plugin's.
+#: What starts the top-level package of a Pipelex distribution beside the runtime, ``pipelex_api`` or a plugin's named that
+#: way. A plugin whose package is named otherwise gets its prefix like any other library.
 PIPELEX_PACKAGE_PREFIX = f"{PIPELEX_PACKAGE}_"
 
 
 def foreign_package_name(*, logger_name: str) -> str | None:
     """The top-level package of a logger that is not Pipelex's, which the console prints before the message; else ``None``.
 
-    A Pipelex logger, the runtime's, the API server's or a Pipelex plugin's, and the root logger have none.
+    A logger under ``pipelex`` or a ``pipelex_`` package, the runtime's, the API server's or a plugin's named that way,
+    and the root logger have none.
     """
     if logger_name == ROOT_LOGGER_NAME:
         return None

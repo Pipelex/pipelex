@@ -67,9 +67,9 @@ from pipelex.runtime_hub import get_class_registry
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
 from pipelex.tools.log.error_fields import error_fields
+from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pipelex.tools.misc.semver import SemVerError, parse_constraint, parse_version, version_satisfies
 from pipelex.validation_error_types import PipeValidationErrorType
-from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping

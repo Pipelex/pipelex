@@ -583,9 +583,7 @@ class TestDeliveryExecutor:
         assert result is None
         assert warn_spy.call_count == 0
         unknown_concept_calls = [
-            call
-            for call in debug_spy.call_args_list
-            if call.args[0] == "A delivered result's concept is not known here and was rendered raw"
+            call for call in debug_spy.call_args_list if call.args[0] == "A delivered result's concept is not known here and was rendered raw"
         ]
         assert len(unknown_concept_calls) == 1
         assert unknown_concept_calls[0].kwargs["fields"] == {"concept_ref": "dynamic_test.Greeting"}

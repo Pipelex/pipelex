@@ -315,6 +315,7 @@ class TestSecurityLogLevels:
     )
     def test_a_callers_refused_credentials_log_at_debug_with_their_reason(
         self,
+        *,
         mocker: MockerFixture,
         caplog: pytest.LogCaptureFixture,
         client_kind: str,

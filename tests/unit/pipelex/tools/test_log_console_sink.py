@@ -217,7 +217,9 @@ class TestConsoleLogSink:
 
     def test_the_advice_prints_on_a_line_of_its_own_under_the_record_and_never_in_the_suffix(self) -> None:
         text = rendered_text(
-            record=record_with_fields(message="A configuration file is out of date", extra={"file.path": "pipelex.toml", USER_ACTION_FIELD: "Run pipelex migrate"})
+            record=record_with_fields(
+                message="A configuration file is out of date", extra={"file.path": "pipelex.toml", USER_ACTION_FIELD: "Run pipelex migrate"}
+            )
         )
 
         assert text.plain == "A configuration file is out of date file.path=pipelex.toml\n→ Run pipelex migrate"
