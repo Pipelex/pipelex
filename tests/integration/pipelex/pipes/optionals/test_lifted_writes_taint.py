@@ -123,6 +123,42 @@ steps = [
 """
 
 
+_GUARDED_DOMAIN = "probe_guarded"
+
+
+def _guarded_bundle(*, flag_spec: str) -> str:
+    """A condition chooses `flagged_note`, which takes `flag` as `flag_spec`, only when its optional `flag` is present."""
+    return f"""domain = "{_GUARDED_DOMAIN}"
+description = "A condition whose expression guards an optional input"
+main_pipe = "route"
+
+[pipe.route]
+type                = "PipeCondition"
+description         = "Route on the presence of the flag"
+inputs              = {{ flag = "Text?" }}
+output              = "Text"
+expression_template = "{{{{ 'with_flag' if flag is defined else 'no_flag' }}}}"
+default_outcome     = "plain_note"
+
+[pipe.route.outcomes]
+with_flag = "flagged_note"
+no_flag   = "plain_note"
+
+[pipe.flagged_note]
+type        = "PipeCompose"
+description = "Note the flag"
+inputs      = {{ flag = "{flag_spec}" }}
+output      = "Text"
+template    = "Flagged: {{{{ flag }}}}"
+
+[pipe.plain_note]
+type        = "PipeCompose"
+description = "Note that there is no flag"
+output      = "Text"
+template    = "Plain"
+"""
+
+
 def _text_input(text: str) -> dict[str, Any]:
     return {"concept": "native.Text", "content": {"text": text}}
 
@@ -224,3 +260,23 @@ class TestLiftedWritesTaint:
         assert await _run(mthds_content=mthds_content, inputs=inputs(mode="a", doc={"label": "L", "note": "N"})) == "N"
         assert await _run(mthds_content=mthds_content, inputs=inputs(mode="a", doc=None)) == "s"
         assert await _run(mthds_content=mthds_content, inputs=inputs(mode="b", doc={"label": "L"})) == "s"
+
+    def test_a_guarded_outcome_taking_the_input_plain_is_refused(self, load_empty_library: Callable[[], str]) -> None:
+        """Validation does not read the expression, so an outcome the guard chooses only with `flag` present, taking it plain,
+        may be lifted as far as it can tell, and the refusal names the remedy that keeps the output plain.
+        """
+        with pytest.raises(PipeValidationError) as exc_info:
+            _load_pipes(mthds_content=_guarded_bundle(flag_spec="Text"), library_id=load_empty_library())
+
+        assert exc_info.value.error_type == PipeValidationErrorType.OPTIONAL_NOT_HANDLED
+        assert exc_info.value.pipe_code == "route"
+        assert "declare 'flag' forced on 'flagged_note' with '!'" in str(exc_info.value)
+
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_a_guarded_outcome_forcing_the_input_keeps_the_output_plain(self, load_empty_library: Callable[[], str]) -> None:
+        mthds_content = _guarded_bundle(flag_spec="Text!")
+        pipes = _load_pipes(mthds_content=mthds_content, library_id=load_empty_library())
+
+        assert build_liftable_pipes(collect_controller_taint_analyses(list(pipes.values()))) == []
+        assert await _run(mthds_content=mthds_content, inputs={"flag": _text_input("urgent")}) == "Flagged: urgent"
+        assert await _run(mthds_content=mthds_content, inputs={}) == "Plain"

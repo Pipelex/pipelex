@@ -330,7 +330,8 @@ class PipeCondition(PipeController):
                         provided_concept_code=self.output.concept.concept_ref,
                     )
             # An outcome that the condition's own `?` inputs may lift resolves the condition's result absent, unless the
-            # result is a list, which the lift leaves empty (D4).
+            # result is a list, which the lift leaves empty (D4). The expression is not read, so an outcome it chooses only
+            # when the input is present is refused too, and forcing the input on that outcome (`!`) is the guarded remedy.
             for outcome_pipe, trigger_scan in self._outcome_trigger_scans(visited_pipes=None):
                 if trigger_scan.trigger_taint is None:
                     continue
@@ -343,7 +344,9 @@ class PipeCondition(PipeController):
                     f"resolves the condition's output absent, but that output '{self.output.concept.concept_ref}' is not declared "
                     f"optional. Declare the condition's output optional ('{self.output.concept.concept_ref}?') so the maybe-absent "
                     f"result stays visible downstream, or declare '{trigger_name}' optional on '{outcome_pipe.code}' and handle "
-                    "its absence there."
+                    f"its absence there. When the condition's expression chooses '{outcome_pipe.code}' only with '{trigger_name}' "
+                    f"present, which validation does not read, declare '{trigger_name}' forced on '{outcome_pipe.code}' with '!', "
+                    "so that a run reaching it without the input fails instead of resolving the output absent."
                 )
                 raise PipeValidationError(
                     message=msg,
