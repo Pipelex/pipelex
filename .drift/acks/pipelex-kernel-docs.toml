@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:e288a96c982d392b4dad457e6359eff4008508a6c2d00ed8bbff515f98e8346b"
+digest = "sha256:f6449898b2c6db663c5a11f287652c487620dd24dec35654a0883fb62c2fd91d"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-10T20:14:04Z"
-rationale = "real-catch: run_multi_judgment now leaves a refused question's field absent only when the field may hold nothing, its default being None, and raises JudgmentRefusedError behind a required or defaulted field, since omitting a defaulted field filled in a verdict nobody gave. pipelex-kernel.md said a field the class lets be left out was left absent; the judgment paragraph now states the may-hold-nothing rule and why a defaulted field raises."
+reviewed_at = "2026-10-10T20:46:23Z"
+rationale = "real-catch: run_multi_judgment now hands the verdicts over by field name, so an aliased field keeps its verdict, and decides a refusal by class_field_may_hold_nothing, the predicate the load's concept walk reads a class field by, storing None outright when the field's type admits it. pipelex-kernel.md said a refused field was left absent when neither required nor defaulted; the judgment paragraph now states the shared rule and the by-name handover, and gains the PipeJudge execution-data paragraph moved out of the building-methods page."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -16,8 +16,8 @@ rationale = "real-catch: run_multi_judgment now leaves a refused question's fiel
 "pipelex/kernel/img_gen_ops.py" = "blob:b85360f6c118e93be53bf8d1a04504ccb7552469"
 "pipelex/kernel/img_gen_prompt.py" = "blob:c653190d40e4323f763b9da511bd55a4a1646888"
 "pipelex/kernel/img_gen_results.py" = "blob:46b4ca11c70d906ae6d58ce66461f9b3414f1bfa"
-"pipelex/kernel/judgment_ops.py" = "blob:154c80ac1af61a69b1b1f6fa4c4ed181cd16db53"
-"pipelex/kernel/judgment_results.py" = "blob:d5e59b60a7e7ff1ca68d21e7a9d258a90816a6b1"
+"pipelex/kernel/judgment_ops.py" = "blob:68316783e27e9a55b95a66929d661c1ed5d6d5a3"
+"pipelex/kernel/judgment_results.py" = "blob:4dbbcb204309265999de59a179f4420a0f83be93"
 "pipelex/kernel/llm_ops.py" = "blob:d37a9c3718a37f5e7d1550d1512dddbf79032cae"
 "pipelex/kernel/llm_prompt_content.py" = "blob:f996cead6e7789494f01f69c128ae71d6dcf8466"
 "pipelex/kernel/llm_results.py" = "blob:6e3b8a2878b5bb284ece5fac10262fb59ac2029d"

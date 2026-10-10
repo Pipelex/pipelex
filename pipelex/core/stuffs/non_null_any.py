@@ -39,3 +39,17 @@ def field_admits_none(*, field_info: FieldInfo) -> bool:
     """Whether a class field admits `None`, read off its annotation, `NonNullAny` being the one `Any` that does not."""
     is_non_null_any = any(isinstance(constraint, AfterValidator) and constraint.func is _refuse_none for constraint in field_info.metadata)
     return annotation_admits_none(annotation=field_info.annotation) and not is_non_null_any
+
+
+def class_field_may_hold_nothing(*, field_info: FieldInfo) -> bool:
+    """Whether a structure class's field may hold nothing: its annotation admits `None`, or it is neither required nor defaulted.
+
+    The standard's rule, `field_may_hold_nothing`, read off a class rather than a structure table: a class states
+    what a field may hold through its annotation, so one admitting `None` may hold nothing whether it is required
+    or has a default, and so may one left unrequired with no default. A generated class spells a field that may
+    not hold nothing so that this reads the same as its table: a required or defaulted field refuses `None`.
+
+    An unrequired field with no default is the only kind whose default is `None`: a required field has no
+    default at all, and a field given a default factory has none of its own either.
+    """
+    return field_admits_none(field_info=field_info) or field_info.default is None

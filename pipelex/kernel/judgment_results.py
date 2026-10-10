@@ -60,7 +60,7 @@ class MultiJudgmentResult(BaseModel):
     """The outcome of a kernel judgment call asking several questions over one evidence.
 
     `content` is the output structure, holding the verdict native of each question in the field of its
-    name, a refused question's optional field left absent. `prompt` is the evidence as the model was
+    name, a refused question's field holding nothing. `prompt` is the evidence as the model was
     given it, and `judgments` says, by question name, what each question was asked as and what the model
     answered, refusals included.
     """

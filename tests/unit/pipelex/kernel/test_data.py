@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from pydantic import Field
+from pydantic import Field, create_model
 
 from pipelex.cogt.judgment.judgment_models import (
     ChoiceAnswer,
@@ -28,11 +28,66 @@ class JudgedTriage(StructuredContent):
 
 
 class DefaultedTriage(StructuredContent):
-    """A triage whose rating, left unrequired, carries a default verdict: a refusal must never fill it in."""
+    """A triage whose rating, left unrequired, carries a default verdict, as a structure field with a `default_value` is generated.
+
+    The field never holds nothing, so a refusal can neither empty it nor fill in its default, a verdict nobody gave.
+    """
+
+    urgent: YesNoContent = Field(description="Whether the message is urgent")
+    team: ChoiceContent = Field(description="The team that handles it")
+    severity: RatingContent = Field(default=RatingContent(level=0, label="Minor"), description="How severe the reported issue is")
+
+
+class NullableRequiredTriage(StructuredContent):
+    """A triage whose rating is required yet admits nothing, so a refusal stores nothing there."""
+
+    urgent: YesNoContent = Field(description="Whether the message is urgent")
+    team: ChoiceContent = Field(description="The team that handles it")
+    severity: RatingContent | None = Field(description="How severe the reported issue is")
+
+
+class NullableDefaultedTriage(StructuredContent):
+    """A triage whose rating carries a default yet admits nothing, so a refusal stores nothing there rather than the default."""
 
     urgent: YesNoContent = Field(description="Whether the message is urgent")
     team: ChoiceContent = Field(description="The team that handles it")
     severity: RatingContent | None = Field(default=RatingContent(level=0, label="Minor"), description="How severe the reported issue is")
+
+
+# A hand-written class may give a field `None` for default while typing it without `None`: the field may hold
+# nothing, by its default, though `None` given outright is refused. Built dynamically, since a type checker
+# rightly refuses that default written in a class body.
+LooseDefaultTriage: type[StructuredContent] = create_model(
+    "LooseDefaultTriage",
+    __base__=StructuredContent,
+    urgent=(YesNoContent, Field(description="Whether the message is urgent")),
+    team=(ChoiceContent, Field(description="The team that handles it")),
+    severity=(RatingContent, Field(default=None, description="How severe the reported issue is")),
+)
+
+
+class AliasedRequiredTriage(StructuredContent):
+    """A triage whose required yes/no field goes by an alias: its answered verdict must land in it all the same."""
+
+    urgent: YesNoContent = Field(alias="isUrgent", description="Whether the message is urgent")
+    team: ChoiceContent = Field(description="The team that handles it")
+    severity: RatingContent | None = Field(default=None, description="How severe the reported issue is")
+
+
+class AliasedOptionalTriage(StructuredContent):
+    """A triage whose optional choice field goes by an alias: its answered verdict must not be dropped for nothing."""
+
+    urgent: YesNoContent = Field(description="Whether the message is urgent")
+    team: ChoiceContent | None = Field(default=None, alias="handlingTeam", description="The team that handles it")
+    severity: RatingContent | None = Field(default=None, description="How severe the reported issue is")
+
+
+class AliasedDefaultedTriage(StructuredContent):
+    """A triage whose defaulted rating field goes by an alias: its answered verdict must not be swapped for the default."""
+
+    urgent: YesNoContent = Field(description="Whether the message is urgent")
+    team: ChoiceContent = Field(description="The team that handles it")
+    severity: RatingContent = Field(default=RatingContent(level=0, label="Minor"), alias="howSevere", description="How severe the reported issue is")
 
 
 def _blocking_rating() -> RatingContent:

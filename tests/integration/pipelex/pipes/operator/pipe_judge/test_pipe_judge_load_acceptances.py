@@ -61,7 +61,7 @@ class TestPipeJudgeLoadAcceptances:
         await validate_bundle(mthds_contents=[bundle])
 
     async def test_several_questions_filling_a_structure_are_admitted(self) -> None:
-        """Each field holds its question's verdict native or a concept refining it, and an optional field may be left absent."""
+        """Each field holds its question's verdict native or a concept refining it, and an optional field may hold nothing."""
         result = await validate_bundle(mthds_contents=[PipeJudgeSeveralQuestionsTestData.bundle()])
         assert "judge_several.judge_it" in {pipe.pipe_ref for pipe in result.pipes}
 

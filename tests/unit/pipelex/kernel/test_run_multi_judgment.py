@@ -30,7 +30,18 @@ from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from tests.unit.pipelex.cogt.judgment.fake_judgment_worker import FakeJudgmentWorker, make_fake_judgment_model
-from tests.unit.pipelex.kernel.test_data import DefaultedTriage, FactoryDefaultedTriage, JudgedTriage, MultiJudgmentTestCases
+from tests.unit.pipelex.kernel.test_data import (
+    AliasedDefaultedTriage,
+    AliasedOptionalTriage,
+    AliasedRequiredTriage,
+    DefaultedTriage,
+    FactoryDefaultedTriage,
+    JudgedTriage,
+    LooseDefaultTriage,
+    MultiJudgmentTestCases,
+    NullableDefaultedTriage,
+    NullableRequiredTriage,
+)
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -126,6 +137,21 @@ class TestRunMultiJudgment:
             "judgment_question": "severity",
         }
 
+    @pytest.mark.parametrize("output_class", [NullableRequiredTriage, NullableDefaultedTriage, LooseDefaultTriage])
+    async def test_a_refused_question_behind_a_field_that_may_hold_nothing_stores_nothing(
+        self, mocker: MockerFixture, output_class: type[StructuredContent]
+    ) -> None:
+        """A field whose type admits nothing holds nothing on a refusal, never its default, and so does one whose default is nothing."""
+        _, result = await self._run(mocker, answers={**MultiJudgmentTestCases.ANSWERS, "severity": JudgmentRefusal()}, output_class=output_class)
+
+        assert isinstance(result.content, output_class)
+        assert result.content.model_dump() == {
+            "urgent": YesNoContent(yes_no=True, probability=0.9).model_dump(),
+            "team": ChoiceContent(choice="technical", confidence=0.7).model_dump(),
+            "severity": None,
+        }
+        assert result.judgments["severity"].outcome == JudgmentRefusal()
+
     async def test_a_refused_question_behind_a_required_field_raises_naming_it(self, mocker: MockerFixture) -> None:
         with pytest.raises(JudgmentRefusedError) as exc_info:
             await self._run(mocker, answers={**MultiJudgmentTestCases.ANSWERS, "team": JudgmentRefusal()})
@@ -141,13 +167,25 @@ class TestRunMultiJudgment:
     async def test_a_refused_question_behind_a_defaulted_field_raises_rather_than_filling_the_default(
         self, mocker: MockerFixture, output_class: type[StructuredContent]
     ) -> None:
-        """A default would read as a verdict nobody gave, so only a field that may hold nothing is left absent."""
+        """A default would read as a verdict nobody gave, so a field that may not hold nothing fails the step."""
         with pytest.raises(JudgmentRefusedError) as exc_info:
             await self._run(mocker, answers={**MultiJudgmentTestCases.ANSWERS, "severity": JudgmentRefusal()}, output_class=output_class)
 
         assert "declined to answer the question 'severity'" in str(exc_info.value)
         assert "make its output field optional with no default" in str(exc_info.value)
         assert exc_info.value.question_name == "severity"
+
+    @pytest.mark.parametrize("output_class", [AliasedRequiredTriage, AliasedOptionalTriage, AliasedDefaultedTriage])
+    async def test_an_aliased_field_keeps_its_answered_verdict(self, mocker: MockerFixture, output_class: type[StructuredContent]) -> None:
+        """The verdicts are handed over by field name, the name each question goes by, whatever alias a field carries."""
+        _, result = await self._run(mocker, answers=MultiJudgmentTestCases.ANSWERS, output_class=output_class)
+
+        assert isinstance(result.content, output_class)
+        assert result.content.model_dump() == {
+            "urgent": YesNoContent(yes_no=True, probability=0.9).model_dump(),
+            "team": ChoiceContent(choice="technical", confidence=0.7).model_dump(),
+            "severity": RatingContent(level=1, label="Major", confidence=0.6).model_dump(),
+        }
 
     async def test_a_dry_run_answers_every_question(self, mocker: MockerFixture) -> None:
         worker, result = await self._run(mocker, answers={}, run_mode=PipeRunMode.DRY)

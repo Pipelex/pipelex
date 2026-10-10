@@ -19,7 +19,6 @@ judging model, every question answered independently over the same evidence.
 from typing import NamedTuple
 
 from pydantic import BaseModel, ConfigDict
-from pydantic.fields import FieldInfo
 
 from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import JudgmentAssignment
@@ -44,6 +43,7 @@ from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.choice_content import ChoiceContent
+from pipelex.core.stuffs.non_null_any import class_field_may_hold_nothing, field_admits_none
 from pipelex.core.stuffs.rating_content import RatingContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
@@ -222,11 +222,13 @@ async def run_multi_judgment(
     model is called. Each answer becomes its verdict native under the single form's rules, the question's
     own threshold deciding a yes/no verdict.
 
-    A refusal leaves its question's field absent when that field may hold nothing, being neither
-    required nor given a default, which is logged and recorded in the result's `judgments`. Any other
-    refused question raises `JudgmentRefusedError`, a content error naming the step, the model and the
-    question: leaving a defaulted field out would fill in its default, a verdict nobody gave. A dry run
-    answers every question and never refuses.
+    A refusal stores nothing in its question's field when that field may hold nothing, by
+    `class_field_may_hold_nothing`, the rule the load's concept walk reads a class by: its type admits
+    `None`, or it is neither required nor given a default. The refusal is logged and recorded in the
+    result's `judgments`. Any other refused question raises `JudgmentRefusedError`, a content error naming
+    the step, the model and the question: leaving a defaulted field out would fill in its default, a
+    verdict nobody gave. The verdicts are handed to `output_class` by field name, whatever alias a field
+    carries. A dry run answers every question and never refuses.
     """
     with job_metadata.log_context():
         _check_questions_are_the_output_fields(question_names=list(questions), output_class=output_class)
@@ -245,12 +247,17 @@ async def run_multi_judgment(
             question = asked_judgment.questions[question_name]
             outcome = asked_judgment.outcomes[question_name]
             if isinstance(outcome, JudgmentRefusal):
-                if not _may_be_left_absent(field_info=output_class.model_fields[question_name]):
+                field_info = output_class.model_fields[question_name]
+                if not class_field_may_hold_nothing(field_info=field_info):
                     raise JudgmentRefusedError(pipe_code=job_metadata.pipe_code, model_handle=judgment_setting.model, question_name=question_name)
                 log.warning(
-                    "A judgment's model declined a question, and its field is left absent",
+                    "A judgment's model declined a question, and its field holds nothing",
                     fields={"pipe_code": job_metadata.pipe_code, "model_handle": judgment_setting.model, "judgment_question": question_name},
                 )
+                # A field whose type admits nothing is given it outright, as a required one must be and as one carrying a
+                # default must be lest the default fill in; any other field that may hold nothing has `None` for default.
+                if field_admits_none(field_info=field_info):
+                    field_values[question_name] = None
                 judgments[question_name] = QuestionJudgment(rendered_question=question.instructions, outcome=outcome)
                 continue
             verdict, threshold_applied = make_verdict_content(
@@ -270,7 +277,8 @@ async def run_multi_judgment(
             # subclasses the native's, is built as that class rather than refusing the native's instance.
             field_values[question_name] = verdict.model_dump()
             judgments[question_name] = QuestionJudgment(rendered_question=question.instructions, outcome=outcome, threshold_applied=threshold_applied)
-        content = output_class.model_validate(field_values)
+        # Keyed by field name, the name each question goes by, so a field carrying an alias still receives its verdict.
+        content = output_class.model_validate(field_values, by_alias=False, by_name=True)
         return MultiJudgmentResult(
             memory=store_result(memory=memory, concept=concept, content=content, result_name=result_name, result_code=result_code),
             content=content,
@@ -278,15 +286,6 @@ async def run_multi_judgment(
             judgment_setting=judgment_setting,
             judgments=judgments,
         )
-
-
-def _may_be_left_absent(*, field_info: FieldInfo) -> bool:
-    """Whether a field may hold nothing, the rule a declared structure field follows: neither required nor given a default.
-
-    Leaving such a field out gives it `None`, and it is the only kind whose default is `None`: a required
-    field has no default at all, and a field given a default factory has none of its own either.
-    """
-    return field_info.default is None
 
 
 def _check_questions_are_the_output_fields(*, question_names: list[str], output_class: type[StuffContent]) -> None:
