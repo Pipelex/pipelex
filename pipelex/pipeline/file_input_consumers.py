@@ -25,9 +25,9 @@ resolving sub-pipes through the hub:
   unresolved cross-package reference consume nothing as far as the walk knows: it never guesses.
 - **Consumers.** A `PipeExtract` consumes its document input, and reads the formats of the model its
   extract choice resolves to. A `PipeLLM` consumes the documents its prompt references by variable
-  path, and reads its resolved model's document types. A `PipeJudge` consumes every document input
-  it declares, since every input is material to judge, and reads its resolved judgment model's
-  document types. A waterfall reads a format when any of its members reads it.
+  path, and reads its resolved model's document types. A `PipeJudge` consumes the documents its prompt
+  references by variable path, as a PipeLLM does, and reads its resolved judgment model's document
+  types. A waterfall reads a format when any of its members reads it.
 
 The walk depends only on the library and the model deck, never on the input values.
 """
@@ -535,17 +535,11 @@ def _record_llm_document_consumers(*, pipe_llm: PipeLLM, frame: _Frame, is_condi
 
 
 def _record_judgment_document_consumers(*, pipe_judge: PipeJudge, frame: _Frame, is_conditional: bool, consumers: list[FileInputConsumer]) -> None:
-    # A `Dynamic` input declares no kind of value, and an image input is an image by the setup check,
-    # so only the inputs declared as documents are followed, as the operator's load-time check does.
-    concept_library = get_concept_library()
-    document_concept = get_native_concept(native_concept=NativeConceptCode.DOCUMENT)
-    document_input_names = [
-        input_name
-        for input_name, stuff_spec in pipe_judge.inputs.items
-        if not NativeConceptCode.is_dynamic_concept(concept_code=stuff_spec.concept.code)
-        and concept_library.is_compatible(tested_concept=stuff_spec.concept, wanted_concept=document_concept, strict=True)
-    ]
-    if not document_input_names:
+    # The prompt presents the documents it references, as a PipeLLM's does, and an input reaches the
+    # judging model only through a template, so a document input the prompt does not reference is not
+    # sent: only the prompt's references are followed.
+    document_references = pipe_judge.prompt_content.document_references or []
+    if not document_references:
         return
     resolved_model = _resolve_judgment_model(pipe_judge=pipe_judge)
     readable_formats: frozenset[str] | None = None
@@ -555,8 +549,8 @@ def _record_judgment_document_consumers(*, pipe_judge: PipeJudge, frame: _Frame,
     # method's load refuses: there is no caller's format to refuse.
     if not readable_formats:
         return
-    for input_name in document_input_names:
-        consumed_path = _tracked_path(frame=frame, variable_path=input_name)
+    for document_reference in document_references:
+        consumed_path = _tracked_path(frame=frame, variable_path=document_reference.variable_path)
         if consumed_path is None:
             continue
         consumers.append(

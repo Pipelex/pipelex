@@ -1,0 +1,10 @@
+name = "operator_judge_roof_condition"
+description = "A rating of a roof's condition, on a scale whose levels carry labels, from an inspector's site note"
+
+validity = "valid"
+tier = "inference"
+granularity = "focused"
+
+covers = [
+  "operator.judge",
+]

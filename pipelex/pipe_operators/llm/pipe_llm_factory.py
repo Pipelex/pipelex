@@ -15,7 +15,7 @@ from pipelex.pipe_operators.llm.exceptions import PipeLLMFactoryError
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
-from pipelex.pipe_operators.llm.template_document_analyzer import TemplateDocumentAnalyzer
+from pipelex.pipe_operators.shared.template_document_analyzer import TemplateDocumentAnalyzer
 from pipelex.pipe_operators.shared.template_image_analyzer import TemplateImageAnalyzer
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle

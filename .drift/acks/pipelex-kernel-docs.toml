@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:c420086cbf7a3af8ea10953c35af326d1ad0fc5da4fe294dd281287f06f95bb2"
+digest = "sha256:58e8e31cfdd4fb5d61c9c4cfcf27e6e25553f405edd31aee917b4d6f7edbe411"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-10T16:21:30Z"
-rationale = "real-catch: the kernel gained pipelex/kernel/prompt_assembly.py, the user-prompt assembly PipeLLM, PipeImgGen and PipeJudge share, and assemble_llm_prompt and assemble_img_gen_prompt became thin over it, dropping their private copies of the image and document extraction and placeholder substitution. pipelex-kernel.md listed neither the module nor its entry points and said the two assemble functions owned the numbering themselves; the module table now lists prompt_assembly with UserPromptContent, AssembledUserPrompt, assemble_user_prompt and PromptFiles, the paragraph after it says the numbering is shared and that the caller's extra_params are copied rather than written to, and assemble_user_prompt joins the list of entry points taking a required templating_style."
+reviewed_at = "2026-10-10T17:11:23Z"
+rationale = "real-catch: run_judgment now assembles the step's evidence prompt through assemble_user_prompt into a JudgmentPrompt, renders the question as a BASIC template, raises JudgmentRefusedError on a refusal and labels a Rating from the declared scale, while build_judgment_material and material_value were deleted and JudgmentResult gained the prompt sent. pipelex-kernel.md still listed the two deleted functions and described the by-name material; the module row drops them and the judgment paragraph now describes the evidence prompt, the BASIC question, the refusal policy, absence as the template's business and the rating label. The boot-contract test change only follows the new run_judgment signature."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -16,8 +16,8 @@ rationale = "real-catch: the kernel gained pipelex/kernel/prompt_assembly.py, th
 "pipelex/kernel/img_gen_ops.py" = "blob:b85360f6c118e93be53bf8d1a04504ccb7552469"
 "pipelex/kernel/img_gen_prompt.py" = "blob:c653190d40e4323f763b9da511bd55a4a1646888"
 "pipelex/kernel/img_gen_results.py" = "blob:46b4ca11c70d906ae6d58ce66461f9b3414f1bfa"
-"pipelex/kernel/judgment_ops.py" = "blob:4b01f5618b8484ae29041151c8cd3f8ad523ce70"
-"pipelex/kernel/judgment_results.py" = "blob:40ba1258cc81d34df3e427d5511ccd40c6edf789"
+"pipelex/kernel/judgment_ops.py" = "blob:c523c36af3a8f9f14dfca608eea1e3585a6f8876"
+"pipelex/kernel/judgment_results.py" = "blob:ad759849054a74aaf1fedcbf7bec31d2f753a13c"
 "pipelex/kernel/llm_ops.py" = "blob:d37a9c3718a37f5e7d1550d1512dddbf79032cae"
 "pipelex/kernel/llm_prompt_content.py" = "blob:f996cead6e7789494f01f69c128ae71d6dcf8466"
 "pipelex/kernel/llm_results.py" = "blob:6e3b8a2878b5bb284ece5fac10262fb59ac2029d"
@@ -28,4 +28,4 @@ rationale = "real-catch: the kernel gained pipelex/kernel/prompt_assembly.py, th
 "pipelex/kernel/search_ops.py" = "blob:b7de7ff62c45dde7f7aa8a9f409aecf3b664cce5"
 "pipelex/kernel/search_results.py" = "blob:101b70dc96cc5ee1721c9f6b1cb725a5ca78ff70"
 "pipelex/kernel/templating_style_ops.py" = "blob:395473806d600dfc4f124c07f2afebb951fc086b"
-"tests/unit/pipelex/kernel/test_kernel_boot_contract.py" = "blob:63c06904e9f53f80f98a0a45e00aa8116c9beb31"
+"tests/unit/pipelex/kernel/test_kernel_boot_contract.py" = "blob:2b60152e6fa07fb0a1eb242cf065d0106d47bc44"

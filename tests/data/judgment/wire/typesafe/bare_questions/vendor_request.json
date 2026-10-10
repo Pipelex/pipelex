@@ -1,0 +1,28 @@
+{
+  "model": "jev-1.13.0",
+  "state": "A message from a customer:\n<message>\nI was charged twice for order 4417 this morning. Please refund one of the two charges.\n</message>",
+  "questions": {
+    "refund": {
+      "type": "noul",
+      "instructions": "Does the customer ask for a refund?"
+    },
+    "tone": {
+      "type": "choice",
+      "instructions": "What is the tone of the message?",
+      "criteria": {
+        "calm": null,
+        "angry": null,
+        "anxious": null
+      }
+    },
+    "priority": {
+      "type": "score",
+      "instructions": "What priority should this message get?",
+      "criteria": [
+        "Low",
+        "Normal",
+        "High"
+      ]
+    }
+  }
+}

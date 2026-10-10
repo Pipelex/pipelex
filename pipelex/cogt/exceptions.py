@@ -505,6 +505,33 @@ class JudgmentModelNotFoundError(ModelNotFoundError):
     pass
 
 
+class JudgmentRefusedError(CogtError):
+    """The judging model declined to answer a step's question.
+
+    A refusal is a worker's outcome, never its error: this is the operator's policy for a question
+    whose verdict has nowhere to be left absent. It is a content error, in the input domain, because
+    what a model declines to judge is the question asked over the evidence given, and the remedy is
+    the author's or the caller's: a reworded question or different evidence. The message names only
+    the step and the model's deck handle, so it is kept verbatim for the caller.
+    """
+
+    error_category = InferenceErrorCategory.CONTENT
+    _authors_caller_facing_message = True
+
+    def __init__(self, *, pipe_code: str | None, model_handle: str):
+        step = f"PipeJudge '{pipe_code}'" if pipe_code else "This judgment"
+        message = (
+            f"{step}: the judgment model '{model_handle}' declined to answer its question. "
+            "Try to reword the question so it can be answered from the evidence, or give the step different evidence."
+        )
+        super().__init__(
+            message,
+            user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail="Reword the question, or give the step different evidence."),
+        )
+        self.pipe_code = pipe_code
+        self.model_handle = model_handle
+
+
 class JudgmentModelMissingError(PipelexError):
     """A judgment has no model to run on: the step names none, and the model deck names no default.
 

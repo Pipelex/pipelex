@@ -25,6 +25,7 @@ description = "Judges whether an amount is high enough to need a second signatur
 inputs      = { total_amount = "Number" }
 output      = "YesNo"
 model       = "@default-judgment"
+prompt      = "The total of an invoice, in euros: $total_amount"
 question    = "Is this amount high enough to need a second signature?"
 criteria    = { yes = "The amount is above five thousand euros", no = "The amount is five thousand euros or less" }
 threshold   = 0.7

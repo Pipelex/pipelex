@@ -58,6 +58,7 @@ filename = "invoice-{{ invoice.number }}"
 description = "Judges whether an invoice is overdue"
 inputs = { invoice = "Invoice" }
 output = "YesNo"
+prompt = "@invoice"
 question = "Is this invoice overdue?"
 """,
         PipeType.PIPE_BATCH: """type = "PipeBatch"

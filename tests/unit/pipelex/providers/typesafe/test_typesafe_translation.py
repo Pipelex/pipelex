@@ -9,8 +9,10 @@ from pipelex.cogt.judgment.judgment_models import (
     ChoiceQuestion,
     JudgmentQuestion,
     RatingAnswer,
+    RatingLevel,
     RatingQuestion,
     YesNoAnswer,
+    YesNoCriteria,
     YesNoQuestion,
 )
 from pipelex.providers.typesafe.typesafe_exceptions import TypesafeJudgmentResponseError, TypesafeQuestionUnsupportedError
@@ -19,28 +21,27 @@ from pipelex.providers.typesafe.typesafe_translation import (
     from_typesafe_response,
     to_typesafe_question,
 )
+from tests.unit.pipelex.cogt.judgment.test_data import described_levels
 from tests.unit.pipelex.providers.typesafe.test_data import TestData, load_recorded, load_recorded_response
 
-SEVERITY_LEVELS = [
+SEVERITY_DESCRIPTIONS = [
     "Cosmetic; no impact on functionality",
     "A feature is degraded, but a workaround exists",
     "Blocking issue; no workaround exists",
 ]
+SEVERITY_LEVELS = described_levels(*SEVERITY_DESCRIPTIONS)
 
 
 class TestTypesafeTranslation:
-    def test_yes_no_sends_only_the_criteria_it_declares(self) -> None:
-        """Both sides go out under the vendor's own keys, one side alone goes out alone, and neither sends no map at all."""
+    def test_yes_no_sends_both_criteria_or_no_map_at_all(self) -> None:
+        """Both sides go out under the vendor's own keys; a question without criteria sends no map at all."""
         both = to_typesafe_question(
-            question_key="q", question=YesNoQuestion(instructions="Is it urgent?", yes_criterion="Needs attention now", no_criterion="Can wait")
+            question_key="q", question=YesNoQuestion(instructions="Is it urgent?", criteria=YesNoCriteria(yes="Needs attention now", no="Can wait"))
         )
-        yes_only = to_typesafe_question(question_key="q", question=YesNoQuestion(instructions="Is it urgent?", yes_criterion="Needs attention now"))
         neither = to_typesafe_question(question_key="q", question=YesNoQuestion(instructions="Is it urgent?"))
 
         assert isinstance(both, TypesafeNoul)
         assert both.model_dump()["criteria"] == {"true": "Needs attention now", "false": "Can wait"}
-        assert isinstance(yes_only, TypesafeNoul)
-        assert yes_only.model_dump()["criteria"] == {"true": "Needs attention now"}
         assert isinstance(neither, TypesafeNoul)
         assert "criteria" not in neither.model_dump()
         assert neither.model_dump()["instructions"] == "Is it urgent?"
@@ -56,7 +57,31 @@ class TestTypesafeTranslation:
         rendered = to_typesafe_question(question_key="severity", question=RatingQuestion(instructions="How severe?", levels=SEVERITY_LEVELS))
 
         assert isinstance(rendered, TypesafeScore)
-        assert rendered.model_dump()["criteria"] == SEVERITY_LEVELS
+        assert rendered.model_dump()["criteria"] == SEVERITY_DESCRIPTIONS
+
+    def test_a_level_goes_out_as_its_label_and_description_or_whichever_it_declares(self) -> None:
+        """The vendor takes one string per level, so a labelled level is joined as `label: description`."""
+        question = RatingQuestion(
+            instructions="How severe?",
+            levels=[
+                RatingLevel(label="Cosmetic", description="Appearance only"),
+                RatingLevel(label="Workaround available"),
+                RatingLevel(label="Fully blocked", description="A task fails with no workaround"),
+            ],
+        )
+        unlabelled = RatingQuestion(instructions="How severe?", levels=described_levels("Appearance only", "A task fails"))
+
+        rendered = to_typesafe_question(question_key="severity", question=question)
+        rendered_unlabelled = to_typesafe_question(question_key="severity", question=unlabelled)
+
+        assert isinstance(rendered, TypesafeScore)
+        assert rendered.model_dump()["criteria"] == [
+            "Cosmetic: Appearance only",
+            "Workaround available",
+            "Fully blocked: A task fails with no workaround",
+        ]
+        assert isinstance(rendered_unlabelled, TypesafeScore)
+        assert rendered_unlabelled.model_dump()["criteria"] == ["Appearance only", "A task fails"]
 
     @pytest.mark.parametrize(
         ("nb_levels", "is_accepted"),
@@ -67,7 +92,7 @@ class TestTypesafeTranslation:
     )
     def test_the_vendor_rating_cap_is_enforced_at_its_boundary(self, nb_levels: int, is_accepted: bool) -> None:
         """Ten levels go out and eleven are refused before any request is built, as the live API refuses them."""
-        question = RatingQuestion(instructions="How severe?", levels=[f"Level {index_level}" for index_level in range(nb_levels)])
+        question = RatingQuestion(instructions="How severe?", levels=described_levels(*(f"Level {index_level}" for index_level in range(nb_levels))))
         if is_accepted:
             assert isinstance(to_typesafe_question(question_key="q", question=question), TypesafeScore)
             return
@@ -110,7 +135,11 @@ class TestTypesafeTranslation:
     def test_a_spread_rating_names_its_most_probable_level_not_its_position(self) -> None:
         """The recorded ten-level answer sits at position 7.86 but is most probable at level 9 — the verdict is 9."""
         answers = from_typesafe_response(
-            questions={"q": RatingQuestion(instructions="How severe?", levels=[f"Severity level {index_level}" for index_level in range(10)])},
+            questions={
+                "q": RatingQuestion(
+                    instructions="How severe?", levels=described_levels(*(f"Severity level {index_level}" for index_level in range(10)))
+                )
+            },
             response=load_recorded_response(TestData.SCORE_TEN_LEVELS),
         )
         answer = answers["q"]
@@ -137,7 +166,7 @@ class TestTypesafeTranslation:
             f'"probabilities": {wire_probabilities}}}}}}}'
         )
         answers = from_typesafe_response(
-            questions={"q": RatingQuestion(instructions="How severe?", levels=["a", "b", "c"])},
+            questions={"q": RatingQuestion(instructions="How severe?", levels=described_levels("a", "b", "c"))},
             response=SystemOneResponse.model_validate_json(wire_body),
         )
         answer = answers["q"]
@@ -151,7 +180,11 @@ class TestTypesafeTranslation:
         assert all(isinstance(level, str) for level in wire_probabilities)
 
         answers = from_typesafe_response(
-            questions={"q": RatingQuestion(instructions="How severe?", levels=[f"Severity level {index_level}" for index_level in range(10)])},
+            questions={
+                "q": RatingQuestion(
+                    instructions="How severe?", levels=described_levels(*(f"Severity level {index_level}" for index_level in range(10)))
+                )
+            },
             response=load_recorded_response(TestData.SCORE_TEN_LEVELS),
         )
         answer = answers["q"]

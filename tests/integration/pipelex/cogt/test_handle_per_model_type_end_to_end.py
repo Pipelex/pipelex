@@ -93,7 +93,8 @@ description = "Judge the reply"
 inputs = {{ reply = "Text" }}
 output = "YesNo"
 model = "{TWIN_HANDLE}"
-question = "Is $reply polite?"
+prompt = "@reply"
+question = "Is the reply polite?"
 """
 
 
