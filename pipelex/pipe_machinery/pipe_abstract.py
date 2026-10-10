@@ -256,7 +256,10 @@ class PipeAbstract(ABC, BaseModel):
         # comes from the bundle's domain field, not from the pipe code itself.
         if "." in code:
             bare_code = code.rsplit(".", maxsplit=1)[1]
-            log.warning("A pipe code carries a namespace prefix, which was stripped: write the pipe code bare", fields={"pipe_code": code})
+            log.warning(
+                "A pipe code carries a namespace prefix, which was stripped: write the pipe code bare",
+                fields={"pipe_code": bare_code, "pipe_ref": code},
+            )
             code = bare_code
         if not is_snake_case(code):
             msg = f"Invalid pipe code syntax '{code}'. Must be in snake_case."

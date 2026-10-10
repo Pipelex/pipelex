@@ -46,7 +46,7 @@ The remaining keys are what the error handlers attach to an error line. The ones
 | `user.id` | The authenticated caller, when auth bound one. An identity the server refused, a token's `user_id` claim or a forwarded `X-User-Id` that is not a path-safe segment, is never written under it: the warning about the refusal carries the claim's type as `claim_type`, and no value at all for the header |
 | `pipe_code` | The pipe the request named, on a run route whose body parsed |
 | `pipeline_run_id` | The run the request named, on a run route whose body parsed |
-| `backend_name`, `model_handle` | The inference backend that served the model and the handle the pipe named it by, on a failure that reached one; the response body carries them as `provider` and `model` |
+| `backend_name`, `model_handle` | The inference backend that served the model and the handle the pipe named it by, on a failure that reached one; the response body carries them as `provider` and `model`. `backend_name` is only ever the backend the error names, which a worker attributes its failure to: a failure no worker attributed carries none, even when the provider's own metadata names who answered, `openai` or `gateway`, since that is neither a backend's name nor an SDK's as the backends configuration spells them, and the record leaves it off rather than write it under `backend_name` or `sdk` |
 | `provider_status_code`, `provider_request_id` | The inference provider's own status and request id, on a failure that reached one |
 
 A key whose value is not set for this request is **absent** from the line rather than written as `null`, so a query filtering on presence gets an honest answer.

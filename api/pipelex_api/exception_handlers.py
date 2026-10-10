@@ -225,7 +225,10 @@ def _log_error_report(report: ErrorReport, *, request: Request, status: int | No
         "error_domain": report.error_domain,
         "retryable": report.retryable,
         OTelLogAttr.HTTP_RESPONSE_STATUS_CODE: effective_status,
-        # A report's `provider` is the backend that served the model and its `model` the handle the pipe named.
+        # A report's `provider` is the backend the error names, which a worker attributes its failure to, and its `model`
+        # the handle the pipe named. The provider the SDK's metadata names, `openai` or `gateway`, is no backend's name
+        # and no SDK's as the backends configuration names them, so it is left off: an unattributed failure has no
+        # `backend_name` rather than a second spelling of the same backend.
         "backend_name": report.provider,
         "model_handle": report.model,
     }

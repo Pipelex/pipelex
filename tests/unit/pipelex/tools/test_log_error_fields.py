@@ -3,10 +3,11 @@ from __future__ import annotations
 import io
 import json
 import logging
-from typing import TYPE_CHECKING
+import uuid
+from typing import TYPE_CHECKING, Annotated, Literal
 
 import pytest
-from pydantic import BaseModel, RootModel, ValidationError, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, RootModel, ValidationError, field_validator, model_validator
 from pydantic_core import PydanticCustomError
 
 from pipelex.core.stuffs.date_content import DateContent
@@ -81,6 +82,38 @@ class _Review(BaseModel):
     def _note_is_signed(self) -> _Review:
         assert self.note.endswith("-- signed"), f"unsigned note {self.note!r}"
         return self
+
+
+class _Letter(BaseModel):
+    kind: Literal["letter"]
+
+
+class _Parcel(BaseModel):
+    kind: Literal["parcel"]
+
+
+class _Shipment(BaseModel):
+    item: Annotated[_Letter | _Parcel, Field(discriminator="kind")]
+
+
+class _Record(BaseModel):
+    record_id: uuid.UUID
+
+
+class _Limits(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    burst: int = 1
+
+
+class _StrictSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    limits: _Limits = Field(default_factory=_Limits)
+
+
+class _Bounded(BaseModel):
+    code: Annotated[str, Field(max_length=8)]
 
 
 class TestLogErrorFields:
@@ -166,6 +199,49 @@ class TestLogErrorFields:
         assert error_fields(exc=mixed.value)[ERROR_MESSAGE_FIELD] == (
             "diagnosis: value_error; reviewed: Input should be a valid boolean, unable to interpret input"
         )
+
+    @pytest.mark.parametrize(
+        ("topic", "model", "document", "input_echo", "expected"),
+        [
+            ("an unknown tag of a discriminated union", _Shipment, {"item": {"kind": _PAYLOAD}}, _PAYLOAD, "item: union_tag_invalid"),
+            ("a value that is no UUID", _Record, {"record_id": _PAYLOAD}, "found `o`", "record_id: uuid_parsing"),
+            ("a key a nested model forbids", _StrictSettings, {"limits": {_PAYLOAD: 1}}, None, "limits: Extra inputs are not permitted"),
+            ("a key the root model forbids", _StrictSettings, {_PAYLOAD: 1}, None, "Extra inputs are not permitted"),
+        ],
+    )
+    def test_a_message_or_a_location_drawn_from_the_input_never_reaches_the_line(
+        self,
+        json_buffer: tuple[Log, io.StringIO],
+        topic: str,
+        model: type[BaseModel],
+        document: dict[str, object],
+        input_echo: str | None,
+        expected: str,
+    ) -> None:
+        """Some of pydantic's own templates quote the input, and a forbidden key's location is the caller's key itself."""
+        with pytest.raises(ValidationError) as caught:
+            model.model_validate(document)
+        (error,) = caught.value.errors(include_url=False, include_input=False)
+        if input_echo is not None:
+            assert input_echo in error["msg"], topic
+        else:
+            assert _PAYLOAD in [str(part) for part in error["loc"]], topic
+
+        fields = error_fields(exc=caught.value)
+        fresh, buffer = json_buffer
+        fresh.warning("A document was refused", fields=fields)
+
+        assert fields[ERROR_MESSAGE_FIELD] == expected, topic
+        own_lines = [line for line in buffer.getvalue().splitlines() if line and json.loads(line)[LOGGER_KEY] == __name__]
+        assert len(own_lines) == 1, topic
+        assert json.loads(own_lines[0])[ERROR_MESSAGE_FIELD] == expected, topic
+        assert _PAYLOAD not in own_lines[0], topic
+
+    def test_a_bounded_value_keeps_pydantic_s_message_whose_bound_comes_from_the_schema(self) -> None:
+        with pytest.raises(ValidationError) as caught:
+            _Bounded.model_validate({"code": _PAYLOAD})
+
+        assert error_fields(exc=caught.value)[ERROR_MESSAGE_FIELD] == "code: String should have at most 8 characters"
 
     def test_a_text_given_for_a_validation_error_is_carried_as_given(self) -> None:
         with pytest.raises(ValidationError) as caught:

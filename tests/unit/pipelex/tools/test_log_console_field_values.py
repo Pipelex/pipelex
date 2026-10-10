@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import math
 from pathlib import Path
 from typing import Any
@@ -34,12 +35,13 @@ class TestConsoleFieldValues:
             ("tab\\tliteral\ttab", '"tab\\\\tliteral\\ttab"'),
             ("line\nbreak", '"line\\nbreak"'),
             ("\x1b[31mred", '"\\x1b[31mred"'),
-            ({"key": "value", "nested": [1, 2]}, '{"key":"value","nested":[1,2]}'),
-            (["a", "b"], '["a","b"]'),
-            (("a", 1), '["a",1]'),
+            ({"key": "value", "nested": [1, 2]}, '"{\\"key\\":\\"value\\",\\"nested\\":[1,2]}"'),
+            (["a", "b"], '"[\\"a\\",\\"b\\"]"'),
+            (("a", 1), '"[\\"a\\",1]"'),
+            ([1, 2], "[1,2]"),
             (math.nan, "NaN"),
-            ({"ratio": math.inf}, '{"ratio":"Infinity"}'),
-            (_Sample(code="x", count=2), '{"code":"x","count":2}'),
+            ({"ratio": math.inf}, '"{\\"ratio\\":\\"Infinity\\"}"'),
+            (_Sample(code="x", count=2), '"{\\"code\\":\\"x\\",\\"count\\":2}"'),
             (Path("reports/march.csv"), "reports/march.csv"),
         ],
         ids=[
@@ -61,6 +63,7 @@ class TestConsoleFieldValues:
             "mapping",
             "list",
             "tuple",
+            "list of numbers",
             "nan",
             "nested infinity",
             "model",
@@ -79,7 +82,21 @@ class TestConsoleFieldValues:
         circular: dict[str, Any] = {}
         circular["self"] = circular
 
-        assert format_field_value(value=circular) == "{'self': {...}}"
+        assert format_field_value(value=circular) == "\"{'self': {...}}\""
+
+    def test_a_long_list_of_paths_is_cut_before_it_is_quoted_so_no_tail_reads_as_a_pair(self) -> None:
+        """Cut as rendered and left bare, the list kept an unterminated string, and its tail ``b=c/…`` read as a pair of its own."""
+        paths = [f"/x/My dir/a b=c/{index_path}/backends.toml" for index_path in range(6)]
+
+        rendered = format_field_value(value=paths)
+
+        rendering = json.dumps(paths, separators=(",", ":"))
+        kept = rendering[: FIELD_VALUE_MAX_LENGTH - len(TRUNCATION_MARK)]
+        assert rendered == '"' + kept.replace("\\", "\\\\").replace('"', '\\"') + TRUNCATION_MARK + '"'
+        assert rendered.startswith('"[\\"/x/My dir/a b=c/0/backends.toml\\",')
+        # The value is one quoted span: every quote inside it is escaped, so nothing after a space reads as a pair.
+        inner = rendered[1:-1]
+        assert '"' not in inner.replace('\\"', "")
 
     def test_a_long_value_is_cut_short_at_the_limit_with_a_mark(self) -> None:
         rendered = format_field_value(value=list(range(200)))

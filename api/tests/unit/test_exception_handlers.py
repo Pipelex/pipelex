@@ -24,6 +24,7 @@ from pipelex.base_exceptions import (
     PipelexConfigError,
     PipelexError,
 )
+from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.config import get_config
@@ -417,6 +418,29 @@ async def run_state_unexpected_error_route(request: Request) -> None:
     raise RuntimeError(msg)
 
 
+def _gateway_failure() -> LLMCompletionError:
+    """An inference failure whose SDK metadata names the provider family, `gateway`, and no backend."""
+    return LLMCompletionError(
+        "the gateway is unavailable",
+        error_category=InferenceErrorCategory.TRANSIENT,
+        provider_metadata=ProviderErrorMetadata(provider=ProviderName.GATEWAY, sdk_exception_type="APIStatusError", status_code=503),
+    )
+
+
+@_router.get("/inference-failure-attributed")
+async def inference_failure_attributed_route() -> None:
+    # A failure the worker's chokepoint attributed: the error names the backend that served the model.
+    gateway_failure = _gateway_failure()
+    gateway_failure.fill_model_and_provider("claude-5.5-sonnet", backend_name="pipelex_gateway")
+    raise gateway_failure
+
+
+@_router.get("/inference-failure-unattributed")
+async def inference_failure_unattributed_route() -> None:
+    # A failure no worker attributed: only the SDK's metadata names who answered.
+    raise _gateway_failure()
+
+
 def _build_client(
     *,
     raise_server_exceptions: bool = True,
@@ -732,6 +756,24 @@ class TestExceptionHandlers:
         assert fields["http.response.status_code"] == 500
         assert fields["error.type"] == "ServerMisconfigured"
         assert "event" not in fields
+
+    @pytest.mark.parametrize(
+        ("path", "expected_backend_name"),
+        [
+            ("/inference-failure-attributed", "pipelex_gateway"),
+            ("/inference-failure-unattributed", None),
+        ],
+    )
+    def test_backend_name_is_only_ever_the_backend_the_error_names(self, mocker: MockerFixture, path: str, expected_backend_name: str | None):
+        """The provider the SDK's metadata names, `gateway`, is no backend's name: it is never written under `backend_name`, nor under `sdk`."""
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
+        response = _build_client().get(path)
+        assert response.status_code == 500
+        fields = _emitted_fields(log_spy, as_error=True)
+        assert fields.get("backend_name") == expected_backend_name
+        assert "sdk" not in fields
+        assert ProviderName.GATEWAY not in fields.values()
+        assert fields["provider_status_code"] == 503
 
     def test_user_id_rides_authenticated_pipelex_error_record(self, mocker: MockerFixture):
         # Phase 3 deleted the per-route `log.error(... user=...)` lines on

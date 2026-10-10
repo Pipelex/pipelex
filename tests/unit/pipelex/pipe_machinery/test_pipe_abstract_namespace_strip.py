@@ -28,7 +28,8 @@ class TestPipeAbstractNamespaceStrip:
         PipeAbstract.validate_pipe_code_syntax("domain.my_pipe")
 
         warning_spy.assert_called_once_with(
-            "A pipe code carries a namespace prefix, which was stripped: write the pipe code bare", fields={"pipe_code": "domain.my_pipe"}
+            "A pipe code carries a namespace prefix, which was stripped: write the pipe code bare",
+            fields={"pipe_code": "my_pipe", "pipe_ref": "domain.my_pipe"},
         )
 
     def test_validate_pipe_code_syntax_raises_for_invalid_after_strip(self) -> None:

@@ -8,14 +8,15 @@ third-party library stamped ever shows. The run identifiers and ``data`` are lef
 identifiers are the same on every line of a run and would drown the message, and ``data`` is the structured
 content the message already renders, which is why the dispatch never stamps a layout on a call carrying it.
 
-A value renders on one line: a string bare unless it is empty or holds a space, an equals sign, a quote, a
-backslash or a character a terminal would act on, in which case it is quoted, with a backslash and a quote
-escaped by a backslash and that character written as its escape; anything else as compact JSON; and the
-whole cut short past ``FIELD_VALUE_MAX_LENGTH``, or past the generous length ``FIELD_MAX_LENGTHS`` gives a field of
-its own, a handled exception's text and a template finding's. A value is cut at its end, except a path's, from
-``LEFT_CUT_FIELDS``, which is cut at its start so the file's name stays. A string is cut before it is quoted and
-escaped, so a quoted value keeps both its quotes and no escape is split, and the cut can never make the value's tail
-read as another pair. A key is written the same way, so a field name
+A value renders on one line: a string as itself, anything else as compact JSON, and the text either gives bare unless
+it is empty or holds a space, an equals sign, a quote, a backslash or a character a terminal would act on, in which
+case it is quoted, with a backslash and a quote escaped by a backslash and that character written as its escape. So a
+list of strings, whose JSON holds quotes, is always quoted, while a number or a list of numbers stays bare. The text
+is cut short past ``FIELD_VALUE_MAX_LENGTH``, or past the generous length ``FIELD_MAX_LENGTHS`` gives a field of its
+own, a handled exception's text and a template finding's. A value is cut at its end, except a path's, from
+``LEFT_CUT_FIELDS``, which is cut at its start so the file's name stays. The text is cut before it is quoted and
+escaped, so a quoted value keeps both its quotes and no escape is split, and the cut can never leave an unbalanced
+quote or bracket whose tail reads as another pair. A key is written the same way, so a field name
 holding a line break, a space, an equals sign or an escape sequence can forge neither a line nor a pair. Redaction has
 already run when the console renders a record, so what is rendered is what the scrub left.
 
@@ -156,23 +157,19 @@ def field_is_cut_at_start(*, name: str) -> bool:
 
 
 def format_field_value(*, value: Any, max_length: int = FIELD_VALUE_MAX_LENGTH, is_cut_at_start: bool = False) -> str:
-    """A field's value as the suffix prints it: one line, a string quoted when it could forge a pair, cut short past ``max_length``.
+    """A field's value as the suffix prints it: one line, quoted when it could forge a pair, cut short past ``max_length``.
 
     The cut drops the end of the value and marks it with a trailing ``TRUNCATION_MARK``, or, with ``is_cut_at_start``,
-    drops its start and marks it with a leading one. A value written as a string is cut before it is quoted and
-    escaped: cutting the quoted rendering would drop a quote, or split an escape, and the value's tail would then read
-    as pairs of its own, ``file.path=…/file fake=value.txt"``. A value written as JSON is cut as rendered.
+    drops its start and marks it with a leading one. The value's text, a string's own or a JSON rendering, is cut before
+    it is quoted and escaped: cutting the quoted rendering would drop a quote, or split an escape, and the value's tail
+    would then read as pairs of its own, ``file.path=…/file fake=value.txt"``. A JSON rendering is quoted by the same
+    rule as a string, since a cut one can leave a string unterminated, ``paths=["/x/My dir/a b=c/…``, whose tail reads
+    as a pair of its own.
     """
     string_text = _string_value_text(value=value)
-    if string_text is not None:
-        cut_text = (
-            _truncated_at_start(text=string_text, max_length=max_length) if is_cut_at_start else _truncated(text=string_text, max_length=max_length)
-        )
-        return _string_text(text=cut_text, is_quoting_strings=True)
-    text = _one_line(value=value, is_quoting_strings=True)
-    if is_cut_at_start:
-        return _truncated_at_start(text=text, max_length=max_length)
-    return _truncated(text=text, max_length=max_length)
+    text = string_text if string_text is not None else _non_string_text(value=value)
+    cut_text = _truncated_at_start(text=text, max_length=max_length) if is_cut_at_start else _truncated(text=text, max_length=max_length)
+    return _string_text(text=cut_text, is_quoting_strings=True)
 
 
 def format_layout_value(*, value: Any) -> str:
@@ -189,10 +186,15 @@ def _one_line(*, value: Any, is_quoting_strings: bool) -> str:
     string_text = _string_value_text(value=value)
     if string_text is not None:
         return _string_text(text=string_text, is_quoting_strings=is_quoting_strings)
+    return one_line_text(text=_non_string_text(value=value))
+
+
+def _non_string_text(*, value: Any) -> str:
+    """The text of a value not written as a string: a non-finite float's spelling, else compact JSON, neither escaped yet."""
     if isinstance(value, float) and not math.isfinite(value):
         # ``NaN``, ``Infinity`` or ``-Infinity``, bare, as the wire sinks spell it.
         return str(spell_non_finite(value=value))
-    return one_line_text(text=_compact_json(value=value))
+    return _compact_json(value=value)
 
 
 def _string_value_text(*, value: Any) -> str | None:

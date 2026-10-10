@@ -5,6 +5,8 @@ Covers setup/teardown wiring and the error-handler dispatch at the CLI boundary.
 
 from __future__ import annotations
 
+import io
+import json
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -20,10 +22,16 @@ from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.tools.log.json_log_sink import EXCEPTION_KEY, LOGGER_KEY, MESSAGE_KEY, JsonLogSink
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
+from tests.helpers.console_log_rendering import console_sink_on_buffer, installed_log
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
+
+    from pipelex.tools.log.log_sink import LogSink
+
+RUN_CORE_MODULE = "pipelex.cli.commands.run._run_core"
 
 
 def _call_execute_run(**overrides: Any) -> None:
@@ -190,9 +198,41 @@ class TestExecuteRunWrapper:
         assert exc_info.value.exit_code == 1
         output = wrapper_mocks["console"].export_text()
         assert "Failed to execute pipeline" in output
-        assert "totally unexpected" not in output
+        assert "RuntimeError: totally unexpected" in output
         assert "Traceback" not in output
         log_mock.error.assert_called_once_with("The pipeline could not be executed", include_exception=True)
+
+    @pytest.mark.parametrize("sink_kind", ["console", "json"])
+    def test_unexpected_error_names_its_cause_on_the_terminal_whatever_the_sink(
+        self, wrapper_mocks: dict[str, Any], mocker: MockerFixture, caplog: pytest.LogCaptureFixture, sink_kind: str
+    ) -> None:
+        """Under a sink that does not write to the terminal, the CLI's own output was "Failed to execute pipeline" and nothing else.
+
+        The CLI names the exception's type and message itself, and the traceback is printed once, by the log line.
+        """
+        caplog.set_level(logging.INFO, logger=RUN_CORE_MODULE)
+        sink_buffer = io.StringIO()
+        sink: LogSink = console_sink_on_buffer(buffer=sink_buffer) if sink_kind == "console" else JsonLogSink(stream=sink_buffer)
+        wrapper_mocks["core"].side_effect = RuntimeError("totally unexpected")
+
+        with installed_log(sink=sink) as fresh:
+            mocker.patch(f"{RUN_CORE_MODULE}.log", new=fresh)
+            with pytest.raises(typer.Exit):
+                _call_execute_run()
+
+        terminal = wrapper_mocks["console"].export_text()
+        assert "Failed to execute pipeline" in terminal
+        assert "RuntimeError: totally unexpected" in terminal
+        assert "Traceback" not in terminal
+        logged = sink_buffer.getvalue()
+        if sink_kind == "console":
+            assert "The pipeline could not be executed" in logged
+            assert logged.count("Traceback") == 1
+        else:
+            (record,) = [json.loads(line) for line in logged.splitlines() if line and json.loads(line)[LOGGER_KEY] == RUN_CORE_MODULE]
+            assert record[MESSAGE_KEY] == "The pipeline could not be executed"
+            assert record[EXCEPTION_KEY].startswith("Traceback")
+            assert record[EXCEPTION_KEY].rstrip().endswith("RuntimeError: totally unexpected")
 
     def test_unexpected_error_reaches_a_structured_sink_with_its_traceback(
         self, wrapper_mocks: dict[str, Any], caplog: pytest.LogCaptureFixture

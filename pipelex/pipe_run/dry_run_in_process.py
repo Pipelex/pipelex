@@ -59,6 +59,7 @@ async def best_effort_graph_spec(*, pipe_ref: str | None, library_id: str | None
     """
     if not pipe_ref or not library_id:
         return None
+    pipe: PipeAbstract | None = None
     try:
         # Entry-shaped: `pipe_ref` is either a caller-supplied graph target (a protocol request
         # field) or a bundle's already-qualified main_pipe_ref. Both are pipes someone pointed at,
@@ -73,9 +74,23 @@ async def best_effort_graph_spec(*, pipe_ref: str | None, library_id: str | None
             raise
         log.warning(
             "The graph dry run produced no graph; the validation result carries none",
-            fields={"caller": log_context, "pipe_code": pipe_ref, **error_fields(exc=graph_error)},
+            fields={"caller": log_context, **_graph_target_fields(pipe=pipe, target=pipe_ref), **error_fields(exc=graph_error)},
         )
         return None
+
+
+def _graph_target_fields(*, pipe: PipeAbstract | None, target: str) -> dict[str, str]:
+    """The fields naming the pipe a graph dry run was for, as the pipe-run lines name it.
+
+    A resolved pipe is named by its bare code under `pipe_code`, the value `Pipe run starts` carries, and by its qualified
+    reference under `pipe_ref`. A target that resolved to no pipe is carried as it was named: under `pipe_ref` when a
+    domain qualifies it, under `pipe_code` when it is a bare code.
+    """
+    if pipe is not None:
+        return {"pipe_code": pipe.code, "pipe_ref": pipe.pipe_ref}
+    if "." in target:
+        return {"pipe_ref": target}
+    return {"pipe_code": target}
 
 
 async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str, caller_identity: CallerIdentity | None = None) -> GraphSpec:

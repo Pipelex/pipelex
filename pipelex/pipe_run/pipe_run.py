@@ -74,7 +74,11 @@ class PipeRun(PipeRunProtocol):
                 error_report = PipelexUnexpectedError(str(exc) or repr(exc)).to_error_report()
             # The error rides as fields and no traceback: the exception is re-raised below, and its traceback
             # belongs to whoever catches it, the CLI or the API's handler, which would otherwise print it twice.
-            log.error("Pipe execution failed", fields={"pipe_code": pipe_job.pipe.pipe_ref, **error_fields(exc=exc)})
+            # `pipe_code` is the bare code `Pipe run starts` carries for the same pipe, so one query finds both lines.
+            log.error(
+                "Pipe execution failed",
+                fields={"pipe_code": pipe_job.pipe.code, "pipe_ref": pipe_job.pipe.pipe_ref, **error_fields(exc=exc)},
+            )
         finally:
             tracer_manager = GraphTracerManager.get_instance()
             if tracer_manager is not None:
