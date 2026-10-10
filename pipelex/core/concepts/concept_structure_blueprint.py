@@ -47,6 +47,11 @@ class ConceptStructureBlueprintFieldType(StrEnum):
     CONCEPT = "concept"
 
 
+def field_may_hold_nothing(*, required: bool, default_value: Any) -> bool:
+    """Whether a structure field's value may hold nothing: by the standard's rule, only when it is neither `required` nor defaulted."""
+    return not required and default_value is None
+
+
 class ConceptStructureBlueprint(BaseModel):
     """One field of a concept's structure table. Unknown keys are rejected — the field table's
     keys are strict, exactly like an input slot table's; hint *content* stays lenient (unknown
@@ -76,8 +81,8 @@ class ConceptStructureBlueprint(BaseModel):
 
     @property
     def may_hold_nothing(self) -> bool:
-        """Whether a value of this field may hold nothing: by the standard's rule, only when it is neither `required` nor defaulted."""
-        return not self.required and self.default_value is None
+        """Whether a value of this field may hold nothing, by `field_may_hold_nothing`."""
+        return field_may_hold_nothing(required=self.required, default_value=self.default_value)
 
     @field_validator("hints", mode="after")
     @classmethod

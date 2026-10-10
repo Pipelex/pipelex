@@ -8,7 +8,9 @@ derives no absence from it, so a required open field holding `None` is an absenc
 Its JSON schema stays the open `{}` that `Any` has. The structure class's schema is what a model is asked
 for, and `{"not": {"type": "null"}}`, the only spelling of "anything but null" that does not enumerate the
 other types, is refused by the strict structured-output modes of several providers, so a model may still
-answer `null` there and is held to this rule when its answer is validated.
+answer `null` there. In process, the answer is validated against the class itself, so that `null` is refused
+and the model asked again; across a worker boundary, the class the worker rebuilds from the schema has a bare
+`Any` there, so the `null` is only refused when the answer reaches the caller's class, failing the step.
 """
 
 from typing import Annotated, Any
