@@ -14,8 +14,9 @@ data: an ordered list of blocks, each holding the spans it prints.
   break.
 - **Plain text**: `str()` of the result is its text, each block on lines of its own, indented under the list item it
   sits in, list markers kept and every other piece of markup gone, for a place that cannot show formatting; and the
-  result is true when it holds a block, so a template's `{% if notes | markdown %}` is false for an empty or a blank
-  text.
+  result is true when it holds a block, so a template tests an empty or a blank text by converting it once,
+  `{% set notes = invoice.notes | markdown %}{% if notes %}…{{ notes }}…{% endif %}`, rather than converting it a
+  second time, and paying for it twice, to print it.
 
 It parses with the one parser Pipelex reads Markdown with (`get_markdown_parser`), its inline nesting capped
 (`markdown_syntax_tree`), and reads it by the rules the built-in PDF engine follows:

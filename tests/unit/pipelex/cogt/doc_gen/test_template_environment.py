@@ -100,6 +100,17 @@ class TestPlainDataTemplateEnvironment:
     def test_markdown_of_emphasis_nested_hundreds_deep_prints_its_text(self, notes: str, expected_text: str) -> None:
         assert make_plain_data_template_environment().from_string("{{ notes | markdown }}").render(notes=notes) == expected_text
 
+    def test_converting_once_to_test_and_print_affords_what_converting_twice_overdraws(self) -> None:
+        """Every conversion is charged, so the idiom the docs give converts a text once into a variable, then tests and prints it."""
+        # Each conversion costs about three fifths of a render's budget: one fits, two do not.
+        notes = "word " * (DEFAULT_RENDER_BUDGET_UNITS * 3 // 5 // MARKDOWN_UNITS_PER_CHARACTER // 5)
+        environment = make_plain_data_template_environment()
+        converted_once = environment.from_string("{% set formatted = notes | markdown %}{% if formatted %}[{{ formatted }}]{% endif %}")
+        assert converted_once.render(notes=notes) == f"[{notes.strip()}]"
+        converted_twice = environment.from_string("{% if notes | markdown %}[{{ notes | markdown }}]{% endif %}")
+        with pytest.raises(RenderBudgetExceededError, match="formatting Markdown"):
+            converted_twice.render(notes=notes)
+
     def test_markdown_of_a_missing_value_fails_the_render(self) -> None:
         template = make_plain_data_template_environment().from_string("{{ invoice.notes | markdown }}")
         with pytest.raises(UndefinedError):
