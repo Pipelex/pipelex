@@ -130,12 +130,18 @@ class StructuredContentComposer:
         """Resolve all fields in the blueprint to their values.
 
         Returns:
-            Dictionary mapping field names to resolved values
+            Dictionary mapping field names to resolved values, a field whose source holds nothing left out
         """
         field_values: dict[str, Any] = {}
 
         for field_name, field_blueprint in self.construct_blueprint.fields.items():
-            field_values[field_name] = await self._resolve_field(field_blueprint=field_blueprint, field_name=field_name)
+            field_value = await self._resolve_field(field_blueprint=field_blueprint, field_name=field_name)
+            if field_value is None:
+                # Only a path reaching a field that holds nothing resolves to `None`, and it leaves the target
+                # field unset rather than nulled: a defaulted field never holds nothing, so it takes its
+                # default, and a field that may hold nothing holds nothing all the same.
+                continue
+            field_values[field_name] = field_value
 
         return field_values
 

@@ -139,20 +139,21 @@ def _render_field(
 def _presence_modifiers(concept_field: ResolvedField) -> list[str]:
     """The zod member calls that encode a field's presence, in chain order.
 
-    Both non-required spellings are **null-tolerant**, because the runtime serializes an unset optional
-    field as an explicit `null`: the generated runtime class annotates every non-required field `X | None`
-    and `dump_for_transport()` keeps nulls on purpose (no `exclude_none`). `.optional()` means
-    `T | undefined` in zod and rejects that payload, so a schema that spelled it would fail to parse the
-    very wire the engine produces. The wire genuinely carries both spellings of "unset" — a key a partial
-    payload omitted, and a key the runtime nulled — and `.nullish()` is the honest description of that.
+    A field that may hold nothing is **null-tolerant**, because the runtime serializes an unset optional
+    field as an explicit `null`: the generated runtime class annotates such a field `X | None` and
+    `dump_for_transport()` keeps nulls on purpose (no `exclude_none`). `.optional()` means `T | undefined`
+    in zod and rejects that payload, so a schema that spelled it would fail to parse the very wire the
+    engine produces. The wire genuinely carries both spellings of "unset" — a key a partial payload
+    omitted, and a key the runtime nulled — and `.nullish()` is the honest description of that.
 
     A defaulted field is non-required by construction (the blueprint validator refuses `required = true`
-    beside a `default_value`, E3), and a producer may set it to `None` explicitly, so `.default(...)` needs
-    `.nullable()` in front of it for the same reason.
+    beside a `default_value`, E3), but it never holds nothing: the runtime class refuses an explicit `None`
+    for it, so the engine always serializes a value there, and a payload omitting the key takes the default.
+    A bare `.default(...)` says exactly that.
     """
     if concept_field.default_value is not None:
-        return [".nullable()", f".default({_format_default_value(concept_field.default_value)})"]
-    if not concept_field.required:
+        return [f".default({_format_default_value(concept_field.default_value)})"]
+    if concept_field.may_hold_nothing:
         return [".nullish()"]
     return []
 
@@ -192,7 +193,7 @@ def _render_broken_call(call: str, *, indent: int) -> str:
     Prettier re-measures every call once the chain is broken, and one that now fits is left flat — the
     threshold is exact, `indent + len(call) <= TS_PRINT_WIDTH` stays on the line. Exploding unconditionally
     is what a `z.enum` special case looks like from the other side: an ordinary three-choice enum carrying a
-    default reaches this branch on its `.nullable()` width alone, sits far inside the width at indent 4, and
+    default reaches this branch on its `.default(…)` width alone, sits far inside the width at indent 4, and
     was being exploded into a shape prettier immediately folds back — a consumer's first format run changes
     the bytes and `pipelex codegen check` reports an untouched artifact as hand-edited. Only the enum's
     arguments are modelled here, for the same reason as in the single-call branch.
@@ -369,10 +370,10 @@ def _render_type_field(
     type_expr = _ts_type(concept_field.resolved_type, by_ref=by_ref, type_name_by_ref=type_name_by_ref)
     # Mirror `_presence_modifiers` branch for branch: this declared type is what the annotated
     # `z.ZodType<Name>` is checked against, so it has to be exactly the schema's inferred output —
-    # `.nullable().default(…)` infers `T | null`, `.nullish()` infers `T | null | undefined`.
+    # `.default(…)` infers `T`, `.nullish()` infers `T | null | undefined`.
     if concept_field.default_value is not None:
-        return f"  {concept_field.name}: {type_expr} | null;"
-    if not concept_field.required:
+        return f"  {concept_field.name}: {type_expr};"
+    if concept_field.may_hold_nothing:
         return f"  {concept_field.name}?: {type_expr} | null;"
     return f"  {concept_field.name}: {type_expr};"
 

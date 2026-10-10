@@ -74,6 +74,11 @@ class ConceptStructureBlueprint(BaseModel):
     field as a site. Carried as authored through the crate; the site-over-concept merge is the
     consumer's. An empty table is equivalent to no hints and normalizes to absence."""
 
+    @property
+    def may_hold_nothing(self) -> bool:
+        """Whether a value of this field may hold nothing: by the standard's rule, only when it is neither `required` nor defaulted."""
+        return not self.required and self.default_value is None
+
     @field_validator("hints", mode="after")
     @classmethod
     def normalize_empty_hints(cls, hints: dict[str, str] | None) -> dict[str, str] | None:

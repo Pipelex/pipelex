@@ -910,3 +910,69 @@ class TestStructuredContentComposerRuntimeParams:
         assert result.details.title == "Acme Corp"
         assert "2025-01-15" in result.details.generated_summary  # From runtime_params
         assert "2025" in result.details.generated_summary  # From extra_context
+
+
+class SourceWithOptionalNote(StructuredContent):
+    """A source whose note may hold nothing."""
+
+    note: str | None = Field(default=None, description="An optional note")
+
+
+class TargetWithPresenceVariants(StructuredContent):
+    """A target fed the same source field three ways: defaulted, may hold nothing, required."""
+
+    defaulted_note: str = Field(default="fallback", description="A defaulted note")
+    optional_note: str | None = Field(default=None, description="An optional note")
+
+
+class TargetWithRequiredNote(StructuredContent):
+    """A target whose note is required."""
+
+    required_note: str = Field(description="A required note")
+
+
+@pytest.mark.asyncio(loop_scope="class")
+class TestStructuredContentComposerSourceHoldingNothing:
+    """A path reaching a field that holds nothing leaves the target field unset, never nulled.
+
+    A defaulted field never holds nothing, so nulling it would fail the composition; left unset, it takes its
+    default. A field that may hold nothing holds nothing either way, and a required one is refused either way.
+    """
+
+    @pytest.fixture
+    def working_memory_with_empty_note(self, load_empty_library: Callable[[], None]) -> WorkingMemory:
+        load_empty_library()
+        return WorkingMemoryFactory.make_from_single_stuff(
+            stuff=StuffFactory.make_stuff(
+                concept=get_native_concept(NativeConceptCode.TEXT),
+                content=SourceWithOptionalNote(),
+                name="source",
+            ),
+        )
+
+    async def test_a_defaulted_target_takes_its_default_and_an_optional_one_holds_nothing(self, working_memory_with_empty_note: WorkingMemory):
+        blueprint = ConstructBlueprint.make_from_raw({"defaulted_note": {"from": "source.note"}, "optional_note": {"from": "source.note"}})
+
+        composer = StructuredContentComposer(
+            templating_style=_TEMPLATING_STYLE,
+            construct_blueprint=blueprint,
+            working_memory=working_memory_with_empty_note,
+            output_class=TargetWithPresenceVariants,
+        )
+        result = await composer.compose()
+
+        assert isinstance(result, TargetWithPresenceVariants)
+        assert result.defaulted_note == "fallback"
+        assert result.optional_note is None
+
+    async def test_a_required_target_is_refused(self, working_memory_with_empty_note: WorkingMemory):
+        blueprint = ConstructBlueprint.make_from_raw({"required_note": {"from": "source.note"}})
+
+        composer = StructuredContentComposer(
+            templating_style=_TEMPLATING_STYLE,
+            construct_blueprint=blueprint,
+            working_memory=working_memory_with_empty_note,
+            output_class=TargetWithRequiredNote,
+        )
+        with pytest.raises(StructuredContentComposerValidationError, match="required_note"):
+            await composer.compose()

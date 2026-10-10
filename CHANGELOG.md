@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **A field that never holds nothing refuses `null` (Breaking)**: a structure field with a `default_value` is generated as `X = Field(default=…)` rather than `X | None`, and a required field naming `native.Anything` as `NonNullAny` (`pipelex.core.stuffs.non_null_any`), any value but `None`, so a value setting either to `null`, an input or a model's answer, is refused, and a binding step reading such a field never records an absence its static analysis ruled out. Leave the key out to get a field's default. The codegen projections follow: a defaulted field is `X = Field(default=…)` in `python-pydantic` and `python-structures` and a bare `.default(…)` in `ts-zod`, typed `T` rather than `T | null`.
+
+### Fixed
+
+- **A construct path holding nothing leaves its field unset**: a `PipeCompose` construct field fed `{ from = "doc.note" }` where `note` holds nothing is left unset rather than set to `null`, so a defaulted target field takes its default.
+- **A model's `null` on a defaulted field is refused where it can be asked again**: the class a worker rebuilds from a structure's JSON schema keeps a defaulted field non-nullable, so a model answering `null` there is asked again rather than failing when its answer reaches the caller's class.
+
 ## [v0.81.1] - 2026-10-10
 
 ### Added

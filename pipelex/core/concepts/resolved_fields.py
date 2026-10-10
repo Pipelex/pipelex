@@ -76,6 +76,11 @@ class ResolvedField(BaseModel):
     default_value: Any | None = None
     resolved_type: ResolvedType
 
+    @property
+    def may_hold_nothing(self) -> bool:
+        """Whether a value of this field may hold nothing: by the standard's rule, only when it is neither `required` nor defaulted."""
+        return not self.required and self.default_value is None
+
 
 def resolve_structure_fields(
     structure_blueprint: dict[str, ConceptStructureBlueprint],

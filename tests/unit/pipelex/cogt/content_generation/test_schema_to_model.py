@@ -5,7 +5,7 @@ import uuid
 from typing import Any, Literal, get_args, get_origin
 
 import pytest
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.content_generation.exceptions import UnsafeSchemaError
@@ -54,6 +54,14 @@ class PersonWithAddress(BaseModel):
 
 def _benign_object_schema() -> dict[str, Any]:
     return {"title": "Innocent", "type": "object", "properties": {"x": {"type": "integer"}}}
+
+
+class ModelWithPresenceVariants(BaseModel):
+    """A defaulted field, a field that may hold nothing, and a required one."""
+
+    note: str = Field(default="fallback", description="A defaulted note")
+    remark: str | None = Field(default=None, description="An optional remark")
+    title: str = Field(..., description="A required title")
 
 
 class TestSchemaToModel:
@@ -171,6 +179,23 @@ class TestSchemaToModel:
         instance = result_class(name="Alice", age=30)
         assert instance.name == "Alice"  # type: ignore[attr-defined]
         assert instance.age == 30  # type: ignore[attr-defined]
+
+    def test_reconstructed_model_keeps_each_field_nullable_only_where_the_source_is(self) -> None:
+        """A defaulted field refuses `null` on the rebuilt class, as on the class it was rebuilt from.
+
+        The rebuilt class is what a model's answer is validated against on a worker, so a `null` it admitted
+        would pass there and fail only at the revalidation into the caller's class, too late to ask again.
+        """
+        schema = ModelWithPresenceVariants.model_json_schema()
+        result_class = SchemaToModelFactory.make_from_json_schema(schema, class_name="ModelWithPresenceVariants")
+
+        instance = result_class.model_validate({"title": "Kept"})
+        assert instance.note == "fallback"  # type: ignore[attr-defined]
+        assert instance.remark is None  # type: ignore[attr-defined]
+        assert result_class.model_validate({"title": "Kept", "remark": None}).remark is None  # type: ignore[attr-defined]
+        with pytest.raises(ValidationError) as exc_info:
+            result_class.model_validate({"title": "Kept", "note": None})
+        assert [error["loc"] for error in exc_info.value.errors()] == [("note",)]
 
     def test_nested_model_reconstruction(self) -> None:
         """A model with nested BaseModel fields (producing $defs) can be reconstructed."""

@@ -36,6 +36,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.native.pinned_blueprints import make_pinned_native_blueprint
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.core.stuffs.non_null_any import is_non_null_any
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.libraries.concept.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
@@ -141,9 +142,10 @@ def _scalar_value_kind(*, field_type: ConceptStructureBlueprintFieldType) -> Bin
 def _walkable_field_from_blueprint(
     *, name: str, field_blueprint: ConceptStructureBlueprint, domain_code: str, package_alias: str | None
 ) -> WalkableField:
-    # The standard's rule: a declared field may hold nothing when it is not `required` and has no `default_value`. A
-    # `required` field is generated as a value that cannot be `None`.
-    may_hold_nothing = not field_blueprint.required and field_blueprint.default_value is None
+    # The standard's rule: a declared field may hold nothing when it is not `required` and has no `default_value`. The
+    # structure generator follows the same rule, so a required or defaulted field is generated as a value that cannot
+    # be `None`.
+    may_hold_nothing = field_blueprint.may_hold_nothing
     if field_blueprint.type is None:
         # A field declared by its `choices` alone holds one of them, a text.
         return WalkableField(name=name, value_kind=BindingValueKind.TEXT, may_hold_nothing=may_hold_nothing)
@@ -305,8 +307,9 @@ class LibraryConceptWalkResolver(ConceptWalkResolver):
 
     def _walkable_field_from_class_field(self, *, name: str, field_info: FieldInfo, package_alias: str | None) -> WalkableField:
         # A class states what a field may hold through its annotation: one that admits `None` may hold nothing, whether it
-        # is required or has a default, and so does one left unrequired with no default.
-        is_nullable = _admits_none(annotation=field_info.annotation)
+        # is required or has a default, and so does one left unrequired with no default. `NonNullAny` is the one `Any` that
+        # refuses `None`, as a generated class spells a required open field.
+        is_nullable = _admits_none(annotation=field_info.annotation) and not is_non_null_any(field_info=field_info)
         may_hold_nothing = is_nullable or (not field_info.is_required() and field_info.default is None and field_info.default_factory is None)
         annotation, _ = _strip_optional(annotation=field_info.annotation)
         is_list = get_origin(annotation) is list
