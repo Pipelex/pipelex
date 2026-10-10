@@ -6,6 +6,16 @@
 
 - **`Rating` carries the label of its level**: the `Rating` native has an optional `label`, which the MTHDS standard's native set pinned at `5.0.0` defines as the name of the selected level when the scale declares labels, held in `RatingContent.label` and stated by the input-form descriptor, the I/O contracts and the generated Python and TypeScript types. A `PipeJudge` declares no labelled levels yet, so a `Rating` it produces carries no label, while a `PipeLLM` whose output is `Rating`, or any other producer, may fill it like any optional member; either way a `Rating` renders in a prompt as its label when it has one and as its level otherwise, so `$severity` reads `Workaround available` for a rating carrying that label and `1` for one carrying none, and its JSON rendering carries the label only when present. Since a crate materializes the pinned definition, a crate whose methods use `Rating` gets a new normalized fingerprint, and types generated before this release gain the field when `pipelex codegen types` regenerates them.
 
+## [v0.81.1] - 2026-10-10
+
+### Added
+
+- **Formatted Markdown for document engines, and a `markdown` filter for plain-data templates**: the document engine contract gains `format_markdown` in `pipelex.cogt.doc_gen.formatted_markdown`, which reads a Markdown text by the rules the built-in PDF engine prints it by and returns a `FormattedMarkdown`, plain data of paragraphs, headings, list items with their marker and the paragraph or heading they open with, code blocks, rules and tables whose cells carry their column's alignment, every block with the list depth and the quote depth it sits at and holding text spans with their bold, italic, strikethrough, code and link, whose `str()` is its plain text and which is false when the text formats into nothing, so an engine prints Markdown formatted in its own format. `make_plain_data_template_environment()` registers a `markdown` filter that returns one, `{{ invoice.notes | markdown }}`, which is false for an empty or a blank text, so `{% set notes = invoice.notes | markdown %}{% if notes %}…{{ notes }}…{% endif %}` converts the text once to test and print it, and takes an optional `finalize` through which an engine prints it, a value printing its plain text without one. Inside a template render the conversion is charged to the render's budget; called from an engine's own code it spends from a budget of its own, as large as one render's, and an overdraft raises `MarkdownFormattingBudgetError`.
+
+### Fixed
+
+- **A PDF of deeply nested emphasis prints**: the built-in PDF engine no longer fails with a `RecursionError` on a Markdown text whose emphasis nests hundreds deep, such as four hundred `*a ` before a word and four hundred ` c*` after it; inline markup nested past fifty levels is dropped and its text printed.
+
 ## [v0.81.0] - 2026-10-10
 
 ### Added

@@ -128,3 +128,19 @@ class DocGenRenderError(PipelexError):
     """
 
     error_domain = ErrorDomain.RUNTIME
+
+
+class MarkdownFormattingBudgetError(PipelexError):
+    """Formatting a Markdown text outside any template render would spend more than the budget it gets of its own.
+
+    `format_markdown` (`formatted_markdown.py`) raises it when an engine converts a value from its own code, as an
+    Excel fill does, and the text, its tables or what they format into is too large; inside a template render, the
+    render's own `RenderBudgetExceededError` is raised instead. The Markdown is the run's input, so the fault is the
+    caller's, and the message names only the text's length and the budget, never the text. It is part of the document
+    engine contract (`pipelex/plugins/contract.py`): an engine reports it as its own fill error, naming where the value
+    goes.
+    """
+
+    error_domain = ErrorDomain.INPUT
+    _authors_caller_facing_message = True
+    _declared_title = "Markdown formatting budget exceeded"

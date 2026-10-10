@@ -1,22 +1,19 @@
 import random
 
+import pytest
 from markdown_it import MarkdownIt
+from markdown_it.tree import SyntaxTreeNode
 
-from pipelex.tools.markdown.markdown_parser import get_markdown_parser, html_length_bound, render_markdown_as_html, table_cells_bound
-
-
-class TestMarkdownParser:
-    def test_only_a_url_with_a_scheme_becomes_a_link(self) -> None:
-        html = render_markdown_as_html("See https://example.com/docs, README.md, www.example.com and ada@example.com.")
-        assert '<a href="https://example.com/docs">' in html
-        assert "README.md" in html
-        assert html.count("<a ") == 1
-
-    def test_tables_and_strikethrough_are_formatted(self) -> None:
-        html = render_markdown_as_html("| a | b |\n| - | - |\n| 1 | 2 |\n\n~~gone~~")
-        assert "<table>" in html
-        assert "<s>gone</s>" in html
-
+from pipelex.tools.markdown.markdown_parser import (
+    MAX_INLINE_NESTING,
+    get_markdown_parser,
+    html_length_bound,
+    markdown_syntax_tree,
+    render_markdown_as_html,
+    table_cells_bound,
+)
+from pipelex.tools.markdown.markdown_rules import plain_text
+from tests.unit.pipelex.tools.markdown.test_data import MarkdownFormattingTestData
 
 # The pieces the generated documents are made of: emphasis and its unmatched delimiters, links, references and
 # images, tables in and out of containers, padded rows, code, escapes, and every line ending markdown-it knows,
@@ -84,7 +81,62 @@ def _stock_parser() -> MarkdownIt:
     return parser
 
 
-class TestMarkdownParserBounds:
+def _deepest_inline_nesting(*, tree: SyntaxTreeNode) -> int:
+    """How many emphasis, strong emphasis, strikethrough and link nodes the deepest path of a syntax tree crosses."""
+    deepest = 0
+    pending: list[tuple[SyntaxTreeNode, int]] = [(tree, 0)]
+    while pending:
+        node, depth = pending.pop()
+        depth += node.type in {"em", "strong", "s", "link"}
+        deepest = max(deepest, depth)
+        pending.extend((child, depth) for child in node.children)
+    return deepest
+
+
+class TestMarkdownParser:
+    def test_only_a_url_with_a_scheme_becomes_a_link(self) -> None:
+        html = render_markdown_as_html("See https://example.com/docs, README.md, www.example.com and ada@example.com.")
+        assert '<a href="https://example.com/docs">' in html
+        assert "README.md" in html
+        assert html.count("<a ") == 1
+
+    def test_an_explicit_link_keeps_its_target_in_html_whatever_its_scheme(self) -> None:
+        html = render_markdown_as_html("[the readme](README.md), [files](ftp://example.com/file) and ![a chart](chart.png)")
+        assert '<a href="README.md">the readme</a>' in html
+        assert '<a href="ftp://example.com/file">files</a>' in html
+        assert '<img src="chart.png" alt="a chart" />' in html
+
+    def test_tables_and_strikethrough_are_formatted(self) -> None:
+        html = render_markdown_as_html("| a | b |\n| - | - |\n| 1 | 2 |\n\n~~gone~~")
+        assert "<table>" in html
+        assert "<s>gone</s>" in html
+
+    @pytest.mark.parametrize(
+        ("markdown_text", "expected_text"),
+        [
+            (MarkdownFormattingTestData.DEEP_EMPHASIS, MarkdownFormattingTestData.DEEP_EMPHASIS_TEXT),
+            (MarkdownFormattingTestData.DEEP_MIXED_EMPHASIS, MarkdownFormattingTestData.DEEP_MIXED_EMPHASIS_TEXT),
+        ],
+    )
+    def test_a_syntax_tree_caps_inline_nesting_and_keeps_the_text(self, markdown_text: str, expected_text: str) -> None:
+        tree = markdown_syntax_tree(tokens=get_markdown_parser().parse(markdown_text))
+        assert _deepest_inline_nesting(tree=tree) == MAX_INLINE_NESTING
+        assert plain_text(nodes=tree.children) == expected_text
+
+    def test_an_image_past_the_cap_prints_its_alt_text_as_written(self) -> None:
+        markdown_text = "*a " * MAX_INLINE_NESTING + "![a *chart*](chart.png)" + " c*" * MAX_INLINE_NESTING
+        tree = markdown_syntax_tree(tokens=get_markdown_parser().parse(markdown_text))
+        assert "[image: a *chart*]" in plain_text(nodes=tree.children)
+
+    def test_nesting_within_the_cap_is_left_as_parsed(self) -> None:
+        parser = get_markdown_parser()
+        nested_to_the_cap = "*a " * MAX_INLINE_NESTING + "b" + " c*" * MAX_INLINE_NESTING
+        for document in [*_generated_documents(), nested_to_the_cap]:
+            tokens = parser.parse(document)
+            expected_html = parser.renderer.render(tokens, parser.options, {})
+            markdown_syntax_tree(tokens=tokens)
+            assert parser.renderer.render(tokens, parser.options, {}) == expected_html, repr(document)
+
     def test_joining_fragments_renders_as_markdown_it_does(self) -> None:
         stock = _stock_parser()
         parser = get_markdown_parser()

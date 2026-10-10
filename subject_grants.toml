@@ -5656,6 +5656,10 @@ rationale = "Factory from source: builds the result from the template_category; 
 param = "value"
 rationale = "Transforms the value; single operand."
 
+["pipelex/tools/jinja2/jinja2_filters.py::markdown_to_formatted"]
+param = "value"
+rationale = "Jinja filter: Jinja passes the filtered value positionally."
+
 ["pipelex/tools/jinja2/jinja2_filters.py::markdown_to_html"]
 param = "value"
 rationale = "Jinja filter: Jinja passes the filtered value positionally."
