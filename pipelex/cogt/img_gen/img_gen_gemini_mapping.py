@@ -2,9 +2,9 @@
 
 Keyed by the `AspectRatioTaxonomy` members `GEMINI_2_5` / `GEMINI_3_PRO` / `GEMINI_3_FLASH` /
 `GEMINI_3_FLASH_LITE` — a `cogt`-owned enum — so this lives beside the args factory that
-consumes it rather than in the Google adapter. The native Google worker and the Pipelex
-gateway (one Portkey SDK spanning several vendors' taxonomies) both resolve geometry through
-it, which is why the mapping cannot belong to either adapter.
+consumes it rather than in the Google adapter. The mapping is keyed by taxonomy rather than
+by provider, so a worker serving any model whose rules name one of these taxonomies resolves
+geometry through it, and it belongs to no single adapter.
 
 Reference: https://ai.google.dev/gemini-api/docs/image-generation
 """
