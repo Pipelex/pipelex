@@ -46,7 +46,7 @@ from pipelex.cogt.image.prompt_image import PromptImageUri
 from pipelex.cogt.img_gen.img_gen_job_factory import ImgGenJobFactory
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.inference_call_summary import INFERENCE_CALL_ENDS_MESSAGE, InferenceOperation
-from pipelex.cogt.judgment.judgment_models import JudgmentAnswer, YesNoAnswer, YesNoQuestion
+from pipelex.cogt.judgment.judgment_models import JudgmentOutcome, YesNoAnswer, YesNoQuestion
 from pipelex.cogt.judgment.judgment_worker_abstract import JudgmentWorkerAbstract
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobParams
@@ -216,7 +216,7 @@ class _StandInJudgmentWorker(JudgmentWorkerAbstract):
         JudgmentWorkerAbstract.__init__(self, inference_model=_model(model_type=ModelType.JUDGMENT, name="judge-test", model_id="judge-test-2026"))
 
     @override
-    async def _judge(self, judgment_job: JudgmentJob) -> dict[str, JudgmentAnswer]:
+    async def _judge(self, judgment_job: JudgmentJob) -> dict[str, JudgmentOutcome]:
         _record_usage(tokens_usage=judgment_job.job_report.judgment_tokens_usage, usage=OTHER_USAGE)
         return {"is_urgent": YesNoAnswer(yes_no=True)}
 

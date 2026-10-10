@@ -18,6 +18,7 @@ from pipelex.cogt.judgment.judgment_models import (
     ChoiceQuestion,
     JudgmentAnswer,
     JudgmentQuestion,
+    JudgmentRefusal,
     RatingAnswer,
     RatingQuestion,
     YesNoAnswer,
@@ -26,7 +27,7 @@ from pipelex.cogt.judgment.judgment_models import (
 from pipelex.reporting.reporting_protocol import ReportingNoOp
 from pipelex.system.job_metadata import JobCategory, UnitJobId
 from tests.unit.pipelex.cogt.judgment.fake_judgment_worker import FakeJudgmentWorker, make_fake_judgment_job, make_fake_judgment_model
-from tests.unit.pipelex.cogt.judgment.test_data import JudgmentTestCases
+from tests.unit.pipelex.cogt.judgment.test_data import JudgmentTestCases, described_levels
 
 
 class _RecordingDelegate(ReportingNoOp):
@@ -66,6 +67,27 @@ class TestJudgmentWorkerContract:
 
         assert "is_spam" in str(exc_info.value)
 
+    async def test_it_accepts_a_refusal_for_any_question(self) -> None:
+        """A refusal is an outcome, not an error: the worker hands it up for the operator's policy to read."""
+        job = make_fake_judgment_job(JudgmentTestCases.THREE_QUESTIONS)
+        worker = FakeJudgmentWorker(
+            make_fake_judgment_model(),
+            answers={"is_urgent": JudgmentRefusal(), "topic": JudgmentRefusal(), "severity": JudgmentTestCases.THREE_ANSWERS["severity"]},
+        )
+
+        outcomes = await worker.judge(job)
+
+        assert outcomes == {"is_urgent": JudgmentRefusal(), "topic": JudgmentRefusal(), "severity": JudgmentTestCases.THREE_ANSWERS["severity"]}
+
+    async def test_it_refuses_a_refusal_under_a_key_nobody_asked(self) -> None:
+        job = make_fake_judgment_job({"is_urgent": YesNoQuestion(instructions="Is it urgent?")})
+        worker = FakeJudgmentWorker(make_fake_judgment_model(), answers={"is_urgent": YesNoAnswer(probability=0.9), "is_spam": JudgmentRefusal()})
+
+        with pytest.raises(JudgmentAnswerMismatchError) as exc_info:
+            await worker.judge(job)
+
+        assert "unasked ['is_spam']" in str(exc_info.value)
+
     async def test_it_refuses_a_dropped_answer(self) -> None:
         job = make_fake_judgment_job(JudgmentTestCases.THREE_QUESTIONS)
         worker = FakeJudgmentWorker(make_fake_judgment_model(), answers={"is_urgent": YesNoAnswer(probability=0.9)})
@@ -86,7 +108,7 @@ class TestJudgmentWorkerContract:
                 id="choice_answered_by_a_rating",
             ),
             pytest.param(
-                RatingQuestion(instructions="How severe?", levels=["mild", "bad", "critical"]),
+                RatingQuestion(instructions="How severe?", levels=described_levels("mild", "bad", "critical")),
                 ChoiceAnswer(choice="mild"),
                 "rating",
                 id="rating_answered_by_a_choice",
@@ -129,7 +151,7 @@ class TestJudgmentWorkerContract:
         ],
     )
     async def test_it_refuses_a_level_beyond_the_scale(self, answer: RatingAnswer, named: str) -> None:
-        job = make_fake_judgment_job({"severity": RatingQuestion(instructions="How severe?", levels=["mild", "bad", "critical"])})
+        job = make_fake_judgment_job({"severity": RatingQuestion(instructions="How severe?", levels=described_levels("mild", "bad", "critical"))})
         worker = FakeJudgmentWorker(make_fake_judgment_model(), answers={"severity": answer})
 
         with pytest.raises(JudgmentAnswerMismatchError) as exc_info:
@@ -148,19 +170,19 @@ class TestJudgmentWorkerContract:
                 id="choice_probability_above_one",
             ),
             pytest.param(
-                RatingQuestion(instructions="How severe?", levels=["mild", "bad", "critical"]),
+                RatingQuestion(instructions="How severe?", levels=described_levels("mild", "bad", "critical")),
                 RatingAnswer(level=1, probabilities={0: -0.1, 1: 1.1}),
                 "0",
                 id="rating_probability_below_zero",
             ),
             pytest.param(
-                RatingQuestion(instructions="How severe?", levels=["mild", "bad", "critical"]),
+                RatingQuestion(instructions="How severe?", levels=described_levels("mild", "bad", "critical")),
                 RatingAnswer(level=2, position=float("inf")),
                 "position",
                 id="rating_infinite_position",
             ),
             pytest.param(
-                RatingQuestion(instructions="How severe?", levels=["mild", "bad", "critical"]),
+                RatingQuestion(instructions="How severe?", levels=described_levels("mild", "bad", "critical")),
                 RatingAnswer(level=2, position=2.5),
                 "position of 2.5",
                 id="rating_position_past_the_last_level",
@@ -181,7 +203,7 @@ class TestJudgmentWorkerContract:
     async def test_it_accepts_the_top_level_and_a_full_distribution(self) -> None:
         job = make_fake_judgment_job(
             {
-                "severity": RatingQuestion(instructions="How severe?", levels=["mild", "bad", "critical"]),
+                "severity": RatingQuestion(instructions="How severe?", levels=described_levels("mild", "bad", "critical")),
                 "topic": ChoiceQuestion(instructions="Which topic?", options={"fire": None, "flood": "water damage"}),
             }
         )
@@ -243,7 +265,7 @@ class TestJudgmentWorkerContract:
         assert answer.choice == "fire"
 
     async def test_a_rating_answer_carries_its_level(self) -> None:
-        job = make_fake_judgment_job({"severity": RatingQuestion(instructions="How severe?", levels=["mild", "bad", "critical"])})
+        job = make_fake_judgment_job({"severity": RatingQuestion(instructions="How severe?", levels=described_levels("mild", "bad", "critical"))})
         worker = FakeJudgmentWorker(make_fake_judgment_model(), answers={"severity": RatingAnswer(level=2, position=1.8)})
 
         answers = await worker.judge(job)

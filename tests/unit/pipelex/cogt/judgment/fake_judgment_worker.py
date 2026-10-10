@@ -7,7 +7,7 @@ from pipelex.cogt.exceptions import CogtError
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.judgment.judgment_job import JudgmentJob
 from pipelex.cogt.judgment.judgment_job_factory import JudgmentJobFactory
-from pipelex.cogt.judgment.judgment_models import JudgmentAnswer, JudgmentQuestion
+from pipelex.cogt.judgment.judgment_models import JudgmentOutcome, JudgmentPrompt, JudgmentQuestion
 from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
 from pipelex.cogt.judgment.judgment_worker_abstract import JudgmentWorkerAbstract
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
@@ -25,7 +25,7 @@ class FakeJudgmentWorker(JudgmentWorkerAbstract):
         self,
         inference_model: InferenceModelSpec,
         *,
-        answers: dict[str, JudgmentAnswer] | None = None,
+        answers: dict[str, JudgmentOutcome] | None = None,
         raises: CogtError | None = None,
         reporting_delegate: ReportingProtocol | None = None,
     ) -> None:
@@ -35,7 +35,7 @@ class FakeJudgmentWorker(JudgmentWorkerAbstract):
         self.was_called = False
 
     @override
-    async def _judge(self, judgment_job: JudgmentJob) -> dict[str, JudgmentAnswer]:
+    async def _judge(self, judgment_job: JudgmentJob) -> dict[str, JudgmentOutcome]:
         self.was_called = True
         if self._raises is not None:
             raise self._raises
@@ -45,13 +45,11 @@ class FakeJudgmentWorker(JudgmentWorkerAbstract):
 def make_fake_judgment_job(
     questions: dict[str, JudgmentQuestion],
     *,
-    images: dict[str, list[PromptImage]] | None = None,
-    documents: dict[str, list[PromptDocument]] | None = None,
+    images: list[PromptImage] | None = None,
+    documents: list[PromptDocument] | None = None,
 ) -> JudgmentJob:
     return JudgmentJobFactory.make_judgment_job(
-        state={"message": "the roof is on fire"},
-        images=images,
-        documents=documents,
+        prompt=JudgmentPrompt(text="A message from a customer: the roof is on fire", images=images or [], documents=documents or []),
         questions=questions,
         judgment_setting=JudgmentSetting(model="fake-judgment-handle"),
         job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="u", pipeline_run_id="run_judgment")),

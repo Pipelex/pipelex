@@ -1,23 +1,25 @@
 ---
 title: "Judgment"
-description: "Closed questions answered by a judgment model inside Pipelex methods. PipeJudge returns a yes/no, a choice or a rating with the probabilities the model measured, ready to route or gate the steps after it."
+description: "Closed questions answered by a judgment model inside Pipelex methods. PipeJudge asks about the evidence its prompt presents and returns a yes/no, a choice or a rating with the probabilities the model measured, ready to route or gate the steps after it."
 ---
 
 # Judgment
 
-Closed questions about your data, answered with a verdict and how sure the model is.
+Closed questions about the evidence a prompt presents, answered with a verdict and how sure the model is.
 
 ## Overview
 
-Many steps of a method come down to a closed question: is this message urgent, which team owns this ticket, how severe is this report. PipeJudge asks such a question of a judgment model, a model built to answer it with a verdict and the probabilities it measured rather than with free text. The verdict is a typed `YesNo`, `Choice` or `Rating`, so the steps after it read it like any other concept.
+Many steps of a method come down to a closed question: is this message urgent, which team owns this ticket, how severe is this report. PipeJudge renders the evidence in its prompt, as a PipeLLM renders its prompt, and asks such a question about it of a judgment model, a model built to answer with a verdict and the probabilities it measured rather than with free text. The verdict is a typed `YesNo`, `Choice` or `Rating`, so the steps after it read it like any other concept.
 
 ## Key Capabilities
 
-- **Three kinds of question** — A yes/no question, a choice among declared options, or a rating on a scale of declared levels, the kind read from the fields the pipe declares
+- **Three kinds of question** — A yes/no question with criteria for both answers, a choice among declared options, or a rating on a scale of declared levels, each with a label, a description or both, the kind read from the fields the pipe declares
 - **Measured probabilities** — Each verdict carries the probabilities the model measured, so a method can act on how sure it is as well as on what it decided
 - **Thresholds** — A yes/no question can declare the probability at or above which its verdict is yes
-- **Material, not prompts** — Every input of the step is sent to the model as material to judge, images and documents as files for a model that reads them
-- **Checked when the method loads** — A step with no model, an output that disagrees with its kind of question, or a file input its model does not read is refused before any run spends anything
+- **The evidence is a prompt** — The model judges what the step's prompt renders and nothing else, so the author decides what it sees, down to one field of a larger value; the images and documents the prompt reads are sent as files to a model that reads them
+- **Labels on a rating** — When the scale's levels carry labels, the verdict carries the label of the level chosen, copied from the declaration
+- **No verdict from a refusal** — A model that declines to answer fails the step with an error naming the pipe and the model, rather than a verdict read off its silence
+- **Checked when the method loads** — A step with no model, an input neither its prompt nor its question reads, an output that disagrees with its kind of question, or a file its prompt reads that its model does not is refused before any run spends anything
 
 ## Usage in Pipelines
 

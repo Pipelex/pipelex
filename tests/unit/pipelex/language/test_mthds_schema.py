@@ -26,7 +26,7 @@ _PIPE_KIND_EXTRA_FIELDS: dict[str, dict[str, Any]] = {
     "PipeSearch": {"prompt": "find it"},
     "PipeStructure": {},
     "PipeDocGen": {"format": "pdf"},
-    "PipeJudge": {"question": "is it?"},
+    "PipeJudge": {"prompt": "@message", "question": "is it?"},
     "PipeBatch": {"branch_pipe_code": "sub_pipe", "input_list_name": "items", "input_item_name": "item"},
     "PipeCondition": {"default_outcome": "fallback_pipe", "outcomes": {"yes": "yes_pipe"}},
     "PipeParallel": {"branches": [{"pipe": "sub_pipe"}]},
@@ -286,21 +286,42 @@ class TestMthdsSchemaGeneration:
         assert not errors, f"{pipe_type} table should match exactly one oneOf arm, got errors: {[e.message for e in errors]}"
 
     @pytest.mark.parametrize(
-        ("question_fields", "should_validate"),
+        ("judge_fields", "should_validate"),
         [
-            pytest.param({"question": "is it?"}, True, id="question"),
-            pytest.param({"prompt": "is it?"}, True, id="prompt-synonym"),
-            pytest.param({"question": "is it?", "prompt": "is it?"}, False, id="both"),
+            pytest.param({"prompt": "@message", "question": "is it?"}, True, id="prompt-and-question"),
+            pytest.param({"question": "is it?"}, False, id="question-alone"),
+            pytest.param({"prompt": "@message"}, False, id="prompt-alone"),
             pytest.param({}, False, id="neither"),
         ],
     )
-    def test_pipe_judge_takes_its_question_or_the_prompt_synonym(
-        self, schema: dict[str, Any], question_fields: dict[str, Any], should_validate: bool
+    def test_pipe_judge_takes_its_evidence_prompt_and_its_question(
+        self, schema: dict[str, Any], judge_fields: dict[str, Any], should_validate: bool
     ) -> None:
-        """A PipeJudge writes its question as `question` or as `prompt`, exactly one, as its blueprint reads it."""
+        """A PipeJudge writes the evidence in `prompt` and asks about it in `question`, both required, as its blueprint reads them."""
         validator = _pipe_union_oneof_validator(schema)
-        table = {"type": "PipeJudge", "description": "A judge", "output": "YesNo", **question_fields}
-        assert validator.is_valid(table) is should_validate, f"{sorted(question_fields)} should {'' if should_validate else 'not '}validate"
+        table = {"type": "PipeJudge", "description": "A judge", "output": "YesNo", **judge_fields}
+        assert validator.is_valid(table) is should_validate, f"{sorted(judge_fields)} should {'' if should_validate else 'not '}validate"
+
+    @pytest.mark.parametrize(
+        ("levels", "should_validate"),
+        [
+            pytest.param(["Minor", "Major"], True, id="descriptions-as-strings"),
+            pytest.param([{"label": "Low", "description": "A cosmetic flaw"}, {"label": "High"}], True, id="labelled-tables"),
+            pytest.param(["Minor", {"description": "Nothing works"}], True, id="strings-and-unlabelled-tables"),
+            pytest.param(["Minor", {"label": "High", "description": "Nothing works"}], False, id="strings-and-labelled-tables"),
+            pytest.param([{"label": "Low"}, {"description": "Nothing works"}], False, id="labelled-and-unlabelled-tables"),
+            pytest.param([{"label": "Low", "colour": "green"}], False, id="table-with-an-unknown-key"),
+            pytest.param([{"label": 3}], False, id="label-not-a-string"),
+        ],
+    )
+    def test_pipe_judge_levels_are_strings_or_closed_tables(self, schema: dict[str, Any], levels: list[Any], should_validate: bool) -> None:
+        """A rating level is written as its description or as a closed `{label, description}` table, and a scale labels every level or none.
+
+        The load refuses a scale labelling some of its levels only (`_validate_levels`), so the schema refuses it first.
+        """
+        validator = _pipe_union_oneof_validator(schema)
+        table = {**_minimal_pipe_table("PipeJudge"), "output": "Rating", "levels": levels}
+        assert validator.is_valid(table) is should_validate, f"levels={levels!r} should {'' if should_validate else 'not '}validate"
 
     @pytest.mark.parametrize(
         ("size_value", "should_validate"),

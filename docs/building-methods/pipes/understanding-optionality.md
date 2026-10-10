@@ -78,7 +78,7 @@ Write a brief about this topic: $topic
 - **A presence block** — `{% if enriched %} ... {% endif %}` (any reference inside the block is guarded, including `$enriched` and attribute access).
 - **An inline presence conditional** — `{{ enriched.text if enriched else "no enrichment" }}`.
 
-The guard-lint covers every pipe that renders authored templates over its inputs: PipeLLM (prompt and system prompt), PipeCompose (template mode), PipeCondition (expression), PipeSearch, PipeJudge (question), and PipeImgGen.
+The guard-lint covers every pipe that renders authored templates over its inputs: PipeLLM (prompt and system prompt), PipeCompose (template mode), PipeCondition (expression), PipeSearch, PipeJudge (prompt and question), and PipeImgGen. A PipeJudge's model sees an input only as its templates render it, so an optional piece of evidence is written `@?note` in its prompt, and renders nothing when it is absent. An optional image or document guarded this way in a PipeLLM, PipeImgGen or PipeJudge prompt is not handed to the model when it is absent, and the files that are present keep consecutive numbers.
 
 ## Controllers Under Absence
 

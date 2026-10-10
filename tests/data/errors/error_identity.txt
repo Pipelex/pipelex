@@ -152,6 +152,7 @@ JudgmentHandleNotFoundError | Judgment handle not found | https://docs.pipelex.c
 JudgmentJobFailureError | Judgment job failure | https://docs.pipelex.com/latest/errors/judgment-job-failure-error/
 JudgmentModelMissingError | Judgment model missing | https://docs.pipelex.com/latest/errors/judgment-model-missing-error/
 JudgmentModelNotFoundError | Judgment model not found | https://docs.pipelex.com/latest/errors/judgment-model-not-found-error/
+JudgmentRefusedError | Judgment refused | https://docs.pipelex.com/latest/errors/judgment-refused-error/
 KitError | Kit | https://docs.pipelex.com/latest/errors/kit-error/
 KitIndexLoadingError | Kit index loading | https://docs.pipelex.com/latest/errors/kit-index-loading-error/
 LLMAssignmentError | LLM assignment | https://docs.pipelex.com/latest/errors/llm-assignment-error/

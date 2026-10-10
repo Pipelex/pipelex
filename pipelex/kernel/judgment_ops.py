@@ -1,32 +1,29 @@
-"""Judgment operator semantics: deck resolution, question rendering, the material, the verdict, memory write-back.
+"""Judgment operator semantics: deck resolution, the evidence prompt, question rendering, the verdict, memory write-back.
 
 These are the functions the interpreter's `PipeJudge` calls, and the ones a programmatic caller
 invokes on a `RuntimeBoot`-only process. They read the runtime hub for the services a runtime boot
 stands up (the model deck, the content generator) and take everything else as an explicit argument.
 
-A judgment is asked over **material**: the step's inputs by name. Every input that is not a file is a
-member of a JSON state, its value read off the content's class; every image or document travels beside
-the state, keyed by the input's name, as the prompt images and documents an LLM prompt carries. The
-dispatch is on the content's class rather than on a concept, because the kernel may not import the
-concept library.
+A judgment is asked over **evidence**: a prompt template, rendered against memory and assembled with
+the images and documents it references exactly as a PipeLLM's user prompt is, through the shared
+user-prompt assembly (`pipelex.kernel.prompt_assembly`). What the evidence holds is the template's
+business, so an input reaches the judging model only when the prompt reads it. An optional input the run
+was not given renders as the template's guard says, and the assembly skips its files, numbering and
+handing over none of them.
 """
-
-from typing import Any
 
 from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import JudgmentAssignment
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
-from pipelex.cogt.document.prompt_document import PromptDocument
-from pipelex.cogt.document.prompt_document_factory import PromptDocumentFactory
-from pipelex.cogt.exceptions import JudgmentAnswerMismatchError, JudgmentModelMissingError, ModelNotFoundError
-from pipelex.cogt.image.prompt_image import PromptImage
-from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
+from pipelex.cogt.exceptions import JudgmentAnswerMismatchError, JudgmentModelMissingError, JudgmentRefusedError, ModelNotFoundError
 from pipelex.cogt.judgment.judgment_models import (
     ChoiceAnswer,
     JudgmentAnswer,
+    JudgmentPrompt,
     JudgmentQuestion,
-    JudgmentState,
+    JudgmentRefusal,
     RatingAnswer,
+    RatingQuestion,
     YesNoAnswer,
 )
 from pipelex.cogt.judgment.judgment_setting import JudgmentModelChoice, JudgmentSetting
@@ -37,19 +34,12 @@ from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.choice_content import ChoiceContent
-from pipelex.core.stuffs.date_content import DateContent
-from pipelex.core.stuffs.document_content import DocumentContent
-from pipelex.core.stuffs.image_content import ImageContent
-from pipelex.core.stuffs.json_content import JSONContent
-from pipelex.core.stuffs.list_content import ListContent
-from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.rating_content import RatingContent
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.core.stuffs.text_content import TextContent
-from pipelex.core.stuffs.time_content import TimeContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.kernel.judgment_results import JudgmentResult
 from pipelex.kernel.memory_ops import store_result
+from pipelex.kernel.prompt_assembly import UserPromptContent, assemble_user_prompt
 from pipelex.runtime_hub import get_content_generator, get_model_deck
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.template_category import TemplateCategory
@@ -115,8 +105,8 @@ def resolve_judgment_setting(
 async def run_judgment(
     *,
     memory: WorkingMemory,
+    prompt_content: UserPromptContent,
     question: JudgmentQuestion,
-    input_names: list[str],
     judgment_setting: JudgmentSetting,
     concept: Concept,
     job_metadata: JobMetadata,
@@ -126,18 +116,25 @@ async def run_judgment(
     result_name: str | None = None,
     result_code: str | None = None,
 ) -> JudgmentResult:
-    """A whole judgment step: render the question, gather the material, judge, read the verdict, store.
+    """A whole judgment step: assemble the evidence, render the question, judge, read the verdict, store.
 
-    The question arrives as the cogt question with its instructions still a template, rendered here
-    against memory as a search renders its query. The judgment itself goes through the same
-    content-generation seam as every other leaf — direct inline, an activity when in-workflow, or a dry
-    mock — so it is replay-safe under a distributed orchestrator.
+    The evidence is assembled as a PipeLLM's user prompt is, its images and documents numbered into
+    `[Image N]` and `[Document N]` tokens. The question arrives as the cogt question with its
+    instructions still a template, rendered here against memory as a `BASIC` template. The judgment
+    itself goes through the same content-generation seam as every other leaf — direct inline, an
+    activity when in-workflow, or a dry mock — so it is replay-safe under a distributed orchestrator.
+
+    A refusal is the worker's outcome, and this step's policy for it is to fail: one question has
+    nowhere to leave its verdict absent, so it raises `JudgmentRefusedError`, a content error naming
+    the step and the model.
 
     The content stored is the verdict native's own class, never the output concept's: a concept
     refining `Choice` has no structure of its own, so its content is a `ChoiceContent`, stored under the
     refining concept as every operator stores a refinement.
     """
     with job_metadata.log_context():
+        assembled_prompt = await assemble_user_prompt(prompt_content=prompt_content, context_provider=memory, templating_style=templating_style)
+        judgment_prompt = JudgmentPrompt(text=assembled_prompt.text, images=assembled_prompt.images, documents=assembled_prompt.documents)
         rendered_question = await render_template(
             template=question.instructions,
             category=TemplateCategory.BASIC,
@@ -145,19 +142,20 @@ async def run_judgment(
             templating_style=templating_style,
         )
         asked_question = question.model_copy(update={"instructions": rendered_question})
-        state, images, documents = build_judgment_material(memory=memory, input_names=input_names)
         judgment_assignment = JudgmentAssignment(
             job_metadata=job_metadata,
             cogt_run_params=cogt_run_params,
-            state=state,
-            images=images,
-            documents=documents,
+            prompt=judgment_prompt,
             questions={JUDGMENT_QUESTION_KEY: asked_question},
             judgment_setting=judgment_setting,
         )
-        answers = await get_content_generator().make_judgment_answers(judgment_assignment=judgment_assignment)
-        answer = answers[JUDGMENT_QUESTION_KEY]
-        content, threshold_applied = make_verdict_content(answer=answer, threshold=threshold, is_dry=cogt_run_params.run_mode.is_dry)
+        outcomes = await get_content_generator().make_judgment_answers(judgment_assignment=judgment_assignment)
+        outcome = outcomes[JUDGMENT_QUESTION_KEY]
+        if isinstance(outcome, JudgmentRefusal):
+            raise JudgmentRefusedError(pipe_code=job_metadata.pipe_code, model_handle=judgment_setting.model)
+        content, threshold_applied = make_verdict_content(
+            question=asked_question, answer=outcome, threshold=threshold, is_dry=cogt_run_params.run_mode.is_dry
+        )
         if threshold_applied is False:
             log.warning(
                 "A judgment's model reported no probability, and its own verdict stands",
@@ -166,103 +164,25 @@ async def run_judgment(
         return JudgmentResult(
             memory=store_result(memory=memory, concept=concept, content=content, result_name=result_name, result_code=result_code),
             content=content,
+            prompt=judgment_prompt,
             rendered_question=rendered_question,
             judgment_setting=judgment_setting,
-            answer=answer,
+            answer=outcome,
             threshold_applied=threshold_applied,
         )
 
 
-def build_judgment_material(
-    *,
-    memory: WorkingMemory,
-    input_names: list[str],
-) -> tuple[JudgmentState, dict[str, list[PromptImage]], dict[str, list[PromptDocument]]]:
-    """The state and the files a judgment is asked over, one entry per input, keyed by its declared name.
-
-    An input name is a plain name, so each entry is one whole value: the step's material holds exactly
-    what it declares, and a field reaches it only when the calling sequence binds it under a name of its
-    own. An optional input that holds no value, whether its absence was recorded or it was never written, is
-    left out rather than sent as a null: a required input with no value never reaches the step, whose
-    presence scan refuses it. An image or a document, or a list of either, goes to the file channel; every
-    other input is a member of the state. An image nested inside a structured input is part of that input's
-    JSON, its URL as text, which is the author's concern.
-    """
-    state: JudgmentState = {}
-    images: dict[str, list[PromptImage]] = {}
-    documents: dict[str, list[PromptDocument]] = {}
-    for input_name in input_names:
-        stuff = memory.get_optional_stuff(name=input_name)
-        if stuff is None:
-            continue
-        content: StuffContent = stuff.content
-        if prompt_images := _prompt_images(content=content):
-            images[input_name] = prompt_images
-        elif prompt_documents := _prompt_documents(content=content):
-            documents[input_name] = prompt_documents
-        else:
-            state[input_name] = material_value(content=content)
-    return state, images, documents
-
-
-def material_value(*, content: StuffContent) -> Any:
-    """The JSON value a content is judged as: the reading a caller would write for it.
-
-    Text (and every refinement of it) is its string, a number its number, a yes/no its boolean, a date
-    or a time its ISO string, a JSON object itself, a list the array of its items' values, and every
-    other content — a choice, a rating, any structure — its JSON object without its absent members.
-    """
-    match content:
-        case TextContent():
-            return content.text
-        case NumberContent():
-            return content.number
-        case YesNoContent():
-            return content.yes_no
-        case DateContent() | TimeContent():
-            return content.rendered_plain()
-        case JSONContent():
-            return content.json_obj
-        case ListContent():
-            return [material_value(content=item) for item in content.items]
-        case _:
-            # Serialized as what each field holds rather than as its declared type, so a field typed as the
-            # content base keeps the fields of the subclass a run put there.
-            return content.model_dump(mode="json", exclude_none=True, serialize_as_any=True)
-
-
-def _prompt_images(*, content: StuffContent) -> list[PromptImage] | None:
-    image_contents: list[ImageContent]
-    match content:
-        case ImageContent():
-            image_contents = [content]
-        case ListContent() if content.items and all(isinstance(item, ImageContent) for item in content.items):
-            image_contents = [item for item in content.items if isinstance(item, ImageContent)]
-        case _:
-            return None
-    return [PromptImageFactory.make_prompt_image(uri=image.url, mime_type=image.mime_type) for image in image_contents]
-
-
-def _prompt_documents(*, content: StuffContent) -> list[PromptDocument] | None:
-    document_contents: list[DocumentContent]
-    match content:
-        case DocumentContent():
-            document_contents = [content]
-        case ListContent() if content.items and all(isinstance(item, DocumentContent) for item in content.items):
-            document_contents = [item for item in content.items if isinstance(item, DocumentContent)]
-        case _:
-            return None
-    return [PromptDocumentFactory.make_prompt_document(uri=document.url, mime_type=document.mime_type) for document in document_contents]
-
-
-def make_verdict_content(*, answer: JudgmentAnswer, threshold: float | None, is_dry: bool) -> tuple[StuffContent, bool | None]:
+def make_verdict_content(
+    *, question: JudgmentQuestion, answer: JudgmentAnswer, threshold: float | None, is_dry: bool
+) -> tuple[StuffContent, bool | None]:
     """The verdict native an answer translates to, and what became of a declared threshold.
 
     A yes/no answer with a probability is decided by it against the threshold, inclusive, the default
     standing in when none is declared; one without a probability keeps its own verdict, and a declared
     threshold then had nothing to work on, which a live run reports and a dry run, whose answers carry
-    no probability by construction, does not. A rating's distribution is keyed by the level index
-    written as text, the one place that conversion happens. Nothing absent is synthesised.
+    no probability by construction, does not. A rating takes the label of the level it names off the
+    scale the question declared, since no backend reports one, and its distribution is keyed by the
+    level index written as text, the one place that conversion happens. Nothing absent is synthesised.
     """
     match answer:
         case YesNoAnswer():
@@ -283,4 +203,25 @@ def make_verdict_content(*, answer: JudgmentAnswer, threshold: float | None, is_
             probabilities = (
                 {str(level): probability for level, probability in answer.probabilities.items()} if answer.probabilities is not None else None
             )
-            return RatingContent(level=answer.level, confidence=answer.confidence, probabilities=probabilities, position=answer.position), None
+            return RatingContent(
+                level=answer.level,
+                label=_declared_label(question=question, level=answer.level),
+                confidence=answer.confidence,
+                probabilities=probabilities,
+                position=answer.position,
+            ), None
+
+
+def _declared_label(*, question: JudgmentQuestion, level: int) -> str | None:
+    """The label the question's scale declares for a level, `None` when the scale declares none.
+
+    The worker checked that the answer's kind is its question's and that its level is on the scale,
+    so the two refusals here are stated for the type checker, which cannot see that check.
+    """
+    if not isinstance(question, RatingQuestion):
+        msg = f"A rating answer came back for a {question.kind} question"
+        raise JudgmentAnswerMismatchError(msg)
+    if not 0 <= level < len(question.levels):
+        msg = f"A rating answer names level {level}, which a scale of {len(question.levels)} levels does not hold"
+        raise JudgmentAnswerMismatchError(msg)
+    return question.levels[level].label

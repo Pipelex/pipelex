@@ -54,11 +54,49 @@ class TestPipeJudgeLoadRefusals:
             pytest.param('{ photo = "Document" }', "documents", id="document"),
         ],
     )
-    async def test_a_file_input_is_refused_for_a_text_only_model(self, inputs: str, file_kind: str) -> None:
-        report = await _refusal_report(PipeJudgeLoadTestData.bundle(inputs=inputs, step_fields=_MODEL))
+    async def test_a_file_the_prompt_presents_is_refused_for_a_text_only_model(self, inputs: str, file_kind: str) -> None:
+        report = await _refusal_report(PipeJudgeLoadTestData.bundle(inputs=inputs, prompt="Inspect this: $photo", step_fields=_MODEL))
         assert f"does not read {file_kind}" in report
-        assert "'photo'" in report
+        assert "presents 'photo' in its prompt" in report
         assert PipeJudgeLoadTestData.JUDGMENT_MODEL in report
+
+    @pytest.mark.usefixtures("judgment_model_reading_files")
+    @pytest.mark.parametrize(
+        "inputs",
+        [
+            pytest.param('{ message = "Text", photo = "Image" }', id="image"),
+            pytest.param('{ message = "Text", photo = "Document" }', id="document"),
+        ],
+    )
+    async def test_a_file_read_by_the_question_is_refused(self, inputs: str) -> None:
+        """A question is plain text, so a file it read would reach the model as a token naming nothing, whatever the model reads."""
+        report = await _refusal_report(PipeJudgeLoadTestData.bundle(inputs=inputs, question="Is $photo damaged?", step_fields=_MODEL))
+        assert "reads 'photo' in its question" in report
+        assert "only the prompt presents files" in report
+        assert "'input_stuff_spec_mismatch'" in report
+
+    @pytest.mark.parametrize(
+        ("prompt", "question"),
+        [
+            pytest.param("@message\n$note", "Is it urgent?", id="in_the_prompt"),
+            pytest.param("@message", "Is it urgent, given $note?", id="in_the_question"),
+        ],
+    )
+    async def test_an_unguarded_optional_input_is_refused(self, prompt: str, question: str) -> None:
+        """Both templates are linted, so an optional input read without a guard is refused wherever it is read."""
+        bundle = PipeJudgeLoadTestData.bundle(inputs='{ message = "Text", note = "Text?" }', prompt=prompt, question=question, step_fields=_MODEL)
+        report = await _refusal_report(bundle)
+        assert "'optional_input_unguarded'" in report
+        assert "note" in report
+
+    async def test_an_input_neither_template_reads_is_refused(self) -> None:
+        report = await _refusal_report(PipeJudgeLoadTestData.bundle(inputs='{ message = "Text", ticket = "Ticket" }', step_fields=_MODEL))
+        assert "Input 'ticket' is declared but never read by the prompt or question" in report
+
+    async def test_a_bundle_writing_its_question_in_prompt_is_told_where_each_goes(self) -> None:
+        """Before MTHDS 5.0.0 `prompt` was a synonym of `question`, so a bundle written then holds its question in `prompt`."""
+        report = await _refusal_report(PipeJudgeLoadTestData.bundle(prompt="Is the message urgent?\n@message", question=None, step_fields=_MODEL))
+        assert "`prompt` holds the evidence the question is asked over, and the question is written in `question`" in report
 
     @pytest.mark.parametrize(
         ("output", "step_fields", "asks"),

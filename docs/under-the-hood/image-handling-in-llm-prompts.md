@@ -194,7 +194,7 @@ flowchart TB
 
 ### Factory Time: Prompt Template Analysis
 
-When a PipeLLM is created from a blueprint, the `TemplateImageAnalyzer` examines both `prompt` and `system_prompt` templates:
+When a PipeLLM is created from a blueprint, the `TemplateImageAnalyzer` examines both `prompt` and `system_prompt` templates. The factory reaches it through `analyze_template_file_references` (`pipelex.pipe_operators.shared.template_file_references`), the one analysis PipeLLM, PipeImgGen and PipeJudge share, which also finds the documents a template reads and marks each reference with whether its root input is declared optional:
 
 1. **Parse prompt template AST** - Extract all variable references with their filters
 2. **Resolve types** - Look up each variable's type from input specifications
@@ -213,7 +213,7 @@ system_image_references = [ImageReference(variable_path="context_image", kind=Im
 
 When the prompt is built:
 
-1. **Create registry** - Fresh `ImageRegistry` for this prompt
+1. **Create registry** - Fresh `ImageRegistry` for this prompt; a reference whose root input is optional and was not given is skipped here, taking no number, so the template's guard renders it out
 2. **Extract system prompt images first** - Direct and list references from `system_prompt` are processed first, getting lower numbers
 3. **Extract user prompt images second** - Direct and list references from `prompt` continue the numbering sequence
 4. **Inject registry into context** - Registry available to Jinja2 filters for nested image extraction

@@ -25,13 +25,14 @@ resolving sub-pipes through the hub:
   unresolved cross-package reference consume nothing as far as the walk knows: it never guesses.
 - **Consumers.** A `PipeExtract` consumes its document input, and reads the formats of the model its
   extract choice resolves to. A `PipeLLM` consumes the documents its prompt references by variable
-  path, and reads its resolved model's document types. A `PipeJudge` consumes every document input
-  it declares, since every input is material to judge, and reads its resolved judgment model's
-  document types. A waterfall reads a format when any of its members reads it.
+  path, and reads its resolved model's document types. A `PipeJudge` consumes the documents its prompt
+  references by variable path, as a PipeLLM does, and reads its resolved judgment model's document
+  types. A waterfall reads a format when any of its members reads it.
 
 The walk depends only on the library and the model deck, never on the input values.
 """
 
+from collections.abc import Sequence
 from enum import StrEnum
 from typing import Final, NamedTuple
 
@@ -47,6 +48,7 @@ from pipelex.interpreter_hub import get_concept_library, get_native_concept, get
 from pipelex.kernel.extract_ops import resolve_extract_setting
 from pipelex.kernel.judgment_ops import judgment_setting_of_choice
 from pipelex.kernel.llm_ops import resolve_llm_setting_for_object, resolve_llm_setting_for_text
+from pipelex.kernel.prompt_references import DocumentReference
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.binding.binding_step import BindingStep
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
@@ -507,12 +509,55 @@ def _record_llm_document_consumers(*, pipe_llm: PipeLLM, frame: _Frame, is_condi
     document_references = [*(prompt_spec.user_document_references or []), *(prompt_spec.system_document_references or [])]
     if not document_references:
         return
-    resolved_model = _resolve_llm_model(pipe_llm=pipe_llm)
+    _record_document_consumers(
+        document_references=document_references,
+        resolved_model=_resolve_llm_model(pipe_llm=pipe_llm),
+        kind=FileConsumerKind.LLM_DOCUMENT,
+        pipe=pipe_llm,
+        frame=frame,
+        is_conditional=is_conditional,
+        consumers=consumers,
+    )
+
+
+def _record_judgment_document_consumers(*, pipe_judge: PipeJudge, frame: _Frame, is_conditional: bool, consumers: list[FileInputConsumer]) -> None:
+    # The prompt presents the documents it references, as a PipeLLM's does, and an input reaches the
+    # judging model only through a template, so a document input the prompt does not reference is not
+    # sent: only the prompt's references are followed.
+    document_references = pipe_judge.prompt_content.document_references or []
+    if not document_references:
+        return
+    _record_document_consumers(
+        document_references=document_references,
+        resolved_model=_resolve_judgment_model(pipe_judge=pipe_judge),
+        kind=FileConsumerKind.JUDGMENT_DOCUMENT,
+        pipe=pipe_judge,
+        frame=frame,
+        is_conditional=is_conditional,
+        consumers=consumers,
+    )
+
+
+def _record_document_consumers(
+    *,
+    document_references: Sequence[DocumentReference],
+    resolved_model: _ResolvedModel | None,
+    kind: FileConsumerKind,
+    pipe: PipeAbstract,
+    frame: _Frame,
+    is_conditional: bool,
+    consumers: list[FileInputConsumer],
+) -> None:
+    """Record one consumer for each document a prompt presents that comes from a tracked entry input.
+
+    A prompt-shaped operator hands its documents to its model as files, so each reference whose root is
+    tracked consumes that input's files, read by the formats the model reads.
+    """
     readable_formats: frozenset[str] | None = None
     if resolved_model is not None:
         readable_formats = frozenset[str]().union(*(model_spec.supported_document_types for model_spec in resolved_model.specs))
-    # A model that reads no documents at all is the method author's choice of model, which the
-    # worker reports as a capability error: there is no caller's format to refuse.
+    # A model that reads no documents at all is the method author's choice of model, which the load or
+    # the worker reports as a capability error: there is no caller's format to refuse.
     if not readable_formats:
         return
     for document_reference in document_references:
@@ -523,49 +568,9 @@ def _record_llm_document_consumers(*, pipe_llm: PipeLLM, frame: _Frame, is_condi
             FileInputConsumer(
                 slot_name=consumed_path[0],
                 consumed_path=consumed_path,
-                pipe_ref=pipe_llm.pipe_ref,
-                pipe_code=pipe_llm.code,
-                kind=FileConsumerKind.LLM_DOCUMENT,
-                model=resolved_model.model if resolved_model else None,
-                readable_formats=readable_formats,
-                reads_web_pages=False,
-                is_conditional=is_conditional,
-            )
-        )
-
-
-def _record_judgment_document_consumers(*, pipe_judge: PipeJudge, frame: _Frame, is_conditional: bool, consumers: list[FileInputConsumer]) -> None:
-    # A `Dynamic` input declares no kind of value, and an image input is an image by the setup check,
-    # so only the inputs declared as documents are followed, as the operator's load-time check does.
-    concept_library = get_concept_library()
-    document_concept = get_native_concept(native_concept=NativeConceptCode.DOCUMENT)
-    document_input_names = [
-        input_name
-        for input_name, stuff_spec in pipe_judge.inputs.items
-        if not NativeConceptCode.is_dynamic_concept(concept_code=stuff_spec.concept.code)
-        and concept_library.is_compatible(tested_concept=stuff_spec.concept, wanted_concept=document_concept, strict=True)
-    ]
-    if not document_input_names:
-        return
-    resolved_model = _resolve_judgment_model(pipe_judge=pipe_judge)
-    readable_formats: frozenset[str] | None = None
-    if resolved_model is not None:
-        readable_formats = frozenset[str]().union(*(model_spec.supported_document_types for model_spec in resolved_model.specs))
-    # A model that reads no documents at all is the method author's choice of model, which the
-    # method's load refuses: there is no caller's format to refuse.
-    if not readable_formats:
-        return
-    for input_name in document_input_names:
-        consumed_path = _tracked_path(frame=frame, variable_path=input_name)
-        if consumed_path is None:
-            continue
-        consumers.append(
-            FileInputConsumer(
-                slot_name=consumed_path[0],
-                consumed_path=consumed_path,
-                pipe_ref=pipe_judge.pipe_ref,
-                pipe_code=pipe_judge.code,
-                kind=FileConsumerKind.JUDGMENT_DOCUMENT,
+                pipe_ref=pipe.pipe_ref,
+                pipe_code=pipe.code,
+                kind=kind,
                 model=resolved_model.model if resolved_model else None,
                 readable_formats=readable_formats,
                 reads_web_pages=False,

@@ -113,6 +113,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
         shape_inputs,
     )
     from pipelex.kernel.pipelex_kernel import PipelexKernel
+    from pipelex.kernel.prompt_assembly import UserPromptContent
     from pipelex.kernel.prompt_references import ImageReference, ImageReferenceKind
     from pipelex.kernel.search_ops import run_search
     from pipelex.kernel.templating_style_ops import resolve_templating_style
@@ -375,8 +376,10 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     judgment_result = asyncio.run(
         run_judgment(
             memory=judgment_memory,
+            prompt_content=UserPromptContent(
+                template=TemplateBlueprint(template="A message from a customer: {{ message }}", category=TemplateCategory.LLM_PROMPT)
+            ),
             question=ChoiceQuestion(instructions="Which team handles {{ message }}?", options={"billing": None, "technical": None}),
-            input_names=["message"],
             judgment_setting=JudgmentSetting(model="kernel-boot-contract-judgment-model"),
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.CHOICE),
             job_metadata=kernel.make_step_metadata(),
@@ -386,7 +389,9 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
         )
     )
 
-    # The rendered question proves the templating ran against memory rather than being skipped.
+    # The rendered prompt and question prove the templating ran against memory rather than being skipped.
+    if judgment_result.prompt.text != "A message from a customer: My invoice is wrong.":
+        fail(f"run_judgment assembled {judgment_result.prompt.text!r}, not the evidence over its memory")
     if judgment_result.rendered_question != "Which team handles My invoice is wrong.?":
         fail(f"run_judgment rendered {judgment_result.rendered_question!r}, not the question over its memory")
     check_stored(judgment_result, "run_judgment", ChoiceContent)

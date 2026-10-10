@@ -58,7 +58,7 @@ from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToMode
 from pipelex.cogt.judgment.judgment_models import (
     ChoiceAnswer,
     ChoiceQuestion,
-    JudgmentAnswer,
+    JudgmentOutcome,
     RatingAnswer,
     RatingQuestion,
     YesNoAnswer,
@@ -389,16 +389,17 @@ def dry_search_gen_sourced_answer() -> SearchResultContent:
     return build_mock_object(SearchResultContent, sources=mock_sources)
 
 
-def dry_judgment_gen_answers(judgment_assignment: JudgmentAssignment) -> dict[str, JudgmentAnswer]:
-    """Dry leaf for a judgment: a deterministic verdict per question, with no uncertainty at all.
+def dry_judgment_gen_answers(judgment_assignment: JudgmentAssignment) -> dict[str, JudgmentOutcome]:
+    """Dry leaf for a judgment: a deterministic verdict per question, with no uncertainty at all, and never a refusal.
 
     Every answer is the first thing its question allows — yes, the first option, the lowest level —
     because a dry run must be reproducible and nothing here measured anything. The uncertainty
     members are left absent for the same reason: the contract makes them optional precisely so a
     producer that measured nothing can say so, and a mock probability would be the one number in the
-    whole family that nobody could tell apart from a real one.
+    whole family that nobody could tell apart from a real one. A level's label is not an answer's: the
+    operator copies it from the declared scale, dry or live.
     """
-    answers: dict[str, JudgmentAnswer] = {}
+    answers: dict[str, JudgmentOutcome] = {}
     for question_key, question in judgment_assignment.questions.items():
         match question:
             case YesNoQuestion():

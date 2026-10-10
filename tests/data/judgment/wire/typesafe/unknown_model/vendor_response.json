@@ -1,0 +1,9 @@
+{
+  "status": 400,
+  "body": {
+    "detail": {
+      "error_type": "api_usage_error",
+      "message": "Unknown model: jev-does-not-exist"
+    }
+  }
+}

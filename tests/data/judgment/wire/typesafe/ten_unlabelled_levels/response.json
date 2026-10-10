@@ -1,0 +1,29 @@
+{
+  "status": 200,
+  "body": {
+    "answers": {
+      "severity": {
+        "kind": "rating",
+        "level": 9,
+        "position": 8.43,
+        "confidence": 0.8,
+        "probabilities": {
+          "0": 0.0,
+          "1": 0.0,
+          "2": 0.0,
+          "3": 0.0,
+          "4": 0.01,
+          "5": 0.03,
+          "6": 0.01,
+          "7": 0.05,
+          "8": 0.2,
+          "9": 0.7
+        }
+      }
+    },
+    "usage": {
+      "input_tokens": 424,
+      "output_tokens": 17
+    }
+  }
+}

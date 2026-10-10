@@ -6,7 +6,7 @@ from pipelex.cogt.exceptions import JudgmentCapabilityError
 from pipelex.cogt.inference.error_classification import extract_typesafe_metadata
 from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.judgment.judgment_job import JudgmentJob
-from pipelex.cogt.judgment.judgment_models import JudgmentAnswer
+from pipelex.cogt.judgment.judgment_models import JudgmentOutcome
 from pipelex.cogt.judgment.judgment_worker_abstract import JudgmentWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
@@ -22,7 +22,9 @@ class TypesafeJudgmentWorker(JudgmentWorkerAbstract):
     One request carries the whole job, which is the reason the family's contract is batch-shaped:
     three questions over one state cost 506 input tokens together against 1138 apart, and answered
     in 0.27 s against 0.66 s. The state is paid for once, so a caller that asks everything it wants
-    to know in one job is rewarded for it.
+    to know in one job is rewarded for it. The state is the job's rendered prompt, sent as a string:
+    the campaign's spike found a JSON object state and the same object as a string answered alike.
+    This backend never refuses a question, so it returns an answer for every one.
     """
 
     def __init__(
@@ -39,14 +41,15 @@ class TypesafeJudgmentWorker(JudgmentWorkerAbstract):
     async def _judge(
         self,
         judgment_job: JudgmentJob,
-    ) -> dict[str, JudgmentAnswer]:
-        if judgment_job.images or judgment_job.documents:
-            # System One judges a JSON state and takes no file, so a request built from this job would
-            # drop the files and the verdict would be given over less than was asked. The kit's spec
-            # says the model reads text alone, which refuses files before this; a spec that claims more
-            # is refused here rather than believed.
+    ) -> dict[str, JudgmentOutcome]:
+        judgment_prompt = judgment_job.prompt
+        if judgment_prompt.images or judgment_prompt.documents:
+            # System One judges text and takes no file, so a request built from this job would drop the
+            # files and the verdict would be given over less than was asked. The kit's spec says the
+            # model reads text alone, which refuses files before this; a spec that claims more is
+            # refused here rather than believed.
             msg = (
-                f"TypeSafe judges a JSON state alone, and this judgment carries files for model '{self.inference_model.name}': "
+                f"TypeSafe judges text alone, and this judgment's prompt presents files for model '{self.inference_model.name}': "
                 "its spec must not declare that it reads images or documents."
             )
             raise JudgmentCapabilityError(msg)
@@ -54,7 +57,7 @@ class TypesafeJudgmentWorker(JudgmentWorkerAbstract):
         try:
             # The SDK types its state as a recursive JSON alias that pyright cannot resolve to the end.
             response = await self._typesafe_client.system_one(  # pyright: ignore[reportUnknownMemberType]
-                judgment_job.state,
+                judgment_prompt.text,
                 typesafe_questions,
                 model=self.inference_model.model_id,
             )
@@ -76,7 +79,8 @@ class TypesafeJudgmentWorker(JudgmentWorkerAbstract):
         self._log_request_id(response=response)
         self._warn_if_another_model_answered(response=response)
         self._record_usage(judgment_job=judgment_job, response=response)
-        return from_typesafe_response(questions=judgment_job.questions, response=response)
+        answers = from_typesafe_response(questions=judgment_job.questions, response=response)
+        return dict(answers)
 
     def _log_request_id(self, *, response: SystemOneResponse) -> None:
         """Trace the provider's own request id, which it returns on success as well as on failure.

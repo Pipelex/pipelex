@@ -1,7 +1,13 @@
 """Replay material for the TypeSafe backend, recorded against the live API.
 
-Every file under ``tests/data/typesafe/responses/`` was captured by the campaign's spike and is
-kept verbatim. A success is the **wire body**, taken from the raw HTTP response rather than from
+Two sets live here. The shared judge wire fixtures under ``tests/data/judgment/wire/typesafe/`` are a
+byte-identical copy of the hosted gateway's, laid out as its ``docs/judge-wire-fixtures.md`` says: per
+case, the neutral request, the vendor request a translation must send, the vendor response and the
+neutral outcome a translation must return. Both implementations of this vendor replay them, so a case
+this worker disagrees with is a disagreement between the two, settled by the fixture and the design.
+
+The older recordings under ``tests/data/typesafe/responses/`` were captured by the campaign's spike and
+are kept verbatim. A success is the **wire body**, taken from the raw HTTP response rather than from
 the SDK's own dump, so a replay test checks our reading of the API and not the SDK's reading of
 itself — which matters here, because a rating answer's keys are strings on the wire and integers
 only after the SDK has parsed them. A refusal is saved as an envelope describing the exception,
@@ -11,13 +17,123 @@ with the wire body nested under ``body``, and is rebuilt into a real SDK excepti
 import json
 import re
 from pathlib import Path
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar, NamedTuple, cast
 
 import typesafe_sdk
 from httpx2 import Headers
+from pydantic import BaseModel, ConfigDict
 from typesafe_sdk import SystemOneResponse, TypeSafeAPIError, TypeSafeAPITimeoutError, TypeSafeError
 
+from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory, JudgmentJobFailureError, JudgmentModelNotFoundError
+from pipelex.cogt.inference.error_classification import UserActionKind
+from pipelex.cogt.judgment.judgment_models import JudgmentOutcome, JudgmentPrompt, JudgmentQuestion
+from pipelex.providers.typesafe.typesafe_exceptions import TypesafeQuestionUnsupportedError
+
 RESPONSES_DIR = Path(__file__).parents[4] / "data" / "typesafe" / "responses"
+WIRE_DIR = Path(__file__).parents[4] / "data" / "judgment" / "wire" / "typesafe"
+
+
+class WireJudgeRequest(BaseModel):
+    """A case's ``request.json``: the neutral request as a client posts it to the gateway's judge route."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    model: str
+    prompt: JudgmentPrompt
+    questions: dict[str, JudgmentQuestion]
+
+
+class WireUsage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+
+
+class WireJudgeAnswers(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    answers: dict[str, JudgmentOutcome]
+    usage: WireUsage
+
+
+class WireJudgeError(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: str
+    code: str
+
+
+class WireJudgeResponse(BaseModel):
+    """A case's ``response.json``: ``{status, body}`` for an answer, ``{status, error}`` for a failure."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: int
+    body: WireJudgeAnswers | None = None
+    error: WireJudgeError | None = None
+
+
+class WireVendorResponse(BaseModel):
+    """A case's ``vendor_response.json``: what TypeSafe answered, its body untouched."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: int
+    body: Any
+    headers: dict[str, str] | None = None
+
+
+class WireCase(NamedTuple):
+    name: str
+    request: WireJudgeRequest
+    response: WireJudgeResponse
+    vendor_request: dict[str, Any] | None
+    vendor_response: WireVendorResponse | None
+
+
+def _read_wire_json(*, case_dir: Path, file_name: str) -> Any:
+    return json.loads((case_dir / file_name).read_text(encoding="utf-8"))
+
+
+def load_wire_case(name: str) -> WireCase:
+    case_dir = WIRE_DIR / name
+    has_vendor_exchange = (case_dir / "vendor_request.json").exists()
+    return WireCase(
+        name=name,
+        request=WireJudgeRequest.model_validate(_read_wire_json(case_dir=case_dir, file_name="request.json")),
+        response=WireJudgeResponse.model_validate(_read_wire_json(case_dir=case_dir, file_name="response.json")),
+        vendor_request=_read_wire_json(case_dir=case_dir, file_name="vendor_request.json") if has_vendor_exchange else None,
+        vendor_response=(
+            WireVendorResponse.model_validate(_read_wire_json(case_dir=case_dir, file_name="vendor_response.json")) if has_vendor_exchange else None
+        ),
+    )
+
+
+def wire_case_names() -> list[str]:
+    return sorted(entry.name for entry in WIRE_DIR.iterdir() if entry.is_dir())
+
+
+class WireErrorMapping(NamedTuple):
+    """What this worker raises for a gateway error code: the gateway answers HTTP, the worker raises its own error."""
+
+    status: int
+    error_class: type[CogtError]
+    category: InferenceErrorCategory
+    user_action_kind: UserActionKind
+
+
+# The mapping is pipelex's to keep, as the fixtures' documentation says. The status is the gateway's,
+# held here so a case whose status moves is noticed rather than silently re-read.
+WIRE_ERROR_MAPPINGS: dict[str, WireErrorMapping] = {
+    "typesafe_context_too_long": WireErrorMapping(400, JudgmentJobFailureError, InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
+    "typesafe_too_many_levels": WireErrorMapping(400, TypesafeQuestionUnsupportedError, InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
+    "typesafe_authentication_error": WireErrorMapping(
+        401, JudgmentJobFailureError, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHECK_CREDENTIALS
+    ),
+    "typesafe_unknown_model": WireErrorMapping(400, JudgmentModelNotFoundError, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHANGE_MODEL),
+    "typesafe_invalid_question": WireErrorMapping(400, JudgmentJobFailureError, InferenceErrorCategory.CONFIGURATION, UserActionKind.CONTACT_SUPPORT),
+}
 
 
 def load_recorded(name: str) -> dict[str, Any]:

@@ -1,0 +1,13 @@
+{
+  "model": "jev-1.13.0",
+  "state": "A message from a customer:\n<message>\nOur production checkout has been returning 500s for every card payment since 09:14 UTC. Nothing is going through. I have three customers on the phone right now. Please help.\n</message>",
+  "questions": {
+    "q": {
+      "type": "choice",
+      "instructions": "Which team?",
+      "criteria": {
+        "payments": null
+      }
+    }
+  }
+}
