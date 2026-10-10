@@ -7,7 +7,7 @@ description: "Reference for the `JudgmentRefusedError` Pipelex error class."
 
 # Judgment refused
 
-The judging model declined to answer a step's question.
+The judging model declined to answer a step's question, whose verdict has nowhere to be left absent.
 
 | Field | Value |
 |---|---|

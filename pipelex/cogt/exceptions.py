@@ -506,30 +506,45 @@ class JudgmentModelNotFoundError(ModelNotFoundError):
 
 
 class JudgmentRefusedError(CogtError):
-    """The judging model declined to answer a step's question.
+    """The judging model declined to answer a step's question, whose verdict has nowhere to be left absent.
 
     A refusal is a worker's outcome, never its error: this is the operator's policy for a question
-    whose verdict has nowhere to be left absent. It is a content error, in the input domain, because
-    what a model declines to judge is the question asked over the evidence given, and the remedy is
-    the author's or the caller's: a reworded question or different evidence. The message names only
-    the step and the model's deck handle, so it is kept verbatim for the caller.
+    whose verdict has nowhere to be left absent, the one question of a single-question step or a
+    question of several whose output field is required. It is a content error, in the input domain,
+    because what a model declines to judge is the question asked over the evidence given, and the
+    remedy is the author's or the caller's: a reworded question, different evidence, or, for a question
+    of several, an optional field a refusal may leave absent. The message names only the step, the
+    model's deck handle and the question's name, which the author wrote, so it is kept verbatim for the
+    caller.
     """
 
     error_category = InferenceErrorCategory.CONTENT
     _authors_caller_facing_message = True
 
-    def __init__(self, *, pipe_code: str | None, model_handle: str):
+    def __init__(self, *, pipe_code: str | None, model_handle: str, question_name: str | None = None):
         step = f"PipeJudge '{pipe_code}'" if pipe_code else "This judgment"
-        message = (
-            f"{step}: the judgment model '{model_handle}' declined to answer its question. "
-            "Try to reword the question so it can be answered from the evidence, or give the step different evidence."
-        )
+        message: str
+        user_action_detail: str
+        if question_name is None:
+            message = (
+                f"{step}: the judgment model '{model_handle}' declined to answer its question. "
+                "Try to reword the question so it can be answered from the evidence, or give the step different evidence."
+            )
+            user_action_detail = "Reword the question, or give the step different evidence."
+        else:
+            message = (
+                f"{step}: the judgment model '{model_handle}' declined to answer the question '{question_name}', whose output field "
+                "is required. Try to reword the question so it can be answered from the evidence, give the step different evidence, "
+                "or make its output field optional, so that a refusal leaves the field absent."
+            )
+            user_action_detail = "Reword the question, give the step different evidence, or make the question's output field optional."
         super().__init__(
             message,
-            user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail="Reword the question, or give the step different evidence."),
+            user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail=user_action_detail),
         )
         self.pipe_code = pipe_code
         self.model_handle = model_handle
+        self.question_name = question_name
 
 
 class JudgmentModelMissingError(PipelexError):

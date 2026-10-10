@@ -483,6 +483,7 @@ What varies goes in `fields`, named by the [naming convention](#naming-conventio
 | `item_count` | integer | The number of items a `PipeBatch` fans out over |
 | `max_concurrency` | integer | The bound on the branches a `PipeBatch` runs at once; absent when the configuration's `"unbounded"` sets none |
 | `threshold` | number | The probability threshold a judgment declares, between `0` and `1` |
+| `judgment_question` | string | A question of a PipeJudge asking several, by the name its `questions` table gives it: `urgent` |
 | `template_file` | string | A PipeDocGen's template file, as the pipe declares it |
 | `finding_message`, `finding_location` | string | The text of a PipeDocGen template finding, and where in the template it was found |
 | `function_name` | string | A function PipeFunc registers or calls, by its name |
