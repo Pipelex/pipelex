@@ -153,9 +153,9 @@ class ImgGenGeminiMapping:
     def optional_img_gen_taxonomy(cls, inference_model: InferenceModelSpec) -> AspectRatioTaxonomy | None:
         """The model's geometry taxonomy, or None when rules are missing or carry an unknown value.
 
-        The None arm mirrors the support-layer abstain policy for remotely-fetched specs (the
-        Pipelex gateway catalog) whose taxonomy strings may predate this factory: with nothing
-        to validate against, callers keep their pre-taxonomy behavior instead of hard-failing.
+        The None arm mirrors the support-layer abstain policy for specs whose taxonomy strings
+        may predate this factory, such as those of an older backend file: with nothing to
+        validate against, callers keep their pre-taxonomy behavior instead of hard-failing.
         """
         rules = inference_model.rules or {}
         taxonomy_value = rules.get(ImgGenArgTopic.ASPECT_RATIO)

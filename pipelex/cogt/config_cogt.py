@@ -161,10 +161,6 @@ class LLMConfig(ConfigModel):
         return value
 
 
-class GatewayTestConfig(ConfigModel):
-    config_id_substitutions: dict[str, str]
-
-
 class InferenceConfig(ConfigModel):
     # Tier 1 transport retry: the number of times an inference SDK client retries a transient
     # transport failure (connection error, 408/409/429/5xx, honoring Retry-After) on top of the
@@ -176,6 +172,5 @@ class InferenceConfig(ConfigModel):
     llm: LLMConfig
     img_gen: ImgGenConfig
     extract: ExtractConfig
-    gateway_test: GatewayTestConfig
     templating: TemplatingConfig
     dry_run: DryRunConfig

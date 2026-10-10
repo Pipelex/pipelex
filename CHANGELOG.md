@@ -18,6 +18,10 @@
 
 - **A Google client's close at teardown is no longer garbage-collected**: when a Google LLM or image-generation worker was torn down inside a running event loop, nothing but the loop referenced the background task closing its async client, and a loop holds its tasks weakly, so the task could be collected before the client was closed, with the `asyncio` error `Task was destroyed but it is pending!`. Each close task is now held until it is done.
 
+### Removed
+
+- **`[inference.gateway_test]` (Breaking)**: the maintainer-only section whose `config_id_substitutions` map swapped the Pipelex Gateway's model configurations is gone, with its `GatewayTestConfig` model and the `gateway_test` field of `InferenceConfig`, as nothing has read it since the Gateway backend left in 0.73.0. **Migration:** run `pipelex migrate`, which deletes the section from the file on disk (ledger entry `pipelex-config@8`).
+
 ### Security
 
 - **The API server refuses to start on an unknown `AUTH_MODE` (Breaking)**: a value that is not exactly `none`, `jwt` or `api_key`, such as `jwtt` or `JWT`, now stops the server at startup with `InvalidAuthModeError`, whose message names the valid modes, where the server used to log a warning and serve every `/v1` route without authentication. An unset or empty `AUTH_MODE` still means `none`. A deployment that booted on a mistyped mode sets it to the mode it meant.
