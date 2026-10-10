@@ -54,6 +54,7 @@ class RichLogConfig(ConfigModel):
 
     is_show_time: bool
     is_show_level: bool
+    is_show_path: bool
     is_link_path_enabled: bool
     highlighter_name: HighlighterName = Field(strict=False)
     is_rich_tracebacks: bool

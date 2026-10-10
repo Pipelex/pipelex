@@ -223,10 +223,10 @@ log.error("Expected list[int], got [red]str[/red]")
 ```
 
 ```text
-ERROR    🧠: Expected list[int], got [red]str[/red]
+ERROR    Expected list[int], got [red]str[/red]
 ```
 
-A tag-shaped span in a message is text like any other: a `list[int]` in a type complaint, a bracketed path, the `[cycle]` marker in the rendering of a circular content, and the `[name]: ` prefix the console puts before a line from a logger with no emoji, such as `[myapp.jobs.nightly]: `. Colour is the console's own: it styles the [fields after the message](#fields-after-the-message) by their names and draws the few [layouts](#layouts), so a call is coloured by naming its fields, never by writing markup into its message. No sink but the console has ever read markup, so a message carrying a tag would reach the `json`, `otlp` and `gcp` sinks with the tag in it, and the rule for a Pipelex log call is to write none. Two checks hold the calls to it, by one reading of what a tag is: a tag Rich would apply as styling, a closing tag, an `@` handler, or a tag naming a style, `[bold]` or `[link=https://pipelex.com]`. A bracketed word that names no style, `list[int]` or `[openai]`, passes, since it prints as written. The [log-call guard](../contribute/log-calls.md), `make check-log-calls`, reads the source of every call: it refuses such a tag in the literal text of a message, its title or its inline title, at every level, that text folded across concatenations and named literals the way it reaches the console. A test checks the messages of one run: it runs the pipes of one test bundle live, a sequence nesting a structuring step, parallel summaries and a condition, with a stand-in worker answering every model call, and fails on any message the run logs, at any level, that holds such a tag, whatever built it. A message the guard cannot read, a value built at run time, is covered only when that run logs it.
+A tag-shaped span in a message is text like any other: a `list[int]` in a type complaint, a bracketed path, the `[cycle]` marker in the rendering of a circular content. Colour is the console's own: it styles the [fields after the message](#fields-after-the-message) by their names and draws the few [layouts](#layouts), so a call is coloured by naming its fields, never by writing markup into its message. No sink but the console has ever read markup, so a message carrying a tag would reach the `json`, `otlp` and `gcp` sinks with the tag in it, and the rule for a Pipelex log call is to write none. Two checks hold the calls to it, by one reading of what a tag is: a tag Rich would apply as styling, a closing tag, an `@` handler, or a tag naming a style, `[bold]` or `[link=https://pipelex.com]`. A bracketed word that names no style, `list[int]` or `[openai]`, passes, since it prints as written. The [log-call guard](../contribute/log-calls.md), `make check-log-calls`, reads the source of every call: it refuses such a tag in the literal text of a message, its title or its inline title, at every level, that text folded across concatenations and named literals the way it reaches the console. A test checks the messages of one run: it runs the pipes of one test bundle live, a sequence nesting a structuring step, parallel summaries and a condition, with a stand-in worker answering every model call, and fails on any message the run logs, at any level, that holds such a tag, whatever built it. A message the guard cannot read, a value built at run time, is covered only when that run logs it.
 
 Rich still honours its own per-record `markup` attribute, which a third-party library may set on a record it logs to ask for markup. No Pipelex call can set it: a field of that name is [reserved](#names-that-are-not-yours-to-give) and lands under `field_markup`.
 
@@ -239,7 +239,7 @@ log.info("Scanned the inputs", fields={"file_count": 7, "source": "inbox/march"}
 ```
 
 ```text
-INFO     🧠: Scanned the inputs file_count=7 source=inbox/march
+INFO     Scanned the inputs file_count=7 source=inbox/march
 ```
 
 - **What is shown.** The fields the call attached, in the order it gave them, under the name each landed on (`field_name` for a field called `name`). The run identifiers (`request_id`, `pipeline_run_id`, `pipe_run_id`) are left out, since they are the same on every line of a run and would drown the message, and so is `data`, the structured content the message already renders. Nothing else on the record is shown: neither the stdlib's own attributes, nor Pipelex's marks, nor what a record factory or a third-party library stamped on it.
@@ -247,6 +247,34 @@ INFO     🧠: Scanned the inputs file_count=7 source=inbox/march
 - **Never markup.** The suffix is built as styled Rich `Text`, not as a markup string, so a value carrying `[red]x[/red]` prints exactly that.
 
 There is no setting to hide the suffix: it carries the values a message used to interpolate, so hiding it would hide what the line is about.
+
+### The advice under the line
+
+A record's advice, its `user_action` field, is not written in the suffix: the console prints it whole on a line of its own under the record, after `→`, in cyan, since it is the part of the record a reader acts on. A traceback the record carries prints under the advice.
+
+```python
+log.warning(
+    "A configuration file is out of date and was read as if migrated",
+    fields={"file.path": "/home/me/project/.pipelex/pipelex.toml", "user_action": "Run pipelex migrate to update it"},
+)
+```
+
+```text
+WARNING  A configuration file is out of date and was read as if migrated file.path=/home/me/project/.pipelex/pipelex.toml
+         → Run pipelex migrate to update it
+```
+
+Every other sink writes `user_action` as the field it is, so a log store can count the events by their message whatever advice each one gave.
+
+### Another library's lines
+
+A line has no prefix when Pipelex logged it, the runtime, the API server or a Pipelex plugin, and none when it was logged on the root logger. A line another library logged, an HTTP client's or a provider SDK's, starts with the top-level package of its logger, dimmed, so the reader still sees which library spoke:
+
+```text
+INFO     httpx: HTTP Request: POST https://api.example.com/v1/chat/completions "HTTP/1.1 200 OK"
+```
+
+Your own application's lines, logged through `log` from a module of `myapp`, start with `myapp: ` the same way. The package name is styled text the console adds, never part of the message, so no other sink writes it: they carry the logger's full name as the record's own.
 
 ### The style map
 
@@ -267,10 +295,10 @@ log.info(
 ```
 
 ```text
-INFO     🧠:    ↳ PipeCompose: compose_company → Company
+INFO        ↳ PipeCompose: compose_company → Company
 ```
 
-- **The console renders the layout in place of the message**, after the logger's emoji, and every other sink ignores it: the `json`, `otlp` and `gcp` sinks write the plain message, `Pipe run starts`, and the fields, and never the layout's name, which rides the record under a reserved mark. The name is explicit at the call, so rewording the message cannot lose the layout, and it is a `LogLayout` member, so a misspelt one is a type error.
+- **The console renders the layout in place of the message**, and every other sink ignores it: the `json`, `otlp` and `gcp` sinks write the plain message, `Pipe run starts`, and the fields, and never the layout's name, which rides the record under a reserved mark. The name is explicit at the call, so rewording the message cannot lose the layout, and it is a `LogLayout` member, so a misspelt one is a type error.
 - **Every value is escaped** with Rich's own escape before it is substituted, the values the layout derives included, so a field carrying `[red]x[/red]` prints literally. A value is written on one line and cut short past 80 characters, as in the suffix, except that it is never quoted, a string or a JSON rendering alike.
 - **The fields a layout presents are not repeated after it**; any other field the call gave still follows as the suffix, and the run identifiers stay hidden.
 - **A layout that cannot be filled costs nothing but itself.** A field it needs is missing, a value its derivation refuses, or anything else the layout raises: the console falls back to the message and shows every field after it.
@@ -290,18 +318,8 @@ A layout is a `ConsoleLayout`: a `template` of Rich markup whose placeholders ar
 ### Rich Formatting
 
 - Color coding and syntax highlighting for JSON and other data structures
-- Clickable file paths pointing at the calling line
 - Word wrapping for better readability
-
-### Emoji Support
-
-Built-in emoji indicators for different components, keyed on the logger name's prefix:
-
-- 🧠 Pipelex core messages
-- ⚪️ OpenAI-related logs
-- 🌀 Google-related logs
-- ⚡️ Network connections
-- *️⃣ JSON processing
+- A column naming the source file and line of each record, at the right of the line, when `is_show_path` is on; it is off by default, since it takes about 25 characters of every line and makes a long one wrap. With `is_link_path_enabled`, that path is clickable where the terminal supports links (see [Logging Configuration](../configuration/config-practical/logging-config.md#display-options))
 
 ### Caller Information
 
@@ -348,8 +366,8 @@ A handle names one model per model type, so a query groups by `gen_ai.operation.
 Rates are per million tokens, so a call billed by the request or by the page records each unit as a million tokens in and out, and the rate table prices one unit: a Linkup search or fetch is one request, and an extraction whose provider reports no usage is priced by its pages. Its usage says so in its `pricing_unit`, `request` or `page` rather than `token`, and the event carries the call's cost and no token counts, since a request or a page is not a token. A worker records such a usage with `record_unit_priced_usage` (`pipelex.cogt.usage.usage_cost`), a plugin's worker as much as a provider's, and never writes the counts itself.
 
 ```text
-INFO     🧠: claude-5.5-sonnet chat · 2,048 → 512 tokens · $0.009216 · done in 1.23 s
-INFO     🧠: claude-5.5-sonnet chat · failed after 2.40 s error.type=LLMCompletionError
+INFO     claude-5.5-sonnet chat · 2,048 → 512 tokens · $0.009216 · done in 1.23 s
+INFO     claude-5.5-sonnet chat · failed after 2.40 s error.type=LLMCompletionError
 ```
 
 ```json
@@ -371,11 +389,11 @@ Every live pipe run ends with `Pipe run ends`, on the logger `pipelex.pipe_machi
 | `duration_ms`, `outcome`, `error.type` | | As above |
 
 ```text
-INFO     🧠: PipeSequence: brief_company → Text
-INFO     🧠:    ↳ PipeLLM: describe_company → Text
-INFO     🧠: claude-5.5-sonnet chat · 1,000 → 200 tokens · $0.004 · done in 1.23 s
-INFO     🧠:    ↳ PipeLLM: describe_company done in 1.25 s
-INFO     🧠: PipeSequence: brief_company done in 1.31 s
+INFO     PipeSequence: brief_company → Text
+INFO        ↳ PipeLLM: describe_company → Text
+INFO     claude-5.5-sonnet chat · 1,000 → 200 tokens · $0.004 · done in 1.23 s
+INFO        ↳ PipeLLM: describe_company done in 1.25 s
+INFO     PipeSequence: brief_company done in 1.31 s
 ```
 
 ```json
@@ -532,7 +550,7 @@ An exception rides the record, never the message. Spliced into the text, `{exc}`
 
 - **No run identifier in the text.** `request_id`, `pipeline_run_id` and `pipe_run_id` are stamped on every record by the [run-scoped context](#the-run-scoped-context); a message repeating one is noise, and a field passing one is only for a call that speaks about a run it is not running under.
 - **No payload contents, at any level.** No prompt text, no base64 data, no raw response and no whole object: a size, a count, a hash or a code instead, as the [level table](#log-levels) already says of every level.
-- **No markup and no emoji in a message.** Colour is the console sink's job: it colours a value by its field's name and draws the few [layouts](#layouts), and its emoji are its own per-logger decoration. Markup in a message travels to every sink as literal tags, the console's included, since it reads no message as markup (see [Messages are plain text](#messages-are-plain-text)). Markup keeps its place in the CLI's own output and in the pretty-print channel, which are presentation to a person and not log records.
+- **No markup and no emoji in a message.** Colour is the console sink's job: it colours a value by its field's name and draws the few [layouts](#layouts). Markup in a message travels to every sink as literal tags, the console's included, since it reads no message as markup (see [Messages are plain text](#messages-are-plain-text)). Markup keeps its place in the CLI's own output and in the pretty-print channel, which are presentation to a person and not log records.
 
 ### Choosing a level
 

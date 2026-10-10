@@ -38,7 +38,6 @@ from pipelex.tools.log.console_log_sink import ConsoleLogSink
 from pipelex.tools.log.json_log_sink import MESSAGE_KEY, JsonLogSink
 from pipelex.tools.log.log_config import HighlighterName, RichLogConfig
 from pipelex.tools.log.log_fields import LAYOUT_MARK
-from pipelex.tools.log.log_formatter import EmojiLogFormatter
 from tests.helpers.console_log_rendering import package_log_config
 
 if TYPE_CHECKING:
@@ -179,6 +178,7 @@ def _markup_reading_handler(*, config: RichLogConfig, buffer: io.StringIO) -> Ri
         console=_colour_console(buffer=buffer),
         show_time=config.is_show_time,
         show_level=config.is_show_level,
+        show_path=config.is_show_path,
         enable_link_path=config.is_link_path_enabled,
         highlighter=highlighter,
         markup=True,
@@ -188,7 +188,7 @@ def _markup_reading_handler(*, config: RichLogConfig, buffer: io.StringIO) -> Ri
         tracebacks_suppress=config.tracebacks_suppress,
         keywords=config.keywords_to_hilight,
     )
-    handler.setFormatter(EmojiLogFormatter())
+    handler.setFormatter(logging.Formatter())
     return handler
 
 

@@ -47,11 +47,11 @@ def console_handler() -> RichHandler:
     return handler
 
 
-def record_with_fields(*, message: str, extra: dict[str, Any] | None = None, layout: LogLayout | str | None = None) -> logging.LogRecord:
+def record_with_fields(
+    *, message: str, extra: dict[str, Any] | None = None, layout: LogLayout | str | None = None, logger_name: str = "pipelex.tools.demo"
+) -> logging.LogRecord:
     """A record as the dispatch builds it: the extra attached through the fields channel, the layout under its mark."""
-    record = logging.LogRecord(
-        name="pipelex.tools.demo", level=logging.INFO, pathname="/repo/pipelex/module.py", lineno=42, msg=message, args=(), exc_info=None
-    )
+    record = logging.LogRecord(name=logger_name, level=logging.INFO, pathname="/repo/pipelex/module.py", lineno=42, msg=message, args=(), exc_info=None)
     attach_log_record_extra(record=record, extra=extra or {})
     if layout is not None:
         record.__dict__[LAYOUT_MARK] = layout
