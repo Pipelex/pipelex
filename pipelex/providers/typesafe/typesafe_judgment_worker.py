@@ -102,8 +102,7 @@ class TypesafeJudgmentWorker(JudgmentWorkerAbstract):
         """
         if response.model != self.inference_model.model_id:
             log.warning(
-                "The provider answered under another model than the pinned one, so verdicts and their thresholds may not mean what "
-                "they meant under the pinned model",
+                "A judgment was answered by another model than the pinned one",
                 fields={
                     "model_handle": self.inference_model.name,
                     "backend_name": self.inference_model.backend_name,

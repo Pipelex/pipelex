@@ -1,9 +1,12 @@
 import asyncio
 import base64
+from collections.abc import Coroutine
+from typing import Any, ClassVar
 
 from google.genai import types as genai_types
 from google.genai.client import Client as GoogleGenAiClient
 
+from pipelex import log
 from pipelex.cogt.document.prompt_document import PromptDocument
 from pipelex.cogt.document.prompt_document_utils import prepare_prompt_document_as_base64
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
@@ -14,9 +17,13 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
+from pipelex.tools.log.error_fields import error_fields
 
 
 class GoogleFactory:
+    # The background tasks closing a Google async client, each held until it is done (see schedule_client_close)
+    _pending_client_closes: ClassVar[set["asyncio.Task[None]"]] = set()
+
     @classmethod
     def make_google_client(cls, backend: InferenceBackend) -> GoogleGenAiClient:
         """Create a Google Gemini API client."""
@@ -26,6 +33,31 @@ class GoogleFactory:
         transport_max_retries = get_config().inference.transport_max_retries
         http_options = genai_types.HttpOptions(retry_options=genai_types.HttpRetryOptions(attempts=transport_max_retries + 1))
         return GoogleGenAiClient(api_key=backend.api_key, http_options=http_options)
+
+    @classmethod
+    def schedule_client_close(cls, *, event_loop: asyncio.AbstractEventLoop, close_coroutine: Coroutine[Any, Any, None]) -> None:
+        """Close a Google async client in a background task on a running event loop, for a worker's teardown.
+
+        The event loop keeps only a weak reference to a task, so a close task nothing else holds could be garbage-collected
+        before it finishes. The class holds each one until it is done, when its done callbacks drop it and log a failure.
+        """
+        close_task = event_loop.create_task(close_coroutine)
+        cls._pending_client_closes.add(close_task)
+        close_task.add_done_callback(cls._pending_client_closes.discard)
+        close_task.add_done_callback(lambda done: cls.log_client_close_failure(close_task=done))
+
+    @classmethod
+    def log_client_close_failure(cls, *, close_task: "asyncio.Task[None]") -> None:
+        """Say at DEBUG why the background task closing a Google async client failed, as that task's done callback.
+
+        A worker's teardown never raises, so a close that fails is only logged. A cancelled task holds no exception to
+        read: ``Task.exception()`` raises ``CancelledError`` for it, which would escape the callback.
+        """
+        if close_task.cancelled():
+            return
+        close_exc = close_task.exception()
+        if close_exc is not None:
+            log.debug("A Google async client could not be closed", fields=error_fields(exc=close_exc))
 
     @classmethod
     async def prepare_image_part(cls, prompt_image: PromptImage) -> genai_types.Part:

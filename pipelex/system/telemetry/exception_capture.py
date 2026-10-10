@@ -7,6 +7,7 @@ from pipelex import log
 from pipelex.system.caller_identity import CallerIdentity, find_stamped_caller_identity, get_current_caller_identity
 from pipelex.system.telemetry.otel_constants import PostHogAttr
 from pipelex.system.telemetry.telemetry_identity import StreamIdentityRule, TelemetryIdentity
+from pipelex.tools.log.error_fields import error_fields
 
 if TYPE_CHECKING:
     # Deferred import: avoid pulling heavy SDK at module-load time
@@ -141,7 +142,7 @@ class ExceptionCapture:
                 client.capture_exception(posthog_exc_info, properties={PostHogAttr.PROCESS_PERSON_PROFILE: False})
         except Exception as capture_exc:  # ruff: ignore[blind-except]
             # Telemetry must never break the app: a failed exception capture is logged at debug and swallowed.
-            log.debug(f"Failed to capture exception to PostHog: {capture_exc}")
+            log.debug("An exception could not be captured to PostHog", fields=error_fields(exc=capture_exc))
 
     @classmethod
     def is_marked_as_captured(cls, *, exception: "ExceptionArg") -> bool:

@@ -96,7 +96,7 @@ class ActivityEventLogCache:
         # land in the workflow's replay-rebuilt buffer (replay determinism), whether the activity runs co-located with
         # the workflow router or on a separate worker pool.
         log.info(
-            "Activity-side usage event emission engaged, through this process's activity event log",
+            "Usage events are emitted through this process's activity event log",
             fields={"writer_id": writer_id, "workflow_id": workflow_id},
         )
 

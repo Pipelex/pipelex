@@ -146,7 +146,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         # value is ambiguous (None both when no tracer existed and when a costs-only tracer
         # legitimately tears down without a GraphSpec).
         if key in self._tracers:
-            log.warning("Replacing a graph tracer left over by an interrupted execution whose cleanup never ran", fields={"tracer_key": key})
+            log.warning("A graph tracer left over by an interrupted execution was replaced", fields={"tracer_key": key})
             try:
                 self.close_tracer(key)
             except Exception as stale_teardown_exc:  # ruff: ignore[blind-except]
@@ -156,7 +156,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
                 # leak state deciding setup success). close_tracer pops before tearing down,
                 # so the key is free either way.
                 log.warning(
-                    "The teardown of a stale graph tracer raised; replacing it anyway",
+                    "The teardown of a stale graph tracer failed, and the tracer was replaced",
                     fields={"tracer_key": key, **error_fields(exc=stale_teardown_exc)},
                 )
 

@@ -185,7 +185,7 @@ make check-rich-imports       - Refuse a module-level Rich import or reach outsi
 make cri                      - Shorthand -> check-rich-imports
 make check-actions-allowlist  - Refuse a workflow action outside the committed Actions allowlist
 make caa                      - Shorthand -> check-actions-allowlist
-make check-log-calls          - Refuse an interpolated log message at INFO+ and Rich markup in any log message, against a baseline that only shrinks from origin/dev's merge base (LOG_CALL_BASELINE_REF=<ref> to compare with another)
+make check-log-calls          - Refuse an interpolated log message at INFO+, Rich markup, a message worded against the conventions and a spliced exception, against a baseline that only shrinks from origin/dev's merge base (LOG_CALL_BASELINE_REF=<ref> to compare with another)
 make clc                      - Shorthand -> check-log-calls
 make check-TODOs              - Check for TODOs
 

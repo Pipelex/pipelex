@@ -200,7 +200,7 @@ def graph_render_cmd(
         # would write. No sink reads a log message as markup, so the fields hold the text as written; the
         # console print below does read markup, and a path may hold brackets, so it prints the text escaped.
         log.error(
-            "The graph spec was refused, so no graph was rendered", fields={OTelLogAttr.FILE_PATH: str(input_file), **error_fields(exc=spec_error)}
+            "The graph spec was refused and no graph was rendered", fields={OTelLogAttr.FILE_PATH: str(input_file), **error_fields(exc=spec_error)}
         )
         console = get_console()
         console.print(f"\n[bold red]Failed to render graph[/bold red]\n\n{escape(str(spec_error))}\n")

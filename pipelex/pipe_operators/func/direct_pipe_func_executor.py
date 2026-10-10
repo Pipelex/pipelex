@@ -133,7 +133,7 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
         for emitted in emit_python_structures(qualified_library):
             generated_target = workdir / emitted.filename
             if generated_target.exists():
-                log.verbose(f"Structures file '{emitted.filename}' was shipped by the method; keeping the shipped copy over the generated one.")
+                log.verbose(f"The structures file '{emitted.filename}' the method shipped was kept over the generated one")
                 continue
             generated_target.parent.mkdir(parents=True, exist_ok=True)
             generated_target.write_text(emitted.content, encoding="utf-8")

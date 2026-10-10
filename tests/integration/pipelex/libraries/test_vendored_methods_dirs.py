@@ -98,7 +98,7 @@ class TestVendoredMethodsDirs:
         pin_warnings = [
             (record.__dict__["method_ref"], record.__dict__["package_version"])
             for record in caplog.records
-            if record.getMessage() == "A method reference pins a tag, and the copy shipped with the request is another version, which is used"
+            if record.getMessage() == "A shipped method copy was used though its version is not the pinned tag"
         ]
         assert pin_warnings == [(pinned_alias, "1.0.0")]
 

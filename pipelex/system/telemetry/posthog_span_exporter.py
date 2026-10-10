@@ -23,6 +23,7 @@ from pipelex.system.telemetry.otel_constants import (
 )
 from pipelex.system.telemetry.telemetry_config import TelemetryRedactionConfig
 from pipelex.system.telemetry.telemetry_identity import RunIdentityPolicy, TelemetryIdentity
+from pipelex.tools.log.error_fields import error_fields
 
 
 class PostHogSpanExporter(SpanExporter):
@@ -372,7 +373,7 @@ class PostHogSpanExporter(SpanExporter):
 
             except Exception as exc:  # ruff: ignore[blind-except]
                 # Fail silently to avoid breaking app
-                log.debug(f"Failed to export span to PostHog: {exc}")
+                log.debug("A span could not be exported to PostHog", fields=error_fields(exc=exc))
 
         return SpanExportResult.SUCCESS
 

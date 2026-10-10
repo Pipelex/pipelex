@@ -12,8 +12,8 @@ from pipelex.providers.bedrock.bedrock_message import BedrockMessageDictList
 
 class BedrockClientBoto3(BedrockClientProtocol):
     def __init__(self, aws_region: str):
-        log.debug(f"Initializing BedrockClientBoto3 with region '{aws_region}'")
         self.boto3_client = boto3.client(service_name="bedrock-runtime", region_name=aws_region)  # pyright: ignore[reportUnknownMemberType]
+        log.debug(f"A Bedrock client was made on boto3 for region '{aws_region}'")
 
     @override
     async def chat(

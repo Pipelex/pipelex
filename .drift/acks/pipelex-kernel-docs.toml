@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:fb848d94ab17c80a70f8e6118a66de94ae5be10c3688e8c3e55f224d6106e3d9"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-09T22:54:09Z"
-rationale = "clean-pass: judgment_ops.py's no-probability warning keeps its level and becomes a fixed message with pipe_code, threshold and model_handle as fields, and llm_ops.py's two cycle and hop-limit lines in concrete_llm_model_handle move from WARNING to DEBUG with fixed messages; no kernel function, parameter or behaviour moved. Re-read pipelex-kernel.md: its run_judgment paragraph still holds (a live run with a declared threshold and no probability logs a warning), and it describes no log line of concrete_llm_model_handle."
+digest = "sha256:e6e3f137fdaf249212cfe9710089203db64a6cf09219861edc1438ee8bf4d3d7"
+reviewed_by = "Claude (Opus 5.5)"
+reviewed_at = "2026-10-10T11:27:10Z"
+rationale = "clean-pass: judgment_ops.py rewords the warning of run_judgment when a declared threshold meets an answer with no probability, same level and the same pipe_code, threshold and model_handle fields; no kernel function, parameter or behaviour moved. Re-read pipelex-kernel.md and checked its run_judgment paragraph against make_verdict_content: threshold_applied is false only when a threshold is declared, the answer has no probability and the run is not dry, and run_judgment warns exactly then, so the claim that a live run logs a warning and reports threshold_applied as false still holds; the page quotes no message. Nothing was stale."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -16,7 +16,7 @@ rationale = "clean-pass: judgment_ops.py's no-probability warning keeps its leve
 "pipelex/kernel/img_gen_ops.py" = "blob:b85360f6c118e93be53bf8d1a04504ccb7552469"
 "pipelex/kernel/img_gen_prompt.py" = "blob:1f6347e10eaab2eb229fa1cee080c6bbc7878bd2"
 "pipelex/kernel/img_gen_results.py" = "blob:46b4ca11c70d906ae6d58ce66461f9b3414f1bfa"
-"pipelex/kernel/judgment_ops.py" = "blob:97acd7bdff4279b3c0ed01cc48f31716f0347cb4"
+"pipelex/kernel/judgment_ops.py" = "blob:4b01f5618b8484ae29041151c8cd3f8ad523ce70"
 "pipelex/kernel/judgment_results.py" = "blob:40ba1258cc81d34df3e427d5511ccd40c6edf789"
 "pipelex/kernel/llm_ops.py" = "blob:d37a9c3718a37f5e7d1550d1512dddbf79032cae"
 "pipelex/kernel/llm_prompt_content.py" = "blob:eabf0ee760c3a26b8967973d511e712e9275e99b"

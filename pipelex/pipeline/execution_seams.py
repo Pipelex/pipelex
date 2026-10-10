@@ -148,7 +148,7 @@ def acquire_library(
                         except (OSError, RuntimeError):
                             resolved_uri = Path(uri)
                         if resolved_uri in current_library.loaded_mthds_paths:
-                            log.verbose(f"Bundle '{uri}' already loaded from library directories, skipping")
+                            log.verbose(f"Bundle '{uri}' was skipped, already loaded from library directories")
                         else:
                             blueprints_to_load.append(blueprint)
 

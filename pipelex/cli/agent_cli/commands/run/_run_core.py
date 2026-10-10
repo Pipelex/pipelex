@@ -169,7 +169,7 @@ async def run_pipeline_core(
             cost_summary = CostRegistry.build_cost_summary(tokens_usages=pipe_output.tokens_usages)
         except PipelexError as cost_summary_error:
             log.warning(
-                "The run succeeded but its cost summary could not be built, so the output carries no cost report",
+                "The cost summary of a successful run could not be built",
                 fields=error_fields(exc=cost_summary_error),
             )
         else:
