@@ -120,17 +120,20 @@ review = [
 verify_commands = []
 
 [contracts.log-call-convention]
-description = "The log-calls doc is the log-call guard's specification and must track the guard's behavior."
+description = "The log-calls doc is the log-call guard's specification and its command's reference, and must track the guard's behavior and the command's options and output."
 # The page states what the guard reads (the scanned trees, every way a module reaches the facade, a
 # message and its titles), each rule it refuses a call under, how a name is resolved through the
 # bindings and control flow of its scope, what counts as a Rich tag, and the baseline's key,
-# signature and shrink-only comparison. A reading, a rule or a signature changed in the guard
-# silently falsifies the page a contributor converts a call by, which is the staleness this contract
-# exists to catch. No verify command: `check-log-calls` already gates `make check`, `make
-# agent-check` and CI, so re-running it here would only add the unstaged-file hard error without
-# adding a guarantee.
+# signature and shrink-only comparison. Under "Running it" it also states what each of the
+# command's options does and what a pass and a failure print, which the command module decides. A
+# reading, a rule or a signature changed in the guard, or an option or an output changed in the
+# command, silently falsifies the page a contributor converts a call by, which is the staleness
+# this contract exists to catch. No verify command: `check-log-calls` already gates `make check`,
+# `make agent-check` and CI, so re-running it here would only add the unstaged-file hard error
+# without adding a guarantee.
 triggers = [
   "pipelex/cli/dev_cli/commands/log_call_guard.py",
+  "pipelex/cli/dev_cli/commands/check_log_calls_cmd.py",
 ]
 review = [
   "docs/contribute/log-calls.md",

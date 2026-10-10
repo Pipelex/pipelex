@@ -16,7 +16,7 @@ is cut short past ``FIELD_VALUE_MAX_LENGTH``, or past the generous length ``FIEL
 own, a handled exception's text and a template finding's. A value is cut at its end, except a path's, or a list of
 paths', which is cut at its start so the last file's name stays: a field is taken for a path by its name, one ending
 in ``LEFT_CUT_FIELD_SUFFIXES`` (``file.path``, ``root_path``, ``override_paths``, ``library_dirs``, ``template_file``)
-or one of ``LEFT_CUT_FIELDS`` (``file.name``). The text is cut before it is quoted and escaped, a string's own or a
+or one listed whole in ``LEFT_CUT_FIELDS``. The text is cut before it is quoted and escaped, a string's own or a
 JSON rendering alike, so a quoted value keeps both its quotes and no escape is split, and the cut can never leave an
 unbalanced quote or bracket whose tail reads as another pair. A key is written the same way, so a field name holding a
 line break, a space, an equals sign or an escape sequence can forge neither a line nor a pair. Redaction has already
