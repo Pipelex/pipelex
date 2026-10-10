@@ -457,7 +457,7 @@ key = "is_console_logging_enabled"
 [[migration]]
 id = "pipelex-config@6"
 to_schema_version = 6
-introduced_in = "0.80.0"
+introduced_in = "0.81.0"
 breaking = true
 safety = "safe"
 title = "Retire the DEV log level: a file naming it logs at INFO"
