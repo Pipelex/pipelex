@@ -931,12 +931,20 @@ class TargetWithRequiredNote(StructuredContent):
     required_note: str = Field(description="A required note")
 
 
+class TargetWithNullableNotes(StructuredContent):
+    """A Python-declared target whose notes admit `None`, one required and one defaulted to a value."""
+
+    required_nullable_note: str | None = Field(description="A required note that admits None")
+    defaulted_nullable_note: str | None = Field(default="fallback", description="A defaulted note that admits None")
+
+
 @pytest.mark.asyncio(loop_scope="class")
 class TestStructuredContentComposerSourceHoldingNothing:
-    """A path reaching a field that holds nothing leaves the target field unset, never nulled.
+    """A path reaching a field that holds nothing feeds the target field `None`, unless it refuses `None` but has a default.
 
-    A defaulted field never holds nothing, so nulling it would fail the composition; left unset, it takes its
-    default. A field that may hold nothing holds nothing either way, and a required one is refused either way.
+    A generated defaulted field refuses `None`, so nulling it would fail the composition; left unset, it takes its
+    default. A field whose annotation admits `None` keeps it, required or defaulted, and a required one refusing
+    it is refused.
     """
 
     @pytest.fixture
@@ -976,3 +984,20 @@ class TestStructuredContentComposerSourceHoldingNothing:
         )
         with pytest.raises(StructuredContentComposerValidationError, match="required_note"):
             await composer.compose()
+
+    async def test_a_target_that_admits_none_keeps_it(self, working_memory_with_empty_note: WorkingMemory):
+        blueprint = ConstructBlueprint.make_from_raw(
+            {"required_nullable_note": {"from": "source.note"}, "defaulted_nullable_note": {"from": "source.note"}}
+        )
+
+        composer = StructuredContentComposer(
+            templating_style=_TEMPLATING_STYLE,
+            construct_blueprint=blueprint,
+            working_memory=working_memory_with_empty_note,
+            output_class=TargetWithNullableNotes,
+        )
+        result = await composer.compose()
+
+        assert isinstance(result, TargetWithNullableNotes)
+        assert result.required_nullable_note is None
+        assert result.defaulted_nullable_note is None

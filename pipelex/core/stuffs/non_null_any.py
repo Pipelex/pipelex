@@ -17,6 +17,8 @@ from pydantic import AfterValidator
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticCustomError
 
+from pipelex.tools.typing.annotation_utils import annotation_admits_none
+
 
 def _refuse_none(  # kw-only: ignore -- pydantic calls an AfterValidator positionally
     value: Any,
@@ -31,6 +33,7 @@ def _refuse_none(  # kw-only: ignore -- pydantic calls an AfterValidator positio
 NonNullAny = Annotated[Any, AfterValidator(_refuse_none)]
 
 
-def is_non_null_any(*, field_info: FieldInfo) -> bool:
-    """Whether a class field is annotated `NonNullAny`, whose `Any` annotation, unlike a bare one, never admits `None`."""
-    return any(isinstance(constraint, AfterValidator) and constraint.func is _refuse_none for constraint in field_info.metadata)
+def field_admits_none(*, field_info: FieldInfo) -> bool:
+    """Whether a class field admits `None`, read off its annotation, `NonNullAny` being the one `Any` that does not."""
+    is_non_null_any = any(isinstance(constraint, AfterValidator) and constraint.func is _refuse_none for constraint in field_info.metadata)
+    return annotation_admits_none(annotation=field_info.annotation) and not is_non_null_any

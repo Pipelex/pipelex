@@ -16,8 +16,10 @@ from pipelex.config import get_config
 from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.exceptions import InputShapingError
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.interpreter_hub import get_pipe_router
+from pipelex.graph.graph_tracer_manager import GraphTracerManager
+from pipelex.interpreter_hub import clear_current_library, get_library_manager, get_pipe_router
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
+from pipelex.runtime_hub import get_report_delegate
 
 _BINDING_MTHDS = """
 domain = "never_nothing"
@@ -46,9 +48,19 @@ steps = [{ from = "doc.note", result = "note" }]
 """
 
 
+def _cleanup(*, pipeline_run_id: str, library_id: str) -> None:
+    """Tear down what `pipeline_run_setup` leaves open on its success path, which its caller owns when it runs the job itself."""
+    get_report_delegate().clear_event_log(context_key=pipeline_run_id)
+    tracer_manager = GraphTracerManager.get_instance()
+    if tracer_manager is not None:
+        tracer_manager.close_tracer(pipeline_run_id)
+    get_library_manager().teardown(library_id=library_id)
+    clear_current_library()
+
+
 async def _run_bind_note(*, doc: dict[str, Any]) -> AbsenceRecord | TextContent:
     execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False)
-    pipe_job, _pipeline_run_id, _ = await pipeline_run_setup(
+    pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
         storage_scope="test/scope",
         read_scope=None,
         user_id="test-user",
@@ -57,7 +69,10 @@ async def _run_bind_note(*, doc: dict[str, Any]) -> AbsenceRecord | TextContent:
         pipe_code="bind_note",
         inputs={"doc": doc},
     )
-    pipe_output = await get_pipe_router().run(pipe_job=pipe_job)
+    try:
+        pipe_output = await get_pipe_router().run(pipe_job=pipe_job)
+    finally:
+        _cleanup(pipeline_run_id=pipeline_run_id, library_id=library_id)
     resolved = pipe_output.working_memory.resolve_main_stuff()
     if isinstance(resolved, AbsenceRecord):
         return resolved

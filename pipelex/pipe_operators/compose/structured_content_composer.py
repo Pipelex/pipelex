@@ -8,6 +8,7 @@ from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.non_null_any import field_admits_none
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
@@ -130,20 +131,27 @@ class StructuredContentComposer:
         """Resolve all fields in the blueprint to their values.
 
         Returns:
-            Dictionary mapping field names to resolved values, a field whose source holds nothing left out
+            Dictionary mapping field names to resolved values, a defaulted field refusing `None` left out when its source holds nothing
         """
         field_values: dict[str, Any] = {}
 
         for field_name, field_blueprint in self.construct_blueprint.fields.items():
             field_value = await self._resolve_field(field_blueprint=field_blueprint, field_name=field_name)
-            if field_value is None:
-                # Only a path reaching a field that holds nothing resolves to `None`, and it leaves the target
-                # field unset rather than nulled: a defaulted field never holds nothing, so it takes its
-                # default, and a field that may hold nothing holds nothing all the same.
+            if field_value is None and self._takes_its_default_over_nothing(field_name=field_name):
                 continue
             field_values[field_name] = field_value
 
         return field_values
+
+    def _takes_its_default_over_nothing(self, *, field_name: str) -> bool:
+        """Whether a target field fed a source holding nothing is left unset, to take its default.
+
+        Only a path reaching a field that holds nothing resolves to `None`. A target field that refuses `None` but has
+        a default, as a generated defaulted field does, takes that default. One that admits `None`, as a Python class
+        may declare `str | None` with or without a default, keeps it, and a required one refusing it is refused.
+        """
+        target_field = self.output_class.model_fields.get(field_name)
+        return target_field is not None and not target_field.is_required() and not field_admits_none(field_info=target_field)
 
     async def _resolve_field(self, field_blueprint: ConstructFieldBlueprint, *, field_name: str) -> Any:
         """Resolve a single field according to its composition method.

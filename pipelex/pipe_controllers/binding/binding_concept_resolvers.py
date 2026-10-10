@@ -36,7 +36,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.native.pinned_blueprints import make_pinned_native_blueprint
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.qualified_ref import QualifiedRef
-from pipelex.core.stuffs.non_null_any import is_non_null_any
+from pipelex.core.stuffs.non_null_any import field_admits_none
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.libraries.concept.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
@@ -309,7 +309,7 @@ class LibraryConceptWalkResolver(ConceptWalkResolver):
         # A class states what a field may hold through its annotation: one that admits `None` may hold nothing, whether it
         # is required or has a default, and so does one left unrequired with no default. `NonNullAny` is the one `Any` that
         # refuses `None`, as a generated class spells a required open field.
-        is_nullable = _admits_none(annotation=field_info.annotation) and not is_non_null_any(field_info=field_info)
+        is_nullable = field_admits_none(field_info=field_info)
         may_hold_nothing = is_nullable or (not field_info.is_required() and field_info.default is None and field_info.default_factory is None)
         annotation, _ = _strip_optional(annotation=field_info.annotation)
         is_list = get_origin(annotation) is list
@@ -365,16 +365,6 @@ class LibraryConceptWalkResolver(ConceptWalkResolver):
         if len(concept_keys) <= 1:
             return concept_keys
         return [concept_key for concept_key in concept_keys if _package_alias_of(concept_key=concept_key) == package_alias] or concept_keys
-
-
-def _admits_none(*, annotation: Any) -> bool:
-    """Whether a field annotation admits `None`: `None` itself, `Any`, or a union with a `None` arm."""
-    if annotation is None or annotation is type(None) or annotation is Any:
-        return True
-    origin = get_origin(annotation)
-    if origin is Union or origin is types.UnionType:
-        return any(_admits_none(annotation=arm) for arm in get_args(annotation))
-    return False
 
 
 def _strip_optional(*, annotation: Any) -> tuple[Any, bool]:

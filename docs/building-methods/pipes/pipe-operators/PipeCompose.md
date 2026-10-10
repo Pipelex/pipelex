@@ -164,9 +164,9 @@ products_by_sku = { from = "products", list_to_dict_keyed_by = "sku" }
 
 The referenced value must be a list, and every item must carry the key attribute with a string value — otherwise the composer raises an error.
 
-A `from` path reaching a field that holds nothing, such as an optional `order.note` left unset, leaves the target field unset rather than setting it to `null`: a target field with a `default_value` takes its default, an optional one holds nothing, and a required one is refused as missing.
-
 A `from` path and a `list_to_dict_keyed_by` name read public fields only: validation refuses a segment starting with an underscore, such as `{ from = "order._stuff" }`, for the reason the [Template Sandbox](../../../under-the-hood/template-sandbox.md) gives.
+
+A `from` path reaching a field that holds nothing, such as an optional `order.note` left unset, gives the target field nothing. A target field with a `default_value` is left unset and takes its default, since it never holds nothing; an optional one holds nothing; and a required one is refused. A Python class field typed `X | None` holds nothing whether it is required or defaulted. With `list_to_dict_keyed_by`, a path holding nothing is refused, since the modifier needs a list.
 
 ### Copying Whole Inputs Into Native Fields
 

@@ -25,3 +25,13 @@ def unwrap_optional(annotation: Any) -> Any:
     if len(non_none_args) < len(args) and len(non_none_args) == 1:
         return non_none_args[0]
     return annotation
+
+
+def annotation_admits_none(*, annotation: Any) -> bool:
+    """Whether a field annotation admits `None`: `None` itself, `Any`, or a union with a `None` arm."""
+    if annotation is None or annotation is type(None) or annotation is Any:
+        return True
+    origin = get_origin(annotation)
+    if origin is Union or origin is types.UnionType:
+        return any(annotation_admits_none(annotation=arm) for arm in get_args(annotation))
+    return False
