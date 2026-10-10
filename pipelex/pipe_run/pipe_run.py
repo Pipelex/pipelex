@@ -80,12 +80,14 @@ class PipeRun(PipeRunProtocol):
             if tracer_manager is not None:
                 try:
                     tracer_manager.close_tracer(pipeline_run_id)
-                except OSError:
+                except OSError as close_error:
                     if execution_error is None:
                         raise
+                    # A secondary failure rides as fields with no traceback: the execution error is chained onto it, so
+                    # its traceback would print the execution error's text, which can quote the run's inputs.
                     log.error(
                         "Closing the graph tracer also failed after the pipe execution failed; the execution error is raised",
-                        include_exception=True,
+                        fields=error_fields(exc=close_error),
                     )
 
             # Assemble graph and/or usage onto pipe_output from the single trace-event read. The two
@@ -118,12 +120,13 @@ class PipeRun(PipeRunProtocol):
                         error_report=error_report,
                         request_id=pipe_job.job_metadata.run_metadata.request_id,
                     )
-                except DeliveryError:
+                except DeliveryError as delivery_error:
                     if execution_error is None:
                         raise
+                    # As fields with no traceback, for the same reason as the tracer's: the execution error is chained onto it.
                     log.error(
                         "The delivery also failed after the pipe execution failed; the execution error is raised",
-                        include_exception=True,
+                        fields=error_fields(exc=delivery_error),
                     )
 
         if execution_error is not None:

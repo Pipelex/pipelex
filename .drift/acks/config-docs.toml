@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:60f133d29f876531c0a63174baacbd92589aa8eed58b783c840706a84fba0bcc"
+digest = "sha256:befa3b014fb06f0fd7cdc943212d7d5b86f7eca17b5e8c7b8bb9b001af97b375"
 reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-10-09T23:47:39Z"
-rationale = "clean-pass: config_surface.py's StaleConfigurationFile.log_fields now spells its file.path key through OTelLogAttr.FILE_PATH, the same key with the same value, and no config model, default, validator or ledger entry moved. Re-read docs/configuration: inference-backend-config.md's quoted console line still matches the warning, its path short enough that the console's new left cut of a long path does not change it, and logging-config.md says nothing about how the console cuts a field; configs.py, config_cogt.py and the ledgers are untouched."
+reviewed_at = "2026-10-10T00:27:59Z"
+rationale = "real-catch: StaleConfigurationWarning.emit in config_surface.py now words its messages 'and nothing was written' and has two more messages for a file with blocked steps, reached by pipelex migrate or not. Re-read docs/configuration: inference-backend-config.md quoted the old 'without being rewritten' line and now quotes the reached, unblocked message as the code emits it; telemetry-config.md and logging-config.md only say the boot warns and writes nothing, which still holds. No config model, default, validator or ledger entry moved: configs.py, config_cogt.py and pipelex/migration/ledgers/ are untouched."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:02f71cb4a6b01aebda59c2e31f262ef9c865e17b"
@@ -16,7 +16,7 @@ rationale = "clean-pass: config_surface.py's StaleConfigurationFile.log_fields n
 "pipelex/system/configuration/config_loader.py" = "blob:2850f6b39df6ad2afafefc4d431672cb6ee91ced"
 "pipelex/system/configuration/config_model.py" = "blob:83b29dc6e93393c9b98c4353636caf0135c80339"
 "pipelex/system/configuration/config_root.py" = "blob:c7d43851270912d17413cfc6a511247d3c7cc160"
-"pipelex/system/configuration/config_surface.py" = "blob:2d6435262ec2f57c655e97951fd1a0ace14815b3"
+"pipelex/system/configuration/config_surface.py" = "blob:7d865822cb339818ac54bbd0d623ad0b39f690fd"
 "pipelex/system/configuration/configs.py" = "blob:1754391061f3be47e28088a4f8ea85e60b1cdd2b"
 "pipelex/system/configuration/pipe_func_config.py" = "blob:dc8890e914fbcdb611147e42eaa0cd87b32288a5"
 "pipelex/system/telemetry/telemetry_config.py" = "blob:068a785d97a2d52ee43e82e723cd944b8b6601bc"

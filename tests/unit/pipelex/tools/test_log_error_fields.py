@@ -6,8 +6,10 @@ import logging
 from typing import TYPE_CHECKING
 
 import pytest
-from pydantic import BaseModel, RootModel, ValidationError
+from pydantic import BaseModel, RootModel, ValidationError, field_validator, model_validator
+from pydantic_core import PydanticCustomError
 
+from pipelex.core.stuffs.date_content import DateContent
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.tools.log.error_fields import ERROR_MESSAGE_FIELD, ERROR_TYPE_FIELD, error_fields
 from pipelex.tools.log.json_log_sink import EXCEPTION_KEY, LOGGER_KEY, MESSAGE_KEY, JsonLogSink
@@ -30,6 +32,55 @@ class _Settings(BaseModel):
 
 class _Retries(RootModel[int]):
     pass
+
+
+# A value no secret pattern matches, so the redaction never hides it and only the field's own rule can keep it out.
+_PAYLOAD = "confidential-patient-diagnosis"
+
+
+class _Diagnosis(BaseModel):
+    """A model whose validators quote the value they reject, as a custom validator is free to."""
+
+    diagnosis: str
+    severity: int = 0
+    code: str = "none"
+    reviewed: bool = False
+
+    @field_validator("diagnosis")
+    @classmethod
+    def _diagnosis_is_coded(cls, value: str) -> str:
+        if not value.startswith("ICD-"):
+            msg = f"{value!r} is not a coded diagnosis"
+            raise ValueError(msg)
+        return value
+
+    @field_validator("code")
+    @classmethod
+    def _code_is_known(cls, value: str) -> str:
+        if value != "none":
+            error_type = "unknown_code"
+            message_template = "The code {code} is not known"
+            raise PydanticCustomError(error_type, message_template, {"code": value})
+        return value
+
+    @field_validator("severity", mode="before")
+    @classmethod
+    def _severity_is_spelt_out(cls, value: object) -> object:
+        if isinstance(value, str) and not value.isdigit():
+            # A custom error borrowing a built-in type's name, with a message of its own that quotes the input.
+            error_type = "int_parsing"
+            message_template = "Severity {severity} is not a number"
+            raise PydanticCustomError(error_type, message_template, {"severity": value})
+        return value
+
+
+class _Review(BaseModel):
+    note: str
+
+    @model_validator(mode="after")
+    def _note_is_signed(self) -> _Review:
+        assert self.note.endswith("-- signed"), f"unsigned note {self.note!r}"
+        return self
 
 
 class TestLogErrorFields:
@@ -72,6 +123,49 @@ class TestLogErrorFields:
             _Retries.model_validate("sk-live-4f9a8b7c6d5e4f3a2b1c")
 
         assert error_fields(exc=caught.value)[ERROR_MESSAGE_FIELD] == "Input should be a valid integer, unable to parse string as an integer"
+
+    @pytest.mark.parametrize(
+        ("topic", "document", "expected"),
+        [
+            ("a field validator's ValueError", {"diagnosis": _PAYLOAD}, "diagnosis: value_error"),
+            ("a PydanticCustomError of its own type", {"diagnosis": "ICD-10", "code": _PAYLOAD}, "code: unknown_code"),
+            ("a PydanticCustomError borrowing a built-in type's name", {"diagnosis": "ICD-10", "severity": _PAYLOAD}, "severity: int_parsing"),
+        ],
+    )
+    def test_a_custom_validator_message_is_written_as_its_type_never_its_text(self, topic: str, document: dict[str, object], expected: str) -> None:
+        """A validator writes its own message, and a message can quote the very value the validator rejected."""
+        with pytest.raises(ValidationError) as caught:
+            _Diagnosis.model_validate(document)
+        assert _PAYLOAD in str(caught.value), topic
+
+        message = error_fields(exc=caught.value)[ERROR_MESSAGE_FIELD]
+
+        assert message == expected, topic
+        assert _PAYLOAD not in message, topic
+
+    def test_a_model_validator_assertion_has_no_location_and_is_written_as_its_type(self) -> None:
+        with pytest.raises(ValidationError) as caught:
+            _Review.model_validate({"note": _PAYLOAD})
+        assert _PAYLOAD in str(caught.value)
+
+        assert error_fields(exc=caught.value)[ERROR_MESSAGE_FIELD] == "assertion_error"
+
+    def test_a_date_content_rejection_is_written_without_the_value_it_quotes(self) -> None:
+        """`DateContent`'s validator names the string it could not read as a date, which can be a run's input."""
+        with pytest.raises(ValidationError) as caught:
+            DateContent.model_validate({"date": _PAYLOAD})
+        assert _PAYLOAD in caught.value.errors()[0]["msg"]
+
+        assert error_fields(exc=caught.value) == {ERROR_TYPE_FIELD: "ValidationError", ERROR_MESSAGE_FIELD: "date: value_error"}
+
+    def test_pydantic_own_reasons_are_kept_beside_a_custom_one(self) -> None:
+        """Only the validator's message goes: the reasons pydantic wrote itself, which quote no input, stay readable."""
+        with pytest.raises(ValidationError) as mixed:
+            _Diagnosis.model_validate({"diagnosis": _PAYLOAD, "reviewed": "not a boolean"})
+
+        assert error_fields(exc=mixed.value)[ERROR_MESSAGE_FIELD] == (
+            "diagnosis: value_error; reviewed: Input should be a valid boolean, unable to interpret input"
+        )
 
     def test_a_text_given_for_a_validation_error_is_carried_as_given(self) -> None:
         with pytest.raises(ValidationError) as caught:

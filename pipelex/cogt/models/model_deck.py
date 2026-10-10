@@ -8,6 +8,7 @@ from pipelex.cogt.config_cogt import ModelDeckConfig
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource, doc_gen_choice_key, parse_doc_gen_choice_key
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice, DocGenSetting
 from pipelex.cogt.exceptions import (
+    CogtError,
     DocGenHandleNotFoundError,
     ExtractHandleNotFoundError,
     ImgGenHandleNotFoundError,
@@ -76,6 +77,14 @@ def _warn_if_ambiguous_bare_handle(
             "prefix it ($ or preset:, @ or alias:, ~ or waterfall:) to avoid the ambiguity",
             fields={"model_handle": name, "model_type": model_type, "matching_reference_kinds": matching_reference_kinds},
         )
+
+
+def _warn_of_unresolvable_preset(*, model_type: ModelType, preset_id: str, model_handle: str | None, exc: CogtError) -> None:
+    """Warn that a preset names a model the deck cannot resolve, for a deck whose `missing_presets_reaction` is to log it."""
+    log.warning(
+        "A preset of the model deck names a model the deck cannot resolve",
+        fields={"model_type": model_type, "preset_id": preset_id, "model_handle": model_handle, **error_fields(exc=exc)},
+    )
 
 
 class LLMDeckBlueprint(ConfigModel):
@@ -907,10 +916,7 @@ class ModelDeck(ConfigModel):
                         enabled_backends=exc.enabled_backends,
                     ) from exc
                 case ProblemReaction.LOG:
-                    log.warning(
-                        "A preset of the model deck names a model the deck cannot resolve",
-                        fields={"model_type": ModelType.LLM, "preset_id": exc.preset_id, "model_handle": exc.model_handle, **error_fields(exc=exc)},
-                    )
+                    _warn_of_unresolvable_preset(model_type=ModelType.LLM, preset_id=exc.preset_id, model_handle=exc.model_handle, exc=exc)
                 case ProblemReaction.NONE:
                     pass
         try:
@@ -926,15 +932,7 @@ class ModelDeck(ConfigModel):
                         model_handle=exc.model_handle,
                     ) from exc
                 case ProblemReaction.LOG:
-                    log.warning(
-                        "A preset of the model deck names a model the deck cannot resolve",
-                        fields={
-                            "model_type": ModelType.IMG_GEN,
-                            "preset_id": exc.preset_id,
-                            "model_handle": exc.model_handle,
-                            **error_fields(exc=exc),
-                        },
-                    )
+                    _warn_of_unresolvable_preset(model_type=ModelType.IMG_GEN, preset_id=exc.preset_id, model_handle=exc.model_handle, exc=exc)
                 case ProblemReaction.NONE:
                     pass
         try:
@@ -950,15 +948,7 @@ class ModelDeck(ConfigModel):
                         model_handle=exc.model_handle,
                     ) from exc
                 case ProblemReaction.LOG:
-                    log.warning(
-                        "A preset of the model deck names a model the deck cannot resolve",
-                        fields={
-                            "model_type": ModelType.TEXT_EXTRACTOR,
-                            "preset_id": exc.preset_id,
-                            "model_handle": exc.model_handle,
-                            **error_fields(exc=exc),
-                        },
-                    )
+                    _warn_of_unresolvable_preset(model_type=ModelType.TEXT_EXTRACTOR, preset_id=exc.preset_id, model_handle=exc.model_handle, exc=exc)
                 case ProblemReaction.NONE:
                     pass
         try:
@@ -974,15 +964,7 @@ class ModelDeck(ConfigModel):
                         model_handle=exc.model_handle,
                     ) from exc
                 case ProblemReaction.LOG:
-                    log.warning(
-                        "A preset of the model deck names a model the deck cannot resolve",
-                        fields={
-                            "model_type": ModelType.SEARCH,
-                            "preset_id": exc.preset_id,
-                            "model_handle": exc.model_handle,
-                            **error_fields(exc=exc),
-                        },
-                    )
+                    _warn_of_unresolvable_preset(model_type=ModelType.SEARCH, preset_id=exc.preset_id, model_handle=exc.model_handle, exc=exc)
                 case ProblemReaction.NONE:
                     pass
         try:
@@ -998,15 +980,7 @@ class ModelDeck(ConfigModel):
                         model_handle=exc.model_handle,
                     ) from exc
                 case ProblemReaction.LOG:
-                    log.warning(
-                        "A preset of the model deck names a model the deck cannot resolve",
-                        fields={
-                            "model_type": ModelType.DOC_GEN,
-                            "preset_id": exc.preset_id,
-                            "model_handle": exc.model_handle,
-                            **error_fields(exc=exc),
-                        },
-                    )
+                    _warn_of_unresolvable_preset(model_type=ModelType.DOC_GEN, preset_id=exc.preset_id, model_handle=exc.model_handle, exc=exc)
                 case ProblemReaction.NONE:
                     pass
         try:
@@ -1022,15 +996,7 @@ class ModelDeck(ConfigModel):
                         model_handle=exc.model_handle,
                     ) from exc
                 case ProblemReaction.LOG:
-                    log.warning(
-                        "A preset of the model deck names a model the deck cannot resolve",
-                        fields={
-                            "model_type": ModelType.JUDGMENT,
-                            "preset_id": exc.preset_id,
-                            "model_handle": exc.model_handle,
-                            **error_fields(exc=exc),
-                        },
-                    )
+                    _warn_of_unresolvable_preset(model_type=ModelType.JUDGMENT, preset_id=exc.preset_id, model_handle=exc.model_handle, exc=exc)
                 case ProblemReaction.NONE:
                     pass
 

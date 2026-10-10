@@ -211,9 +211,13 @@ class DeliveryExecutor:
             return None
         try:
             return AbsenceRecord.model_validate(candidate)
-        except ValidationError:
-            # Treated as missing, the caller then fails the delivery: the record is lost, and this line says why.
-            log.error("The absence record of the main output is malformed, so the delivery has no result to render", include_exception=True)
+        except ValidationError as validation_error:
+            # Treated as missing, the caller then fails the delivery: the record is lost, and this line says why. The
+            # error rides as its fields, never its text or traceback, which quote the values the record held.
+            log.error(
+                "The absence record of the main output is malformed, so the delivery has no result to render",
+                fields=error_fields(exc=validation_error),
+            )
             return None
 
     @classmethod

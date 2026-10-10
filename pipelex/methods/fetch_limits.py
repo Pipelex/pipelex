@@ -5,8 +5,7 @@ bounded here rather than trusted. Values are read once at import time — a chan
 a process restart. The pattern mirrors the request-size ceilings of `pipelex-api`.
 """
 
-from pipelex import log
-from pipelex.system.environment import get_optional_env
+from pipelex.system.environment import get_positive_int_env
 
 DEFAULT_MAX_FETCHED_PACKAGE_FILES = 256
 DEFAULT_MAX_FETCHED_PACKAGE_TOTAL_KIB = 8 * 1024  # 8 MiB across the selected package
@@ -14,25 +13,9 @@ DEFAULT_MAX_MANIFEST_FILE_KIB = 256  # per METHODS.toml read during package loca
 DEFAULT_MAX_SCANNED_MANIFESTS = 100  # METHODS.toml files considered per fetched repository
 
 
-def _read_positive_int(*, env_var: str, default: int) -> int:
-    raw = get_optional_env(env_var)
-    if not raw:
-        return default
-    try:
-        parsed = int(raw)
-    except ValueError:
-        parsed = 0
-    if parsed <= 0:
-        log.warning(
-            "An environment variable holds no positive integer, so the default ceiling applies", fields={"env_var": env_var, "default_value": default}
-        )
-        return default
-    return parsed
-
-
-MAX_FETCHED_PACKAGE_FILES = _read_positive_int(env_var="PIPELEX_MAX_FETCHED_PACKAGE_FILES", default=DEFAULT_MAX_FETCHED_PACKAGE_FILES)
+MAX_FETCHED_PACKAGE_FILES = get_positive_int_env(env_var="PIPELEX_MAX_FETCHED_PACKAGE_FILES", default=DEFAULT_MAX_FETCHED_PACKAGE_FILES)
 MAX_FETCHED_PACKAGE_TOTAL_BYTES = (
-    _read_positive_int(env_var="PIPELEX_MAX_FETCHED_PACKAGE_TOTAL_KIB", default=DEFAULT_MAX_FETCHED_PACKAGE_TOTAL_KIB) * 1024
+    get_positive_int_env(env_var="PIPELEX_MAX_FETCHED_PACKAGE_TOTAL_KIB", default=DEFAULT_MAX_FETCHED_PACKAGE_TOTAL_KIB) * 1024
 )
-MAX_MANIFEST_FILE_BYTES = _read_positive_int(env_var="PIPELEX_MAX_MANIFEST_FILE_KIB", default=DEFAULT_MAX_MANIFEST_FILE_KIB) * 1024
-MAX_SCANNED_MANIFESTS = _read_positive_int(env_var="PIPELEX_MAX_SCANNED_MANIFESTS", default=DEFAULT_MAX_SCANNED_MANIFESTS)
+MAX_MANIFEST_FILE_BYTES = get_positive_int_env(env_var="PIPELEX_MAX_MANIFEST_FILE_KIB", default=DEFAULT_MAX_MANIFEST_FILE_KIB) * 1024
+MAX_SCANNED_MANIFESTS = get_positive_int_env(env_var="PIPELEX_MAX_SCANNED_MANIFESTS", default=DEFAULT_MAX_SCANNED_MANIFESTS)

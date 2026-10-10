@@ -1,6 +1,6 @@
 """`pipelex graph render` when rendering fails: on a spec this version refuses, the diagnosis names the file exactly as
-the user wrote it, and on an unexpected error the log line carries the error as fields while the console prints its
-traceback without the locals.
+the user wrote it, and on an unexpected error the log line carries the exception, whose traceback every sink writes its
+own way, and the console prints none of its own.
 
 Boot, teardown and telemetry are mocked out so no real Pipelex is made; the console is swapped for one
 writing to a buffer so the printed diagnosis can be read back.
@@ -62,9 +62,9 @@ class TestGraphRenderFailure:
         assert str(spec_file) in fields["error.message"]
         assert "\\[" not in fields["error.message"]
 
-    def test_an_unexpected_error_logs_its_fields_and_prints_no_locals(self, mocker: MockerFixture, tmp_path: Path) -> None:
-        """The log line is a fixed message with the error's class and text, and carries no exception, whose chain can quote
-        the graph file's traced content; the console's traceback prints no locals, which would print the loaded graph.
+    def test_an_unexpected_error_logs_its_traceback_once(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """The log line is a fixed message with the file, and carries the exception for every sink to write its traceback,
+        the console under the line; the console prints no traceback of its own, which would show it twice.
         """
         mocker.patch(f"{GRAPH_CMD}.make_pipelex_for_cli")
         mocker.patch(f"{GRAPH_CMD}.Pipelex.teardown_if_needed")
@@ -84,9 +84,6 @@ class TestGraphRenderFailure:
 
         assert exit_info.value.exit_code == 1
         assert "Failed to render graph" in printed.getvalue()
-        assert "the renderer broke" in printed.getvalue()
-        assert " locals ─" not in printed.getvalue()
-        log_spy.error.assert_called_once_with(
-            "The graph could not be rendered",
-            fields={"file.path": str(spec_file), "error.type": "RuntimeError", "error.message": "the renderer broke"},
-        )
+        assert "the renderer broke" not in printed.getvalue()
+        assert "Traceback" not in printed.getvalue()
+        log_spy.error.assert_called_once_with("The graph could not be rendered", fields={"file.path": str(spec_file)}, include_exception=True)

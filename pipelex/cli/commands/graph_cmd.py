@@ -208,14 +208,13 @@ def graph_render_cmd(
 
     except Exception as exc:
         # CLI command root: any unexpected failure is reported to the user and exits non-zero via typer.Exit.
-        # As for a refused spec, the log line carries the error's class and text as fields rather than the
-        # exception itself, whose chain every sink would write: an unexpected rendering error can be raised
-        # from one that quotes the graph file's traced content. The traceback is the console's to print, and
-        # it prints no locals, which would print the loaded graph.
-        log.error("The graph could not be rendered", fields={OTelLogAttr.FILE_PATH: str(input_file), **error_fields(exc=exc)})
+        # An unexpected failure is a bug, and this is the catcher that owns its traceback, so the traceback rides the
+        # log record: the `console` sink renders it under the line, and the `json` and `otlp` sinks write it to the
+        # log store, which a traceback printed on the console alone never reached. The console renders no locals
+        # unless the configuration asks it to, since they would print the loaded graph.
         console = get_console()
         console.print("\n[bold red]Failed to render graph[/bold red]\n")
-        console.print_exception()
+        log.error("The graph could not be rendered", fields={OTelLogAttr.FILE_PATH: str(input_file)}, include_exception=True)
         raise typer.Exit(1) from exc
 
     finally:

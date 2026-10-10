@@ -36,6 +36,8 @@ from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.system.configuration.config_surface import (
     PIPELEX_CONFIG_SURFACE_ID,
     TELEMETRY_CONFIG_SURFACE_ID,
+    StaleConfigurationFile,
+    StaleConfigurationWarning,
     replay_surface_files_in_memory,
     stale_configuration_warning,
 )
@@ -328,6 +330,43 @@ class TestWhatTheWarningSays:
         assert outside_call.kwargs["fields"]["file.path"] == str(outside_file)
         for call in (inside_call, outside_call):
             assert str(tmp_path) not in call.args[0]
+
+    @pytest.mark.parametrize(
+        ("topic", "is_reached_by_migrate", "has_blocked_steps", "expected_remedy"),
+        [
+            ("in reach", True, False, "run `pipelex migrate` to update it"),
+            ("in reach, blocked", True, True, "run `pipelex migrate` to update it, and make by hand the changes it reports it cannot apply"),
+            ("out of reach", False, False, "`pipelex migrate` does not reach it, so update it where it lives"),
+            (
+                "out of reach, blocked",
+                False,
+                True,
+                "`pipelex migrate` does not reach it, so update it where it lives, including changes no migration can apply for you",
+            ),
+        ],
+    )
+    def test_each_message_says_nothing_was_written_and_a_blocked_file_says_so(
+        self, tmp_path: Path, mocker: MockerFixture, topic: str, is_reached_by_migrate: bool, has_blocked_steps: bool, expected_remedy: str
+    ) -> None:
+        """The warning used to be one text that said nothing was written, and that some of what a file needs cannot be applied for
+        the user, with `pipelex migrate` reporting it; a fixed message per file must keep saying both.
+        """
+        stale_file = StaleConfigurationFile(
+            file_path=tmp_path / "pipelex.toml",
+            is_reached_by_migrate=is_reached_by_migrate,
+            migration_steps=["Rename the default log level"],
+            has_blocked_steps=has_blocked_steps,
+        )
+        warning_spy = mocker.patch.object(log, "warning")
+
+        StaleConfigurationWarning(files=[stale_file]).emit()
+
+        warning_spy.assert_called_once()
+        message = warning_spy.call_args.args[0]
+        assert message == (
+            f"A configuration file is out of date and was read as if it had been migrated, and nothing was written; {expected_remedy}"
+        ), topic
+        assert warning_spy.call_args.kwargs["fields"]["has_blocked_steps"] is has_blocked_steps
 
     def test_it_says_what_the_ledger_carried_and_nothing_read_from_the_file(self, tmp_path: Path) -> None:
         """Ledger text only, the same rule the migration report obeys — a boot warning is read in

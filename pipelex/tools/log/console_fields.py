@@ -13,7 +13,9 @@ backslash or a character a terminal would act on, in which case it is quoted, wi
 escaped by a backslash and that character written as its escape; anything else as compact JSON; and the
 whole cut short past ``FIELD_VALUE_MAX_LENGTH``, or past the generous length ``FIELD_MAX_LENGTHS`` gives a field of
 its own, a handled exception's text and a template finding's. A value is cut at its end, except a path's, from
-``LEFT_CUT_FIELDS``, which is cut at its start so the file's name stays. A key is written the same way, so a field name
+``LEFT_CUT_FIELDS``, which is cut at its start so the file's name stays. A string is cut before it is quoted and
+escaped, so a quoted value keeps both its quotes and no escape is split, and the cut can never make the value's tail
+read as another pair. A key is written the same way, so a field name
 holding a line break, a space, an equals sign or an escape sequence can forge neither a line nor a pair. Redaction has
 already run when the console renders a record, so what is rendered is what the scrub left.
 
@@ -157,8 +159,16 @@ def format_field_value(*, value: Any, max_length: int = FIELD_VALUE_MAX_LENGTH, 
     """A field's value as the suffix prints it: one line, a string quoted when it could forge a pair, cut short past ``max_length``.
 
     The cut drops the end of the value and marks it with a trailing ``TRUNCATION_MARK``, or, with ``is_cut_at_start``,
-    drops its start and marks it with a leading one.
+    drops its start and marks it with a leading one. A value written as a string is cut before it is quoted and
+    escaped: cutting the quoted rendering would drop a quote, or split an escape, and the value's tail would then read
+    as pairs of its own, ``file.path=…/file fake=value.txt"``. A value written as JSON is cut as rendered.
     """
+    string_text = _string_value_text(value=value)
+    if string_text is not None:
+        cut_text = (
+            _truncated_at_start(text=string_text, max_length=max_length) if is_cut_at_start else _truncated(text=string_text, max_length=max_length)
+        )
+        return _string_text(text=cut_text, is_quoting_strings=True)
     text = _one_line(value=value, is_quoting_strings=True)
     if is_cut_at_start:
         return _truncated_at_start(text=text, max_length=max_length)
@@ -176,14 +186,24 @@ def one_line_text(*, text: str) -> str:
 
 
 def _one_line(*, value: Any, is_quoting_strings: bool) -> str:
-    if isinstance(value, str):
-        return _string_text(text=value, is_quoting_strings=is_quoting_strings)
+    string_text = _string_value_text(value=value)
+    if string_text is not None:
+        return _string_text(text=string_text, is_quoting_strings=is_quoting_strings)
     if isinstance(value, float) and not math.isfinite(value):
         # ``NaN``, ``Infinity`` or ``-Infinity``, bare, as the wire sinks spell it.
         return str(spell_non_finite(value=value))
+    return one_line_text(text=_compact_json(value=value))
+
+
+def _string_value_text(*, value: Any) -> str | None:
+    """The raw text of a value written as a string, a string itself or what is neither JSON nor a non-finite float; else ``None``."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
     if _renders_as_json(value=value):
-        return one_line_text(text=_compact_json(value=value))
-    return _string_text(text=str(value), is_quoting_strings=is_quoting_strings)
+        return None
+    return str(value)
 
 
 def _renders_as_json(*, value: Any) -> bool:

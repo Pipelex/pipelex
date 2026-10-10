@@ -101,7 +101,7 @@ A failure lists each call the baseline does not list, at its file and line, with
 
 ## Converting a call
 
-1. Rewrite the call by the [conventions](../tools/logging.md#log-call-conventions): a fixed message, its values in `fields` under the names of the vocabulary table, a handled exception through `error_fields` at WARNING and below or `include_exception=True` at ERROR and above.
+1. Rewrite the call by the [conventions](../tools/logging.md#log-call-conventions): a fixed message, its values in `fields` under the names of the vocabulary table, a handled exception through `error_fields` at WARNING and below or `include_exception=True` at ERROR and above, except one that is re-raised, one that failed while another propagated and a swallowed `ValidationError`, which ride as `error_fields` at every level.
 2. Run `make check-log-calls`. It reports the call's signature as stale; editing what a listed call logs without converting it reports the old signature as stale and the new one as unlisted.
 3. Remove the signature, by hand or with `.venv/bin/pipelex-dev check-log-calls --prune`, and commit the file with the change.
 

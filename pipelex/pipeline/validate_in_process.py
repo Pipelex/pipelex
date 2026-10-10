@@ -36,6 +36,7 @@ from pipelex.pipeline.liftable_pipes import LiftablePipeEntry, build_liftable_pi
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.pipeline.validation_report import PipelexValidationReport, build_validation_report
 from pipelex.system.caller_identity import CallerIdentity, scoped_caller_identity
+from pipelex.tools.log.error_fields import error_fields
 
 if TYPE_CHECKING:
     from pipelex.graph.graphspec import GraphSpec
@@ -171,17 +172,18 @@ async def _validate_bundles_in_scope(
                 clear_current_library()
             try:
                 get_library_manager().teardown(library_id=validation_library_id)
-            except PipelexError:
+            except PipelexError as teardown_error:
                 # A teardown failure must not REPLACE the body's in-flight error (the
                 # caller's error would name the teardown instead of the actual problem) —
                 # suppress it and let the primary propagate; raise it only when the body
                 # succeeded. Mirrors act_dry_validate's finally.
                 if body_succeeded:
                     raise
+                # As fields and no traceback: the validation error is chained onto this one, so its traceback would
+                # print the validation error's text, which can quote the bundle, and which its own catcher reports.
                 log.error(
                     "The teardown of the validation library also failed after the validation failed; the original error is raised",
-                    fields={"caller": log_context, "library_id": validation_library_id},
-                    include_exception=True,
+                    fields={"caller": log_context, "library_id": validation_library_id, **error_fields(exc=teardown_error)},
                 )
     return build_validation_report(
         blueprints=result.blueprints,

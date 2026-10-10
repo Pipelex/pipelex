@@ -180,6 +180,37 @@ class TestConsoleFields:
         assert "/Users/someone" not in text.plain
         assert text.plain.endswith(f"excerpt={'x' * (FIELD_VALUE_MAX_LENGTH - len(TRUNCATION_MARK))}{TRUNCATION_MARK}")
 
+    @pytest.mark.parametrize(
+        ("topic", "file_name"),
+        [
+            ("a space", "file fake=value.txt"),
+            ("an equals sign", "file=fake.txt"),
+        ],
+    )
+    def test_a_long_quoted_path_is_cut_before_it_is_quoted_so_its_quotes_stay_balanced(self, topic: str, file_name: str) -> None:
+        """Cut after quoting, the path lost its opening quote, and its tail read as a pair of its own: ``file.path=…/file fake=value.txt"``."""
+        long_path = "/Users/someone/projects/acme/" + "nested-directory/" * 8 + file_name
+        text = rendered_text(record=record_with_fields(message="Read", extra={"file.path": long_path, "attempt": 2}))
+
+        kept_tail = long_path[len(long_path) - FIELD_VALUE_MAX_LENGTH + len(TRUNCATION_MARK) :]
+        assert text.plain.endswith(f'file.path="{TRUNCATION_MARK}{kept_tail}" attempt=2'), topic
+        assert kept_tail.endswith(f"/{file_name}"), topic
+
+    def test_a_long_quoted_value_is_cut_before_it_is_quoted_so_its_closing_quote_stays(self) -> None:
+        """Cut after quoting, a long spaced value lost its closing quote, and every pair after it read as part of it."""
+        excerpt = "two words " * 20
+        text = rendered_text(record=record_with_fields(message="Read", extra={"excerpt": excerpt, "attempt": 2}))
+
+        kept_head = excerpt[: FIELD_VALUE_MAX_LENGTH - len(TRUNCATION_MARK)]
+        assert text.plain.endswith(f'excerpt="{kept_head}{TRUNCATION_MARK}" attempt=2')
+
+    def test_a_cut_never_splits_an_escape(self) -> None:
+        """A quote escaped at the cut kept its backslash and lost the quote, and the backslash then escaped the closing one."""
+        excerpt = "x" * (FIELD_VALUE_MAX_LENGTH - len(TRUNCATION_MARK) - 1) + '"' + "y" * 40
+        text = rendered_text(record=record_with_fields(message="Read", extra={"excerpt": excerpt, "attempt": 2}))
+
+        assert text.plain.endswith(f'excerpt="{"x" * (FIELD_VALUE_MAX_LENGTH - len(TRUNCATION_MARK) - 1)}\\"{TRUNCATION_MARK}" attempt=2')
+
     def test_a_short_path_is_written_whole(self) -> None:
         text = rendered_text(record=record_with_fields(message="Read", extra={"file.path": "/repo/.pipelex/pipelex.toml"}))
 

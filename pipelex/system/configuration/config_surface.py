@@ -278,16 +278,34 @@ class StaleConfigurationWarning(NamedTuple):
     files: list[StaleConfigurationFile]
 
     def emit(self) -> None:
+        """One line per stale file, a fixed message naming that file's remedy.
+
+        The remedy is the command where it reaches the file, with the changes it reports it cannot apply where some
+        steps are blocked, and the file's own place where it does not. Every message says that nothing was written,
+        which is why the same warning comes back at the next boot.
+        """
         for stale_file in self.files:
-            if stale_file.is_reached_by_migrate:
+            if stale_file.is_reached_by_migrate and stale_file.has_blocked_steps:
                 log.warning(
-                    "A configuration file is out of date and was read as if it had been migrated, without being rewritten; "
+                    "A configuration file is out of date and was read as if it had been migrated, and nothing was written; "
+                    "run `pipelex migrate` to update it, and make by hand the changes it reports it cannot apply",
+                    fields=stale_file.log_fields(),
+                )
+            elif stale_file.is_reached_by_migrate:
+                log.warning(
+                    "A configuration file is out of date and was read as if it had been migrated, and nothing was written; "
                     "run `pipelex migrate` to update it",
+                    fields=stale_file.log_fields(),
+                )
+            elif stale_file.has_blocked_steps:
+                log.warning(
+                    "A configuration file is out of date and was read as if it had been migrated, and nothing was written; "
+                    "`pipelex migrate` does not reach it, so update it where it lives, including changes no migration can apply for you",
                     fields=stale_file.log_fields(),
                 )
             else:
                 log.warning(
-                    "A configuration file is out of date and was read as if it had been migrated, without being rewritten; "
+                    "A configuration file is out of date and was read as if it had been migrated, and nothing was written; "
                     "`pipelex migrate` does not reach it, so update it where it lives",
                     fields=stale_file.log_fields(),
                 )

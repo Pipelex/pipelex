@@ -116,6 +116,32 @@ def assemble_tracing(
     """
     result = TracingAssembly()
     result.set_run_metadata(run_metadata=run_metadata)
+    # Bound here rather than left to the caller: besides `PipeRun`'s run, whose context binds the run already, this is
+    # the body of the durable-execution activity `act_assemble_tracing`, which runs under no binding of the run, so its
+    # lines would name no run. A `request_id` of `None` inherits whatever the caller bound.
+    with log.context(request_id=run_metadata.request_id if run_metadata else None, pipeline_run_id=pipeline_run_id):
+        return _assemble_tracing_events(
+            result=result,
+            pipeline_run_id=pipeline_run_id,
+            assemble_graph=assemble_graph,
+            assemble_usage=assemble_usage,
+            domain_code=domain_code,
+            main_pipe_code=main_pipe_code,
+            run_mode=run_mode,
+        )
+
+
+def _assemble_tracing_events(
+    *,
+    result: TracingAssembly,
+    pipeline_run_id: str,
+    assemble_graph: bool,
+    assemble_usage: bool,
+    domain_code: str | None,
+    main_pipe_code: str | None,
+    run_mode: PipeRunMode,
+) -> TracingAssembly:
+    """The body of ``assemble_tracing``, run inside the log context it binds: read the events once, assemble onto ``result``."""
     tracing_config = get_config().runtime.tracing
     # A scoped override (see hub.scoped_event_log) is the run's transport and implies
     # tracing-enabled (D1) — it must not be skipped by the is_enabled early-return.
