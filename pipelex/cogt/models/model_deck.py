@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Container, Mapping
 from typing import NoReturn, Self
 
 from pydantic import Field, PrivateAttr, field_validator, model_validator
@@ -8,6 +8,7 @@ from pipelex.cogt.config_cogt import ModelDeckConfig
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource, doc_gen_choice_key, parse_doc_gen_choice_key
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice, DocGenSetting
 from pipelex.cogt.exceptions import (
+    CogtError,
     DocGenHandleNotFoundError,
     ExtractHandleNotFoundError,
     ImgGenHandleNotFoundError,
@@ -47,9 +48,43 @@ from pipelex.cogt.search.search_setting import SearchModelChoice, SearchSetting
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.exceptions import ConfigValidationError
 from pipelex.system.runtime import ProblemReaction
+from pipelex.system.telemetry.otel_constants import OTelLogAttr
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.urls import URLs
 
 LLM_PRESET_DISABLED = "disabled"
+
+
+def _warn_if_ambiguous_bare_handle(
+    *,
+    name: str,
+    model_type: ModelType,
+    presets: Container[str],
+    aliases: Container[str],
+    waterfalls: Container[str],
+) -> None:
+    """Warn when a bare name, read as a direct model handle, also names a preset, an alias or a waterfall of its model type."""
+    matching_reference_kinds: list[ModelReferenceKind] = []
+    if name in presets:
+        matching_reference_kinds.append(ModelReferenceKind.PRESET)
+    if name in aliases:
+        matching_reference_kinds.append(ModelReferenceKind.ALIAS)
+    if name in waterfalls:
+        matching_reference_kinds.append(ModelReferenceKind.WATERFALL)
+    if matching_reference_kinds:
+        log.warning(
+            "A bare model name also names a preset, an alias or a waterfall, and is read as a direct model handle; "
+            "prefix it ($ or preset:, @ or alias:, ~ or waterfall:) to avoid the ambiguity",
+            fields={"model_handle": name, "model_type": model_type, "matching_reference_kinds": matching_reference_kinds},
+        )
+
+
+def _warn_of_unresolvable_preset(*, model_type: ModelType, preset_id: str, model_handle: str | None, exc: CogtError) -> None:
+    """Warn that a preset names a model the deck cannot resolve, for a deck whose `missing_presets_reaction` is to log it."""
+    log.warning(
+        "A preset of the model deck names a model the deck cannot resolve",
+        fields={"model_type": model_type, "preset_id": preset_id, "model_handle": model_handle, **error_fields(exc=exc)},
+    )
 
 
 class LLMDeckBlueprint(ConfigModel):
@@ -315,87 +350,47 @@ class ModelDeck(ConfigModel):
 
     def _warn_if_ambiguous_llm(self, name: str) -> None:
         """Log a warning if a bare string handle matches presets/aliases/waterfalls."""
-        matches: list[str] = []
-        if name in self.llm_presets:
-            matches.append(f"LLM preset (use ${name} or preset:{name})")
-        if name in self.llm_aliases:
-            matches.append(f"alias (use @{name} or alias:{name})")
-        if name in self.llm_waterfalls:
-            matches.append(f"waterfall (use ~{name} or waterfall:{name})")
-        if matches:
-            log.warning(
-                f"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity."
-            )
+        _warn_if_ambiguous_bare_handle(
+            name=name, model_type=ModelType.LLM, presets=self.llm_presets, aliases=self.llm_aliases, waterfalls=self.llm_waterfalls
+        )
 
     def _warn_if_ambiguous_extract(self, name: str) -> None:
         """Log a warning if a bare string handle matches presets/aliases/waterfalls."""
-        matches: list[str] = []
-        if name in self.extract_presets:
-            matches.append(f"extract preset (use ${name} or preset:{name})")
-        if name in self.extract_aliases:
-            matches.append(f"alias (use @{name} or alias:{name})")
-        if name in self.extract_waterfalls:
-            matches.append(f"waterfall (use ~{name} or waterfall:{name})")
-        if matches:
-            log.warning(
-                f"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity."
-            )
+        _warn_if_ambiguous_bare_handle(
+            name=name,
+            model_type=ModelType.TEXT_EXTRACTOR,
+            presets=self.extract_presets,
+            aliases=self.extract_aliases,
+            waterfalls=self.extract_waterfalls,
+        )
 
     def _warn_if_ambiguous_img_gen(self, name: str) -> None:
         """Log a warning if a bare string handle matches presets/aliases/waterfalls."""
-        matches: list[str] = []
-        if name in self.img_gen_presets:
-            matches.append(f"image generation preset (use ${name} or preset:{name})")
-        if name in self.img_gen_aliases:
-            matches.append(f"alias (use @{name} or alias:{name})")
-        if name in self.img_gen_waterfalls:
-            matches.append(f"waterfall (use ~{name} or waterfall:{name})")
-        if matches:
-            log.warning(
-                f"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity."
-            )
+        _warn_if_ambiguous_bare_handle(
+            name=name, model_type=ModelType.IMG_GEN, presets=self.img_gen_presets, aliases=self.img_gen_aliases, waterfalls=self.img_gen_waterfalls
+        )
 
     def _warn_if_ambiguous_search(self, name: str) -> None:
         """Log a warning if a bare string handle matches presets/aliases/waterfalls."""
-        matches: list[str] = []
-        if name in self.search_presets:
-            matches.append(f"search preset (use ${name} or preset:{name})")
-        if name in self.search_aliases:
-            matches.append(f"alias (use @{name} or alias:{name})")
-        if name in self.search_waterfalls:
-            matches.append(f"waterfall (use ~{name} or waterfall:{name})")
-        if matches:
-            log.warning(
-                f"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity."
-            )
+        _warn_if_ambiguous_bare_handle(
+            name=name, model_type=ModelType.SEARCH, presets=self.search_presets, aliases=self.search_aliases, waterfalls=self.search_waterfalls
+        )
 
     def _warn_if_ambiguous_doc_gen(self, name: str) -> None:
         """Log a warning if a bare string handle matches presets/aliases/waterfalls."""
-        matches: list[str] = []
-        if name in self.doc_gen_presets:
-            matches.append(f"doc gen preset (use ${name} or preset:{name})")
-        if name in self.doc_gen_aliases:
-            matches.append(f"alias (use @{name} or alias:{name})")
-        if name in self.doc_gen_waterfalls:
-            matches.append(f"waterfall (use ~{name} or waterfall:{name})")
-        if matches:
-            log.warning(
-                f"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity."
-            )
+        _warn_if_ambiguous_bare_handle(
+            name=name, model_type=ModelType.DOC_GEN, presets=self.doc_gen_presets, aliases=self.doc_gen_aliases, waterfalls=self.doc_gen_waterfalls
+        )
 
     def _warn_if_ambiguous_judgment(self, name: str) -> None:
         """Log a warning if a bare string handle matches presets/aliases/waterfalls."""
-        matches: list[str] = []
-        if name in self.judgment_presets:
-            matches.append(f"judgment preset (use ${name} or preset:{name})")
-        if name in self.judgment_aliases:
-            matches.append(f"alias (use @{name} or alias:{name})")
-        if name in self.judgment_waterfalls:
-            matches.append(f"waterfall (use ~{name} or waterfall:{name})")
-        if matches:
-            log.warning(
-                f"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity."
-            )
+        _warn_if_ambiguous_bare_handle(
+            name=name,
+            model_type=ModelType.JUDGMENT,
+            presets=self.judgment_presets,
+            aliases=self.judgment_aliases,
+            waterfalls=self.judgment_waterfalls,
+        )
 
     def _raise_handle_not_found_error(
         self,
@@ -921,7 +916,7 @@ class ModelDeck(ConfigModel):
                         enabled_backends=exc.enabled_backends,
                     ) from exc
                 case ProblemReaction.LOG:
-                    log.warning(f"LLM handle not found: {exc}")
+                    _warn_of_unresolvable_preset(model_type=ModelType.LLM, preset_id=exc.preset_id, model_handle=exc.model_handle, exc=exc)
                 case ProblemReaction.NONE:
                     pass
         try:
@@ -937,7 +932,7 @@ class ModelDeck(ConfigModel):
                         model_handle=exc.model_handle,
                     ) from exc
                 case ProblemReaction.LOG:
-                    log.warning(f"ImgGen handle not found: {exc}")
+                    _warn_of_unresolvable_preset(model_type=ModelType.IMG_GEN, preset_id=exc.preset_id, model_handle=exc.model_handle, exc=exc)
                 case ProblemReaction.NONE:
                     pass
         try:
@@ -953,7 +948,7 @@ class ModelDeck(ConfigModel):
                         model_handle=exc.model_handle,
                     ) from exc
                 case ProblemReaction.LOG:
-                    log.warning(f"Extract handle not found: {exc}")
+                    _warn_of_unresolvable_preset(model_type=ModelType.TEXT_EXTRACTOR, preset_id=exc.preset_id, model_handle=exc.model_handle, exc=exc)
                 case ProblemReaction.NONE:
                     pass
         try:
@@ -969,7 +964,7 @@ class ModelDeck(ConfigModel):
                         model_handle=exc.model_handle,
                     ) from exc
                 case ProblemReaction.LOG:
-                    log.warning(f"Search handle not found: {exc}")
+                    _warn_of_unresolvable_preset(model_type=ModelType.SEARCH, preset_id=exc.preset_id, model_handle=exc.model_handle, exc=exc)
                 case ProblemReaction.NONE:
                     pass
         try:
@@ -985,7 +980,7 @@ class ModelDeck(ConfigModel):
                         model_handle=exc.model_handle,
                     ) from exc
                 case ProblemReaction.LOG:
-                    log.warning(f"DocGen handle not found: {exc}")
+                    _warn_of_unresolvable_preset(model_type=ModelType.DOC_GEN, preset_id=exc.preset_id, model_handle=exc.model_handle, exc=exc)
                 case ProblemReaction.NONE:
                     pass
         try:
@@ -1001,7 +996,7 @@ class ModelDeck(ConfigModel):
                         model_handle=exc.model_handle,
                     ) from exc
                 case ProblemReaction.LOG:
-                    log.warning(f"Judgment handle not found: {exc}")
+                    _warn_of_unresolvable_preset(model_type=ModelType.JUDGMENT, preset_id=exc.preset_id, model_handle=exc.model_handle, exc=exc)
                 case ProblemReaction.NONE:
                     pass
 
@@ -1032,7 +1027,7 @@ class ModelDeck(ConfigModel):
         waterfall_key = f"{NAMESPACE_WATERFALL}{waterfall_name}"
         if waterfall_key in visited:
             if not is_quiet:
-                log.warning(f"Circular model reference detected: waterfall '{waterfall_name}' leads back to itself")
+                log.warning("A model waterfall leads back to itself, so it resolves to no model", fields={"model_handle": waterfall_key})
             return None
         step_visited = visited | {waterfall_key}
         ideal_model_handle = fallback_list[0]
@@ -1069,15 +1064,17 @@ class ModelDeck(ConfigModel):
                 # which would otherwise use up the notice the next real fallback owes its run.
                 if fallback_index > 0 and not is_quiet and waterfall_name not in self._logged_fallback_warnings:
                     # Waterfall success: we explain what happened in the logs
-                    msg = (
-                        f"Inference model fallback: '{ideal_model_handle}' was not found in the model deck, "
-                        f"so it was replaced by '{fallback}'. "
-                        f"As a consequence, the results of the method may not have the expected quality, "
-                        f"and the method might fail due to feature limitations such as context window size, etc. "
-                        f"Consider getting access to '{ideal_model_handle}'."
+                    log.info(
+                        "A waterfall's first model is not in the model deck, so a fallback model replaces it; the results may not have "
+                        "the expected quality, and the method may hit feature limits such as the context window. Consider getting access "
+                        "to the first model",
+                        fields={
+                            "model_handle": waterfall_key,
+                            "ideal_model_handle": ideal_model_handle,
+                            "fallback_model_handle": fallback,
+                            OTelLogAttr.URL_FULL: URLs.backend_provider_docs,
+                        },
                     )
-                    msg += f" Please see our docs for more details about setting up inference backends:\n{URLs.backend_provider_docs}"
-                    log.info(msg)
                     # Mark this warning as logged for this waterfall_name
                     self._logged_fallback_warnings.add(waterfall_name)
                 return inference_model
@@ -1100,7 +1097,7 @@ class ModelDeck(ConfigModel):
         alias_key = f"{NAMESPACE_ALIAS}{alias_name}"
         if alias_key in visited:
             if not is_quiet:
-                log.warning(f"Circular model reference detected: alias '{alias_name}' leads back to itself")
+                log.warning("A model alias leads back to itself, so it resolves to no model", fields={"model_handle": alias_key})
             return None
         if not is_quiet:
             log.verbose(f"Alias '{alias_name}' -> '{alias_target}'")
@@ -1224,10 +1221,12 @@ class ModelDeck(ConfigModel):
         if is_quiet:
             return None
         if served_types := self.inference_models.types_serving(handle=ref.name):
-            served_types_description = ", ".join(f"'{served_type}'" for served_type in served_types)
-            log.warning(f"Model handle '{ref.name}' is served as {served_types_description} but was requested as '{model_type}'. Skipping.")
+            log.warning(
+                "A model handle is served as another model type than the one requested, so it is skipped",
+                fields={"model_handle": ref.name, "model_type": model_type, "served_model_types": served_types},
+            )
             return None
-        log.verbose(f"Skipping model handle '{model_handle}' because it's was not found in the model deck, it could be an external plugin.")
+        log.verbose(f"Skipping model handle '{model_handle}' because it was not found in the model deck, it could be an external plugin.")
         return None
 
     def is_handle_defined(self, model_handle: str, *, model_type: ModelType) -> bool:
@@ -1343,5 +1342,5 @@ class ModelDeck(ConfigModel):
                 )
             raise model_not_found_error
         if self.inference_models.get(model_type=model_type, handle=model_handle) is None:
-            log.verbose(f"Model handle '{model_handle}' is an alias which resolves to '{inference_model.name}'")
+            log.verbose(f"Model reference '{model_handle}' resolves to model '{inference_model.name}'")
         return inference_model

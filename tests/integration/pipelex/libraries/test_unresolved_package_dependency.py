@@ -27,6 +27,7 @@ from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.execution_seams import acquire_library
 from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.tools.log.error_fields import ERROR_MESSAGE_FIELD, ERROR_TYPE_FIELD
 from pipelex.validation_error_types import PipeValidationErrorType
 from tests.integration.pipelex.libraries.installed_packages import isolate_installed_methods, write_consumer
 from tests.integration.pipelex.libraries.test_data import ProbePackageTestData
@@ -160,12 +161,16 @@ class TestUnresolvedPackageDependency:
             await _verdict_for(mthds_content=ProbePackageTestData.CONSUMER_BUNDLE)
 
         warnings = [
-            record.message for record in caplog.records if record.levelno == logging.WARNING and ProbePackageTestData.DEP_ALIAS in record.message
+            record
+            for record in caplog.records
+            if record.levelno == logging.WARNING and getattr(record, "package_address", None) == ProbePackageTestData.DEP_ALIAS
         ]
-        assert len(warnings) == 1, warnings
-        assert "MethodDependencyFetchError" in warnings[0]
-        assert "VCSFetchError" in warnings[0]
-        assert "Cloning into '/host/clones/x'" in warnings[0]
+        assert [record.getMessage() for record in warnings] == ["A method package could not be resolved"]
+        assert getattr(warnings[0], ERROR_TYPE_FIELD) == "MethodDependencyFetchError"
+        cause_chain = getattr(warnings[0], ERROR_MESSAGE_FIELD)
+        assert "MethodDependencyFetchError" in cause_chain
+        assert "VCSFetchError" in cause_chain
+        assert "Cloning into '/host/clones/x'" in cause_chain
 
     async def test_a_repository_without_the_package_is_one_item(self, tmp_path: Path, mocker: MockerFixture) -> None:
         isolate_installed_methods(mocker=mocker, root=tmp_path)

@@ -13,10 +13,12 @@ from pydantic import TypeAdapter, ValidationError
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.system.telemetry.otel_constants import OTelLogAttr
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.tracing.event_log_protocol import EventLogProtocol
 from pipelex.tracing.exceptions import EventLogSchemaMismatchError
-from pipelex.tracing.trace_events import AnyTraceEvent, TraceEvent
+from pipelex.tracing.trace_events import AnyTraceEvent, TraceEvent, json_invalid_message
 
 _any_trace_event_adapter: TypeAdapter[TraceEvent] = TypeAdapter(AnyTraceEvent)
 
@@ -160,8 +162,16 @@ class NdjsonEventLog(EventLogProtocol):
                         # written whole by a version whose event shape this one no longer accepts. The refusal
                         # names fields rather than quoting them: it travels into the run's assembly errors, and
                         # the pydantic error's own text quotes the traced values it refused.
-                        if any(error["type"] == "json_invalid" for error in validation_error.errors()):
-                            log.warning(f"Skipping corrupt line in {ndjson_path}:{line_number} — {validation_error}")
+                        if (json_error := json_invalid_message(validation_error=validation_error)) is not None:
+                            # The parse error's own message, never the exception's text, which quotes the line.
+                            log.warning(
+                                "A corrupt line of a trace event log, not valid JSON, was skipped",
+                                fields={
+                                    OTelLogAttr.FILE_PATH: str(ndjson_path),
+                                    "line_number": line_number,
+                                    **error_fields(exc=validation_error, text=json_error),
+                                },
+                            )
                             continue
                         refused_count += 1
                         if first_refusal is None:

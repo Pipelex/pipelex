@@ -35,7 +35,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import BaseModel
 
-from pipelex.tools.log.log_fields import COLLIDING_FIELD_PREFIX, DATA_FIELD, UNSCRUBBED_MARK, carried_attributes
+from pipelex.tools.log.log_fields import DATA_FIELD, LAYOUT_MARK, UNSCRUBBED_MARK, carried_attributes, given_field_name
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -234,6 +234,9 @@ def make_redaction_processor(*, config: LogRedactionConfig) -> LogRecordProcesso
 def _quarantine(*, record: logging.LogRecord, exc: Exception) -> None:
     """Strip a record whose scrub failed down to a notice naming the failure, so nothing unscrubbed leaves with it.
 
+    The console layout the call named is taken off too: a layout renders in place of the message, so it
+    would draw the redacted fields and hide the notice that says why they are redacted.
+
     The mark ``redact`` set is lifted at the end and only there, so a strip that gets partway leaves the
     record marked and the record is dropped rather than emitted as a notice that says it was stripped
     while still carrying what the scrub never read.
@@ -243,6 +246,7 @@ def _quarantine(*, record: logging.LogRecord, exc: Exception) -> None:
     record.exc_info = None
     record.exc_text = None
     record.stack_info = None
+    record.__dict__.pop(LAYOUT_MARK, None)
     for name in carried_attributes(record=record):
         setattr(record, name, REDACTED_TEXT)
     record.__dict__.pop(UNSCRUBBED_MARK, None)
@@ -284,9 +288,7 @@ def _is_secret_field_name(*, name: str) -> bool:
     Judging the name as it was spelled rather than as it was carried covers that, and covers a caller who
     spelled the prefix themselves, which is the safe direction to be wrong in.
     """
-    while name.startswith(COLLIDING_FIELD_PREFIX):
-        name = name[len(COLLIDING_FIELD_PREFIX) :]
-    return _is_secret_key(key=name)
+    return _is_secret_key(key=given_field_name(name=name))
 
 
 def _redact_exception_text(*, record: logging.LogRecord, patterns: tuple[RedactionPattern, ...]) -> None:

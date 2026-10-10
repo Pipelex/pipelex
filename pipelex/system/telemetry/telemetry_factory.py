@@ -32,7 +32,7 @@ class TelemetryFactory:
             telemetry_config = load_telemetry_config(secrets_provider=secrets_provider)
 
         if not telemetry_config.is_custom_telemetry_allowed_for_mode(integration_mode):
-            log.verbose(f"Telemetry is disabled because the integration mode '{integration_mode}' does not allow it")
+            log.debug(f"Telemetry is disabled because the integration mode '{integration_mode}' does not allow it")
             return TelemetryManagerNoOp()
 
         # Always respect DO_NOT_TRACK env var

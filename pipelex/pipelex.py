@@ -43,7 +43,7 @@ from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
 from pipelex.plugins.pipe_func_executor_registry import PipeFuncExecutorRegistry
 from pipelex.plugins.registrar import HubSlot
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.runtime_boot import PACKAGE_NAME, PACKAGE_VERSION, RuntimeBoot
+from pipelex.runtime_boot import PACKAGE_VERSION, RuntimeBoot
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.environment import get_pipelexpath_dirs
 from pipelex.system.runtime import IntegrationMode
@@ -75,8 +75,6 @@ class Pipelex(RuntimeBoot):
 
         # pipeline
         self.library_manager: LibraryManagerAbstract | None = None
-
-        log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} init done")
 
     @override
     def setup(
@@ -202,8 +200,6 @@ class Pipelex(RuntimeBoot):
         self.interpreter_hub.set_pipe_run(
             self._resolve_hub_slot(slot=HubSlot.PIPE_RUN, default=lambda: PipeRun(pipe_router=self.interpreter_hub.get_required_pipe_router()))
         )
-
-        log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done")
 
     @override
     def teardown(self) -> None:
@@ -345,5 +341,5 @@ class Pipelex(RuntimeBoot):
         # and the delete-on-failure handler above is behind us, so a reader can never adopt an instance
         # that is about to be removed from the registry.
         pipelex_instance.is_ready = True
-        log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} ready")
+        log.debug("Pipelex is ready", fields={"pipelex_version": PACKAGE_VERSION, "integration_mode": integration_mode})
         return pipelex_instance

@@ -19,7 +19,7 @@ default_log_level = "INFO"
 ```
 
 - Sets the default logging level for all loggers
-- Valid values: `"VERBOSE"`, `"DEBUG"`, `"DEV"`, `"INFO"`, `"WARNING"`, `"ERROR"`, `"CRITICAL"`, `"OFF"`
+- Valid values: `"VERBOSE"`, `"DEBUG"`, `"INFO"`, `"WARNING"`, `"ERROR"`, `"CRITICAL"`, `"OFF"`; what a line at each level means is in [Logging](../../tools/logging.md#log-levels)
 - `"OFF"` silences the loggers `[runtime.log.package_log_levels]` does not pin; Pipelex's own loggers are pinned there at `INFO`, so silencing them, whichever sink is selected, is `pipelex = "OFF"` in that section
 
 ### Package-Specific Log Levels
@@ -34,6 +34,7 @@ pipelex = "INFO"
 ```
 
 - Override log levels for specific packages
+- The defaults keep the HTTP clients under the inference SDKs quiet: `httpx = "WARNING"` and `httpcore = "INFO"`, with the same levels for `httpx2` and `httpcore2`, the forks openai 3.x sends its requests through, so an inference call prints no line of its own carrying the provider's endpoint URL
 - Use `-` instead of `.` in package names (e.g., `urllib3-connectionpool`)
 - A key works at any depth of the logger hierarchy, because Pipelex names every logger after the emitting module: `pipelex` governs the whole runtime, and `pipelex-pipe_operators-pipe_llm = "DEBUG"` opens one module while the rest of `pipelex` stays at its level
 
@@ -150,7 +151,7 @@ silenced_problem_ids = ["azure_openai_no_stream_options"]
 
 ## The `console` Sink
 
-Configuration section: `[runtime.log.rich_log]`, read only when `sink = "console"`. The sink writes to `console_log_target`.
+Configuration section: `[runtime.log.rich_log]`, read only when `sink = "console"`. The sink writes to `console_log_target`. It shows a record's fields after its message, coloured by name, and renders the layouts a call names; neither has a setting (see [Console rendering](../../tools/logging.md#console-rendering)).
 
 ### Display Options
 
@@ -168,11 +169,11 @@ is_link_path_enabled = true
 
 ```toml
 highlighter_name = "json"  # or "repr"
-is_markup_enabled = true
 ```
 
 - `highlighter_name`: Choose between JSON or repr highlighting
-- `is_markup_enabled`: Enable Rich markup syntax in log messages
+
+The console reads no log message as Rich markup: a message prints exactly as written, and colour comes from the fields and the layouts (see [Messages are plain text](../../tools/logging.md#messages-are-plain-text)). There is no setting to turn markup on. A file that still sets `is_markup_enabled` does not stop the boot: Pipelex deletes the key in memory with ledger entry `pipelex-config@7`, writes nothing, and warns that the configuration is out of date. Run `pipelex migrate` to delete it from the file on disk, which also ends the warning.
 
 ### Traceback Settings
 
@@ -254,7 +255,7 @@ The sink refreshes its credentials once when it is built, before the transport s
 
 Each record becomes one Cloud Logging entry with a JSON payload:
 
-- The level maps onto the Cloud Logging severity scale. That scale has nothing below `DEBUG`, so Pipelex's two custom levels, `VERBOSE` and `DEV`, both land there
+- The level maps onto the Cloud Logging severity scale. That scale has nothing below `DEBUG`, so Pipelex's custom `VERBOSE` level lands there
 - The payload carries `message`, `logger` and `exception` when the record carries one, `pipelex.trace_id` and `pipelex.span_id` when a Pipelex span is active, the pipe's own or the LLM call's, written exactly as the `json` sink writes them, then every field and the `data` attribute flat beside them. The keys the `json` sink reserves are reserved here too, `time`, `severity`, `trace_id`, `span_id` and `trace_flags` included although the payload carries none of them — the client library takes the time and the severity out of band, and the entry's own `trace`, `spanId` and `traceSampled` carry the current span — so a field named like one of them is carried under a `field_` prefix under either sink rather than under one and not the other; a value JSON cannot carry — a non-finite float, a model, a circular structure — is written as text rather than costing the line
 - The run-scoped identifiers become the entry's **labels** rather than payload keys: `request_id`, `pipeline_run_id` and `pipe_run_id`, whichever of them the record carries. Cloud Logging indexes labels, so these are what a query filters a run by
 - The entry's `trace`, `spanId` and `traceSampled` name OpenTelemetry's current span, your own code's, the trace project-qualified as `projects/<project>/traces/<trace-id>`, so Cloud Logging files the line under your trace. A line logged where no current span names a trace carries none of the three, inside a Pipelex run too: the `pipeline_run_id` label is what selects a run's lines, and the `pipelex.*` payload keys name its spans
@@ -302,7 +303,6 @@ is_show_time = false
 is_show_level = true
 is_link_path_enabled = true
 highlighter_name = "json"
-is_markup_enabled = true
 is_rich_tracebacks = true
 is_tracebacks_word_wrap = true
 is_tracebacks_show_locals = false
@@ -325,6 +325,10 @@ Two of those keys chose a behaviour their deletion undoes, and no operation in t
 - `is_console_logging_enabled = false` suppressed every record Pipelex's own log calls emitted. Its equivalent is `pipelex = "OFF"` under `[runtime.log.package_log_levels]`, which deep-merges over the base's `INFO` and leaves the third-party levels alone; `default_log_level` governs only the loggers that section does not pin, so on its own it silences none of Pipelex's records. Silence for everything takes `default_log_level = "OFF"` and every entry of that section at `OFF`, and sending the records elsewhere instead means selecting the sink that goes there. `is_console_logging_enabled = true` was the default and asks for nothing: the migration deletes it and the new default renders the same console.
 - `log_mode = "poor"` chose a plain handler for a process with no terminal; that process now sets `sink = "json"`. `log_mode = "rich"` chose what `console` renders, and asks for nothing either.
 - `poor_loggers` and `generic_poor_logger` have nothing to carry over: every record goes to the one selected sink.
+
+## Migrating From the DEV Level
+
+The `DEV` level, which sat between `DEBUG` and `INFO`, is gone, and so is `log.dev()`. Ledger entry `pipelex-config@6` reads `DEV` as `INFO` wherever a file names it, as `default_log_level` or as a level under `[runtime.log.package_log_levels]`. `INFO` is the equivalent because a `DEV` threshold let through `INFO` and above plus the lines logged at `DEV` itself, and since nothing logs at `DEV` any more, `INFO` lets through exactly the same lines. A third-party package you held at `DEV` therefore keeps its debug output suppressed, a provider SDK's request dumps included. A file that still names `DEV` does not stop the boot: Pipelex migrates it in memory, starts at `INFO`, writes nothing, and warns that the configuration is out of date. Run `pipelex migrate` to rewrite the file on disk, which also ends the warning. Set `DEBUG` yourself where you want the lines a diagnosis needs.
 
 ## Best Practices
 

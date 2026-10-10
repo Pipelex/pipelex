@@ -193,6 +193,16 @@ class TestDetectFileTypeFromBase64:
         with pytest.raises(FileTypeError, match="Could not identify file type of given bytes because input is not valid base64"):
             detect_file_type_from_base64(invalid_b64_bytes)
 
+    def test_detect_file_type_from_base64_error_names_the_length_and_none_of_the_content(self) -> None:
+        payload = "SECRETPAYLOAD!" * 10
+
+        with pytest.raises(FileTypeError) as exc_info:
+            detect_file_type_from_base64(payload)
+
+        message = str(exc_info.value)
+        assert f"({len(payload)} bytes)" in message
+        assert "SECRETPAYLOAD" not in message
+
     def test_detect_file_type_from_base64_data_url_no_comma(self, mocker: MockerFixture):
         # Test data URL without comma (should be treated as regular base64)
         mocker.patch(

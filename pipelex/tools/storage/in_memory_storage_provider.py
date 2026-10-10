@@ -1,7 +1,6 @@
 from pydantic import RootModel
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.tools.misc.exceptions import FileTypeError
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_bytes
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError
@@ -42,7 +41,6 @@ class InMemoryStorageProvider(RootModel[InMemoryStorageRoot], StorageProviderAbs
         except FileTypeError:
             pass  # MIME type detection failed, return None
 
-        log.dev(f"Loaded data with metadata from key: '{key}', mime_type={mime_type}")
         return StoredData(data=data, mime_type=mime_type)
 
     @override

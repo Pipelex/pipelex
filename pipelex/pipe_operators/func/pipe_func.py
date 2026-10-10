@@ -151,14 +151,6 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
                 is_subclass = not is_same_class and issubclass(item_type, concept_structure_class)
                 is_same_name = item_type.__name__ == self.output.concept.structure_class_name
 
-                # Debug logging
-                log.verbose(
-                    f"PipeFunc '{self.code}' ListContent validation: "
-                    f"item_type={item_type.__module__}.{item_type.__name__}, "
-                    f"concept_structure_class={concept_structure_class.__module__}.{concept_structure_class.__name__}, "
-                    f"is_same_class={is_same_class}, is_subclass={is_subclass}, is_same_name={is_same_name}"
-                )
-
                 if not (is_same_class or is_subclass or is_same_name):
                     msg = (
                         f"PipeFunc '{self.code}' output concept expects structure class '{self.output.concept.structure_class_name}' "
@@ -193,8 +185,6 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeFuncOutput:
-        log.verbose(f"Running PipeFunc with function '{self.function_name}'")
-
         try:
             execution_result = await get_pipe_func_executor().run_pipe_func(
                 job_metadata=job_metadata,
@@ -267,10 +257,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeFuncOutput:
-        log.info(
-            f"🚨 For your information, the dry run of PipeFunc '{self.code}' is not actually running the python function \
-            but only validating the inputs and return type."
-        )
+        log.debug("The dry run of a PipeFunc validates its inputs and return type without running the function", fields={"pipe_code": self.code})
         # Sandbox-hosted mode: the customer function is not registered in THIS process (its source only
         # travels on the crate to the sandbox), so its return type cannot be inspected here. Build the
         # mock output from the DECLARED output concept's structure class instead — mirroring PipeLLM's

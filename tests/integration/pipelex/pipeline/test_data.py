@@ -1,5 +1,7 @@
 from typing import ClassVar
 
+from mthds.protocol.pipeline_inputs import PipelineInputs
+
 
 class LocatedRunFailureTestData:
     """Bundles whose runs fail at a nested pipe, one per way a run failure is located."""
@@ -410,4 +412,158 @@ description = "Restate the topic"
 inputs = { topic = "Text" }
 output = "Text"
 template = "About {{ topic }}"
+"""
+
+
+class LogMarkupTestData:
+    """A nested method run live, every model call answered by a stand-in worker, to read what its log messages say."""
+
+    MAIN_PIPE: ClassVar[str] = "profile_company"
+
+    INPUTS: ClassVar[PipelineInputs] = {"brief": "Acme builds reusable rockets in Toulouse and sells launches to research labs."}
+
+    MTHDS: ClassVar[str] = """
+domain = "log_markup_check"
+description = "Describe a company, structure it, summarize it two ways at once, route and compose a report"
+main_pipe = "profile_company"
+
+[concept.Company]
+description = "A company"
+
+[concept.Company.structure]
+name = { type = "text", description = "The company's name" }
+sector = { type = "text", description = "The company's sector" }
+
+[concept.ShortSummary]
+description = "A one-sentence summary"
+refines = "Text"
+
+[concept.DetailedSummary]
+description = "A detailed summary"
+refines = "Text"
+
+[pipe.profile_company]
+type = "PipeSequence"
+description = "Describe the company, structure it, summarize it and compose the report"
+inputs = { brief = "Text" }
+output = "Text"
+steps = [
+  { pipe = "describe_company", result = "description" },
+  { pipe = "structure_company", result = "company" },
+  { pipe = "summarize_company", result = "summaries" },
+  { pipe = "route_report", result = "report" },
+]
+
+[pipe.describe_company]
+type = "PipeLLM"
+description = "Describe the company the brief is about"
+inputs = { brief = "Text" }
+output = "Text"
+prompt = "Describe the company this brief is about: $brief"
+
+[pipe.structure_company]
+type = "PipeLLM"
+description = "Structure the description as a company"
+inputs = { description = "Text" }
+output = "Company"
+prompt = "Read the company out of this description: $description"
+
+[pipe.summarize_company]
+type = "PipeParallel"
+description = "Summarize the description in one sentence and in detail, at once"
+inputs = { description = "Text" }
+output = "Composite"
+add_each_output = true
+branches = [
+  { pipe = "summarize_short", result = "short_summary" },
+  { pipe = "summarize_detailed", result = "detailed_summary" },
+]
+
+[pipe.summarize_short]
+type = "PipeLLM"
+description = "Summarize in one sentence"
+inputs = { description = "Text" }
+output = "ShortSummary"
+prompt = "Summarize in one sentence: $description"
+
+[pipe.summarize_detailed]
+type = "PipeLLM"
+description = "Summarize in detail"
+inputs = { description = "Text" }
+output = "DetailedSummary"
+prompt = "Summarize in detail: $description"
+
+[pipe.route_report]
+type = "PipeCondition"
+description = "Pick the report's shape"
+inputs = { company = "Company", short_summary = "ShortSummary" }
+output = "Text"
+expression_template = "{{ 'compact' }}"
+default_outcome = "compose_report"
+
+[pipe.route_report.outcomes]
+compact = "compose_report"
+
+[pipe.compose_report]
+type = "PipeCompose"
+description = "Compose the report"
+inputs = { company = "Company", short_summary = "ShortSummary" }
+output = "Text"
+template = "{{ company.name }} works in {{ company.sector }}: {{ short_summary.text }}"
+"""
+
+
+class SummaryEventsTestData:
+    """A small method run live on two models, every model call answered by a stand-in worker, to read the events it ends with."""
+
+    MAIN_PIPE: ClassVar[str] = "brief_company"
+
+    INPUTS: ClassVar[PipelineInputs] = {"brief": "Acme builds reusable rockets in Toulouse and sells launches to research labs."}
+
+    MTHDS: ClassVar[str] = """
+domain = "summary_events_check"
+description = "Describe a company, structure it and pitch it, on two models"
+main_pipe = "brief_company"
+
+[concept.Company]
+description = "A company"
+
+[concept.Company.structure]
+name = { type = "text", description = "The company's name" }
+sector = { type = "text", description = "The company's sector" }
+
+[pipe.brief_company]
+type = "PipeSequence"
+description = "Describe the company, structure it and pitch it"
+inputs = { brief = "Text" }
+output = "Text"
+steps = [
+  { pipe = "describe_company", result = "description" },
+  { pipe = "structure_company", result = "company" },
+  { pipe = "pitch_company", result = "pitch" },
+]
+
+[pipe.describe_company]
+type = "PipeLLM"
+description = "Describe the company the brief is about"
+inputs = { brief = "Text" }
+output = "Text"
+model = "$testing-text"
+prompt = "Describe the company this brief is about: $brief"
+
+[pipe.structure_company]
+type = "PipeLLM"
+description = "Structure the description as a company"
+inputs = { description = "Text" }
+output = "Company"
+model = "$testing-text"
+prompt = "Read the company out of this description: $description"
+
+[pipe.pitch_company]
+type = "PipeLLM"
+description = "Pitch the company in one sentence"
+inputs = { description = "Text" }
+output = "Text"
+model = "$writing-creative"
+prompt = "Pitch this company in one sentence: $description"
 """

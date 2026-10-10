@@ -285,9 +285,8 @@ class TestCostRegistry:
 
     def test_generate_report_with_empty_data(self, mocker: MockerFixture):
         """Test proper handling when no usage data."""
-        # Mock logging
-        mock_log_warning = mocker.patch("pipelex.cogt.usage.cost_registry.log.warning")
-        mock_log_verbose = mocker.patch("pipelex.cogt.usage.cost_registry.log.verbose")
+        # Mock logging: a run with no usage is not something an operator acts on, so it is noted at DEBUG
+        mock_log_debug = mocker.patch("pipelex.cogt.usage.cost_registry.log.debug")
 
         # Test with non-untitled pipeline
         CostRegistry.generate_report(
@@ -296,16 +295,16 @@ class TestCostRegistry:
             unit_scale=1.0,
             cost_report_file_path=None,
         )
-        mock_log_warning.assert_called_once()
+        mock_log_debug.assert_called_once()
 
-        # Test with untitled pipeline
+        # Test with untitled pipeline: nothing more is noted
         CostRegistry.generate_report(
             pipeline_run_id="untitled",
             tokens_usages=[],
             unit_scale=1.0,
             cost_report_file_path=None,
         )
-        mock_log_verbose.assert_called_once()
+        mock_log_debug.assert_called_once()
 
     def test_generate_report_with_file_output(self, job_metadata: JobMetadata, tmp_path: Path, mocker: MockerFixture):
         """Test that CSV file is created when file path is provided."""
@@ -430,15 +429,6 @@ class TestCostRegistry:
         # Extract the numeric value and verify it matches expected scaled cost
         actual_cost = float(cost_str)
         assert abs(actual_cost - expected_scaled_cost) < 0.0001
-
-    def test_compute_total_cost(self):
-        """Test total cost computation."""
-        total = CostRegistry.compute_total_cost(
-            input_non_cached_cost=1.0,
-            input_cached_cost=0.5,
-            output_cost=2.0,
-        )
-        assert total == 3.5
 
     def test_generate_report_print_to_console_false_skips_console(self, job_metadata: JobMetadata, mocker: MockerFixture):
         """When print_to_console=False, the console.print is not called."""

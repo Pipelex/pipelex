@@ -44,6 +44,9 @@ BATCH_ITEM_STUFF_NAME = "BATCH_ITEM"
 PRIVATE_BINDING_NAME_PREFIX = "_bound_"
 PRETTY_PRINT_MAX_LENGTH = 1000
 TEST_DUMMY_NAME = "dummy_result"
+# What working memory logs when a name is bound anew to a different stuff. A sequence may rebind a name on purpose, so the
+# line is a DEBUG one; a test watching for an unexpected replacement reads it by this constant.
+STUFF_REPLACED_MESSAGE = "A name already in working memory is bound to a different stuff, which replaces the one it held"
 
 StuffDict = dict[str, Stuff]
 StuffArtefactDict = dict[str, StuffArtefact]
@@ -67,14 +70,16 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
     def validate_stuff_names(self) -> Self:
         for key, stuff in self.root.items():
             if _is_reserved_for_params(name=key):
-                log.warning(f"Stuff key '{key}' starts with '_', which is reserved for params")
+                log.warning("A stuff name starts with an underscore, which is reserved for params", fields={"stuff_name": key})
 
             if not stuff.stuff_name:
                 self.root[key].stuff_name = key
             elif key not in {MAIN_STUFF_NAME, stuff.stuff_name}:
-                log.warning(f"Stuff name '{stuff.stuff_name}' does not match the key '{key}'")
-            elif _is_reserved_for_params(name=stuff.stuff_name):
-                log.warning(f"Stuff name '{stuff.stuff_name}' starts with '_', which is reserved for params")
+                # Nothing for a user to act on: the key is the name the stuff is read by.
+                log.debug(f"Stuff name '{stuff.stuff_name}' does not match the key '{key}'")
+            elif key == MAIN_STUFF_NAME and _is_reserved_for_params(name=stuff.stuff_name):
+                # A stuff stored under its own name was warned about by its key, above; the main stuff's own name is the one left.
+                log.warning("A stuff name starts with an underscore, which is reserved for params", fields={"stuff_name": stuff.stuff_name})
 
         return self
 
@@ -224,12 +229,10 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
         if name in self.root or name in self.aliases:
             existing_stuff = self.get_stuff(name=name)
             if existing_stuff == stuff and name != TEST_DUMMY_NAME:
-                log.warning(f"Key '{name}' already exists in WorkingMemory with the same stuff")
+                log.debug("A stuff is added under a name it is already bound to, so working memory is unchanged", fields={"stuff_name": name})
                 return
             elif name != TEST_DUMMY_NAME:
-                log.warning(f"Key '{name}' already exists in WorkingMemory and will be replaced by something different")
-                log.verbose(f"Existing stuff: {existing_stuff}")
-                log.verbose(f"New stuff: {stuff}")
+                log.debug(STUFF_REPLACED_MESSAGE, fields={"stuff_name": name})
 
         # it's a new stuff
         self.set_stuff(name=name, stuff=stuff)
@@ -245,11 +248,9 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
         if name:
             self.remove_main_stuff()
             self.add_new_stuff(name=name, stuff=stuff, aliases=[MAIN_STUFF_NAME])
-            log.verbose(f"Setting new main stuff {name}: {stuff.concept.code} = '{stuff.short_desc}'")
         else:
             self.remove_alias_to_main_stuff()
             self.set_stuff(name=MAIN_STUFF_NAME, stuff=stuff)
-            log.verbose(f"Setting new main stuff (unnamed): {stuff.concept.code} = '{stuff.short_desc}'")
 
     def set_alias(self, alias: str, *, target: str) -> None:
         """Add an alias pointing to a target name."""

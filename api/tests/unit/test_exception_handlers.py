@@ -24,6 +24,7 @@ from pipelex.base_exceptions import (
     PipelexConfigError,
     PipelexError,
 )
+from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.config import get_config
@@ -40,7 +41,7 @@ from typing_extensions import override
 
 from pipelex_api.error_types import ErrorType
 from pipelex_api.errors import raise_internal_server_error, raise_validation_error
-from pipelex_api.exception_handlers import API_ERROR_EVENT, register_exception_handlers
+from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware
 from pipelex_api.problem_document import PROBLEM_JSON_MEDIA_TYPE
 from pipelex_api.routes.pipelex.pipeline import router as pipeline_router
@@ -417,6 +418,29 @@ async def run_state_unexpected_error_route(request: Request) -> None:
     raise RuntimeError(msg)
 
 
+def _gateway_failure() -> LLMCompletionError:
+    """An inference failure whose SDK metadata names the provider family, `gateway`, and no backend."""
+    return LLMCompletionError(
+        "the gateway is unavailable",
+        error_category=InferenceErrorCategory.TRANSIENT,
+        provider_metadata=ProviderErrorMetadata(provider=ProviderName.GATEWAY, sdk_exception_type="APIStatusError", status_code=503),
+    )
+
+
+@_router.get("/inference-failure-attributed")
+async def inference_failure_attributed_route() -> None:
+    # A failure the worker's chokepoint attributed: the error names the backend that served the model.
+    gateway_failure = _gateway_failure()
+    gateway_failure.fill_model_and_provider("claude-5.5-sonnet", backend_name="pipelex_gateway")
+    raise gateway_failure
+
+
+@_router.get("/inference-failure-unattributed")
+async def inference_failure_unattributed_route() -> None:
+    # A failure no worker attributed: only the SDK's metadata names who answered.
+    raise _gateway_failure()
+
+
 def _build_client(
     *,
     raise_server_exceptions: bool = True,
@@ -641,12 +665,11 @@ class TestExceptionHandlers:
         assert response.status_code == 500
         log_spy.error.assert_called_once()
         fields = _emitted_fields(log_spy, as_error=True)
-        assert fields["event"] == API_ERROR_EVENT
-        assert fields["status"] == 500
-        assert fields["error_type"] == "ServerMisconfigured"
+        assert fields["http.response.status_code"] == 500
+        assert fields["error.type"] == "ServerMisconfigured"
         assert fields["error_domain"] == "config"
         assert fields["retryable"] is False
-        assert fields["route"] == "/api-config-error"
+        assert fields["url.path"] == "/api-config-error"
         # The operator-facing cause rides a field of its own and never reaches the message, which
         # is what stops a crafted value from shaping the rendered line at all.
         assert fields["detail"] == "the configuration is broken"
@@ -662,9 +685,8 @@ class TestExceptionHandlers:
         assert response.status_code == 422
         log_spy.warning.assert_called_once()
         fields = _emitted_fields(log_spy, as_error=False)
-        assert fields["event"] == API_ERROR_EVENT
-        assert fields["status"] == 422
-        assert fields["error_type"] == "ValidationError"
+        assert fields["http.response.status_code"] == 422
+        assert fields["error.type"] == "ValidationError"
         assert fields["error_domain"] == "input"
         assert fields["retryable"] is False
         assert fields["detail"] == "a caller-side mistake"
@@ -717,16 +739,41 @@ class TestExceptionHandlers:
         assert body["error_domain"] == "input"
         log_spy.warning.assert_called_once()
         fields = _emitted_fields(log_spy, as_error=False)
-        assert fields["status"] == 400
-        assert fields["error_type"] == "BadRequest"
+        assert fields["http.response.status_code"] == 400
+        assert fields["error.type"] == "BadRequest"
         log_spy.error.assert_not_called()
 
-    def test_the_summary_message_names_the_status_and_the_error_type(self, mocker: MockerFixture):
-        # The message is built from server-authored values alone, so it stays a stable sentence
-        # whatever a caller sent; everything variable is a field beside it.
+    def test_the_message_is_fixed_and_the_failure_rides_the_fields(self, mocker: MockerFixture):
+        # The message is the same sentence on every error line, at either level, so it is the key a
+        # query or an alert selects the error stream by; the status and the error type, which used
+        # to be spliced into it, ride fields under their OpenTelemetry keys.
         log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         assert _build_client().get("/api-config-error").status_code == 500
-        assert log_spy.error.call_args.args[0] == "API error 500: ServerMisconfigured"
+        assert _build_client().get("/api-input-error").status_code == 422
+        assert log_spy.error.call_args.args[0] == "A request ended in an error response"
+        assert log_spy.warning.call_args.args[0] == "A request ended in an error response"
+        fields = _emitted_fields(log_spy, as_error=True)
+        assert fields["http.response.status_code"] == 500
+        assert fields["error.type"] == "ServerMisconfigured"
+        assert "event" not in fields
+
+    @pytest.mark.parametrize(
+        ("path", "expected_backend_name"),
+        [
+            ("/inference-failure-attributed", "pipelex_gateway"),
+            ("/inference-failure-unattributed", None),
+        ],
+    )
+    def test_backend_name_is_only_ever_the_backend_the_error_names(self, mocker: MockerFixture, path: str, expected_backend_name: str | None):
+        """The provider the SDK's metadata names, `gateway`, is no backend's name: it is never written under `backend_name`, nor under `sdk`."""
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
+        response = _build_client().get(path)
+        assert response.status_code == 500
+        fields = _emitted_fields(log_spy, as_error=True)
+        assert fields.get("backend_name") == expected_backend_name
+        assert "sdk" not in fields
+        assert ProviderName.GATEWAY not in fields.values()
+        assert fields["provider_status_code"] == 503
 
     def test_user_id_rides_authenticated_pipelex_error_record(self, mocker: MockerFixture):
         # Phase 3 deleted the per-route `log.error(... user=...)` lines on
@@ -739,13 +786,13 @@ class TestExceptionHandlers:
         assert response.status_code == 500
         log_spy.error.assert_called_once()
         fields = _emitted_fields(log_spy, as_error=True)
-        assert fields["user_id"] == _TEST_USER_ID
-        assert fields["error_type"] == "PipelexConfigError"
+        assert fields["user.id"] == _TEST_USER_ID
+        assert fields["error.type"] == "PipelexConfigError"
 
     def test_user_id_rides_authenticated_api_authored_record(self, mocker: MockerFixture):
         # `handle_api_error` covers the API-authored 4xx surface (storage's
         # `raise_bad_request`, `raise_forbidden`, `raise_payload_too_large`;
-        # uploader's same set). It must ride the same `user_id` correlation
+        # uploader's same set). It must ride the same `user.id` correlation
         # `_log_error_report` does so the contract is uniform — a caller
         # mistake and a backend failure both name the caller.
         log_spy = mocker.patch("pipelex_api.exception_handlers.log")
@@ -753,31 +800,31 @@ class TestExceptionHandlers:
         assert response.status_code == 422
         log_spy.warning.assert_called_once()
         fields = _emitted_fields(log_spy, as_error=False)
-        assert fields["user_id"] == _TEST_USER_ID
-        assert fields["error_type"] == "ValidationError"
+        assert fields["user.id"] == _TEST_USER_ID
+        assert fields["error.type"] == "ValidationError"
 
     def test_user_id_rides_authenticated_unexpected_error_record(self, mocker: MockerFixture):
         # The catch-all 500 (`handle_unexpected_error`) is the one place a
-        # missing `user_id` is most expensive — by definition the failure
+        # missing `user.id` is most expensive — by definition the failure
         # was not classifiable upstream — so the same enrichment fires here.
         log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = _build_client(raise_server_exceptions=False).get("/authenticated-unexpected-error")
         assert response.status_code == 500
         log_spy.error.assert_called_once()
         fields = _emitted_fields(log_spy, as_error=True)
-        assert fields["user_id"] == _TEST_USER_ID
-        assert fields["error_type"] == "RuntimeError"
+        assert fields["user.id"] == _TEST_USER_ID
+        assert fields["error.type"] == "RuntimeError"
 
     def test_user_id_absent_from_unauthenticated_error_record(self, mocker: MockerFixture):
         # Pre-auth paths, and a deployment with no user model, have no `request.state.user`;
         # `_user_id_of` returns `None` and `_emit_api_error` drops `None`-valued fields, so the
-        # record carries no `user_id` attribute at all — never a null, which a query filtering on
+        # record carries no `user.id` attribute at all — never a null, which a query filtering on
         # presence would read as an answer.
         log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = _build_client().get("/config-error")
         assert response.status_code == 500
         log_spy.error.assert_called_once()
-        assert "user_id" not in _emitted_fields(log_spy, as_error=True)
+        assert "user.id" not in _emitted_fields(log_spy, as_error=True)
 
     def test_run_state_rides_pipelex_error_record(self, mocker: MockerFixture):
         # `_parse_request` binds `pipe_code` / `pipeline_run_id` on
@@ -793,7 +840,7 @@ class TestExceptionHandlers:
         fields = _emitted_fields(log_spy, as_error=True)
         assert fields["pipe_code"] == _TEST_PIPE_CODE
         assert fields["pipeline_run_id"] == _TEST_RUN_ID
-        assert fields["error_type"] == "PipelexConfigError"
+        assert fields["error.type"] == "PipelexConfigError"
 
     def test_run_state_rides_api_authored_record(self, mocker: MockerFixture):
         # API-authored 4xx surface: `raise_validation_error` raised from a
@@ -807,7 +854,7 @@ class TestExceptionHandlers:
         fields = _emitted_fields(log_spy, as_error=False)
         assert fields["pipe_code"] == _TEST_PIPE_CODE
         assert fields["pipeline_run_id"] == _TEST_RUN_ID
-        assert fields["error_type"] == "ValidationError"
+        assert fields["error.type"] == "ValidationError"
 
     def test_run_state_rides_unexpected_error_record(self, mocker: MockerFixture):
         # The catch-all 500 is the most operationally expensive case for a
@@ -822,7 +869,7 @@ class TestExceptionHandlers:
         fields = _emitted_fields(log_spy, as_error=True)
         assert fields["pipe_code"] == _TEST_PIPE_CODE
         assert fields["pipeline_run_id"] == _TEST_RUN_ID
-        assert fields["error_type"] == "RuntimeError"
+        assert fields["error.type"] == "RuntimeError"
 
     def test_run_state_absent_when_parse_request_did_not_bind(self, mocker: MockerFixture):
         # A route that didn't go through `_parse_request` (here: `/config-error`,
@@ -853,9 +900,8 @@ class TestExceptionHandlers:
         assert response.status_code == 422
         log_spy.warning.assert_called_once()
         fields = _emitted_fields(log_spy, as_error=False)
-        assert fields["event"] == API_ERROR_EVENT
-        assert fields["status"] == 422
-        assert fields["error_type"] == "ValidationError"
+        assert fields["http.response.status_code"] == 422
+        assert fields["error.type"] == "ValidationError"
         assert fields["error_domain"] == "input"
         # The summary covers both per-field failures the request triggered.
         assert "field" in fields["detail"]
@@ -890,8 +936,7 @@ class TestExceptionHandlers:
         assert response.status_code == 422
         fields = _emitted_fields(log_spy, as_error=False)
         assert fields["detail"] == crafted_detail, f"the value was altered on the way to the record: {fields['detail']!r}"
-        assert fields["event"] == API_ERROR_EVENT, "a crafted detail overwrote a legitimate field"
-        assert fields["status"] == 422, "a crafted detail overwrote a legitimate field"
+        assert fields["http.response.status_code"] == 422, "a crafted detail overwrote a legitimate field"
         message = log_spy.warning.call_args.args[0]
         assert crafted_detail not in message, f"caller input reached the message: {message!r}"
 
@@ -928,9 +973,8 @@ class TestExceptionHandlers:
         assert response.status_code == 501
         log_spy.error.assert_called_once()
         fields = _emitted_fields(log_spy, as_error=True)
-        assert fields["event"] == API_ERROR_EVENT
-        assert fields["status"] == 501
-        assert fields["error_type"] == "AsyncExecutionNotEnabledError"
+        assert fields["http.response.status_code"] == 501
+        assert fields["error.type"] == "AsyncExecutionNotEnabledError"
         assert fields["error_domain"] == "config"
 
     def test_pipeline_run_id_conflict_maps_to_409(self):
@@ -982,6 +1026,5 @@ class TestExceptionHandlers:
         log_spy.warning.assert_called_once()
         log_spy.error.assert_not_called()
         fields = _emitted_fields(log_spy, as_error=False)
-        assert fields["event"] == API_ERROR_EVENT
-        assert fields["status"] == 409
-        assert fields["error_type"] == "PipelineManagerAlreadyExistsError"
+        assert fields["http.response.status_code"] == 409
+        assert fields["error.type"] == "PipelineManagerAlreadyExistsError"

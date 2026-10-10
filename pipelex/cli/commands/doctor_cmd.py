@@ -994,7 +994,8 @@ def display_health_report(
             backend_credential_reports=bad_backend_credential_reports,
             suggest_hosted_runs=True,
         )
-        console.print(error_msg)
+        # Plain text naming each backend's table as `[openai]`, which Rich would read as a style tag and drop
+        console.print(escape(error_msg))
     console.print()
 
     # Models section
@@ -1600,7 +1601,7 @@ def setup_doctor_runtime(*, log_config_overrides: Mapping[str, Any] | None = Non
     runtime_setup = discover_doctor_runtime(log_config=log_config, installs_log_sink=installs_log_sink)
     runtime_hub.set_pretty_print_mode(mode=log_config.pretty_print_mode)
     if (stale_warning := config_manager.take_stale_configuration_warning()) is not None:
-        log.warning(stale_warning)
+        stale_warning.emit()
     return runtime_setup
 
 

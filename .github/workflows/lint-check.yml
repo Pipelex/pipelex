@@ -209,6 +209,39 @@ jobs:
         run: make check-actions-allowlist
 
 # --------------------------------------------------------------------------
+# 6c. Log calls — single job, version-independent (the guard renders each
+#     call's signature the same on every supported Python). A message at INFO
+#     and above is a literal with its values in fields, and no message holds
+#     Rich markup, against the committed log_call_baseline.toml, which only
+#     shrinks: the check compares it with the baseline at the pull request's
+#     base, fetched here since the checkout holds only the merge commit, and
+#     refuses an entry the base does not list.
+# --------------------------------------------------------------------------
+  lint-log-calls:
+    name: Lint (log calls)
+    runs-on: ubuntu-latest
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/.venv
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install dependencies
+        run: PYTHON_VERSION=3.11 TEST_PROFILE=ci make install
+
+      - name: Fetch the pull request's base
+        run: git fetch --no-tags --depth=1 origin "${{ github.event.pull_request.base.sha }}"
+
+      - name: Run log-call check
+        run: make check-log-calls LOG_CALL_BASELINE_REF="${{ github.event.pull_request.base.sha }}"
+
+# --------------------------------------------------------------------------
 # 7.  Drift contracts — single job, version-independent
 #     BLOCKING, but through the ruleset rather than through lint-all: `Lint
 #     (drift-contracts)` is named as a required status check on both `dev` and
@@ -309,14 +342,14 @@ jobs:
 # 10. Aggregator job — the required status check that covers every lint job,
 #     including the ones the rulesets do not name individually
 #     (`Lint (hub layering)`, `Lint (rich imports)`, `Lint (actions allowlist)`,
-#     `Lint (agent-rules)`, `Lint (api)`). It is not the only required lint check: the rulesets name
+#     `Lint (log calls)`, `Lint (agent-rules)`, `Lint (api)`). It is not the only required lint check: the rulesets name
 #     several of the jobs above by name as well. Anything added to `needs`
 #     becomes blocking through here.
 # --------------------------------------------------------------------------
   lint-all:
     name: Lint (all)
     runs-on: ubuntu-latest
-    needs: [lint-ruff-plxt, lint-typecheck, lint-config-sync, lint-keyword-only, lint-hub-layering, lint-rich-imports, lint-actions-allowlist, lint-agent-rules, lint-api]
+    needs: [lint-ruff-plxt, lint-typecheck, lint-config-sync, lint-keyword-only, lint-hub-layering, lint-rich-imports, lint-actions-allowlist, lint-log-calls, lint-agent-rules, lint-api]
     if: always()
 
     steps:
@@ -329,6 +362,7 @@ jobs:
              [ "${{ needs.lint-hub-layering.result }}" != "success" ] || \
              [ "${{ needs.lint-rich-imports.result }}" != "success" ] || \
              [ "${{ needs.lint-actions-allowlist.result }}" != "success" ] || \
+             [ "${{ needs.lint-log-calls.result }}" != "success" ] || \
              [ "${{ needs.lint-agent-rules.result }}" != "success" ] || \
              [ "${{ needs.lint-api.result }}" != "success" ]; then
             echo "::error::At least one lint job failed."

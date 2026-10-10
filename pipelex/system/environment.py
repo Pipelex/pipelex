@@ -3,6 +3,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from pipelex import log
 from pipelex.system.exceptions import EnvVarNotFoundError
 from pipelex.tools.misc.placeholder import value_is_placeholder
 
@@ -91,6 +92,29 @@ def any_env_var_is_placeholder(keys: list[str]) -> bool:
 
 def set_env(key: str, value: str) -> None:
     os.environ[key] = value
+
+
+def get_positive_int_env(*, env_var: str, default: int) -> int:
+    """The positive integer an environment variable holds, or ``default`` when it holds none.
+
+    An unset or empty variable gives the default silently. A value that is not a positive integer gives it with a
+    warning, which names the variable and the default and never the value, whatever the environment holds there.
+    The one reader of an env-tunable size or count, for the library's ceilings and the API server's limits alike.
+    """
+    raw = get_optional_env(env_var)
+    if not raw:
+        return default
+    try:
+        parsed = int(raw)
+    except ValueError:
+        parsed = 0
+    if parsed <= 0:
+        log.warning(
+            "An environment variable holds no positive integer, so its default applies",
+            fields={"env_var": env_var, "default_value": default},
+        )
+        return default
+    return parsed
 
 
 def is_env_var_truthy(key: str) -> bool:

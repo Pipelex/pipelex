@@ -691,13 +691,10 @@ Common error types:
 
 `pipelex init` writes the backend definitions once and never overwrites a file you already have — which is what keeps your edits, and which also means a file written by an older Pipelex stays on your machine after the model-spec format changes. When a release removes a key, your copy still carries it, and the strict model that reads it refuses.
 
-You do not have to do anything about that at boot. Pipelex reads the migration history for the `inference/backends/` files, carries the out-of-date ones forward **in memory**, and starts with a warning naming each file:
+You do not have to do anything about that at boot. Pipelex reads the migration history for the `inference/backends/` files, carries the out-of-date ones forward **in memory**, and starts with a warning line for each file, the file and what the migration history carried forward following the message as fields:
 
 ```
-Your configuration is out of date, and pipelex read it as if it had been migrated:
-'~/.pipelex/inference/backends/openai.toml'. What the ledger carried forward: Drop
-prompting_target from every backend definition. Nothing was written. Run
-`pipelex migrate` to bring the files up to date.
+WARNING  🧠: A configuration file is out of date and was read as if it had been migrated, and nothing was written; run `pipelex migrate` to update it file.path=/Users/me/.pipelex/inference/backends/openai.toml migration_steps=["Drop prompting_target from every backend definition"] has_blocked_steps=false
 ```
 
 Nothing has been written at that point, so the warning comes back at the next boot until you run the command:

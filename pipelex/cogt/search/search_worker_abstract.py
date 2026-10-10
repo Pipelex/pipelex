@@ -3,8 +3,8 @@ from typing import Any
 
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import CogtError
+from pipelex.cogt.inference.inference_call_summary import InferenceCallSummary, InferenceOperation
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.search.search_job import SearchJob
@@ -28,31 +28,42 @@ class SearchWorkerAbstract(InferenceWorkerAbstract):
     def desc(self) -> str:
         return f"Search using {self.inference_model.desc}"
 
+    def _call_summary(self, *, search_job: SearchJob) -> InferenceCallSummary:
+        """The event the call ends with, its model and its usage read off the worker and the job it reports when it ends."""
+        return InferenceCallSummary(
+            operation=InferenceOperation.SEARCH,
+            model_handle=self.inference_model.name,
+            read_inference_model=lambda: self.inference_model,
+            read_tokens_usage=lambda: search_job.job_report.search_tokens_usage,
+        )
+
     async def search_sourced_answer(
         self,
         search_job: SearchJob,
     ) -> SearchResultContent:
         """Execute a search query and return a sourced answer with sources."""
-        log.dev(f"✨ {self.desc} ✨")
-        search_job.validate_before_execution()
-        search_job.job_metadata.unit_job_id = UnitJobId.SEARCH_SOURCED_ANSWER
-        search_job.search_job_before_start(inference_model=self.inference_model)
+        # The call ends with its summary event whichever way it ends, a refusal by the job's validation included
+        with self._call_summary(search_job=search_job):
+            search_job.validate_before_execution()
+            search_job.job_metadata.unit_job_id = UnitJobId.SEARCH_SOURCED_ANSWER
+            search_job.search_job_before_start(inference_model=self.inference_model)
 
-        try:
-            result = await self._search_sourced_answer(search_job=search_job)
-        except CogtError as exc:
-            exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
-            raise
-        finally:
-            # Completion and reporting belong on *every* way out, not just the happy one. A backend's
-            # response-shape guard raises after the provider already answered and after usage was
-            # recorded, so that call is billed — reporting only on success would make the spend vanish
-            # from the run's cost report. A failure that never reached the provider recorded no tokens
-            # (`search_job_before_start` initialises `nb_tokens_by_category` empty), so it reports as the
-            # zero-cost attempt it was rather than inventing a charge.
-            search_job.search_job_after_complete()
-            if self.reporting_delegate:
-                self.reporting_delegate.report_inference_job(inference_job=search_job)
+            try:
+                result = await self._search_sourced_answer(search_job=search_job)
+            except CogtError as exc:
+                exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
+                raise
+            finally:
+                # Completion and reporting belong on *every* way out, not just the happy one. A backend's
+                # response-shape guard raises after the provider already answered and after usage was
+                # recorded, so that call is billed — reporting only on success would make the spend vanish
+                # from the run's cost report. A failure that never reached the provider recorded no tokens
+                # (`search_job_before_start` initialises `nb_tokens_by_category` empty), so it reports as the
+                # zero-cost attempt it was rather than inventing a charge. The summary event the call ends
+                # with reads the same usage, so a billed failure carries its tokens and cost there too.
+                search_job.search_job_after_complete()
+                if self.reporting_delegate:
+                    self.reporting_delegate.report_inference_job(inference_job=search_job)
 
         return result
 
@@ -63,23 +74,24 @@ class SearchWorkerAbstract(InferenceWorkerAbstract):
         schema: type[BaseModelTypeVar],
     ) -> dict[str, Any]:
         """Execute a search query and return structured data matching the schema."""
-        log.dev(f"✨ {self.desc} ✨")
-        search_job.validate_before_execution()
-        search_job.job_metadata.unit_job_id = UnitJobId.SEARCH_STRUCTURED
-        search_job.search_job_before_start(inference_model=self.inference_model)
+        # The call ends with its summary event whichever way it ends, a refusal by the job's validation included
+        with self._call_summary(search_job=search_job):
+            search_job.validate_before_execution()
+            search_job.job_metadata.unit_job_id = UnitJobId.SEARCH_STRUCTURED
+            search_job.search_job_before_start(inference_model=self.inference_model)
 
-        try:
-            result = await self._search_structured(search_job=search_job, schema=schema)
-        except CogtError as exc:
-            exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
-            raise
-        finally:
-            # Reported on every way out, for the reason spelled out in `search_sourced_answer` — and it
-            # bites hardest here, because this arm is the one whose response-shape guards reject a
-            # payload the provider already charged for.
-            search_job.search_job_after_complete()
-            if self.reporting_delegate:
-                self.reporting_delegate.report_inference_job(inference_job=search_job)
+            try:
+                result = await self._search_structured(search_job=search_job, schema=schema)
+            except CogtError as exc:
+                exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
+                raise
+            finally:
+                # Reported on every way out, for the reason spelled out in `search_sourced_answer` — and it
+                # bites hardest here, because this arm is the one whose response-shape guards reject a
+                # payload the provider already charged for.
+                search_job.search_job_after_complete()
+                if self.reporting_delegate:
+                    self.reporting_delegate.report_inference_job(inference_job=search_job)
 
         return result
 

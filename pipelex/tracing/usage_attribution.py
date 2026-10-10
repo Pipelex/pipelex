@@ -23,6 +23,7 @@ from collections.abc import Mapping, Sequence
 from pipelex import log
 from pipelex.cogt.llm.llm_report import LLMTokenCostReportField
 from pipelex.cogt.usage.cost_registry import AggregatedCosts, CostRegistry, ModelUsageKey
+from pipelex.cogt.usage.usage_cost import compute_total_cost
 from pipelex.graph.graphspec import ModelUsageSpec, NodeUsageSpec
 from pipelex.reporting.reporting_types import AnyTokensUsage
 
@@ -78,7 +79,7 @@ def _model_specs(*, usages: Sequence[AnyTokensUsage], aggregated: AggregatedCost
     specs: list[ModelUsageSpec] = []
     for model_key, model_data in aggregated.grouped_by_model.items():
         rated_calls = rated_by_model.get(model_key, 0)
-        model_cost = CostRegistry.compute_total_cost(
+        model_cost = compute_total_cost(
             input_non_cached_cost=model_data[LLMTokenCostReportField.COST_INPUT_NON_CACHED],
             input_cached_cost=model_data[LLMTokenCostReportField.COST_INPUT_CACHED],
             output_cost=model_data[LLMTokenCostReportField.COST_OUTPUT],
@@ -226,7 +227,7 @@ def _walk_subtree(
         if node_id in subtree_by_node:
             continue
         if node_id in in_progress:
-            log.warning(f"Cycle in graph node parentage at '{node_id}'; subtree usage rollup will be incomplete")
+            log.warning("The node parentage of a graph has a cycle, so a subtree's usage rollup is incomplete", fields={"node_id": node_id})
             continue
 
         in_progress.add(node_id)

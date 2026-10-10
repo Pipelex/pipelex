@@ -59,7 +59,6 @@ def do_which_pipe(pipe_code: str, *, library_dirs: list[Path], source_label: str
         source_path = get_pipe_source(pipe_code=pipe_code)
         if source_path:
             console.print(f"  Source: [cyan]{source_path}[/cyan]")
-        log.verbose(f"Pipe '{pipe_code}' resolved", title="which")
         console.print("")
         return True
     else:
@@ -101,7 +100,7 @@ def which_cmd(
         if effective_dirs:
             library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
         else:
-            log.info(f"No library directories to load ({source_label})")
+            log.verbose(f"No library directories to load ({source_label})")
 
         with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)

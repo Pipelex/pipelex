@@ -311,11 +311,13 @@ class ModelUsageSpec(BaseModel):
 
     inference_model_name: str
     inference_model_id: str
-    # Kind of inference: "llm", "img_gen", "extract", "search", "judgment". The discriminator a
-    # consumer needs before displaying token counts: extract/search/img_gen are billed
-    # PER REQUEST, and that price is encoded by putting 1_000_000 in each token
-    # category (rates are per-million), so their "tokens" are a scaled request counter.
-    # llm and judgment report the real tokens the provider read and wrote.
+    # Kind of inference: "llm", "img_gen", "extract", "search", "judgment". It does not tell a
+    # consumer whether the token counts are tokens: most calls of every kind report the real
+    # tokens the provider read and wrote, while a call billed by the request or by the page, a
+    # Linkup search or fetch or an extraction priced by its pages, records each unit as
+    # 1_000_000 in each token category so the per-million rates price one unit. Its usage says
+    # so in `pricing_unit` (`pipelex.cogt.usage.pricing_unit`), which this spec does not carry
+    # yet, so the token totals here still add those scaled counts.
     model_type: str
     inference_calls: int = 0
     rated_inference_calls: int = 0

@@ -18,6 +18,7 @@ import asyncio
 import contextvars
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
@@ -30,11 +31,15 @@ from pipelex.cogt.doc_gen.doc_gen_engine import get_doc_gen_inference_model, req
 from pipelex.cogt.doc_gen.doc_gen_worker_factory import DocGenWorkerFactory
 from pipelex.cogt.doc_gen.exceptions import DocGenRenderError
 from pipelex.cogt.doc_gen.render_job import LoadedResource, RenderedDocument, RenderResources
+from pipelex.cogt.inference.inference_call_summary import InferenceCallSummary, InferenceOperation
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.runtime_hub import get_report_delegate
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.tools.uri.uri_bytes import load_bytes_and_mime_type_from_any_uri
 from pipelex.tools.uri.uri_read_scope import authorize_uri_read
+
+if TYPE_CHECKING:
+    from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 
 # How long an engine may wait for one file it reads, such as an image fetched over https.
 _RESOURCE_LOAD_TIMEOUT_SECONDS = 120
@@ -83,8 +88,8 @@ async def render_document_and_store(
 ) -> DocumentContent:
     """Print the composed document with its engine, store the file, and return the `DocumentContent` pointing at it.
 
-    The read scope is authorized first, then the DRY branch, which prints and stores nothing, so a dry run
-    refuses what a live one would.
+    The read scope is authorized first in either mode, so a dry run, which prints and stores nothing, refuses what
+    a live one would. A live print ends with the event every inference call ends with, as `_print_document` says.
 
     Raises:
         UriReadRefusedError: an image the document names is outside the run's read scope.
@@ -93,48 +98,82 @@ async def render_document_and_store(
             no installed plugin registers it.
         DocGenRenderError: the engine could not print it, or failed in a way it did not report.
     """
-    authorize_assignment_reads(job_metadata=render_assignment.job_metadata, uri_references=render_assignment.referenced_uris())
     if render_assignment.cogt_run_params.run_mode.is_dry:
+        authorize_assignment_reads(job_metadata=render_assignment.job_metadata, uri_references=render_assignment.referenced_uris())
         return dry_render_document(render_assignment)
+    rendered = await _print_document(render_assignment=render_assignment, storage_provider=generated_content_factory.storage_provider)
     composition = render_assignment.composition
-    inference_model = get_doc_gen_inference_model(
-        model_handle=render_assignment.doc_gen_setting.model,
-        doc_gen_format=composition.format,
-        source=composition.source,
-        pipe_code=render_assignment.job_metadata.pipe_code,
-    )
-    require_doc_gen_engine_installed(
-        inference_model=inference_model,
-        doc_gen_format=composition.format,
-        source=composition.source,
-        pipe_code=render_assignment.job_metadata.pipe_code,
-    )
-    worker = DocGenWorkerFactory.make_doc_gen_worker(inference_model=inference_model, reporting_delegate=get_report_delegate())
-    render_job = composition.make_render_job()
-    resources = RunRenderResources(
-        storage_provider=generated_content_factory.storage_provider,
-        read_scope=render_assignment.job_metadata.run_metadata.read_scope,
-        loop=asyncio.get_running_loop(),
-    )
-    # The context is carried into the thread, as `asyncio.to_thread` would, so the engine logs under the run.
-    run_context = contextvars.copy_context()
-
-    def _print() -> RenderedDocument:
-        return run_context.run(worker.render, job=render_job, resources=resources)
-
-    try:
-        rendered = await asyncio.get_running_loop().run_in_executor(_PRINT_EXECUTOR, _print)
-    except PipelexError:
-        # Already classified: a refused read, or a failure the engine reported as a `DocGenRenderError`.
-        raise
-    except Exception as exc:
-        # Dynamic plugin dispatch: an engine is plugin code whose exceptions cannot be enumerated, and anything
-        # else it raises is a failure to print this document.
-        msg = f"The engine '{inference_model.name}' could not print '{composition.filename}': {exc}"
-        raise DocGenRenderError(msg) from exc
     return await generated_content_factory.make_document_content(
         storage_scope=render_assignment.job_metadata.run_metadata.storage_scope,
         data=rendered.data,
         mime_type=composition.format.mime_type,
         filename=composition.filename,
     )
+
+
+async def _print_document(*, render_assignment: RenderDocumentAssignment, storage_provider: StorageProviderAbstract) -> RenderedDocument:
+    """Print the composed document with its engine, ending the print with the event every inference call ends with.
+
+    The event is entered before the checks that may refuse the print, the read scope, the engine's model and its
+    installation, so a refused print ends with it too, as a refused call of any other family does. It is logged on
+    this coroutine rather than on the engine's thread, so its outcome is the awaiting coroutine's: a print cancelled
+    from outside ends `cancelled`, once, while the thread, which nothing can stop, finishes its render and logs
+    nothing more. An engine reports no usage, so the event carries no tokens and no cost, never a zero standing for
+    either.
+
+    Raises:
+        UriReadRefusedError: an image the document names is outside the run's read scope.
+        ModelNotFoundError: the assignment's engine is not a model served here.
+        DocGenEngineMissingError: the engine is the built-in one or one of the plugin's and is no longer declared here, or
+            no installed plugin registers it.
+        DocGenRenderError: the engine could not print it, or failed in a way it did not report.
+    """
+    composition = render_assignment.composition
+    model_handle = render_assignment.doc_gen_setting.model
+    pipe_code = render_assignment.job_metadata.pipe_code
+    # The event reads it when the print ends, so it names the model the handle resolved to, or the handle alone when
+    # the print ended before it was resolved or because it resolved to none.
+    inference_model: InferenceModelSpec | None = None
+    with InferenceCallSummary(
+        operation=InferenceOperation.DOC_GEN,
+        model_handle=model_handle,
+        read_inference_model=lambda: inference_model,
+        read_tokens_usage=None,
+    ):
+        authorize_assignment_reads(job_metadata=render_assignment.job_metadata, uri_references=render_assignment.referenced_uris())
+        inference_model = get_doc_gen_inference_model(
+            model_handle=model_handle,
+            doc_gen_format=composition.format,
+            source=composition.source,
+            pipe_code=pipe_code,
+        )
+        require_doc_gen_engine_installed(
+            inference_model=inference_model,
+            doc_gen_format=composition.format,
+            source=composition.source,
+            pipe_code=pipe_code,
+        )
+        engine_name = inference_model.name
+        worker = DocGenWorkerFactory.make_doc_gen_worker(inference_model=inference_model, reporting_delegate=get_report_delegate())
+        render_job = composition.make_render_job()
+        resources = RunRenderResources(
+            storage_provider=storage_provider,
+            read_scope=render_assignment.job_metadata.run_metadata.read_scope,
+            loop=asyncio.get_running_loop(),
+        )
+        # The context is carried into the thread, as `asyncio.to_thread` would, so the engine logs under the run.
+        run_context = contextvars.copy_context()
+
+        def _render() -> RenderedDocument:
+            return run_context.run(worker.render, job=render_job, resources=resources)
+
+        try:
+            return await asyncio.get_running_loop().run_in_executor(_PRINT_EXECUTOR, _render)
+        except PipelexError:
+            # Already classified: a refused read, or a failure the engine reported as a `DocGenRenderError`.
+            raise
+        except Exception as exc:
+            # Dynamic plugin dispatch: an engine is plugin code whose exceptions cannot be enumerated, and anything
+            # else it raises is a failure to print this document.
+            msg = f"The engine '{engine_name}' could not print '{composition.filename}': {exc}"
+            raise DocGenRenderError(msg) from exc

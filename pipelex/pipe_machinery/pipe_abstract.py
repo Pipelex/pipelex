@@ -7,6 +7,7 @@ import shortuuid
 from opentelemetry import trace
 from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, Status, StatusCode, TraceFlags
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
@@ -46,6 +47,8 @@ from pipelex.system.telemetry.otel_constants import (
 from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_identity import make_run_identity_span_attributes
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
+from pipelex.tools.log.console_layouts import LogLayout
+from pipelex.tools.log.summary_event import SummaryEvent
 from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path, is_snake_case
 from pipelex.validation_error_types import PipeValidationErrorType
@@ -54,6 +57,40 @@ if TYPE_CHECKING:
     from pipelex.system.trace_context import TraceContext
 
 PipeAbstractType = type["PipeAbstract"]
+
+#: The message every live pipe run announces itself with; the pipe is in the fields, and the console draws it as the pipe tree.
+PIPE_RUN_STARTS_MESSAGE = "Pipe run starts"
+
+#: The message every live pipe run ends with, whichever way it ends; the pipe, its duration and its outcome are in the fields.
+PIPE_RUN_ENDS_MESSAGE = "Pipe run ends"
+
+
+class PipeRunEnd(SummaryEvent):
+    """Times a live pipe run and logs the event it ends with, once, when it ends, however it ends.
+
+    The pair of the run's announcement: entered with it, under the run's `pipe_run_id`, and left once the run returns
+    or raises, so every announced run ends with one event and a dry run, which announces nothing, with none. The run
+    enters `ends_here` around the block its span is active in, so the event is logged as the pipe's own span closes,
+    just after the block has ended it, while it is still the active Pipelex span, and carries that span's ids; a
+    failure before that block still ends the run with its event. The event carries the announcement's fields, then
+    `duration_ms`, `outcome`, `error.type` on failure, and `cancelled` for a run stopped from outside. It never handles
+    the exception it reads the outcome from, which goes on as it came.
+
+    Args:
+        pipe_fields: The announcement's fields, the same mapping the announcement was logged with.
+    """
+
+    def __init__(self, *, pipe_fields: dict[str, Any]) -> None:
+        super().__init__(message=PIPE_RUN_ENDS_MESSAGE)
+        self._pipe_fields = pipe_fields
+
+    @override
+    def _work_fields(self) -> dict[str, Any]:
+        return self._pipe_fields
+
+    @override
+    def _log_event(self, *, fields: dict[str, Any]) -> None:
+        log.info(PIPE_RUN_ENDS_MESSAGE, fields=fields, layout=LogLayout.PIPE_RUN_END)
 
 
 class AbsentInput(NamedTuple):
@@ -219,7 +256,10 @@ class PipeAbstract(ABC, BaseModel):
         # comes from the bundle's domain field, not from the pipe code itself.
         if "." in code:
             bare_code = code.rsplit(".", maxsplit=1)[1]
-            log.warning(f"Runtime pipe code '{code}' contains a namespace prefix, stripped to '{bare_code}'")
+            log.warning(
+                "A pipe code carries a namespace prefix, which was stripped: write the pipe code bare",
+                fields={"pipe_code": bare_code, "pipe_ref": code},
+            )
             code = bare_code
         if not is_snake_case(code):
             msg = f"Invalid pipe code syntax '{code}'. Must be in snake_case."
@@ -636,18 +676,19 @@ class PipeAbstract(ABC, BaseModel):
         """
         return {}
 
-    def _format_pipe_run_info(self, pipe_run_params: PipeRunParams) -> str:
-        indent_level = len(pipe_run_params.pipe_stack) - 1
-        indent = "   " * indent_level
-        if indent_level > 0:
-            indent = f"{indent}[yellow]↳[/yellow] "
-        pipe_type_label = f"[white]{self.pipe_type}:[/white]"
-        if pipe_run_params.run_mode.is_dry:
-            pipe_type_label = f"[dim]Dry run:[/dim] {pipe_type_label}"
-        pipe_code_label = f"[red]{self.code}[/red]"
-        concept_code_label = f"[bold green]{self.output.concept.code}[/bold green]"
-        arrow = "[yellow]→[/yellow]"
-        return f"{indent}{pipe_type_label} {pipe_code_label} {arrow} {concept_code_label}"
+    def _pipe_run_fields(self, *, pipe_run_params: PipeRunParams) -> dict[str, Any]:
+        """The fields of the pipe announcement, the ones the console's pipe-run layout draws as the pipe tree.
+
+        The depth counts the pipes this one runs under: the top-level pipe is already on the stack when it
+        announces itself, so it stands at depth 0, and a pipe run with no stack at all is drawn there too.
+        Only a live run announces itself, so the fields carry no run mode.
+        """
+        return {
+            "pipe_type": self.pipe_type,
+            "pipe_code": self.code,
+            "output_concept": self.output.concept.code,
+            "pipe_depth": max(len(pipe_run_params.pipe_stack) - 1, 0),
+        }
 
     @final
     async def run_pipe(
@@ -922,9 +963,9 @@ class PipeAbstract(ABC, BaseModel):
         the same way, so no downstream consumer meets a neither-value-nor-record hard miss.
         """
         lifted_input = liftable[0]
-        absent_names = ", ".join(absent.named_stuff_spec.variable_name for absent in liftable)
+        absent_names = [absent.named_stuff_spec.variable_name for absent in liftable]
         output_slot_name = output_name or MAIN_STUFF_NAME
-        log.info(f"Skipping {self.type} '{self.code}': absent input(s): {absent_names}")
+        log.info("Pipe run skipped for absent inputs", fields={"pipe_type": self.pipe_type, "pipe_code": self.code, "variable_names": absent_names})
 
         skip_reason = self._make_skip_reason(liftable=liftable)
         skip_record = AbsenceRecord(
@@ -983,6 +1024,7 @@ class PipeAbstract(ABC, BaseModel):
         output_name: str | None = None,
         library_crate: LibraryCrate | None = None,
     ) -> PipeOutput:
+        assert not pipe_run_params.run_mode.is_dry, f"Live run of {self.type} '{self.code}' called with run_mode = {pipe_run_params.run_mode}"
         # Generate pipe_run_id (business ID, always set)
         this_pipe_run_id = PipelineFactory.make_pipe_run_id()
 
@@ -991,19 +1033,25 @@ class PipeAbstract(ABC, BaseModel):
         # names the pipe run it belongs to, a nested pipe's until it binds its own. The outer binding
         # comes back when the pipe returns, however it returns. A pipe lifted for absent optional
         # inputs never gets here: it has no run and no id, and its skip line carries the enclosing binding.
-        with log.context(pipe_run_id=this_pipe_run_id):
-            log.info(self._format_pipe_run_info(pipe_run_params=pipe_run_params))
+        # The run ends with its summary event, under the same binding, whichever way it ends: it is logged
+        # as the pipe's own span closes when the run reaches it, and here when the setup before it fails.
+        pipe_run_fields = self._pipe_run_fields(pipe_run_params=pipe_run_params)
+        with log.context(pipe_run_id=this_pipe_run_id), PipeRunEnd(pipe_fields=pipe_run_fields) as run_end:
+            # A fixed message, the pipe in the fields: the console draws the pipe tree from them through
+            # the pipe-run layout, and every other sink writes them as keys a query can select on.
+            log.info(PIPE_RUN_STARTS_MESSAGE, fields=pipe_run_fields, layout=LogLayout.PIPE_RUN)
 
             # Handle telemetry ------------------------------------------------------------
 
-            # Derive OtelContext if telemetry is enabled (not dry mode and tracer available)
+            # Derive OtelContext if telemetry is enabled (a tracer is available). The assertion above
+            # holds this method to a live run, so no run-mode check is needed.
             # The trace_id comes from parent's otel_context (already computed at pipeline start)
             this_otel_context: OtelContext | None = None
             span: Span | None = None
             is_root_span: bool = False
 
             parent_otel_context = job_metadata.otel_context
-            if not pipe_run_params.run_mode.is_dry and parent_otel_context is not None:
+            if parent_otel_context is not None:
                 # Start OTel span first
                 span, is_root_span = self._start_pipe_span(
                     parent_otel_context=parent_otel_context,
@@ -1023,7 +1071,7 @@ class PipeAbstract(ABC, BaseModel):
             # Create child metadata with updated pipe_code and pipe_run_id
             # This passes down a modified copy rather than mutating the original
             # otel_context is passed separately because it must always be set explicitly
-            # (even when None in dry mode) to avoid inheriting stale parent context
+            # (even when None, with no tracer) to avoid inheriting stale parent context
             child_metadata = job_metadata.copy_with_update(
                 otel_context=this_otel_context,
                 pipe_code=self.code,
@@ -1036,8 +1084,9 @@ class PipeAbstract(ABC, BaseModel):
             # line inside the run names it under `pipelex.*`. OpenTelemetry's current context is left
             # alone, so a host's own instrumentation is never re-parented and a line's standard trace
             # fields keep naming the host's span, and the span's children still take their parent from
-            # `child_metadata`.
-            with pipelex_span_active(span=span):
+            # `child_metadata`. The run's summary event is logged at the end of this block, as the span closes:
+            # the span has ended by then, but it is still the active Pipelex span, so the event carries its ids.
+            with pipelex_span_active(span=span), run_end.ends_here():
                 try:
                     pipe_output = await self._live_run_pipe(
                         job_metadata=child_metadata,
@@ -1076,9 +1125,8 @@ class PipeAbstract(ABC, BaseModel):
         # unset — so everything downstream that identifies a step by it (leaf-activity labelling in a
         # distributed backend, log correlation) sees an anonymous step in DRY and a named one in LIVE.
         # Telemetry stays live-only on purpose: `pipe_run_id` and `otel_context` belong to a real run.
-        # `otel_context=None` matches what `live_run_pipe` itself computes in dry mode, and clearing
-        # it explicitly is the point of that parameter being required — inheriting the parent's would
-        # attach a dry step to a live span.
+        # A dry run opens no span, so `otel_context` is cleared, and explicitly, which is the point of
+        # that parameter being required: inheriting the parent's would attach a dry step to a live span.
         child_metadata = job_metadata.copy_with_update(otel_context=None, pipe_code=self.code)
         return await self._dry_run_pipe(
             job_metadata=child_metadata,
@@ -1136,7 +1184,6 @@ class PipeAbstract(ABC, BaseModel):
         """
         tracer = TelemetryManagerAbstract.get_instance_tracer()
         if tracer is None:
-            log.verbose(f"[OTel] No tracer available for pipe '{self.code}'")
             return None, False
 
         pipeline_run_id = run_metadata.pipeline_run_id
@@ -1226,19 +1273,6 @@ class PipeAbstract(ABC, BaseModel):
         if span.get_span_context() == parent_span_context:
             return None, False
 
-        # Debug logging, under the span it announces, so the line's `pipelex.*` fields name that span
-        span_ctx = span.get_span_context()
-        with pipelex_span_active(span=span):
-            log.verbose(
-                f"[OTel] PIPE SPAN STARTED:\n"
-                f"  pipe_code='{self.code}'\n"
-                f"  pipeline_run_id='{pipeline_run_id}'\n"
-                f"  trace_id={span_ctx.trace_id:032x}\n"
-                f"  span_id={span_ctx.span_id:016x}\n"
-                f"  parent_span_id={parent_span_id:016x}\n"
-                f"  is_root_span={is_root_span}"
-            )
-
         return span, is_root_span
 
     def _end_pipe_span_success(self, span: Span | None, *, pipe_output: PipeOutput, is_root_span: bool) -> None:
@@ -1251,9 +1285,6 @@ class PipeAbstract(ABC, BaseModel):
         """
         if span is None:
             return
-
-        span_ctx = span.get_span_context()
-        log.verbose(f"[OTel] PIPE SPAN ENDING:\n  pipe_code='{self.code}'\n  trace_id={span_ctx.trace_id:032x}\n  span_id={span_ctx.span_id:016x}")
 
         # Always capture full output content for Langfuse
         if TelemetryManagerAbstract.get_langfuse_enabled():
@@ -1285,11 +1316,6 @@ class PipeAbstract(ABC, BaseModel):
         """
         if span is None:
             return
-
-        span_ctx = span.get_span_context()
-        log.verbose(
-            f"[OTel] PIPE SPAN ENDING WITH ERROR:\n  pipe_code='{self.code}'\n  trace_id={span_ctx.trace_id:032x}\n  span_id={span_ctx.span_id:016x}"
-        )
 
         span.set_attribute(PipelexSpanAttr.OUTCOME, SpanOutcome.FAILURE)
         span.record_exception(error)

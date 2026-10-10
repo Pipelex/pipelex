@@ -519,7 +519,6 @@ class BundleValidator:
             return DryRunOutput(
                 pipe_code=pipe.code, pipe_ref=pipe.pipe_ref, status=DryRunStatus.FAILURE, error_message=error_message, failure=failure
             )
-        log.verbose(f"✅ Pipe '{pipe.pipe_ref}' dry run completed successfully")
         return DryRunOutput(pipe_code=pipe.code, pipe_ref=pipe.pipe_ref, status=DryRunStatus.SUCCESS)
 
     @classmethod

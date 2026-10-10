@@ -1,5 +1,7 @@
 import pytest
+from pytest_mock import MockerFixture
 
+from pipelex import log
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 
 
@@ -18,6 +20,17 @@ class TestPipeAbstractNamespaceStrip:
         """Dotted pipe codes should be stripped to bare snake_case; bare codes pass through."""
         result = PipeAbstract.validate_pipe_code_syntax(code)
         assert result == expected
+
+    def test_the_strip_warning_names_the_code_as_it_was_written(self, mocker: MockerFixture) -> None:
+        """The warning's message is the same for every code, and its field is the dotted code the author wrote, the one to fix."""
+        warning_spy = mocker.spy(log, "warning")
+
+        PipeAbstract.validate_pipe_code_syntax("domain.my_pipe")
+
+        warning_spy.assert_called_once_with(
+            "A pipe code carries a namespace prefix, which was stripped: write the pipe code bare",
+            fields={"pipe_code": "my_pipe", "pipe_ref": "domain.my_pipe"},
+        )
 
     def test_validate_pipe_code_syntax_raises_for_invalid_after_strip(self) -> None:
         """A dotted code whose bare part is not snake_case should raise ValueError."""

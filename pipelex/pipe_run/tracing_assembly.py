@@ -24,6 +24,7 @@ from pipelex.runtime_hub import get_event_log_override
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.system.job_metadata import RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tracing.event_log_factory import make_event_log
 from pipelex.tracing.exceptions import EventLogError
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
@@ -115,6 +116,32 @@ def assemble_tracing(
     """
     result = TracingAssembly()
     result.set_run_metadata(run_metadata=run_metadata)
+    # Bound here rather than left to the caller: besides `PipeRun`'s run, whose context binds the run already, this is
+    # the body of the durable-execution activity `act_assemble_tracing`, which runs under no binding of the run, so its
+    # lines would name no run. A `request_id` of `None` inherits whatever the caller bound.
+    with log.context(request_id=run_metadata.request_id if run_metadata else None, pipeline_run_id=pipeline_run_id):
+        return _assemble_tracing_events(
+            result=result,
+            pipeline_run_id=pipeline_run_id,
+            assemble_graph=assemble_graph,
+            assemble_usage=assemble_usage,
+            domain_code=domain_code,
+            main_pipe_code=main_pipe_code,
+            run_mode=run_mode,
+        )
+
+
+def _assemble_tracing_events(
+    *,
+    result: TracingAssembly,
+    pipeline_run_id: str,
+    assemble_graph: bool,
+    assemble_usage: bool,
+    domain_code: str | None,
+    main_pipe_code: str | None,
+    run_mode: PipeRunMode,
+) -> TracingAssembly:
+    """The body of ``assemble_tracing``, run inside the log context it binds: read the events once, assemble onto ``result``."""
     tracing_config = get_config().runtime.tracing
     # A scoped override (see hub.scoped_event_log) is the run's transport and implies
     # tracing-enabled (D1) — it must not be skipped by the is_enabled early-return.
@@ -142,7 +169,7 @@ def assemble_tracing(
                 event_log.close()
     except (OSError, json.JSONDecodeError, ValidationError, PipelexConfigError, MissingDependencyError, EventLogError) as read_error:
         message = f"Tracing assembly failed to read events for pipeline_run_id={pipeline_run_id}: {read_error}"
-        log.warning(message)
+        log.warning("Tracing assembly could not read the run's trace events", fields=error_fields(exc=read_error))
         if assemble_graph:
             result.graph_assembly_error = message
         if assemble_usage:
@@ -166,11 +193,10 @@ def assemble_tracing(
                 ),
                 mode=run_mode.graphspec_mode,
             )
-            log.debug(f"Graph assembled from {len(events)} events for pipeline_run_id={pipeline_run_id}")
+            log.debug("Assembled the graph from the trace events", fields={"event_count": len(events)})
         except ValidationError as validation_error:
-            message = f"Graph assembly failed for pipeline_run_id={pipeline_run_id}: {validation_error}"
-            log.warning(message)
-            result.graph_assembly_error = message
+            log.warning("The graph could not be assembled from the trace events", fields=error_fields(exc=validation_error))
+            result.graph_assembly_error = f"Graph assembly failed for pipeline_run_id={pipeline_run_id}: {validation_error}"
 
     return result
 

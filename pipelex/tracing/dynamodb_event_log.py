@@ -19,10 +19,11 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.system.exceptions import MissingDependencyError
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.tracing.event_log_protocol import EventLogProtocol
 from pipelex.tracing.exceptions import EventLogReadError, EventLogSchemaMismatchError, EventLogSetupError
-from pipelex.tracing.trace_events import AnyTraceEvent, TraceEvent
+from pipelex.tracing.trace_events import AnyTraceEvent, TraceEvent, json_invalid_message
 
 try:
     import boto3
@@ -156,7 +157,10 @@ class DynamoDBEventLog(EventLogProtocol):
         for item in items:
             payload = item.get("payload")
             if payload is None:
-                log.warning(f"Skipping DynamoDB item with missing payload: PK={item.get('PK')}, SK={item.get('SK')}")
+                log.warning(
+                    "A trace event item in DynamoDB has no payload, and was skipped",
+                    fields={"pipeline_run_id": pipeline_run_id, "sort_key": item.get("SK")},
+                )
                 continue
             try:
                 event = _any_trace_event_adapter.validate_json(payload)
@@ -167,9 +171,10 @@ class DynamoDBEventLog(EventLogProtocol):
                 # — so it is counted and raised rather than skipped, which would have handed the caller a
                 # silently truncated record of the run. This is the shape that persists across a rolling
                 # deploy, where one image writes what another reads back.
-                if any(error["type"] == "json_invalid" for error in exc.errors()):
+                if (json_error := json_invalid_message(validation_error=exc)) is not None:
                     log.warning(
-                        f"Skipping unparseable DynamoDB item PK={item.get('PK')} SK={item.get('SK')}: {format_pydantic_validation_error(exc)}"
+                        "A trace event item in DynamoDB is not valid JSON, and was skipped",
+                        fields={"pipeline_run_id": pipeline_run_id, "sort_key": item.get("SK"), **error_fields(exc=exc, text=json_error)},
                     )
                     continue
                 refused_count += 1

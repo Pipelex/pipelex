@@ -7,6 +7,8 @@ from typing import Any
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.runtime_hub import get_class_registry
+from pipelex.system.telemetry.otel_constants import OTelLogAttr
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.typing.exceptions import ModuleFileError
 from pipelex.tools.typing.module_inspector import (
@@ -118,15 +120,15 @@ class ClassRegistryUtils:
                     import_module_from_file(python_file)
             except ModuleFileError:
                 # Expected: file validation issues (directories with .py extension, etc.)
-                # log.verbose(f"Skipping file {python_file}: {e}")
                 pass
             except ImportError:
                 # Common: missing dependencies, circular imports, relative imports
-                # log.verbose(f"Could not import {python_file}: {e}"
                 pass
             except SyntaxError as exc:
                 # Potentially problematic: invalid Python syntax may indicate broken code
-                log.warning(f"Syntax error in {python_file}: {exc}")
+                log.warning(
+                    "A Python file has a syntax error and was not imported", fields={OTelLogAttr.FILE_PATH: str(python_file), **error_fields(exc=exc)}
+                )
 
     @classmethod
     def auto_register_all_subclasses(

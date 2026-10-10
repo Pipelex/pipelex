@@ -39,6 +39,7 @@ from pipelex.kernel.memory_ops import store_result
 from pipelex.runtime_hub import get_content_generator, get_inference_backend_registry, get_model_deck
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.telemetry.otel_constants import GenAISpanAttr
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.tools.typing.structure_printer import StructurePrinter
@@ -108,7 +109,17 @@ def check_llm_setting_with_served_model(*, llm_setting: LLMSetting, is_structure
         check_request(inference_model=inference_model, job_params=job_params, is_structured=is_structured)
     except MissingDependencyError:
         # The backend's SDK is not installed here, so no worker for the model can be built: the run says so
-        log.verbose(f"Model '{inference_model.desc}' was not checked: its backend's SDK is not installed")
+        log.verbose(
+            "The model's settings were not checked: its backend's SDK is not installed",
+            fields={
+                "model_handle": inference_model.name,
+                "backend_name": inference_model.backend_name,
+                "sdk": inference_model.sdk,
+                # The model keys of the LLM span and of the fixed-temperature warning, with the same meanings
+                GenAISpanAttr.REQUEST_MODEL: inference_model.name,
+                GenAISpanAttr.RESPONSE_MODEL: inference_model.model_id,
+            },
+        )
     except LLMCapabilityError as refusal:
         if registered_check and not registered_check.is_builtin:
             # An external plugin's text may carry what it keeps private: it reaches the caller only if the plugin vouched for it
@@ -150,7 +161,12 @@ def concrete_llm_model_handle(model: str) -> str:
         match reference.kind:
             case ModelReferenceKind.PRESET | ModelReferenceKind.ALIAS:
                 if current in seen:
-                    log.warning(f"Cycle resolving model reference '{model}' at '{current}'; reporting it unresolved")
+                    # DEBUG, not WARNING: this only feeds a display field, and a run that uses the reference meets
+                    # the same deck through the model deck's own resolution, which reports it there
+                    log.debug(
+                        "A model reference leads back to itself, so it is reported unresolved",
+                        fields={"model_handle": model, "revisited_model_handle": current},
+                    )
                     return current
                 seen.add(current)
                 try:
@@ -162,7 +178,10 @@ def concrete_llm_model_handle(model: str) -> str:
                 current = setting.model
             case ModelReferenceKind.WATERFALL | ModelReferenceKind.HANDLE:
                 return current
-    log.warning(f"Model reference '{model}' did not resolve within {_MAX_MODEL_RESOLUTION_HOPS} hops")
+    log.debug(
+        "A model reference did not resolve within the hop limit, so it is reported unresolved",
+        fields={"model_handle": model, "hop_count": _MAX_MODEL_RESOLUTION_HOPS},
+    )
     return current
 
 
@@ -210,8 +229,6 @@ async def generate_object_content(
     with job_metadata.log_context():
         content_generator = get_content_generator()
         if is_multiple_output:
-            count_desc = f"{fixed_nb_output}x" if fixed_nb_output else "list of "
-            log.verbose(f"Kernel generating {count_desc}{output_class.__name__} by object_direct")
             generated_objects = await content_generator.make_object_list(
                 job_metadata=job_metadata,
                 cogt_run_params=cogt_run_params,
@@ -222,7 +239,6 @@ async def generate_object_content(
             )
             return ListContent(items=generated_objects)
 
-        log.verbose(f"Kernel generating a single {output_class.__name__} by object_direct")
         return await content_generator.make_object(
             job_metadata=job_metadata,
             cogt_run_params=cogt_run_params,

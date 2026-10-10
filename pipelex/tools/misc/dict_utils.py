@@ -4,7 +4,6 @@ import re
 from collections.abc import Callable
 from typing import Any, TypeVar, cast
 
-from pipelex import log
 from pipelex.system.exceptions import NestedKeyConflictError
 
 K = TypeVar("K")
@@ -128,8 +127,6 @@ def substitute_nested_in_context(context: dict[str, Any], *, extra_params: dict[
     if not extra_params:
         return context
 
-    original_context = context.copy()
-
     for key, value in extra_params.items():
         if "." not in key:
             # Simple key without dots - add directly to context
@@ -147,8 +144,6 @@ def substitute_nested_in_context(context: dict[str, Any], *, extra_params: dict[
                 elif not hasattr(current[segment], "__getitem__"):
                     # Conflict: trying to nest under a primitive value (string, int, etc.)
                     error_message = f"Cannot set nested key '{key}': '{segment}' is not a dict-like object"
-                    log.error(original_context, title="original_context")
-                    log.error(extra_params, title="extra_params")
                     raise NestedKeyConflictError(error_message)
                 elif not hasattr(current[segment], "__setitem__"):
                     # Conflict: trying to nest under an immutable object (e.g., StuffArtefact)
@@ -157,8 +152,6 @@ def substitute_nested_in_context(context: dict[str, Any], *, extra_params: dict[
                         f"which is immutable (supports reading but not writing). "
                         f"Use the appropriate filter (e.g., | with_images) instead of nested key substitution."
                     )
-                    log.error(original_context, title="original_context")
-                    log.error(extra_params, title="extra_params")
                     raise NestedKeyConflictError(error_message)
                 # Navigate into the nested dict
                 current = current[segment]

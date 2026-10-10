@@ -18,7 +18,10 @@ class DocGenWorkerAbstract(InferenceWorkerAbstract):
     registers `reportlab`; the Pipelex document generation plugin registers the rest from outside this repository.
 
     A worker is made for each print, and `render` runs on a thread of the print pool, never on the event loop, so
-    an engine loads its library once per process, in the module that holds its worker, rather than per worker.
+    an engine loads its library once per process, in the module that holds its worker, rather than per worker. An
+    engine overrides `render` alone: the print stage that calls it, `render_document_and_store`, ends each print with
+    the event every inference call ends with, on the coroutine that awaits the engine's thread, so an engine logs
+    nothing for the print itself.
     """
 
     def __init__(self, *, inference_model: InferenceModelSpec, reporting_delegate: ReportingProtocol | None = None):

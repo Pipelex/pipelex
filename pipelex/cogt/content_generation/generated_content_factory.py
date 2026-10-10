@@ -12,6 +12,7 @@ from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.system.storage_scope import GENERATED_CONTENT_LEAF
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.base64_utils import extract_base64_str_from_base64_url_if_possible
 from pipelex.tools.misc.exceptions import RemoteFileFetchError
 from pipelex.tools.misc.file_fetch_utils import fetch_file_and_content_type_from_url_httpx
@@ -223,7 +224,7 @@ class GeneratedContentFactory:
                 # so there is nothing to refuse and the URL is kept as it came.
                 actual_bytes, fetched_mime_type = await self._fetch_remote_content(url=url)
             except RemoteFileFetchError as exc:
-                log.warning(f"Failed to fetch a remote image: {exc}")
+                log.warning("A generated image could not be fetched from its remote URL, so the URL is kept as it came", fields=error_fields(exc=exc))
                 public_url = url
             else:
                 if not declared_mime_type and fetched_mime_type:

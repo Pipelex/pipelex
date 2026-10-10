@@ -271,9 +271,13 @@ What an out-of-tree backend plugin imports *is* the contract. The published surf
 | `DocGenWorkerAbstract` | `pipelex.cogt.doc_gen.doc_gen_worker_abstract` | the document-generation worker contract |
 | `RenderJob`, `RenderedDocument`, `RenderResources`, `LoadedResource` | `pipelex.cogt.doc_gen.render_job` | the job a document engine prints, the file it returns, and how it reads a file the document names, with that file's media type |
 | `NbTokensByCategoryDict`, `TokenCategory` | `pipelex.cogt.usage.token_category` | the token usage a worker reports |
+| `PricingUnit` | `pipelex.cogt.usage.pricing_unit` | what a usage counts: tokens, or requests or pages priced as tokens |
+| `record_unit_priced_usage` | `pipelex.cogt.usage.usage_cost` | records a call billed by the request or by the page on its usage |
 | `BaseModelTypeVar` | `pipelex.tools.typing.pydantic_utils` | the schema type variable of a structured-output signature |
 | `CogtError`, `SdkTypeError`, `ImgGenGenerationError`, `ImgGenParameterError`, `InferenceErrorCategory` | `pipelex.cogt.exceptions` | the inference error bases and categories a worker raises with |
 | `LLMCapabilityError` | `pipelex.cogt.exceptions` | a request the model refuses, raised by an LLM request check |
+
+A worker implements the provider half of a call, `_gen_text` or `_extract_pages` for instance, and records the usage the provider answered with on its job's report. The base around it logs the event every call ends with, `Inference call ends`, with that usage, its cost, its duration and its outcome, so a worker logs nothing for the call itself (see [Summary events](../tools/logging.md#summary-events)). A provider that bills by the request or by the page rather than by the token is recorded with `record_unit_priced_usage(tokens_usage=…, pricing_unit=PricingUnit.REQUEST, nb_units=1)`, which writes each unit as a million tokens in and out so the per-million rates price one unit, and marks the usage so the event keeps the call's cost and writes no token counts; a worker never writes those counts itself.
 
 **Building on an OpenAI- or Anthropic-compatible service**
 

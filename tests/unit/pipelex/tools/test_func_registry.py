@@ -1,9 +1,7 @@
-import logging
 from collections.abc import Callable
 from typing import Any
 
 import pytest
-from pytest import LogCaptureFixture
 
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.text_content import TextContent
@@ -196,16 +194,3 @@ class TestFuncRegistry:
         registry.root["not_a_function"] = "a string"  # type: ignore[assignment]
         with pytest.raises(FuncRegistryError, match="is not a callable function"):
             registry.get_required_function_with_signature("not_a_function")
-
-    def test_set_logger(self, registry: FuncRegistry, caplog: LogCaptureFixture):
-        """Test setting a custom logger"""
-        custom_logger = logging.getLogger("custom_test_logger")
-        registry.set_logger(custom_logger)
-
-        # Test that the custom logger is being used by triggering a log message
-        with caplog.at_level("DEBUG", logger="custom_test_logger"):
-            registry.register_function(valid_function)
-
-        # Verify the log message was captured by our custom logger
-        assert len(caplog.records) > 0
-        assert any("Registered new single function" in record.message for record in caplog.records)

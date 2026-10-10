@@ -1,0 +1,7 @@
+# The log calls that broke the log-call conventions when the guard arrived (pipelex-dev check-log-calls).
+# Keyed by <relative_path>::<qualified_name>, each call listed by its method, its message's source,
+# the rules it breaks and the bindings its message was read through.
+# It only shrinks: convert a call, then remove its signature (pipelex-dev check-log-calls --prune).
+# Never add an entry: the check refuses a baseline that lists more than its base. See docs/contribute/log-calls.md.
+
+version = 1

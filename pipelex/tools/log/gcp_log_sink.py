@@ -277,9 +277,8 @@ class GcpExportPathFilter(logging.Filter):
 def severity_for_level(*, levelno: int) -> GcpLogSeverity:
     """The Cloud Logging severity for a stdlib level.
 
-    Cloud Logging's scale is coarser than ours and has nothing below ``DEBUG``, so both of our custom
-    levels land there: ``VERBOSE`` and ``DEV`` sit below ``INFO``, which is the whole of what the
-    severity can say about them.
+    Cloud Logging's scale is coarser than ours and has nothing below ``DEBUG``, so our custom ``VERBOSE``
+    level lands there: it sits below ``INFO``, which is the whole of what the severity can say about it.
     """
     if levelno < logging.INFO:
         return GcpLogSeverity.DEBUG

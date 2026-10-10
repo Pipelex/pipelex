@@ -17,6 +17,7 @@ from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.runtime_hub import is_in_isolated_execution
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.system.trace_context import TraceContext
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tracing.activity_event_log import ActivityEventLogCache
 from pipelex.tracing.event_log_protocol import EventLogProtocol
 from pipelex.tracing.trace_events import UNATTRIBUTED_NODE_ID, UsageReportEvent
@@ -253,7 +254,7 @@ class ReportingManager(ReportingProtocol):
         try:
             event_log.emit(event)
         except _EMIT_BEST_EFFORT_EXCEPTIONS as exc:
-            log.warning(f"Usage event emit failed; dropping: {exc}")
+            log.warning("A usage event could not be written to the event log and was dropped", fields=error_fields(exc=exc))
 
     def _emit_usage_event_runner_fallback(
         self,
@@ -293,7 +294,7 @@ class ReportingManager(ReportingProtocol):
         try:
             process_event_log = ActivityEventLogCache.get_or_create(tracing_config)
         except (OSError, MissingDependencyError, PipelexConfigError) as exc:
-            log.warning(f"Runner-side activity event log construction failed; dropping usage event: {exc}")
+            log.warning("The runner-side activity event log could not be built, so a usage event was dropped", fields=error_fields(exc=exc))
             return
 
         if process_event_log is None:
@@ -319,7 +320,6 @@ class ReportingManager(ReportingProtocol):
 
     @override
     def report_inference_job(self, inference_job: InferenceJobAbstract):
-        log.verbose(f"Inference job '{inference_job.job_metadata.unit_job_id}' completed in {inference_job.job_metadata.duration:.2f} seconds")
         if isinstance(inference_job, LLMJob):
             self._report_llm_job(llm_job=inference_job)
         elif isinstance(inference_job, ImgGenJob):
@@ -331,4 +331,7 @@ class ReportingManager(ReportingProtocol):
         elif isinstance(inference_job, JudgmentJob):
             self._report_judgment_job(judgment_job=inference_job)
         else:
-            log.warning(f"ReportingManager does not support reporting for inference job type: {type(inference_job).__name__}")
+            log.error(
+                "The reporting manager cannot report this type of inference job, so its usage is lost",
+                fields={"inference_job_type": type(inference_job).__name__},
+            )

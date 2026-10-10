@@ -135,6 +135,7 @@ def _make_inference_model(backend_name: str = WORKER_PROVIDER) -> SimpleNamespac
     return SimpleNamespace(
         name=WORKER_MODEL,
         backend_name=backend_name,
+        sdk="stub-sdk",
         model_id=WORKER_MODEL,
         tag="stub-tag",
         desc="stub-desc",

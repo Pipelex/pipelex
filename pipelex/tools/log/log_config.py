@@ -56,7 +56,6 @@ class RichLogConfig(ConfigModel):
     is_show_level: bool
     is_link_path_enabled: bool
     highlighter_name: HighlighterName = Field(strict=False)
-    is_markup_enabled: bool
     is_rich_tracebacks: bool
     is_tracebacks_word_wrap: bool
     is_tracebacks_show_locals: bool

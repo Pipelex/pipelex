@@ -15,6 +15,7 @@ from pipelex.cli.dev_cli.commands.check_config_sync_cmd import LeadingConfig, ch
 from pipelex.cli.dev_cli.commands.check_hub_layering_cmd import check_hub_layering_cmd
 from pipelex.cli.dev_cli.commands.check_keyword_only_cmd import check_keyword_only_cmd
 from pipelex.cli.dev_cli.commands.check_ledger_cmd import check_ledger_cmd
+from pipelex.cli.dev_cli.commands.check_log_calls_cmd import check_log_calls_cmd
 from pipelex.cli.dev_cli.commands.check_migration_schemas_cmd import check_migration_schemas_cmd
 from pipelex.cli.dev_cli.commands.check_mthds_schema_cmd import check_mthds_schema_cmd
 from pipelex.cli.dev_cli.commands.check_rich_imports_cmd import check_rich_imports_cmd
@@ -51,6 +52,7 @@ class PipelexDevCLI(TyperGroup):
             "check-hub-layering",
             "check-keyword-only",
             "check-ledger",
+            "check-log-calls",
             "check-migration-schemas",
             "check-mthds-schema",
             "check-rich-imports",
@@ -410,6 +412,49 @@ def check_rich_imports_command(
     """Refuse a module-level Rich import outside pipelex/cli/, direct or through a CLI module."""
     try:
         check_rich_imports_cmd(quiet=quiet)
+    except (typer.Exit, typer.Abort):
+        # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
+        raise
+    except Exception:  # ruff: ignore[blind-except]
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
+        console = get_console()
+        console.print()
+        console.print("[bold red]Unexpected error occurred[/bold red]")
+        console.print()
+        console.print(Traceback())
+        sys.exit(1)
+
+
+@app.command(name="check-log-calls", help="Refuse an interpolated log message at INFO and above, and Rich markup in any log message")
+def check_log_calls_command(
+    prune: Annotated[
+        bool,
+        typer.Option("--prune", help="Remove the baseline signatures no call matches any more, then check; never adds one"),
+    ] = False,
+    report: Annotated[bool, typer.Option("--report", help="Print the baseline's calls by package area (no pass/fail gating)")] = False,
+    quiet: Annotated[
+        bool, typer.Option("--quiet", "-q", help="Light output on success (single line); the full violation list still prints on failure")
+    ] = False,
+    against: Annotated[
+        str | None,
+        typer.Option(
+            "--against",
+            metavar="REF",
+            help="Fail when the baseline lists a signature more times than the one committed at REF does (REF must resolve)",
+        ),
+    ] = None,
+    against_merge_base: Annotated[
+        str | None,
+        typer.Option(
+            "--against-merge-base",
+            metavar="REF",
+            help="Like --against, at the merge base of HEAD and REF; when that merge base does not resolve, say so and skip the comparison",
+        ),
+    ] = None,
+) -> None:
+    """Hold log calls to the log-call conventions against the committed baseline, which only shrinks."""
+    try:
+        check_log_calls_cmd(prune=prune, report=report, quiet=quiet, against=against, against_merge_base=against_merge_base)
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise

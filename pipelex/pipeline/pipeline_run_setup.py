@@ -39,6 +39,7 @@ from pipelex.system.storage_scope import (
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.otel_factory import OtelFactory
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tracing.event_log_factory import make_event_log
 
 if TYPE_CHECKING:
@@ -482,11 +483,13 @@ async def pipeline_run_setup(
                     if tracer_manager is not None:
                         try:
                             tracer_manager.close_tracer(pipeline_run_id)
-                        except OSError as tracer_close_error:
+                        except OSError as close_error:
+                            # A secondary failure rides as fields with no traceback: Python chains the setup error onto
+                            # it, so its traceback would print the setup error's text, which the setup error's own
+                            # catcher reports, and which can quote a run's inputs.
                             log.error(
-                                f"close_tracer also failed for pipeline_run_id={pipeline_run_id} "
-                                f"during setup-failure cleanup; raising original setup error. "
-                                f"Suppressed tracer close error: {tracer_close_error}"
+                                "Closing the graph tracer also failed while cleaning up after the setup failed; the setup error is raised",
+                                fields=error_fields(exc=close_error),
                             )
             finally:
                 if event_log is not None:

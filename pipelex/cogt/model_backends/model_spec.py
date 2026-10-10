@@ -78,11 +78,13 @@ class InferenceModelSpec(ConfigModel):
 
     @property
     def tag(self) -> str:
-        return rf"{self.name} → \[{self.sdk}@{self.backend_name}]({self.model_id})"
+        """The model, its SDK, its backend and the provider's model id, as plain text for a message: never Rich markup."""
+        return f"{self.name} → [{self.sdk}@{self.backend_name}]({self.model_id})"
 
     @property
     def desc(self) -> str:
-        return rf"{self.name} → SDK\[{self.sdk}]•Backend\[{self.backend_name}]•Model\[{self.model_id}]"
+        """The model, its SDK, its backend and the provider's model id, labelled, as plain text for a message: never Rich markup."""
+        return f"{self.name} → SDK[{self.sdk}]•Backend[{self.backend_name}]•Model[{self.model_id}]"
 
     @property
     def is_gen_object_supported(self) -> bool:

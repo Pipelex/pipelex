@@ -8,6 +8,8 @@ from typing import Any
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.system.registries.func_registry import func_registry, pipe_func
+from pipelex.system.telemetry.otel_constants import OTelLogAttr
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.typing.exceptions import ModuleFileError
 from pipelex.tools.typing.module_inspector import import_module_from_file_if_has_decorated_functions
@@ -29,7 +31,9 @@ class FuncRegistryUtils:
         functions_registered = 0
 
         if not hasattr(package, "__path__"):
-            log.warning(f"Package {package_name} has no __path__ attribute, cannot walk modules")
+            log.warning(
+                "A PipeFunc package is a plain module with no submodules to walk, so nothing was registered", fields={"module_name": package_name}
+            )
             return 0
 
         log.verbose(f"Walking package {package_name} at {package.__path__}")
@@ -41,7 +45,6 @@ class FuncRegistryUtils:
         ):
             # Import the module
             module = importlib.import_module(modname)
-            log.verbose(f"Imported {modname}")
 
             # Find @pipe_func decorated functions in this module
             decorated_functions = cls._find_functions_in_module(module)
@@ -59,7 +62,6 @@ class FuncRegistryUtils:
                         name=func_name,
                     )
                     functions_registered += 1
-                    log.verbose(f"Registered @pipe_func: {func_name} from {modname}")
                 else:
                     # Function has @pipe_func but is not eligible - track it for better error messages
                     func_registry.register_ineligible_function(
@@ -67,7 +69,10 @@ class FuncRegistryUtils:
                         reason=eligibility_error,
                         source_file=modname,
                     )
-                    log.warning(f"Function '{func_name}' in '{modname}' has @pipe_func() decorator but is not eligible: {eligibility_error}")
+                    log.warning(
+                        "A function decorated with @pipe_func is not eligible, and was not registered",
+                        fields={"function_name": func_name, "module_name": modname, "eligibility_error": eligibility_error},
+                    )
 
         return functions_registered
 
@@ -197,10 +202,12 @@ class FuncRegistryUtils:
                         reason=eligibility_error,
                         source_file=str(file_path),
                     )
-                    log.warning(f"Function '{func_name}' in '{file_path}' has @pipe_func() decorator but is not eligible: {eligibility_error}")
+                    log.warning(
+                        "A function decorated with @pipe_func is not eligible, and was not registered",
+                        fields={"function_name": func_name, OTelLogAttr.FILE_PATH: str(file_path), "eligibility_error": eligibility_error},
+                    )
         except ModuleFileError:
             # Expected: file validation issues (directories with .py extension, etc.)
-            # log.verbose(f"Skipping file {file_path}: {e}")
             pass
         except ImportError as exc:
             # A module that fails to import (missing sibling module, circular import, bad relative
@@ -208,10 +215,16 @@ class FuncRegistryUtils:
             # is essential: the only downstream symptom is an opaque "Function '<name>' not found in
             # registry" raised much later by the PipeFunc validator, with the real ImportError (the
             # actual cause) otherwise swallowed here and invisible.
-            log.warning(f"Could not import '{file_path}' while registering PipeFuncs; its functions are unavailable: {exc}")
+            log.warning(
+                "A Python file could not be imported while registering PipeFuncs, so its functions are unavailable",
+                fields={OTelLogAttr.FILE_PATH: str(file_path), **error_fields(exc=exc)},
+            )
         except SyntaxError as exc:
             # Potentially problematic: invalid Python syntax may indicate broken code
-            log.warning(f"Syntax error in {file_path}: {exc}")
+            log.warning(
+                "A Python file has a syntax error, so its PipeFuncs are unavailable",
+                fields={OTelLogAttr.FILE_PATH: str(file_path), **error_fields(exc=exc)},
+            )
 
     @classmethod
     def _find_functions_in_module(

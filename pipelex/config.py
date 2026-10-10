@@ -50,7 +50,10 @@ def is_method_fetch_on_miss_enabled() -> bool:
             return True
         if normalized in _ENV_FALSY:
             return False
-        log.warning(f"Unrecognized {METHODS_FETCH_ON_MISS_ENV_VAR}={raw_env!r} (expected 1/0, true/false); falling back to the config")
+        log.warning(
+            "An environment variable holds no recognized boolean (1/0, true/false, yes/no, on/off), so it is ignored and the config decides",
+            fields={"env_var": METHODS_FETCH_ON_MISS_ENV_VAR},
+        )
     optional_config = get_optional_config()
     if not isinstance(optional_config, PipelexConfig):
         return True

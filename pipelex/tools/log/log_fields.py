@@ -8,8 +8,9 @@ added is a collision too rather than the stdlib's ``KeyError``.
 
 Pipelex's own machinery owns a name on the record too, and it is reserved here for the same reason the
 ``json`` sink reserves its own keys: a name nobody owns *yet* is a name a caller's field lands on freely,
-and this one steers delivery. So the reserved set spans what the formatter sets later and what this
-package stamps later, and neither is a field a sink reads back.
+and this one steers delivery. So the reserved set spans what the formatter sets later, what this
+package stamps later and what Rich's console handler reads off a record ahead of its own settings, and
+none of them is a field a sink reads back.
 """
 
 from __future__ import annotations
@@ -38,13 +39,22 @@ FORMATTER_OWNED_ATTRIBUTES = frozenset({"message", "asctime"})
 # the marker and cost the whole record its delivery.
 FORWARDED_MARK = "_pipelex_forwarded"
 
-# Rich's own per-record override of its handler's markup setting, which it reads as
-# ``getattr(record, "markup", self.markup)``, and so the one way to put one record on the console verbatim
-# while the handler goes on interpreting markup for every other. A message assembled from an exception is
-# what needs it: text like ``[Errno 2]`` is a markup tag to Rich, which swallows the span, or raises on an
-# unbalanced one. The name is Rich's rather than ours, but stamping it is a console concern that rides no
-# wire, and reserving it is what stops a caller steering the console through a field of that name.
-VERBATIM_MARK = "markup"
+# Rich's per-record override of its handler's markup setting, which ``RichHandler.render_message`` reads as
+# ``getattr(record, "markup", self.markup)``. The console sink reads no message as markup, and a caller's
+# field landing on this name would turn markup back on for its line, where a tag-shaped span of the message,
+# a ``list[int]`` or a bracketed path, is swallowed or raises.
+RICH_MARKUP_ATTRIBUTE = "markup"
+
+# Rich's per-record override of its handler's highlighter, which ``RichHandler.render_message`` reads as
+# ``getattr(record, "highlighter", self.highlighter)`` and then calls on the line. A caller's field landing
+# on it would be called in the highlighter's place: a string there raises, and the whole line is lost.
+RICH_HIGHLIGHTER_ATTRIBUTE = "highlighter"
+
+# Every attribute Rich's handler reads off a record ahead of its own setting: ``render_message`` reads these
+# two, and nothing else ``emit`` or ``render`` reads is outside the stdlib's own attributes. Each steers the
+# console alone and means nothing on a wire, so neither is a field a caller can land on nor one a sink is
+# handed as something the record carries, whoever stamped it.
+RICH_RECORD_OVERRIDES = frozenset({RICH_MARKUP_ATTRIBUTE, RICH_HIGHLIGHTER_ATTRIBUTE})
 
 # The attribute the redaction stamps on a record it could not strip, and takes back off the moment it
 # has. It is the fail-closed half of the scrub: a record still carrying it reaches no sink, because what
@@ -53,17 +63,29 @@ VERBATIM_MARK = "markup"
 # second thing to go right at the moment the first one went wrong.
 UNSCRUBBED_MARK = "_pipelex_unscrubbed"
 
+# The attribute naming, in order, the attributes ``attach_log_record_extra`` set on the record: the fields,
+# the context identifiers and ``data`` under the names they landed on. It is how the console tells what the
+# call attached from what a record factory or a third-party library stamped, which it does not render. A
+# caller's field spelling it would hand the console a list of names the call never gave.
+FIELD_NAMES_MARK = "_pipelex_field_names"
+
+# The attribute carrying the console layout a call named with ``layout=``. The layout is console
+# presentation: the console sink reads it, and reserving it is what keeps it off every wire, where the
+# message already says what the line is. A caller's field spelling it would pick the line's layout.
+LAYOUT_MARK = "_pipelex_layout"
+
 # The names this package stamps on a record itself. Never a field: a caller's entry of the same name is
 # prefixed on the way on, and a record carrying one does not hand it to a sink as something it carries.
 # Reserving them is what makes each one safe, because each is stamped later than the entries are attached
 # and so a fresh record owns none of them: a caller's field spelling ``FORWARDED_MARK`` would be read as
 # the forwarding marker and cost the whole record its delivery, and one spelling ``UNSCRUBBED_MARK`` would
 # have a perfectly ordinary record read as one the scrub could not strip, and dropped.
-PIPELEX_OWNED_ATTRIBUTES = frozenset({FORWARDED_MARK, VERBATIM_MARK, UNSCRUBBED_MARK})
+PIPELEX_OWNED_ATTRIBUTES = frozenset({FORWARDED_MARK, UNSCRUBBED_MARK, FIELD_NAMES_MARK, LAYOUT_MARK})
 
 # Reserved whether or not the record carries the name yet, which is exactly what the stdlib's own refusal
-# cannot cover: both sets are stamped after the entries are attached.
-RESERVED_ATTRIBUTES = FORMATTER_OWNED_ATTRIBUTES | PIPELEX_OWNED_ATTRIBUTES
+# cannot cover: the formatter's and Pipelex's are stamped after the entries are attached, and Rich's are
+# read by the console handler whoever set them.
+RESERVED_ATTRIBUTES = FORMATTER_OWNED_ATTRIBUTES | PIPELEX_OWNED_ATTRIBUTES | RICH_RECORD_OVERRIDES
 
 # The attributes the stdlib gives every record, read off one built by the stdlib's own constructor on
 # this interpreter rather than listed by hand, so a version that adds one (``taskName`` arrived with
@@ -122,12 +144,36 @@ def attach_log_record_extra(*, record: logging.LogRecord, extra: Mapping[str, An
     the name lands on an attribute nobody owns, and entries are attached in order, so an entry attached
     earlier under a prefixed name is owned for the entries after it: whatever the order of the mapping, no
     value is lost.
+
+    The names the entries landed on are recorded, in order, under ``FIELD_NAMES_MARK``, which is how the
+    console tells what this call attached from what anything else stamped on the record.
     """
+    attached: list[str] = []
     for name, value in extra.items():
         attribute = name
         while hasattr(record, attribute) or attribute in RESERVED_ATTRIBUTES:
             attribute = f"{COLLIDING_FIELD_PREFIX}{attribute}"
         setattr(record, attribute, value)
+        attached.append(attribute)
+    already_attached: tuple[str, ...] = record.__dict__.get(FIELD_NAMES_MARK, ())
+    record.__dict__[FIELD_NAMES_MARK] = (*already_attached, *attached)
+
+
+def given_field_name(*, name: str) -> str:
+    """The name a field was given, read off the name it landed on with every collision prefix taken off.
+
+    A field lands under a prefixed name whenever the record already owns the one the caller used, so
+    whatever judges a field by its meaning, a secret's name or a colour, reads it here rather than as carried.
+    """
+    while name.startswith(COLLIDING_FIELD_PREFIX):
+        name = name[len(COLLIDING_FIELD_PREFIX) :]
+    return name
+
+
+def attached_field_names(*, record: logging.LogRecord) -> tuple[str, ...]:
+    """The attributes ``attach_log_record_extra`` set on the record, in order, or none for a record it never saw."""
+    names: tuple[str, ...] = record.__dict__.get(FIELD_NAMES_MARK, ())
+    return names
 
 
 def carried_attributes(*, record: logging.LogRecord) -> dict[str, Any]:
@@ -135,7 +181,11 @@ def carried_attributes(*, record: logging.LogRecord) -> dict[str, Any]:
 
     Read the way a structured sink reads a record, in the order the attributes were attached. A value is
     handed back as the call gave it: a sink serializes it when it emits, on the calling thread. What this
-    package stamps on a record itself is machinery and belongs on no wire, so it is left out here as it is
-    reserved on the way in.
+    package stamps on a record itself is machinery and Rich's per-record overrides steer the console alone,
+    so neither belongs on a wire, and both are left out here as they are reserved on the way in.
     """
-    return {name: value for name, value in vars(record).items() if name not in STDLIB_RECORD_ATTRIBUTES and name not in PIPELEX_OWNED_ATTRIBUTES}
+    return {
+        name: value
+        for name, value in vars(record).items()
+        if name not in STDLIB_RECORD_ATTRIBUTES and name not in PIPELEX_OWNED_ATTRIBUTES and name not in RICH_RECORD_OVERRIDES
+    }

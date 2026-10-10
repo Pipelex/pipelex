@@ -70,6 +70,21 @@ jobs:
       - name: Run Rich import check
         run: make check-rich-imports
 
+      # The baseline only shrinks: a pull request is compared with the baseline at
+      # its base, fetched since the checkout holds only the merge commit. A manual
+      # run has no base to compare with, and says so.
+      - name: Run log-call check
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$BASE_SHA" ]; then
+            git fetch --no-tags --depth=1 origin "$BASE_SHA"
+            make check-log-calls LOG_CALL_BASELINE_REF="$BASE_SHA"
+          else
+            echo "A ${{ github.event_name }} run has no pull request base: the log-call baseline is checked against the tree, without the comparison that refuses an added entry."
+            make check-log-calls
+          fi
+
       - name: Run drift contracts check
         run: make drift-check
 

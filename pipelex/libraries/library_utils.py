@@ -5,6 +5,8 @@ from pathlib import Path
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
+from pipelex.system.telemetry.otel_constants import OTelLogAttr
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.file_utils import find_files_in_dir
 
 
@@ -29,15 +31,16 @@ def get_pipelex_mthds_files_from_package() -> list[Path]:
 
             for child in sorted(traversable.iterdir(), key=lambda entry: entry.name):
                 if child.is_file() and is_pipelex_file(Path(child.name)):
-                    mthds_path_str = str(child)
-                    collected.append(Path(mthds_path_str))
-                    log.verbose(f"Found pipelex package MTHDS file: {mthds_path_str}")
+                    collected.append(Path(str(child)))
                 elif child.is_dir():
                     # Skip excluded directories
                     if child.name not in excluded_dirs:
                         _find_mthds_in_traversable(child, collected=collected)
         except (PermissionError, OSError) as exc:
-            log.warning(f"Could not access {traversable}: {exc}")
+            log.warning(
+                "A directory of the pipelex package could not be read, so its MTHDS files are left out",
+                fields={OTelLogAttr.FILE_PATH: str(traversable), **error_fields(exc=exc)},
+            )
 
     _find_mthds_in_traversable(pipelex_package, collected=mthds_files)
     log.verbose(f"Found {len(mthds_files)} MTHDS files in pipelex package")
@@ -57,7 +60,9 @@ def get_pipelex_package_dir_for_imports() -> Path | None:
         if pkg_path.exists() and pkg_path.is_dir():
             return pkg_path
     except (TypeError, ValueError, OSError) as exc:
-        log.warning(f"Could not convert importlib.resources Traversable to filesystem Path: {exc}")
+        log.warning(
+            "The pipelex package is not a directory on the filesystem, so its modules cannot be imported from it", fields=error_fields(exc=exc)
+        )
     return None
 
 

@@ -19,6 +19,7 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.runtime_hub import get_class_registry
+from pipelex.tools.log.error_fields import error_fields
 
 # Field names whose mocked values must be snake_case codes, as MTHDS domain and pipe codes are
 SNAKE_CASE_FIELD_NAMES = {"domain", "domain_code", "pipe_code"}
@@ -160,7 +161,7 @@ class WorkingMemoryFactory(BaseModel):
                     needed_inputs_for_factory.append(typed_named_stuff_spec)
                 else:
                     # Fallback to TextContent if we can't get the proper class
-                    log.verbose(
+                    log.debug(
                         f"Could not get structure class '{structure_class_name}' for "
                         f"concept '{named_stuff_spec.concept.code}', falling back to TextContent",
                     )
@@ -172,7 +173,14 @@ class WorkingMemoryFactory(BaseModel):
 
             except ValidationError as exc:
                 # Fallback to TextContent when the typed stuff spec fails pydantic validation
-                log.warning(f"Error getting structure class for concept '{named_stuff_spec.concept.code}': {exc}, falling back to TextContent")
+                log.warning(
+                    "The structure class of an input's concept could not be used, so the input is mocked as text",
+                    fields={
+                        "stuff_name": named_stuff_spec.variable_name,
+                        "concept_ref": named_stuff_spec.concept.concept_ref,
+                        **error_fields(exc=exc),
+                    },
+                )
                 text_typed_named_stuff_spec = TypedNamedStuffSpec.make_from_named(
                     named=named_stuff_spec,
                     structure_class=TextContent,
@@ -200,7 +208,7 @@ class WorkingMemoryFactory(BaseModel):
         structure_class = class_registry.get_class(name=structure_class_name)
         if structure_class and issubclass(structure_class, StuffContent):
             return TypedNamedStuffSpec.make_from_named(named=named, structure_class=structure_class)
-        log.verbose(
+        log.debug(
             f"Could not get structure class '{structure_class_name}' for concept '{concept.code}', falling back to TextContent",
         )
         return TypedNamedStuffSpec.make_from_named(named=named, structure_class=TextContent)
@@ -275,8 +283,12 @@ class WorkingMemoryFactory(BaseModel):
                 # Mock build (polyfactory) or content validation (pydantic) failed for this dynamic
                 # class — fall back to text content. Unexpected errors propagate.
                 log.warning(
-                    f"Failed to create mock for '{typed_named_stuff_spec.variable_name}' ({typed_named_stuff_spec.concept.code}): "
-                    f"{exc}. Using fallback text content."
+                    "A mock input could not be built from its concept's structure, so a text stand-in is used",
+                    fields={
+                        "stuff_name": typed_named_stuff_spec.variable_name,
+                        "concept_ref": typed_named_stuff_spec.concept.concept_ref,
+                        **error_fields(exc=exc),
+                    },
                 )
                 # Create fallback text content
                 fallback_content = TextContent(

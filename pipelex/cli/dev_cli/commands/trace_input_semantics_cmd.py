@@ -29,6 +29,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from rich.markup import escape
+
 from pipelex.base_exceptions import PipelexError
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import ErrorContext
@@ -349,7 +351,7 @@ def trace_input_semantics_cmd(*, bundle_paths: list[Path], output_dir: Path, all
     console = get_console()
     for bundle_path in bundle_paths:
         if not bundle_path.is_file():
-            console.print(f"[red]Bundle file not found: {bundle_path}[/red]")
+            console.print(f"[red]Bundle file not found: {escape(str(bundle_path))}[/red]")
             sys.exit(2)
 
     make_pipelex_for_cli(context=ErrorContext.VALIDATION, needs_inference=False)
@@ -362,10 +364,10 @@ def trace_input_semantics_cmd(*, bundle_paths: list[Path], output_dir: Path, all
             )
         )
     except ValidateBundleError as exc:
-        console.print(f"[red]Bundle validation failed — the trace requires a valid bundle:[/red]\n{exc}")
+        console.print(f"[red]Bundle validation failed — the trace requires a valid bundle:[/red]\n{escape(str(exc))}")
         sys.exit(1)
     except PipelexError as exc:
-        console.print(f"[red]Trace failed:[/red]\n{exc}")
+        console.print(f"[red]Trace failed:[/red]\n{escape(str(exc))}")
         sys.exit(1)
     finally:
         Pipelex.teardown_if_needed()

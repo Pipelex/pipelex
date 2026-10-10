@@ -76,5 +76,6 @@ class LLMPromptBlueprint(BaseModel):
             extra_params=extra_params,
             templating_style=templating_style,
         )
-        log.verbose(f"User text with {output_concept_ref=}:\n {llm_prompt.user_text}")
+        user_text_length = len(llm_prompt.user_text) if llm_prompt.user_text else 0
+        log.verbose(f"Rendered the LLM prompt for output '{output_concept_ref}': user text of {user_text_length} characters")
         return llm_prompt

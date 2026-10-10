@@ -9,7 +9,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from pipelex.graph.condition_output_merge import ConditionOutputMerge
 from pipelex.graph.graphspec import EdgeKind, ErrorSpec, IOSpec, NodeKind
@@ -224,3 +224,17 @@ AnyTraceEvent = Annotated[
     | UsageReportEvent,
     Field(discriminator="event_kind"),
 ]
+
+
+def json_invalid_message(*, validation_error: ValidationError) -> str | None:
+    """The parse error of a stored trace event that is not JSON at all, or `None` when it parsed and was refused.
+
+    `validate_json` reports unparseable input as a `json_invalid` entry rather than raising `JSONDecodeError`, so
+    the two cases are told apart by the entry's type. The entry's message says where the parse stopped and quotes
+    nothing, while the exception's own text quotes the stored record whole, traced values included: a reader that
+    logs why it skipped a record logs this message, never the exception's text.
+    """
+    for error in validation_error.errors():
+        if error["type"] == "json_invalid":
+            return error["msg"]
+    return None

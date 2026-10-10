@@ -232,11 +232,8 @@ class MistralFactory:
         Returns:
             Cleaned base64 string with metadata removed if it was present
         """
-        log.debug("=== Cleaning Mistral image base64 ===")
         try:
             decoded_bytes = base64.b64decode(base64_str)
-            log.debug(f"Decoded image length: {len(decoded_bytes)} bytes")
-            log.debug(f"First 24 bytes (hex): {decoded_bytes[:24].hex()}")
 
             # Image file magic numbers
             jpeg_magic = b"\xff\xd8"  # JPEG SOI (Start of Image) - FF D8
@@ -244,31 +241,23 @@ class MistralFactory:
 
             # Check if the data already starts with a valid image magic number
             if decoded_bytes[:2] == jpeg_magic:
-                log.debug("Image already starts with JPEG magic (FF D8), no cleaning needed")
                 return base64_str
             if decoded_bytes[:4] == png_magic:
-                log.debug("Image already starts with PNG magic, no cleaning needed")
                 return base64_str
 
             # Scan for JPEG magic in the first 32 bytes
             jpeg_pos = decoded_bytes[:32].find(jpeg_magic)
             if jpeg_pos > 0:
-                log.debug(f"Found JPEG magic (FF D8) at byte position {jpeg_pos}")
                 cleaned_bytes = decoded_bytes[jpeg_pos:]
-                log.debug(f"Cleaned image length: {len(cleaned_bytes)} bytes")
-                log.debug(f"Cleaned first 20 bytes (hex): {cleaned_bytes[:20].hex()}")
                 return base64.b64encode(cleaned_bytes).decode("ascii")
 
             # Scan for PNG magic in the first 32 bytes
             png_pos = decoded_bytes[:32].find(png_magic)
             if png_pos > 0:
-                log.debug(f"Found PNG magic at byte position {png_pos}")
                 cleaned_bytes = decoded_bytes[png_pos:]
-                log.debug(f"Cleaned image length: {len(cleaned_bytes)} bytes")
-                log.debug(f"Cleaned first 20 bytes (hex): {cleaned_bytes[:20].hex()}")
                 return base64.b64encode(cleaned_bytes).decode("ascii")
 
-            log.debug("No image magic number found in first 32 bytes, returning original")
+            # No image magic number in the first 32 bytes: return the original
             return base64_str
         except ValueError as exc:
             # base64 decode/encode failed (binascii.Error / UnicodeDecodeError, both ValueError subclasses) — return the original string unmodified

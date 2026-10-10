@@ -1,10 +1,12 @@
 import json
+import logging
 import socket
 from datetime import UTC, datetime
 
 import pytest
 from pytest_mock import MockerFixture, MockType
 
+from pipelex import log
 from pipelex.base_exceptions import ErrorDomain, ErrorReport
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.cogt.inference.provider_name import ProviderName
@@ -29,6 +31,7 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.graph.graphspec import GraphSpec, PipelineRef
 from pipelex.interpreter_hub import get_concept_library, get_current_library_id_or_none, get_library_manager, scoped_current_library
+from pipelex.pipe_run import delivery_executor as delivery_executor_module
 from pipelex.pipe_run.delivery_assignment import (
     DeliveryAssignment,
     DeliveryStatus,
@@ -40,6 +43,22 @@ from pipelex.pipe_run.exceptions import PipeJobError, StorageDeliveryError, Webh
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.tools.network.exceptions import SsrfBlockedError
 from tests.helpers.pipe_io_artifacts import make_pipe_io_artifacts
+
+
+def _records_with_message(*, caplog: pytest.LogCaptureFixture, message: str) -> list[logging.LogRecord]:
+    """The delivery executor's records whose message is ``message``, in emission order."""
+    return [record for record in caplog.records if record.name == delivery_executor_module.__name__ and record.getMessage() == message]
+
+
+def _mock_webhook_client(mocker: MockerFixture) -> None:
+    """Patch the delivery's HTTP client with one whose POST succeeds."""
+    mock_client = mocker.AsyncMock()
+    mock_response = mocker.MagicMock()
+    mock_response.raise_for_status = mocker.Mock()
+    mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
+    mock_client.post = mocker.AsyncMock(return_value=mock_response)
+    mocker.patch("pipelex.pipe_run.delivery_executor.httpx.AsyncClient", return_value=mock_client)
 
 
 def _make_main_stuff() -> Stuff:
@@ -111,6 +130,34 @@ class TestDeliveryExecutor:
         assert any("tenant/plr-123/results/main_stuff.md" in key for key in stored_keys)
         assert any("tenant/plr-123/results/main_stuff.html" in key for key in stored_keys)
         assert any("tenant/plr-123/results/tokens_usages.json" in key for key in stored_keys)
+
+    async def test_each_stored_file_is_logged_at_debug_by_its_key(self, mocker: MockerFixture) -> None:
+        """A user's log says which result files were written before a failure, one line per key."""
+        from pipelex import log as pipelex_log  # ruff: ignore[import-outside-top-level]
+
+        debug_spy = mocker.spy(pipelex_log, "debug")
+        mock_storage = mocker.AsyncMock()
+        mock_storage.store = mocker.AsyncMock(return_value="pipelex-storage://test-key")
+        mocker.patch("pipelex.pipe_run.delivery_executor.get_storage_provider", return_value=mock_storage)
+
+        mock_output = _make_output_mock(mocker)
+        mock_output.working_memory_raw = None
+        mock_output.working_memory.smart_dump.return_value = {"root": {}, "aliases": {}}
+        mock_output.working_memory.resolve_main_stuff.return_value = _make_main_stuff()
+        mock_output.graph_spec = None
+
+        await DeliveryExecutor().execute(
+            pipe_output=mock_output,
+            storage_scope="tenant/plr-123",
+            pipeline_run_id="plr-123",
+            delivery_assignment=DeliveryAssignment(storage=StorageTarget()),
+            status=DeliveryStatus.COMPLETED,
+        )
+
+        stored_keys = [call.kwargs["key"] for call in mock_storage.store.call_args_list]
+        logged_keys = [call.kwargs["fields"]["storage_key"] for call in debug_spy.call_args_list if call.args[0] == "Stored a delivery result file"]
+        assert stored_keys
+        assert logged_keys == stored_keys
 
     async def test_key_prefix_inserts_a_level_and_never_supplies_the_leaf(self, mocker: MockerFixture) -> None:
         """`results/` is the RUNTIME's leaf; `key_prefix` sits before it, never instead of it.
@@ -515,10 +562,14 @@ class TestDeliveryExecutor:
         assert result.content == content
 
     async def test_try_local_hydrate_stuff_returns_none_for_unknown_concept(self, mocker: MockerFixture) -> None:
-        """A dynamic concept is unknown to a crate-free delivery worker: the ref resolves to nothing, the raw render takes over."""
+        """A dynamic concept is unknown to a crate-free delivery worker: the ref resolves to nothing, the raw render takes over.
+
+        That is the expected path for most hosted results, so it is a debug line naming the concept, never a warning.
+        """
         from pipelex import log as pipelex_log  # ruff: ignore[import-outside-top-level]
 
         warn_spy = mocker.spy(pipelex_log, "warning")
+        debug_spy = mocker.spy(pipelex_log, "debug")
 
         stuff_raw = {
             "stuff_code": "test",
@@ -530,8 +581,32 @@ class TestDeliveryExecutor:
         result = DeliveryExecutor.try_local_hydrate_stuff(stuff_raw)
 
         assert result is None
-        assert warn_spy.call_count == 1
-        assert "Local hydration failed" in str(warn_spy.call_args)
+        assert warn_spy.call_count == 0
+        unknown_concept_calls = [
+            call
+            for call in debug_spy.call_args_list
+            if call.args[0] == "The delivered result's concept is not known here; the delivery renders it raw"
+        ]
+        assert len(unknown_concept_calls) == 1
+        assert unknown_concept_calls[0].kwargs["fields"] == {"concept_ref": "dynamic_test.Greeting"}
+
+    async def test_a_hydration_failure_is_logged_without_the_values_it_refused(self, mocker: MockerFixture) -> None:
+        """A content that does not validate falls back to the raw render, and the warning says where and why it failed
+        without quoting the run's own result, which a pydantic error's text would.
+        """
+        from pipelex import log as pipelex_log  # ruff: ignore[import-outside-top-level]
+
+        warn_spy = mocker.spy(pipelex_log, "warning")
+        stuff_raw = {"stuff_code": "test", "stuff_name": "greeting", "concept": "native.Text", "content": {"text": ["secret-result-value"]}}
+
+        result = DeliveryExecutor.try_local_hydrate_stuff(stuff_raw)
+
+        assert result is None
+        (warning_call,) = warn_spy.call_args_list
+        assert warning_call.args[0] == "The delivered result could not be hydrated; the delivery renders it raw"
+        assert warning_call.kwargs["fields"]["error.type"] == "ValidationError"
+        assert warning_call.kwargs["fields"]["error.message"].startswith("text: ")
+        assert "secret-result-value" not in str(warning_call)
 
     async def test_try_local_hydrate_stuff_returns_none_for_malformed_dict(self, mocker: MockerFixture) -> None:
         from pipelex import log as pipelex_log  # ruff: ignore[import-outside-top-level]
@@ -628,7 +703,7 @@ class TestDeliveryExecutor:
         """A ref the current library does not hold falls back to the raw render rather than raising."""
         from pipelex import log as pipelex_log  # ruff: ignore[import-outside-top-level]
 
-        warn_spy = mocker.spy(pipelex_log, "warning")
+        debug_spy = mocker.spy(pipelex_log, "debug")
         library_manager = get_library_manager()
         library_id, _ = library_manager.open_library()
         try:
@@ -638,8 +713,7 @@ class TestDeliveryExecutor:
                 result = DeliveryExecutor.try_local_hydrate_stuff(stuff_raw)
 
                 assert result is None
-                assert warn_spy.call_count == 1
-                assert "dynamic_test.Greeting" in str(warn_spy.call_args)
+                assert any(call.kwargs.get("fields") == {"concept_ref": "dynamic_test.Greeting"} for call in debug_spy.call_args_list)
         finally:
             library_manager.teardown(library_id=library_id)
 
@@ -904,12 +978,12 @@ class TestDeliveryExecutor:
         assert payload["status"] == DeliveryStatus.FAILED
         assert "error" not in payload
 
-    async def test_storage_completion_log_includes_request_id_when_set(self, mocker: MockerFixture) -> None:
-        """The ``Storage delivery completed`` log line carries the originating ``request_id`` for cross-phase correlation."""
-        from pipelex import log as pipelex_log  # ruff: ignore[import-outside-top-level]
-
-        info_spy = mocker.spy(pipelex_log, "info")
-
+    async def test_the_storage_completion_line_names_the_run_through_its_context(
+        self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The delivery binds the run's identifiers onto the log context, so the completion line carries them as the record's
+        own, and its message stays the same on every run.
+        """
         mock_storage = mocker.AsyncMock()
         mock_storage.store = mocker.AsyncMock(return_value="pipelex-storage://test-key")
         mocker.patch("pipelex.pipe_run.delivery_executor.get_storage_provider", return_value=mock_storage)
@@ -920,140 +994,94 @@ class TestDeliveryExecutor:
         mock_output.working_memory.resolve_main_stuff.return_value = _make_main_stuff()
         mock_output.graph_spec = None
 
-        executor = DeliveryExecutor()
-        assignment = DeliveryAssignment(storage=StorageTarget())
+        with caplog.at_level(logging.INFO, logger=delivery_executor_module.__name__):
+            await DeliveryExecutor().execute(
+                pipe_output=mock_output,
+                storage_scope="test-user",
+                pipeline_run_id="plr-storage-req",
+                delivery_assignment=DeliveryAssignment(storage=StorageTarget()),
+                status=DeliveryStatus.COMPLETED,
+                request_id="req-abc-123",
+            )
 
-        await executor.execute(
-            pipe_output=mock_output,
-            storage_scope="test-user",
-            pipeline_run_id="plr-storage-req",
-            delivery_assignment=assignment,
-            status=DeliveryStatus.COMPLETED,
-            request_id="req-abc-123",
-        )
+        (record,) = _records_with_message(caplog=caplog, message="Storage delivery completed")
+        assert vars(record).get("request_id") == "req-abc-123"
+        assert vars(record).get("pipeline_run_id") == "plr-storage-req"
+        assert isinstance(vars(record).get("file_count"), int)
+        assert vars(record)["file_count"] > 0
 
-        storage_messages = [str(c.args[0]) for c in info_spy.call_args_list if "Storage delivery completed" in str(c.args[0])]
-        assert storage_messages, "Storage delivery completion must emit one info log"
-        assert "request_id=req-abc-123" in storage_messages[0]
-        assert "pipeline_run_id=plr-storage-req" in storage_messages[0]
-
-    async def test_webhook_completion_log_includes_request_id_when_set(self, mocker: MockerFixture) -> None:
-        """The ``Webhook delivery completed`` log line carries the originating ``request_id`` for cross-phase correlation."""
-        from pipelex import log as pipelex_log  # ruff: ignore[import-outside-top-level]
-
-        info_spy = mocker.spy(pipelex_log, "info")
-
-        mock_client = mocker.AsyncMock()
-        mock_response = mocker.MagicMock()
-        mock_response.raise_for_status = mocker.Mock()
-        mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
-        mock_client.post = mocker.AsyncMock(return_value=mock_response)
-        mocker.patch("pipelex.pipe_run.delivery_executor.httpx.AsyncClient", return_value=mock_client)
-
-        executor = DeliveryExecutor()
-        assignment = DeliveryAssignment(webhooks=[WebhookTarget(url="https://example.com/callback")])
-
-        await executor.execute(
-            pipe_output=None,
-            storage_scope="test-user",
-            pipeline_run_id="plr-webhook-req",
-            delivery_assignment=assignment,
-            status=DeliveryStatus.COMPLETED,
-            request_id="req-xyz-789",
-        )
-
-        webhook_messages = [str(c.args[0]) for c in info_spy.call_args_list if "Webhook delivery completed" in str(c.args[0])]
-        assert webhook_messages, "Webhook delivery completion must emit one info log"
-        assert "request_id=req-xyz-789" in webhook_messages[0]
-        assert "pipeline_run_id=plr-webhook-req" in webhook_messages[0]
-
-    async def test_failed_webhook_log_includes_request_id_when_set(self, mocker: MockerFixture) -> None:
-        """``request_id`` and ``error_report`` are independent dimensions of ``DeliveryExecutor.execute``.
-
-        The COMPLETED variant is pinned by ``test_webhook_completion_log_includes_request_id_when_set``;
-        this pins that the FAILED + populated-error_report path still surfaces ``request_id`` on the
-        delivery log line — so a future refactor that split the FAILED and COMPLETED webhook code
-        paths cannot drop the correlation id from the failure surface.
-        """
-        from pipelex import log as pipelex_log  # ruff: ignore[import-outside-top-level]
-
-        info_spy = mocker.spy(pipelex_log, "info")
-
-        mock_client = mocker.AsyncMock()
-        mock_response = mocker.MagicMock()
-        mock_response.raise_for_status = mocker.Mock()
-        mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
-        mock_client.post = mocker.AsyncMock(return_value=mock_response)
-        mocker.patch("pipelex.pipe_run.delivery_executor.httpx.AsyncClient", return_value=mock_client)
-
-        error_report = ErrorReport(
-            error_type="LLMCompletionError",
-            message="provider returned 429",
-            title="AI inference failed",
-            type_uri="https://docs.pipelex.com/latest/errors/llm-completion-error/",
-            error_category="transient",
-            error_domain=ErrorDomain.RUNTIME,
-            retryable=True,
-            user_action=UserAction(kind=UserActionKind.WAIT_AND_RETRY, detail="Wait a moment and retry"),
-            model="gpt-4o-mini",
-            provider="openai",
-            provider_metadata=ProviderErrorMetadata(
-                provider=ProviderName.OPENAI,
-                sdk_exception_type="RateLimitError",
-                message="429 Too Many Requests",
-                status_code=429,
-                retry_after_seconds=2.5,
+    @pytest.mark.parametrize(
+        ("status", "error_report"),
+        [
+            (DeliveryStatus.COMPLETED, None),
+            (
+                DeliveryStatus.FAILED,
+                ErrorReport(
+                    error_type="LLMCompletionError",
+                    message="provider returned 429",
+                    title="AI inference failed",
+                    type_uri="https://docs.pipelex.com/latest/errors/llm-completion-error/",
+                    error_category="transient",
+                    error_domain=ErrorDomain.RUNTIME,
+                    retryable=True,
+                ),
             ),
-        )
+        ],
+    )
+    async def test_the_webhook_completion_line_names_the_run_and_the_receiver_host(
+        self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture, status: DeliveryStatus, error_report: ErrorReport | None
+    ) -> None:
+        """The webhook line carries the run's identifiers from the context, on a failed run with its error report as on a
+        completed one, and names the receiver by its host alone: the URL is the caller's, and its path or query may carry
+        a credential.
+        """
+        _mock_webhook_client(mocker)
+        webhook_url = "https://hooks.example.com/services/T0SECRET/B0SECRET?token=s3cr3t-callback-token"
 
-        executor = DeliveryExecutor()
+        with caplog.at_level(logging.INFO, logger=delivery_executor_module.__name__):
+            await DeliveryExecutor().execute(
+                pipe_output=None,
+                storage_scope="test-user",
+                pipeline_run_id="plr-webhook-req",
+                delivery_assignment=DeliveryAssignment(webhooks=[WebhookTarget(url=webhook_url)]),
+                status=status,
+                error_report=error_report,
+                request_id="req-xyz-789",
+            )
+
+        (record,) = _records_with_message(caplog=caplog, message="Webhook delivery completed")
+        assert vars(record).get("request_id") == "req-xyz-789"
+        assert vars(record).get("pipeline_run_id") == "plr-webhook-req"
+        assert vars(record).get("server.address") == "hooks.example.com"
+        assert "SECRET" not in json.dumps(vars(record), default=str)
+        assert "s3cr3t-callback-token" not in json.dumps(vars(record), default=str)
+
+    async def test_an_unset_request_id_inherits_the_callers_binding(self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture) -> None:
+        """A delivery dispatched without an inbound id carries none of its own, and keeps the one its caller bound, if any."""
+        _mock_webhook_client(mocker)
         assignment = DeliveryAssignment(webhooks=[WebhookTarget(url="https://example.com/callback")])
 
-        await executor.execute(
-            pipe_output=None,
-            storage_scope="test-user",
-            pipeline_run_id="plr-webhook-failed-req",
-            delivery_assignment=assignment,
-            status=DeliveryStatus.FAILED,
-            error_report=error_report,
-            request_id="req-fail-1",
-        )
+        with caplog.at_level(logging.INFO, logger=delivery_executor_module.__name__):
+            await DeliveryExecutor().execute(
+                pipe_output=None,
+                storage_scope="test-user",
+                pipeline_run_id="plr-no-req",
+                delivery_assignment=assignment,
+                status=DeliveryStatus.COMPLETED,
+            )
+            with log.context(request_id="req-outer"):
+                await DeliveryExecutor().execute(
+                    pipe_output=None,
+                    storage_scope="test-user",
+                    pipeline_run_id="plr-no-req",
+                    delivery_assignment=assignment,
+                    status=DeliveryStatus.COMPLETED,
+                )
 
-        webhook_messages = [str(c.args[0]) for c in info_spy.call_args_list if "Webhook delivery completed" in str(c.args[0])]
-        assert webhook_messages, "Webhook delivery completion must emit one info log even on FAILED status"
-        assert "request_id=req-fail-1" in webhook_messages[0]
-        assert "pipeline_run_id=plr-webhook-failed-req" in webhook_messages[0]
-
-    async def test_completion_logs_omit_request_id_when_unset(self, mocker: MockerFixture) -> None:
-        """When ``request_id`` is None (run dispatched without an inbound id), the log lines do NOT print a stray ``request_id=None``."""
-        from pipelex import log as pipelex_log  # ruff: ignore[import-outside-top-level]
-
-        info_spy = mocker.spy(pipelex_log, "info")
-
-        mock_client = mocker.AsyncMock()
-        mock_response = mocker.MagicMock()
-        mock_response.raise_for_status = mocker.Mock()
-        mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
-        mock_client.post = mocker.AsyncMock(return_value=mock_response)
-        mocker.patch("pipelex.pipe_run.delivery_executor.httpx.AsyncClient", return_value=mock_client)
-
-        executor = DeliveryExecutor()
-        assignment = DeliveryAssignment(webhooks=[WebhookTarget(url="https://example.com/callback")])
-
-        await executor.execute(
-            pipe_output=None,
-            storage_scope="test-user",
-            pipeline_run_id="plr-no-req",
-            delivery_assignment=assignment,
-            status=DeliveryStatus.COMPLETED,
-        )
-
-        webhook_messages = [str(c.args[0]) for c in info_spy.call_args_list if "Webhook delivery completed" in str(c.args[0])]
-        assert webhook_messages, "Webhook delivery completion must emit one info log"
-        assert "request_id" not in webhook_messages[0], "an unset request_id must not produce a stray field"
+        unbound_record, inherited_record = _records_with_message(caplog=caplog, message="Webhook delivery completed")
+        assert "request_id" not in vars(unbound_record), "an unset request_id must not be stamped at all"
+        assert vars(unbound_record).get("pipeline_run_id") == "plr-no-req"
+        assert vars(inherited_record).get("request_id") == "req-outer"
 
     async def test_webhook_aborts_on_dns_rebind_to_private_ip(self, mocker: MockerFixture) -> None:
         """A callback host that passes literal-IP validation but resolves to a private

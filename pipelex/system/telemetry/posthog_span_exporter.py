@@ -307,16 +307,6 @@ class PostHogSpanExporter(SpanExporter):
         pipeline_run_id = attributes.get(PipelexSpanAttr.PIPELINE_RUN_ID)
         properties["pipeline_run_id"] = pipeline_run_id
 
-        log.verbose(
-            f"[OTel->PostHog] EXPORT $ai_generation:\n"
-            f"  pipe_code='{properties.get('pipe_code')}'\n"
-            f"  pipeline_run_id='{pipeline_run_id}'\n"
-            f"  trace_id={properties.get(PostHogAttr.TRACE_ID)}\n"
-            f"  span_id={properties.get(PostHogAttr.SPAN_ID)}\n"
-            f"  parent_id={properties.get(PostHogAttr.PARENT_ID)}\n"
-            f"  model={properties.get(PostHogAttr.MODEL)}"
-        )
-
         self._capture_event(
             event=PostHogEvent.GENERATION,
             properties=properties,
@@ -351,15 +341,6 @@ class PostHogSpanExporter(SpanExporter):
         # Apply pipe code redaction (only add if not None, for consistency)
         if redacted_pipe_code := self._get_redacted_pipe_code(pipe_code):
             properties["pipe_code"] = redacted_pipe_code
-        log.verbose(
-            f"[OTel->PostHog] EXPORT $ai_span:\n"
-            f"  pipe_code='{properties.get('pipe_code')}'\n"
-            f"  pipeline_run_id='{pipeline_run_id}'\n"
-            f"  $ai_span_name='{redacted_span_name}'\n"
-            f"  trace_id={properties.get(PostHogAttr.TRACE_ID)}\n"
-            f"  span_id={properties.get(PostHogAttr.SPAN_ID)}\n"
-            f"  parent_id={properties.get(PostHogAttr.PARENT_ID)}"
-        )
 
         self._capture_event(
             event=PostHogEvent.SPAN,
@@ -377,31 +358,11 @@ class PostHogSpanExporter(SpanExporter):
             return SpanExportResult.SUCCESS
 
     def _do_export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
-        log.verbose(f"[OTel->PostHog] export() called with {len(spans)} span(s)")
-
         for span in spans:
             try:
                 attributes = span.attributes or {}
                 span_category_str = cast("str", attributes.get(PipelexSpanAttr.SPAN_CATEGORY))
                 span_category = SpanCategory(span_category_str)
-
-                span_ctx = span.get_span_context()
-                parent_id = f"{span.parent.span_id:016x}" if span.parent else "None"
-                trace_id_str = f"{span_ctx.trace_id:032x}" if span_ctx else "unknown"
-                span_id_str = f"{span_ctx.span_id:016x}" if span_ctx else "unknown"
-                pipe_code = attributes.get(PipelexSpanAttr.PIPE_CODE)
-                pipeline_run_id = attributes.get(PipelexSpanAttr.PIPELINE_RUN_ID)
-                trace_name = attributes.get(PipelexSpanAttr.TRACE_NAME)
-                log.verbose(
-                    f"[OTel->PostHog] Processing span:\n"
-                    f"  trace_name='{trace_name}'\n"
-                    f"  trace_id={trace_id_str}\n"
-                    f"  span_id={span_id_str}\n"
-                    f"  span_category={span_category}\n"
-                    f"  pipeline_run_id='{pipeline_run_id}'\n"
-                    f"  pipe_code='{pipe_code}'\n"
-                    f"  parent_id={parent_id}"
-                )
 
                 match span_category:
                     case SpanCategory.INFERENCE:

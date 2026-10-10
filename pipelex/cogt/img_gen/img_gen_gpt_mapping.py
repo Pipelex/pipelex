@@ -184,12 +184,12 @@ class ImgGenGptMapping:
             raise ImgGenParameterError(msg)
 
         if total_pixels > cls.GPT_IMAGE_2_RELIABILITY_PIXELS:
-            msg = f"Size '{size_string}' is valid for OpenAI image model '{model_name}', but it is above the 2560x1440 reliability boundary."
+            size_fields = {"model_handle": model_name, "image_size": size_string}
             if is_tier_derived:
                 # A tier is a portable request, not a hand-picked size: note it quietly.
-                log.verbose(msg)
+                log.verbose("The image size a tier derives is above the model's 2560x1440 reliability boundary", fields=size_fields)
             else:
-                log.warning(msg)
+                log.warning("The requested image size is valid but above the model's 2560x1440 reliability boundary", fields=size_fields)
 
     @classmethod
     def moderation_literal(cls, *, is_moderated: bool | None) -> GptImageModerationType | None:

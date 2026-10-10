@@ -8,7 +8,6 @@ from openai import (
 from openai.types.chat import ChatCompletionReasoningEffort
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, SdkTypeError
 from pipelex.cogt.inference.error_classification import (
     UserAction,
@@ -107,9 +106,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
             effort = job_params.reasoning_effort
             match thinking_mode:
                 case ThinkingMode.MANUAL:
-                    openai_effort = get_config().inference.llm.openai.get_reasoning_level(effort=effort)
-                    log.verbose(f"OpenAI Chat Completions reasoning_effort={openai_effort}")
-                    return openai_effort
+                    return get_config().inference.llm.openai.get_reasoning_level(effort=effort)
                 case ThinkingMode.ADAPTIVE:
                     msg = f"Model '{inference_model.desc}' has thinking_mode=adaptive which is not supported by the OpenAI Chat Completions API"
                     raise LLMCapabilityError(msg)
@@ -140,6 +137,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
         messages = await self.openai_completions_factory.make_simple_messages(llm_job=llm_job)
 
         openai_reasoning_effort = self._resolve_reasoning_effort(inference_model=self.inference_model, job_params=job_params)
+        self._log_reasoning_sent(api_name="OpenAI Chat Completions", settings={"reasoning_effort": openai_reasoning_effort})
 
         try:
             extra_headers, extra_body = self.openai_completions_factory.make_extras(
@@ -217,6 +215,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
         openai_reasoning_effort = self._resolve_reasoning_effort(inference_model=self.inference_model, job_params=job_params)
+        self._log_reasoning_sent(api_name="OpenAI Chat Completions", settings={"reasoning_effort": openai_reasoning_effort})
         messages = await self.openai_completions_factory.make_simple_messages(llm_job=llm_job)
         # Deferred import: avoid pulling heavy SDK at module-load time
         from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]

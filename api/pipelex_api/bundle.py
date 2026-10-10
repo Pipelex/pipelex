@@ -49,6 +49,7 @@ from mthds.package.discovery import MANIFEST_FILENAME
 from mthds.package.exceptions import ManifestError
 from mthds.package.manifest.parser import parse_methods_toml
 from pipelex import log
+from pipelex.tools.log.error_fields import error_fields
 from pydantic import ConfigDict
 from pydantic.dataclasses import dataclass
 
@@ -133,13 +134,15 @@ def _entries_from_zip(bundle_b64: str) -> list[tuple[PurePosixPath, bytes]]:
     try:
         raw = base64.b64decode(bundle_b64, validate=True)
     except (binascii.Error, ValueError) as decode_error:
-        log.warning(f"bundle: invalid base64 ({decode_error})")
+        # DEBUG: the refusal below is a caller's mistake, which the error handler already logs; this keeps the cause.
+        log.debug("A bundle's base64 could not be decoded", fields=error_fields(exc=decode_error))
         raise_bad_request(message="bundle_b64 is not valid base64", error_type=ErrorType.INVALID_BASE64)
 
     try:
         archive = zipfile.ZipFile(BytesIO(raw))
     except zipfile.BadZipFile as zip_error:
-        log.warning(f"bundle: corrupt zip ({zip_error})")
+        # DEBUG: the refusal below is a caller's mistake, which the error handler already logs; this keeps the cause.
+        log.debug("A bundle is not a valid zip archive", fields=error_fields(exc=zip_error))
         raise_validation_error(message="bundle_b64 is not a valid zip archive", error_type=ErrorType.INVALID_BUNDLE)
 
     entries: list[tuple[PurePosixPath, bytes]] = []

@@ -23,7 +23,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
-from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
+from pipelex.pipe_machinery.pipe_abstract import PIPE_RUN_ENDS_MESSAGE, PIPE_RUN_STARTS_MESSAGE, PipeAbstract
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -158,7 +158,12 @@ def _own_records(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
 
 def _announcements(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
     """The lines ``live_run_pipe`` itself emits to announce each pipe, on the pipe machinery's own logger."""
-    return [record for record in caplog.records if record.name == PipeAbstract.__module__ and record.levelno == logging.INFO]
+    return [record for record in caplog.records if record.name == PipeAbstract.__module__ and record.getMessage() == PIPE_RUN_STARTS_MESSAGE]
+
+
+def _run_ends(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
+    """The events ``live_run_pipe`` ends each pipe run with, on the same logger, in the order the runs ended."""
+    return [record for record in caplog.records if record.name == PipeAbstract.__module__ and record.getMessage() == PIPE_RUN_ENDS_MESSAGE]
 
 
 def _field(record: logging.LogRecord, *, name: str) -> Any:
@@ -189,6 +194,8 @@ class TestLiveRunPipeLogContext:
         assert succeeded.context == running.context
         (announcement,) = _announcements(caplog)
         assert _field(announcement, name="pipe_run_id") == minted_id
+        (run_end,) = _run_ends(caplog)
+        assert _field(run_end, name="pipe_run_id") == minted_id
         (record,) = _own_records(caplog)
         assert _field(record, name="pipe_run_id") == minted_id
         assert _field(record, name="request_id") == "req-live"
@@ -215,6 +222,9 @@ class TestLiveRunPipeLogContext:
         outer_announcement, inner_announcement = _announcements(caplog)
         assert _field(outer_announcement, name="pipe_run_id") == outer_id
         assert _field(inner_announcement, name="pipe_run_id") == inner_id
+        inner_end, outer_end = _run_ends(caplog)
+        assert _field(inner_end, name="pipe_run_id") == inner_id
+        assert _field(outer_end, name="pipe_run_id") == outer_id
         outer_record, inner_record, back_record = _own_records(caplog)
         assert _field(outer_record, name="pipe_run_id") == outer_id
         assert _field(inner_record, name="pipe_run_id") == inner_id
@@ -246,3 +256,6 @@ class TestLiveRunPipeLogContext:
         assert _field(inner_error, name="pipe_run_id") == inner_id
         assert outer_error.getMessage() == "outer span ends in error"
         assert _field(outer_error, name="pipe_run_id") == outer_id
+        inner_end, outer_end = _run_ends(caplog)
+        assert (_field(inner_end, name="pipe_run_id"), _field(inner_end, name="outcome")) == (inner_id, "error")
+        assert (_field(outer_end, name="pipe_run_id"), _field(outer_end, name="outcome")) == (outer_id, "error")

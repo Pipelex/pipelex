@@ -107,6 +107,8 @@ class TestImgGenArgsGptSizes:
         )
 
         mock_log.warning.assert_called_once()
+        # The model's name here is its deck handle, and the size rides as a field, never in the message
+        assert mock_log.warning.call_args.kwargs["fields"] == {"model_handle": "gpt-image-2", "image_size": "2048x2048"}
         mock_log.verbose.assert_not_called()
 
     def test_exact_size_below_reliability_boundary_logs_nothing(self, mocker: MockerFixture) -> None:

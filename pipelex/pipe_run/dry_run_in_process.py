@@ -30,6 +30,7 @@ from pipelex.runtime_hub import scoped_content_generator, scoped_event_log
 from pipelex.system.caller_identity import CallerIdentity, scoped_caller_identity
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.storage_scope import DRY_RUN_STORAGE_SCOPE, DRY_RUN_USER_ID
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 
 
@@ -51,13 +52,14 @@ async def best_effort_graph_spec(*, pipe_ref: str | None, library_id: str | None
     Args:
         pipe_ref: The namespaced ref of the pipe to dry-run, or ``None`` for no graph.
         library_id: The id of the already-open library to run against, or ``None`` for no graph.
-        log_context: Caller tag prefixed to the degrade warning (e.g. ``"act_dry_validate"``).
+        log_context: Caller tag the degrade warning carries in its ``caller`` field (e.g. ``"act_dry_validate"``).
 
     Returns:
         The assembled GraphSpec, or ``None`` when skipped or degraded.
     """
     if not pipe_ref or not library_id:
         return None
+    pipe: PipeAbstract | None = None
     try:
         # Entry-shaped: `pipe_ref` is either a caller-supplied graph target (a protocol request
         # field) or a bundle's already-qualified main_pipe_ref. Both are pipes someone pointed at,
@@ -71,10 +73,24 @@ async def best_effort_graph_spec(*, pipe_ref: str | None, library_id: str | None
         if foreign_fault is not None and not isinstance(foreign_fault, (FactoryException, ValueError)):
             raise
         log.warning(
-            f"{log_context}: graph dry-run of '{pipe_ref}' did not produce a graph "
-            f"({type(graph_error).__name__}: {graph_error}); returning validation result without graph_spec"
+            "The graph dry run produced no graph; the validation result carries none",
+            fields={"caller": log_context, **_graph_target_fields(pipe=pipe, target=pipe_ref), **error_fields(exc=graph_error)},
         )
         return None
+
+
+def _graph_target_fields(*, pipe: PipeAbstract | None, target: str) -> dict[str, str]:
+    """The fields naming the pipe a graph dry run was for, as the pipe-run lines name it.
+
+    A resolved pipe is named by its bare code under `pipe_code`, the value `Pipe run starts` carries, and by its qualified
+    reference under `pipe_ref`. A target that resolved to no pipe is carried as it was named: under `pipe_ref` when a
+    domain qualifies it, under `pipe_code` when it is a bare code.
+    """
+    if pipe is not None:
+        return {"pipe_code": pipe.code, "pipe_ref": pipe.pipe_ref}
+    if "." in target:
+        return {"pipe_ref": target}
+    return {"pipe_code": target}
 
 
 async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str, caller_identity: CallerIdentity | None = None) -> GraphSpec:

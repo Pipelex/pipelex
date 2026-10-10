@@ -192,7 +192,10 @@ class TestTypesafeJudgmentWorker:
 
         if expects_warning:
             warning.assert_called_once()
-            assert "'jev-latest'" in warning.call_args.args[0]
-            assert "'jev-1.13.0'" in warning.call_args.args[0]
+            # The pinned id rides gen_ai.response.model, as on the LLM span, and the id that answered beside it
+            fields = warning.call_args.kwargs["fields"]
+            assert fields["gen_ai.request.model"] == "jev-1.13.0"
+            assert fields["gen_ai.response.model"] == "jev-latest"
+            assert fields["answered_model_id"] == "jev-1.13.0"
         else:
             warning.assert_not_called()

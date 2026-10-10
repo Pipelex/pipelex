@@ -51,7 +51,7 @@ class OpenAIClientFactory:
         the_client: openai.AsyncOpenAI
         match sdk_variant:
             case OpenAISdkVariant.AZURE_OPENAI | OpenAISdkVariant.AZURE_OPENAI_RESPONSES:
-                log.verbose(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
+                log.debug(f"Making AsyncAzureOpenAI client with endpoint: {backend.endpoint}")
                 if backend.endpoint is None:
                     msg = "Azure OpenAI endpoint is not set"
                     raise OpenAIClientFactoryError(msg)
@@ -68,7 +68,7 @@ class OpenAIClientFactory:
                 | OpenAISdkVariant.BLACKBOXAI_IMG_GEN
                 | OpenAISdkVariant.OPENROUTER_IMG_GEN
             ):
-                log.verbose(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
+                log.debug(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
                 the_client = openai.AsyncOpenAI(
                     api_key=api_key,
                     base_url=backend.endpoint,

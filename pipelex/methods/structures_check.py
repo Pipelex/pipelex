@@ -46,7 +46,8 @@ STRUCTURE_BASE_CLASS_NAME = "StructuredContent"
 
 STRUCTURES_REFUSAL_RULE = "hosted execution accepts MTHDS concepts and sandboxed PipeFuncs, not in-process Python"
 
-# What every message about the rule tells the author to do, whether it refuses or only predicts a refusal.
+# What every message about the rule tells the author to do, whether it refuses or only predicts a refusal. The one exception
+# is the warning fetch-on-miss logs: a log message is a literal written at the call, so that line gives the remedy's first step.
 STRUCTURES_REFUSAL_REMEDY = (
     "Declare these types as MTHDS concepts with inline structures; a PipeFunc can return them by importing the classes "
     "the sandbox generates from those concepts (`from structures import <domain>__<Concept>`). A structures module "
