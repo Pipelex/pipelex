@@ -5332,22 +5332,6 @@ rationale = "Verb-object: searches upward from the start dir; single operand."
 param = "relative_path"
 rationale = "Verb-object: resolves the relative path; single operand."
 
-["pipelex/system/configuration/config_model.py::ConfigModel.transform_dict_keys_str_to_enum"]
-param = "input_dict"
-rationale = "Verb-object: transforms the input dict; enum class stays keyword."
-
-["pipelex/system/configuration/config_model.py::ConfigModel.transform_dict_of_floats_str_to_enum"]
-param = "input_dict"
-rationale = "Verb-object: transforms the input dict; enum class stays keyword."
-
-["pipelex/system/configuration/config_model.py::ConfigModel.transform_dict_str_to_enum"]
-param = "input_dict"
-rationale = "Verb-object: transforms the input dict; enum class stays keyword."
-
-["pipelex/system/configuration/config_model.py::ConfigModel.transform_list_of_str_to_enum"]
-param = "input_list"
-rationale = "Verb-object: transforms the input list; enum class stays keyword."
-
 ["pipelex/system/environment.py::all_env_vars_are_set"]
 param = "keys"
 rationale = "Predicate on the given env-var keys; single operand."

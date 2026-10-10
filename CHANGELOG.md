@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **A refused enum value names the valid ones**: a validation error for an unknown enum value, in a configuration file or anywhere else Pipelex formats pydantic's errors, now lists the values the field accepts, `invalid enum value 'inptu', expected 'input', 'input_cached', …`, where it used to name only the refused value.
+
+### Fixed
+
+- **A configuration value of the wrong type is a validation error (Breaking)**: a model's `costs`, `listed_constraints`, `valued_constraints` or `rules` in a backend file or in a plugin's internal model, a backend's constraints in `backends.toml`, and `package_log_levels` in `pipelex.toml` no longer crash the boot with a bare `AttributeError` or `TypeError` naming nothing when written as a value of the wrong shape, such as `costs = "free"` or a date; the boot fails with a message naming the field, the model, the backend and the file, or the plugin, and an empty `inference.dry_run.image_urls` is reported the same way. A plugin may set an internal model's `costs` to `None`. Some values that used to be accepted are now refused: a table as `listed_constraints`, a string as `interpreter.scan.excluded_dirs`, a price that is `nan` or infinite, and a `max_tokens` setting that is neither an integer nor `"auto"`, which used to fall back to the model's default.
+
+### Removed
+
+- **`ConfigModelError` and `ConfigModel`'s conversion helpers (Breaking)**: `ConfigModel.transform_dict_str_to_enum`, `transform_dict_of_floats_str_to_enum`, `transform_dict_keys_str_to_enum` and `transform_list_of_str_to_enum` are gone, and with them `ConfigModelError`, which only they raised. A configuration model holding enums in a container annotates them with `LaxEnum` from `pipelex.system.configuration.config_model`, `list[LaxEnum[MyEnum]]`, and pydantic converts the strings itself.
+
 ## [v0.81.1] - 2026-10-10
 
 ### Added

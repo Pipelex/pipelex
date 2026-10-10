@@ -217,3 +217,13 @@ sdk = "openai_responses"
 ["acme-one"]
 model_id = "${secrte:ACME_MODEL}"
 """
+
+    @classmethod
+    def model_specs_toml_with_member(cls, *, member_line: str) -> str:
+        """`MODEL_SPECS_TOML` with one more member on its `acme-one` table, which is the file's last."""
+        return f"{cls.MODEL_SPECS_TOML}{member_line}\n"
+
+    @classmethod
+    def backends_toml_with_member(cls, *, member_line: str) -> str:
+        """`BACKENDS_TOML` with one more member on its `acme` table, which is the file's last."""
+        return f"{cls.BACKENDS_TOML}{member_line}\n"

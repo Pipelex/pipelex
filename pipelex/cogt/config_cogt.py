@@ -1,6 +1,5 @@
 from pydantic import Field, field_validator
 
-from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cogt.exceptions import LLMConfigError
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams, ImgGenJobParamsDefaults, Quality
 from pipelex.cogt.llm.llm_job_components import ReasoningEffort
@@ -42,12 +41,12 @@ class DryRunConfig(ConfigModel):
     image_urls: list[str]
     allowed_to_fail_pipes: list[str] = Field(default_factory=list)
 
-    @field_validator("image_urls", mode="before")
+    @field_validator("image_urls")
     @classmethod
     def validate_image_urls(cls, value: list[str]) -> list[str]:
         if not value:
             msg = "inference.dry_run.image_urls must be a non-empty list"
-            raise PipelexConfigError(msg)
+            raise ValueError(msg)
         return value
 
 

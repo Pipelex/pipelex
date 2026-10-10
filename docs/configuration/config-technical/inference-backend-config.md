@@ -209,6 +209,8 @@ costs = { input = 0.04, output = 0.0 }
 
 The `[defaults]` table applies to every model of the file, and a model table overrides any key of it.
 
+`costs` maps a cost category, such as `input` or `output`, to a price, which must be a finite number no lower than zero; an empty table, or no `costs` at all, declares no price. Every field is checked against its type when the file loads, so a value of the wrong shape, such as `costs = "free"`, a price written as a string, or a table where `listed_constraints` takes an array, fails the boot with a message naming the field, the model, the backend and the file.
+
 #### One handle, several kinds of model
 
 A handle names one model per model type. The same name may be an LLM and a judgment model at once, and each pipe reaches the kind its family asks for: a `PipeLLM` naming `acme-one` gets the LLM, and a `PipeJudge` naming it gets the judgment model. A table's name is its handle, and TOML forbids declaring a table twice, so the second model of a handle gets a table name of its own and says which handle it serves with `handle`:

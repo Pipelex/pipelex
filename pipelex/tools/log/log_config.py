@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import re
 from enum import StrEnum
-from typing import cast
 
 from pydantic import Field, field_validator
 
-from pipelex.system.configuration.config_model import ConfigModel
+from pipelex.system.configuration.config_model import ConfigModel, LaxEnum
 from pipelex.system.console_target import ConsoleTarget
 from pipelex.tools.log.log_levels import LogLevel
 from pipelex.tools.misc.pretty import PrettyPrintMode
@@ -140,7 +139,7 @@ class LogRedactionConfig(ConfigModel):
 
 class LogConfig(ConfigModel):
     default_log_level: LogLevel = Field(strict=False)
-    package_log_levels: dict[str, LogLevel]
+    package_log_levels: dict[str, LaxEnum[LogLevel]]
     # The registered log-sink token boot selects: an open string, validated at the registry lookup.
     sink: str
     pretty_print_mode: PrettyPrintMode = Field(strict=False)
@@ -158,11 +157,3 @@ class LogConfig(ConfigModel):
     rich_log: RichLogConfig
     otlp: OtlpLogSinkConfig
     gcp: GcpLogSinkConfig
-
-    @field_validator("package_log_levels", mode="before")
-    @classmethod
-    def validate_package_log_levels(cls, value: dict[str, str]) -> dict[str, LogLevel]:
-        return cast(
-            "dict[str, LogLevel]",
-            ConfigModel.transform_dict_str_to_enum(input_dict=value, value_enum_cls=LogLevel),
-        )
