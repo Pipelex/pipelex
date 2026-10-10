@@ -24,6 +24,7 @@ _CONTRACT_IMPORT_SCRIPT = textwrap.dedent(
     import pipelex.cogt.doc_gen
 
     names = sorted(module.name for module in pkgutil.iter_modules(pipelex.cogt.doc_gen.__path__, "pipelex.cogt.doc_gen."))
+    assert "pipelex.cogt.doc_gen.formatted_markdown" in names
     assert "pipelex.cogt.doc_gen.layout_display" in names
     assert "pipelex.cogt.doc_gen.template_environment" in names
     for name in names:

@@ -69,8 +69,11 @@ def markdown_as_html(*, markdown: str) -> str:
     """Markdown as an HTML fragment, parsed as the `markdown` filter, the `Markdown` concept and the built-in engine parse it.
 
     The parser reads CommonMark with tables and strikethrough; raw HTML in the source comes out escaped, so it
-    shows as text rather than entering the document; and only a URL with a scheme becomes a link, so `README.md`
-    or `www.example.com` stays text.
+    shows as text rather than entering the document; and a bare URL becomes a link only when it has a scheme, so a
+    bare `README.md` or `www.example.com` stays text. An explicit link follows markdown-it's own rule, keeping any
+    target but a `javascript:`, `vbscript:`, `file:` or non-image `data:` one, so `[x](README.md)` is a link, and an
+    image becomes an `<img>`: an engine that formats Markdown itself keeps only `http`, `https` and `mailto` links and
+    prints an image's alt text instead (`formatted_markdown.py`).
 
     A conversion is charged to the budget of the template render running at the time, so one an engine makes from
     its own code, outside any template render, is charged to none: the engine bounds what it converts and prints.

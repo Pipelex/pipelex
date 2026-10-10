@@ -3,12 +3,15 @@ import re
 import pytest
 from markdown_it.token import Token
 from markdown_it.tree import SyntaxTreeNode
+from pytest_mock import MockerFixture
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT  # type: ignore[import-untyped]
 from reportlab.platypus import Paragraph  # type: ignore[import-untyped]
 
 from pipelex.cogt.doc_gen.layout_tree import MarkdownBlock
-from pipelex.providers.reportlab.markdown_flowables import inline_markup, is_linked_href, markdown_nodes_to_flowables, plain_text
-from pipelex.providers.reportlab.pdf_elements import MONO_FONT, build_pdf_styles
+from pipelex.providers.reportlab.markdown_flowables import inline_markup, markdown_nodes_to_flowables
+from pipelex.providers.reportlab.pdf_elements import MONO_FONT, build_pdf_styles, data_table
 from pipelex.tools.markdown.markdown_parser import get_markdown_parser
+from pipelex.tools.markdown.markdown_rules import is_linked_href, plain_text
 from tests.unit.pipelex.providers.reportlab.reportlab_test_helpers import (
     StubRenderResources,
     document_text,
@@ -19,6 +22,7 @@ from tests.unit.pipelex.providers.reportlab.reportlab_test_helpers import (
     render_markdown,
 )
 from tests.unit.pipelex.providers.reportlab.test_data import MarkdownFlowablesTestData
+from tests.unit.pipelex.tools.markdown.test_data import MarkdownFormattingTestData
 
 
 def _list_lines(*, text: str) -> list[str]:
@@ -53,6 +57,13 @@ class TestMarkdownFlowables:
         markdown_text = "| Quarter | Revenue |\n| --- | --: |\n| Q1 | **$1.2M** |\n| Q2 |\n"
         assert "Quarter Revenue\nQ1 $1.2M\nQ2" in document_text(pdf_data=render_markdown(markdown_text=markdown_text))
 
+    def test_a_table_cell_is_aligned_as_its_column_is(self, mocker: MockerFixture) -> None:
+        built_table = mocker.patch("pipelex.providers.reportlab.markdown_flowables.data_table", wraps=data_table)
+        nodes = SyntaxTreeNode(get_markdown_parser().parse("| L | C | R | N |\n| :-- | :-: | --: | --- |\n| a | b | c | d |\n")).children
+        markdown_nodes_to_flowables(nodes=nodes, styles=build_pdf_styles(), available_width=400)
+        rows = built_table.call_args.kwargs["rows"]
+        assert [[cell.style.alignment for cell in row] for row in rows] == [[TA_LEFT, TA_CENTER, TA_RIGHT, TA_LEFT]] * 2
+
     def test_a_long_table_repeats_its_header_on_the_next_page(self) -> None:
         rows = "".join(f"| Row {index} | {index * 10} |\n" for index in range(1, 91))
         pages = page_texts(pdf_data=render_markdown(markdown_text=f"| Label | Value |\n| --- | --- |\n{rows}"))
@@ -76,6 +87,17 @@ class TestMarkdownFlowables:
         assert "Some bold, some italic, some both, struck and code." in document_text(pdf_data=pdf_data)
         expected_fonts = {"OpenSans-Regular", "OpenSans-Bold", "OpenSans-Italic", "OpenSans-BoldItalic", "RobotoMono-Regular"}
         assert expected_fonts <= embedded_font_names(pdf_data=pdf_data)
+
+    @pytest.mark.parametrize(
+        ("markdown_text", "expected_text"),
+        [
+            (MarkdownFormattingTestData.DEEP_EMPHASIS, MarkdownFormattingTestData.DEEP_EMPHASIS_TEXT),
+            (MarkdownFormattingTestData.DEEP_MIXED_EMPHASIS, MarkdownFormattingTestData.DEEP_MIXED_EMPHASIS_TEXT),
+        ],
+    )
+    def test_emphasis_nested_hundreds_deep_prints_its_text(self, markdown_text: str, expected_text: str) -> None:
+        text = document_text(pdf_data=render_markdown(markdown_text=markdown_text))
+        assert expected_text in " ".join(text.split())
 
     def test_markup_in_markdown_text_prints_as_written(self) -> None:
         text = document_text(pdf_data=render_markdown(markdown_text="Tom & Jerry say <b>hello</b> &amp; <br/> bye"))
