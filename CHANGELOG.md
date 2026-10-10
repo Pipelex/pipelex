@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Security
+
+- **`uv.lock` refreshed past the open Dependabot alerts**: the lock the `pipelex/pipelex-api` Docker image installs from now holds patched releases of `anyio`, `datamodel-code-generator`, `multidict`, `oauthlib` and `urllib3`, and a development checkout also gets patched `docling`, `transformers`, `torch`, `accelerate`, `fsspec` and `setuptools` through the `docling` extra and a patched `Werkzeug` through the `dev` extra. No `pyproject.toml` range moved, so an application installing the `pipelex` wheel picks these releases up through its own resolution.
+
 ## [v0.81.1] - 2026-10-10
 
 ### Added
