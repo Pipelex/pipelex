@@ -170,7 +170,7 @@ class ReportingManager(ReportingProtocol):
         self._emit_usage_event(judgment_job, tokens_usage=judgment_tokens_usage)
 
     @classmethod
-    def _warn_of_missing_usage(cls, *, inference_job: object) -> None:
+    def _warn_of_missing_usage(cls, *, inference_job: InferenceJobAbstract) -> None:
         """Warn that an inference job reported no usage: one event whichever family the job is of, its class a field."""
         log.warning("An inference job reported no usage", fields={"inference_job_type": type(inference_job).__name__})
 
