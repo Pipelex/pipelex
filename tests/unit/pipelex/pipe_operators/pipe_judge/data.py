@@ -19,6 +19,38 @@ def _judge(**fields: Any) -> dict[str, Any]:
     return {key: value for key, value in blueprint.items() if value is not None}
 
 
+def _questions(**overrides: Any) -> dict[str, Any]:
+    """Three questions of each kind about one message, with the given question tables on top: a table given as `None` is dropped."""
+    questions: dict[str, Any] = {
+        "urgent": {"question": "Is it urgent?", "threshold": 0.7, "criteria": {"yes": "It cannot wait", "no": "It can wait"}},
+        "team": {"question": "Which team handles it?", "options": {"billing": "Charges and invoices", "technical": ""}},
+        "severity": {"question": "How severe is it?", "levels": [{"label": "Low"}, {"label": "High"}]},
+    }
+    questions.update(overrides)
+    return {key: value for key, value in questions.items() if value is not None}
+
+
+def _multi(**fields: Any) -> dict[str, Any]:
+    """A PipeJudge blueprint asking several questions over the evidence of one message, with the given fields on top.
+
+    A field given as `None` is left out, so `_multi(question=…)` adds a single-form question beside the several.
+    """
+    blueprint: dict[str, Any] = {
+        "description": "d",
+        "inputs": {"message": "Text"},
+        "output": "MessageTriage",
+        "prompt": "A message from a customer:\n@message",
+        "questions": _questions(),
+    }
+    blueprint.update(fields)
+    return {key: value for key, value in blueprint.items() if value is not None}
+
+
+def _one_question(**question_fields: Any) -> dict[str, Any]:
+    """A PipeJudge blueprint asking one question through `questions`, the question table being the given fields."""
+    return _multi(questions={"verdict": question_fields})
+
+
 class PipeJudgeBlueprintTestCases:
     """Each refusal is (test_id, blueprint fields, a fragment of its message); each acceptance is (test_id, fields, the kind it resolves to)."""
 
@@ -110,4 +142,64 @@ class PipeJudgeBlueprintTestCases:
             JudgmentKind.RATING,
         ),
         ("rating_unlabelled_tables_and_strings", _judge(output="Rating", levels=[{"description": "Barely"}, "Severe"]), JudgmentKind.RATING),
+    ]
+
+    # Several questions: (test_id, blueprint fields, a fragment of its message).
+    REFUSED_SEVERAL: ClassVar[list[tuple[str, dict[str, Any], str]]] = [
+        ("question_and_questions", _multi(question="Is it urgent?"), "sets both `question` and `questions`"),
+        ("neither_question_nor_questions", _multi(questions=None), "or several in `questions`"),
+        ("no_question_in_questions", _multi(questions={}), "`questions` holds at least one question, and this one holds none"),
+        ("key_not_an_identifier", _multi(questions=_questions(**{"is-urgent": {"question": "Urgent?"}})), "'is-urgent' is not"),
+        ("key_a_python_keyword", _multi(questions=_questions(**{"class": {"question": "Urgent?"}})), "'class' is not"),
+        ("key_starting_with_an_underscore", _multi(questions=_questions(_urgent={"question": "Urgent?"})), "'_urgent' is not"),
+        ("key_a_reserved_name", _multi(questions=_questions(model_config={"question": "Urgent?"})), "'model_config' is not"),
+        ("options_on_the_pipe", _multi(options={"a": "", "b": ""}), "sets `options` on each question rather than on the pipe"),
+        ("levels_on_the_pipe", _multi(levels=["low", "high"]), "sets `levels` on each question rather than on the pipe"),
+        ("criteria_on_the_pipe", _multi(criteria={"yes": "y", "no": "n"}), "sets `criteria` on each question rather than on the pipe"),
+        ("threshold_on_the_pipe", _multi(threshold=0.7), "sets `threshold` on each question rather than on the pipe"),
+        ("question_table_without_question", _one_question(threshold=0.7), "writes what it asks in `question`, and this one sets none"),
+        ("empty_question_in_a_table", _one_question(question=""), "its `question` cannot be empty"),
+        ("blank_question_in_a_table", _one_question(question="  \n "), "its `question` cannot be empty"),
+        ("prompt_in_a_question_table", _one_question(question="Is it urgent?", prompt="@message"), "prompt"),
+        ("question_with_options_and_levels", _one_question(question="Q?", options={"a": "", "b": ""}, levels=["low", "high"]), "not both"),
+        (
+            "criteria_beside_options_in_a_question",
+            _one_question(question="Q?", options={"a": "", "b": ""}, criteria={"yes": "y", "no": "n"}),
+            "`criteria` applies to a yes/no question only, and this question declares `options`",
+        ),
+        ("question_threshold_out_of_range", _one_question(question="Q?", threshold=1.5), "strictly between 0 and 1, and this question declares 1.5"),
+        ("question_with_one_option", _one_question(question="Q?", options={"only": ""}), "at least two `options`"),
+        ("question_with_one_level", _one_question(question="Q?", levels=["only"]), "at least two `levels`"),
+        ("question_with_a_lone_criterion", _one_question(question="Q?", criteria={"yes": "y"}), "these declare `yes` without `no`"),
+        (
+            "question_with_mixed_labels",
+            _one_question(question="Q?", levels=[{"label": "Low"}, "High"]),
+            "every level carries a `label` or none does",
+        ),
+        (
+            "undeclared_variable_in_a_question",
+            _multi(questions=_questions(urgent={"question": "Is it about $topic?"})),
+            "Variable 'topic' is read by the prompt or questions",
+        ),
+        (
+            "input_no_template_reads",
+            _multi(inputs={"message": "Text", "history": "Text"}),
+            "Input 'history' is declared but never read by the prompt or questions",
+        ),
+        ("output_with_brackets", _multi(output="MessageTriage[]"), "fills one structure with their verdicts"),
+    ]
+
+    # Several questions: (test_id, blueprint fields, the kind each question resolves to).
+    ACCEPTED_SEVERAL: ClassVar[list[tuple[str, dict[str, Any], dict[str, JudgmentKind]]]] = [
+        (
+            "one_question_of_each_kind",
+            _multi(),
+            {"urgent": JudgmentKind.YES_NO, "team": JudgmentKind.CHOICE, "severity": JudgmentKind.RATING},
+        ),
+        ("a_single_question_in_questions", _one_question(question="Is it urgent?"), {"verdict": JudgmentKind.YES_NO}),
+        (
+            "an_input_read_by_one_question_alone",
+            _multi(inputs={"message": "Text", "topic": "Text"}, questions=_questions(urgent={"question": "Is it about $topic?"})),
+            {"urgent": JudgmentKind.YES_NO, "team": JudgmentKind.CHOICE, "severity": JudgmentKind.RATING},
+        ),
     ]

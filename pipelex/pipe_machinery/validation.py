@@ -103,7 +103,7 @@ def check_inputs_match_variables(
     """Refuse a variable the templates read that no input declares, then a declared input no template reads.
 
     The rule shared by every operator that reads its inputs through templates: PipeLLM, PipeCompose,
-    PipeSearch, PipeImgGen and PipeJudge, whose prompt and question are read together. It is the
+    PipeSearch, PipeImgGen and PipeJudge, whose prompt and questions are read together. It is the
     composition of `check_variables_are_declared` and `check_inputs_are_read`, in that order.
 
     Raises:

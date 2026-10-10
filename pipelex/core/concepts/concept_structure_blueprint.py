@@ -1,3 +1,4 @@
+import keyword
 from datetime import date, datetime, time
 from enum import StrEnum
 from typing import Any, Self
@@ -45,6 +46,18 @@ class ConceptStructureBlueprintFieldType(StrEnum):
     DATETIME = "datetime"
     TIME = "time"
     CONCEPT = "concept"
+
+
+def is_admitted_structure_field_name(*, field_name: str) -> bool:
+    """Whether a concept structure admits this name for a field, by the rules `ConceptBlueprint` applies to its `structure` keys.
+
+    A field name is a Python identifier that is not a Python keyword, does not start with an underscore,
+    which is reserved for internal use, and is none of `RESERVED_FIELD_NAMES`. A name that elsewhere
+    stands for a field, such as the key of a PipeJudge's `questions`, is held to the same rules.
+    """
+    return (
+        field_name.isidentifier() and not keyword.iskeyword(field_name) and not field_name.startswith("_") and field_name not in RESERVED_FIELD_NAMES
+    )
 
 
 def field_may_hold_nothing(*, required: bool, default_value: Any) -> bool:

@@ -3,7 +3,12 @@
 import pytest
 
 from pipelex.pipeline.validate_bundle import validate_bundle
-from tests.integration.pipelex.pipes.operator.pipe_judge.test_data import PipeJudgeLoadTestData
+from tests.integration.pipelex.pipes.operator.pipe_judge.test_data import (
+    ClassBackedTriage,
+    PipeJudgeClassBackedTestData,
+    PipeJudgeLoadTestData,
+    PipeJudgeSeveralQuestionsTestData,
+)
 
 _MODEL = f'model = "{PipeJudgeLoadTestData.JUDGMENT_MODEL}"'
 
@@ -54,3 +59,35 @@ class TestPipeJudgeLoadAcceptances:
             inputs='{ photo = "Image" }', prompt="Inspect this photo: $photo", step_fields=f'model = "{unserved_judgment_waterfall}"'
         )
         await validate_bundle(mthds_contents=[bundle])
+
+    async def test_several_questions_filling_a_structure_are_admitted(self) -> None:
+        """Each field holds its question's verdict native or a concept refining it, and an optional field may be left absent."""
+        result = await validate_bundle(mthds_contents=[PipeJudgeSeveralQuestionsTestData.bundle()])
+        assert "judge_several.judge_it" in {pipe.pipe_ref for pipe in result.pipes}
+
+    async def test_an_output_refining_the_structured_concept_is_admitted(self) -> None:
+        """A refinement inherits the structure it refines, so its fields are the question names all the same."""
+        bundle = PipeJudgeSeveralQuestionsTestData.bundle(
+            output="UrgentTriage", extra_concepts='UrgentTriage = { description = "The triage of an urgent message", refines = "Triage" }'
+        )
+        await validate_bundle(mthds_contents=[bundle])
+
+    async def test_a_field_refining_its_verdict_native_is_admitted(self) -> None:
+        structure = {
+            **PipeJudgeSeveralQuestionsTestData.STRUCTURE,
+            "severity": '{ type = "concept", concept_ref = "Severity", description = "How severe it is" }',
+        }
+        bundle = PipeJudgeSeveralQuestionsTestData.bundle(
+            structure=structure, extra_concepts='Severity = { description = "How severe an issue is", refines = "Rating" }'
+        )
+        await validate_bundle(mthds_contents=[bundle])
+
+    async def test_an_input_read_by_one_of_several_questions_alone_is_admitted(self) -> None:
+        questions = {**PipeJudgeSeveralQuestionsTestData.QUESTIONS, "urgent": 'question = "Is the message about $topic and urgent?"'}
+        bundle = PipeJudgeSeveralQuestionsTestData.bundle(inputs='{ message = "Text", topic = "Text" }', questions=questions)
+        await validate_bundle(mthds_contents=[bundle])
+
+    @pytest.mark.usefixtures("class_backed_triages")
+    async def test_several_questions_filling_a_class_backed_structure_are_admitted(self) -> None:
+        """A structure that exists only as a Python class offers its class's fields, each typed by its verdict native's class."""
+        await validate_bundle(mthds_contents=[PipeJudgeClassBackedTestData.bundle(structure_class_name=ClassBackedTriage.__name__)])
