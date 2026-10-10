@@ -17,6 +17,8 @@
 ### Fixed
 
 - **A Google client's close at teardown is no longer garbage-collected**: when a Google LLM or image-generation worker was torn down inside a running event loop, nothing but the loop referenced the background task closing its async client, and a loop holds its tasks weakly, so the task could be collected before the client was closed, with the `asyncio` error `Task was destroyed but it is pending!`. Each close task is now held until it is done.
+- **A condition whose outcome may be skipped declares it**: a PipeCondition routing to an outcome pipe that takes plainly an input the condition declares optional must declare its own output optional, and is refused with `optional_not_handled` otherwise, since a run without that input skips the outcome and resolves the condition's output absent; an outcome the condition's expression chooses only with that input present declares it forced (`!`) instead, since validation does not read the expression. Every name such an outcome always stores in its caller's memory counts as maybe-absent too, so a sequence binding one into a plain output is refused where it used to validate and then resolve absent; the outcome is listed in `liftable_pipes` under its condition, and a `!` input on an outcome counts in the `optional_force_redundant` lint.
+- **A sequence step that may be skipped keeps what its run may store**: a step an absent input may lift, whose pipe stores a name on some runs only, now leaves that name maybe-absent when a run may store an absence there, so a sequence binding it into a plain output is refused with `optional_not_handled` rather than validating and then resolving absent.
 
 ### Security
 

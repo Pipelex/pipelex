@@ -33,9 +33,9 @@ class LiftablePipeEntry(BaseModel):
 def build_liftable_pipes(taint_analyses: Sequence[ControllerTaintAnalysis]) -> list[LiftablePipeEntry]:
     """Project the controllers' taint analyses into `liftable_pipes` entries.
 
-    Sequences contribute their lifted steps; parallels contribute their liftable branches
-    (a parallel nested in a sequence reports its branches under itself, so there is no
-    double-reporting).
+    Sequences contribute their lifted steps; parallels contribute their liftable branches and
+    conditions the outcomes their own `?` inputs may lift (a parallel or a condition nested in a
+    sequence reports its branches or outcomes under itself, so there is no double-reporting).
 
     Args:
         taint_analyses: The controllers' analyses from `collect_controller_taint_analyses`
