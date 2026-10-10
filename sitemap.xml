@@ -529,10 +529,6 @@
          <lastmod>2026-10-10</lastmod>
     </url>
     <url>
-         <loc>https://docs.pipelex.com/latest/errors/config-model-error/</loc>
-         <lastmod>2026-10-10</lastmod>
-    </url>
-    <url>
          <loc>https://docs.pipelex.com/latest/errors/config-validation-error/</loc>
          <lastmod>2026-10-10</lastmod>
     </url>
@@ -990,6 +986,10 @@
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/judgment-model-not-found-error/</loc>
+         <lastmod>2026-10-10</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/judgment-refused-error/</loc>
          <lastmod>2026-10-10</lastmod>
     </url>
     <url>

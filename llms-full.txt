@@ -1543,7 +1543,7 @@ See [PipeSearch reference](../building-methods/pipes/pipe-operators/PipeSearch.m
 
 ## PipeJudge
 
-One closed question asked of a judgment model about the step's inputs: yes or no, one option out of a set, or a level on a scale. The verdict comes back as a typed `YesNo`, `Choice` or `Rating` carrying the probabilities the model measured, ready to route a `PipeCondition` or gate a step on a threshold.
+A closed question asked of a judgment model about the evidence the step's prompt renders: yes or no, one option out of a set, or a level on a scale. The verdict comes back as a typed `YesNo`, `Choice` or `Rating` carrying the probabilities the model measured, ready to route a `PipeCondition` or gate a step on a threshold. A step may also ask several such questions about the same evidence in one request, and fill a structure with one verdict per question.
 
 See [PipeJudge reference](../building-methods/pipes/pipe-operators/PipeJudge.md).
 
@@ -1772,19 +1772,22 @@ Use PipeSearch in a PipeSequence to retrieve information from the web and then p
 
 # Judgment
 
-Closed questions about your data, answered with a verdict and how sure the model is.
+Closed questions about the evidence a prompt presents, answered with a verdict and how sure the model is.
 
 ## Overview
 
-Many steps of a method come down to a closed question: is this message urgent, which team owns this ticket, how severe is this report. PipeJudge asks such a question of a judgment model, a model built to answer it with a verdict and the probabilities it measured rather than with free text. The verdict is a typed `YesNo`, `Choice` or `Rating`, so the steps after it read it like any other concept.
+Many steps of a method come down to a closed question: is this message urgent, which team owns this ticket, how severe is this report. PipeJudge renders the evidence in its prompt, as a PipeLLM renders its prompt, and asks such a question about it of a judgment model, a model built to answer with a verdict and the probabilities it measured rather than with free text. The verdict is a typed `YesNo`, `Choice` or `Rating`, so the steps after it read it like any other concept.
 
 ## Key Capabilities
 
-- **Three kinds of question** — A yes/no question, a choice among declared options, or a rating on a scale of declared levels, the kind read from the fields the pipe declares
+- **Three kinds of question** — A yes/no question with criteria for both answers, a choice among declared options, or a rating on a scale of declared levels, each with a label, a description or both, the kind read from the fields the pipe declares
 - **Measured probabilities** — Each verdict carries the probabilities the model measured, so a method can act on how sure it is as well as on what it decided
 - **Thresholds** — A yes/no question can declare the probability at or above which its verdict is yes
-- **Material, not prompts** — Every input of the step is sent to the model as material to judge, images and documents as files for a model that reads them
-- **Checked when the method loads** — A step with no model, an output that disagrees with its kind of question, or a file input its model does not read is refused before any run spends anything
+- **Several questions in one request** — A step can ask several questions about the same evidence, each of its own kind, and fill a structure with one verdict per question, each in the field of its question's name
+- **The evidence is a prompt** — The model judges what the step's prompt renders and nothing else, so the author decides what it sees, down to one field of a larger value; the images and documents the prompt reads are sent as files to a model that reads them
+- **Labels on a rating** — When the scale's levels carry labels, the verdict carries the label of the level chosen, copied from the declaration
+- **No verdict from a refusal** — A model that declines to answer fails the step with an error naming the pipe and the model, rather than a verdict read off its silence; a step asking several questions leaves the declined question's field holding nothing instead when that field is optional with no default, and fails when it is required or carries a `default_value`
+- **Checked when the method loads** — A step with no model, an input neither its prompt nor its questions read, an output that disagrees with its kind of question or a structure whose fields are not exactly its questions, or a file its prompt reads that its model does not is refused before any run spends anything
 
 ## Usage in Pipelines
 
@@ -2024,7 +2027,7 @@ Check pipeline syntax, structure, and compatibility without execution:
 - **Structure validation** — Resolve pipe and concept references in the loaded library, refuse concepts whose structures form a cycle or whose fields name a concept that cannot be found, and verify each pipe's declared inputs against the concepts that operator accepts — plus a controller's declared output against what it actually produces (for a `PipeSequence`, its last step's output concept and multiplicity)
 - **Input validation** — Ensure required inputs are provided and correctly typed, and that every variable a step reads is bound by the time that step runs
 - **What each sequence step reads** — Follow each `PipeSequence` step by step and check every step against the concept and multiplicity of each name it reads, whichever declared input or earlier step stored it (`input_stuff_spec_mismatch`): a step reading a single `Page` where an extraction stored `Page[]` is refused before anything runs
-- **Declared inputs are read** — For `PipeLLM`, `PipeCompose`, `PipeSearch` and `PipeImgGen`, every variable a template reads must be declared in `inputs` (`missing_input_variable`), and every declared input must be read by one of the pipe's templates (`extraneous_input_variable`): the prompt and system prompt of a `PipeLLM`, the template or the construct of a `PipeCompose`, the prompt of a `PipeSearch`, the prompt and negative prompt of a `PipeImgGen`. An unread input is refused on the pipe that declares it, before any controller above it is asked to supply it. A `PipeJudge` is the exception on that second rule: every input it declares is material for its model, so only the variables its `question` reads must be declared. A name the template sets with `{% set %}` is its own, not an input, from that statement on: after an `{% if %}` it stays set only when every branch sets it, the `{% else %}` included, so a name only some branches set is read from the input of that name on the other paths; and a loop, a macro or a block keeps what it sets to its own body.
+- **Declared inputs are read** — For `PipeLLM`, `PipeCompose`, `PipeSearch`, `PipeImgGen` and `PipeJudge`, every variable a template reads must be declared in `inputs` (`missing_input_variable`), and every declared input must be read by one of the pipe's templates (`extraneous_input_variable`): the prompt and system prompt of a `PipeLLM`, the template or the construct of a `PipeCompose`, the prompt of a `PipeSearch`, the prompt and negative prompt of a `PipeImgGen`, the prompt and question of a `PipeJudge`. An unread input is refused on the pipe that declares it, before any controller above it is asked to supply it. A `PipeJudge`'s question presents no file, so an `Image` or a `Document` it reads is refused as `input_stuff_spec_mismatch`: only its prompt presents files to the judging model. A name the template sets with `{% set %}` is its own, not an input, from that statement on: after an `{% if %}` it stays set only when every branch sets it, the `{% else %}` included, so a name only some branches set is read from the input of that name on the other paths; and a loop, a macro or a block keeps what it sets to its own body.
 
 A pipe that references a sub-pipe from a package that isn't loaded is reported as **skipped** rather than validated, so a passing run is not proof that every cross-package dependency resolves.
 
@@ -2036,6 +2039,7 @@ A pipe that references a sub-pipe from a package that isn't loaded is reported a
 Execute pipelines with mocked LLM responses to test pipeline logic, data flow, and orchestration without making API calls.
 
 - **Mock generation** — Format-compliant mock values for constrained fields, including structured outputs
+- **Judgments rendered, not answered** — A dry `PipeJudge` renders its evidence prompt and its questions as a live run does, then answers each with a mock verdict of the right kind carrying no probability; on a scale whose levels carry labels, the mock level carries its declared label
 - **Configurable mock behavior** — Control mock list sizes, template handling, and response formats
 - **Full pipeline execution** — Working memory, controllers, and data flow all work as in production
 - **No credentials needed** — A dry run boots without inference credentials, on both `pipelex run --dry-run` and `pipelex-agent run --dry-run`, and so does `pipelex validate`. Such a boot loads every enabled backend with all its models but resolves none of their keys, so validation and dry runs give the same verdict on a machine that holds no key at all as on one that holds them all: presets, the default models and a bare handle such as `model = "gpt-4o-mini"` resolve alike
@@ -3062,7 +3066,7 @@ Each field can specify:
 - **type**: The data type (required for detailed definitions)
 - **description**: Human-readable description
 - **required**: Whether the field must be present in the payload (defaults to `false`)
-- **default_value**: Default value applied when the field is omitted. A field cannot declare both `required = true` and a `default_value` — a default makes absence legal, which contradicts requiring the field, so the pair is rejected at validation
+- **default_value**: Default value applied when the field is omitted. A field cannot declare both `required = true` and a `default_value` — a default makes absence legal, which contradicts requiring the field, so the pair is rejected at validation. A defaulted field never holds nothing: a value that sets it to `null` is refused, so leave the key out to get the default
 - **choices**: For `enum`-like fields, a list of valid values
 - **item_type**: For `list` fields, the type of list items
 - **key_type** and **value_type**: For `dict` fields, the types of keys and values
@@ -3304,6 +3308,8 @@ bio = { type = "text", description = "User bio" }  # Optional (default)
 ```
 
 In this example, `username` and `email` are mandatory, while `bio` is optional.
+
+Only an optional field with no `default_value` may hold nothing, and it is the only kind of field a value may set to `null`. A required field refuses `null`, a required field naming `native.Anything` included, which takes any value but `null`, and so does a defaulted one. This is the rule a [binding step](../pipes/understanding-optionality.md#binding-steps-under-absence) reading a field relies on: binding a required or defaulted field never records an absence.
 
 ## Generating Python Classes
 
@@ -3907,12 +3913,15 @@ class ChoiceContent(StuffContent):
 
 class RatingContent(StuffContent):
     level: int  # the index of the selected level, 0 being the first
+    label: str | None = None  # the selected level's label, when the scale declares labels
     confidence: float | None = None  # from 0 to 1
     probabilities: dict[str, float] | None = None  # keyed by level index written as text: "0", "1", ...
     position: float | None = None  # a continuous position, from 0 to the last level's index
 ```
 
-A `Choice` renders as its key and a `Rating` as its level, so `$team` in a later prompt reads `billing` and `$severity` reads `2`. Branch on them with a `PipeCondition`: `expression = "team.choice"` routes by the key, and `expression = "'severe' if severity.level >= 2 else 'mild'"` by the level.
+A `Rating`'s `label` is not a measure. The MTHDS standard defines it as the name of the selected level, when the scale declares labels. A `PipeJudge` whose levels carry labels fills it with the label of the level it chose, copied from its declaration, and one whose levels carry none leaves it absent; a `PipeLLM` whose output is `Rating`, or any other producer, may fill it like any optional member. The `level` stays the verdict either way.
+
+A `Choice` renders as its key, and a `Rating` as its label when it has one and as its level otherwise, so `$team` in a later prompt reads `billing`, and `$severity` reads `Workaround available` for a rating carrying that label and `1` for one carrying none. Branch on them with a `PipeCondition`: `expression = "team.choice"` routes by the key, and `expression = "'severe' if severity.level >= 2 else 'mild'"` by the level, which every `Rating` has, labelled or not.
 
 A measure is only as good as its producer. A language model asked to fill a verdict — a `PipeLLM` whose output is `YesNo`, `Choice` or `Rating` — sees the uncertainty members, optional and described, and may fill them with its own estimate of its verdict. That estimate is worth having, and it is not the probability a dedicated judging model measures over the options it was given: a `Choice` written by a `PipeLLM` has no declared option set behind it, so its `probabilities` are keyed by whatever the model wrote. When a `PipeCondition` gates on a probability, read which producer wrote it, and guard against its absence: `approved.probability is not none and approved.probability >= 0.8`.
 
@@ -6873,14 +6882,14 @@ Write a brief about this topic: $topic
 - **A presence block** — `{% if enriched %} ... {% endif %}` (any reference inside the block is guarded, including `$enriched` and attribute access).
 - **An inline presence conditional** — `{{ enriched.text if enriched else "no enrichment" }}`.
 
-The guard-lint covers every pipe that renders authored templates over its inputs: PipeLLM (prompt and system prompt), PipeCompose (template mode), PipeCondition (expression), PipeSearch, PipeJudge (question), and PipeImgGen.
+The guard-lint covers every pipe that renders authored templates over its inputs: PipeLLM (prompt and system prompt), PipeCompose (template mode), PipeCondition (expression), PipeSearch, PipeJudge (prompt and question), and PipeImgGen. A PipeJudge's model sees an input only as its templates render it, so an optional piece of evidence is written `@?note` in its prompt, and renders nothing when it is absent. An optional image or document guarded this way in a PipeLLM, PipeImgGen or PipeJudge prompt is not handed to the model when it is absent, and the files that are present keep consecutive numbers.
 
 ## Controllers Under Absence
 
 Each controller has a defined behavior when a value inside its flow resolves absent:
 
-- **PipeSequence** — steps consuming an absent value plainly are lifted (skipped), and the absence propagates step to step. The sequence's own declared output must account for it: if the last producing step can be lifted, the sequence output must be declared `?` (otherwise `optional_not_handled`). A name a nested sequence, a condition's outcome or an `add_each_output` parallel stores in the sequence's memory carries its absence the same way, and a nested controller that is lifted records an absence for every name it always stores (an empty list for a list), so a later step reading one is lifted in turn.
-- **PipeCondition** — the `continue` outcome resolves the declared output as a **declared-absent** record (memory otherwise unchanged). A condition that can reach `continue` must declare its output `?` (`optional_output_required`). See [PipeCondition](pipe-controllers/PipeCondition.md).
+- **PipeSequence** — steps consuming an absent value plainly are lifted (skipped), and the absence propagates step to step. The sequence's own declared output must account for it: if the last producing step can be lifted, the sequence output must be declared `?` (otherwise `optional_not_handled`). A name a nested sequence, a condition's outcome or an `add_each_output` parallel stores in the sequence's memory carries its absence the same way, and a nested controller that is lifted records an absence for every name it always stores (an empty list for a list), so a later step reading one is lifted in turn. A step that may be lifted may also run, so a name it stores on some runs only may hold either what it held before or the absence a run leaves there.
+- **PipeCondition** — the `continue` outcome resolves the declared output as a **declared-absent** record (memory otherwise unchanged). A condition that can reach `continue` must declare its output `?` (`optional_output_required`). An outcome that takes plainly an input the condition declares `?` is lifted when it is chosen with that input absent: the condition's output then resolves absent, so the condition must declare it `?` (`optional_not_handled`), and every name the outcome always stores in the caller's memory may hold an absence too. An outcome the expression chooses only when the input is present declares it forced (`!`) instead, since validation does not read the expression. See [PipeCondition](pipe-controllers/PipeCondition.md).
 - **PipeParallel** — combining under absence: a `Composite` output omits the absent component (with a ledger note); a structured output absorbs an absent branch into a non-required field as that field's declared default; a **required** field fed by a maybe-absent branch is rejected statically (`optional_branch_required_field`). See [PipeParallel](pipe-controllers/PipeParallel.md).
 - **PipeBatch** — absent branch results are **compacted** out of the aggregated list (a list cannot hold a hole). See [PipeBatch](pipe-controllers/PipeBatch.md).
 
@@ -6952,7 +6961,7 @@ Here are the primary pipe operators available in Pipelex:
 -   [**`PipeExtract`**](./PipeExtract.md): Performs Optical Character Recognition (OCR) on images and PDF documents to extract text and embedded images, and fetches and extracts content from web pages.
 -   [**`PipeImgGen`**](./PipeImgGen.md): Generates images from a text prompt using models like GPT Image, Flux, or other image generation models.
 -   [**`PipeSearch`**](./PipeSearch.md): Searches the web using a configurable search provider and returns structured results with an answer and source citations.
--   [**`PipeJudge`**](./PipeJudge.md): Asks a judgment model one closed question about its inputs, and returns a `YesNo`, a `Choice` or a `Rating` verdict with the probabilities the model measured.
+-   [**`PipeJudge`**](./PipeJudge.md): Asks a judgment model a closed question about the evidence its prompt presents, and returns a `YesNo`, a `Choice` or a `Rating` verdict with the probabilities the model measured, or asks several in one request and fills a structure with their verdicts.
 -   [**`PipeFunc`**](./PipeFunc.md): An escape hatch that allows you to execute any custom Python function, giving you maximum flexibility.
 -   [**`PipeCompose`**](./PipeCompose.md): Composes outputs deterministically from working memory — renders Jinja2 templates for formatted reports or complex prompts, or constructs structured objects by mapping fields from inputs, without an LLM.
 -   [**`PipeDocGen`**](./PipeDocGen.md): Generates a document file from its inputs, calling no AI model: a PDF laid out from a structure or formatted from a Markdown report, and with the Pipelex document generation plugin a PDF from an HTML template, an Excel workbook, a Word document or a PowerPoint deck.
@@ -7053,13 +7062,15 @@ Searches the web and returns structured results with sources.
 
 ## PipeJudge
 
-Asks a judgment model one closed question about its inputs.
+Asks a judgment model closed questions about the evidence its prompt presents.
 
 ### Key Features
 
 - Yes/no, choice and rating questions, the kind read from the fields the pipe declares
+- Several questions in one request, their verdicts filling the fields of a structure named after them
 - Verdicts carrying the probabilities the model measured, and a threshold for a yes/no
-- Every input sent to the model as material, images and documents as files for a model that reads them
+- The evidence written as a prompt template, rendered as a `PipeLLM`'s prompt is, its images and documents sent as files to a model that reads them
+- Two-sided criteria for a yes/no, and rating levels that may carry labels, which the verdict reports
 
 
 ## PipeLLM
@@ -8087,9 +8098,19 @@ When the output concept is compatible with `SearchResult`, the output contains t
 
 # PipeJudge
 
-The `PipeJudge` operator asks a judgment model one closed question about its inputs, and stores the verdict it answers with: a `YesNo`, a `Choice` or a `Rating`, each carrying the probabilities the model measured. A judgment model is built for this kind of question: it answers with a verdict and the probabilities it measured, where a language model asked the same question writes its answer out as text.
+The `PipeJudge` operator asks a judgment model a closed question about the evidence its prompt presents, and stores the verdict it answers with: a `YesNo`, a `Choice` or a `Rating`, each carrying the probabilities the model measured. It may also ask several questions about the same evidence in one request, and fill a structure with one verdict per question (see [Several questions in one request](#several-questions-in-one-request)). A judgment model is built for this kind of question: it answers with a verdict and the probabilities it measured, where a language model asked the same question writes its answer out as text.
 
 ## How it works
+
+A `PipeJudge` keeps what is judged apart from what is asked. Its `prompt` renders the evidence, the material the model judges, and its `question` asks about that evidence:
+
+```toml
+prompt   = """
+A message from someone writing to the inbox:
+@message
+"""
+question = "Does this message need an answer today?"
+```
 
 The fields a `PipeJudge` declares decide the kind of question it asks, and the kind decides its output:
 
@@ -8101,13 +8122,65 @@ The fields a `PipeJudge` declares decide the kind of question it asks, and the k
 
 The output must be that native or a concept refining it, and `Dynamic` is neither: a pipe declaring `options` whose output is `YesNo` is refused when the method loads, with a message naming both sides. A `PipeJudge` produces one verdict, so its output cannot be a list; to judge every item of a list, map the `PipeJudge` over it with a [`PipeBatch`](../pipe-controllers/PipeBatch.md).
 
-**Every input is material to judge.** The model receives each input the pipe declares, by name, whether or not the question mentions it: a `Text` as its text, a `Number` as its number, a `YesNo` as its boolean, a list as a list, and a structured concept as its fields. An optional input that is absent is left out. Each input is sent whole, under its plain name: an input name never reaches into a field with a dot, on any pipe, and `"invoice.total" = "Number"` is refused as `invalid_input_name`. To judge one field of a larger value without sending the rest of it, have the calling sequence bind the field under a plain name with a binding step, `{ from = "invoice.total", result = "total_amount" }`, and declare `total_amount = "Number"`. So, unlike the other operators, a `PipeJudge` does not have to read its inputs in its `question`; it may still interpolate one, which suits a short parameter such as `"Is the message about $topic?"`, and every variable the question reads must be a declared input.
+**The evidence is the rendered prompt.** `prompt` is a template rendered exactly as a [`PipeLLM`](PipeLLM.md)'s prompt is, and the model sees the pipe's inputs only as the prompt and the question render them. `@message` sets the input out as a block tagged with its name, `$total_amount` writes a short value inline, and a dotted reference such as `$invoice.total` reads one field of a larger value, so the model sees that field and nothing else of the invoice. Every declared input must be read by the prompt or by the question, and an input neither of them reads is refused when the method loads, since it would never reach the model. Absence is the template's business too: an optional input is read through a guarded reference such as `@?note`, which renders nothing when the input is absent, and an optional image or document left out that way is not presented to the model at all (see [Understanding optionality](../understanding-optionality.md)).
 
-**Images and documents are sent as files.** An `Image` or a `Document` input, or a list of either, reaches the model as a file rather than as text. Whether a model reads files is stated in its model configuration, and a `PipeJudge` with an image or a document input is refused when the method loads if its model does not read that kind of file, with a message naming the input and what the model reads. An input declared `Dynamic` names no kind of value, so a file it holds is checked when the step runs instead. A document given to the run in a format the model does not read is refused when the run starts, before any step spends anything. TypeSafe's model reads text only, so turn a document into text with a [`PipeExtract`](PipeExtract.md) step first.
+**The question is plain text.** `question` is a template as well, with the same shorthand, but it presents no file: it suits the instruction itself and a short parameter such as `"Is the message about $topic?"`. The evidence belongs in the prompt, and a question that reads an `Image` or a `Document` is refused when the method loads, since only the prompt presents files.
 
-**The verdict.** A yes/no question's verdict follows from its probability: yes when the probability of yes is at least the `threshold`, which defaults to `0.5`. A model that reports no probability gives its own verdict, and a declared threshold then cannot apply, which the run logs as a warning. A choice's verdict is the key of the option chosen, with the model's `confidence` and the `probabilities` of every option when it reports them. A rating's verdict is the index of the level chosen, `0` being the first level declared, with the model's `confidence`, the `probabilities` of every level keyed by its index written as text, and a continuous `position` on the scale, when it reports them.
+**Images and documents are sent as files.** An `Image` or a `Document` the prompt reads, a single value or a list, reaches the model as a file rather than as text, and a numbered token such as `[Image 1]` marks the place in the rendered prompt where the prompt reads it. Whether a model reads files is stated in its model configuration, and a `PipeJudge` whose prompt reads an image or a document is refused when the method loads if its model does not read that kind of file, with a message naming the variable and what the model reads. An input declared `Dynamic` names no kind of value, so the prompt renders it as text, as a `PipeLLM`'s does, and an image it holds reaches the model as its address rather than as a file. A document given to the run in a format the model does not read is refused when the run starts, before any step spends anything. TypeSafe's model reads text only, so turn a document into text with a [`PipeExtract`](PipeExtract.md) step first.
+
+**The verdict.** A yes/no question's verdict follows from its probability: yes when the probability of yes is at least the `threshold`, which defaults to `0.5`. A model that reports no probability gives its own verdict, and a declared threshold then cannot apply, which the run logs as a warning. A choice's verdict is the key of the option chosen, with the model's `confidence` and the `probabilities` of every option when it reports them. A rating's verdict is the index of the level chosen, `0` being the first level declared, with the model's `confidence`, the `probabilities` of every level keyed by its index written as text, and a continuous `position` on the scale, when it reports them. When the scale's levels carry labels, the verdict's `label` is the label of the level chosen, copied from the pipe's declaration.
+
+**A refusal fails the step.** A judgment model may decline to answer a question, and a refusal carries no verdict: it is never read as a no, as the first option or as the lowest level. A pipe asking one question has nowhere to leave its verdict absent, so the step fails with a [`JudgmentRefusedError`](../../../errors/judgment-refused-error.md) naming the pipe and the model; reword the question so it can be answered from the evidence, or give the step different evidence. A pipe asking several questions may leave a verdict absent instead, as the next section explains.
 
 The [native concepts page](../../concepts/native-concepts.md) describes the fields of the three verdicts. A downstream pipe reads them like any other fields, for example a [`PipeCondition`](../pipe-controllers/PipeCondition.md) routing on `routing.choice`, or one gating on `approved.probability`.
+
+## Several questions in one request
+
+A `PipeJudge` may ask several questions about the same evidence, written in `questions`, one table per question, each keyed by a name. The model answers every question in one request, each independently of the others, and the verdicts fill the output's structure, each in the field of its question's name:
+
+```toml
+[concept.MessageTriage]
+description = "What a triage of an inbox message found"
+
+[concept.MessageTriage.structure]
+urgent   = { type = "concept", concept_ref = "YesNo", description = "Whether the message needs an answer today", required = true }
+team     = { type = "concept", concept_ref = "Choice", description = "The team that should handle it", required = true }
+severity = { type = "concept", concept_ref = "Rating", description = "How severe the reported problem is" }
+
+[pipe.triage_message]
+type        = "PipeJudge"
+description = "Triages a message: its urgency, its team and its severity"
+inputs      = { message = "Text" }
+output      = "MessageTriage"
+model       = "@default-judgment"
+prompt      = """
+A message from someone writing to the inbox:
+@message
+"""
+
+[pipe.triage_message.questions.urgent]
+question  = "Does this message need an answer today?"
+criteria  = { yes = "Something is broken or blocked for the sender right now", no = "The sender can wait for a reply" }
+threshold = 0.7
+
+[pipe.triage_message.questions.team]
+question = "Which team should handle this message?"
+options  = { billing = "Charges, invoices, refunds and subscriptions", technical = "Errors, outages and features that do not work", other = "" }
+
+[pipe.triage_message.questions.severity]
+question = "How severe is the problem this message reports?"
+levels   = [{ label = "Minor" }, { label = "Major" }, { label = "Blocking" }]
+```
+
+**Each question carries its own kind.** A question's table holds its `question` and the fields that decide its kind, `options`, `levels`, `criteria` and `threshold`, under the same rules as a pipe asking one question; no other field is allowed in it. The pipe sets exactly one of `question` and `questions`, and a pipe asking several sets none of the kind fields itself: they belong to the question they qualify. A question's name must be a valid field name: a Python identifier that is not a keyword, does not start with an underscore and is not a reserved name.
+
+**The output is a structure holding one verdict per question.** The output must be a concept with a structure, or a concept refining one, whose fields are exactly the question names: a question with no field to hold its verdict is refused when the method loads, and so is a field no question answers, since nothing could ever fill it. Each field is a `concept` field holding its question's verdict native, `YesNo`, `Choice` or `Rating`, or a concept refining it, and holds one verdict: a list field, a plain value such as a `boolean` and a concept of another kind are refused, each with a message naming the field and the question. The output itself carries no multiplicity; to judge each item of a list, map the `PipeJudge` over it with a [`PipeBatch`](../pipe-controllers/PipeBatch.md).
+
+**The questions share the evidence.** The prompt renders the evidence once, and every question is asked about it. A question may read a short parameter of its own, such as `$topic`, and every declared input must be read by the prompt or by at least one question.
+
+**A refusal leaves an optional field holding nothing.** When the model declines one question, the step leaves that question's field holding nothing if the field is optional, being neither `required` nor given a `default_value`, and logs a warning naming the question. When the field is `required` or carries a `default_value`, the step fails with a [`JudgmentRefusedError`](../../../errors/judgment-refused-error.md) naming the question, since a default filled in for it would read as a verdict the model never gave: reword the question, give the step different evidence, or make the field optional with no `default_value` so that a refusal leaves it holding nothing. Leaving a field optional with no default is how a method says that a refusal on that question is acceptable.
+
+**A question depending on another's verdict is a later step.** The questions of one `PipeJudge` are answered independently over the same evidence, so none of them can read another's verdict. When one question only makes sense once another is answered, such as rating a problem's severity only when the message reports a problem at all, ask the second in a later `PipeJudge` of a [`PipeSequence`](../pipe-controllers/PipeSequence.md), behind a [`PipeCondition`](../pipe-controllers/PipeCondition.md) routing on the first verdict when the second should not always be asked.
 
 ## Configuration
 
@@ -8121,14 +8194,18 @@ No judgment model is served out of the box: the model deck names no default for 
 | ------------- | ---------- | ----------- | -------- |
 | `type`        | string     | The type of the pipe: `PipeJudge`. | Yes |
 | `description` | string     | A description of the judgment. | Yes |
-| `inputs`      | dictionary | The material to judge, as a dictionary mapping input names to concept codes. Every input is sent to the model. | No |
-| `output`      | string     | `YesNo`, `Choice` or `Rating`, according to the kind of question, or a concept refining it. | Yes |
+| `inputs`      | dictionary | The inputs, as a dictionary mapping input names to concept codes. Every input must be read by `prompt` or by a question. | No |
+| `output`      | string     | Asking one question: `YesNo`, `Choice` or `Rating`, according to the kind of question, or a concept refining it. Asking several: a concept with a structure whose fields are exactly the question names, each holding its question's verdict native or a concept refining it. | Yes |
 | `model`       | string     | The judgment model, alias or preset, such as `"@default-judgment"`. Required unless your model deck names a default for judgments. | No |
-| `question`    | string     | The one closed question to ask. It may interpolate an input with the `$` prefix. `prompt` is read as a synonym, but a pipe may not set both. | Yes |
+| `prompt`      | string     | The evidence template: what the model judges. Rendered as a `PipeLLM` prompt, with the `@variable` and `$variable` shorthand and Jinja2, and presents the images and documents it reads as files. Must not be empty. | Yes |
+| `question`    | string     | The one closed question to ask about the evidence. A plain text template, which may interpolate a short parameter with the `$` prefix and reads no image or document. Must not be empty. | One of `question` or `questions` |
+| `questions`   | dictionary | Several closed questions to ask about the evidence in one request, each keyed by the name of the output field holding its verdict. Each is a table holding its `question` and, for its kind, `options`, `levels`, `criteria` and `threshold`, as described below for a pipe asking one question. At least one question. | One of `question` or `questions` |
 | `options`     | dictionary | For a choice question: each key is an option, each value describes it. An empty string leaves an option undescribed. At least two options. | No |
-| `levels`      | list of strings | For a rating question: the levels from lowest to highest. At least two. | No |
-| `criteria`    | dictionary | For a yes/no question: what a `yes` and what a `no` mean, either or both. | No |
+| `levels`      | list       | For a rating question: the levels from lowest to highest, at least two. Each is a string describing the level, or a table carrying a `label`, a `description` or both. Either every level carries a label or none does, and labels are distinct. | No |
+| `criteria`    | dictionary | For a yes/no question: what a `yes` and what a `no` mean, both required. | No |
 | `threshold`   | number     | For a yes/no question: the probability of yes at or above which the verdict is yes, strictly between 0 and 1. Defaults to `0.5`. | No |
+
+`options`, `levels`, `criteria` and `threshold` are set on the pipe when it asks one `question`, and in each question's table when it asks several `questions`, never on the pipe.
 
 ### Example: A yes/no question with a threshold
 
@@ -8139,6 +8216,10 @@ description = "Judges whether a message needs an answer today"
 inputs      = { message = "Text" }
 output      = "YesNo"
 model       = "@default-judgment"
+prompt      = """
+A message from someone writing to the inbox:
+@message
+"""
 question    = "Does this message need an answer today?"
 criteria    = { yes = "Something is broken or blocked for the sender right now", no = "The sender can wait for a reply" }
 threshold   = 0.7
@@ -8153,6 +8234,10 @@ description = "Judges which team should handle a support ticket"
 inputs      = { ticket = "Text" }
 output      = "Choice"
 model       = "@default-judgment"
+prompt      = """
+A support ticket, as the customer wrote it:
+@ticket
+"""
 question    = "Which team should handle this support ticket?"
 options     = { billing = "Charges, invoices, refunds and subscriptions", technical = "Errors, outages and features that do not work", other = "" }
 
@@ -8166,7 +8251,7 @@ outcomes        = { billing = "acknowledge_billing", technical = "acknowledge_te
 default_outcome = "acknowledge_other"
 ```
 
-### Example: A rating on a scale
+### Example: A rating on a labelled scale
 
 ```toml
 [pipe.rate_severity]
@@ -8175,22 +8260,51 @@ description = "Rates how severe a bug report is"
 inputs      = { report = "Text" }
 output      = "Rating"
 model       = "@default-judgment"
+prompt      = """
+A bug report filed by a user:
+@report
+"""
 question    = "How severe is the bug this report describes?"
-levels      = ["Cosmetic: nothing stops working", "Degraded: a workaround exists", "Blocking: users cannot do their work at all"]
+levels      = [
+  { label = "Cosmetic", description = "Nothing stops working" },
+  { label = "Degraded", description = "A workaround exists" },
+  { label = "Blocking", description = "Users cannot do their work at all" },
+]
 ```
+
+A verdict of the last level reads `level = 2` and `label = "Blocking"`. A level may also be written as a plain string, which is its description: `levels = ["Nothing stops working", "A workaround exists", "Users cannot do their work at all"]`.
+
+### Example: One field of a larger value
+
+```toml
+[pipe.judge_needs_second_signature]
+type        = "PipeJudge"
+description = "Judges whether an invoice total needs a second signature"
+inputs      = { invoice = "Invoice" }
+output      = "YesNo"
+model       = "@default-judgment"
+prompt      = "The total of an invoice, in euros: $invoice.total"
+question    = "Is this amount high enough to need a second signature?"
+criteria    = { yes = "The amount is above five thousand euros", no = "The amount is five thousand euros or less" }
+```
+
+The model sees the rendered prompt, `The total of an invoice, in euros: 7420.0`, and nothing else of the invoice.
 
 ## Writing good judgments
 
-- **Ask one narrow question per pipe.** A question that bundles two judgments ("is it urgent and about billing?") gets one verdict for both. Split it into two `PipeJudge` steps, and combine their verdicts downstream.
-- **Make levels describe situations, not degrees.** "Blocking: users cannot do their work at all" gives the model something to recognize, where "Very severe" only restates the scale. A long scale of thin levels buys resolution the model cannot supply, and TypeSafe's model reads at most ten levels.
-- **Give a choice a catch-all option** when the material may fit none of the others, such as `other = ""`, so the model is not forced to pick a wrong one.
+- **Ask one narrow thing per question.** A question that bundles two judgments ("is it urgent and about billing?") gets one verdict for both. Split it into two questions of one `PipeJudge` when they share the evidence and neither depends on the other's verdict, and into two `PipeJudge` steps of a `PipeSequence` when one does.
+- **Keep the evidence focused.** The judgment vendors advise that a large evidence the question does not need degrades the answers, so render in the prompt what the question is about and leave the rest out: a dotted reference such as `$invoice.total` reads one field, where `@invoice` sets out the whole value.
+- **Write criteria for both answers.** `criteria` declares what a `yes` and what a `no` mean, and both are required, so a table with one side or none is refused: when one side is the plain opposite of the other, write it as its complement, "The amount is five thousand euros or less" beside "The amount is above five thousand euros", and leave `criteria` out when the question needs none.
+- **Make levels describe situations, not degrees.** "Users cannot do their work at all" gives the model something to recognize, where "Very severe" only restates the scale; a label names the level in a few words, and the description says what it stands for. A long scale of thin levels buys resolution the model cannot supply, and a scale holds at most ten levels: TypeSafe's model refuses more, and a longer scale fails the step before the model is called.
+- **Give a choice a catch-all option** when the evidence may fit none of the others, such as `other = ""`, so the model is not forced to pick a wrong one.
 - **Leave counting, arithmetic and dates to code.** Whether an invoice is over a sum, or a date is past a deadline, is a comparison a [`PipeFunc`](PipeFunc.md) or a `PipeCondition` expression makes exactly.
-- **State the condition directly** in the question rather than through an indirection, and keep interpolated inputs to short parameters: the material reaches the model anyway.
+- **State the condition directly** in the question rather than through an indirection, and keep what the question interpolates to short parameters: the evidence belongs in the prompt.
 
 ## Related Documentation
 
 - [Judgment Feature](../../../features/judgment.md) - Overview of judgments in a method
 - [Native concepts](../../concepts/native-concepts.md) - The `YesNo`, `Choice` and `Rating` verdicts
+- [PipeLLM](PipeLLM.md) - The prompt templating the evidence shares
 - [PipeCondition](../pipe-controllers/PipeCondition.md) - Route on a verdict
 
 
@@ -8359,6 +8473,8 @@ products_by_sku = { from = "products", list_to_dict_keyed_by = "sku" }
 The referenced value must be a list, and every item must carry the key attribute with a string value — otherwise the composer raises an error.
 
 A `from` path and a `list_to_dict_keyed_by` name read public fields only: validation refuses a segment starting with an underscore, such as `{ from = "order._stuff" }`, for the reason the [Template Sandbox](../../../under-the-hood/template-sandbox.md) gives.
+
+A `from` path reaching a field that holds nothing, such as an optional `order.note` left unset, gives the target field nothing. A target field with a `default_value` is left unset and takes its default, since it never holds nothing; an optional one holds nothing; and a required one is refused. A Python class field typed `X | None` holds nothing whether it is required or defaulted. With `list_to_dict_keyed_by`, a path holding nothing is refused, since the modifier needs a list.
 
 ### Copying Whole Inputs Into Native Fields
 
@@ -9416,7 +9532,7 @@ Beside pipe names, an outcome (or the `default_outcome`) can be one of two speci
 - **`fail`**: the run fails loudly with an error naming the pipe. Use it to make "this should never happen" branches explicit. The failure is a refusal written into your method, so a hosted run answers it with HTTP 422 and keeps its message, with a next step, under STRICT disclosure. The message leaves out the value the expression rendered, which the run's execution graph keeps: that value can be text of a condition a host's library declared.
 - **`continue`**: the condition declares that it produced **no output**. The runtime records an absence for the declared output, whose reason names the condition and its `continue` outcome, and the run continues as a success — the rest of the working memory is unchanged. The reason leaves out the value the expression rendered, which the run's execution graph keeps, for the same reason a `fail` outcome's message does: a pipe that later requires the output quotes the reason to the caller.
 
-Because `continue` resolves the declared output as absent, a `continue`-reachable condition (any outcome mapped to `continue`, or `default_outcome = "continue"`) **must declare its output optional** — `output = "Constraint?"`. Validation enforces this statically (`optional_output_required`), so the no-output path is always visible to the type system. The same visibility rule applies at the condition's boundary: if a mapped outcome pipe declares an optional output, the condition must declare `?` too (`optional_not_handled`).
+Because `continue` resolves the declared output as absent, a `continue`-reachable condition (any outcome mapped to `continue`, or `default_outcome = "continue"`) **must declare its output optional** — `output = "Constraint?"`. Validation enforces this statically (`optional_output_required`), so the no-output path is always visible to the type system. The same visibility rule applies at the condition's boundary: if a mapped outcome pipe declares an optional output, the condition must declare `?` too (`optional_not_handled`). So must a condition whose outcome pipe takes plainly an input the condition declares optional: when that input is absent, the chosen outcome is skipped and the condition's output resolves absent, along with every name the outcome would have stored in the caller's memory. A list output is the exception, since a skipped list output is an empty list. Validation does not read the expression, so a condition that chooses such an outcome only when the input is present, as `{{ 'with_flag' if flag is defined else 'no_flag' }}` does, is refused as well: declare the input forced on that outcome, `flag = "Text!"`, which says the outcome never runs without it and fails the run loudly if it ever does.
 
 ### What happens downstream of `continue`
 
@@ -9933,7 +10049,7 @@ So a pipe with `templating_style = "no_tag"` and one with `$article` instead of 
 ## Beyond PipeLLM
 
 - **[`PipeCompose`](pipes/pipe-operators/PipeCompose.md)** takes `templating_style` on its `[pipe.name.template]` section, for templates that use the `tag` or `format` filters directly. A compose pipe that declares nothing renders under the same runtime default.
-- **`PipeImgGen`, `PipeSearch` and `PipeJudge`** have no authored style of their own — their prompts and questions render under the runtime default. Image and search prompts rarely benefit from tagging, but they do render under a real style rather than an invisible fallback.
+- **`PipeImgGen`, `PipeSearch` and `PipeJudge`** have no authored style of their own — their prompts and questions render under the runtime default. Image and search prompts rarely benefit from tagging, but they do render under a real style rather than an invisible fallback. A `PipeJudge`'s evidence prompt is where tagging earns its keep: `@message` sets the input out under its name, which is how the judging model learns what each block of evidence is.
 - **Construct-mode template fields** and the built-in structuring prompts likewise resolve a real style, so a template of yours that uses `| tag` behaves the same everywhere.
 
 !!! warning "A style is always required, and never invented"
@@ -12623,12 +12739,24 @@ Configuration section: `[runtime.log.rich_log]`, read only when `sink = "console
 ```toml
 is_show_time = false
 is_show_level = true
+is_show_path = false
 is_link_path_enabled = true
+package_prefix = "libraries"  # or "all", or "none"
 ```
 
 - `is_show_time`: Show timestamp in logs
 - `is_show_level`: Show log level
-- `is_link_path_enabled`: Make file paths clickable
+- `is_show_path`: Show the source file and line that logged each record, in a column at the right of the line. It is off by default: the column takes about 25 characters of every line and makes a long one wrap
+- `is_link_path_enabled`: Make that path clickable, where the terminal supports links
+- `package_prefix`: Choose which lines start with their logger's top-level package name, dimmed, such as `httpx: ` (see [Another library's lines](../../tools/logging.md#another-librarys-lines))
+
+`package_prefix` takes one of three values:
+
+- `libraries`, the default: a line another library logged starts with its package name, and a line from `pipelex` or from a package whose name starts with `pipelex_`, the API server's `pipelex_api` or a plugin named that way, has none. A plugin whose package is named otherwise counts as another library
+- `all`: every line starts with its package name, Pipelex's own included, so `pipelex: `, `pipelex_api: ` and a plugin's name tell the runtime, the API server and the plugin apart
+- `none`: no line has one
+
+A line logged on the root logger names no package, so it never starts with one, whatever the value.
 
 ### Syntax Highlighting
 
@@ -12766,6 +12894,7 @@ anthropic = "INFO"
 [runtime.log.rich_log]
 is_show_time = false
 is_show_level = true
+is_show_path = false
 is_link_path_enabled = true
 highlighter_name = "json"
 is_rich_tracebacks = true
@@ -12773,6 +12902,7 @@ is_tracebacks_word_wrap = true
 is_tracebacks_show_locals = false
 tracebacks_suppress = []
 keywords_to_hilight = ["error", "warning", "failed"]
+package_prefix = "libraries"
 
 [runtime.log.otlp]
 headers = {}
@@ -13864,6 +13994,8 @@ costs = { input = 0.04, output = 0.0 }
 
 The `[defaults]` table applies to every model of the file, and a model table overrides any key of it.
 
+`costs` maps a cost category, such as `input` or `output`, to a price, which must be a finite number no lower than zero; an empty table, or no `costs` at all, declares no price. Every field is checked against its type when the file loads, so a value of the wrong shape, such as `costs = "free"`, a price written as a string, or a table where `listed_constraints` takes an array, fails the boot with a message naming the field, the model, the backend and the file.
+
 #### One handle, several kinds of model
 
 A handle names one model per model type. The same name may be an LLM and a judgment model at once, and each pipe reaches the kind its family asks for: a `PipeLLM` naming `acme-one` gets the LLM, and a `PipeJudge` naming it gets the judgment model. A table's name is its handle, and TOML forbids declaring a table twice, so the second model of a handle gets a table name of its own and says which handle it serves with `handle`:
@@ -14349,7 +14481,8 @@ Common error types:
 You do not have to do anything about that at boot. Pipelex reads the migration history for the `inference/backends/` files, carries the out-of-date ones forward **in memory**, and starts with a warning line for each file, the file and what the migration history carried forward following the message as fields:
 
 ```
-WARNING  🧠: A configuration file is out of date and was read as if it had been migrated, and nothing was written; run `pipelex migrate` to update it file.path=/Users/me/.pipelex/inference/backends/openai.toml migration_steps=["Drop prompting_target from every backend definition"] has_blocked_steps=false
+WARNING  A configuration file is out of date and was migrated in memory only file.path=/Users/me/.pipelex/inference/backends/openai.toml migration_steps="[\"Drop prompting_target from every backend definition\"]" has_blocked_steps=false
+         → Run pipelex migrate to update it
 ```
 
 Nothing has been written at that point, so the warning comes back at the next boot until you run the command:
@@ -14694,6 +14827,8 @@ To improve performance and avoid loading unnecessary files, Pipelex automaticall
 - `results` - Common output directory
 
 Files in these directories will not be scanned, even if they contain `.mthds` files or structure classes.
+
+The list is the `excluded_dirs` array under `[interpreter.scan]` in `pipelex.toml`, each entry naming a directory; a value that is not an array, such as a single string, fails the boot.
 
 ## Project Organization
 
@@ -15338,7 +15473,7 @@ pipelex-pipe_operators-pipe_llm = "DEBUG"
 httpx = "WARNING"
 ```
 
-The record's `pathname`, `lineno` and `funcName` point at the calling line, which is what the `console` sink links to and what the caller-info templates render when `is_caller_info_enabled` is on; all of it comes from that same frame, with no source file read.
+The record's `pathname`, `lineno` and `funcName` point at the calling line, which is what the `console` sink's path column shows when `is_show_path` is on and what the caller-info templates render when `is_caller_info_enabled` is on; all of it comes from that same frame, with no source file read.
 
 A filter attached to `logging.getLogger("pipelex")` never sees these records: the stdlib runs a logger's filters only for records emitted on that very logger, and a record is emitted on the module-named one. Attach the filter to the handler instead, which the stdlib runs for every record it handles, or, to reach whichever sink is installed, append a processor to the sink's `processors` list, as described in [Log Sink Plugins](../under-the-hood/log-sink-plugins.md#logsink).
 
@@ -15359,10 +15494,10 @@ log.error("Expected list[int], got [red]str[/red]")
 ```
 
 ```text
-ERROR    🧠: Expected list[int], got [red]str[/red]
+ERROR    Expected list[int], got [red]str[/red]
 ```
 
-A tag-shaped span in a message is text like any other: a `list[int]` in a type complaint, a bracketed path, the `[cycle]` marker in the rendering of a circular content, and the `[name]: ` prefix the console puts before a line from a logger with no emoji, such as `[myapp.jobs.nightly]: `. Colour is the console's own: it styles the [fields after the message](#fields-after-the-message) by their names and draws the few [layouts](#layouts), so a call is coloured by naming its fields, never by writing markup into its message. No sink but the console has ever read markup, so a message carrying a tag would reach the `json`, `otlp` and `gcp` sinks with the tag in it, and the rule for a Pipelex log call is to write none. Two checks hold the calls to it, by one reading of what a tag is: a tag Rich would apply as styling, a closing tag, an `@` handler, or a tag naming a style, `[bold]` or `[link=https://pipelex.com]`. A bracketed word that names no style, `list[int]` or `[openai]`, passes, since it prints as written. The [log-call guard](../contribute/log-calls.md), `make check-log-calls`, reads the source of every call: it refuses such a tag in the literal text of a message, its title or its inline title, at every level, that text folded across concatenations and named literals the way it reaches the console. A test checks the messages of one run: it runs the pipes of one test bundle live, a sequence nesting a structuring step, parallel summaries and a condition, with a stand-in worker answering every model call, and fails on any message the run logs, at any level, that holds such a tag, whatever built it. A message the guard cannot read, a value built at run time, is covered only when that run logs it.
+A tag-shaped span in a message is text like any other: a `list[int]` in a type complaint, a bracketed path, the `[cycle]` marker in the rendering of a circular content. Colour is the console's own: it styles the [fields after the message](#fields-after-the-message) by their names and draws the few [layouts](#layouts), so a call is coloured by naming its fields, never by writing markup into its message. No sink but the console has ever read markup, so a message carrying a tag would reach the `json`, `otlp` and `gcp` sinks with the tag in it, and the rule for a Pipelex log call is to write none. Two checks hold the calls to it, by one reading of what a tag is: a tag Rich would apply as styling, a closing tag, an `@` handler, or a tag naming a style, `[bold]` or `[link=https://pipelex.com]`. A bracketed word that names no style, `list[int]` or `[openai]`, passes, since it prints as written. The [log-call guard](../contribute/log-calls.md), `make check-log-calls`, reads the source of every call: it refuses such a tag in the literal text of a message, its title or its inline title, at every level, that text folded across concatenations and named literals the way it reaches the console. A test checks the messages of one run: it runs the pipes of one test bundle live, a sequence nesting a structuring step, parallel summaries and a condition, with a stand-in worker answering every model call, and fails on any message the run logs, at any level, that holds such a tag, whatever built it. A message the guard cannot read, a value built at run time, is covered only when that run logs it.
 
 Rich still honours its own per-record `markup` attribute, which a third-party library may set on a record it logs to ask for markup. No Pipelex call can set it: a field of that name is [reserved](#names-that-are-not-yours-to-give) and lands under `field_markup`.
 
@@ -15375,14 +15510,44 @@ log.info("Scanned the inputs", fields={"file_count": 7, "source": "inbox/march"}
 ```
 
 ```text
-INFO     🧠: Scanned the inputs file_count=7 source=inbox/march
+INFO     Scanned the inputs file_count=7 source=inbox/march
 ```
 
-- **What is shown.** The fields the call attached, in the order it gave them, under the name each landed on (`field_name` for a field called `name`). The run identifiers (`request_id`, `pipeline_run_id`, `pipe_run_id`) are left out, since they are the same on every line of a run and would drown the message, and so is `data`, the structured content the message already renders. Nothing else on the record is shown: neither the stdlib's own attributes, nor Pipelex's marks, nor what a record factory or a third-party library stamped on it.
+- **What is shown.** The fields the call attached, in the order it gave them, under the name each landed on (`field_name` for a field called `name`). The run identifiers (`request_id`, `pipeline_run_id`, `pipe_run_id`) are left out, since they are the same on every line of a run and would drown the message, and so is `data`, the structured content the message already renders, while `user_action` prints on a line of its own ([The advice under the line](#the-advice-under-the-line)). Nothing else on the record is shown: neither the stdlib's own attributes, nor Pipelex's marks, nor what a record factory or a third-party library stamped on it.
 - **How a value is written.** On one line: a string as itself, a number, a boolean, `None`, a mapping, a list or a pydantic model as compact JSON, and anything else as its text. That text is written bare, or quoted when it is empty or holds a space, an `=`, a `"`, a `\` or a character a terminal would act on. Inside the quotes a backslash is written `\\`, a quote `\"` and any character a terminal would act on as its escape (`"line\nbreak"`), so `fields={"a": "b=c"}` prints `a="b=c"` rather than a second pair. A number, a boolean and `None` print bare (`7`, `true`, `null`), and so does a list of numbers (`[1,2]`), while a JSON rendering holding a string holds a quote and is quoted like a string: `["a","b"]` prints `"[\"a\",\"b\"]"`. A value longer than 80 characters is cut short and ends with `…`, its text, a string's or a JSON rendering's, being cut before it is quoted and escaped, so a quoted value keeps both its quotes, no escape is split, and no unbalanced quote or bracket is left whose tail could read as a pair of its own, except `error.message`, a handled exception's text, which is cut only past 2000 characters, quoted and escaped the same way: its diagnosis, a cause chain or a parse error's location, is what a fragment would lose, while a dependency's raw output, a validation error's every line or git's stderr, would flood the terminal uncut. `finding_message`, the text of a PipeDocGen template finding, gets the same generous cut, being the part of its warning a reader acts on. A path is cut at its start instead and begins with `…`, so the file's name stays on the line while the directory every line of a run shares goes. A field is taken for a path by its name: one ending in `.path`, `_path`, `_paths`, `_dir`, `_dirs`, `_file` or `_files`, such as `file.path`, `root_path`, `override_paths`, `library_dirs` or `template_file`, and `file.name` and `storage_key`, whose ends are a file's name too. A list of paths is cut the same way, its JSON rendering at its start before it is quoted, so the last path's file name stays and the cut list is still one quoted value: `override_paths="…/.pipelex/inference/backends_override.toml\"]"`. A path that is not on disk, `url.path` or a `variable_path`, is cut at its start as well, its end being what tells it apart. These cuts are the console's alone: every other sink writes each value whole. A key is written the same way, so a field whose name holds a line break, a space, an `=` or an escape sequence is quoted and escaped rather than forging a line or a second pair: `fields={"x=1": 2}` prints `"x=1"=2`. The [redaction](#redaction) has run before the console renders, so a secret is already `[REDACTED]`.
 - **Never markup.** The suffix is built as styled Rich `Text`, not as a markup string, so a value carrying `[red]x[/red]` prints exactly that.
 
 There is no setting to hide the suffix: it carries the values a message used to interpolate, so hiding it would hide what the line is about.
+
+### The advice under the line
+
+A record's advice, its `user_action` field, is not written in the suffix: the console prints it whole on a line of its own under the record, after `→`, in cyan, since it is the part of the record a reader acts on. A traceback the record carries prints under the advice.
+
+```python
+log.warning(
+    "A configuration file is out of date and was migrated in memory only",
+    fields={"file.path": "/home/me/project/.pipelex/pipelex.toml", "user_action": "Run pipelex migrate to update it"},
+)
+```
+
+```text
+WARNING  A configuration file is out of date and was migrated in memory only file.path=/home/me/project/.pipelex/pipelex.toml
+         → Run pipelex migrate to update it
+```
+
+Every other sink writes `user_action` as the field it is, so a log store can count the events by their message whatever advice each one gave.
+
+### Another library's lines
+
+By default, a line has no prefix when its logger's top-level package is `pipelex` or starts with `pipelex_`, which covers the runtime, the API server's `pipelex_api` and a plugin whose package is named that way, and none when it was logged on the root logger. A line another library logged, an HTTP client's or a provider SDK's, starts with the top-level package of its logger, dimmed, so the reader still sees which library spoke:
+
+```text
+INFO     httpx: HTTP Request: POST https://api.example.com/v1/chat/completions "HTTP/1.1 200 OK"
+```
+
+Your own application's lines, logged through `log` from a module of `myapp`, start with `myapp: ` the same way, and so does a plugin whose package is not named `pipelex_…`. The package name is styled text the console adds, never part of the message, so no other sink writes it: they carry the logger's full name as the record's own.
+
+The console setting `package_prefix` under `[runtime.log.rich_log]` changes which lines carry the prefix. The default, `libraries`, is the rule above; `all` puts it on every line, Pipelex's own included, where `pipelex: `, `pipelex_api: ` and a plugin's name tell apart which component spoke; `none` puts it on no line. A line logged on the root logger never carries one (see [Display options](../configuration/config-practical/logging-config.md#display-options)).
 
 ### The style map
 
@@ -15403,12 +15568,12 @@ log.info(
 ```
 
 ```text
-INFO     🧠:    ↳ PipeCompose: compose_company → Company
+INFO        ↳ PipeCompose: compose_company → Company
 ```
 
-- **The console renders the layout in place of the message**, after the logger's emoji, and every other sink ignores it: the `json`, `otlp` and `gcp` sinks write the plain message, `Pipe run starts`, and the fields, and never the layout's name, which rides the record under a reserved mark. The name is explicit at the call, so rewording the message cannot lose the layout, and it is a `LogLayout` member, so a misspelt one is a type error.
+- **The console renders the layout in place of the message**, and every other sink ignores it: the `json`, `otlp` and `gcp` sinks write the plain message, `Pipe run starts`, and the fields, and never the layout's name, which rides the record under a reserved mark. The name is explicit at the call, so rewording the message cannot lose the layout, and it is a `LogLayout` member, so a misspelt one is a type error.
 - **Every value is escaped** with Rich's own escape before it is substituted, the values the layout derives included, so a field carrying `[red]x[/red]` prints literally. A value is written on one line and cut short past 80 characters, as in the suffix, except that it is never quoted, a string or a JSON rendering alike.
-- **The fields a layout presents are not repeated after it**; any other field the call gave still follows as the suffix, and the run identifiers stay hidden.
+- **The fields a layout presents are not repeated after it**; any other field the call gave still follows as the suffix, the advice still prints under the line, and the run identifiers stay hidden.
 - **A layout that cannot be filled costs nothing but itself.** A field it needs is missing, a value its derivation refuses, or anything else the layout raises: the console falls back to the message and shows every field after it.
 - **A layout is for a string message.** A call whose content is anything else, a mapping, a list or a model, keeps its layout off the record, and the console renders its message: the message is the only place that content renders, since the suffix never repeats `data`, and a content JSON refuses, a circular one for instance, lives only in the message's `repr`. A record whose [redaction](#redaction) failed loses its layout too, so the notice saying the scrub failed is what prints.
 - **A layout replaces the whole message.** A line rendered through a layout shows neither the title nor the inline text the call gave, nor any [caller information](#caller-information), all of which belong to the message it replaces. A traceback the record carries still prints under the line, as it does under a message, and the fields stay on the line above it, whether Rich renders the traceback or `is_rich_tracebacks = false` has it printed as plain text.
@@ -15426,18 +15591,8 @@ A layout is a `ConsoleLayout`: a `template` of Rich markup whose placeholders ar
 ### Rich Formatting
 
 - Color coding and syntax highlighting for JSON and other data structures
-- Clickable file paths pointing at the calling line
 - Word wrapping for better readability
-
-### Emoji Support
-
-Built-in emoji indicators for different components, keyed on the logger name's prefix:
-
-- 🧠 Pipelex core messages
-- ⚪️ OpenAI-related logs
-- 🌀 Google-related logs
-- ⚡️ Network connections
-- *️⃣ JSON processing
+- A column naming the source file and line of each record, at the right of the line, when `is_show_path` is on; it is off by default, since it takes about 25 characters of every line and makes a long one wrap. With `is_link_path_enabled`, that path is clickable where the terminal supports links (see [Logging Configuration](../configuration/config-practical/logging-config.md#display-options))
 
 ### Caller Information
 
@@ -15484,8 +15639,8 @@ A handle names one model per model type, so a query groups by `gen_ai.operation.
 Rates are per million tokens, so a call billed by the request or by the page records each unit as a million tokens in and out, and the rate table prices one unit: a Linkup search or fetch is one request, and an extraction whose provider reports no usage is priced by its pages. Its usage says so in its `pricing_unit`, `request` or `page` rather than `token`, and the event carries the call's cost and no token counts, since a request or a page is not a token. A worker records such a usage with `record_unit_priced_usage` (`pipelex.cogt.usage.usage_cost`), a plugin's worker as much as a provider's, and never writes the counts itself.
 
 ```text
-INFO     🧠: claude-5.5-sonnet chat · 2,048 → 512 tokens · $0.009216 · done in 1.23 s
-INFO     🧠: claude-5.5-sonnet chat · failed after 2.40 s error.type=LLMCompletionError
+INFO     claude-5.5-sonnet chat · 2,048 → 512 tokens · $0.009216 · done in 1.23 s
+INFO     claude-5.5-sonnet chat · failed after 2.40 s error.type=LLMCompletionError
 ```
 
 ```json
@@ -15507,11 +15662,11 @@ Every live pipe run ends with `Pipe run ends`, on the logger `pipelex.pipe_machi
 | `duration_ms`, `outcome`, `error.type` | | As above |
 
 ```text
-INFO     🧠: PipeSequence: brief_company → Text
-INFO     🧠:    ↳ PipeLLM: describe_company → Text
-INFO     🧠: claude-5.5-sonnet chat · 1,000 → 200 tokens · $0.004 · done in 1.23 s
-INFO     🧠:    ↳ PipeLLM: describe_company done in 1.25 s
-INFO     🧠: PipeSequence: brief_company done in 1.31 s
+INFO     PipeSequence: brief_company → Text
+INFO        ↳ PipeLLM: describe_company → Text
+INFO     claude-5.5-sonnet chat · 1,000 → 200 tokens · $0.004 · done in 1.23 s
+INFO        ↳ PipeLLM: describe_company done in 1.25 s
+INFO     PipeSequence: brief_company done in 1.31 s
 ```
 
 ```json
@@ -15540,7 +15695,7 @@ A test runs a small method live, with stand-in workers answering every model cal
 
 ## Log-call conventions
 
-Pipelex's own log calls, in `pipelex/` and in the API server's `api/pipelex_api/`, follow these conventions, so that a line written today can be grouped, counted and filtered in a log store tomorrow. The [log-call guard](../contribute/log-calls.md), `make check-log-calls`, holds every call to the ones that can be read off the source, the fixed message at INFO and above and the absence of markup; the rest is for review. Code of your own that logs through `log` is welcome to follow them too.
+Pipelex's own log calls, in `pipelex/` and in the API server's `api/pipelex_api/`, follow these conventions, so that a line written today can be grouped, counted and filtered in a log store tomorrow. The [log-call guard](../contribute/log-calls.md), `make check-log-calls`, holds every call to the ones that can be read off the source: the fixed message at INFO and above, the absence of markup, the mechanical rules of [wording a message](#wording-a-message), and no handled exception spliced into the text; the rest is for review. Code of your own that logs through `log` is welcome to follow them too.
 
 ### A fixed message
 
@@ -15559,6 +15714,31 @@ log.warning(
 )
 ```
 
+### Wording a message
+
+A message says what happened, and how it was handled when that matters, in one short sentence a reader takes in at a glance. The [log-call guard](../contribute/log-calls.md) holds every call to the rules below that can be read off the source, a capital, no trailing period and no backtick at every level, no identifier and at most 80 characters at INFO and above; the rest is for review.
+
+- **One shape.** The subject comes first, then what happened to it, in the past tense or as a state: "A pipe of a dependency could not be loaded", "The routing profiles were read with override files merged over the base", "A stuff name starts with an underscore". A failure is "could not be", never "Failed to". The [summary events](#summary-events) and the pipe-run announcement keep their present-tense names, `Inference call ends`, `Pipe run ends` and `Pipe run starts`, which name events rather than tell what happened.
+- **Short.** At INFO and above a message holds at most 80 characters, so the line, its fields included, mostly stays on one line of a terminal. A consequence the reader needs goes in the sentence when it fits, "A model waterfall that leads back to itself resolves to no model", and the rest in fields; a second clause after "so" or ";" is a sign the sentence carries two things.
+- **Advice in `user_action`.** What the reader should do rides in the `user_action` field, one imperative sentence written like a message, a command included as plain text: `fields={"user_action": "Run pipelex migrate to update it"}`. One event with several remedies is then one message with several `user_action` values, so a log store counts the event once whatever the cause. The console prints the advice on a line of its own under the record ([The advice under the line](#the-advice-under-the-line)), and every other sink writes it as a field. Pipelex's error reports carry their advice under the same name.
+- **No identifier and no backtick.** A message is written for the person reading the log, not for the code: no snake_case name, no call, no `needs_inference=False`, no backticks. What the reader needs of an identifier is a field's value: an environment variable's name rides in `env_var`, a job's class in `inference_job_type`. A word of Pipelex's own vocabulary, a pipe type such as `PipeBatch` or a file such as `METHODS.toml`, is a word like any other.
+- **A capital, no period, no prefix.** A message starts with a capital letter and ends with no period and no `...`, and carries no subsystem tag such as `OTel:`, since the logger's name already says where a line comes from.
+- **DEBUG and VERBOSE follow the same wording**, beside the f-strings they may keep, and one thing has one verb: a client that is made is "Made" on every line, never "Init" on one and "Initializing" on the next.
+
+```python
+# Not this: the event, its consequence and the remedy in one sentence of 137 characters
+log.warning(
+    "A method reference pins a tag the installed copy was not fetched at, so the installed copy is used; removing it re-fetches the pinned tag",
+    fields={"method_ref": method_ref, "installed_tag": installed_tag},
+)
+
+# This: what happened in one sentence, the remedy in user_action
+log.warning(
+    "A method's installed copy was used though not fetched at the pinned tag",
+    fields={"method_ref": method_ref, "installed_tag": installed_tag, "user_action": "Remove the installed copy to fetch the pinned tag"},
+)
+```
+
 ### Values in fields
 
 What varies goes in `fields`, named by the [naming convention](#naming-convention), and one concept has one name across the codebase, so that a query written for one line finds every line about the same thing. Pipelex's own concepts take the names in the table below. A concept the OpenTelemetry semantic conventions define takes their key verbatim: `file.path` for a path on disk and `file.name` for a file's name alone, `url.full` for a URL and `url.path` for the path of a request's URL, `server.address` for the host a request is sent to, `http.response.status_code` for the status of an HTTP response, `user.id` for the authenticated caller, never an identity the server refused, `error.type` for the class of an error, and the `gen_ai.*` keys for inference, such as `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.request.temperature`, `gen_ai.operation.name`, `gen_ai.usage.input_tokens` and `gen_ai.usage.output_tokens`. A `gen_ai.*` key means on a log line what it means on Pipelex's LLM span: `gen_ai.request.model` is the model's handle and `gen_ai.response.model` the provider's id the model deck pins for that handle, the one the call is made with, whichever model the provider says answered. `gen_ai.operation.name` is the one exception for now, as [the inference call end](#the-inference-call-end) explains. A line about an inference call carries them beside `model_handle`, `backend_name` and `sdk`, so it joins its span in a log store, while `model_handle` names the handle on every line about a model, inference or not. An OpenTelemetry key that more than one call site uses is spelled through a constant, so a misspelt one is an error the type checker reports rather than a field no query finds: `OTelLogAttr` in `pipelex/system/telemetry/otel_constants.py` holds those keys, `GenAISpanAttr` beside it the `gen_ai.*` ones, and `pipelex.tools.log.error_fields` the two error keys. A count is named `<what>_count` (`concept_count`) and a duration `duration_ms`, in milliseconds. A path is named `<what>_path`, a list of paths `<what>_paths`, a directory `<what>_dir` and a file as a declaration names it `<what>_file`, with their plurals, beside `file.path`: the console takes a field for a path by that ending and cuts its value at its start, keeping the file's name (see [Fields after the message](#fields-after-the-message)), so a field holding no path takes none of these endings. A field carries one JSON type on every line that has it, `null` aside, so a query compares it one way: where the value would be an integer on some lines and a word on others, `unbounded` for instance, the field is left out of the lines the word would name, and the table says so.
@@ -15574,6 +15754,7 @@ What varies goes in `fields`, named by the [naming convention](#naming-conventio
 | `item_count` | integer | The number of items a `PipeBatch` fans out over |
 | `max_concurrency` | integer | The bound on the branches a `PipeBatch` runs at once; absent when the configuration's `"unbounded"` sets none |
 | `threshold` | number | The probability threshold a judgment declares, between `0` and `1` |
+| `judgment_question` | string | A question of a PipeJudge asking several, by the name its `questions` table gives it: `urgent` |
 | `template_file` | string | A PipeDocGen's template file, as the pipe declares it |
 | `finding_message`, `finding_location` | string | The text of a PipeDocGen template finding, and where in the template it was found |
 | `function_name` | string | A function PipeFunc registers or calls, by its name |
@@ -15640,12 +15821,14 @@ What varies goes in `fields`, named by the [naming convention](#naming-conventio
 | `env_var` | string | The name of an environment variable, never its value |
 | `default_value` | integer | The value a setting falls back to when its environment variable holds none it can use |
 | `auth_mode` | string | The authentication mode the API server's `AUTH_MODE` names |
+| `auth_refusal_reason` | string | Why the API server refused a caller's own credentials: `missing_bearer_token`, `expired_token`, `invalid_token` or `api_key_mismatch` |
 | `claim_type` | string | The type a token's claim was decoded as, by its Python name, where the claim is refused and its value is not logged: `str`, `int`, `dict` |
 | `error.type`, `error.message` | string | A handled exception's class name and its text, as [Exceptions](#exceptions) describes |
 | `error_domain` | string | Who fixes a failure, as an error report classifies it: `input`, `config`, `runtime` |
 | `error_category` | string | A failure's Pipelex classification, as an error report carries it |
 | `retryable` | boolean | Whether retrying the failed call as it was can help, as an error report says |
 | `detail` | string | The explanation an API error response gives its caller |
+| `user_action` | string | What the reader of a line should do about it, one imperative sentence: `Run pipelex migrate to update it`. The console prints it on a line of its own under the record, as [The advice under the line](#the-advice-under-the-line) shows |
 | `provider_status_code` | integer | The HTTP status an inference provider answered a failed call with |
 | `provider_request_id` | string | The id an inference provider gave a failed call |
 
@@ -15653,7 +15836,7 @@ What varies goes in `fields`, named by the [naming convention](#naming-conventio
 
 ### Exceptions
 
-An exception rides the record, never the message. Spliced into the text, `{exc}` makes the message vary, loses the exception's type and traceback, and gets only the pattern half of the [redaction](#redaction), where a field also has its control characters escaped. So:
+An exception rides the record, never the message, at every level, DEBUG and VERBOSE included, as the [log-call guard](../contribute/log-calls.md#no-exception-in-the-text) holds every call to. Spliced into the text, `{exc}` makes the message vary, loses the exception's type and traceback, and gets only the pattern half of the [redaction](#redaction), where a field also has its control characters escaped. So:
 
 - **At ERROR and CRITICAL**, inside the `except` block, pass `include_exception=True`: the record carries the exception, and each sink writes its type and its traceback its own way. That is for an exception the code handles where it logs it, whose traceback nobody else will see, and above all for the catcher of an unexpected failure, the root of a CLI command or the API server's error handler, which logs it there and prints no traceback of its own: the `console` sink renders it under the line, and the `json` and `otlp` sinks write it to the log store, which a traceback printed on the console alone never reaches. A CLI command's root also names the exception's type and message in its own output, which is not a log record, so the terminal says why the command failed whatever the sink and the level, under a `json` sink writing to a file as under a level above ERROR.
 - **An exception logged and then re-raised carries no traceback, at ERROR too**: it rides as `error_fields`, since whoever catches it owns its traceback, and a line that carried it as well would print it a second time, ahead of the catcher's own report.
@@ -15668,7 +15851,7 @@ An exception rides the record, never the message. Spliced into the text, `{exc}`
 
 - **No run identifier in the text.** `request_id`, `pipeline_run_id` and `pipe_run_id` are stamped on every record by the [run-scoped context](#the-run-scoped-context); a message repeating one is noise, and a field passing one is only for a call that speaks about a run it is not running under.
 - **No payload contents, at any level.** No prompt text, no base64 data, no raw response and no whole object: a size, a count, a hash or a code instead, as the [level table](#log-levels) already says of every level.
-- **No markup and no emoji in a message.** Colour is the console sink's job: it colours a value by its field's name and draws the few [layouts](#layouts), and its emoji are its own per-logger decoration. Markup in a message travels to every sink as literal tags, the console's included, since it reads no message as markup (see [Messages are plain text](#messages-are-plain-text)). Markup keeps its place in the CLI's own output and in the pretty-print channel, which are presentation to a person and not log records.
+- **No markup and no emoji in a message.** Colour is the console sink's job: it colours a value by its field's name and draws the few [layouts](#layouts). Markup in a message travels to every sink as literal tags, the console's included, since it reads no message as markup (see [Messages are plain text](#messages-are-plain-text)). Markup keeps its place in the CLI's own output and in the pretty-print channel, which are presentation to a person and not log records.
 
 ### Choosing a level
 
@@ -16337,7 +16520,7 @@ Operators perform concrete actions:
 - **PipeFunc** - Execute custom Python functions
 - **PipeCompose** - Compose content from templates or construct structured objects
 - **PipeSearch** - Search the web for information
-- **PipeJudge** - Answer a closed question about the inputs with a verdict
+- **PipeJudge** - Answer a closed question about the evidence its prompt renders with a verdict
 
 What an operator *does* — model-deck resolution, prompt assembly, generation, memory write-back — lives one layer down in [`pipelex/kernel/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/kernel), as plain functions that take everything method-specific as an explicit argument and read only the kernel-layer services a boot stands up, such as the model deck and the content generator. The operator classes above hold what is specific to being a step in a method: blueprint resolution, input validation, error context, and execution-graph tracing. The split exists so the same semantics can be called without a loaded method, and so there is one implementation rather than two that drift. See [The Pipelex Kernel](./pipelex-kernel.md) for the layering contract, what a programmatic caller imports, and how it boots.
 
@@ -16558,22 +16741,25 @@ Both façade calls take the concept and the output class the caller wants, defau
 | `pipelex.kernel.extract_ops` | `resolve_extract_setting`, `build_extract_job_params`, `run_extract` |
 | `pipelex.kernel.img_gen_ops` | `resolve_img_gen_setting`, `resolve_default_size`, `build_img_gen_job_params`, `run_img_gen` |
 | `pipelex.kernel.search_ops` | `resolve_search_setting`, `run_search` |
-| `pipelex.kernel.judgment_ops` | `judgment_setting_of_choice`, `served_judgment_model`, `resolve_judgment_setting`, `build_judgment_material`, `material_value`, `make_verdict_content`, `run_judgment` |
+| `pipelex.kernel.judgment_ops` | `judgment_setting_of_choice`, `served_judgment_model`, `resolve_judgment_setting`, `make_verdict_content`, `run_judgment`, `AskedQuestion`, `run_multi_judgment` |
 | `pipelex.kernel.compose_ops` | `build_compose_context`, `build_composed_content`, `run_compose_template` |
 | `pipelex.kernel.func_ops` | `call_registered_function`, `run_func` |
 | `pipelex.kernel.memory_ops` | `shape_inputs`, `store_result`, `extract_main_content` / `extract_named_content`, `extract_main_content_as_list` / `extract_named_content_as_list` |
+| `pipelex.kernel.prompt_assembly` | `UserPromptContent`, `AssembledUserPrompt`, `assemble_user_prompt`, `PromptFiles` |
 | `pipelex.kernel.llm_prompt_content` | `LlmPromptContent`, `assemble_llm_prompt` |
 | `pipelex.kernel.img_gen_prompt` | `assemble_img_gen_prompt` |
 | `pipelex.kernel.prompt_references` | `ImageReference` / `ImageReferenceKind`, `DocumentReference` / `DocumentReferenceKind` |
 | `pipelex.kernel.*_results` | The typed result envelopes |
 
-The two `assemble_*` functions are there because `run_llm_text` and `run_img_gen` both take a *ready* prompt. A caller that could not build one would be holding an operator it cannot reach, which is what image generation was until `assemble_img_gen_prompt` existed: its only builder was an interpreter-layer blueprint. What they own is the part a caller must not re-derive — resolving `ImageReference` and `DocumentReference` out of working memory, and, on the image side, keeping the `[Image N]` tokens numbered from the same registry that orders `input_images`, since a mismatch mislabels which image the prompt is describing and nothing downstream can detect it.
+The two operator-specific `assemble_*` functions are there because `run_llm_text` and `run_img_gen` both take a *ready* prompt. A caller that could not build one would be holding an operator it cannot reach, which is what image generation was until `assemble_img_gen_prompt` existed: its only builder was an interpreter-layer blueprint. Both are thin over `pipelex.kernel.prompt_assembly`, the user-prompt assembly PipeLLM, PipeImgGen and PipeJudge share. It owns the part a caller must not re-derive: resolving `ImageReference` and `DocumentReference` out of working memory, numbering the files they name, substituting the `[Image N]` and `[Document N]` tokens for direct, list and dotted references, and handing the files over in the order their tokens number them, since a mismatch mislabels which file the prompt is describing and nothing downstream can detect it. `assemble_user_prompt` assembles one template into an `AssembledUserPrompt`, its text with its ordered images and documents; `PromptFiles` is the same numbering shared by several templates of one prompt, a PipeLLM's system and user prompts or a PipeImgGen's positive and negative ones, whose references are all registered before the first renders so their tokens number one sequence. A reference whose root input is declared optional and was not given is skipped before numbering, taking no number and handing over no file, so the template's guard renders it out, while an absent required input is refused; the reference carries `is_optional`, which the factories set through the one analysis they share, `analyze_template_file_references` in `pipelex.pipe_operators.shared`, and the context answers presence through `ContextProviderAbstract.is_variable_present`. The caller's `extra_params` are copied, never written to.
 
 `served_llm_model` gives the spec of the LLM a handle resolves to on this boot, an alias to its target and a waterfall to its first served member as a run resolves them, or `None` when no backend serves one. `check_llm_setting_with_served_model` refuses an LLM setting the model it resolves to refuses, before anything is spent: it runs the request check the model's backend registered beside its worker factory, which is the check the worker itself runs before every call, against the job params the setting gives once the model's constraints apply, for a text or a structured output. For a built-in backend it raises an `LLMSettingRefusedError`, an `LLMCapabilityError` carrying the worker's reason with the model named by its deck handle rather than by the SDK, backend and provider model id the worker's own refusal names, so its message is shown to a caller even under strict error disclosure. An external plugin's refusal is raised as the plugin wrote it, and its message reaches a caller only when the plugin raised it as caller-facing copy. A backend that registered no check is held to the rule every worker shares, that a model whose spec declares `thinking_mode = "none"` takes no reasoning setting, and a model no backend serves, or whose backend's SDK is not installed, is left to the run. The interpreter's `PipeLLM` and `PipeStructure` call it when a method loads; a programmatic caller calls it before `run_llm_text` or `run_llm_object` to get the same refusal without a call.
 
-`run_judgment` asks one question over the step's inputs by name, which it calls the material. `build_judgment_material` reads each input off its content's class, never off its concept, so the kernel stays free of the concept library: text is its string, a number its number, a yes/no its boolean, a date or a time its ISO string, a list the array of its items, any other structure its JSON object without its absent members, and an image or a document, or a list of either, travels beside that JSON state as prompt images and documents keyed by the input's name. An optional input that holds no value is left out, whether its absence was recorded or it was never written. An input name is a plain name, so each entry is one input's whole value, and the material holds exactly what the step declares: a field reaches a judgment only when the calling sequence binds it under a name of its own. `make_verdict_content` turns the answer into the verdict native: a yes/no answer's probability decides the verdict against the step's threshold, inclusive, or against 0.5 when none is declared; an answer with no probability keeps the model's own verdict, and when a threshold was declared a live run logs a warning and its `JudgmentResult` reports `threshold_applied` as false. A rating's distribution is keyed by the level index written as text. `judgment_setting_of_choice` gives the setting of the step's model, else of the deck's default, and raises `JudgmentModelMissingError` when neither names one, since the deck serves none by default. `served_judgment_model` gives the spec of the model a handle resolves to on this boot, or `None` when no backend serves one, a waterfall none of whose models is served included. `resolve_judgment_setting` then pins the setting to the handle the model resolves to; on a dry run, a model no backend serves on this boot keeps the deck's handle, since no judging worker is called.
+`run_judgment` asks one question about the evidence of a prompt. It takes the step's evidence template as a `UserPromptContent`, the same carrier a PipeLLM's user prompt travels in, and assembles it through `assemble_user_prompt`, so the evidence is rendered, and its images and documents numbered into `[Image N]` and `[Document N]` tokens, exactly as a PipeLLM's prompt is; the text and the ordered files become the `JudgmentPrompt` the worker receives. The question arrives as the cogt question with its instructions still a template, rendered against memory as a `BASIC` template, and is sent as the job's only question, under one fixed key. An optional input that holds no value renders as the template's guard says, through `@?name` or a Jinja2 test, and the shared assembly skips its files, as it does for every operator. A refusal is a worker outcome like an answer, and `run_judgment`'s policy for it is to fail: one question has nowhere to leave its verdict absent, so it raises `JudgmentRefusedError`, a content error naming the step and the model. The `JudgmentResult` carries the prompt sent and the rendered question beside the verdict, which is what the operator records as its execution data. `run_multi_judgment` asks several questions about one evidence, in one request, and fills a structure with their verdicts. The evidence is assembled and each question rendered as `run_judgment` does, and the questions travel as `AskedQuestion`s, each a cogt question beside the threshold its yes/no verdict reads its probability against, keyed by name in one job. A question's name is also the name of the field holding its verdict in `output_class`, the output's content class, which the caller resolves and hands down, as `run_llm_object` takes its output class, since the kernel does not read the concept library; a class whose fields are not exactly the questions' names is refused with `JudgmentOutputFieldsError`, a `ValueError` raised before the judging model is called. Each answer becomes its verdict native under `make_verdict_content`'s rules, and the verdicts are handed to the class as plain data keyed by field name, whatever alias a field carries, so a field typed by a concept refining the native is built as that concept's class. A refusal stores nothing in its question's field when that field may hold nothing, by `class_field_may_hold_nothing` (`pipelex.core.stuffs.non_null_any`), the rule the load's concept walk reads a class field by too: its type admits `None`, whether it is required or has a default, or it is neither required nor given a default. A field whose type admits `None` is given it outright, so a required one validates and a defaulted one does not fill in its default. The refusal is logged as a warning naming the question and recorded in the result; behind any other field it raises `JudgmentRefusedError`, which then names the question too, since leaving a defaulted field out would fill in its default, a verdict nobody gave. The `MultiJudgmentResult` carries the prompt sent and, per question, a `QuestionJudgment`: the rendered question, the raw outcome, a refusal included, and whether a threshold decided the verdict. A dry run answers every question and never refuses. `make_verdict_content` turns the answer into the verdict native: a yes/no answer's probability decides the verdict against the step's threshold, inclusive, or against 0.5 when none is declared; an answer with no probability keeps the model's own verdict, and when a threshold was declared a live run logs a warning and its `JudgmentResult` reports `threshold_applied` as false. A rating takes the label of the level the answer names off the scale the question declared, since no backend reports one, a dry run included, and its distribution is keyed by the level index written as text. `judgment_setting_of_choice` gives the setting of the step's model, else of the deck's default, and raises `JudgmentModelMissingError` when neither names one, since the deck serves none by default. `served_judgment_model` gives the spec of the model a handle resolves to on this boot, or `None` when no backend serves one, a waterfall none of whose models is served included. `resolve_judgment_setting` then pins the setting to the handle the model resolves to; on a dry run, a model no backend serves on this boot keeps the deck's handle, since no judging worker is called.
 
-**Every entry point that renders a template takes a required `templating_style`** — `run_llm_text`, `run_llm_object`, `derive_structure_prompt`, `assemble_llm_prompt`, `assemble_img_gen_prompt`, `run_search`, `run_judgment`, `run_compose_template`. It is not nullable, and that is the contract: the Jinja2 filters that tag and format a value have no default of their own, so a call that omitted the style would render a prompt in a shape nobody chose. `resolve_templating_style(authored=...)` is what produces one — pass what the caller authored, or `None` to take the runtime default.
+A PipeJudge records these results as its execution data, kept per question. A step asking one question records its rendered question, its kind as text, its threshold, whether the threshold decided the verdict and the model's raw answer at the top level, beside the rendered prompt and the resolved model. A step asking several records the rendered prompt and the model there too, and nests the rest under `questions`, keyed by each question's name, as `rendered_question`, `judgment_kind`, `threshold`, `threshold_applied` and `outcome`, the outcome being the raw answer or the refusal, since a field holding nothing shows nothing of what the model said.
+
+**Every entry point that renders a template takes a required `templating_style`** — `run_llm_text`, `run_llm_object`, `derive_structure_prompt`, `assemble_user_prompt`, `assemble_llm_prompt`, `assemble_img_gen_prompt`, `run_search`, `run_judgment`, `run_multi_judgment`, `run_compose_template`. It is not nullable, and that is the contract: the Jinja2 filters that tag and format a value have no default of their own, so a call that omitted the style would render a prompt in a shape nobody chose. `resolve_templating_style(authored=...)` is what produces one — pass what the caller authored, or `None` to take the runtime default.
 
 There are **no re-exports**: `pipelex/kernel/__init__.py` holds doctrine and nothing else, and every symbol is imported from the module that defines it. For this package that is a layering property rather than a style one — a module that re-exports across layers is a layer boundary with the sign filed off.
 
@@ -16654,7 +16840,7 @@ Passing a `trace_context` adopts its `graph_id` as the run's `pipeline_run_id`, 
 
 A record emitted inside a `log.context` block carries the run's identifiers — `request_id`, `pipeline_run_id` and `pipe_run_id` — as fields a sink can filter on ([Logging](../tools/logging.md#the-run-scoped-context)). The interpreter binds them around a run and around each pipe; a program driving the kernel has no interpreter around it, so the kernel binds them itself, split the same way as the usage lifecycle above.
 
-- **Each step binds itself.** Every kernel function that takes a `job_metadata` — `run_llm_text`, `run_llm_object`, `generate_object_content`, `run_extract`, `run_search`, `run_judgment` and `run_img_gen` — opens its body with `with job_metadata.log_context():`, so every line it emits, from prompt assembly to the memory write-back and any failure raised on the way, names the run and the step. A unit test sweeps `pipelex/kernel/` and fails on a function that takes a `job_metadata` without opening its body that way, so the rule holds for the next function added as well.
+- **Each step binds itself.** Every kernel function that takes a `job_metadata` — `run_llm_text`, `run_llm_object`, `generate_object_content`, `run_extract`, `run_search`, `run_judgment`, `run_multi_judgment` and `run_img_gen` — opens its body with `with job_metadata.log_context():`, so every line it emits, from prompt assembly to the memory write-back and any failure raised on the way, names the run and the step. A unit test sweeps `pipelex/kernel/` and fails on a function that takes a `job_metadata` without opening its body that way, so the rule holds for the next function added as well.
 - **The host binds the run.** `PipelexKernel.log_context()` binds `request_id` and `pipeline_run_id` and no step, and a host wraps its run in it. The kernel cannot do this for the host, for the reason it cannot own the usage lifecycle: a kernel call has no run boundary to hang the binding on. Inside the host's block, each step's binding merges over the run's for the length of the call, so a line the host emits between two calls names the run, and a line emitted during one names the step as well.
 
 ```python
@@ -16817,14 +17003,16 @@ For **`python-pydantic`**, no key mapping is ever needed either: wire names are 
 
 ### Optionality: the wire carries explicit nulls
 
-A projection describes the payload the engine actually produces, and that payload spells an unset optional field as an explicit `null` — not as an absent key. The runtime class generated for a concept annotates every non-required field `X | None`, and the transport dump keeps nulls deliberately (`dump_for_transport()` is a `model_dump(serialize_as_any=True)` with no `exclude_none`, and the composer spells `exclude_none=False` at its dump sites), because the shape also feeds the Temporal data converter and the hydrator. A partial payload arriving from a caller, meanwhile, may simply omit the key. **The wire genuinely carries both spellings of "unset", so every projection must accept both.**
+A projection describes the payload the engine actually produces, and that payload spells an unset optional field as an explicit `null` — not as an absent key. The runtime class generated for a concept annotates every field that may hold nothing `X | None`, and the transport dump keeps nulls deliberately (`dump_for_transport()` is a `model_dump(serialize_as_any=True)` with no `exclude_none`, and the composer spells `exclude_none=False` at its dump sites), because the shape also feeds the Temporal data converter and the hydrator. A partial payload arriving from a caller, meanwhile, may simply omit the key. **The wire genuinely carries both spellings of "unset", so every projection must accept both.**
+
+A field **may hold nothing** only when it is neither `required` nor defaulted, which is the standard's rule and the one a binding step derives a read's presence from. A defaulted field never holds nothing: the runtime class annotates it `X = Field(default=…)` and refuses an explicit `null` for it, so the engine always puts a value there, and a payload omitting the key takes the default.
 
 Per target that means:
 
-- **`python-pydantic` / `python-structures`** — `X | None = Field(default=None)`. Pydantic accepts an omitted key and an explicit `null` alike, so nothing further is needed.
-- **`ts-zod`** — `.nullish()` for a non-required field (`T | null | undefined`), and `.nullable().default(…)` for a non-required field carrying a default, since a producer may null it explicitly. A bare `.optional()` would mean `T | undefined` in Zod and would **reject the engine's own output**; a bare `.default(…)` rejects the explicit null the same way. There is deliberately no `.transform()` folding `null` into `undefined`: the binder uses one schema for both `parse` and `serialize`, so a transform would make the pair asymmetric.
+- **`python-pydantic` / `python-structures`** — `X | None = Field(default=None)` for a field that may hold nothing, since pydantic accepts an omitted key and an explicit `null` alike, and `X = Field(default=…)` for a defaulted field, which refuses the `null` the runtime refuses.
+- **`ts-zod`** — `.nullish()` for a field that may hold nothing (`T | null | undefined`), and a bare `.default(…)` for a defaulted field, which infers `T` and refuses `null`. A bare `.optional()` would mean `T | undefined` in Zod and would **reject the engine's own output**. There is deliberately no `.transform()` folding `null` into `undefined`: the binder uses one schema for both `parse` and `serialize`, so a transform would make the pair asymmetric.
 
-On the TypeScript side the consequence is that a parsed optional field types as `T | null | undefined` rather than `T | undefined` — `??` covers both. For a recursive concept, where the emitter writes an explicit `export type` beside a `z.ZodType<Name>`-annotated schema, the declared type carries the same widening (`next?: Node | null`), because that annotation is checked against the schema's inferred output and stops typechecking otherwise.
+On the TypeScript side the consequence is that a parsed optional field types as `T | null | undefined` rather than `T | undefined` — `??` covers both — while a defaulted one types as `T`. For a recursive concept, where the emitter writes an explicit `export type` beside a `z.ZodType<Name>`-annotated schema, the declared type carries the same widening (`next?: Node | null`), because that annotation is checked against the schema's inferred output and stops typechecking otherwise.
 
 ### Refinement and native bases
 
@@ -18429,7 +18617,7 @@ flowchart TB
 
 ### Factory Time: Prompt Template Analysis
 
-When a PipeLLM is created from a blueprint, the `TemplateImageAnalyzer` examines both `prompt` and `system_prompt` templates:
+When a PipeLLM is created from a blueprint, the `TemplateImageAnalyzer` examines both `prompt` and `system_prompt` templates. The factory reaches it through `analyze_template_file_references` (`pipelex.pipe_operators.shared.template_file_references`), the one analysis PipeLLM, PipeImgGen and PipeJudge share, which also finds the documents a template reads and marks each reference with whether its root input is declared optional:
 
 1. **Parse prompt template AST** - Extract all variable references with their filters
 2. **Resolve types** - Look up each variable's type from input specifications
@@ -18448,7 +18636,7 @@ system_image_references = [ImageReference(variable_path="context_image", kind=Im
 
 When the prompt is built:
 
-1. **Create registry** - Fresh `ImageRegistry` for this prompt
+1. **Create registry** - Fresh `ImageRegistry` for this prompt; a reference whose root input is optional and was not given is skipped here, taking no number, so the template's guard renders it out
 2. **Extract system prompt images first** - Direct and list references from `system_prompt` are processed first, getting lower numbers
 3. **Extract user prompt images second** - Direct and list references from `prompt` continue the numbering sequence
 4. **Inject registry into context** - Registry available to Jinja2 filters for nested image extraction
@@ -19523,7 +19711,7 @@ def with_images(context: Context, value: Any, _: Any = None) -> str:
 
 # Template Sandbox
 
-A method's templates are code. PipeLLM prompts, PipeCompose templates and construct templates, PipeImgGen and PipeSearch prompts, PipeJudge questions, and PipeCondition expressions are all Jinja2 templates, and they render inside the process that runs the method. When that process is shared, as it is on a hosted runner, a template must not be able to reach anything but the data it was given.
+A method's templates are code. PipeLLM prompts, PipeCompose templates and construct templates, PipeImgGen and PipeSearch prompts, PipeJudge prompts and questions, and PipeCondition expressions are all Jinja2 templates, and they render inside the process that runs the method. When that process is shared, as it is on a hosted runner, a template must not be able to reach anything but the data it was given.
 
 Pipelex therefore renders every template, its own included, under one policy: **a template reads data and calls methods of plain values, and nothing else.** And because a template that only reads data can still ask for a billion-character string, every render also spends from a [budget of work](#the-render-budget), and a render that would overdraw it is refused before it allocates.
 
@@ -21054,6 +21242,12 @@ What an out-of-tree backend plugin imports *is* the contract. The published surf
 | `SearchResultContent` | `pipelex.core.stuffs.search_result_content` | a search result |
 | `DocumentContent` | `pipelex.core.stuffs.document_content` | a source document a search result cites |
 | `JudgmentWorkerAbstract` | `pipelex.cogt.judgment.judgment_worker_abstract` | the judgment worker contract |
+| `JudgmentJob` | `pipelex.cogt.judgment.judgment_job` | the judgment job: one prompt, and the questions asked about it by key |
+| `JudgmentPrompt` | `pipelex.cogt.judgment.judgment_models` | the evidence a judgment presents: the rendered prompt text, with the images and documents it numbers |
+| `JudgmentKind`, `JudgmentQuestion`, `YesNoQuestion`, `YesNoCriteria`, `ChoiceQuestion`, `RatingQuestion`, `RatingLevel` | `pipelex.cogt.judgment.judgment_models` | the closed questions a judgment asks: yes/no with optional criteria for both sides, a choice among described options, a rating on a scale of levels each with a label, a description or both |
+| `JudgmentAnswer`, `YesNoAnswer`, `ChoiceAnswer`, `RatingAnswer`, `JudgmentRefusal`, `JudgmentOutcome` | `pipelex.cogt.judgment.judgment_models` | what a judgment worker returns per question: an answer of the question's kind, or a refusal when the model declines it |
+| `PromptImage` | `pipelex.cogt.image.prompt_image` | an image a prompt presents, by URI, inline or as bytes |
+| `PromptDocument` | `pipelex.cogt.document.prompt_document` | a document a prompt presents, by URI, inline or as bytes |
 | `DocGenWorkerAbstract` | `pipelex.cogt.doc_gen.doc_gen_worker_abstract` | the document-generation worker contract |
 | `RenderJob`, `RenderedDocument`, `RenderResources`, `LoadedResource` | `pipelex.cogt.doc_gen.render_job` | the job a document engine prints, the file it returns, and how it reads a file the document names, with that file's media type |
 | `NbTokensByCategoryDict`, `TokenCategory` | `pipelex.cogt.usage.token_category` | the token usage a worker reports |
@@ -21062,6 +21256,7 @@ What an out-of-tree backend plugin imports *is* the contract. The published surf
 | `BaseModelTypeVar` | `pipelex.tools.typing.pydantic_utils` | the schema type variable of a structured-output signature |
 | `CogtError`, `SdkTypeError`, `ImgGenGenerationError`, `ImgGenParameterError`, `InferenceErrorCategory` | `pipelex.cogt.exceptions` | the inference error bases and categories a worker raises with |
 | `LLMCapabilityError` | `pipelex.cogt.exceptions` | a request the model refuses, raised by an LLM request check |
+| `JudgmentJobFailureError`, `JudgmentModelNotFoundError`, `JudgmentCapabilityError`, `JudgmentAnswerMismatchError` | `pipelex.cogt.exceptions` | the judgment family's errors a worker raises: a failed call, a model the service does not serve, a file the model cannot read, answers that do not match the questions |
 
 A worker implements the provider half of a call, `_gen_text` or `_extract_pages` for instance, and records the usage the provider answered with on its job's report. The base around it logs the event every call ends with, `Inference call ends`, with that usage, its cost, its duration and its outcome, so a worker logs nothing for the call itself (see [Summary events](../tools/logging.md#summary-events)). A provider that bills by the request or by the page rather than by the token is recorded with `record_unit_priced_usage(tokens_usage=…, pricing_unit=PricingUnit.REQUEST, nb_units=1)`, which writes each unit as a million tokens in and out so the per-million rates price one unit, and marks the usage so the event keeps the call's cost and writes no token counts; a worker never writes those counts itself.
 
@@ -22269,7 +22464,7 @@ class LogSinkPlugin:
 | Sink | What it does | Where it reads its settings |
 |------|--------------|-----------------------------|
 | `json` | One JSON object per line on the configured stream: `time`, `severity`, `logger`, `message`, `exception` when there is one, `trace_id`, `span_id` and `trace_flags` in hex when OpenTelemetry's current span names a trace, under the keys OpenTelemetry specifies for trace context in a JSON log that is not OTLP, `pipelex.trace_id` and `pipelex.span_id` in hex when a Pipelex span is active, then the fields, the context identifiers and `data` flat beside them, a field named like one of those keys under a `field_` prefix on every line, a non-finite float as the string `"NaN"`, `"Infinity"` or `"-Infinity"`. The key names are the ones the CloudWatch agent, the Google Cloud Logging agent and any OTLP collector ingest without a parser, and no ANSI ever. What the hosted plane's runner and worker select. | `console_log_target` |
-| `console` | The Rich handler with the emoji formatter and every `[runtime.log.rich_log]` setting, which reads no message as markup, shows a record's fields after its message, coloured by name, and renders the layouts a call names (see [Console rendering](../tools/logging.md#console-rendering)). Rich, the `cli` extra, is imported when the handler is built, and a process that selects another sink never loads it through this path. | `console_log_target`, `[runtime.log.rich_log]` |
+| `console` | The Rich handler with every `[runtime.log.rich_log]` setting, which reads no message as markup, shows a record's fields after its message, coloured by name, starts a line another library logged with that library's top-level package name, dimmed, and renders the layouts a call names (see [Console rendering](../tools/logging.md#console-rendering)). The column naming each record's source file is off unless `is_show_path` turns it on, and `package_prefix` chooses which lines carry the package name: another library's by default, every line's, or none. Rich, the `cli` extra, is imported when the handler is built, and a process that selects another sink never loads it through this path. | `console_log_target`, `[runtime.log.rich_log]` |
 | `otlp` | The OpenTelemetry logs signal: a `LoggerProvider` carrying the same service identity as the tracer, a `BatchLogRecordProcessor` and the OTLP HTTP log exporter. The message is the body, the level maps onto the OTel severity scale, the fields, identifiers and `data` ride as attributes (a mapping as JSON text), an exception lands under the `exception.*` semantic-convention keys, each record is filed under OpenTelemetry's current span, with the active Pipelex span as the `pipelex.trace_id` and `pipelex.span_id` attributes, and a collector receives the logs beside the spans the runtime already exports. The keys the sink writes itself, the `code.*` source location, the two `pipelex.*` keys and the `exception.*` set, are reserved on every record whether or not it carries an exception, so a field named like one of them rides under a `field_` prefix rather than being overwritten. A filter on the handler rejects the records of the sink's own export path, the SDK's by logger name and the transport's by the context value the SDK sets around an export, before the handler's lock is taken, so an export failure never re-enters the pipeline and a shutdown never waits on itself. | `[runtime.log.otlp]` |
 | `gcp` | Google Cloud Logging through the `google-cloud-logging` client library, behind the `gcp-logging` extra. Each record becomes one struct entry: the level maps onto the Cloud Logging severity scale (which has nothing below `DEBUG`, so `VERBOSE` lands there), the message, the logger, the exception and the fields become the JSON payload, the run-scoped identifiers become the entry's labels, which is what Cloud Logging indexes, the entry's `trace`, `spanId` and `traceSampled` name OpenTelemetry's current span, the trace project-qualified, and the active Pipelex span rides in the payload as `pipelex.trace_id` and `pipelex.span_id`. The entries leave through the client library's background-thread transport, which batches them off the calling thread. The factory refreshes the credentials once before that transport starts, so credentials Google refuses stop the boot with `GcpLogSinkCredentialsError` rather than losing every record in silence. **Most processes on Google Cloud want `json` instead**: a platform whose logging agent reads the container's stdout, Cloud Run and GKE among them, ingests what that sink writes and needs no client at all; `gcp` is for a process with no such agent in front of it, or one writing to a log or a project that is not the ambient one. | `[runtime.log.gcp]` |
 
@@ -22277,7 +22472,7 @@ The `otlp` factory imports the OpenTelemetry logs SDK when it runs, and the `gcp
 
 ### Why `console` is the default
 
-`pipelex/pipelex.toml` ships `sink = "console"`. A user who installs the CLI expects the rendering the CLI always had, the emoji, the colours, the clickable paths, and a default that changed it would be a regression for every terminal. A server is the process that must choose, and it chooses in its own configuration: it selects `json` in its `pipelex.toml`, as the [API server](../api-server/logging.md) does. Nothing at boot catches a server that forgot. The `console` factory checks that Rich imports, and stops the boot naming the `cli` extra and the `json` alternative when it does not, but Rich is installed with or without the extra, because `typer` and `instructor`, both core dependencies, require it unconditionally. So a server that forgot to select `json` boots on the `console` sink and ships ANSI to its log agent. A host whose log pipeline depends on JSON asserts the effective sink at boot itself, after every configuration layer is merged, as our Temporal plugin does. How the rest of the runtime keeps Rich off a server's path, and why that is not the same as keeping it out of the install, is in [Rich Imports](../contribute/rich-imports.md).
+`pipelex/pipelex.toml` ships `sink = "console"`. A user who installs the CLI reads its logs in a terminal and expects them rendered for one: the level, the fields after each message coloured by name, the advice on a line of its own and the pipe-run tree. A default that wrote JSON objects instead would hand every terminal a stream meant for a log store. A server is the process that must choose, and it chooses in its own configuration: it selects `json` in its `pipelex.toml`, as the [API server](../api-server/logging.md) does. Nothing at boot catches a server that forgot. The `console` factory checks that Rich imports, and stops the boot naming the `cli` extra and the `json` alternative when it does not, but Rich is installed with or without the extra, because `typer` and `instructor`, both core dependencies, require it unconditionally. So a server that forgot to select `json` boots on the `console` sink and ships ANSI to its log agent. A host whose log pipeline depends on JSON asserts the effective sink at boot itself, after every configuration layer is merged, as our Temporal plugin does. How the rest of the runtime keeps Rich off a server's path, and why that is not the same as keeping it out of the install, is in [Rich Imports](../contribute/rich-imports.md).
 
 ---
 
@@ -24393,11 +24588,11 @@ Use an action GitHub created, one an organization of the enterprise owns, or one
 
 # Log-call guard
 
-Pipelex's log calls follow the [log-call conventions](../tools/logging.md#log-call-conventions): a fixed message, its values in `fields`, no markup. Most of them are for review; the ones that can be read off the source are held by `make check-log-calls` on every call: a message at INFO and above is a literal written at the call, and no message holds Rich markup at any level. This page is the guard's specification. The calls that broke the rules when the guard arrived were listed in a committed baseline that can only shrink, so that new code was held to the conventions from the start while the existing calls were converted. Every one of them has been converted since: the baseline lists no call, and since it can only shrink, it stays empty, so every log call is held to the rules.
+Pipelex's log calls follow the [log-call conventions](../tools/logging.md#log-call-conventions): a fixed message, worded as one short sentence, its values in `fields`, no markup and no exception in its text. Most of them are for review; the ones that can be read off the source are held by `make check-log-calls` on every call: a message at INFO and above is a literal written at the call, no message holds Rich markup, a message keeps the mechanical rules of its wording, and no message splices a handled exception into its text. This page is the guard's specification. The calls that broke the rules when the guard arrived were listed in a committed baseline that can only shrink, so that new code was held to the conventions from the start while the existing calls were converted. Every one of them has been converted since: the baseline lists no call, and since it can only shrink, it stays empty, so every log call is held to the rules.
 
 ## What it reads
 
-The guard parses every Python module in `pipelex/`, except the facade's own package `pipelex/tools/log/`, and in the API server's `api/pipelex_api/`, which logs through the same facade. It reads the calls of the `log` facade, however a module reaches it: the name it imports `log` under, from `pipelex` or from `pipelex.tools.log.log`, an alias, a relative import and a star import included, or an attribute path through a module it imports, `pipelex.log.warning(...)` after `import pipelex`, `m.log.info(...)` after `from pipelex.tools.log import log as m`, `x.log.info(...)` after `import pipelex.tools.log.log as x`. The receiver is read where the call is made, through the bindings of its name that can reach the call, as a message's names are below, save that a name captured from an enclosing function is followed, through every binding that function makes: it is the facade when one of them imports the facade, so a parameter or a local named `log`, a stdlib logger say, is not the facade, and neither is a `log` imported in another function, while one imported in an enclosing function is. A call's message is its first positional argument, or its `content=` keyword, and its `title=` and `inline=` keywords count as part of it, since the dispatch renders both into the message. A title or an inline title that is statically `None`, `title=None` or a name bound only to `None` and literals, is no message text at all. A `**` expansion of a dict literal whose keys are all strings passes its `content`, `title` and `inline` entries like keywords, `log.warning(**{"content": f"Value {value}"})` being read as `log.warning(content=f"Value {value}")`; any other `**` expansion in a facade call, `log.warning(**params)`, could carry the message or a title, so the call is refused as `non-literal`, at every level, since neither rule can read through it.
+The guard parses every Python module in `pipelex/`, except the facade's own package `pipelex/tools/log/`, and in the API server's `api/pipelex_api/`, which logs through the same facade. It reads the calls of the `log` facade, however a module reaches it: the name it imports `log` under, from `pipelex` or from `pipelex.tools.log.log`, an alias, a relative import and a star import included, or an attribute path through a module it imports, `pipelex.log.warning(...)` after `import pipelex`, `m.log.info(...)` after `from pipelex.tools.log import log as m`, `x.log.info(...)` after `import pipelex.tools.log.log as x`. The receiver is read where the call is made, through the bindings of its name that can reach the call, as a message's names are below, save that a name captured from an enclosing function is followed, through every binding that function makes: it is the facade when one of them imports the facade, so a parameter or a local named `log`, a stdlib logger say, is not the facade, and neither is a `log` imported in another function, while one imported in an enclosing function is. A call's message is its first positional argument, or its `content=` keyword, and its `title=` and `inline=` keywords count as part of it, since the dispatch renders both into the message. A title or an inline title that is statically `None`, `title=None` or a name bound only to `None` and literals, is no message text at all. A `**` expansion of a dict literal whose keys are all strings passes its `content`, `title` and `inline` entries like keywords, `log.warning(**{"content": f"Value {value}"})` being read as `log.warning(content=f"Value {value}")`; any other `**` expansion in a facade call, `log.warning(**params)`, could carry the message or a title, so the call is refused as `non-literal`, at every level, since no rule can read through it.
 
 ## The rules
 
@@ -24442,9 +24637,41 @@ A markup tag is what Rich reads as one, matched with Rich's own tag pattern:
 
 A bracketed word that is no style, `list[int]`, `[Errno 2]` or `items[index]`, is text and passes, and so does a tag escaped with a backslash. The tests that check the messages a live run logs, described under [Messages are plain text](../tools/logging.md#messages-are-plain-text), read tags by this same rule, the guard's `find_markup_tags`, so the source and the run are held to one definition.
 
+### The wording of a message
+
+The text of a message is held to the rules of [Wording a message](../tools/logging.md#wording-a-message) that can be read off the source; the rest of that section, the subject first, one thing per sentence, the past tense, is for review.
+
+| Rule | Where | What it refuses |
+| --- | --- | --- |
+| `lowercase-start` | Every level | A message whose first character is a lowercase letter, `"loaded the library"`, leading whitespace skipped; one that starts with a quote or a digit passes |
+| `trailing-period` | Every level | A message that ends with a period or an ellipsis, `.`, `...` or `…`, trailing whitespace skipped |
+| `backtick` | Every level | A backtick anywhere in the message |
+| `identifier` | INFO and above | A word holding an underscore, `needs_inference` or `PIPELEX_API_KEY`, or a call written with empty parentheses, `setup()` or `Loader.load()` |
+| `length` | INFO and above | A message of more than 80 characters |
+
+A word of Pipelex's own vocabulary is a word like any other, so `PipeBatch`, `METHODS.toml` and a plural written `model(s)` pass. On `log.debug` and `log.verbose`, which a person at a terminal reads, a message may name an identifier and run long, but it still starts with no lowercase letter, ends with no period and holds no backtick.
+
+The rules read the text the markup rule reads: the literal text of the message, of its title and of its inline title, each as a text of its own, folded across concatenations, named literals and `+=` extensions the way it reaches the console, the format string of a `%` or a `.format()` read as written. A message can reach the console as several texts, a conditional between two literals or a name bound to a different literal on each branch, and each of them is read: one that breaks a rule is enough, so `"Loaded" if cached else "loading..."` breaks `lowercase-start` and `trailing-period`.
+
+A value the guard cannot read, an f-string's placeholder or a name bound to no literal, keeps the texts around it apart, as it does for markup, and could be anything. So a text that starts with such a value passes `lowercase-start`, `f"{count} pipes were loaded"`, and one that ends with one passes `trailing-period`, while `backtick` and `identifier` read every literal part, never across a value. A `+` whose two sides could combine into more texts than the fold's bound reads as if such a value stood between them: its left side keeps the start of the message, its right side the end. The length counts the literal parts alone, since a value is at least empty: a message whose literal text runs past 80 characters is refused whatever it splices, `the message is at least 95 characters long`, while one that only its values would push past the bound is not. At INFO and above the message is a literal anyway, by the first rule, so the length is exact there for every message that passes that rule.
+
+### No exception in the text
+
+On every method, no value a message splices into its text reaches a handled exception, which rides the record or its fields and never the message, as [Exceptions](../tools/logging.md#exceptions) explains. A call that breaks it is refused as `spliced-exception`.
+
+The values a message splices are an f-string's placeholders, the right operand of a `%`, the arguments of a `.format()` call, and any part of the message that is no literal text, a call's result or an attribute, the message itself included: `log.debug(exc)` and `log.debug("A cleanup failed: " + str(exc))` splice the exception as surely as `log.debug(f"A cleanup failed: {exc}")`. A message held in a name is read through its bindings, as above, so `msg = f"A cleanup failed: {exc}"` then `log.debug(msg)` is refused too.
+
+A spliced value reaches a handled exception when it:
+
+- reads a name one of whose bindings that can reach the read is an `except ... as` target, `{exc}`, `{exc!r}` or `{type(exc).__name__}`;
+- reads a name bound to a value that reaches one in turn, however many bindings away, `detail = str(exc)` then `{detail}`;
+- calls a method named `exception`, a finished task's `t.exception()`, a retry outcome's or `sys.exception()`, which return an exception no handler binds.
+
+A name captured from an enclosing function is read through every binding that function makes, as the facade's receiver is, so a callback a handler registers, `lambda: log.debug(f"A cleanup failed: {exc}")`, splices the handler's exception. A name bound by a handler and rebound before the read holds what it was rebound to, and a handler's target reaches nothing past its handler, where Python deletes it. A value that reaches the exception counts whatever it takes from it, its text, its class's name or a count of its errors: what a line needs of an exception rides in `error_fields`, and anything else in a field of its own.
+
 ## The baseline
 
-`log_call_baseline.toml`, at the repo root, lists the calls exempted from the rules until they are converted. It started with every call that broke one when the guard arrived, and lists none now that they are all converted. Its key is the call's file and enclosing qualified name, `<relative_path>::<qualified_name>`, the classes and functions joined by dots, or `<module>` for a call made at module level. Under the key, each call is listed by its **signature**, once per call that carries it. A signature is the call's method, its message's source text with any `**` expansion it cannot read, the rules it breaks between brackets, and, after `where`, every binding the guard read to judge it, sorted, which is every binding that can reach the names it read, a binding it does not read written as what binds it (`<parameter>`, `<for target>`, `<enclosing function>`, `<unbound>`). In a baseline that still listed calls, two entries would read like these, made up for the example:
+`log_call_baseline.toml`, at the repo root, lists the calls exempted from the rules until they are converted. It started with every call that broke one when the guard arrived, and lists none now that they are all converted. Its key is the call's file and enclosing qualified name, `<relative_path>::<qualified_name>`, the classes and functions joined by dots, or `<module>` for a call made at module level. Under the key, each call is listed by its **signature**, once per call that carries it. A signature is the call's method, its message's source text with any `**` expansion it cannot read, the rules it breaks between brackets, and, after `where`, every binding the guard read to judge it, sorted, which is every binding that can reach the names it read, a binding it does not read written as what binds it (`<parameter>`, `<for target>`, `<enclosing function>`, `<unbound>`), and, for a call that splices an exception, the bindings that exception is reached through, the handler's own binding written as `<except target>`. In a baseline that still listed calls, two entries would read like these, made up for the example:
 
 ```toml
 version = 1
@@ -24489,7 +24716,7 @@ A failure lists each call the baseline does not list, at its file and line, with
 
 ## Converting a call
 
-1. Rewrite the call by the [conventions](../tools/logging.md#log-call-conventions): a fixed message, its values in `fields` under the names of the vocabulary table, a handled exception through `error_fields` at WARNING and below or `include_exception=True` at ERROR and above, except one that is re-raised, one that failed while another propagated and a swallowed `ValidationError`, which ride as `error_fields` at every level.
+1. Rewrite the call by the [conventions](../tools/logging.md#log-call-conventions): a fixed message worded as [Wording a message](../tools/logging.md#wording-a-message) says, its advice in `user_action`, its values in `fields` under the names of the vocabulary table, a handled exception through `error_fields` at WARNING and below or `include_exception=True` at ERROR and above, except one that is re-raised, one that failed while another propagated and a swallowed `ValidationError`, which ride as `error_fields` at every level.
 2. Run `make check-log-calls`. It reports the call's signature as stale; editing what a listed call logs without converting it reports the old signature as stale and the new one as unlisted.
 3. Remove the signature, by hand or with `.venv/bin/pipelex-dev check-log-calls --prune`, and commit the file with the change.
 
@@ -24655,9 +24882,11 @@ Most of the list is enforced by the type checker: the matches over the family en
 
 11. **The MTHDS protocol's model categories.** `PipelexMTHDSProtocol.models()` in `pipelex/pipeline/runner.py` types each preset by the protocol's own `ModelCategory`, which carries every family this runtime serves, `judgment` included, through two exhaustive matches beside it: `_protocol_category_of` for the deck's entries and `_listing_category_of` for the `?type=` filter. A new member of the model listing's `ModelCategory` (step 2) stops the type checker at the first of them, because a new family needs a protocol category too, which the standard adds in a protocol minor for each settings family it adds. Until the protocol defines one, the family's presets go under an extension property `PipelexModelDeck` adds for them, never under a category the protocol does not define, since a runner must not put such a value in a deck entry's `type`.
 
-12. **Files, when the family reads them.** The job and the assignment carry them keyed by input name, as `JudgmentJob` and `JudgmentAssignment` carry `images` and `documents`, and the assignment's `referenced_uris()` returns each one, or a scoped run's read authorization never sees them. The worker's template method checks that the model reads them before its hook runs, raising the family's capability error (`JudgmentWorkerAbstract._check_can_read_files`), and runs the per-file format checks in `pipelex/cogt/inference/prompt_file_checks.py`, which the LLM family shares. What a model reads is the `inputs` of its spec in the backend's model file, so the capability is configuration, and an operator that knows its model at load time refuses a file input there too, as `PipeJudge` does.
+12. **Files, when the family reads them.** The job and the assignment carry them inside the prompt that numbers them, as `JudgmentJob` and `JudgmentAssignment` carry a `JudgmentPrompt` whose `images` and `documents` are the files its `text` marks with `[Image N]` and `[Document N]` tokens, and the assignment's `referenced_uris()` returns each one, or a scoped run's read authorization never sees them. A family whose operator renders a template shapes its contract around the rendered prompt rather than the step's inputs: the operator assembles it through `pipelex/kernel/prompt_assembly.py`, which PipeLLM, PipeImgGen and PipeJudge share, so the worker receives one text and its ordered files and never reads an input by name. The worker's template method checks that the model reads them before its hook runs, raising the family's capability error (`JudgmentWorkerAbstract._check_can_read_files`), and runs the per-file format checks in `pipelex/cogt/inference/prompt_file_checks.py`, which the LLM family shares. What a model reads is the `inputs` of its spec in the backend's model file, so the capability is configuration, and an operator that knows its model at load time refuses a file input there too, as `PipeJudge` does.
 
-13. **Silent: a default nothing serves boots cleanly and fails at run time.** A boot checks only that each alias a deck names exists, not that an enabled backend serves the model it resolves to, so a `default-*` alias pointing at a model no backend declares loads without complaint and fails the first pipe that relies on it with a `ModelNotFoundError`, for everyone running on their own keys. `tests/unit/pipelex/kit/test_shipped_deck_defaults.py` is the guard: every `default-*` alias of the shipped deck must reach, through aliases, presets and every entry of a waterfall, a model some backend file of the kit declares. Give a new family's defaults such a model, or ship no default, as `judgment` ships no `choice_default`.
+13. **Outcomes the worker may return besides an answer.** A model may decline a question, and the worker reports that as an outcome rather than as an error or a made-up answer: `judge` returns a `JudgmentOutcome` per question, an answer of the question's kind or a `JudgmentRefusal`, and the base checks an answer's key, kind and offered option while accepting a refusal for any question it was asked. What a refusal means is the caller's policy, never the worker's: the kernel's single-question judgment raises `JudgmentRefusedError`, a content error naming the step and the model, its several-question judgment leaves an optional field absent and raises the same error naming the question behind a required one, and neither reads a refusal as a no, a first option or a lowest level.
+
+14. **Silent: a default nothing serves boots cleanly and fails at run time.** A boot checks only that each alias a deck names exists, not that an enabled backend serves the model it resolves to, so a `default-*` alias pointing at a model no backend declares loads without complaint and fails the first pipe that relies on it with a `ModelNotFoundError`, for everyone running on their own keys. `tests/unit/pipelex/kit/test_shipped_deck_defaults.py` is the guard: every `default-*` alias of the shipped deck must reach, through aliases, presets and every entry of a waterfall, a model some backend file of the kit declares. Give a new family's defaults such a model, or ship no default, as `judgment` ships no `choice_default`.
 
 ## A new backend for a family
 
@@ -25737,7 +25966,7 @@ The rules this encodes:
 - **The main configuration's warning waits for the logger.** That configuration is what configures logging, so when its retry succeeds there is no logger yet — the loader parks the warning (`config_manager.take_stale_configuration_warning()`) and the boot emits it right after `log.configure`. The telemetry and service loaders run after that point and warn directly. The warning is the same either way; only *when* it is said moves.
 - **The inference backend loader parks its warning too, and for a different reason: a caller, not boot order.** By the time backends load, logging has been configured for a while. What that loader has instead is `pipelex doctor`, which probes the backend files by loading the whole library **once per backend** — so a loader that logged for itself would repeat one stale directory's warning a dozen times in one report. It hands the warning over instead (`take_stale_configuration_warning()`), and the caller that owes the user a copy takes it: the models-manager setup emits it exactly once per boot, the doctor's per-backend probe simply never asks, and no abstract interface widens to carry it. One warning per load, not one per backend probe.
 - **The warning names `pipelex migrate` only for a file the command would reach.** The retry replays whatever the loader merged, and a loader pointed at a directory of its own — an embedder's `config_dir=`, or this repository's `tests/pipelex_{run_mode}.toml` — merges files [outside the walk](#the-commands). For those the warning says the file is the caller's to update where it lives, and does not name a command that would then report nothing to do; a load that spans both gets both remedies, each on the lines of its own files. Same rule as [the remedy on a validation error](#every-surface-reports-it-the-same-way-and-none-of-them-says-start-over): *a remedy is named only where it would write*. The walk is `config_manager.existing_config_dirs`, which is also where `config_directories_to_migrate` reads it — one derivation, read from both ends, so a boot cannot promise what the command declines. Reach is per *surface*, not per path: the file must sit in the directory **its own surface** owns under one of those roots, so a `telemetry.toml` dropped into `inference/backends/` is out of reach exactly as it was before any surface owned a subdirectory.
-- **The warning is a line per stale file.** Each line is a fixed message naming the file's remedy, `pipelex migrate` or an edit where the file lives, with the file in `file.path`, the titles of the ledger steps the replay carried in `migration_steps` and whether one of them is blocked in `has_blocked_steps`. The message follows the [log-call conventions](tools/logging.md#log-call-conventions): the files are values, so they ride fields rather than the text, and a list of paths in one field would be cut short on the console, which writes each field on one line at a fixed width. Everything on the line but the path is ledger text; nothing read from the user's file reaches it.
+- **The warning is a line per stale file.** Each line is the same fixed message, `A configuration file is out of date and was migrated in memory only`, with the file's remedy, `pipelex migrate` or an edit where the file lives, as its advice in `user_action`, the file in `file.path`, the titles of the ledger steps the replay carried in `migration_steps` and whether one of them is blocked in `has_blocked_steps`. The message follows the [log-call conventions](tools/logging.md#log-call-conventions): the files are values, so they ride fields rather than the text, and a list of paths in one field would be cut short on the console, which writes each field on one line at a fixed width. Everything on the line but the path is ledger text; nothing read from the user's file reaches it.
 - **The healthy path is untouched.** The replay runs only on the failure path, so a current configuration never reads a ledger, never re-parses a document, and never even imports the migration engine. (Not "never loads tomlkit": the ordinary configuration read has always imported it. What a healthy boot avoids is the second, DOM-level read.) Replay neutrality is what makes the retry free when it does run.
 - **One shared helper**, called by each configuration-surface loader — and that helper is also where `[meta] schema_version` is stripped. The strip belongs there and **not** in the generic TOML reader, which also reads `.mthds` files, backend definitions and the kit index, none of which reserve that key.
 
@@ -26050,7 +26279,7 @@ To run methods on it from the `pipelex` CLI, give its origin, without `/v1`, to 
 
 ## Authentication
 
-The API supports three authentication modes via the `AUTH_MODE` environment variable:
+The `AUTH_MODE` environment variable selects how the API authenticates its callers, with one of the modes below. An unset or empty `AUTH_MODE` means `none`. Any other value must spell a mode exactly as written here, lowercase included, or the server refuses to start with an error naming the valid modes: a mistyped mode never serves the API without the authentication it asked for.
 
 ### No Authentication (Default)
 
@@ -26176,7 +26405,7 @@ The API reads its settings from environment variables. With Docker, the easiest 
 OPENAI_API_KEY=your-openai-api-key
 
 # Authentication for the API itself (optional — defaults to AUTH_MODE=none)
-AUTH_MODE=none                 # one of: none | api_key | jwt
+AUTH_MODE=none                 # one of: none | api_key | jwt (any other value refuses to start)
 API_KEY=your-api-key           # used when AUTH_MODE=api_key
 JWT_SECRET_KEY=your-jwt-secret # used when AUTH_MODE=jwt
 
@@ -28242,6 +28471,13 @@ The other keys, `error_domain`, `error_category`, `retryable`, `detail`, `pipe_c
 Every field in that table is a **record attribute**, which is a different thing from the message. A structured sink — `json` here, and the OTLP sink — writes them beside the message as keys. The Rich console sink shows them after the message as a `key=value` suffix, each value on one line and cut short when long, a handled exception's `error.message` at a far more generous length, and leaves out the run identifiers (`request_id`, `pipeline_run_id`), which a person at a terminal does not need on every line, so `A request ended in an error response` is followed by the path, the status, the error type and the rest of the fields above. That rendering is for a person reading a terminal; keep `sink = "json"` wherever the lines are read by anything else.
 
 Disposition follows the HTTP status, not the error domain: a `4xx` is a caller mistake and logs at `WARNING` without a traceback; a `5xx` is a server fault and logs at `ERROR` with one. See [Error Responses](error-responses.md) for the response side of the same failure.
+
+## Authentication lines
+
+The error line above is the record of every refused request, a `401` included, at `WARNING`. The authentication check before it says why it refused, at a level that depends on who has to act:
+
+- **A caller's own mistake logs at `DEBUG`**: no bearer token, an expired or invalid token, a wrong API key. Each is the line `A caller's credentials were refused`, its `auth_mode` naming the mode in force and its `auth_refusal_reason` one of `missing_bearer_token`, `expired_token`, `invalid_token` and `api_key_mismatch`, with an invalid token's `error.type` and `error.message` beside it. The operator can do nothing about a client holding a stale token, so its refusals add nothing to the warnings beyond the error line of each request.
+- **A misconfiguration of the deployment keeps its level**: forwarded identity headers trusted while a request arrives without a user id log at `WARNING`, and an unset `JWT_SECRET_KEY` or `API_KEY` at `ERROR`, each naming the variable in `env_var`. An unknown `AUTH_MODE` writes no line here, because the server refuses to start with it (see [Authentication](index.md#authentication)). A token that verifies against the server's secret but whose `user_id` claim is missing, is not a path-safe segment or is the reserved single-tenant id logs at `WARNING` too: whoever minted it holds the secret, so it is the deployment's token issuer that needs fixing, which the line's `user_action` says.
 
 ## Configuration
 
