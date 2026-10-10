@@ -93,19 +93,30 @@ class TestJsonLogSink:
         assert structured[MESSAGE_KEY].startswith("Config:")
 
     def test_the_console_s_cuts_never_reach_a_structured_line(self, json_log: tuple[Log, io.StringIO]) -> None:
-        """The console cuts a long value, a path at its start and a template finding past its own length; the json sink writes each whole."""
+        """The console cuts a long value, a path or a list of paths at its start and a template finding past its own length.
+
+        The json sink writes each whole.
+        """
         fresh, buffer = json_log
         long_path = "/Users/someone/projects/acme/" + "nested-directory/" * 8 + "invoice_template_v2.docx"
         long_finding = "The placeholder 'invoice.lines' is read as a list " + "z" * (2 * ERROR_MESSAGE_MAX_LENGTH)
         long_excerpt = "x" * (2 * FIELD_VALUE_MAX_LENGTH)
 
         fresh.warning(
-            "Checked", fields={"file.path": long_path, "template_file": long_path, FINDING_MESSAGE_FIELD: long_finding, "excerpt": long_excerpt}
+            "Checked",
+            fields={
+                "file.path": long_path,
+                "template_file": long_path,
+                "override_paths": [long_path],
+                FINDING_MESSAGE_FIELD: long_finding,
+                "excerpt": long_excerpt,
+            },
         )
 
         (checked,) = _own_lines(buffer)
         assert checked["file.path"] == long_path
         assert checked["template_file"] == long_path
+        assert checked["override_paths"] == [long_path]
         assert checked[FINDING_MESSAGE_FIELD] == long_finding
         assert checked["excerpt"] == long_excerpt
 
