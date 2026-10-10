@@ -1,10 +1,11 @@
 """Markdown as ReportLab flowables, for the built-in PDF engine.
 
 The Markdown is parsed by the one parser Pipelex formats Markdown with (`get_markdown_parser`), so a PDF reads it
-exactly as the `markdown` filter of HTML templates does, and the converter walks markdown-it's syntax tree rather
-than its flat token stream, so a nested list lives inside its item and each list numbers its own items. The rules it
-shares with the engines of the other formats, the link rule, the bullets by depth, a list's start, a heading's level,
-a code block's text and the plain text of nodes, are the document engine contract's (`formatted_markdown.py`).
+as the `markdown` filter of HTML templates parses it, and the converter walks markdown-it's syntax tree rather than
+its flat token stream, so a nested list lives inside its item and each list numbers its own items. The rules it
+shares with the formatting the engines of the other formats print from, the link rule, the bullets by depth, a list's
+start, a heading's level, a code block's text, a table cell's alignment and the plain text of nodes, are in
+`pipelex/tools/markdown/markdown_rules.py`.
 
 What it prints:
 
@@ -25,7 +26,6 @@ from reportlab.lib.styles import ParagraphStyle  # type: ignore[import-untyped]
 from reportlab.pdfbase import pdfmetrics  # type: ignore[import-untyped]
 from reportlab.platypus import Flowable, HRFlowable, ListFlowable, Paragraph, Preformatted, Spacer  # type: ignore[import-untyped]
 
-from pipelex.cogt.doc_gen.formatted_markdown import code_text, heading_level, is_linked_href, list_bullet, list_start, plain_text
 from pipelex.providers.reportlab.pdf_elements import (
     BOX_PADDING,
     LINK_COLOR_HEX,
@@ -45,6 +45,16 @@ from pipelex.providers.reportlab.pdf_elements import (
     measure_column,
 )
 from pipelex.tools.markdown.markdown_parser import get_markdown_parser
+from pipelex.tools.markdown.markdown_rules import (
+    CellAlignment,
+    cell_alignment,
+    code_text,
+    heading_level,
+    is_linked_href,
+    list_bullet,
+    list_start,
+    plain_text,
+)
 
 _MINIMUM_LIST_INDENT = 14.0
 _BULLET_GAP = 6.0
@@ -158,20 +168,20 @@ class _MarkdownWriter:
             for column_index in range(column_count):
                 if column_index < len(row):
                     cell = row[column_index]
-                    style = self._cell_style(alignment=_cell_alignment(node=cell), is_header=is_header)
+                    style = self._cell_style(alignment=cell_alignment(node=cell), is_header=is_header)
                     cells.append(Paragraph(inline_markup(nodes=cell.children), style))
                 else:
                     cells.append("")
             table_rows.append(cells)
         return [data_table(rows=table_rows, col_widths=col_widths, has_header=header_row is not None, right_aligned_columns=[])]
 
-    def _cell_style(self, *, alignment: str | None, is_header: bool) -> ParagraphStyle:
+    def _cell_style(self, *, alignment: CellAlignment | None, is_header: bool) -> ParagraphStyle:
         match alignment:
             case "right":
                 return self._styles.cell_header_right if is_header else self._styles.cell_right
             case "center":
                 return self._styles.cell_header_center if is_header else self._styles.cell_center
-            case _:
+            case "left" | None:
                 return self._styles.cell_header if is_header else self._styles.cell
 
     def _code(self, *, text: str, available_width: float) -> list[Flowable]:
@@ -223,14 +233,3 @@ def _link_markup(*, node: SyntaxTreeNode) -> str:
     if not isinstance(href, str) or not is_linked_href(href=href):
         return label
     return f'<a href="{escape_attribute(value=href)}" color="{LINK_COLOR_HEX}">{label}</a>'
-
-
-def _cell_alignment(*, node: SyntaxTreeNode) -> str | None:
-    style = node.attrs.get("style")
-    if not isinstance(style, str):
-        return None
-    if "text-align:right" in style:
-        return "right"
-    if "text-align:center" in style:
-        return "center"
-    return None

@@ -1024,7 +1024,7 @@ FILTER_COSTS: Final[dict[Callable[..., Any], OperationCost]] = {
     text_format: LINEAR,
     tag: _CONVERTS_TO_TEXT,
     # Each conversion charges itself, by its source and its output (`markdown_parser.py` for HTML,
-    # `formatted_markdown.py` for a document engine), once the value is converted to the text it reads.
+    # `markdown_formatting.py` for a document engine), once the value is converted to the text it reads.
     markdown_to_html: _CONVERTS_TO_TEXT,
     markdown_to_formatted: _CONVERTS_TO_TEXT,
     escape_script_tag: OperationCost(estimate=_script_tag_escaped),

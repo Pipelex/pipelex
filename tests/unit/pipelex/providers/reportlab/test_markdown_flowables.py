@@ -3,13 +3,15 @@ import re
 import pytest
 from markdown_it.token import Token
 from markdown_it.tree import SyntaxTreeNode
+from pytest_mock import MockerFixture
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT  # type: ignore[import-untyped]
 from reportlab.platypus import Paragraph  # type: ignore[import-untyped]
 
-from pipelex.cogt.doc_gen.formatted_markdown import is_linked_href, plain_text
 from pipelex.cogt.doc_gen.layout_tree import MarkdownBlock
 from pipelex.providers.reportlab.markdown_flowables import inline_markup, markdown_nodes_to_flowables
-from pipelex.providers.reportlab.pdf_elements import MONO_FONT, build_pdf_styles
+from pipelex.providers.reportlab.pdf_elements import MONO_FONT, build_pdf_styles, data_table
 from pipelex.tools.markdown.markdown_parser import get_markdown_parser
+from pipelex.tools.markdown.markdown_rules import is_linked_href, plain_text
 from tests.unit.pipelex.providers.reportlab.reportlab_test_helpers import (
     StubRenderResources,
     document_text,
@@ -53,6 +55,13 @@ class TestMarkdownFlowables:
     def test_a_table_prints_its_header_and_cells(self) -> None:
         markdown_text = "| Quarter | Revenue |\n| --- | --: |\n| Q1 | **$1.2M** |\n| Q2 |\n"
         assert "Quarter Revenue\nQ1 $1.2M\nQ2" in document_text(pdf_data=render_markdown(markdown_text=markdown_text))
+
+    def test_a_table_cell_is_aligned_as_its_column_is(self, mocker: MockerFixture) -> None:
+        built_table = mocker.patch("pipelex.providers.reportlab.markdown_flowables.data_table", wraps=data_table)
+        nodes = SyntaxTreeNode(get_markdown_parser().parse("| L | C | R | N |\n| :-- | :-: | --: | --- |\n| a | b | c | d |\n")).children
+        markdown_nodes_to_flowables(nodes=nodes, styles=build_pdf_styles(), available_width=400)
+        rows = built_table.call_args.kwargs["rows"]
+        assert [[cell.style.alignment for cell in row] for row in rows] == [[TA_LEFT, TA_CENTER, TA_RIGHT, TA_LEFT]] * 2
 
     def test_a_long_table_repeats_its_header_on_the_next_page(self) -> None:
         rows = "".join(f"| Row {index} | {index * 10} |\n" for index in range(1, 91))

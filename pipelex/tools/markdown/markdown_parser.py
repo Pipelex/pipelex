@@ -20,17 +20,18 @@ bytes it produces, and can produce far more than it reads, so it is charged befo
 character of its source and every cell of its tables (`table_cells_bound`), since the table rule pads a short
 row with empty cells; and its output, bounded from the parsed tokens (`html_length_bound`), must fit what is
 left before it renders, since a reference link's destination and title are written once and printed at
-every link that uses the reference.
+every link that uses the reference. The formatting a document engine prints from (`markdown_formatting.py`) is
+charged the same way, so both parse through `charged_parse`, which holds that order.
 """
 
 import re
 from collections.abc import Sequence
 from functools import cache
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any, Final, NamedTuple, Protocol
 
 from markdown_it import MarkdownIt
 
-from pipelex.tools.jinja2.jinja2_render_budget import MARKDOWN_UNITS_PER_CHARACTER, active_render_budget
+from pipelex.tools.jinja2.jinja2_render_budget import MARKDOWN_UNITS_PER_CHARACTER, RenderBudget, active_render_budget
 
 if TYPE_CHECKING:
     from markdown_it.rules_inline import StateInline
@@ -107,15 +108,42 @@ def render_markdown_as_html(markdown_text: str) -> str:
     if budget is None:
         html: str = parser.render(markdown_text)
         return html
-    # The length first: the table scan reads every line, so it runs only once the source is affordable.
-    budget.charge(units=MARKDOWN_UNITS_PER_CHARACTER * len(markdown_text), operation=_CONVERTING)
-    budget.charge(units=MARKDOWN_UNITS_PER_CHARACTER * table_cells_bound(markdown_text=markdown_text), operation=_CONVERTING)
-    env: dict[str, Any] = {}
-    tokens = parser.parse(markdown_text, env)
-    budget.afford(units=html_length_bound(tokens=tokens), operation=_CONVERTING)
-    rendered: str = parser.renderer.render(tokens, parser.options, env)
+    parsed = charged_parse(markdown_text=markdown_text, budget=budget, operation=_CONVERTING, output_bound=html_length_bound)
+    rendered: str = parser.renderer.render(parsed.tokens, parser.options, parsed.env)
     budget.charge(units=len(rendered), operation=_CONVERTING)
     return rendered
+
+
+class TokensBound(Protocol):
+    """At most the work units of what a conversion builds out of parsed tokens, taken without building it."""
+
+    def __call__(self, *, tokens: Sequence["Token"]) -> int: ...
+
+
+class ParsedMarkdown(NamedTuple):
+    """A Markdown text's tokens, and the environment the parser filled, holding its reference definitions."""
+
+    tokens: list["Token"]
+    env: dict[str, Any]
+
+
+def charged_parse(*, markdown_text: str, budget: RenderBudget, operation: str, output_bound: TokensBound) -> ParsedMarkdown:
+    """Parse a Markdown text for a conversion charged to `budget`, refusing it at the first step the budget cannot afford.
+
+    In this order: its length, before anything reads it, since the table scan reads every line; then the cells of its
+    tables, before the parser pads them (`table_cells_bound`); then the parse; and then what the conversion builds out
+    of the tokens, bounded from them by `output_bound`, must fit what is left. The caller builds its output and
+    charges what it built.
+
+    Raises:
+        RenderBudgetExceededError: a step would overdraw the budget, `operation` naming the conversion.
+    """
+    budget.charge(units=MARKDOWN_UNITS_PER_CHARACTER * len(markdown_text), operation=operation)
+    budget.charge(units=MARKDOWN_UNITS_PER_CHARACTER * table_cells_bound(markdown_text=markdown_text), operation=operation)
+    env: dict[str, Any] = {}
+    tokens = get_markdown_parser().parse(markdown_text, env)
+    budget.afford(units=output_bound(tokens=tokens), operation=operation)
+    return ParsedMarkdown(tokens=tokens, env=env)
 
 
 def table_cells_bound(*, markdown_text: str) -> int:

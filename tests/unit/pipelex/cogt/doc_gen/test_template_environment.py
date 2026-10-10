@@ -8,7 +8,7 @@ from pipelex.cogt.doc_gen.formatted_markdown import FormattedMarkdown
 from pipelex.cogt.doc_gen.template_environment import make_plain_data_template_environment
 from pipelex.tools.jinja2.jinja2_filters import markdown_to_formatted
 from pipelex.tools.jinja2.jinja2_render_budget import DEFAULT_RENDER_BUDGET_UNITS, MARKDOWN_UNITS_PER_CHARACTER, RenderBudgetExceededError
-from tests.unit.pipelex.cogt.doc_gen.test_data import FormattedMarkdownTestData
+from tests.unit.pipelex.tools.markdown.test_data import MarkdownFormattingTestData
 
 
 def _kinds_of_formatted(value: object) -> object:
@@ -65,7 +65,7 @@ class TestPlainDataTemplateEnvironment:
     def test_markdown_prints_through_the_engine_s_finalize(self) -> None:
         environment = make_plain_data_template_environment(finalize=_kinds_of_formatted)
         rendered = environment.from_string("{{ notes | markdown }}|{{ count }}|{{ title }}").render(
-            notes=FormattedMarkdownTestData.NOTES, count=3, title="Invoice"
+            notes=MarkdownFormattingTestData.NOTES, count=3, title="Invoice"
         )
         assert rendered == "<paragraph,list_item,list_item>|3|Invoice"
 
@@ -73,9 +73,9 @@ class TestPlainDataTemplateEnvironment:
         rendered = (
             make_plain_data_template_environment()
             .from_string("{{ invoice.notes | markdown }}")
-            .render(invoice={"notes": FormattedMarkdownTestData.NOTES})
+            .render(invoice={"notes": MarkdownFormattingTestData.NOTES})
         )
-        assert rendered == FormattedMarkdownTestData.NOTES_PLAIN_TEXT
+        assert rendered == MarkdownFormattingTestData.NOTES_PLAIN_TEXT
 
     def test_markdown_reads_any_other_value_as_its_text(self) -> None:
         assert make_plain_data_template_environment().from_string("{{ total | markdown }}").render(total=12.5) == "12.5"
@@ -84,6 +84,11 @@ class TestPlainDataTemplateEnvironment:
         environment = make_plain_data_template_environment(finalize=_kinds_of_formatted)
         assert environment.from_string("[{{ notes | markdown }}]").render(notes=None) == "[<>]"
         assert make_plain_data_template_environment().from_string("[{{ notes | markdown }}]").render(notes=None) == "[]"
+
+    @pytest.mark.parametrize(("notes", "expected"), [(None, "no"), ("", "no"), ("   \n\t", "no"), ("Due in *30* days.", "yes")])
+    def test_markdown_is_false_when_it_formats_into_nothing(self, notes: str | None, expected: str) -> None:
+        template = make_plain_data_template_environment().from_string("{% if notes | markdown %}yes{% else %}no{% endif %}")
+        assert template.render(notes=notes) == expected
 
     def test_markdown_of_a_missing_value_fails_the_render(self) -> None:
         template = make_plain_data_template_environment().from_string("{{ invoice.notes | markdown }}")
