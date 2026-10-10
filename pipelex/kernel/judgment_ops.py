@@ -7,8 +7,9 @@ stands up (the model deck, the content generator) and take everything else as an
 A judgment is asked over **evidence**: a prompt template, rendered against memory and assembled with
 the images and documents it references exactly as a PipeLLM's user prompt is, through the shared
 user-prompt assembly (`pipelex.kernel.prompt_assembly`). What the evidence holds is the template's
-business, so an input reaches the judging model only when the prompt reads it, and an absent optional
-input is the template's to guard.
+business, so an input reaches the judging model only when the prompt reads it. An optional input the run
+was not given renders as the template's guard says, and the assembly skips its files, numbering and
+handing over none of them.
 """
 
 from pipelex import log

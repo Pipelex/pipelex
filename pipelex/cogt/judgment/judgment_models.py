@@ -36,8 +36,9 @@ class JudgmentPrompt(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     text: str
-    images: list[PromptImage] = []
-    documents: list[PromptDocument] = []
+    # Subscripted `list` factories: `empty_list_factory_of` takes a class, and both item types are `Annotated` unions.
+    images: list[PromptImage] = Field(default_factory=list[PromptImage])
+    documents: list[PromptDocument] = Field(default_factory=list[PromptDocument])
 
 
 class JudgmentKind(StrEnum):
@@ -179,6 +180,8 @@ JudgmentAnswer: TypeAlias = Annotated[
 
 class JudgmentRefusal(BaseModel):
     """The model declined to answer a question. It carries no score, because the one backend that refuses discloses none."""
+
+    model_config = ConfigDict(extra="forbid")
 
     # A discriminator of its own beside the three kinds an answer carries: a refusal is no kind of answer.
     kind: Literal["refusal"] = "refusal"

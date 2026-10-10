@@ -1,4 +1,5 @@
 import json
+from typing import ClassVar
 
 
 class PipeJudgeLoadTestData:
@@ -38,4 +39,41 @@ output = "{output}"
 {prompt_line}
 {question_line}
 {step_fields}
+"""
+
+
+class PipeJudgeOptionalFileTestData:
+    """A PipeJudge whose evidence prompt reads an optional file, run with that file absent or present."""
+
+    PIPE_CODE = "judge_damage"
+    NOTE = "The parcel arrived with one corner crushed."
+    PHOTO_URL = "https://example.com/parcel-corner.png"
+
+    # (topic, the optional input's declaration, the evidence prompt reading it behind a guard)
+    ABSENT_CASES: ClassVar[list[tuple[str, str, str]]] = [
+        ("image", 'photo = "Image?"', "A claim note: $note\n@?photo\n"),
+        ("document", 'claim = "Document?"', "A claim note: $note\n@?claim\n"),
+        ("list_of_images", 'album = "Album?"', "A claim note: $note{% if album %}\nThe photos: $album.photos{% endif %}"),
+    ]
+
+    @classmethod
+    def bundle(cls, *, optional_input: str, prompt: str) -> str:
+        return f"""
+domain = "judge_optional_files"
+description = "A PipeJudge whose evidence may hold a file"
+
+[concept.Album]
+description = "Photos taken when a parcel was delivered"
+
+[concept.Album.structure]
+photos = {{ type = "list", item_type = "concept", item_concept_ref = "native.Image", description = "The photos", required = true }}
+
+[pipe.{cls.PIPE_CODE}]
+type = "PipeJudge"
+description = "Judge whether a parcel's damage is serious"
+inputs = {{ note = "Text", {optional_input} }}
+output = "YesNo"
+model = "{PipeJudgeLoadTestData.JUDGMENT_MODEL}"
+prompt = {json.dumps(prompt)}
+question = "Is the damage serious?"
 """

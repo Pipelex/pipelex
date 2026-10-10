@@ -14,3 +14,7 @@ class ContextProviderAbstract(ABC):
     @abstractmethod
     def generate_context(self) -> dict[str, Any]:
         pass
+
+    @abstractmethod
+    def is_variable_present(self, *, name: str) -> bool:
+        """Whether the context holds a value under this top-level name, an alias included; an absent optional input does not."""

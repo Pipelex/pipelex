@@ -72,6 +72,11 @@ class PipeJudgeBlueprintTestCases:
             _judge(criteria={"no": "The message can wait"}),
             "Criteria describe both answers, and these declare `no` without `yes`: write `yes` as the complement of `no`",
         ),
+        (
+            "criteria_empty_table",
+            _judge(criteria={}),
+            "Criteria describe both answers, and this table declares neither: write both `yes` and `no`, or remove the table",
+        ),
         ("criteria_empty_side", _judge(criteria={"yes": "Today", "no": " "}), "`no` cannot be empty"),
         ("output_with_brackets", _judge(output="YesNo[]"), "produces one verdict"),
         ("undeclared_variable_in_question", _judge(question="Is it about $topic?"), "Variable 'topic' is read by the prompt or question"),

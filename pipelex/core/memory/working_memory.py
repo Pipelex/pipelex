@@ -299,6 +299,10 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
         return artefact_dict
 
     @override
+    def is_variable_present(self, *, name: str) -> bool:
+        return self.is_stuff_exists(name=name)
+
+    @override
     def get_typed_object_or_attribute(self, name: str, *, wanted_type: type[Any] | None = None, accept_list: bool = False) -> Any:
         """Retrieve a typed object or nested attribute from working memory.
 

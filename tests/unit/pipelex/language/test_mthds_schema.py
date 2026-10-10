@@ -307,13 +307,18 @@ class TestMthdsSchemaGeneration:
         [
             pytest.param(["Minor", "Major"], True, id="descriptions-as-strings"),
             pytest.param([{"label": "Low", "description": "A cosmetic flaw"}, {"label": "High"}], True, id="labelled-tables"),
-            pytest.param(["Minor", {"label": "High", "description": "Nothing works"}], True, id="strings-and-tables"),
+            pytest.param(["Minor", {"description": "Nothing works"}], True, id="strings-and-unlabelled-tables"),
+            pytest.param(["Minor", {"label": "High", "description": "Nothing works"}], False, id="strings-and-labelled-tables"),
+            pytest.param([{"label": "Low"}, {"description": "Nothing works"}], False, id="labelled-and-unlabelled-tables"),
             pytest.param([{"label": "Low", "colour": "green"}], False, id="table-with-an-unknown-key"),
             pytest.param([{"label": 3}], False, id="label-not-a-string"),
         ],
     )
     def test_pipe_judge_levels_are_strings_or_closed_tables(self, schema: dict[str, Any], levels: list[Any], should_validate: bool) -> None:
-        """A rating level is written as its description or as a closed `{label, description}` table."""
+        """A rating level is written as its description or as a closed `{label, description}` table, and a scale labels every level or none.
+
+        The load refuses a scale labelling some of its levels only (`_validate_levels`), so the schema refuses it first.
+        """
         validator = _pipe_union_oneof_validator(schema)
         table = {**_minimal_pipe_table("PipeJudge"), "output": "Rating", "levels": levels}
         assert validator.is_valid(table) is should_validate, f"levels={levels!r} should {'' if should_validate else 'not '}validate"

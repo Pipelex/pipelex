@@ -26,6 +26,7 @@ from pipelex.system.registries.func_registry import func_registry
 
 PDF_ONLY_MODEL = "pypdfium2-extract-pdf"
 DOCLING_MODEL = "docling-extract-text"
+TEXT_ONLY_LLM = "gemini-2.5-flash"
 DOCLING_FORMATS = frozenset({"pdf", "docx", "pptx", "xlsx", "html", "md", "csv", "txt", "vtt", "eml", "image"})
 
 _EXTRACTORS_MTHDS = f"""
@@ -482,10 +483,60 @@ question = "Is this claim complete, given $note?"
         assert _summary(consumers["scans"]) == [("main", "scans", False)]
         for consumer in (*consumers["form"], *consumers["scans"]):
             assert consumer.kind == FileConsumerKind.JUDGMENT_DOCUMENT
+            assert consumer.pipe_ref == "fic_judge.main"
             assert consumer.model == judgment_model
             assert consumer.readable_formats == frozenset({"pdf"})
         assert consumers["scans"][0].covers(file_input_path=("scans", 0))
         assert not consumers["scans"][0].covers(file_input_path=("form",))
+
+    def test_a_prompt_whose_model_reads_no_documents_consumes_nothing(self, load_empty_library: Callable[[], str], mocker: MockerFixture):
+        """A model reading no documents at all is the method author's choice, so there is no caller's format to refuse."""
+        llm_specs = get_model_deck().inference_models.root[ModelType.LLM]
+        booted_spec = llm_specs[TEXT_ONLY_LLM]
+        mocker.patch.dict(llm_specs, {TEXT_ONLY_LLM: booted_spec.model_copy(update={"inputs": ["text"]})})
+        pipes = f"""
+[pipe.main]
+type = "PipeLLM"
+description = "Summarize a transcript with a model reading text only"
+inputs = {{ transcript = "Document" }}
+output = "Text"
+model = "{TEXT_ONLY_LLM}"
+prompt = "Summarize this transcript: $transcript"
+"""
+        consumers = _consumers(load_empty_library=load_empty_library, domain="fic_text_only", pipes=pipes)
+
+        assert not any(consumers.values())
+
+    def test_a_document_the_prompt_reads_from_no_entry_input_is_not_followed(self, load_empty_library: Callable[[], str]):
+        """A prompt's document that an earlier step produced is no file the caller sends."""
+        pipes = """
+[pipe.main]
+type = "PipeSequence"
+description = "Make a new document from the transcript, then summarize the new one"
+inputs = { transcript = "Document" }
+output = "Text"
+steps = [
+    { pipe = "replace_transcript", result = "fresh_document" },
+    { pipe = "summarize_fresh_document", result = "summary" },
+]
+
+[pipe.replace_transcript]
+type = "PipeFunc"
+description = "Make a new document from the transcript"
+inputs = { transcript = "Document" }
+output = "Document"
+function_name = "file_consumers_replace_transcript"
+
+[pipe.summarize_fresh_document]
+type = "PipeLLM"
+description = "Summarize the new document"
+inputs = { fresh_document = "Document" }
+output = "Text"
+prompt = "Summarize this document: $fresh_document"
+"""
+        consumers = _consumers(load_empty_library=load_empty_library, domain="fic_untracked", pipes=pipes)
+
+        assert not any(consumers.values())
 
     def test_a_waterfall_reads_a_format_when_any_member_reads_it(self, load_empty_library: Callable[[], str], mocker: MockerFixture):
         mocker.patch.dict(get_model_deck().extract_waterfalls, {"fic-mixed-extractors": [PDF_ONLY_MODEL, DOCLING_MODEL]})

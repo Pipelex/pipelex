@@ -37,6 +37,9 @@ class JudgeYesNoCriteria(BaseModel):
         if not isinstance(values, dict):
             return values
         raw_criteria = cast("dict[str, Any]", values)
+        if not raw_criteria:
+            msg = "Criteria describe both answers, and this table declares neither: write both `yes` and `no`, or remove the table."
+            raise ValueError(msg)
         declared_sides = [side for side in ("yes", "no") if side in raw_criteria]
         if len(declared_sides) == 1:
             declared_side = declared_sides[0]

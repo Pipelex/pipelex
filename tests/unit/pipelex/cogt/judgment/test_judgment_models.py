@@ -170,3 +170,9 @@ class TestJudgmentModels:
 
     def test_a_refusal_carries_nothing_but_its_kind(self) -> None:
         assert JudgmentRefusal().model_dump(mode="json") == {"kind": "refusal"}
+
+    def test_a_refusal_carrying_a_score_is_refused(self) -> None:
+        """A refusal crosses the distributed boundary, so a worker's refusal smuggling a score must fail there rather than be dropped."""
+        adapter: TypeAdapter[JudgmentOutcome] = TypeAdapter(JudgmentOutcome)
+        with pytest.raises(ValidationError, match="score"):
+            adapter.validate_python({"kind": "refusal", "score": 0.4})

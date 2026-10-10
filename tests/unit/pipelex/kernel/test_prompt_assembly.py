@@ -161,9 +161,69 @@ class TestPromptAssembly:
         assert extra_params == {"suffix": "!"}
 
     @pytest.mark.parametrize(
+        ("template_source", "image_references", "document_references"),
+        [
+            pytest.param(
+                "Note: $note{% if snapshot %} $snapshot{% endif %}",
+                [ImageReference(variable_path="snapshot", kind=ImageReferenceKind.DIRECT, is_optional=True)],
+                [],
+                id="image",
+            ),
+            pytest.param(
+                "Note: $note{% if receipt %} $receipt{% endif %}",
+                [],
+                [DocumentReference(variable_path="receipt", kind=DocumentReferenceKind.DIRECT, is_optional=True)],
+                id="document",
+            ),
+            pytest.param(
+                "Note: $note{% if case %} $case.photos{% endif %}",
+                [ImageReference(variable_path="case.photos", kind=ImageReferenceKind.DIRECT_LIST, is_optional=True)],
+                [],
+                id="list_of_images",
+            ),
+            pytest.param(
+                "Note: $note{% if case %} $case.annexes{% endif %}",
+                [],
+                [DocumentReference(variable_path="case.annexes", kind=DocumentReferenceKind.DIRECT_LIST, is_optional=True)],
+                id="list_of_documents",
+            ),
+        ],
+    )
+    async def test_an_absent_optional_file_is_skipped_so_its_guard_renders_it_out(
+        self, template_source: str, image_references: list[ImageReference], document_references: list[DocumentReference]
+    ) -> None:
+        """An optional input that holds no value gets no number and no file, and the template's guard leaves it out."""
+        content = UserPromptContent(template=_template(template_source), image_references=image_references, document_references=document_references)
+
+        assembled = await assemble_user_prompt(prompt_content=content, context_provider=_every_kind_of_file(), templating_style=_STYLE)
+
+        assert assembled.text == "Note: Handle with care."
+        assert assembled.images == []
+        assert assembled.documents == []
+
+    async def test_a_present_optional_file_is_attached_and_numbered(self) -> None:
+        """Being declared optional changes nothing for a file that is there, a dotted path into a present input included."""
+        content = UserPromptContent(
+            template=_template("$photo, {{ page.page_view }}{% if claim %} $claim{% endif %}"),
+            image_references=[
+                ImageReference(variable_path="photo", kind=ImageReferenceKind.DIRECT, is_optional=True),
+                ImageReference(variable_path="page.page_view", kind=ImageReferenceKind.DIRECT, is_optional=True),
+            ],
+            document_references=[DocumentReference(variable_path="claim", kind=DocumentReferenceKind.DIRECT, is_optional=True)],
+        )
+
+        assembled = await assemble_user_prompt(prompt_content=content, context_provider=_every_kind_of_file(), templating_style=_STYLE)
+
+        assert assembled.text == "[Image 1], [Image 2] [Document 1]"
+        assert [image.uri for image in assembled.images if isinstance(image, PromptImageUri)] == [_PHOTO, _PAGE_VIEW]
+        assert [document.uri for document in assembled.documents if isinstance(document, PromptDocumentUri)] == [_CLAIM]
+
+    @pytest.mark.parametrize(
         ("image_reference", "message_fragment"),
         [
-            pytest.param(ImageReference(variable_path="absent", kind=ImageReferenceKind.DIRECT), "Could not find image 'absent'", id="missing"),
+            pytest.param(
+                ImageReference(variable_path="absent", kind=ImageReferenceKind.DIRECT), "Could not find image 'absent'", id="missing_required"
+            ),
             pytest.param(ImageReference(variable_path="note", kind=ImageReferenceKind.DIRECT), "Could not find image 'note'", id="not_an_image"),
         ],
     )

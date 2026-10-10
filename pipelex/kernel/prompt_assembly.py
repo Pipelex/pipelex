@@ -46,6 +46,7 @@ from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract
 from pipelex.tools.misc.dict_utils import substitute_nested_in_context
 from pipelex.tools.misc.exceptions import ContextProviderError
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.tools.templating.templating_style import TemplatingStyle
 
 
@@ -123,12 +124,20 @@ class PromptFiles:
     ) -> Self:
         """Fetch every referenced file out of the context and register it, in the order given.
 
+        A reference whose root input is declared optional and absent is skipped before registration: it
+        takes no number and hands over no file, and the template's guard (`@?photo`, `{% if photo %}`)
+        renders it out. An absent required input is refused here.
+
         Raises:
-            PromptContentError: when a reference names something the context does not hold, or holds
-                as the wrong type.
+            PromptContentError: when a reference names something the context does not hold, unless its
+                root input is optional and absent, or holds it as the wrong type.
         """
         prompt_files = cls()
         for image_reference in image_references:
+            if _is_absent_optional(
+                variable_path=image_reference.variable_path, is_optional=image_reference.is_optional, context_provider=context_provider
+            ):
+                continue
             match image_reference.kind:
                 case ImageReferenceKind.DIRECT:
                     prompt_files._register_direct_image(image_reference=image_reference, context_provider=context_provider)
@@ -140,6 +149,10 @@ class PromptFiles:
                     # from the context.
                     pass
         for document_reference in document_references:
+            if _is_absent_optional(
+                variable_path=document_reference.variable_path, is_optional=document_reference.is_optional, context_provider=context_provider
+            ):
+                continue
             match document_reference.kind:
                 case DocumentReferenceKind.DIRECT:
                     prompt_files._register_direct_document(document_reference=document_reference, context_provider=context_provider)
@@ -306,3 +319,11 @@ class PromptFiles:
 
 def _image_token(*, registry_index: int) -> str:
     return f"[Image {registry_index + 1}]"
+
+
+def _is_absent_optional(*, variable_path: str, is_optional: bool, context_provider: ContextProviderAbstract) -> bool:
+    """Whether a reference reads an optional input the run was not given, which the prompt then leaves out.
+
+    Only the root input's absence counts: a dotted path into a structure that is present resolves as usual.
+    """
+    return is_optional and not context_provider.is_variable_present(name=get_root_from_dotted_path(variable_path))
