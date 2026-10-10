@@ -107,7 +107,7 @@ class TestPipeJudgeSeveralQuestionsRun:
         with pytest.raises(PipelineExecutionError) as exc_info:
             await _run(pipe_run_mode=PipeRunMode.LIVE)
 
-        assert "declined to answer the question 'team', whose output field is required" in str(exc_info.value)
+        assert "declined to answer the question 'team', and its output field cannot be left absent" in str(exc_info.value)
 
     async def test_a_dry_run_answers_every_question(self) -> None:
         triage = await _run(pipe_run_mode=PipeRunMode.DRY)

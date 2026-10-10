@@ -510,10 +510,10 @@ class JudgmentRefusedError(CogtError):
 
     A refusal is a worker's outcome, never its error: this is the operator's policy for a question
     whose verdict has nowhere to be left absent, the one question of a single-question step or a
-    question of several whose output field is required. It is a content error, in the input domain,
+    question of several whose output field is required or defaulted. It is a content error, in the input domain,
     because what a model declines to judge is the question asked over the evidence given, and the
     remedy is the author's or the caller's: a reworded question, different evidence, or, for a question
-    of several, an optional field a refusal may leave absent. The message names only the step, the
+    of several, an optional field with no default, which a refusal may leave absent. The message names only the step, the
     model's deck handle and the question's name, which the author wrote, so it is kept verbatim for the
     caller.
     """
@@ -533,11 +533,14 @@ class JudgmentRefusedError(CogtError):
             user_action_detail = "Reword the question, or give the step different evidence."
         else:
             message = (
-                f"{step}: the judgment model '{model_handle}' declined to answer the question '{question_name}', whose output field "
-                "is required. Try to reword the question so it can be answered from the evidence, give the step different evidence, "
-                "or make its output field optional, so that a refusal leaves the field absent."
+                f"{step}: the judgment model '{model_handle}' declined to answer the question '{question_name}', and its output field "
+                "cannot be left absent, being required or given a default. Try to reword the question so it can be answered from the "
+                "evidence, give the step different evidence, or make its output field optional with no default, so that a refusal "
+                "leaves the field absent."
             )
-            user_action_detail = "Reword the question, give the step different evidence, or make the question's output field optional."
+            user_action_detail = (
+                "Reword the question, give the step different evidence, or make the question's output field optional with no default."
+            )
         super().__init__(
             message,
             user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail=user_action_detail),

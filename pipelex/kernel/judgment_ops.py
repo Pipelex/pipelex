@@ -19,6 +19,7 @@ judging model, every question answered independently over the same evidence.
 from typing import NamedTuple
 
 from pydantic import BaseModel, ConfigDict
+from pydantic.fields import FieldInfo
 
 from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import JudgmentAssignment
@@ -221,9 +222,10 @@ async def run_multi_judgment(
     model is called. Each answer becomes its verdict native under the single form's rules, the question's
     own threshold deciding a yes/no verdict.
 
-    A refusal leaves its question's field absent when the class lets that field be left out, which is
-    logged and recorded in the result's `judgments`; when the field is required, it raises
-    `JudgmentRefusedError`, a content error naming the step, the model and the question. A dry run
+    A refusal leaves its question's field absent when that field may hold nothing, being neither
+    required nor given a default, which is logged and recorded in the result's `judgments`. Any other
+    refused question raises `JudgmentRefusedError`, a content error naming the step, the model and the
+    question: leaving a defaulted field out would fill in its default, a verdict nobody gave. A dry run
     answers every question and never refuses.
     """
     with job_metadata.log_context():
@@ -243,7 +245,7 @@ async def run_multi_judgment(
             question = asked_judgment.questions[question_name]
             outcome = asked_judgment.outcomes[question_name]
             if isinstance(outcome, JudgmentRefusal):
-                if output_class.model_fields[question_name].is_required():
+                if not _may_be_left_absent(field_info=output_class.model_fields[question_name]):
                     raise JudgmentRefusedError(pipe_code=job_metadata.pipe_code, model_handle=judgment_setting.model, question_name=question_name)
                 log.warning(
                     "A judgment's model declined a question, and its field is left absent",
@@ -276,6 +278,15 @@ async def run_multi_judgment(
             judgment_setting=judgment_setting,
             judgments=judgments,
         )
+
+
+def _may_be_left_absent(*, field_info: FieldInfo) -> bool:
+    """Whether a field may hold nothing, the rule a declared structure field follows: neither required nor given a default.
+
+    Leaving such a field out gives it `None`, and it is the only kind whose default is `None`: a required
+    field has no default at all, and a field given a default factory has none of its own either.
+    """
+    return field_info.default is None
 
 
 def _check_questions_are_the_output_fields(*, question_names: list[str], output_class: type[StuffContent]) -> None:

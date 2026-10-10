@@ -27,6 +27,26 @@ class JudgedTriage(StructuredContent):
     severity: RatingContent | None = Field(default=None, description="How severe the reported issue is")
 
 
+class DefaultedTriage(StructuredContent):
+    """A triage whose rating, left unrequired, carries a default verdict: a refusal must never fill it in."""
+
+    urgent: YesNoContent = Field(description="Whether the message is urgent")
+    team: ChoiceContent = Field(description="The team that handles it")
+    severity: RatingContent | None = Field(default=RatingContent(level=0, label="Minor"), description="How severe the reported issue is")
+
+
+def _blocking_rating() -> RatingContent:
+    return RatingContent(level=1, label="Major")
+
+
+class FactoryDefaultedTriage(StructuredContent):
+    """A triage whose rating, left unrequired, gets a default verdict from a factory: a refusal must never fill it in."""
+
+    urgent: YesNoContent = Field(description="Whether the message is urgent")
+    team: ChoiceContent = Field(description="The team that handles it")
+    severity: RatingContent = Field(default_factory=_blocking_rating, description="How severe the reported issue is")
+
+
 class MultiJudgmentTestCases:
     """A triage asking three questions of a message, one of each kind, and the answers a worker gives them."""
 

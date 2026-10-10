@@ -17,6 +17,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.choice_content import ChoiceContent
 from pipelex.core.stuffs.rating_content import RatingContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
@@ -29,7 +30,7 @@ from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from tests.unit.pipelex.cogt.judgment.fake_judgment_worker import FakeJudgmentWorker, make_fake_judgment_model
-from tests.unit.pipelex.kernel.test_data import JudgedTriage, MultiJudgmentTestCases
+from tests.unit.pipelex.kernel.test_data import DefaultedTriage, FactoryDefaultedTriage, JudgedTriage, MultiJudgmentTestCases
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -42,6 +43,7 @@ class TestRunMultiJudgment:
         run_mode: PipeRunMode = PipeRunMode.LIVE,
         questions: dict[str, AskedQuestion] | None = None,
         worker: FakeJudgmentWorker | None = None,
+        output_class: type[StructuredContent] = JudgedTriage,
     ) -> tuple[FakeJudgmentWorker, MultiJudgmentResult]:
         """Run the judgment through the content generator, which reaches the fake worker as it would reach a backend's."""
         worker = worker or FakeJudgmentWorker(make_fake_judgment_model(), answers=answers)
@@ -59,9 +61,9 @@ class TestRunMultiJudgment:
             questions=questions or MultiJudgmentTestCases.QUESTIONS,
             judgment_setting=JudgmentSetting(model="fake-judgment-handle"),
             concept=ConceptFactory.make(
-                concept_code="Triage", domain_code="judge_kernel", description="A triage", structure_class_name=JudgedTriage.__name__
+                concept_code="Triage", domain_code="judge_kernel", description="A triage", structure_class_name=output_class.__name__
             ),
-            output_class=JudgedTriage,
+            output_class=output_class,
             job_metadata=kernel.make_step_metadata(pipe_code="triage_message"),
             cogt_run_params=kernel.cogt_run_params,
             templating_style=resolve_templating_style(authored=None),
@@ -134,6 +136,18 @@ class TestRunMultiJudgment:
         assert "make its output field optional" in message
         assert exc_info.value.question_name == "team"
         assert exc_info.value.error_category == "content"
+
+    @pytest.mark.parametrize("output_class", [DefaultedTriage, FactoryDefaultedTriage])
+    async def test_a_refused_question_behind_a_defaulted_field_raises_rather_than_filling_the_default(
+        self, mocker: MockerFixture, output_class: type[StructuredContent]
+    ) -> None:
+        """A default would read as a verdict nobody gave, so only a field that may hold nothing is left absent."""
+        with pytest.raises(JudgmentRefusedError) as exc_info:
+            await self._run(mocker, answers={**MultiJudgmentTestCases.ANSWERS, "severity": JudgmentRefusal()}, output_class=output_class)
+
+        assert "declined to answer the question 'severity'" in str(exc_info.value)
+        assert "make its output field optional with no default" in str(exc_info.value)
+        assert exc_info.value.question_name == "severity"
 
     async def test_a_dry_run_answers_every_question(self, mocker: MockerFixture) -> None:
         worker, result = await self._run(mocker, answers={}, run_mode=PipeRunMode.DRY)
