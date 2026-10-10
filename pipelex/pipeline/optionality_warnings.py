@@ -7,7 +7,8 @@ is present — but when every analyzed flow guarantees the slot, the assertion c
 the marker is dead weight.
 
 The presence data comes from the same controller taint analyses that feed the liftable-pipe
-inventory (`PipeSequence.analyze_taint`, `PipeParallel.analyze_branch_taint`). Observations are
+inventory (`PipeSequence.analyze_taint`, `PipeParallel.analyze_branch_taint`,
+`PipeCondition.analyze_outcome_taint`). Observations are
 aggregated per (pipe, variable) ACROSS flows before warning: a pipe whose `!` is meaningful in
 one flow is never told to remove it just because another flow guarantees the slot. A `!` input
 on a pipe that appears in no analyzed flow yields no observation and no warning (conservative —

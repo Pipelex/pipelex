@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **A condition whose outcome may be skipped declares it**: a PipeCondition routing to an outcome pipe that takes plainly an input the condition declares optional must declare its own output optional, and is refused with `optional_not_handled` otherwise, since a run without that input skips the outcome and resolves the condition's output absent. Every name such an outcome always stores in its caller's memory counts as maybe-absent too, so a sequence binding one into a plain output is refused where it used to validate and then resolve absent; the outcome is listed in `liftable_pipes` under its condition, and a `!` input on an outcome counts in the `optional_force_redundant` lint.
+- **A sequence step that may be skipped keeps what its run may store**: a step an absent input may lift, whose pipe stores a name on some runs only, now leaves that name maybe-absent when a run may store an absence there, so a sequence binding it into a plain output is refused with `optional_not_handled` rather than validating and then resolving absent.
+
 ## [v0.81.1] - 2026-10-10
 
 ### Added

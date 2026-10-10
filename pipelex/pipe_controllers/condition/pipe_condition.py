@@ -16,10 +16,20 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.graph.condition_output_merge import ConditionOutputMerge, ConditionOutputTyping
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import get_optional_pipe, get_pipe_router, get_required_pipe
+from pipelex.pipe_controllers.absence_taint import (
+    ConditionTaintAnalysis,
+    ForceConsumptionInfo,
+    LiftableStepInfo,
+    TaintTriggerScan,
+    is_plural_step_result,
+    optional_input_taints,
+    scan_taint_triggers,
+)
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import describe_expression_parse_failure
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.pipe_controller import PipeController
-from pipelex.pipe_machinery.memory_writes import AlternativeWrites, MemoryWrite, merge_alternative_writes
+from pipelex.pipe_machinery.memory_writes import AlternativeWrites, MemoryWrite, SlotTaint, merge_alternative_writes, write_after_lift
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
@@ -101,29 +111,102 @@ class PipeCondition(PipeController):
         The outcomes are merged as alternatives (`merge_alternative_writes`): a name is always written only if every outcome
         that can run stores it, may hold an absence if any outcome may leave one, and keeps a spec only if every outcome
         storing it stores the same one, recording otherwise which outcome stores which spec, so that a binding reading the name
-        is refused before the run. A `continue` outcome stores nothing, a `fail` outcome stops the run, and an outcome
-        pipe that does not resolve is left out, as a sequence assumes an unresolved pipe delivers. The alias the condition
-        may add is left out too: the working memory refuses an alias over a name it already holds, so it never replaces a
-        value the flow types.
+        is refused before the run. An outcome that the condition's own `?` inputs may lift (`analyze_outcome_taint`) may leave
+        an absence under every single name it always stores, since its lift resolves them so (`write_after_lift`). A `continue`
+        outcome stores nothing, a `fail` outcome stops the run, and an outcome pipe that does not resolve is left out, as a
+        sequence assumes an unresolved pipe delivers. The alias the condition may add is left out too: the working memory
+        refuses an alias over a name it already holds, so it never replaces a value the flow types.
         """
         if visited_pipes is None:
             visited_pipes = set()
         if self.visit_key in visited_pipes:
             return {}
         visited_pipes_with_current = visited_pipes | {self.visit_key}
+        input_taints = optional_input_taints(pipe=self)
         outcome_writes: list[AlternativeWrites] = []
         for outcome_pipe_code in sorted(self.pipe_dependencies()):
             outcome_pipe = get_optional_pipe(pipe_code=outcome_pipe_code)
-            if outcome_pipe is not None:
-                outcome_writes.append(
-                    AlternativeWrites(
-                        label=f"outcome '{outcome_pipe.code}' of pipe '{self.code}'",
-                        writes=outcome_pipe.memory_writes(visited_pipes=visited_pipes_with_current),
-                    )
-                )
+            if outcome_pipe is None:
+                continue
+            writes = outcome_pipe.memory_writes(visited_pipes=visited_pipes_with_current)
+            if writes and input_taints:
+                trigger_scan = scan_taint_triggers(outcome_pipe, slot_taints=input_taints, visited_pipes=visited_pipes_with_current)
+                writes = self._writes_after_outcome_lift(outcome_pipe=outcome_pipe, writes=writes, trigger_scan=trigger_scan)
+            outcome_writes.append(AlternativeWrites(label=f"outcome '{outcome_pipe.code}' of pipe '{self.code}'", writes=writes))
         if self._continue_reachable:
             outcome_writes.append(AlternativeWrites(label=f"the `continue` outcome of pipe '{self.code}'", writes={}))
         return merge_alternative_writes(alternatives=outcome_writes)
+
+    @classmethod
+    def _writes_after_outcome_lift(
+        cls, *, outcome_pipe: PipeAbstract, writes: dict[str, MemoryWrite], trigger_scan: TaintTriggerScan
+    ) -> dict[str, MemoryWrite]:
+        """What an outcome stores, joined with its lift when it consumes plain one of the condition's `?` inputs."""
+        trigger_taint = trigger_scan.trigger_taint
+        if trigger_taint is None:
+            return writes
+        return {
+            written_name: write_after_lift(
+                memory_write=memory_write,
+                lift_taint=SlotTaint(
+                    source=trigger_taint.source,
+                    origin_slot_name=trigger_taint.origin_slot_name,
+                    chain=(
+                        *trigger_taint.chain,
+                        f"pipe '{outcome_pipe.code}' may be skipped when '{trigger_scan.trigger_names[0]}' is absent → slot '{written_name}'",
+                    ),
+                ),
+            )
+            for written_name, memory_write in writes.items()
+        }
+
+    def analyze_outcome_taint(self, *, visited_pipes: set[str] | None = None) -> ConditionTaintAnalysis:
+        """Static taint over the outcomes (D6): which outcome the condition's own `?` inputs may lift.
+
+        Within the condition's frame the maybe-absent slots are exactly its own `?`-declared inputs, as in a parallel's: a
+        maybe-absent slot it declares plain lifts the whole condition, which is its caller's concern. An outcome consuming one
+        of them plain is lifted when it is chosen with that input absent, which resolves the condition's result, and every
+        name the outcome always stores, to an absence, or to an empty list for a list (D4).
+
+        Args:
+            visited_pipes: The recursion guard of the walk this one runs inside, handed to each outcome's needed inputs;
+                `None` for a walk of its own.
+        """
+        liftable_steps: list[LiftableStepInfo] = []
+        force_consumptions: list[ForceConsumptionInfo] = []
+        for outcome_pipe, trigger_scan in self._outcome_trigger_scans(visited_pipes=visited_pipes):
+            for asserting_name in trigger_scan.asserting_force_names:
+                force_consumptions.append(
+                    ForceConsumptionInfo(
+                        within_pipe_ref=self.pipe_ref, pipe_ref=outcome_pipe.pipe_ref, variable_name=asserting_name, is_asserting=True
+                    )
+                )
+            for redundant_name in trigger_scan.redundant_force_names:
+                force_consumptions.append(
+                    ForceConsumptionInfo(
+                        within_pipe_ref=self.pipe_ref, pipe_ref=outcome_pipe.pipe_ref, variable_name=redundant_name, is_asserting=False
+                    )
+                )
+            if trigger_scan.trigger_taint is not None:
+                liftable_steps.append(
+                    LiftableStepInfo(
+                        within_pipe_ref=self.pipe_ref,
+                        pipe_ref=outcome_pipe.pipe_ref,
+                        trigger_variable_names=trigger_scan.trigger_names,
+                        absence_source=trigger_scan.trigger_taint.source,
+                    )
+                )
+        return ConditionTaintAnalysis(liftable_steps=tuple(liftable_steps), force_consumptions=tuple(force_consumptions))
+
+    def _outcome_trigger_scans(self, *, visited_pipes: set[str] | None) -> list[tuple[PipeAbstract, TaintTriggerScan]]:
+        """How each outcome pipe that resolves consumes the condition's `?` inputs, in the order of the outcome pipe codes."""
+        input_taints = optional_input_taints(pipe=self)
+        trigger_scans: list[tuple[PipeAbstract, TaintTriggerScan]] = []
+        for outcome_pipe_code in sorted(self.pipe_dependencies()):
+            outcome_pipe = get_optional_pipe(pipe_code=outcome_pipe_code)
+            if outcome_pipe is not None:
+                trigger_scans.append((outcome_pipe, scan_taint_triggers(outcome_pipe, slot_taints=input_taints, visited_pipes=visited_pipes)))
+        return trigger_scans
 
     @override
     def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
@@ -246,6 +329,30 @@ class PipeCondition(PipeController):
                         pipe_code=self.code,
                         provided_concept_code=self.output.concept.concept_ref,
                     )
+            # An outcome that the condition's own `?` inputs may lift resolves the condition's result absent, unless the
+            # result is a list, which the lift leaves empty (D4).
+            for outcome_pipe, trigger_scan in self._outcome_trigger_scans(visited_pipes=None):
+                if trigger_scan.trigger_taint is None:
+                    continue
+                if is_plural_step_result(outcome_pipe, step_output_multiplicity=None, has_batch_params=False):
+                    continue
+                trigger_name = trigger_scan.trigger_names[0]
+                msg = (
+                    f"PipeCondition '{self.code}' maps outcome pipe '{outcome_pipe.code}', which is skipped when its input "
+                    f"'{trigger_name}' is absent, and the condition declares '{trigger_name}' optional, so a run without it "
+                    f"resolves the condition's output absent, but that output '{self.output.concept.concept_ref}' is not declared "
+                    f"optional. Declare the condition's output optional ('{self.output.concept.concept_ref}?') so the maybe-absent "
+                    f"result stays visible downstream, or declare '{trigger_name}' optional on '{outcome_pipe.code}' and handle "
+                    "its absence there."
+                )
+                raise PipeValidationError(
+                    message=msg,
+                    error_type=PipeValidationErrorType.OPTIONAL_NOT_HANDLED,
+                    domain_code=self.domain_code,
+                    pipe_code=self.code,
+                    provided_concept_code=self.output.concept.concept_ref,
+                    variable_names=[trigger_name],
+                )
 
         # Collect all unique output concept refs from mapped pipes
         mapped_output_refs: set[str] = set()

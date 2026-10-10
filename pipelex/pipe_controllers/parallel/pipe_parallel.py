@@ -33,6 +33,7 @@ from pipelex.pipe_controllers.absence_taint import (
     LiftableStepInfo,
     ParallelTaintAnalysis,
     is_plural_step_result,
+    optional_input_taints,
     scan_taint_triggers,
 )
 from pipelex.pipe_controllers.pipe_controller import PipeController
@@ -293,14 +294,7 @@ class PipeParallel(PipeController):
             visited_pipes: The recursion guard of the walk this one runs inside, `memory_writes`'s, handed to each branch's
                 needed inputs; `None` for a walk of its own.
         """
-        optional_input_taints: dict[str, SlotTaint] = {}
-        for input_name, stuff_spec in self.inputs.root.items():
-            if stuff_spec.presence.is_optional and not stuff_spec.is_multiple():
-                optional_input_taints[input_name] = SlotTaint(
-                    source=f"optional input '{input_name}' of pipe '{self.code}'",
-                    origin_slot_name=input_name,
-                )
-
+        input_taints = optional_input_taints(pipe=self)
         branch_taints: dict[str, SlotTaint] = {}
         liftable_steps: list[LiftableStepInfo] = []
         force_consumptions: list[ForceConsumptionInfo] = []
@@ -308,7 +302,7 @@ class PipeParallel(PipeController):
             branch_pipe = get_optional_pipe(pipe_code=sub_pipe.pipe_code)
             if branch_pipe is None:
                 continue
-            trigger_scan = scan_taint_triggers(branch_pipe, slot_taints=optional_input_taints, visited_pipes=visited_pipes)
+            trigger_scan = scan_taint_triggers(branch_pipe, slot_taints=input_taints, visited_pipes=visited_pipes)
             for asserting_name in trigger_scan.asserting_force_names:
                 force_consumptions.append(
                     ForceConsumptionInfo(
@@ -361,32 +355,21 @@ class PipeParallel(PipeController):
 
     @override
     def lifted_companion_slots(self) -> list[CompanionSlot]:
-        """When an `add_each_output` parallel is lifted, every branch result slot it would have
-        written must be resolved too: a recorded absence for singular results, an empty list for
-        plural ones (D4).
+        """The slots the base class derives from `memory_writes`, each credited to the branch pipe producing it.
+
+        When an `add_each_output` parallel is lifted, every branch result slot it would have written is resolved, a recorded
+        absence for a single result and an empty list for a plural one (D4), exactly the names its caller's analyses count as
+        stored, a branch whose pipe does not resolve included, which is credited to the pipe its branch names.
         """
-        if not self.add_each_output:
-            return []
-        companion_slots: list[CompanionSlot] = []
-        for sub_pipe in self.parallel_sub_pipes:
-            if not sub_pipe.output_name:
-                continue
-            branch_pipe = get_optional_pipe(pipe_code=sub_pipe.pipe_code)
-            if branch_pipe is None:
-                continue
-            companion_slots.append(
-                CompanionSlot(
-                    slot_name=sub_pipe.output_name,
-                    concept=branch_pipe.output.concept,
-                    is_plural=is_plural_step_result(
-                        branch_pipe,
-                        step_output_multiplicity=sub_pipe.output_multiplicity,
-                        has_batch_params=sub_pipe.batch_params is not None,
-                    ),
-                    producing_pipe_code=branch_pipe.code,
-                ),
-            )
-        return companion_slots
+        producing_pipe_codes: dict[str, str] = {}
+        for branch in self.parallel_sub_pipes:
+            if branch.output_name:
+                branch_pipe = get_optional_pipe(pipe_code=branch.pipe_code)
+                producing_pipe_codes[branch.output_name] = branch_pipe.code if branch_pipe is not None else branch.pipe_code
+        return [
+            companion_slot._replace(producing_pipe_code=producing_pipe_codes.get(companion_slot.slot_name, companion_slot.producing_pipe_code))
+            for companion_slot in super().lifted_companion_slots()
+        ]
 
     # Note: builtins.type because the `type: Literal["PipeParallel"]` field shadows the
     # builtin in this class body, where signature annotations are evaluated.
