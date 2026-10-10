@@ -20,6 +20,10 @@
 - **A PDF of deeply nested emphasis prints**: the built-in PDF engine no longer fails with a `RecursionError` on a Markdown text whose emphasis nests hundreds deep, such as four hundred `*a ` before a word and four hundred ` c*` after it; inline markup nested past fifty levels is dropped and its text printed.
 - **A Google client's close at teardown is no longer garbage-collected**: when a Google LLM or image-generation worker was torn down inside a running event loop, nothing but the loop referenced the background task closing its async client, and a loop holds its tasks weakly, so the task could be collected before the client was closed, with the `asyncio` error `Task was destroyed but it is pending!`. Each close task is now held until it is done.
 
+### Security
+
+- **The API server refuses to start on an unknown `AUTH_MODE` (Breaking)**: a value that is not exactly `none`, `jwt` or `api_key`, such as `jwtt` or `JWT`, now stops the server at startup with `InvalidAuthModeError`, whose message names the valid modes, where the server used to log a warning and serve every `/v1` route without authentication. An unset or empty `AUTH_MODE` still means `none`. A deployment that booted on a mistyped mode sets it to the mode it meant.
+
 ## [v0.81.0] - 2026-10-10
 
 ### Added

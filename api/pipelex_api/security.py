@@ -1,4 +1,7 @@
-"""Authentication module with configurable AUTH_MODE (none, jwt, api_key).
+"""Authentication module: the `AUTH_MODE` environment variable selects one of the `AuthMode` members.
+
+An unset or empty `AUTH_MODE` means `none`. Any other value must spell a member exactly, or the server refuses to
+start (`InvalidAuthModeError`): a mistyped mode must never serve the API without the authentication it asked for.
 
 User identity is extracted during auth and stored on request.state.user as a RequestUser.
 Route handlers access it via the get_request_user dependency.
@@ -20,6 +23,8 @@ from pydantic import BaseModel, Field
 
 from pipelex_api.error_types import ErrorType
 from pipelex_api.errors import raise_bad_request, raise_internal_server_error, raise_unauthenticated
+
+AUTH_MODE_ENV_VAR = "AUTH_MODE"
 
 # JWT Configuration (only used when AUTH_MODE=jwt)
 JWT_ALGORITHM = "HS256"
@@ -140,19 +145,28 @@ def _set_request_user(request: Request, user_id: str) -> None:
     request.state.user = RequestUser(user_id=user_id)
 
 
+class InvalidAuthModeError(ValueError):
+    """Raised at startup when `AUTH_MODE` holds a value that is not an `AuthMode` member."""
+
+
 def get_auth_mode() -> AuthMode:
-    """Read AUTH_MODE from environment. Defaults to 'none'."""
-    raw = get_optional_env("AUTH_MODE")
+    """Resolve `AUTH_MODE` to an `AuthMode`.
+
+    Returns `AuthMode.NONE` when the variable is unset or empty, the documented default. Any other value must spell a
+    member exactly, case included, or `InvalidAuthModeError` is raised: the server is assembled at import
+    (`pipelex_api.main` resolves the auth dependency there), so a mistyped mode refuses to start rather than serving
+    every authenticated route without authentication. There is deliberately no case-insensitive match and no
+    fallback, so a value is either a mode or an error naming the valid spellings.
+    """
+    raw = get_optional_env(AUTH_MODE_ENV_VAR)
     if not raw:
         return AuthMode.NONE
     try:
         return AuthMode(raw)
-    except ValueError:
-        log.warning(
-            "An unknown authentication mode was replaced by no authentication",
-            fields={"env_var": "AUTH_MODE", "auth_mode": raw, USER_ACTION_FIELD: "Set AUTH_MODE to none, jwt or api_key"},
-        )
-        return AuthMode.NONE
+    except ValueError as exc:
+        valid = ", ".join(f"'{mode}'" for mode in AuthMode)
+        msg = f"{AUTH_MODE_ENV_VAR}={raw!r} is not a valid authentication mode. Valid values: {valid}."
+        raise InvalidAuthModeError(msg) from exc
 
 
 async def verify_jwt(
@@ -317,6 +331,8 @@ def get_auth_dependency() -> Any:
     - none: No authentication (self-hosted default, or behind API Gateway)
     - jwt: Validate JWT tokens
     - api_key: Validate static API key
+
+    Raises `InvalidAuthModeError` when `AUTH_MODE` names no mode (see `get_auth_mode`).
     """
     auth_mode = get_auth_mode()
     match auth_mode:
