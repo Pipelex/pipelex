@@ -15,6 +15,7 @@ from pipelex import log
 from pipelex.system.environment import get_optional_env
 from pipelex.system.storage_scope import SINGLE_TENANT_USER_ID
 from pipelex.tools.log.error_fields import error_fields
+from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pydantic import BaseModel, Field
 
 from pipelex_api.error_types import ErrorType
@@ -86,6 +87,28 @@ class AuthMode(StrEnum):
     API_KEY = "api_key"
 
 
+class AuthRefusalReason(StrEnum):
+    """Why the server refused a caller's own credentials, as the `auth_refusal_reason` field of the line that says so.
+
+    These are the caller's mistakes, answered with a 401 the exception handler records at WARNING with its `error.type`
+    and `detail`, so the line naming the reason is diagnosis and logs at DEBUG. A token that verifies but whose
+    `user_id` claim is unusable is no caller's mistake: whoever minted it holds the server's secret, so it is the
+    deployment's issuer that is misconfigured, and that line stays a WARNING the operator can act on.
+    """
+
+    MISSING_BEARER_TOKEN = "missing_bearer_token"
+    EXPIRED_TOKEN = "expired_token"
+    INVALID_TOKEN = "invalid_token"
+    API_KEY_MISMATCH = "api_key_mismatch"
+
+
+#: The message of every line saying the server refused a caller's own credentials, its reason a field.
+CREDENTIALS_REFUSED_MESSAGE = "A caller's credentials were refused"
+
+#: The advice of every line about a verified token whose user id claim the server cannot use.
+TOKEN_ISSUER_USER_ACTION = "Have the token issuer put a path-safe user_id claim in every token, never the single-tenant id"
+
+
 class ForwardedIdentityHeader(StrEnum):
     """HTTP headers a trusted reverse proxy may forward to authenticate
     a caller when `TRUST_FORWARDED_IDENTITY_HEADERS=true`.
@@ -125,7 +148,10 @@ def get_auth_mode() -> AuthMode:
     try:
         return AuthMode(raw)
     except ValueError:
-        log.warning("AUTH_MODE names no known mode, so the server falls back to no authentication", fields={"env_var": "AUTH_MODE", "auth_mode": raw})
+        log.warning(
+            "An unknown authentication mode was replaced by no authentication",
+            fields={"env_var": "AUTH_MODE", "auth_mode": raw, USER_ACTION_FIELD: "Set AUTH_MODE to none, jwt or api_key"},
+        )
         return AuthMode.NONE
 
 
@@ -139,12 +165,14 @@ async def verify_jwt(
         # is configured with `auto_error=False` so this branch (rather than
         # FastAPI's default `HTTPException`) shapes the response — same RFC
         # 7807 `application/problem+json` as every other 401.
-        log.warning("JWT auth requested without a Bearer token")
+        log.debug(
+            CREDENTIALS_REFUSED_MESSAGE, fields={"auth_mode": AuthMode.JWT, "auth_refusal_reason": AuthRefusalReason.MISSING_BEARER_TOKEN}
+        )
         raise_unauthenticated("Missing or malformed Authorization header")
 
     jwt_secret = get_optional_env("JWT_SECRET_KEY")
     if not jwt_secret:
-        log.error("JWT_SECRET_KEY environment variable is not set")
+        log.error("An environment variable the authentication mode requires is not set", fields={"env_var": "JWT_SECRET_KEY", "auth_mode": AuthMode.JWT})
         raise_internal_server_error("Server configuration error: JWT_SECRET_KEY not configured", error_type=ErrorType.SERVER_MISCONFIGURED)
 
     token = credentials.credentials
@@ -163,12 +191,15 @@ async def verify_jwt(
         # the id becomes the owner segment of every storage key.
         user_id = payload.get("user_id")
         if not user_id:
-            log.warning("JWT missing user_id claim")
+            log.warning("A verified token has no user id claim", fields={USER_ACTION_FIELD: TOKEN_ISSUER_USER_ACTION})
             raise_unauthenticated("Invalid token: missing user_id claim", error_type=ErrorType.INVALID_TOKEN)
         if not isinstance(user_id, str) or not is_safe_user_id(user_id):
             # The claim is refused, so it is not `user.id`, which names an authenticated caller and is always a string:
             # the line carries the type the claim was decoded as, and never its value.
-            log.warning("A JWT's user_id claim is not a path-safe segment", fields={"claim_type": type(user_id).__name__})
+            log.warning(
+                "A verified token's user id claim is not a path-safe segment",
+                fields={"claim_type": type(user_id).__name__, USER_ACTION_FIELD: TOKEN_ISSUER_USER_ACTION},
+            )
             raise_unauthenticated("Invalid token: user_id claim must be a single path-safe segment", error_type=ErrorType.INVALID_TOKEN)
         if user_id == SINGLE_TENANT_USER_ID:
             # Path-safe, but reserved for the no-user-model deployment. An
@@ -176,7 +207,7 @@ async def verify_jwt(
             # land in the single-tenant namespace of a server that DOES have
             # users — beside whatever a no-auth deployment of the same image
             # wrote there.
-            log.warning("JWT user_id claim is the reserved single-tenant id")
+            log.warning("A verified token's user id claim is the reserved single-tenant id", fields={USER_ACTION_FIELD: TOKEN_ISSUER_USER_ACTION})
             raise_unauthenticated(
                 f"Invalid token: user_id claim must not be the reserved {SINGLE_TENANT_USER_ID!r} value",
                 error_type=ErrorType.INVALID_TOKEN,
@@ -186,10 +217,13 @@ async def verify_jwt(
         return payload
 
     except jwt.ExpiredSignatureError:
-        log.warning("JWT token has expired")
+        log.debug(CREDENTIALS_REFUSED_MESSAGE, fields={"auth_mode": AuthMode.JWT, "auth_refusal_reason": AuthRefusalReason.EXPIRED_TOKEN})
         raise_unauthenticated("Token expired", error_type=ErrorType.TOKEN_EXPIRED)
     except jwt.InvalidTokenError as exc:
-        log.warning("A JWT failed validation", fields=error_fields(exc=exc))
+        log.debug(
+            CREDENTIALS_REFUSED_MESSAGE,
+            fields={"auth_mode": AuthMode.JWT, "auth_refusal_reason": AuthRefusalReason.INVALID_TOKEN, **error_fields(exc=exc)},
+        )
         raise_unauthenticated("Invalid token", error_type=ErrorType.INVALID_TOKEN)
 
 
@@ -202,17 +236,19 @@ async def verify_api_key(credentials: Annotated[HTTPAuthorizationCredentials | N
         # Missing, empty, or non-Bearer `Authorization` header. See the
         # matching branch in `verify_jwt` for why this lives here and not
         # in `HTTPBearer`'s default `auto_error=True` behavior.
-        log.warning("API key auth requested without a Bearer token")
+        log.debug(
+            CREDENTIALS_REFUSED_MESSAGE, fields={"auth_mode": AuthMode.API_KEY, "auth_refusal_reason": AuthRefusalReason.MISSING_BEARER_TOKEN}
+        )
         raise_unauthenticated("Missing or malformed Authorization header")
 
     api_key = get_optional_env("API_KEY")
 
     if not api_key:
-        log.error("API_KEY environment variable is not set")
+        log.error("An environment variable the authentication mode requires is not set", fields={"env_var": "API_KEY", "auth_mode": AuthMode.API_KEY})
         raise_internal_server_error("Server configuration error: API_KEY not configured", error_type=ErrorType.SERVER_MISCONFIGURED)
 
     if credentials.credentials != api_key:
-        log.warning("API key mismatch")
+        log.debug(CREDENTIALS_REFUSED_MESSAGE, fields={"auth_mode": AuthMode.API_KEY, "auth_refusal_reason": AuthRefusalReason.API_KEY_MISMATCH})
         raise_unauthenticated("Invalid authentication token", error_type=ErrorType.INVALID_TOKEN)
 
     return credentials.credentials
@@ -245,13 +281,19 @@ async def no_auth(request: Request) -> None:
         # is missing, misconfigured, or bypassed — and continuing under a shared
         # owner is how a multi-tenant server silently becomes a single namespace
         # where every tenant reads the others' outputs. It is now a hard failure.
-        log.warning("TRUST_FORWARDED_IDENTITY_HEADERS is on but no X-User-Id was forwarded")
+        log.warning(
+            "No user id was forwarded though forwarded identity headers are trusted",
+            fields={
+                "env_var": "TRUST_FORWARDED_IDENTITY_HEADERS",
+                USER_ACTION_FIELD: "Make sure the proxy in front of the server authenticates every request and forwards X-User-Id",
+            },
+        )
         raise_unauthenticated("Identity required: no X-User-Id was forwarded", error_type=ErrorType.INVALID_TOKEN)
     if not is_safe_user_id(user_id):
         # A non-empty but path-unsafe id: the proxy intended to authenticate
         # someone and sent a malformed value. Fail closed.
         # No value: the header is refused, so it names no caller, and it is whatever text anyone reaching the server sent.
-        log.warning("A forwarded X-User-Id is not a path-safe segment, and the request is refused")
+        log.warning("A forwarded user id is not a path-safe segment and the request was refused")
         raise_bad_request("Forwarded X-User-Id must be a single path-safe segment", error_type=ErrorType.BAD_REQUEST)
 
     _set_request_user(request, user_id=user_id)

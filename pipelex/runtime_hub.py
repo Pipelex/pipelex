@@ -51,6 +51,7 @@ from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
 from pipelex.tools.misc.rich_extra import require_rich
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
+from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 
 if TYPE_CHECKING:
     # Deferred import: avoid pulling heavy SDK at module-load time
@@ -188,7 +189,7 @@ class RuntimeHub:
 
     def set_config(self, config: ConfigRoot):
         if self._config is not None:
-            log.warning("set_config() got called but it has already been set")
+            log.warning("A second configuration was ignored, since one is already set")
             return
         self._config = config
 
@@ -663,8 +664,8 @@ def resolve_run_mode_for_boot(*, requested: PipeRunMode) -> PipeRunMode:
     """
     if is_dry_run_forced() and requested.is_live:
         log.warning(
-            "LIVE run requested under a keyless boot (needs_inference=False): forcing run_mode to DRY — "
-            "outputs will be synthetic mocks, not real inference."
+            "A live run was forced dry because this boot has no inference",
+            fields={USER_ACTION_FIELD: "Boot with inference to get real outputs rather than synthetic mocks"},
         )
         return PipeRunMode.DRY
     return requested

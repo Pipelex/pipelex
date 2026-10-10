@@ -51,6 +51,7 @@ from pipelex.system.runtime import ProblemReaction
 from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.urls import URLs
+from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 
 LLM_PRESET_DISABLED = "disabled"
 
@@ -73,9 +74,13 @@ def _warn_if_ambiguous_bare_handle(
         matching_reference_kinds.append(ModelReferenceKind.WATERFALL)
     if matching_reference_kinds:
         log.warning(
-            "A bare model name also names a preset, an alias or a waterfall, and is read as a direct model handle; "
-            "prefix it ($ or preset:, @ or alias:, ~ or waterfall:) to avoid the ambiguity",
-            fields={"model_handle": name, "model_type": model_type, "matching_reference_kinds": matching_reference_kinds},
+            "An ambiguous bare model name was read as a direct model handle",
+            fields={
+                "model_handle": name,
+                "model_type": model_type,
+                "matching_reference_kinds": matching_reference_kinds,
+                USER_ACTION_FIELD: "Prefix the name with $ or preset: for a preset, @ or alias: for an alias, ~ or waterfall: for a waterfall",
+            },
         )
 
 
@@ -1027,7 +1032,7 @@ class ModelDeck(ConfigModel):
         waterfall_key = f"{NAMESPACE_WATERFALL}{waterfall_name}"
         if waterfall_key in visited:
             if not is_quiet:
-                log.warning("A model waterfall leads back to itself, so it resolves to no model", fields={"model_handle": waterfall_key})
+                log.warning("A model waterfall that leads back to itself resolves to no model", fields={"model_handle": waterfall_key})
             return None
         step_visited = visited | {waterfall_key}
         ideal_model_handle = fallback_list[0]
@@ -1065,14 +1070,13 @@ class ModelDeck(ConfigModel):
                 if fallback_index > 0 and not is_quiet and waterfall_name not in self._logged_fallback_warnings:
                     # Waterfall success: we explain what happened in the logs
                     log.info(
-                        "A waterfall's first model is not in the model deck, so a fallback model replaces it; the results may not have "
-                        "the expected quality, and the method may hit feature limits such as the context window. Consider getting access "
-                        "to the first model",
+                        "A fallback model replaces a waterfall's first model, which the deck lacks",
                         fields={
                             "model_handle": waterfall_key,
                             "ideal_model_handle": ideal_model_handle,
                             "fallback_model_handle": fallback,
                             OTelLogAttr.URL_FULL: URLs.backend_provider_docs,
+                            USER_ACTION_FIELD: "Get access to the first model, since a fallback may lower the quality or hit limits such as its context window",
                         },
                     )
                     # Mark this warning as logged for this waterfall_name
@@ -1097,7 +1101,7 @@ class ModelDeck(ConfigModel):
         alias_key = f"{NAMESPACE_ALIAS}{alias_name}"
         if alias_key in visited:
             if not is_quiet:
-                log.warning("A model alias leads back to itself, so it resolves to no model", fields={"model_handle": alias_key})
+                log.warning("A model alias that leads back to itself resolves to no model", fields={"model_handle": alias_key})
             return None
         if not is_quiet:
             log.verbose(f"Alias '{alias_name}' -> '{alias_target}'")
@@ -1222,7 +1226,7 @@ class ModelDeck(ConfigModel):
             return None
         if served_types := self.inference_models.types_serving(handle=ref.name):
             log.warning(
-                "A model handle is served as another model type than the one requested, so it is skipped",
+                "A model handle served as another model type than requested was skipped",
                 fields={"model_handle": ref.name, "model_type": model_type, "served_model_types": served_types},
             )
             return None

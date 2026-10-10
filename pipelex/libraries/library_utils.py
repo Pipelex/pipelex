@@ -38,7 +38,7 @@ def get_pipelex_mthds_files_from_package() -> list[Path]:
                         _find_mthds_in_traversable(child, collected=collected)
         except (PermissionError, OSError) as exc:
             log.warning(
-                "A directory of the pipelex package could not be read, so its MTHDS files are left out",
+                "A directory of the pipelex package could not be read and was left out",
                 fields={OTelLogAttr.FILE_PATH: str(traversable), **error_fields(exc=exc)},
             )
 
@@ -60,9 +60,7 @@ def get_pipelex_package_dir_for_imports() -> Path | None:
         if pkg_path.exists() and pkg_path.is_dir():
             return pkg_path
     except (TypeError, ValueError, OSError) as exc:
-        log.warning(
-            "The pipelex package is not a directory on the filesystem, so its modules cannot be imported from it", fields=error_fields(exc=exc)
-        )
+        log.warning("The pipelex package is not a directory, and its modules were not imported", fields=error_fields(exc=exc))
     return None
 
 

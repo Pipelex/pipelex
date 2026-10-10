@@ -137,7 +137,7 @@ class TestPipeRun:
             await PipeRun(pipe_router=mock_router).run(pipe_job=mock_job)
 
         (failure_record,) = [
-            record for record in caplog.records if record.name == pipe_run_module.__name__ and record.getMessage() == "Pipe execution failed"
+            record for record in caplog.records if record.name == pipe_run_module.__name__ and record.getMessage() == "The execution of a pipe failed"
         ]
         record_fields = vars(failure_record)
         assert record_fields["pipe_code"] == "describe_company"

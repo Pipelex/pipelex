@@ -382,7 +382,7 @@ class TelemetryManager(TelemetryManagerAbstract):
             case PostHogMode.IDENTIFIED:
                 if not self.telemetry_config.custom_posthog.user_id:
                     log.warning(
-                        "An event could not be tracked as identified because no user_id is set, and was tracked as anonymous",
+                        "An event with no user id to identify it was tracked as anonymous",
                         fields={"event_name": event_name},
                     )
                     self._capture_custom_event(event_name, properties=tracked_properties, identity=TelemetryIdentity.make_anonymous())
@@ -423,7 +423,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         dict must not carry that mark away with it.
         """
         if not self.custom_posthog_client:
-            log.error("Could not track event to custom telemetry because custom_posthog_client is not set")
+            log.error("An event could not be tracked to custom telemetry, which has no PostHog client")
             return
         capture_properties = dict(properties)
         if identity.distinct_id:

@@ -418,7 +418,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         requested_temperature = self._scaled_temperature(inference_model=self.inference_model, temperature=llm_job.job_params.temperature)
         if fixed_temperature is not None and requested_temperature != fixed_temperature:
             log.warning(
-                "The model takes a fixed temperature, so it is used in place of the requested one",
+                "The model's fixed temperature was used in place of the requested one",
                 fields={
                     "model_handle": self.inference_model.name,
                     "backend_name": self.inference_model.backend_name,

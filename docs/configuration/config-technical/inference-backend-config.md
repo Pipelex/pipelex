@@ -694,7 +694,8 @@ Common error types:
 You do not have to do anything about that at boot. Pipelex reads the migration history for the `inference/backends/` files, carries the out-of-date ones forward **in memory**, and starts with a warning line for each file, the file and what the migration history carried forward following the message as fields:
 
 ```
-WARNING  🧠: A configuration file is out of date and was read as if it had been migrated, and nothing was written; run `pipelex migrate` to update it file.path=/Users/me/.pipelex/inference/backends/openai.toml migration_steps=["Drop prompting_target from every backend definition"] has_blocked_steps=false
+WARNING  A configuration file is out of date and was migrated in memory only file.path=…/.pipelex/inference/backends/openai.toml migration_steps="[\"Drop prompting_target from every backend definition\"]" has_blocked_steps=false
+         → Run pipelex migrate to update it
 ```
 
 Nothing has been written at that point, so the warning comes back at the next boot until you run the command:

@@ -32,6 +32,7 @@ from pipelex.methods.fetching import fetch_method_package
 from pipelex.methods.method_ref import MethodRef, looks_like_method_ref, parse_method_ref
 from pipelex.methods.structures_check import describe_structured_content_violations, scan_structured_content_classes
 from pipelex.system.telemetry.otel_constants import OTelLogAttr
+from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 
 # The remedy every refusal ends with. It names no directory: on a host, the runtime's own store is not the caller's to write.
 MANUAL_INSTALL_HINT = "install the package where this runtime runs (for example with `mthds install <address>`)"
@@ -83,7 +84,7 @@ def find_vendored_method(*, full_address: str, methods_dirs: list[Path]) -> Inst
         version = vendored.manifest.version
         if lookup.ref.tag not in {version, f"v{version}"}:
             log.warning(
-                "A method reference pins a tag, and the copy shipped with the request is another version, which is used",
+                "A shipped method copy was used though its version is not the pinned tag",
                 fields={"method_ref": lookup.ref.ref_str, "package_version": version},
             )
     return vendored
@@ -95,14 +96,15 @@ def _warn_on_tag_mismatch(*, installed: InstalledMethod, ref: MethodRef | None) 
         return
     if installed.provenance is not None and installed.provenance.tag == ref.tag:
         return
-    mismatch_fields: dict[str, str | None] = {"method_ref": ref.ref_str, OTelLogAttr.FILE_PATH: str(installed.path)}
+    mismatch_fields: dict[str, str | None] = {
+        "method_ref": ref.ref_str,
+        OTelLogAttr.FILE_PATH: str(installed.path),
+        USER_ACTION_FIELD: "Remove the installed copy to fetch the pinned tag",
+    }
     if installed.provenance is not None:
         # Absent when the copy's provenance was never recorded, and None when the copy was fetched with no tag.
         mismatch_fields["installed_tag"] = installed.provenance.tag
-    log.warning(
-        "A method reference pins a tag the installed copy was not fetched at, so the installed copy is used; removing it re-fetches the pinned tag",
-        fields=mismatch_fields,
-    )
+    log.warning("A method's installed copy was used though not fetched at the pinned tag", fields=mismatch_fields)
 
 
 def resolve_address_based_method(
@@ -188,9 +190,12 @@ def resolve_address_based_method(
         if violations:
             # The remedy is in the message, which the console never cuts; `STRUCTURES_REFUSAL_REMEDY` says it at length in the refusal.
             log.warning(
-                "A fetched method declares Python structure classes: it runs locally, but hosted execution refuses them, "
-                "so declare these types as MTHDS concepts with inline structures",
-                fields={"package_address": fetched.full_address, "structure_classes": describe_structured_content_violations(violations=violations)},
+                "A fetched method declares Python structure classes, which hosted runs refuse",
+                fields={
+                    "package_address": fetched.full_address,
+                    "structure_classes": describe_structured_content_violations(violations=violations),
+                    USER_ACTION_FIELD: "Declare these types as MTHDS concepts with inline structures",
+                },
             )
 
         name = fetched.manifest.name or fetched.package_dir.name

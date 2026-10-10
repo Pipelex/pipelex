@@ -52,6 +52,7 @@ from pipelex.tools.log.summary_event import SummaryEvent
 from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path, is_snake_case
 from pipelex.validation_error_types import PipeValidationErrorType
+from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 
 if TYPE_CHECKING:
     from pipelex.system.trace_context import TraceContext
@@ -257,8 +258,8 @@ class PipeAbstract(ABC, BaseModel):
         if "." in code:
             bare_code = code.rsplit(".", maxsplit=1)[1]
             log.warning(
-                "A pipe code carries a namespace prefix, which was stripped: write the pipe code bare",
-                fields={"pipe_code": bare_code, "pipe_ref": code},
+                "A namespace prefix was stripped from a pipe code",
+                fields={"pipe_code": bare_code, "pipe_ref": code, USER_ACTION_FIELD: "Write the pipe code bare"},
             )
             code = bare_code
         if not is_snake_case(code):

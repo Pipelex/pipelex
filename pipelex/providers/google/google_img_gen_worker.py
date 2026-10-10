@@ -135,7 +135,7 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
 
         usage_metadata: genai_types.GenerateContentResponseUsageMetadata | None = response.usage_metadata
         if not usage_metadata:
-            log.warning("No usage metadata returned from Google")
+            log.warning("Google returned no usage metadata")
 
         if usage_metadata and (img_gen_tokens_usage := img_gen_job.job_report.img_gen_tokens_usage):
             request_tokens = GoogleFactory.extract_token_usage(usage_metadata)

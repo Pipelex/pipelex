@@ -136,7 +136,7 @@ class TestNoAuthForwardedHeaders:
         (record,) = [
             record
             for record in caplog.records
-            if record.getMessage() == "A forwarded X-User-Id is not a path-safe segment, and the request is refused"
+            if record.getMessage() == "A forwarded user id is not a path-safe segment and the request was refused"
         ]
         carried = carried_attributes(record=record)
         assert OTelLogAttr.USER_ID not in carried

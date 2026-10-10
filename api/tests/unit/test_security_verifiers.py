@@ -144,7 +144,7 @@ class TestSecurityVerifiers:
             response = client.get(RoutePath.WHOAMI, headers={"Authorization": f"Bearer {token}"})
 
         assert response.status_code == 401
-        (record,) = [record for record in caplog.records if record.getMessage() == "A JWT's user_id claim is not a path-safe segment"]
+        (record,) = [record for record in caplog.records if record.getMessage() == "A verified token's user id claim is not a path-safe segment"]
         carried = carried_attributes(record=record)
         assert carried.get("claim_type") == expected_claim_type
         assert OTelLogAttr.USER_ID not in carried
@@ -286,3 +286,97 @@ class TestSecurityVerifiers:
         assert response.headers["content-type"] == "application/problem+json"
         assert response.headers["WWW-Authenticate"] == "Bearer"
         assert response.json()["error_type"] == "Unauthenticated"
+
+
+SECURITY_LOGGER = "pipelex_api.security"
+
+
+def _security_records(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
+    return [record for record in caplog.records if record.name == SECURITY_LOGGER]
+
+
+class TestSecurityLogLevels:
+    """A caller's own credential mistakes log at DEBUG, their reason a field; the server's misconfigurations keep their level.
+
+    The exception handler records every 401 at WARNING with its `error.type` and `detail` already, so a stale client's
+    refusals flooded the warnings twice over when the security module warned as well.
+    """
+
+    @pytest.mark.parametrize(
+        ("client_kind", "secret", "authorization", "expected_mode", "expected_reason"),
+        [
+            ("jwt", JWT_SECRET, None, "jwt", "missing_bearer_token"),
+            ("jwt", JWT_SECRET, "expired", "jwt", "expired_token"),
+            ("jwt", JWT_SECRET, "Bearer not.a.real.token", "jwt", "invalid_token"),
+            ("api_key", API_KEY, None, "api_key", "missing_bearer_token"),
+            ("api_key", API_KEY, "Bearer wrong-key", "api_key", "api_key_mismatch"),
+        ],
+        ids=["jwt without a token", "an expired jwt", "an invalid jwt", "api key without a token", "a wrong api key"],
+    )
+    def test_a_callers_refused_credentials_log_at_debug_with_their_reason(
+        self,
+        mocker: MockerFixture,
+        caplog: pytest.LogCaptureFixture,
+        client_kind: str,
+        secret: str,
+        authorization: str | None,
+        expected_mode: str,
+        expected_reason: str,
+    ):
+        mocker.patch("pipelex_api.security.get_optional_env", return_value=secret)
+        client = _build_jwt_client() if client_kind == "jwt" else _build_api_key_client()
+        route = RoutePath.WHOAMI if client_kind == "jwt" else RoutePath.PING
+        if authorization == "expired":
+            authorization = f"Bearer {jwt.encode({'user_id': USER_ID_UUID, 'exp': 0}, JWT_SECRET, algorithm='HS256')}"
+        headers = {"Authorization": authorization} if authorization is not None else {}
+
+        with caplog.at_level(logging.DEBUG, logger=SECURITY_LOGGER):
+            response = client.get(route, headers=headers)
+
+        assert response.status_code == 401
+        (record,) = _security_records(caplog)
+        assert record.levelno == logging.DEBUG
+        assert record.getMessage() == "A caller's credentials were refused"
+        carried = carried_attributes(record=record)
+        assert carried["auth_mode"] == expected_mode
+        assert carried["auth_refusal_reason"] == expected_reason
+
+    @pytest.mark.parametrize(
+        ("client_kind", "expected_env_var"),
+        [("jwt", "JWT_SECRET_KEY"), ("api_key", "API_KEY")],
+    )
+    def test_a_missing_secret_still_logs_at_error_naming_the_variable(
+        self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture, client_kind: str, expected_env_var: str
+    ):
+        mocker.patch("pipelex_api.security.get_optional_env", return_value=None)
+        client = _build_jwt_client() if client_kind == "jwt" else _build_api_key_client()
+        route = RoutePath.WHOAMI if client_kind == "jwt" else RoutePath.PING
+
+        with caplog.at_level(logging.DEBUG, logger=SECURITY_LOGGER):
+            response = client.get(route, headers={"Authorization": "Bearer anything"})
+
+        assert response.status_code == 500
+        (record,) = _security_records(caplog)
+        assert record.levelno == logging.ERROR
+        assert carried_attributes(record=record)["env_var"] == expected_env_var
+
+    @pytest.mark.parametrize(
+        "claims",
+        [{"iat": 0}, {"user_id": "a/b"}, {"user_id": SINGLE_TENANT_USER_ID}],
+        ids=["no user id claim", "an unsafe user id claim", "the single-tenant id"],
+    )
+    def test_a_verified_token_with_an_unusable_claim_still_warns_the_operator(
+        self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture, claims: dict[str, object]
+    ):
+        """A token that verifies was minted by whoever holds the server's secret, so its unusable claim is the issuer's to fix."""
+        mocker.patch("pipelex_api.security.get_optional_env", return_value=JWT_SECRET)
+        client = _build_jwt_client()
+        token = jwt.encode(claims, JWT_SECRET, algorithm="HS256")
+
+        with caplog.at_level(logging.DEBUG, logger=SECURITY_LOGGER):
+            response = client.get(RoutePath.WHOAMI, headers={"Authorization": f"Bearer {token}"})
+
+        assert response.status_code == 401
+        (record,) = _security_records(caplog)
+        assert record.levelno == logging.WARNING
+        assert "user_action" in carried_attributes(record=record)

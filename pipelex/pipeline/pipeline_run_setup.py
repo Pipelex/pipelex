@@ -488,7 +488,7 @@ async def pipeline_run_setup(
                             # it, so its traceback would print the setup error's text, which the setup error's own
                             # catcher reports, and which can quote a run's inputs.
                             log.error(
-                                "Closing the graph tracer also failed while cleaning up after the setup failed; the setup error is raised",
+                                "The graph tracer could not be closed after the run setup failed",
                                 fields=error_fields(exc=close_error),
                             )
             finally:

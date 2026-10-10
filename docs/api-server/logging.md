@@ -72,6 +72,13 @@ Every field in that table is a **record attribute**, which is a different thing 
 
 Disposition follows the HTTP status, not the error domain: a `4xx` is a caller mistake and logs at `WARNING` without a traceback; a `5xx` is a server fault and logs at `ERROR` with one. See [Error Responses](error-responses.md) for the response side of the same failure.
 
+## Authentication lines
+
+The error line above is the record of every refused request, a `401` included, at `WARNING`. The authentication check before it says why it refused, at a level that depends on who has to act:
+
+- **A caller's own mistake logs at `DEBUG`**: no bearer token, an expired or invalid token, a wrong API key. Each is the line `A caller's credentials were refused`, its `auth_mode` naming the mode in force and its `auth_refusal_reason` one of `missing_bearer_token`, `expired_token`, `invalid_token` and `api_key_mismatch`, with an invalid token's `error.type` and `error.message` beside it. The operator can do nothing about a client holding a stale token, so its refusals add nothing to the warnings beyond the error line of each request.
+- **A misconfiguration of the deployment keeps its level**: an unknown `AUTH_MODE`, and forwarded identity headers trusted while a request arrives without a user id, log at `WARNING`, and an unset `JWT_SECRET_KEY` or `API_KEY` at `ERROR`, each naming the variable in `env_var`. A token that verifies against the server's secret but whose `user_id` claim is missing, is not a path-safe segment or is the reserved single-tenant id logs at `WARNING` too: whoever minted it holds the secret, so it is the deployment's token issuer that needs fixing, which the line's `user_action` says.
+
 ## Configuration
 
 The keys live in `[runtime.log]` of the server's own `api/.pipelex/pipelex.toml`, which the image copies to `/root/.pipelex/`:

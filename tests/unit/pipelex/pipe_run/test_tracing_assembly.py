@@ -189,7 +189,7 @@ class TestTracingAssembly:
         with caplog.at_level(logging.WARNING, logger=_MODULE):
             assemble_tracing(pipeline_run_id="plr-activity", assemble_graph=True, assemble_usage=True, run_metadata=run_metadata)
 
-        (record,) = [record for record in caplog.records if record.getMessage() == "Tracing assembly could not read the run's trace events"]
+        (record,) = [record for record in caplog.records if record.getMessage() == "The trace events of a run could not be read for its tracing assembly"]
         assert getattr(record, PIPELINE_RUN_ID_FIELD) == "plr-activity"
         assert getattr(record, REQUEST_ID_FIELD) == "req-activity"
         assert get_log_context() is None, "the binding is released when the assembly returns"

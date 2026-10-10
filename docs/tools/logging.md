@@ -254,13 +254,13 @@ A record's advice, its `user_action` field, is not written in the suffix: the co
 
 ```python
 log.warning(
-    "A configuration file is out of date and was read as if migrated",
+    "A configuration file is out of date and was migrated in memory only",
     fields={"file.path": "/home/me/project/.pipelex/pipelex.toml", "user_action": "Run pipelex migrate to update it"},
 )
 ```
 
 ```text
-WARNING  A configuration file is out of date and was read as if migrated file.path=/home/me/project/.pipelex/pipelex.toml
+WARNING  A configuration file is out of date and was migrated in memory only file.path=/home/me/project/.pipelex/pipelex.toml
          → Run pipelex migrate to update it
 ```
 
@@ -441,6 +441,32 @@ log.warning(
 )
 ```
 
+### Wording a message
+
+A message says what happened, and how it was handled when that matters, in one short sentence a reader takes in at a glance. The [log-call guard](../contribute/log-calls.md) holds every call to the rules below that can be read off the source; the rest is for review.
+
+- **One shape.** The subject comes first, then what happened to it, in the past tense or as a state: "A pipe of a dependency could not be loaded", "The routing profiles were read with override files merged over the base", "A stuff name starts with an underscore". A failure is "could not be", never "Failed to". The [summary events](#summary-events) and the pipe-run announcement keep their present-tense names, `Inference call ends`, `Pipe run ends` and `Pipe run starts`, which name events rather than tell what happened.
+- **Short.** At INFO and above a message holds at most 80 characters, so the line, its fields included, mostly stays on one line of a terminal. A consequence the reader needs goes in the sentence when it fits, "A model waterfall that leads back to itself resolves to no model", and the rest in fields; a second clause after "so" or ";" is a sign the sentence carries two things.
+- **Advice in `user_action`.** What the reader should do rides in the `user_action` field, one imperative sentence written like a message, a command included as plain text: `fields={"user_action": "Run pipelex migrate to update it"}`. One event with several remedies is then one message with several `user_action` values, so a log store counts the event once whatever the cause. The console prints the advice on a line of its own under the record ([The advice under the line](#the-advice-under-the-line)), and every other sink writes it as a field. Pipelex's error reports carry their advice under the same name.
+- **No identifier and no backtick.** A message is written for the person reading the log, not for the code: no snake_case name, no call, no `needs_inference=False`, no backticks. What the reader needs of an identifier is a field's value: an environment variable's name rides in `env_var`, a job's class in `inference_job_type`. A word of Pipelex's own vocabulary, a pipe type such as `PipeBatch` or a file such as `METHODS.toml`, is a word like any other.
+- **A capital, no period, no prefix.** A message starts with a capital letter and ends with no period and no `...`, and carries no subsystem tag such as `OTel:`, since the logger's name already says where a line comes from.
+- **DEBUG and VERBOSE follow the same wording**, beside the f-strings they may keep, and one thing has one verb: a client that is made is "Made" on every line, never "Init" on one and "Initializing" on the next.
+
+```python
+# Not this: the event, its consequence and the remedy in one sentence of 137 characters
+log.warning(
+    "A method reference pins a tag the installed copy was not fetched at, so the installed copy is used; "
+    "removing it re-fetches the pinned tag",
+    fields={"method_ref": method_ref, "installed_tag": installed_tag},
+)
+
+# This: what happened in one sentence, the remedy in user_action
+log.warning(
+    "A method's installed copy was used though not fetched at the pinned tag",
+    fields={"method_ref": method_ref, "installed_tag": installed_tag, "user_action": "Remove the installed copy to fetch the pinned tag"},
+)
+```
+
 ### Values in fields
 
 What varies goes in `fields`, named by the [naming convention](#naming-convention), and one concept has one name across the codebase, so that a query written for one line finds every line about the same thing. Pipelex's own concepts take the names in the table below. A concept the OpenTelemetry semantic conventions define takes their key verbatim: `file.path` for a path on disk and `file.name` for a file's name alone, `url.full` for a URL and `url.path` for the path of a request's URL, `server.address` for the host a request is sent to, `http.response.status_code` for the status of an HTTP response, `user.id` for the authenticated caller, never an identity the server refused, `error.type` for the class of an error, and the `gen_ai.*` keys for inference, such as `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.request.temperature`, `gen_ai.operation.name`, `gen_ai.usage.input_tokens` and `gen_ai.usage.output_tokens`. A `gen_ai.*` key means on a log line what it means on Pipelex's LLM span: `gen_ai.request.model` is the model's handle and `gen_ai.response.model` the provider's id the model deck pins for that handle, the one the call is made with, whichever model the provider says answered. `gen_ai.operation.name` is the one exception for now, as [the inference call end](#the-inference-call-end) explains. A line about an inference call carries them beside `model_handle`, `backend_name` and `sdk`, so it joins its span in a log store, while `model_handle` names the handle on every line about a model, inference or not. An OpenTelemetry key that more than one call site uses is spelled through a constant, so a misspelt one is an error the type checker reports rather than a field no query finds: `OTelLogAttr` in `pipelex/system/telemetry/otel_constants.py` holds those keys, `GenAISpanAttr` beside it the `gen_ai.*` ones, and `pipelex.tools.log.error_fields` the two error keys. A count is named `<what>_count` (`concept_count`) and a duration `duration_ms`, in milliseconds. A path is named `<what>_path`, a list of paths `<what>_paths`, a directory `<what>_dir` and a file as a declaration names it `<what>_file`, with their plurals, beside `file.path`: the console takes a field for a path by that ending and cuts its value at its start, keeping the file's name (see [Fields after the message](#fields-after-the-message)), so a field holding no path takes none of these endings. A field carries one JSON type on every line that has it, `null` aside, so a query compares it one way: where the value would be an integer on some lines and a word on others, `unbounded` for instance, the field is left out of the lines the word would name, and the table says so.
@@ -522,12 +548,14 @@ What varies goes in `fields`, named by the [naming convention](#naming-conventio
 | `env_var` | string | The name of an environment variable, never its value |
 | `default_value` | integer | The value a setting falls back to when its environment variable holds none it can use |
 | `auth_mode` | string | The authentication mode the API server's `AUTH_MODE` names |
+| `auth_refusal_reason` | string | Why the API server refused a caller's own credentials: `missing_bearer_token`, `expired_token`, `invalid_token` or `api_key_mismatch` |
 | `claim_type` | string | The type a token's claim was decoded as, by its Python name, where the claim is refused and its value is not logged: `str`, `int`, `dict` |
 | `error.type`, `error.message` | string | A handled exception's class name and its text, as [Exceptions](#exceptions) describes |
 | `error_domain` | string | Who fixes a failure, as an error report classifies it: `input`, `config`, `runtime` |
 | `error_category` | string | A failure's Pipelex classification, as an error report carries it |
 | `retryable` | boolean | Whether retrying the failed call as it was can help, as an error report says |
 | `detail` | string | The explanation an API error response gives its caller |
+| `user_action` | string | What the reader of a line should do about it, one imperative sentence: `Run pipelex migrate to update it`. The console prints it on a line of its own under the record, as [The advice under the line](#the-advice-under-the-line) shows |
 | `provider_status_code` | integer | The HTTP status an inference provider answered a failed call with |
 | `provider_request_id` | string | The id an inference provider gave a failed call |
 
