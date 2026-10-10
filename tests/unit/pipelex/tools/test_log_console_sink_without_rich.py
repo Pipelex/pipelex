@@ -27,7 +27,7 @@ _GUARD_SCRIPT = textwrap.dedent(
     from pipelex.system.console_target import ConsoleTarget
     from pipelex.system.exceptions import MissingDependencyError
     from pipelex.tools.log.console_log_sink import ConsoleLogSink
-    from pipelex.tools.log.log_config import HighlighterName, RichLogConfig
+    from pipelex.tools.log.log_config import HighlighterName, PackagePrefix, RichLogConfig
     from pipelex.tools.misc.rich_extra import RICH_EXTRA_NAME
 
     sink = ConsoleLogSink(
@@ -42,6 +42,7 @@ _GUARD_SCRIPT = textwrap.dedent(
             is_tracebacks_show_locals=False,
             tracebacks_suppress=[],
             keywords_to_hilight=[],
+            package_prefix=PackagePrefix.LIBRARIES,
         ),
         target=ConsoleTarget.STDERR,
     )

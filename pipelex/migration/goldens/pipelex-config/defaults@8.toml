@@ -97,7 +97,10 @@ pipelex = "INFO"
 
 # The settings of the "console" sink. is_show_path adds a column at the right of every line naming the
 # source file and line that logged it, which makes a long line wrap; is_link_path_enabled makes that
-# path clickable where the terminal supports links.
+# path clickable where the terminal supports links. package_prefix chooses which lines start with their
+# logger's top-level package name, dimmed: "libraries" names another library's package and leaves a
+# line from pipelex or a pipelex_ package bare, "all" names every line's package, Pipelex's own
+# included, and "none" names none. A line logged on the root logger never carries one.
 [runtime.log.rich_log]
 is_show_time = false
 is_show_level = true
@@ -109,6 +112,7 @@ is_tracebacks_word_wrap = true
 is_tracebacks_show_locals = false
 tracebacks_suppress = []
 keywords_to_hilight = []
+package_prefix = "libraries"
 
 # The settings of the "otlp" sink. An endpoint key, when set, names the collector's logs URL
 # (for instance "http://localhost:4318/v1/logs"); left unset, the exporter follows the OpenTelemetry

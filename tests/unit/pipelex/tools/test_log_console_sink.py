@@ -23,7 +23,7 @@ from pipelex.system.console_target import ConsoleTarget
 from pipelex.tools.log.console_fields import ADVICE_STYLE, one_line_text
 from pipelex.tools.log.console_layouts import LogLayout
 from pipelex.tools.log.console_log_sink import ConsoleLogSink
-from pipelex.tools.log.log_config import HighlighterName, LogConfig, RichLogConfig
+from pipelex.tools.log.log_config import HighlighterName, LogConfig, PackagePrefix, RichLogConfig
 from pipelex.tools.log.log_fields import RICH_MARKUP_ATTRIBUTE, USER_ACTION_FIELD, attach_log_record_extra
 from pipelex.tools.log.log_redaction import CYCLE_TEXT
 from pipelex.tools.misc.toml_utils import load_toml_from_path
@@ -202,6 +202,30 @@ class TestConsoleLogSink:
 
         assert text.plain == "httpx: HTTP Request: POST attempt=2"
         assert "dim" in styles_of(text=text, fragment="httpx: ")
+
+    def test_with_package_prefix_all_a_pipelex_line_starts_with_its_package_name_dimmed(self) -> None:
+        config = _package_rich_log_config().model_copy(update={"package_prefix": PackagePrefix.ALL})
+        record = record_with_fields(message="Model resolved", logger_name="pipelex.cogt.inference", extra={"attempt": 2})
+
+        text = rendered_text(record=record, rich_log_config=config)
+
+        assert text.plain == "pipelex: Model resolved attempt=2"
+        assert "dim" in styles_of(text=text, fragment="pipelex: ")
+
+    def test_with_package_prefix_all_a_root_line_still_carries_no_prefix(self) -> None:
+        config = _package_rich_log_config().model_copy(update={"package_prefix": PackagePrefix.ALL})
+
+        text = rendered_text(record=record_with_fields(message="Loaded the library", logger_name="root"), rich_log_config=config)
+
+        assert text.plain == "Loaded the library"
+
+    def test_with_package_prefix_none_a_line_from_another_library_carries_no_prefix(self) -> None:
+        config = _package_rich_log_config().model_copy(update={"package_prefix": PackagePrefix.NONE})
+        record = record_with_fields(message="HTTP Request: POST", logger_name="httpx._client", extra={"attempt": 2})
+
+        text = rendered_text(record=record, rich_log_config=config)
+
+        assert text.plain == "HTTP Request: POST attempt=2"
 
     @pytest.mark.parametrize("is_show_path", [False, True], ids=["the default", "is_show_path"])
     def test_the_source_path_column_shows_only_when_the_setting_asks_for_it(self, is_show_path: bool) -> None:

@@ -160,12 +160,22 @@ is_show_time = false
 is_show_level = true
 is_show_path = false
 is_link_path_enabled = true
+package_prefix = "libraries"  # or "all", or "none"
 ```
 
 - `is_show_time`: Show timestamp in logs
 - `is_show_level`: Show log level
 - `is_show_path`: Show the source file and line that logged each record, in a column at the right of the line. It is off by default: the column takes about 25 characters of every line and makes a long one wrap
 - `is_link_path_enabled`: Make that path clickable, where the terminal supports links
+- `package_prefix`: Choose which lines start with their logger's top-level package name, dimmed, such as `httpx: ` (see [Another library's lines](../../tools/logging.md#another-librarys-lines))
+
+`package_prefix` takes one of three values:
+
+- `libraries`, the default: a line another library logged starts with its package name, and a line from `pipelex` or from a package whose name starts with `pipelex_`, the API server's `pipelex_api` or a plugin named that way, has none. A plugin whose package is named otherwise counts as another library
+- `all`: every line starts with its package name, Pipelex's own included, so `pipelex: `, `pipelex_api: ` and a plugin's name tell the runtime, the API server and the plugin apart
+- `none`: no line has one
+
+A line logged on the root logger names no package, so it never starts with one, whatever the value.
 
 ### Syntax Highlighting
 
@@ -311,6 +321,7 @@ is_tracebacks_word_wrap = true
 is_tracebacks_show_locals = false
 tracebacks_suppress = []
 keywords_to_hilight = ["error", "warning", "failed"]
+package_prefix = "libraries"
 
 [runtime.log.otlp]
 headers = {}
