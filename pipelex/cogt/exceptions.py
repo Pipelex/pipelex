@@ -396,6 +396,74 @@ class LLMCompletionError(CogtError):
     pass
 
 
+class LLMCompletionTruncatedError(LLMCompletionError):
+    """A text completion stopped before the model finished it: it hit its output limit, or its context window.
+
+    A worker raises it when its provider's stop signal says the text was cut (see
+    `pipelex.cogt.llm.completion_stop`), instead of handing back the partial or empty text as a result. It
+    is a content error, in the input domain, and not retryable: the same request stops at the same limit,
+    and the remedy is the author's or the caller's, a higher `max_tokens` on the pipe or a shorter input.
+    The message names only the pipe, the model's deck handle, the provider's stop value and the token
+    counts, never the partial text or the provider's body, so it is kept verbatim for the caller.
+    """
+
+    error_category = InferenceErrorCategory.CONTENT
+    _authors_caller_facing_message = True
+
+    def __init__(
+        self,
+        *,
+        model_handle: str,
+        stop_reason: str,
+        pipe_code: str | None = None,
+        max_tokens: int | None = None,
+        output_tokens: int | None = None,
+    ):
+        subject = f"the text of pipe '{pipe_code}'" if pipe_code else "its text"
+        details = [f"stop reason '{stop_reason}'"]
+        if output_tokens is not None:
+            details.append(f"{output_tokens} output tokens used")
+        if max_tokens is not None:
+            details.append(f"max_tokens set to {max_tokens}")
+        next_step = "Raise the pipe's max_tokens, or shorten its input." if pipe_code else "Raise max_tokens, or shorten the input."
+        message = (
+            f"The model '{model_handle}' was cut off before it finished {subject} ({', '.join(details)}), so the text is incomplete. {next_step}"
+        )
+        super().__init__(message, user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail=next_step))
+        self.model_handle = model_handle
+        self.stop_reason = stop_reason
+        self.pipe_code = pipe_code
+        self.max_tokens = max_tokens
+        self.output_tokens = output_tokens
+
+
+class LLMCompletionRefusedError(LLMCompletionError):
+    """A text completion the model declined to write, or that a provider's safety filter stopped.
+
+    A worker raises it when its provider's stop signal says the model refused or a filter cut the text (see
+    `pipelex.cogt.llm.completion_stop`), instead of handing back the partial or empty text as a result. It
+    is a content error, in the input domain, and not retryable: what a model declines or a filter blocks is
+    the prompt and the input it was given, so the remedy is to revise them. The message names only the pipe,
+    the model's deck handle and the provider's stop value, never the partial text or the provider's body, so
+    it is kept verbatim for the caller.
+    """
+
+    error_category = InferenceErrorCategory.CONTENT
+    _authors_caller_facing_message = True
+
+    def __init__(self, *, model_handle: str, stop_reason: str, pipe_code: str | None = None):
+        subject = f"the text of pipe '{pipe_code}'" if pipe_code else "its text"
+        next_step = "Revise the pipe's prompt or its input." if pipe_code else "Revise the prompt or the input."
+        message = (
+            f"The model '{model_handle}' declined to finish {subject}, or a content filter stopped it (stop reason '{stop_reason}'), "
+            f"so the text cannot be used. {next_step}"
+        )
+        super().__init__(message, user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail=next_step))
+        self.model_handle = model_handle
+        self.stop_reason = stop_reason
+        self.pipe_code = pipe_code
+
+
 class LLMAssignmentError(CogtError):
     pass
 

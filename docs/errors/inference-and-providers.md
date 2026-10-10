@@ -52,6 +52,8 @@ own page. Classes are grouped by subsystem.
 - [`LLMAssignmentError`](llm-assignment-error.md) — LLM assignment
 - [`LLMCapabilityError`](llm-capability-error.md) — LLM capability
 - [`LLMCompletionError`](llm-completion-error.md) — LLM completion
+- [`LLMCompletionRefusedError`](llm-completion-refused-error.md) — LLM completion refused
+- [`LLMCompletionTruncatedError`](llm-completion-truncated-error.md) — LLM completion truncated
 - [`LLMConfigError`](llm-config-error.md) — LLM config
 - [`LLMHandleNotFoundError`](llm-handle-not-found-error.md) — LLM handle not found
 - [`LLMModelNotFoundError`](llm-model-not-found-error.md) — LLM model not found

@@ -14,6 +14,7 @@ from pipelex.cogt.inference.inference_call_summary import InferenceCallSummary, 
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.inference.prompt_file_checks import check_prompt_documents_are_read, check_prompt_images_are_images
+from pipelex.cogt.llm.completion_stop import CompletionStopOutcome, classify_stop_reason, raise_for_completion_stop
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.usage.token_category import TokenCategory
@@ -461,6 +462,39 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         # End OTel span with success status and usage data
         self._end_otel_span_with_completion_object(span=span, llm_job=llm_job, completion_object=result_object)
+
+    def _check_completion_stop(self, *, llm_job: LLMJob, stop_reason: str | None, max_tokens: int | None) -> None:
+        """Raise when the text's stop value says it was cut or refused, before the worker hands the text back.
+
+        Every worker's text generation calls it with its response's stop value, after it has read the response's
+        token usage into the job, so a truncation names the output tokens used. A missing or unknown value is
+        normal (see `pipelex.cogt.llm.completion_stop`).
+
+        Args:
+            llm_job: The job whose text it is: its pipe and its token usage are named by the error.
+            stop_reason: The provider's stop value, None when the response carries none.
+            max_tokens: The output limit the request sent, None when it sent none.
+
+        Raises:
+            LLMCompletionTruncatedError: When the text was cut before the model finished it.
+            LLMCompletionRefusedError: When the model refused, or a content filter stopped the text.
+        """
+        outcome = classify_stop_reason(stop_reason=stop_reason, model_handle=self.inference_model.name)
+        self._raise_for_completion_stop(llm_job=llm_job, outcome=outcome, stop_reason=stop_reason or "", max_tokens=max_tokens)
+
+    def _raise_for_completion_stop(self, *, llm_job: LLMJob, outcome: CompletionStopOutcome, stop_reason: str, max_tokens: int | None) -> None:
+        """Raise the error a classified stop stands for, naming the job's pipe, the model and the output tokens used."""
+        output_tokens: int | None = None
+        if tokens_usage := llm_job.job_report.llm_tokens_usage:
+            output_tokens = tokens_usage.nb_tokens_by_category.get(TokenCategory.OUTPUT)
+        raise_for_completion_stop(
+            outcome=outcome,
+            stop_reason=stop_reason,
+            model_handle=self.inference_model.name,
+            pipe_code=llm_job.job_metadata.pipe_code,
+            max_tokens=max_tokens,
+            output_tokens=output_tokens,
+        )
 
     def _check_can_perform_job(self, llm_job: LLMJob):
         # This can be overridden by subclasses for specific checks

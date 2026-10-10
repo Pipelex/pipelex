@@ -158,6 +158,8 @@ KitIndexLoadingError | Kit index loading | https://docs.pipelex.com/latest/error
 LLMAssignmentError | LLM assignment | https://docs.pipelex.com/latest/errors/llm-assignment-error/
 LLMCapabilityError | LLM capability | https://docs.pipelex.com/latest/errors/llm-capability-error/
 LLMCompletionError | LLM completion | https://docs.pipelex.com/latest/errors/llm-completion-error/
+LLMCompletionRefusedError | LLM completion refused | https://docs.pipelex.com/latest/errors/llm-completion-refused-error/
+LLMCompletionTruncatedError | LLM completion truncated | https://docs.pipelex.com/latest/errors/llm-completion-truncated-error/
 LLMConfigError | LLM config | https://docs.pipelex.com/latest/errors/llm-config-error/
 LLMHandleNotFoundError | LLM handle not found | https://docs.pipelex.com/latest/errors/llm-handle-not-found-error/
 LLMModelNotFoundError | LLM model not found | https://docs.pipelex.com/latest/errors/llm-model-not-found-error/

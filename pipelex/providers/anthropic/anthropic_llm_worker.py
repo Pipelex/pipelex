@@ -11,7 +11,8 @@ from anthropic.types import OutputConfigParam, ThinkingConfigParam
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, SdkTypeError
+from pipelex import log
+from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, SdkTypeError
 from pipelex.cogt.inference.error_classification import (
     UserAction,
     UserActionKind,
@@ -141,6 +142,60 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         timeout_seconds = get_config().inference.llm.anthropic.structured_output_timeout_seconds
         safe_max_tokens = AnthropicFactory.calculate_safe_max_tokens_for_timeout(timeout_seconds=timeout_seconds)
         return min(requested_max_tokens, safe_max_tokens)
+
+    def _say_max_tokens_lowered(
+        self,
+        *,
+        is_caller_setting: bool,
+        requested_max_tokens: int,
+        effective_max_tokens: int,
+        timeout_seconds: int,
+    ) -> str | None:
+        """Say that a structured call sends a lower max_tokens than it was given, and return the sentence its errors end with.
+
+        A max_tokens the pipe's setting asked for and the call lowers is said at warning level, since the call then
+        sends less than the method wrote. The model's own default lowered is said at debug level: a model whose
+        default exceeds what the timeout allows has it lowered on every structured call, by design. Either way, an
+        error the call raises says the limit was lowered and to what.
+
+        Args:
+            is_caller_setting: Whether the requested max_tokens is the pipe's setting rather than the model's default.
+            requested_max_tokens: The max_tokens the call was given.
+            effective_max_tokens: The max_tokens the call sends.
+            timeout_seconds: The structured call's timeout, which the effective max_tokens fits.
+
+        Returns:
+            The sentence an error of the call ends with, None when the call sends the max_tokens it was given.
+        """
+        if effective_max_tokens >= requested_max_tokens:
+            return None
+        fields = {
+            "model_handle": self.inference_model.name,
+            "requested_max_tokens": requested_max_tokens,
+            "effective_max_tokens": effective_max_tokens,
+            "timeout_seconds": timeout_seconds,
+        }
+        if is_caller_setting:
+            log.warning("A structured output's token limit was lowered to fit its timeout", fields=fields)
+        else:
+            log.debug("The model's default token limit was lowered to fit the structured output's timeout", fields=fields)
+        return (
+            f"The structured output's max_tokens was lowered from {requested_max_tokens} to {effective_max_tokens} "
+            f"to fit its {timeout_seconds}-second timeout."
+        )
+
+    @classmethod
+    def _with_note(cls, *, error: CogtError, note: str | None) -> CogtError:
+        """The error a structured call raises, its message ending with the note when there is one.
+
+        The note adds a fact to the error the call built and changes nothing else: its class, its category and
+        whether it is retried stay what they were.
+        """
+        if note is None:
+            return error
+        error.message = f"{error.message} {note}"
+        error.args = (error.message,)
+        return error
 
     @classmethod
     def _build_thinking_params(cls, *, inference_model: InferenceModelSpec, job_params: LLMJobParams, max_tokens: int | None) -> _ThinkingParams:
@@ -301,6 +356,12 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                 model_handle=self.inference_model.name,
             ) from sdk_exc
 
+        if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and final_message.usage:
+            llm_tokens_usage.nb_tokens_by_category = AnthropicFactory.make_nb_tokens_by_category(usage=final_message.usage)
+
+        # Read before the text, so a text cut at max_tokens with nothing written, thinking having used the budget, is a truncation too
+        self._check_completion_stop(llm_job=llm_job, stop_reason=final_message.stop_reason, max_tokens=max_tokens)
+
         # Collect all text blocks (adaptive thinking enables interleaved thinking,
         # so the response may contain multiple text blocks interspersed with thinking blocks)
         text_parts: list[str] = []
@@ -331,12 +392,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                 ),
             )
 
-        full_reply_content = "\n\n".join(text_parts)
-
-        if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and final_message.usage:
-            llm_tokens_usage.nb_tokens_by_category = AnthropicFactory.make_nb_tokens_by_category(usage=final_message.usage)
-
-        return full_reply_content
+        return "\n\n".join(text_parts)
 
     def _request_extras_kwargs(self, *, llm_job: LLMJob, output_desc: str) -> dict[str, Any]:
         """The per-request headers and body additions this call sends, as SDK keyword arguments.
@@ -395,7 +451,14 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
 
         # The structured call sets an explicit timeout, and its max_tokens is held to what that timeout allows
         timeout_seconds = get_config().inference.llm.anthropic.structured_output_timeout_seconds
-        effective_max_tokens = self._sent_max_tokens(requested_max_tokens=job_params.max_tokens or self.default_max_tokens, is_structured=True)
+        requested_max_tokens = job_params.max_tokens or self.default_max_tokens
+        effective_max_tokens = self._sent_max_tokens(requested_max_tokens=requested_max_tokens, is_structured=True)
+        lowered_max_tokens_note = self._say_max_tokens_lowered(
+            is_caller_setting=llm_job.job_params.max_tokens is not None,
+            requested_max_tokens=requested_max_tokens,
+            effective_max_tokens=effective_max_tokens,
+            timeout_seconds=timeout_seconds,
+        )
 
         # The thinking budget is fitted against the max_tokens this call actually sends
         thinking_params = self._build_thinking_params(inference_model=self.inference_model, job_params=job_params, max_tokens=effective_max_tokens)
@@ -432,35 +495,38 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
             if underlying_exc is not None:
                 metadata = extract_anthropic_metadata(underlying_exc)
                 classification = classify_inference_error(metadata)
-                raise render_inference_error(
+                rendered_error = render_inference_error(
                     metadata=metadata,
                     classification=classification,
                     family=InferenceErrorFamily.LLM,
                     model_desc=self.inference_model.desc,
                     model_handle=self.inference_model.name,
-                ) from instructor_exc
+                )
+                raise self._with_note(error=rendered_error, note=lowered_max_tokens_note) from instructor_exc
             msg = (
                 f"Anthropic structured generation via 'instructor' failed with model: {self.inference_model.desc} "
                 f"trying to generate schema: {schema} with error: {instructor_exc}"
             )
-            raise LLMCompletionError(
+            fallback_error = LLMCompletionError(
                 msg,
                 error_category=InferenceErrorCategory.UNKNOWN,
                 user_action=UserAction(
                     kind=UserActionKind.CONTACT_SUPPORT,
                     detail="Structured generation failed for an unrecognized reason — retry, and report this if it persists",
                 ),
-            ) from instructor_exc
+            )
+            raise self._with_note(error=fallback_error, note=lowered_max_tokens_note) from instructor_exc
         except (APIStatusError, APIConnectionError) as sdk_exc:
             metadata = extract_anthropic_metadata(sdk_exc)
             classification = classify_inference_error(metadata)
-            raise render_inference_error(
+            rendered_error = render_inference_error(
                 metadata=metadata,
                 classification=classification,
                 family=InferenceErrorFamily.LLM,
                 model_desc=self.inference_model.desc,
                 model_handle=self.inference_model.name,
-            ) from sdk_exc
+            )
+            raise self._with_note(error=rendered_error, note=lowered_max_tokens_note) from sdk_exc
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
             llm_tokens_usage.nb_tokens_by_category = AnthropicFactory.make_nb_tokens_by_category(usage=usage)
 

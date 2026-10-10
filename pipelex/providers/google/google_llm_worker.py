@@ -260,14 +260,16 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 model_handle=self.inference_model.name,
             ) from sdk_exc
 
-        # Extract text from response (skips thinking parts)
-        text_content = GoogleFactory.extract_text_from_response(response=response, model_desc=self.inference_model.desc)
-
         # Track token usage if available
         if llm_job.job_report.llm_tokens_usage and response.usage_metadata:
             llm_job.job_report.llm_tokens_usage.nb_tokens_by_category = GoogleFactory.extract_token_usage(response.usage_metadata)
 
-        return text_content
+        # Read before the text, so a candidate cut or filtered with no text left is reported for what stopped it
+        if response.candidates and (finish_reason := response.candidates[0].finish_reason):
+            self._check_completion_stop(llm_job=llm_job, stop_reason=finish_reason.value, max_tokens=job_params.max_tokens)
+
+        # Extract text from response (skips thinking parts)
+        return GoogleFactory.extract_text_from_response(response=response, model_desc=self.inference_model.desc)
 
     def _validates_structured_output_strictly(self) -> bool:
         """Whether ``instructor`` validates a structured response in pydantic's strict mode.

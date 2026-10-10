@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from pipelex.providers.bedrock.bedrock_client_boto3 import BedrockClientBoto3
-from pipelex.providers.bedrock.bedrock_client_protocol import make_converse_params
+from pipelex.providers.bedrock.bedrock_client_protocol import BedrockChatResult, make_converse_params
 from pipelex.providers.bedrock.bedrock_llm_worker import BedrockLLMWorker
 
 if TYPE_CHECKING:
@@ -43,7 +43,7 @@ def _make_worker(mocker: MockerFixture, *, accepts_temperature: bool) -> tuple[B
     model.accepts_temperature = accepts_temperature
     worker.inference_model = model
     worker.default_max_tokens = 4096
-    chat = mocker.AsyncMock(return_value=("answer", {}))
+    chat = mocker.AsyncMock(return_value=BedrockChatResult(text="answer", nb_tokens_by_category={}, stop_reason="end_turn"))
     client = mocker.MagicMock()
     client.chat = chat
     worker.bedrock_client_for_text = client
@@ -88,9 +88,9 @@ class TestBedrockConverseRequest:
         recording = _RecordingConverse()
         client.boto3_client = recording
 
-        text, _ = await client.chat(messages=_MESSAGES, system_text=None, model="mistral.test", temperature=None, max_tokens=100)
+        chat_result = await client.chat(messages=_MESSAGES, system_text=None, model="mistral.test", temperature=None, max_tokens=100)
 
-        assert text == "answer"
+        assert chat_result.text == "answer"
         assert recording.params == [
             make_converse_params(messages=_MESSAGES, system_text=None, model="mistral.test", temperature=None, max_tokens=100)
         ]
