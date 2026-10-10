@@ -51,7 +51,6 @@ class OpenAIClientFactory:
         the_client: openai.AsyncOpenAI
         match sdk_variant:
             case OpenAISdkVariant.AZURE_OPENAI | OpenAISdkVariant.AZURE_OPENAI_RESPONSES:
-                log.debug(f"Making AsyncAzureOpenAI client with endpoint: {backend.endpoint}")
                 if backend.endpoint is None:
                     msg = "Azure OpenAI endpoint is not set"
                     raise OpenAIClientFactoryError(msg)
@@ -61,6 +60,7 @@ class OpenAIClientFactory:
                     api_version=backend.get_extra_config(AzureExtraField.API_VERSION),
                     max_retries=transport_max_retries,
                 )
+                log.debug(f"An AsyncAzureOpenAI client was made with endpoint {backend.endpoint}")
             case (
                 OpenAISdkVariant.OPENAI
                 | OpenAISdkVariant.OPENAI_RESPONSES
@@ -68,11 +68,11 @@ class OpenAIClientFactory:
                 | OpenAISdkVariant.BLACKBOXAI_IMG_GEN
                 | OpenAISdkVariant.OPENROUTER_IMG_GEN
             ):
-                log.debug(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
                 the_client = openai.AsyncOpenAI(
                     api_key=api_key,
                     base_url=backend.endpoint,
                     max_retries=transport_max_retries,
                 )
+                log.debug(f"An AsyncOpenAI client was made with endpoint {backend.endpoint}")
 
         return the_client

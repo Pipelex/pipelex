@@ -50,8 +50,8 @@ from pipelex.system.exceptions import ConfigValidationError
 from pipelex.system.runtime import ProblemReaction
 from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.log.error_fields import error_fields
-from pipelex.urls import URLs
 from pipelex.tools.log.log_fields import USER_ACTION_FIELD
+from pipelex.urls import URLs
 
 LLM_PRESET_DISABLED = "disabled"
 
@@ -1076,7 +1076,9 @@ class ModelDeck(ConfigModel):
                             "ideal_model_handle": ideal_model_handle,
                             "fallback_model_handle": fallback,
                             OTelLogAttr.URL_FULL: URLs.backend_provider_docs,
-                            USER_ACTION_FIELD: "Get access to the first model, since a fallback may lower the quality or hit limits such as its context window",
+                            USER_ACTION_FIELD: (
+                                "Get access to the first model, since a fallback may lower the quality or hit limits such as its context window"
+                            ),
                         },
                     )
                     # Mark this warning as logged for this waterfall_name
@@ -1230,7 +1232,7 @@ class ModelDeck(ConfigModel):
                 fields={"model_handle": ref.name, "model_type": model_type, "served_model_types": served_types},
             )
             return None
-        log.verbose(f"Skipping model handle '{model_handle}' because it was not found in the model deck, it could be an external plugin.")
+        log.verbose(f"Model handle '{model_handle}' was skipped: the model deck lacks it, and an external plugin may serve it")
         return None
 
     def is_handle_defined(self, model_handle: str, *, model_type: ModelType) -> bool:

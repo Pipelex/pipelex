@@ -201,12 +201,12 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         # Skip if telemetry is disabled (no otel_context)
         if otel_context is None:
-            log.verbose("OTel: the job carries no otel_context, so no LLM span is started")
+            log.verbose("No LLM span was started, since the job carries no OpenTelemetry context")
             return None
 
         tracer = TelemetryManagerAbstract.get_instance_tracer()
         if tracer is None:
-            log.verbose("OTel: no tracer is available, so no LLM span is started")
+            log.verbose("No LLM span was started, since no tracer is available")
             return None
 
         unit_job_id = job_metadata.unit_job_id

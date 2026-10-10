@@ -4,6 +4,7 @@ import base64
 from google.genai import types as genai_types
 from google.genai.client import Client as GoogleGenAiClient
 
+from pipelex import log
 from pipelex.cogt.document.prompt_document import PromptDocument
 from pipelex.cogt.document.prompt_document_utils import prepare_prompt_document_as_base64
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
@@ -14,6 +15,7 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
+from pipelex.tools.log.error_fields import error_fields
 
 
 class GoogleFactory:
@@ -26,6 +28,19 @@ class GoogleFactory:
         transport_max_retries = get_config().inference.transport_max_retries
         http_options = genai_types.HttpOptions(retry_options=genai_types.HttpRetryOptions(attempts=transport_max_retries + 1))
         return GoogleGenAiClient(api_key=backend.api_key, http_options=http_options)
+
+    @classmethod
+    def log_client_close_failure(cls, *, close_task: "asyncio.Task[None]") -> None:
+        """Say at DEBUG why the background task closing a Google async client failed, as that task's done callback.
+
+        A worker's teardown never raises, so a close that fails is only logged. A cancelled task holds no exception to
+        read: ``Task.exception()`` raises ``CancelledError`` for it, which would escape the callback.
+        """
+        if close_task.cancelled():
+            return
+        close_exc = close_task.exception()
+        if close_exc is not None:
+            log.debug("A Google async client could not be closed", fields=error_fields(exc=close_exc))
 
     @classmethod
     async def prepare_image_part(cls, prompt_image: PromptImage) -> genai_types.Part:

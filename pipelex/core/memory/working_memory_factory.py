@@ -162,8 +162,8 @@ class WorkingMemoryFactory(BaseModel):
                 else:
                     # Fallback to TextContent if we can't get the proper class
                     log.debug(
-                        f"Could not get structure class '{structure_class_name}' for "
-                        f"concept '{named_stuff_spec.concept.code}', falling back to TextContent",
+                        f"The structure class '{structure_class_name}' of concept '{named_stuff_spec.concept.code}' "
+                        "is not available, and TextContent is used in its place",
                     )
                     text_typed_named_stuff_spec = TypedNamedStuffSpec.make_from_named(
                         named=named_stuff_spec,
@@ -209,7 +209,7 @@ class WorkingMemoryFactory(BaseModel):
         if structure_class and issubclass(structure_class, StuffContent):
             return TypedNamedStuffSpec.make_from_named(named=named, structure_class=structure_class)
         log.debug(
-            f"Could not get structure class '{structure_class_name}' for concept '{concept.code}', falling back to TextContent",
+            f"The structure class '{structure_class_name}' of concept '{concept.code}' is not available, and TextContent is used in its place",
         )
         return TypedNamedStuffSpec.make_from_named(named=named, structure_class=TextContent)
 

@@ -70,7 +70,7 @@ def get_pipelex_mthds_files_from_dirs(dirs: set[Path]) -> list[Path]:
 
     for dir_path in dirs:
         if not dir_path.exists():
-            log.debug(f"Directory does not exist, skipping: {dir_path}")
+            log.debug(f"A directory that does not exist was skipped: {dir_path}")
             continue
 
         # Find all .mthds files in the directory, excluding problematic directories
@@ -85,5 +85,5 @@ def get_pipelex_mthds_files_from_dirs(dirs: set[Path]) -> list[Path]:
             if is_pipelex_file(mthds_file):
                 all_mthds_paths.append(mthds_file)
             else:
-                log.debug(f"Skipping non-Pipelex MTHDS file: {mthds_file}")
+                log.debug(f"An MTHDS file that is not a Pipelex file was skipped: {mthds_file}")
     return all_mthds_paths

@@ -31,6 +31,7 @@ from pipelex.config import get_config
 from pipelex.providers.google.google_exceptions import GoogleLLMWorkerError
 from pipelex.providers.google.google_factory import GoogleFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 if TYPE_CHECKING:
@@ -85,7 +86,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 # Schedule cleanup on the captured loop and store reference to prevent garbage collection
                 task = self._event_loop.create_task(self.genai_async_client.aclose())
                 # Add a callback to log any errors that occur during cleanup
-                task.add_done_callback(lambda t: log.debug(f"Google async client cleanup error: {t.exception()}") if t.exception() else None)
+                task.add_done_callback(lambda done: GoogleFactory.log_client_close_failure(close_task=done))
                 return
 
             # Otherwise, try to get the current running loop
@@ -94,17 +95,17 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 # Schedule cleanup on the current running loop and store reference to prevent garbage collection
                 task = current_loop.create_task(self.genai_async_client.aclose())
                 # Add a callback to log any errors that occur during cleanup
-                task.add_done_callback(lambda t: log.debug(f"Google async client cleanup error: {t.exception()}") if t.exception() else None)
+                task.add_done_callback(lambda done: GoogleFactory.log_client_close_failure(close_task=done))
             except RuntimeError:
                 # No running event loop, we can safely use asyncio.run()
                 try:
                     asyncio.run(self.genai_async_client.aclose())
                 except Exception as exc:  # ruff: ignore[blind-except]
                     # Best-effort: asyncio.run() runs aclose(), whose failure surface is not enumerable; teardown must never fail.
-                    log.debug(f"Error closing Google async client during teardown: {exc}")
+                    log.debug("A Google async client could not be closed", fields=error_fields(exc=exc))
         except Exception as exc:  # ruff: ignore[blind-except]
             # Best-effort cleanup boundary: teardown must never fail, whatever client/event-loop close throws.
-            log.debug(f"Error during Google async client teardown: {exc}")
+            log.debug("A Google async client could not be closed", fields=error_fields(exc=exc))
 
     #########################################################
     # Reasoning helpers

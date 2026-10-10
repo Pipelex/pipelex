@@ -188,7 +188,7 @@ def resolve_address_based_method(
 
         violations = scan_structured_content_classes(package_dir=fetched.package_dir)
         if violations:
-            # The remedy is in the message, which the console never cuts; `STRUCTURES_REFUSAL_REMEDY` says it at length in the refusal.
+            # The remedy rides in `user_action`, which the console prints whole; `STRUCTURES_REFUSAL_REMEDY` says it at length in the refusal.
             log.warning(
                 "A fetched method declares Python structure classes, which hosted runs refuse",
                 fields={
