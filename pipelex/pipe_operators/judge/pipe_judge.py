@@ -418,7 +418,8 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
                 judgment = multi_result.judgments[question_name]
                 question_record: dict[str, Any] = {
                     "rendered_question": judgment.rendered_question,
-                    "judgment_kind": question.judgment_kind,
+                    # The plain string: the execution data is serialized, and the enum would be written out with its class.
+                    "judgment_kind": question.judgment_kind.value,
                     "outcome": judgment.outcome.model_dump(mode="json", exclude_none=True),
                 }
                 if question.threshold is not None:
@@ -431,7 +432,7 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
                 "nb_prompt_images": len(multi_result.prompt.images),
                 "nb_prompt_documents": len(multi_result.prompt.documents),
                 "resolved_model": multi_result.judgment_setting.model,
-                # Each question's raw outcome rides along, a refusal included, since a field left absent shows nothing.
+                # Each question's raw outcome rides along, a refusal included, since a field holding nothing shows nothing.
                 "questions": question_records,
             }
             result_memory = multi_result.memory
@@ -457,7 +458,8 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
                 "nb_prompt_documents": len(judgment_prompt.documents),
                 "rendered_question": judgment_result.rendered_question,
                 "resolved_model": judgment_result.judgment_setting.model,
-                "judgment_kind": self.question.judgment_kind,
+                # The plain string: the execution data is serialized, and the enum would be written out with its class.
+                "judgment_kind": self.question.judgment_kind.value,
                 "answer": judgment_result.answer.model_dump(mode="json", exclude_none=True),
             }
             if self.question.threshold is not None:
