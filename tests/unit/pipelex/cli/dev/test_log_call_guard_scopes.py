@@ -104,17 +104,17 @@ class TestLogCallGuardScopes:
             ),
             ("a for target", "def load(items):\n    for MSG in items:\n        log.info(MSG)\n", LogCallRule.NON_LITERAL),
             ("a with target", "def load(path):\n    with open(path) as MSG:\n        log.info(MSG)\n", LogCallRule.NON_LITERAL),
-            (
-                "an except target",
-                "def load(path):\n    try:\n        open(path)\n    except OSError as MSG:\n        log.info(MSG)\n",
-                LogCallRule.NON_LITERAL,
-            ),
             ("an import alias", "def load():\n    from somewhere import thing as MSG\n    log.info(MSG)\n", LogCallRule.NON_LITERAL),
             ("an unpacking", "def load(pair):\n    MSG, _other = pair\n    log.info(MSG)\n", LogCallRule.NON_LITERAL),
         ],
     )
     def test_every_binding_form_shadows_the_module_s_literal(self, topic: str, body: str, expected_rule: LogCallRule) -> None:
         assert _rules(body) == [[expected_rule]], topic
+
+    def test_an_except_target_shadows_the_module_s_literal_and_is_the_exception_itself(self) -> None:
+        """The name is no literal, and what it holds is the handled exception, which the message would carry as its text."""
+        body = "def load(path):\n    try:\n        open(path)\n    except OSError as MSG:\n        log.info(MSG)\n"
+        assert _rules(body) == [[LogCallRule.NON_LITERAL, LogCallRule.SPLICED_EXCEPTION]]
 
     @pytest.mark.parametrize(
         ("topic", "body"),

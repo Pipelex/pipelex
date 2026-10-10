@@ -189,7 +189,7 @@ class ImgGenGptMapping:
                 # A tier is a portable request, not a hand-picked size: note it quietly.
                 log.verbose("The image size a tier derives is above the model's 2560x1440 reliability boundary", fields=size_fields)
             else:
-                log.warning("The requested image size is valid but above the model's 2560x1440 reliability boundary", fields=size_fields)
+                log.warning("The requested image size is above the model's 2560x1440 reliability boundary", fields=size_fields)
 
     @classmethod
     def moderation_literal(cls, *, is_moderated: bool | None) -> GptImageModerationType | None:

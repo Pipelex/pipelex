@@ -158,12 +158,14 @@ Configuration section: `[runtime.log.rich_log]`, read only when `sink = "console
 ```toml
 is_show_time = false
 is_show_level = true
+is_show_path = false
 is_link_path_enabled = true
 ```
 
 - `is_show_time`: Show timestamp in logs
 - `is_show_level`: Show log level
-- `is_link_path_enabled`: Make file paths clickable
+- `is_show_path`: Show the source file and line that logged each record, in a column at the right of the line. It is off by default: the column takes about 25 characters of every line and makes a long one wrap
+- `is_link_path_enabled`: Make that path clickable, where the terminal supports links
 
 ### Syntax Highlighting
 
@@ -301,6 +303,7 @@ anthropic = "INFO"
 [runtime.log.rich_log]
 is_show_time = false
 is_show_level = true
+is_show_path = false
 is_link_path_enabled = true
 highlighter_name = "json"
 is_rich_tracebacks = true

@@ -123,8 +123,8 @@ class AnthropicFactory:
                             raise AwsCredentialsError(msg) from exc
                         if is_bedrock_token_in_env:
                             log.debug(
-                                f"Ignoring {BEDROCK_TOKEN_VAR_NAME} from the environment: "
-                                f'bedrock_access_variant = "{BedrockAccessVariant.AWS_ACCESS}" signs with the configured AWS access keys.'
+                                f"The {BEDROCK_TOKEN_VAR_NAME} environment variable was ignored, since "
+                                f'bedrock_access_variant = "{BedrockAccessVariant.AWS_ACCESS}" signs with the configured AWS access keys'
                             )
                         return AsyncAnthropicBedrockSigV4(
                             aws_access_key=aws_access_key_id,

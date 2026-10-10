@@ -144,7 +144,7 @@ class TestSecurityVerifiers:
             response = client.get(RoutePath.WHOAMI, headers={"Authorization": f"Bearer {token}"})
 
         assert response.status_code == 401
-        (record,) = [record for record in caplog.records if record.getMessage() == "A JWT's user_id claim is not a path-safe segment"]
+        (record,) = [record for record in caplog.records if record.getMessage() == "A verified token's user id claim is not a path-safe segment"]
         carried = carried_attributes(record=record)
         assert carried.get("claim_type") == expected_claim_type
         assert OTelLogAttr.USER_ID not in carried

@@ -264,7 +264,7 @@ class PipeRunParams(BaseModel):
             # raise: this runs inside run_pipe()'s `finally`, where raising would mask the
             # in-flight exception.
             log.error(
-                "The pipe stack is unbalanced: the pipe popped is not the last one pushed",
+                "The pipe popped off the pipe stack is not the last one pushed",
                 fields={"pipe_code": pipe_code, "popped_pipe_code": popped_pipe_code},
             )
 

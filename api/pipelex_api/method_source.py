@@ -97,7 +97,7 @@ def _fetch_package(method_ref: str) -> FetchedMethodPackage:
     # The tag and the commit say which version of the package a hosted run executed; the tag is `None` when the
     # reference named none and the default branch was fetched.
     log.info(
-        "A method_ref was resolved to a package",
+        "A method reference was resolved to a package",
         fields={
             "method_ref": ref.ref_str,
             "package_address": package.provenance.address,

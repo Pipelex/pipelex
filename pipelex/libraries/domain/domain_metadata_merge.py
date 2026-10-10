@@ -45,5 +45,5 @@ def merge_domain_metadata_field(
         conflict_fields: dict[str, str] = {"domain_code": domain_code, "metadata_field": metadata_field}
         if show_values_on_conflict:
             conflict_fields.update(established_value=established, incoming_value=incoming)
-        log.warning("Two declarations of one domain give one of its fields different values, so the first is kept", fields=conflict_fields)
+        log.warning("Two declarations of a domain disagree on a field, and the first value is kept", fields=conflict_fields)
     return established

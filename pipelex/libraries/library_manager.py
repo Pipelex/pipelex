@@ -67,6 +67,7 @@ from pipelex.runtime_hub import get_class_registry
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
 from pipelex.tools.log.error_fields import error_fields
+from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pipelex.tools.misc.semver import SemVerError, parse_constraint, parse_version, version_satisfies
 from pipelex.validation_error_types import PipeValidationErrorType
 
@@ -463,12 +464,12 @@ class LibraryManager(LibraryManagerAbstract):
             # (worker-local leak state deciding setup success would be the M1 class again).
             # _pop_and_teardown_library forgets the entry pop-first, so the id is free either way.
             log.warning(
-                "The teardown of a stale library raised; continuing with a fresh library",
+                "The teardown of a stale library failed, and a fresh library was made",
                 fields={"library_id": library_id, **error_fields(exc=stale_teardown_exc)},
             )
         else:
             if removed_existing:
-                log.warning("Tore down a library left over by an interrupted execution whose cleanup never ran", fields={"library_id": library_id})
+                log.warning("A library left over by an interrupted execution was torn down", fields={"library_id": library_id})
         _library_id, the_library = self.open_library(library_id=library_id)
         return the_library
 
@@ -1135,18 +1136,19 @@ class LibraryManager(LibraryManagerAbstract):
             current_version = parse_version(MTHDS_STANDARD_VERSION)
         except SemVerError as exc:
             log.warning(
-                "The mthds_version constraint of a package could not be parsed",
+                "The MTHDS version constraint of a package could not be parsed",
                 fields={"package_address": package_address, "mthds_version_constraint": mthds_version_constraint, **error_fields(exc=exc)},
             )
             return
 
         if not version_satisfies(current_version, constraint=constraint):
             log.warning(
-                "A package requires another MTHDS standard version than this runtime's; some features may not work correctly",
+                "A package requires another MTHDS standard version than this runtime's",
                 fields={
                     "package_address": package_address,
                     "mthds_version_constraint": mthds_version_constraint,
                     "mthds_standard_version": MTHDS_STANDARD_VERSION,
+                    USER_ACTION_FIELD: "Run the package on a Pipelex release that implements its MTHDS version, or some features may fail",
                 },
             )
 

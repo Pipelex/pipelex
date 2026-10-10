@@ -215,7 +215,7 @@ class DeliveryExecutor:
             # Treated as missing, the caller then fails the delivery: the record is lost, and this line says why. The
             # error rides as its fields, never its text or traceback, which quote the values the record held.
             log.error(
-                "The absence record of the main output is malformed, so the delivery has no result to render",
+                "The absence record of the main output is malformed",
                 fields=error_fields(exc=validation_error),
             )
             return None
@@ -253,7 +253,7 @@ class DeliveryExecutor:
                 return get_concept_library().resolve_wire_concept_ref(concept_ref=concept_ref)
             except ConceptRefAmbiguousError as exc:
                 log.warning(
-                    "A concept ref is ambiguous in the current library; the delivery renders the result raw",
+                    "A delivered result's concept ref is ambiguous and the result was rendered raw",
                     fields={"concept_ref": concept_ref, **error_fields(exc=exc)},
                 )
                 return None
@@ -262,13 +262,13 @@ class DeliveryExecutor:
             except RuntimeError as exc:
                 # The contextvar still names a library, but the hub that held it is gone. A delivery
                 # outlives the run it renders, so this is a race to survive, not a state to assert.
-                log.warning("The current library is no longer reachable; the delivery renders the result raw", fields=error_fields(exc=exc))
+                log.warning("The current library is gone and a delivered result was rendered raw", fields=error_fields(exc=exc))
                 return None
         try:
             is_native_ref = NativeConceptCode.is_valid_native_concept_ref(concept_ref=concept_ref)
         except QualifiedRefError as exc:
             log.warning(
-                "A concept ref is malformed; the delivery renders the result raw",
+                "A delivered result's concept ref is malformed and the result was rendered raw",
                 fields={"concept_ref": concept_ref, **error_fields(exc=exc)},
             )
             return None
@@ -293,20 +293,20 @@ class DeliveryExecutor:
             concept_ref = stuff_raw["concept"]
             if not isinstance(concept_ref, str):
                 # A stale runtime dumped the whole concept object here: worth a redeploy, so a warning.
-                log.warning("The delivered result does not name its concept by a concept ref string; the delivery renders it raw")
+                log.warning("A delivered result names no concept ref string and was rendered raw")
                 return None
             concept = cls._resolve_concept_locally(concept_ref=concept_ref)
             if concept is None:
                 # A crate-free delivery worker does not know a method's own concepts by design, so this is the
                 # expected path for most hosted results: worth a debug line, not a warning nobody can act on.
-                log.debug("The delivered result's concept is not known here; the delivery renders it raw", fields={"concept_ref": concept_ref})
+                log.debug("A delivered result's concept is not known here and was rendered raw", fields={"concept_ref": concept_ref})
                 return None
             # A structureless concept (`native.Anything`) names no class to look up: its content carries its own.
             if concept.declares_a_structure_class:
                 item_class = get_class_registry().get_class(name=concept.structure_class_name)
                 if item_class is None or not issubclass(item_class, StuffContent):
                     log.warning(
-                        "The structure class of the delivered result's concept is not registered here; the delivery renders it raw",
+                        "A delivered result's structure class is unregistered here and was rendered raw",
                         fields={"concept_ref": concept_ref, "structure_class_name": concept.structure_class_name},
                     )
                     return None
@@ -319,7 +319,7 @@ class DeliveryExecutor:
             )
         except (PipeJobError, ValidationError, KajsonException, KeyError, TypeError) as exc:
             log.warning(
-                "The delivered result could not be hydrated; the delivery renders it raw",
+                "A delivered result could not be hydrated and was rendered raw",
                 fields=error_fields(exc=exc),
             )
             return None
@@ -377,7 +377,7 @@ class DeliveryExecutor:
             self._add_optional_text_file(files=files, filename="reactflow.html", text=graph_outputs.reactflow_html, content_type="text/html")
         except Exception as exc:  # ruff: ignore[blind-except]
             # Best-effort: graph generation spans a deep mermaid/reactflow render tree; a graph failure must never fail result delivery.
-            log.warning("Failed to generate graph outputs", fields=error_fields(exc=exc))
+            log.warning("The graph outputs could not be generated", fields=error_fields(exc=exc))
 
     @classmethod
     async def _try_add_rendered_file(
@@ -394,7 +394,7 @@ class DeliveryExecutor:
         except Exception as exc:  # ruff: ignore[blind-except]
             # Best-effort: per-format rendering (incl. jinja2 viewer); a single render failure must not drop the other result files.
             log.warning(
-                "A result file could not be rendered; the delivery goes on without it",
+                "A result file could not be rendered and was left out of the delivery",
                 fields={"file.name": filename, **error_fields(exc=exc)},
             )
             return

@@ -76,7 +76,7 @@ class PipeRun(PipeRunProtocol):
             # belongs to whoever catches it, the CLI or the API's handler, which would otherwise print it twice.
             # `pipe_code` is the bare code `Pipe run starts` carries for the same pipe, so one query finds both lines.
             log.error(
-                "Pipe execution failed",
+                "The execution of a pipe failed",
                 fields={"pipe_code": pipe_job.pipe.code, "pipe_ref": pipe_job.pipe.pipe_ref, **error_fields(exc=exc)},
             )
         finally:
@@ -90,7 +90,7 @@ class PipeRun(PipeRunProtocol):
                     # A secondary failure rides as fields with no traceback: the execution error is chained onto it, so
                     # its traceback would print the execution error's text, which can quote the run's inputs.
                     log.error(
-                        "Closing the graph tracer also failed after the pipe execution failed; the execution error is raised",
+                        "The graph tracer could not be closed after the pipe execution failed",
                         fields=error_fields(exc=close_error),
                     )
 
@@ -129,7 +129,7 @@ class PipeRun(PipeRunProtocol):
                         raise
                     # As fields with no traceback, for the same reason as the tracer's: the execution error is chained onto it.
                     log.error(
-                        "The delivery also failed after the pipe execution failed; the execution error is raised",
+                        "The delivery also failed after the pipe execution failed",
                         fields=error_fields(exc=delivery_error),
                     )
 
@@ -158,5 +158,5 @@ class PipeRun(PipeRunProtocol):
         try:
             pipe_output.pipe_io_artifacts = build_pipe_io_artifacts(get_own_pipes())
         except Exception as build_error:  # ruff: ignore[blind-except]
-            log.warning("The I/O artifacts of the run could not be built; the run keeps its result", fields=error_fields(exc=build_error))
+            log.warning("The I/O artifacts of a run could not be built", fields=error_fields(exc=build_error))
             pipe_output.pipe_io_artifacts_error = f"Failed to build the I/O artifacts for pipeline_run_id={pipeline_run_id}: {build_error}"
