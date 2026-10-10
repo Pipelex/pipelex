@@ -35,8 +35,8 @@ def _schedule_and_find_close_task(*, close_coroutine: Coroutine[Any, Any, None])
     return close_task
 
 
-class TestGoogleFactoryScheduleClientClose:
-    """The background task a worker's teardown schedules to close its Google async client."""
+class TestGoogleFactoryClientClose:
+    """The background task a worker's teardown schedules to close its Google async client, and the done callback logging its failure."""
 
     @pytest.mark.asyncio
     async def test_a_pending_close_survives_garbage_collection_until_it_is_done(self) -> None:
@@ -66,10 +66,6 @@ class TestGoogleFactoryScheduleClientClose:
             "A Google async client could not be closed",
             fields={ERROR_TYPE_FIELD: "ConnectionError", ERROR_MESSAGE_FIELD: "connection reset"},
         )
-
-
-class TestGoogleFactoryClientClose:
-    """The done callback of the background task closing a Google async client at teardown."""
 
     @pytest.mark.asyncio
     async def test_a_failed_close_is_logged_with_its_error_as_fields(self, mocker: MockerFixture) -> None:
