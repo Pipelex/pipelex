@@ -1,0 +1,9 @@
+contract = "logging-docs"
+digest = "sha256:26e4b90b98c1001b981f1d060d55c18383d988ec2704b2efa1f98f4af51c811d"
+reviewed_by = "Claude (Opus 5.5)"
+reviewed_at = "2026-10-10T09:16:44Z"
+rationale = "clean-pass: the only change to the triggers is console_fields.py's module docstring, which still gave LEFT_CUT_FIELDS as file.name alone after storage_key joined the set and now names the constant instead of listing its members; no constant or code moved, and error_fields.py is the blob the last ack reviewed. Re-derived the page's left-cut sentence from the code: it gives every LEFT_CUT_FIELD_SUFFIXES ending and both LEFT_CUT_FIELDS names, file.name and storage_key, so the page was already right where the docstring was not. Rechecked against the code the FIELD_STYLES keys and colours with unmapped fields and keys dimmed, the hidden run identifiers and data, the 80 cut and the 2000 cut of both FIELD_MAX_LENGTHS entries, the layout cut, the quoting characters, and the pydantic and extra_forbidden rules against SCHEMA_CONTEXT_KEYS and _pydantic_own_reason; all still hold. The page needed no change."
+
+[trigger_files]
+"pipelex/tools/log/console_fields.py" = "blob:cb51c6004ad7704f80f1753043180fb8e34b517c"
+"pipelex/tools/log/error_fields.py" = "blob:515b7649ddd22dceb192faa21713732ec61cd6e0"
