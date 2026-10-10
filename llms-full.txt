@@ -9205,7 +9205,7 @@ For durable, rate-limited execution of very large batches, run the pipeline on t
 
 ## Compaction Under Absence
 
-When a branch's result resolves as a recorded absence — typically because the branch pipe is a `PipeCondition` whose outcome was `continue`, or the branch was skipped (lifted) on an absent optional value — that branch contributes **no item** to the aggregated output list. The list is compacted: a list cannot hold a hole, and absent results are dropped rather than replaced by placeholders. Order is preserved among the results that did produce a value, and each dropped branch is logged with its absence reason.
+When a branch's result resolves as a recorded absence — typically because the branch pipe is a `PipeCondition` whose outcome was `continue`, or the branch was skipped (lifted) on an absent optional value — that branch contributes **no item** to the aggregated output list. The list is compacted: a list cannot hold a hole, and absent results are dropped rather than replaced by placeholders. Order is preserved among the results that did produce a value, and each dropped branch is logged at `DEBUG`, with its index among the inputs and its absence reason as the fields `branch_index` and `absence_reason`, which is how a log explains an output list shorter than its input.
 
 This is the batch arm of the "route or skip" pattern: batch over items with a condition branch pipe that builds a result for the items that qualify and `continue`s past the rest — the output is the compacted list of qualifying results. See [Understanding Optionality](../understanding-optionality.md) for the full absence model.
 
@@ -10489,7 +10489,7 @@ The command exits non-zero when it leaves something for you to look at.
 
 ## The warning that sends you here
 
-You will usually meet this command through a warning rather than a crash. When a file is out of date in a way the migration history explains, Pipelex boots anyway: it carries the file forward **in memory**, tells you which files it did that for, and points at this command. That covers your inference backend definitions as well as the configuration files proper — a backend file left behind by a model-spec change boots on the models it would have loaded anyway, and the warning arrives with the rest of the model setup. Nothing is written, so the same warning appears at the next boot, and the one after — running `pipelex migrate` is what makes the change to the file and stops it.
+You will usually meet this command through a warning rather than a crash. When a file is out of date in a way the migration history explains, Pipelex boots anyway: it carries the file forward **in memory**, tells you which files it did that for, and points at this command. That covers your inference backend definitions as well as the configuration files proper — a backend file left behind by a model-spec change boots on the models it would have loaded anyway, and the warning arrives with the rest of the model setup. Nothing is written, so the same warning appears at the next boot, and the one after — running `pipelex migrate` is what makes the change to the file and stops it. When some of what a file needs cannot be applied for you, the warning says so, and `pipelex migrate` reports those changes for you to make by hand; a file the command does not reach is yours to update where it lives, and its warning says that instead.
 
 A file the history cannot explain is a different case, and it still fails the boot with the configuration error itself: tolerance widens what starts, never what is accepted. That error names this command too, though — beside the key it could not accept, it tells you which of your files a migration would touch, what it would carry forward, and what only you can decide.
 
@@ -12484,7 +12484,7 @@ default_log_level = "INFO"
 ```
 
 - Sets the default logging level for all loggers
-- Valid values: `"VERBOSE"`, `"DEBUG"`, `"DEV"`, `"INFO"`, `"WARNING"`, `"ERROR"`, `"CRITICAL"`, `"OFF"`
+- Valid values: `"VERBOSE"`, `"DEBUG"`, `"INFO"`, `"WARNING"`, `"ERROR"`, `"CRITICAL"`, `"OFF"`; what a line at each level means is in [Logging](../../tools/logging.md#log-levels)
 - `"OFF"` silences the loggers `[runtime.log.package_log_levels]` does not pin; Pipelex's own loggers are pinned there at `INFO`, so silencing them, whichever sink is selected, is `pipelex = "OFF"` in that section
 
 ### Package-Specific Log Levels
@@ -12499,6 +12499,7 @@ pipelex = "INFO"
 ```
 
 - Override log levels for specific packages
+- The defaults keep the HTTP clients under the inference SDKs quiet: `httpx = "WARNING"` and `httpcore = "INFO"`, with the same levels for `httpx2` and `httpcore2`, the forks openai 3.x sends its requests through, so an inference call prints no line of its own carrying the provider's endpoint URL
 - Use `-` instead of `.` in package names (e.g., `urllib3-connectionpool`)
 - A key works at any depth of the logger hierarchy, because Pipelex names every logger after the emitting module: `pipelex` governs the whole runtime, and `pipelex-pipe_operators-pipe_llm = "DEBUG"` opens one module while the rest of `pipelex` stays at its level
 
@@ -12615,7 +12616,7 @@ silenced_problem_ids = ["azure_openai_no_stream_options"]
 
 ## The `console` Sink
 
-Configuration section: `[runtime.log.rich_log]`, read only when `sink = "console"`. The sink writes to `console_log_target`.
+Configuration section: `[runtime.log.rich_log]`, read only when `sink = "console"`. The sink writes to `console_log_target`. It shows a record's fields after its message, coloured by name, and renders the layouts a call names; neither has a setting (see [Console rendering](../../tools/logging.md#console-rendering)).
 
 ### Display Options
 
@@ -12633,11 +12634,11 @@ is_link_path_enabled = true
 
 ```toml
 highlighter_name = "json"  # or "repr"
-is_markup_enabled = true
 ```
 
 - `highlighter_name`: Choose between JSON or repr highlighting
-- `is_markup_enabled`: Enable Rich markup syntax in log messages
+
+The console reads no log message as Rich markup: a message prints exactly as written, and colour comes from the fields and the layouts (see [Messages are plain text](../../tools/logging.md#messages-are-plain-text)). There is no setting to turn markup on. A file that still sets `is_markup_enabled` does not stop the boot: Pipelex deletes the key in memory with ledger entry `pipelex-config@7`, writes nothing, and warns that the configuration is out of date. Run `pipelex migrate` to delete it from the file on disk, which also ends the warning.
 
 ### Traceback Settings
 
@@ -12719,7 +12720,7 @@ The sink refreshes its credentials once when it is built, before the transport s
 
 Each record becomes one Cloud Logging entry with a JSON payload:
 
-- The level maps onto the Cloud Logging severity scale. That scale has nothing below `DEBUG`, so Pipelex's two custom levels, `VERBOSE` and `DEV`, both land there
+- The level maps onto the Cloud Logging severity scale. That scale has nothing below `DEBUG`, so Pipelex's custom `VERBOSE` level lands there
 - The payload carries `message`, `logger` and `exception` when the record carries one, `pipelex.trace_id` and `pipelex.span_id` when a Pipelex span is active, the pipe's own or the LLM call's, written exactly as the `json` sink writes them, then every field and the `data` attribute flat beside them. The keys the `json` sink reserves are reserved here too, `time`, `severity`, `trace_id`, `span_id` and `trace_flags` included although the payload carries none of them — the client library takes the time and the severity out of band, and the entry's own `trace`, `spanId` and `traceSampled` carry the current span — so a field named like one of them is carried under a `field_` prefix under either sink rather than under one and not the other; a value JSON cannot carry — a non-finite float, a model, a circular structure — is written as text rather than costing the line
 - The run-scoped identifiers become the entry's **labels** rather than payload keys: `request_id`, `pipeline_run_id` and `pipe_run_id`, whichever of them the record carries. Cloud Logging indexes labels, so these are what a query filters a run by
 - The entry's `trace`, `spanId` and `traceSampled` name OpenTelemetry's current span, your own code's, the trace project-qualified as `projects/<project>/traces/<trace-id>`, so Cloud Logging files the line under your trace. A line logged where no current span names a trace carries none of the three, inside a Pipelex run too: the `pipeline_run_id` label is what selects a run's lines, and the `pipelex.*` payload keys name its spans
@@ -12767,7 +12768,6 @@ is_show_time = false
 is_show_level = true
 is_link_path_enabled = true
 highlighter_name = "json"
-is_markup_enabled = true
 is_rich_tracebacks = true
 is_tracebacks_word_wrap = true
 is_tracebacks_show_locals = false
@@ -12790,6 +12790,10 @@ Two of those keys chose a behaviour their deletion undoes, and no operation in t
 - `is_console_logging_enabled = false` suppressed every record Pipelex's own log calls emitted. Its equivalent is `pipelex = "OFF"` under `[runtime.log.package_log_levels]`, which deep-merges over the base's `INFO` and leaves the third-party levels alone; `default_log_level` governs only the loggers that section does not pin, so on its own it silences none of Pipelex's records. Silence for everything takes `default_log_level = "OFF"` and every entry of that section at `OFF`, and sending the records elsewhere instead means selecting the sink that goes there. `is_console_logging_enabled = true` was the default and asks for nothing: the migration deletes it and the new default renders the same console.
 - `log_mode = "poor"` chose a plain handler for a process with no terminal; that process now sets `sink = "json"`. `log_mode = "rich"` chose what `console` renders, and asks for nothing either.
 - `poor_loggers` and `generic_poor_logger` have nothing to carry over: every record goes to the one selected sink.
+
+## Migrating From the DEV Level
+
+The `DEV` level, which sat between `DEBUG` and `INFO`, is gone, and so is `log.dev()`. Ledger entry `pipelex-config@6` reads `DEV` as `INFO` wherever a file names it, as `default_log_level` or as a level under `[runtime.log.package_log_levels]`. `INFO` is the equivalent because a `DEV` threshold let through `INFO` and above plus the lines logged at `DEV` itself, and since nothing logs at `DEV` any more, `INFO` lets through exactly the same lines. A third-party package you held at `DEV` therefore keeps its debug output suppressed, a provider SDK's request dumps included. A file that still names `DEV` does not stop the boot: Pipelex migrates it in memory, starts at `INFO`, writes nothing, and warns that the configuration is out of date. Run `pipelex migrate` to rewrite the file on disk, which also ends the warning. Set `DEBUG` yourself where you want the lines a diagnosis needs.
 
 ## Best Practices
 
@@ -14342,13 +14346,10 @@ Common error types:
 
 `pipelex init` writes the backend definitions once and never overwrites a file you already have — which is what keeps your edits, and which also means a file written by an older Pipelex stays on your machine after the model-spec format changes. When a release removes a key, your copy still carries it, and the strict model that reads it refuses.
 
-You do not have to do anything about that at boot. Pipelex reads the migration history for the `inference/backends/` files, carries the out-of-date ones forward **in memory**, and starts with a warning naming each file:
+You do not have to do anything about that at boot. Pipelex reads the migration history for the `inference/backends/` files, carries the out-of-date ones forward **in memory**, and starts with a warning line for each file, the file and what the migration history carried forward following the message as fields:
 
 ```
-Your configuration is out of date, and pipelex read it as if it had been migrated:
-'~/.pipelex/inference/backends/openai.toml'. What the ledger carried forward: Drop
-prompting_target from every backend definition. Nothing was written. Run
-`pipelex migrate` to bring the files up to date.
+WARNING  🧠: A configuration file is out of date and was read as if it had been migrated, and nothing was written; run `pipelex migrate` to update it file.path=/Users/me/.pipelex/inference/backends/openai.toml migration_steps=["Drop prompting_target from every backend definition"] has_blocked_steps=false
 ```
 
 Nothing has been written at that point, so the warning comes back at the next boot until you run the command:
@@ -15142,22 +15143,23 @@ The following Make targets are available for convenience:
 
 ## Overview
 
-Pipelex logs through one facade, `from pipelex import log`, built on Python's standard `logging`. A call takes a message, optional named fields and the usual presentation options; the run-scoped identifiers are bound once at a process entry and stamped onto every record emitted in scope. Fields and identifiers ride the stdlib `LogRecord` as attributes, never spliced into the message text, so a structured sink renders them as fields while the console keeps a narrative line. Where the records go is one config key, `sink` under `[runtime.log]`: `console` renders them through Rich, `json` writes one JSON object per line, `otlp` ships them to an OpenTelemetry collector, and a plugin can register another. The keys are in [Logging Configuration](../configuration/config-practical/logging-config.md) and the seam itself in [Log Sink Plugins](../under-the-hood/log-sink-plugins.md).
+Pipelex logs through one facade, `from pipelex import log`, built on Python's standard `logging`. A call takes a message, optional named fields and the usual presentation options; the run-scoped identifiers are bound once at a process entry and stamped onto every record emitted in scope. Fields and identifiers ride the stdlib `LogRecord` as attributes, never spliced into the message text, so a structured sink writes them as keys while the console shows the fields after the message, coloured by name. Where the records go is one config key, `sink` under `[runtime.log]`: `console` renders them through Rich, `json` writes one JSON object per line, `otlp` ships them to an OpenTelemetry collector, and a plugin can register another. The keys are in [Logging Configuration](../configuration/config-practical/logging-config.md) and the seam itself in [Log Sink Plugins](../under-the-hood/log-sink-plugins.md).
 
 ## Log Levels
 
-In addition to standard Python log levels, Pipelex introduces custom levels:
+Pipelex uses the standard Python log levels and adds two of its own, `VERBOSE` below `DEBUG` and `OFF` above everything. Each level makes a promise about what a line at that level means:
 
-| Level | Value | Description |
-|-------|-------|-------------|
-| VERBOSE | 5 | Most detailed logging, below DEBUG |
-| DEBUG | 10 | Standard debug information |
-| DEV | 15 | Development-specific logging (between DEBUG and INFO) |
-| INFO | 20 | General informational messages |
-| WARNING | 30 | Warning messages |
-| ERROR | 40 | Error messages |
-| CRITICAL | 50 | Critical errors |
+| Level | Value | What a line at this level means |
+|-------|-------|---------------------------------|
+| VERBOSE | 5 | Step-level tracing for Pipelex's own developers, following the runtime through its steps |
+| DEBUG | 10 | What you would need to diagnose a problem from a log a user sends |
+| INFO | 20 | A lifecycle milestone, and there are few of them, besides the [summary event](#summary-events) that ends each inference call and each live pipe run |
+| WARNING | 30 | A handled degradation, or a user misconfiguration worth fixing; a warning is actionable |
+| ERROR | 40 | A run failed or data was lost |
+| CRITICAL | 50 | The process cannot go on |
 | OFF | 999 | Disable logging |
+
+A line names what it is about, a pipe, a model or a file, and never carries its contents: base64 data, a prompt or a raw response stays out of the log at every level, `DEBUG` and `VERBOSE` included.
 
 ## Using the Logger
 
@@ -15168,7 +15170,16 @@ from pipelex import log
 log.info("Simple message")
 
 # Named fields ride the record as attributes; the message stays narrative
-log.info("Scanned the inputs", fields={"files": 7, "bytes": 12_288})
+log.info("Scanned the inputs", fields={"file_count": 7, "byte_count": 12_288})
+
+# A named console layout; every sink but the console writes the plain message and the fields
+from pipelex.tools.log.console_layouts import LogLayout
+
+log.info(
+    "Pipe run starts",
+    fields={"pipe_type": "PipeCompose", "pipe_code": "compose_company", "output_concept": "Company", "pipe_depth": 1},
+    layout=LogLayout.PIPE_RUN,
+)
 
 # Logging with title
 log.info("Detailed message", title="Process Status")
@@ -15186,20 +15197,17 @@ log.warning("API rate limit approaching", problem_id="rate_limit_warning")
 # Error carrying the exception being handled, for the sink to render
 log.error("Failed to process", include_exception=True)
 
-# Development logging
-log.dev("Testing new feature")
-
 # Verbose logging
 log.verbose("Detailed debug information")
 ```
 
-Every one of the seven methods (`verbose`, `debug`, `dev`, `info`, `warning`, `error`, `critical`) takes the same keyword-only `fields`. `title`, `inline`, `problem_id` and `include_exception` keep their meaning beside it. `include_exception=True` carries the exception being handled as the record's `exc_info`, with nothing spliced into the message: the `console` sink renders the traceback under the line, the `json` sink writes it under the `exception` key and the `otlp` sink under the `exception.*` attributes. Outside an `except` block it carries nothing.
+Each level's method (`verbose`, `debug`, `info`, `warning`, `error`, `critical`) takes the same keyword-only `fields` and `layout`, the second naming a [console layout](#layouts). `title`, `inline`, `problem_id` and `include_exception` keep their meaning beside them. `include_exception=True` carries the exception being handled as the record's `exc_info`, with nothing spliced into the message: the `console` sink renders the traceback under the line, the `json` sink writes it under the `exception` key and the `otlp` sink under the `exception.*` attributes. Outside an `except` block it carries nothing.
 
 ## Fields
 
-`fields` is a mapping of named values. Each entry becomes an attribute of the emitted `LogRecord`, which is where a formatter or a sink reads it: `record.files` for the example above, or `%(files)s` in a stdlib format string. Nothing from `fields` is written into the message, so `record.getMessage()` is exactly the text you passed.
+`fields` is a mapping of named values. Each entry becomes an attribute of the emitted `LogRecord`, which is where a formatter or a sink reads it: `record.file_count` for the example above, or `%(file_count)s` in a stdlib format string. Nothing from `fields` is written into the message, so `record.getMessage()` is exactly the text you passed.
 
-A value can be anything. It rides the record by reference and the sink serializes it on emit, on the calling thread, so what leaves the process is the value as it was at the call, and mutating it afterwards changes nothing already emitted. The `console` sink ignores it, the `json` sink dumps a pydantic model in JSON mode and falls back to `str` for a value JSON does not know, and the `otlp` sink carries a scalar or a sequence of scalars as an attribute and anything else as JSON text; prefer plain JSON-ready values (strings, numbers, booleans, lists and dictionaries of those) for anything meant to be queried later. A value JSON refuses outright, a circular reference or a mapping with a non-string key, is written by the `json` sink as its `repr`, and that costs the value alone: every other field on the line keeps its JSON type, so a number or a boolean beside it is still queried as one.
+A value can be anything. It rides the record by reference and the sink serializes it on emit, on the calling thread, so what leaves the process is the value as it was at the call, and mutating it afterwards changes nothing already emitted. The `console` sink shows it after the message on one line, as [Fields after the message](#fields-after-the-message) describes, the `json` sink dumps a pydantic model in JSON mode and falls back to `str` for a value JSON does not know, and the `otlp` sink carries a scalar or a sequence of scalars as an attribute and anything else as JSON text; prefer plain JSON-ready values (strings, numbers, booleans, lists and dictionaries of those) for anything meant to be queried later. A value JSON refuses outright, a circular reference or a mapping with a non-string key, is written by the `json` sink as its `repr`, and that costs the value alone: every other field on the line keeps its JSON type, so a number or a boolean beside it is still queried as one.
 
 ### Naming convention
 
@@ -15211,7 +15219,9 @@ A value can be anything. It rides the record by reference and the sink serialize
 
 The stdlib refuses an `extra` key that would overwrite one of the record's own attributes (`name`, `message`, `lineno`, `module`, `args`, `asctime` and the rest), and a library's log call never raises. An entry of such a name is therefore carried under the prefix `field_`: `fields={"name": "alpha"}` lands as `record.field_name`. What counts as owned is read off the record actually built, through whatever record factory is installed, so an attribute an OpenTelemetry or tracing instrumentation stamps on every record is a collision too, for a field, a context identifier and `data` alike. The prefix is applied until the name lands on an attribute nobody owns, and entries attach in order, so a call that gives both `name` and `field_name` keeps both values whatever their order: the one that arrives second lands on `field_field_name`.
 
-Two kinds of name are reserved though nothing on a fresh record owns them yet, because both are stamped after the entries are attached and the stdlib's refusal therefore cannot cover them: what the formatter sets (`message`, `asctime`) and what Pipelex's own logging machinery sets — `_pipelex_forwarded`, the marker that tells the sink's handler a record reached it through the boot's holding handler already. Both take the same `field_` prefix, and the marker is never handed to a sink as something the record carries. Without that reservation, `fields={"_pipelex_forwarded": True}` would have the sink's own filter read the record as one already delivered and drop it whole.
+Two kinds of name are reserved though nothing on a fresh record owns them yet, because both are stamped after the entries are attached and the stdlib's refusal therefore cannot cover them: what the formatter sets (`message`, `asctime`) and what Pipelex's own logging machinery sets — `_pipelex_forwarded`, the marker that tells the sink's handler a record reached it through the boot's holding handler already, `_pipelex_field_names`, the names the call's entries landed on, which is what the console renders, and `_pipelex_layout`, the [layout](#layouts) a call named. Both kinds take the same `field_` prefix, and no mark is ever handed to a sink as something the record carries. Without that reservation, `fields={"_pipelex_forwarded": True}` would have the sink's own filter read the record as one already delivered and drop it whole, and `fields={"_pipelex_layout": "pipe_run"}` would pick the line's layout.
+
+The names Rich's console handler reads off each record ahead of its own settings, `markup` and `highlighter`, are reserved the same way and for the same reason: a field landing on `markup` would turn markup back on for that line, which the console otherwise never reads, and one landing on `highlighter` would be called in the highlighter's place, so `fields={"highlighter": "pygments"}` would raise inside the handler and lose the whole line. Such a field rides under `field_markup` or `field_highlighter`, and neither name is handed to a sink as something the record carries.
 
 ## The run-scoped context
 
@@ -15241,6 +15251,8 @@ The context is a `LogContext` with three optional identifiers, `request_id`, `pi
 The identifiers travel in the payload, and the contextvar is in-process plumbing bound after deserialization and nothing else; it never crosses a process boundary. Each process entry binds from the payload it received:
 
 - **A direct-mode run**: `PipeRun.run` binds `request_id` and `pipeline_run_id` from the job's `JobMetadata` for the whole run, delivery included, through `JobMetadata.log_context()`, and releases the binding when the run returns. The metadata a submission builds carries no `pipe_run_id` yet.
+- **A delivery**: `DeliveryExecutor.execute` binds `request_id` and `pipeline_run_id` for the length of a delivery, so its storage and webhook lines name the run whether or not its caller bound them, a durable-execution activity delivering a run included; a `request_id` of `None` inherits the one the caller bound.
+- **A tracing assembly**: `assemble_tracing` binds `pipeline_run_id`, and the `request_id` of the run metadata it is given, for the length of the assembly, so its lines name the run in the durable-execution activity that runs it, `act_assemble_tracing`, as they do under `PipeRun`.
 - **Every pipe run**: `live_run_pipe` mints the pipe run's id and binds `pipe_run_id` around the whole of the run, the line announcing it, its span lines and its failure included, so every record emitted during a pipe's run names the run it belongs to, a nested pipe rebinding its own and the outer id coming back when it returns, however it returns. A pipe lifted for absent optional inputs does not run and has no id: its skip line carries the enclosing binding, the parent pipe's or none. This is the binding every orchestration shares, direct or distributed.
 - **Every kernel step**: each kernel function that takes a `job_metadata` — `run_llm_text`, `run_llm_object`, `generate_object_content`, `run_extract`, `run_search` and `run_img_gen` — binds it for the length of its call, so a program driving the kernel directly gets lines naming the run and the step. Inside the interpreter the operator hands the kernel the `pipe_run_id` that `live_run_pipe` already bound, so this nested binding changes nothing there.
 - **A kernel-driven run**: the host wraps its run in `PipelexKernel.log_context()`, which binds `request_id` and `pipeline_run_id` and no step. The kernel has no run boundary of its own, so this binding is the host's, and each step's binding merges over it. See [The Pipelex Kernel](../under-the-hood/pipelex-kernel.md#the-log-context).
@@ -15307,7 +15319,7 @@ In place, because what the processor does is *remove* something. A record that h
 
 `log.install_sink` is what puts the processor in front of the sink's own, so every sink gets it — the built-in ones, an out-of-tree one, and the console sink `pipelex doctor` falls back to — and no sink knows about it. A boot that dies before its sink arrives runs the same processor, behind the same guard, over every record it held before handing them to the stdlib's last resort on stderr, so the trail a failed boot leaves is scrubbed too. `[runtime.log.redaction] is_enabled = false` installs nothing at all.
 
-The processor fails closed. A sink processor that raises is reported on stderr and the record is handed on, which is the right rule for a processor that enriches; for one that removes, it would mean the secret ships. So when the scrub itself fails, a value nested past the interpreter's recursion limit for one, the record is stripped before the failure is reported: its message becomes `[REDACTION FAILED: <exception type>]`, every field and the `data` attribute become `[REDACTED]`, and the exception text is dropped. The line says the scrub failed, and nothing of the call leaves with it.
+The processor fails closed. A sink processor that raises is reported on stderr and the record is handed on, which is the right rule for a processor that enriches; for one that removes, it would mean the secret ships. So when the scrub itself fails, a value nested past the interpreter's recursion limit for one, the record is stripped before the failure is reported: its message becomes `[REDACTION FAILED: <exception type>]`, every field and the `data` attribute become `[REDACTED]`, the exception text is dropped, and so is any [console layout](#layouts) the call named, which would otherwise draw the redacted fields in place of the notice. The line says the scrub failed, and nothing of the call leaves with it.
 
 The stripping can fail in its turn, and that case is closed too. The commonest reason the scrub fails is a stack that has run out — a `log.<level>(...)` call made a few frames from the limit, by a recursive walker or by an `except RecursionError:` handler — and a stack that could not take the scrub cannot always take the stripping of what it left behind a line later. So the record is marked before the stripping starts, by a plain assignment into its own dictionary that pushes no frame, and unmarked only once the stripping has gone all the way through; a record still carrying the mark when the processors are done is **dropped** rather than emitted. A notice saying the record was quarantined while it still carried the field the scrub never read would be worse than no line at all.
 
@@ -15336,7 +15348,80 @@ Logging is configured in two steps at boot. `log.configure` sets the levels and 
 
 ## Console rendering
 
-The default sink, `console`, renders through Rich with every `[runtime.log.rich_log]` setting. Rich is the `cli` extra (`pipelex[cli]`), which the command-line tools install. The sink imports Rich when it is built, so a process that selects `json` or `otlp` never loads it through the sink, and one that selects `console` without Rich installed stops at boot naming the extra to install and the `json` alternative. That refusal is not what keeps a server off the console: `typer` and `instructor`, both core dependencies, require Rich, so it is installed even where the extra is not, and a server that forgot to select `json` boots on the `console` sink. A server therefore selects `json` in its own configuration, and sets `pretty_print_mode` to `"poor"` or `"silent"` beside it, since the boot makes neither choice for it (see [Pretty-Print Mode](../configuration/config-practical/logging-config.md#pretty-print-mode)).
+The default sink, `console`, renders through Rich with every `[runtime.log.rich_log]` setting, and reads no message as markup (see [Messages are plain text](#messages-are-plain-text)). Rich is the `cli` extra (`pipelex[cli]`), which the command-line tools install. The sink imports Rich when it is built, so a process that selects `json` or `otlp` never loads it through the sink, and one that selects `console` without Rich installed stops at boot naming the extra to install and the `json` alternative. That refusal is not what keeps a server off the console: `typer` and `instructor`, both core dependencies, require Rich, so it is installed even where the extra is not, and a server that forgot to select `json` boots on the `console` sink. A server therefore selects `json` in its own configuration, and sets `pretty_print_mode` to `"poor"` or `"silent"` beside it, since the boot makes neither choice for it (see [Pretty-Print Mode](../configuration/config-practical/logging-config.md#pretty-print-mode)).
+
+### Messages are plain text
+
+The console reads no log message as Rich markup: a message is the caller's text, made of values nobody chose, and it prints exactly as written.
+
+```python
+log.error("Expected list[int], got [red]str[/red]")
+```
+
+```text
+ERROR    🧠: Expected list[int], got [red]str[/red]
+```
+
+A tag-shaped span in a message is text like any other: a `list[int]` in a type complaint, a bracketed path, the `[cycle]` marker in the rendering of a circular content, and the `[name]: ` prefix the console puts before a line from a logger with no emoji, such as `[myapp.jobs.nightly]: `. Colour is the console's own: it styles the [fields after the message](#fields-after-the-message) by their names and draws the few [layouts](#layouts), so a call is coloured by naming its fields, never by writing markup into its message. No sink but the console has ever read markup, so a message carrying a tag would reach the `json`, `otlp` and `gcp` sinks with the tag in it, and the rule for a Pipelex log call is to write none. Two checks hold the calls to it, by one reading of what a tag is: a tag Rich would apply as styling, a closing tag, an `@` handler, or a tag naming a style, `[bold]` or `[link=https://pipelex.com]`. A bracketed word that names no style, `list[int]` or `[openai]`, passes, since it prints as written. The [log-call guard](../contribute/log-calls.md), `make check-log-calls`, reads the source of every call: it refuses such a tag in the literal text of a message, its title or its inline title, at every level, that text folded across concatenations and named literals the way it reaches the console. A test checks the messages of one run: it runs the pipes of one test bundle live, a sequence nesting a structuring step, parallel summaries and a condition, with a stand-in worker answering every model call, and fails on any message the run logs, at any level, that holds such a tag, whatever built it. A message the guard cannot read, a value built at run time, is covered only when that run logs it.
+
+Rich still honours its own per-record `markup` attribute, which a third-party library may set on a record it logs to ask for markup. No Pipelex call can set it: a field of that name is [reserved](#names-that-are-not-yours-to-give) and lands under `field_markup`.
+
+### Fields after the message
+
+The console shows the fields a call gave after its message, as a `key=value` suffix, the way structlog's console renderer and pino-pretty do:
+
+```python
+log.info("Scanned the inputs", fields={"file_count": 7, "source": "inbox/march"})
+```
+
+```text
+INFO     🧠: Scanned the inputs file_count=7 source=inbox/march
+```
+
+- **What is shown.** The fields the call attached, in the order it gave them, under the name each landed on (`field_name` for a field called `name`). The run identifiers (`request_id`, `pipeline_run_id`, `pipe_run_id`) are left out, since they are the same on every line of a run and would drown the message, and so is `data`, the structured content the message already renders. Nothing else on the record is shown: neither the stdlib's own attributes, nor Pipelex's marks, nor what a record factory or a third-party library stamped on it.
+- **How a value is written.** On one line: a string as itself, a number, a boolean, `None`, a mapping, a list or a pydantic model as compact JSON, and anything else as its text. That text is written bare, or quoted when it is empty or holds a space, an `=`, a `"`, a `\` or a character a terminal would act on. Inside the quotes a backslash is written `\\`, a quote `\"` and any character a terminal would act on as its escape (`"line\nbreak"`), so `fields={"a": "b=c"}` prints `a="b=c"` rather than a second pair. A number, a boolean and `None` print bare (`7`, `true`, `null`), and so does a list of numbers (`[1,2]`), while a JSON rendering holding a string holds a quote and is quoted like a string: `["a","b"]` prints `"[\"a\",\"b\"]"`. A value longer than 80 characters is cut short and ends with `…`, its text, a string's or a JSON rendering's, being cut before it is quoted and escaped, so a quoted value keeps both its quotes, no escape is split, and no unbalanced quote or bracket is left whose tail could read as a pair of its own, except `error.message`, a handled exception's text, which is cut only past 2000 characters, quoted and escaped the same way: its diagnosis, a cause chain or a parse error's location, is what a fragment would lose, while a dependency's raw output, a validation error's every line or git's stderr, would flood the terminal uncut. `finding_message`, the text of a PipeDocGen template finding, gets the same generous cut, being the part of its warning a reader acts on. A path is cut at its start instead and begins with `…`, so the file's name stays on the line while the directory every line of a run shares goes. A field is taken for a path by its name: one ending in `.path`, `_path`, `_paths`, `_dir`, `_dirs`, `_file` or `_files`, such as `file.path`, `root_path`, `override_paths`, `library_dirs` or `template_file`, and `file.name` and `storage_key`, whose ends are a file's name too. A list of paths is cut the same way, its JSON rendering at its start before it is quoted, so the last path's file name stays and the cut list is still one quoted value: `override_paths="…/.pipelex/inference/backends_override.toml\"]"`. A path that is not on disk, `url.path` or a `variable_path`, is cut at its start as well, its end being what tells it apart. These cuts are the console's alone: every other sink writes each value whole. A key is written the same way, so a field whose name holds a line break, a space, an `=` or an escape sequence is quoted and escaped rather than forging a line or a second pair: `fields={"x=1": 2}` prints `"x=1"=2`. The [redaction](#redaction) has run before the console renders, so a secret is already `[REDACTED]`.
+- **Never markup.** The suffix is built as styled Rich `Text`, not as a markup string, so a value carrying `[red]x[/red]` prints exactly that.
+
+There is no setting to hide the suffix: it carries the values a message used to interpolate, so hiding it would hide what the line is about.
+
+### The style map
+
+A field's value is coloured by the field's name, wherever it appears, from one table in `pipelex/tools/log/console_fields.py` (`FIELD_STYLES`): a pipe code red, a concept (`output_concept`, `concept_ref`, `concept_code`) bold green, a pipe type white, a stuff name cyan and a domain bold magenta, the colours the pipe announcement and the stuff renderings have always used. A field outside the map, and every key, is dimmed. The colour follows the name the field was given, so a `pipe_code` that landed on `field_pipe_code` because a record factory owns `pipe_code` is still red. So a call is coloured by naming its fields, never by writing markup into its message. The map lives in code, with no configuration key; extending it is a one-line change beside the sink.
+
+### Layouts
+
+A few lines have a shape that matters on a terminal, the pipe-run tree above all. For those, a call names a layout, a Rich template over the record's fields registered in `pipelex/tools/log/console_layouts.py`. Every live pipe run announces itself this way, with the message `Pipe run starts` and the pipe in the fields, and the console draws the line byte for byte as it did when the announcement was markup in its message:
+
+```python
+from pipelex.tools.log.console_layouts import LogLayout
+
+log.info(
+    "Pipe run starts",
+    fields={"pipe_type": "PipeCompose", "pipe_code": "compose_company", "output_concept": "Company", "pipe_depth": 1},
+    layout=LogLayout.PIPE_RUN,
+)
+```
+
+```text
+INFO     🧠:    ↳ PipeCompose: compose_company → Company
+```
+
+- **The console renders the layout in place of the message**, after the logger's emoji, and every other sink ignores it: the `json`, `otlp` and `gcp` sinks write the plain message, `Pipe run starts`, and the fields, and never the layout's name, which rides the record under a reserved mark. The name is explicit at the call, so rewording the message cannot lose the layout, and it is a `LogLayout` member, so a misspelt one is a type error.
+- **Every value is escaped** with Rich's own escape before it is substituted, the values the layout derives included, so a field carrying `[red]x[/red]` prints literally. A value is written on one line and cut short past 80 characters, as in the suffix, except that it is never quoted, a string or a JSON rendering alike.
+- **The fields a layout presents are not repeated after it**; any other field the call gave still follows as the suffix, and the run identifiers stay hidden.
+- **A layout that cannot be filled costs nothing but itself.** A field it needs is missing, a value its derivation refuses, or anything else the layout raises: the console falls back to the message and shows every field after it.
+- **A layout is for a string message.** A call whose content is anything else, a mapping, a list or a model, keeps its layout off the record, and the console renders its message: the message is the only place that content renders, since the suffix never repeats `data`, and a content JSON refuses, a circular one for instance, lives only in the message's `repr`. A record whose [redaction](#redaction) failed loses its layout too, so the notice saying the scrub failed is what prints.
+- **A layout replaces the whole message.** A line rendered through a layout shows neither the title nor the inline text the call gave, nor any [caller information](#caller-information), all of which belong to the message it replaces. A traceback the record carries still prints under the line, as it does under a message, and the fields stay on the line above it, whether Rich renders the traceback or `is_rich_tracebacks = false` has it printed as plain text.
+
+The registry holds these layouts:
+
+| Layout | Fields it presents | What it draws |
+| --- | --- | --- |
+| `LogLayout.PIPE_RUN` | `pipe_type`, `pipe_code`, `output_concept`, `pipe_depth` (an integer, `0` at the top level and at most `100`) | `PipeCompose: compose_company → Company`, indented three spaces per level of depth and behind `↳` when nested, in the style map's colours. A depth of another type, or out of range, falls back to the message. The pipe announcement names it, and only a live run announces itself, so the line carries no run mode |
+| `LogLayout.PIPE_RUN_END` | The pipe-run layout's fields, `duration_ms` and `outcome` | `PipeLLM: describe_company done in 1.25 s`, at the depth and in the colours of the line that announced the run, or `failed after 1.25 s` in red with `error.type` following as the suffix, or `cancelled after 1.25 s` in yellow. A duration is written in milliseconds under a second and in seconds from a second on. An unknown outcome, or a duration that is no number or is negative, falls back to the message. The [pipe-run end event](#the-pipe-run-end) names it |
+| `LogLayout.INFERENCE_CALL_END` | Every field of the [inference summary event](#the-inference-call-end) but `error.type` | `claude-5.5-sonnet chat · 2,048 → 512 tokens · $0.009216 · done in 1.23 s`: the model's handle, the operation, the tokens in and out, the cost and the duration, or `failed after` in red with `error.type` following as the suffix, or `cancelled after` in yellow. A count or a cost the call did not report is left out with its separator, and a cost under a millionth of a dollar is written `<$0.000001`, so it never reads as a free call's `$0`. The keys naming the model a second way, `gen_ai.request.model`, `gen_ai.response.model`, `backend_name` and `sdk`, are presented and not drawn, so the line stays short and the other sinks carry them. A count, a cost or a duration of the wrong type, or an unknown outcome, falls back to the message |
+
+A layout is a `ConsoleLayout`: a `template` of Rich markup whose placeholders are bare field names (`{pipe_code}`, never an attribute, an index or a format spec, which registration refuses), the `presented_fields` the suffix leaves out, and, for a shape a template cannot express alone, a subclass whose `derived_values` computes presentation values such as an indentation from the fields.
 
 ### Rich Formatting
 
@@ -15363,41 +15448,244 @@ Optional inclusion of caller information in logs, prefixed to the console line:
 - Module name
 - Customizable format templates
 
-## Best Practices
+## Summary events
 
-1. **Log Level Selection**:
+Two kinds of work end with one event each, whichever way they end: an inference call and a live pipe run. Each event has a fixed message, carries what the work was, how long it took and how it ended as fields, and is logged once, when the work returns or raises, so a log store selects every one by its message and groups them by their fields. The event is the work's measurement and never part of its result: if its own fields cannot be built or logged, it is replaced by one WARNING, `A summary event could not be logged`, naming the event in `summary_event` with the failure's `error.type` and `error.message`, and the work returns or raises exactly as it would have. A handler that raises on the event, as a host's might on a full disk, gets that warning next, and when it refuses the warning too nothing more is logged: the failure of a log line never reaches the work. They are what an operator's dashboards are built from: a run's `json` output alone gives the latency and the cost of each operation on each model, and the failures by their class, with no span store and no text to parse.
 
-    - Use VERBOSE for detailed debugging
-    - Use DEBUG for general debugging
-    - Use DEV for development-specific logging
-    - Use INFO for general progress
-    - Use WARNING for potential issues
-    - Use ERROR for actual errors
-    - Use CRITICAL for system-critical issues
+Both are logged at **INFO**. The dashboards read the events at the default production level, and a query over a run's `json` output computes latency and cost per operation and model from these events alone only if they are logged at that level. The pipe-run end pairs with the pipe-run announcement, `Pipe run starts`, which is logged at INFO already. Each event has a console layout that draws it on one short line, so a terminal stays readable. So an application that embeds Pipelex at the default level gets one line per inference call and one per live pipe run. A host that wants either one quiet raises its logger's level with `package_log_levels`: `pipelex-cogt-inference-inference_call_summary = "WARNING"` for the inference event, and `pipelex-pipe_machinery-pipe_abstract = "WARNING"` for the pipe-run end, which quiets the announcement too, since the two share that logger.
 
-2. **Fields over interpolation**:
+The fields the two events share:
 
-    - Put a value a reader might filter or aggregate on in `fields`, and keep the message a sentence
-    - Name a field after the thing it carries, in `snake_case`, or after its OpenTelemetry key when one exists
-    - Leave the run identifiers to the context; bind them at the process entry, never per call
+| Field | Type | What it says |
+| --- | --- | --- |
+| `duration_ms` | number, in milliseconds | How long the work took, read off a monotonic clock, to the microsecond |
+| `outcome` | `success`, `error` or `cancelled` | Whether the work returned, failed, or was stopped from outside. An exception that is not an `Exception` stops work without the work failing, so it ends the work `cancelled`: a task cancelled, as a batch or a parallel controller cancels its siblings when one fails and as a client cancels a run, an interrupt, a generator closed or the interpreter exiting. So the siblings a failure cancels are not counted as failures of their own |
+| `error.type` | string | The class of the exception the work failed with, when `outcome` is `error` only. The exception's text stays off the event: the exception propagates to whoever handles it, which logs it there |
 
-3. **Structured Data**:
+### The inference call end
 
-    - Log complex data structures directly; they reach the console as JSON and a sink as `data`
-    - Use titles for context
-    - Include problem IDs for trackable issues
+Every inference call ends with `Inference call ends`, on the logger `pipelex.cogt.inference.inference_call_summary`: an LLM call, the generation of an image, an extraction, a search, a judgment or the print of a document. It is logged by the worker bases, `LLMWorkerAbstract`, `ImgGenWorkerAbstract`, `ExtractWorkerAbstract`, `SearchWorkerAbstract` and `JudgmentWorkerAbstract`, around the call their public method makes, the checks that may refuse the call before the provider is reached included, so every worker that subclasses them, a provider's or a plugin's, ends its calls with the event, a refused call too, and logs nothing for it itself. A document engine, a `DocGenWorkerAbstract`, overrides `render` alone, which the print stage, `render_document_and_store`, runs on a thread of the print pool: the stage logs the event around the print and the checks before it, the run's read scope, the engine's model and its installation, so a refused print ends with it too, and it logs it on the coroutine that awaits the thread, so a print cancelled from outside ends `cancelled` once, while the thread, which nothing stops, finishes its render and logs nothing more. An LLM call's event is logged as the call's span closes, just after the span has ended but while it is still the active Pipelex span, so it carries that span under `pipelex.trace_id` and `pipelex.span_id`; a call the checks refuse ends before its span starts and carries none.
 
-4. **Exception Handling**:
+| Field | Type | What it says |
+| --- | --- | --- |
+| `gen_ai.operation.name` | string | The operation: `chat` for an LLM call, OpenTelemetry's name for it, and the family's own name where the conventions define none, `img_gen`, `extract`, `search`, `judgment` and `doc_gen` |
+| `model_handle` | string | The model's handle, as the model deck names it |
+| `backend_name` | string | The backend serving the model |
+| `sdk` | string | The SDK the backend reaches the model through |
+| `gen_ai.request.model` | string | The model requested, its handle, as on the LLM span |
+| `gen_ai.response.model` | string | The provider's id the model deck pins for the handle, the one the call is made with, as on the LLM span |
+| `gen_ai.usage.input_tokens` | integer | The tokens the call read, when it reported them |
+| `gen_ai.usage.output_tokens` | integer | The tokens the call wrote, when it reported them |
+| `cost_usd` | number, in US dollars | What the call cost, when it reported usage and the model has rates |
+| `duration_ms`, `outcome`, `error.type` | | As above |
 
-    - Use `include_exception=True` inside the `except` block, and let the sink render the traceback its own way
-    - Include relevant data in error logs
-    - Use appropriate log levels for exceptions
+A handle names one model per model type, so a query groups by `gen_ai.operation.name` and `model_handle` together. The model keys are read when the call ends, so a worker that names its model in the checks before the call is named on the event as on the call's span. Every worker writes under `gen_ai.response.model` the provider's id the deck pins for the handle, the one the call is made with, and none writes the id a provider answers with: a provider that says another model answered is named on a warning of its own, the TypeSafe judgment worker's, under `answered_model_id`. A print that ended before its handle was resolved, refused by the read scope, or whose handle resolves to no model served here, names the model by its handle alone, under `model_handle` and `gen_ai.request.model`, and leaves off `backend_name`, `sdk` and `gen_ai.response.model`, which only a served model has. The usage is the one the call recorded on its job's report, the object the base hands to `ReportingProtocol.report_inference_job` when it reports the job and the reporting manager turns into a usage event, and the event prices it with `compute_tokens_usage_cost`, the cost engine the usage records and the run's cost report read, so a usage the cost report counts has the same price there as on the event. The event carries what the job recorded, though, and the cost report only what was reported: the search and judgment bases report a job whichever way it ends, while the LLM, image-generation and extraction bases report it only when it succeeds, so a failure of theirs the provider billed carries a cost on the event that the run's cost report does not count. A token count or a cost the call did not record is left off, never written as zero: a call that failed before the provider answered, or that the checks before it refused, recorded no usage, a model with no rates has no price, and a document engine reports no usage at all, so a print carries neither. A failure the provider billed, a search or a judgment whose answer a guard refused, carries the usage it recorded.
+
+Rates are per million tokens, so a call billed by the request or by the page records each unit as a million tokens in and out, and the rate table prices one unit: a Linkup search or fetch is one request, and an extraction whose provider reports no usage is priced by its pages. Its usage says so in its `pricing_unit`, `request` or `page` rather than `token`, and the event carries the call's cost and no token counts, since a request or a page is not a token. A worker records such a usage with `record_unit_priced_usage` (`pipelex.cogt.usage.usage_cost`), a plugin's worker as much as a provider's, and never writes the counts itself.
+
+```text
+INFO     🧠: claude-5.5-sonnet chat · 2,048 → 512 tokens · $0.009216 · done in 1.23 s
+INFO     🧠: claude-5.5-sonnet chat · failed after 2.40 s error.type=LLMCompletionError
+```
+
+```json
+{"time": "2026-10-09T23:08:37.099Z", "severity": "INFO", "logger": "pipelex.cogt.inference.inference_call_summary", "message": "Inference call ends", "pipeline_run_id": "0b2319a6-c511-4e1f-80f6-914cbab5f28b", "pipe_run_id": "0b63ab15-ff93-4c4f-9a2d-4f1c4f9901d4", "gen_ai.operation.name": "chat", "model_handle": "claude-5.5-sonnet", "backend_name": "anthropic", "sdk": "anthropic", "gen_ai.request.model": "claude-5.5-sonnet", "gen_ai.response.model": "claude-sonnet-5-5", "gen_ai.usage.input_tokens": 2048, "gen_ai.usage.output_tokens": 512, "cost_usd": 0.009216, "duration_ms": 1234.512, "outcome": "success"}
+```
+
+On Pipelex's LLM span, `gen_ai.operation.name` still holds Pipelex's unit-job id, `llm_gen_text` or `llm_gen_object`, which the PostHog exporter reads back to name the span; the event carries OpenTelemetry's operation name under that key, and the span is to follow it. Every other `gen_ai.*` key means the same on both.
+
+### The pipe-run end
+
+Every live pipe run ends with `Pipe run ends`, on the logger `pipelex.pipe_machinery.pipe_abstract`, the announcement's. `PipeAbstract.live_run_pipe` enters it with the announcement, under the run's `pipe_run_id`, and logs it when the run returns or raises, so every announced run ends once, a nested one before the pipe it runs under, and a dry run, which announces nothing, ends with nothing. It is logged as the pipe's own span closes, just after the span has ended but while it is still the active Pipelex span, so with telemetry on it carries the span of the pipe that ended under `pipelex.trace_id` and `pipelex.span_id`, as the lines of the run do, a nested pipe's its own and never its parent's; a run whose setup fails before its span is active still ends with the event, outside any span of its own.
+
+| Field | Type | What it says |
+| --- | --- | --- |
+| `pipe_type` | string | The pipe's class |
+| `pipe_code` | string | The pipe |
+| `output_concept` | string | The concept the pipe produces |
+| `pipe_depth` | integer | How deep the run is nested, `0` at the top level, as in the announcement |
+| `duration_ms`, `outcome`, `error.type` | | As above |
+
+```text
+INFO     🧠: PipeSequence: brief_company → Text
+INFO     🧠:    ↳ PipeLLM: describe_company → Text
+INFO     🧠: claude-5.5-sonnet chat · 1,000 → 200 tokens · $0.004 · done in 1.23 s
+INFO     🧠:    ↳ PipeLLM: describe_company done in 1.25 s
+INFO     🧠: PipeSequence: brief_company done in 1.31 s
+```
+
+```json
+{"time": "2026-10-09T23:08:37.127Z", "severity": "INFO", "logger": "pipelex.pipe_machinery.pipe_abstract", "message": "Pipe run ends", "pipeline_run_id": "0b2319a6-c511-4e1f-80f6-914cbab5f28b", "pipe_run_id": "0b63ab15-ff93-4c4f-9a2d-4f1c4f9901d4", "pipe_type": "PipeLLM", "pipe_code": "describe_company", "output_concept": "Text", "pipe_depth": 1, "duration_ms": 1250.663, "outcome": "success"}
+```
+
+### Pricing a run from its events
+
+A dashboard reads a run's `json` output, keeps the inference events and adds them up by operation and model:
+
+```python
+import json
+from collections import defaultdict
+
+calls = [record for record in map(json.loads, open("run.jsonl")) if record["message"] == "Inference call ends"]
+groups = defaultdict(list)
+for call in calls:
+    groups[call["gen_ai.operation.name"], call["model_handle"]].append(call)
+for (operation, model_handle), group in groups.items():
+    cost_usd = sum(call.get("cost_usd", 0) for call in group)
+    latency_ms = sum(call["duration_ms"] for call in group) / len(group)
+    print(operation, model_handle, len(group), f"${cost_usd:.4f}", f"{latency_ms:.0f} ms")
+```
+
+A test runs a small method live, with stand-in workers answering every model call on two models, and computes the cost and the latency of each operation and model from the `json` output alone.
+
+## Log-call conventions
+
+Pipelex's own log calls, in `pipelex/` and in the API server's `api/pipelex_api/`, follow these conventions, so that a line written today can be grouped, counted and filtered in a log store tomorrow. The [log-call guard](../contribute/log-calls.md), `make check-log-calls`, holds every call to the ones that can be read off the source, the fixed message at INFO and above and the absence of markup; the rest is for review. Code of your own that logs through `log` is welcome to follow them too.
+
+### A fixed message
+
+A message is a sentence that reads the same on every emission. A log store groups and counts lines by their message, and an interpolated value makes a different string of every line, so a question as plain as "how many of these today" needs a regular expression. The message is the key a query, a dashboard or an alert selects a line by, and Pipelex carries no separate `event` field beside it, so rewording a message is a change made on purpose.
+
+At INFO and above, the message is a literal: written at the call, or a module constant holding a literal, as the summary events and `PIPE_RUN_STARTS_MESSAGE` pass theirs, and no f-string, no `%`, no `+`, no `.format()` and no message built elsewhere and passed in, since nothing can tell that one is fixed. DEBUG and VERBOSE may keep an f-string, because a person at a terminal reads them; fields are welcome there too.
+
+```python
+# Not this: the alias makes every line a different message, and the exception is buried in the text
+log.warning(f"Could not load dependency '{alias}' pipe '{pipe_code}': {exc}")
+
+# This: one message, the values in fields, the exception's class and text as fields of their own
+log.warning(
+    "A pipe of a dependency could not be loaded",
+    fields={"dependency_alias": alias, "pipe_code": pipe_code, **error_fields(exc=exc)},
+)
+```
+
+### Values in fields
+
+What varies goes in `fields`, named by the [naming convention](#naming-convention), and one concept has one name across the codebase, so that a query written for one line finds every line about the same thing. Pipelex's own concepts take the names in the table below. A concept the OpenTelemetry semantic conventions define takes their key verbatim: `file.path` for a path on disk and `file.name` for a file's name alone, `url.full` for a URL and `url.path` for the path of a request's URL, `server.address` for the host a request is sent to, `http.response.status_code` for the status of an HTTP response, `user.id` for the authenticated caller, never an identity the server refused, `error.type` for the class of an error, and the `gen_ai.*` keys for inference, such as `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.request.temperature`, `gen_ai.operation.name`, `gen_ai.usage.input_tokens` and `gen_ai.usage.output_tokens`. A `gen_ai.*` key means on a log line what it means on Pipelex's LLM span: `gen_ai.request.model` is the model's handle and `gen_ai.response.model` the provider's id the model deck pins for that handle, the one the call is made with, whichever model the provider says answered. `gen_ai.operation.name` is the one exception for now, as [the inference call end](#the-inference-call-end) explains. A line about an inference call carries them beside `model_handle`, `backend_name` and `sdk`, so it joins its span in a log store, while `model_handle` names the handle on every line about a model, inference or not. An OpenTelemetry key that more than one call site uses is spelled through a constant, so a misspelt one is an error the type checker reports rather than a field no query finds: `OTelLogAttr` in `pipelex/system/telemetry/otel_constants.py` holds those keys, `GenAISpanAttr` beside it the `gen_ai.*` ones, and `pipelex.tools.log.error_fields` the two error keys. A count is named `<what>_count` (`concept_count`) and a duration `duration_ms`, in milliseconds. A path is named `<what>_path`, a list of paths `<what>_paths`, a directory `<what>_dir` and a file as a declaration names it `<what>_file`, with their plurals, beside `file.path`: the console takes a field for a path by that ending and cuts its value at its start, keeping the file's name (see [Fields after the message](#fields-after-the-message)), so a field holding no path takes none of these endings. A field carries one JSON type on every line that has it, `null` aside, so a query compares it one way: where the value would be an integer on some lines and a word on others, `unbounded` for instance, the field is left out of the lines the word would name, and the table says so.
+
+| Field | Type | What it names |
+| --- | --- | --- |
+| `pipe_code` | string | The pipe a line is about, by its bare code, the value `Pipe run starts` carries for it: `compose_company` |
+| `pipe_ref` | string | The pipe a line is about, by its reference qualified by its domain, beside its `pipe_code` where the line keeps both: `company.compose_company`. A qualified reference that resolved to no pipe is carried here as it was named |
+| `popped_pipe_code` | string | The pipe taken off a run's pipe stack where the line's `pipe_code` was expected |
+| `pipe_type` | string | The pipe's class: `PipeLLM`, `PipeCompose` |
+| `pipe_depth` | integer | How deep a pipe run is nested, `0` at the top level |
+| `is_dry_run` | boolean | Whether the run is a dry run |
+| `item_count` | integer | The number of items a `PipeBatch` fans out over |
+| `max_concurrency` | integer | The bound on the branches a `PipeBatch` runs at once; absent when the configuration's `"unbounded"` sets none |
+| `threshold` | number | The probability threshold a judgment declares, between `0` and `1` |
+| `template_file` | string | A PipeDocGen's template file, as the pipe declares it |
+| `finding_message`, `finding_location` | string | The text of a PipeDocGen template finding, and where in the template it was found |
+| `function_name` | string | A function PipeFunc registers or calls, by its name |
+| `module_name` | string | A Python module's dotted name, as the PipeFunc registry imports or walks it: `myapp.functions` |
+| `eligibility_error` | string | Why a function cannot be registered for PipeFunc |
+| `output_concept` | string | The concept a pipe produces |
+| `concept_ref` | string | A concept's qualified reference, `<domain>.<Code>`: `company.Company` |
+| `concept_code` | string | A concept's code alone, where the call site has no domain for it: `Company` |
+| `structure_class_name` | string | The Python class a concept's content is structured by, by its name |
+| `structure_classes` | string | The Python structure classes a fetched method package declares, as one text naming each file and the classes it defines |
+| `domain_code` | string | A domain's code: `company` |
+| `metadata_field` | string | A field of a domain's metadata that two declarations of the domain give different values: `description` |
+| `established_value`, `incoming_value` | string | The value a domain's metadata field already holds, which is kept, and the different one a later declaration gives |
+| `stuff_name` | string | The name a stuff has in working memory |
+| `variable_path` | string | A dotted path into working memory, as a pipe's inputs name it: `invoice.total` |
+| `variable_names` | list of strings | The names a pipe's inputs give their variables, as a list: the absent inputs a pipe run was skipped for |
+| `library_id` | string | The library a load or a lookup runs in |
+| `caller` | string | The entry point a shared helper logs on behalf of, as the label it passes: `API validate` |
+| `package_address` | string | A method package's address, as its manifest declares it or a bundle's reference names it: `github.com/acme/methods/invoices` |
+| `package_version` | string | A method package's version, as its manifest declares it |
+| `installed_tag` | string or `null` | The tag an installed method package was fetched at, `null` when it was fetched with no tag |
+| `dependency_alias` | string | The alias under which a package's manifest declares a dependency; a dependency a bundle names by address has its address as its alias |
+| `method_ref` | string | The address a caller names a method by, selector and tag included, as the run routes and the CLI take it: `github.com/acme/methods/invoices@v1.2.0` |
+| `fetched_tag` | string or `null` | The tag a method package was fetched at for a run, as its `method_ref` named it, `null` when it named none and the default branch was fetched |
+| `commit_sha` | string | The commit a fetched method package was cloned at |
+| `mthds_version_constraint` | string | The MTHDS standard versions a package accepts, as the `mthds_version` of its `METHODS.toml` declares them: `^4.0.0` |
+| `mthds_standard_version` | string | The MTHDS standard version this runtime implements |
+| `mthds_paths` | list of strings | The `.mthds` files a load reads, as a list of paths |
+| `crate_fingerprint` | string | The fingerprint that identifies a normalized crate in the library it is loaded into |
+| `model_handle` | string | The handle a pipe or the model deck names a model by, an alias included: `gpt-image-2`, `@default-premium` |
+| `ideal_model_handle`, `fallback_model_handle` | string | A waterfall's first model, which the model deck lacks, and the model that replaces it, by their handles |
+| `preset_id` | string | A preset of the model deck, by its id |
+| `model_type` | string | The kind of model a line is about, as the model deck names it: `llm`, `img_gen`, `text_extractor` |
+| `served_model_types` | list of strings | The kinds of model a model serves, as a list of `model_type` values |
+| `matching_reference_kinds` | list of strings | The kinds of model reference a bare model name also names, as a list: `preset`, `alias`, `waterfall` |
+| `backend_name` | string | The inference backend serving a model, as the backends configuration names it: `anthropic`, `bedrock` |
+| `sdk` | string | The SDK a backend reaches a model through, as the backends configuration names it: `openai`, `bedrock_anthropic` |
+| `answered_model_id` | string | The provider's id of the model a provider says answered a call, where it is not the pinned id the call was made with, which `gen_ai.response.model` names |
+| `fixed_temperature` | number | The one temperature a model accepts, as its constraints declare it, used in place of the one requested |
+| `inference_job_type` | string | An inference job's class: `LLMJob`, `ImgGenJob` |
+| `image_size` | string | An image size as a generation request spells it, width by height: `2560x1440` |
+| `nb_steps` | integer | The number of inference steps an image generation job requests, spelled as its parameters spell it |
+| `cost_usd` | number | What an inference call cost, in US dollars, as the cost engine prices the usage it reported |
+| `duration_ms` | number | How long a unit of work took, in milliseconds |
+| `outcome` | string | How a unit of work ended, `success`, `error` or `cancelled`, on the [summary events](#summary-events) |
+| `summary_event` | string | The [summary event](#summary-events) a line is about, by its message: `Inference call ends`, `Pipe run ends` |
+| `node_id` | string | A node of a run's execution graph, as the graph tracer names it |
+| `trace_event_type` | string | A trace event's class: `PipeStartEvent` |
+| `writer_id`, `workflow_id` | string | The writer and the workflow a trace event names, as the event log records them |
+| `tracer_key` | string | The key a graph tracer is registered under |
+| `sort_key` | string | The sort key of a trace event's item in DynamoDB |
+| `event_count` | integer | The number of events a line is about, telemetry events or trace events |
+| `event_name` | string | A telemetry event, by its name |
+| `pipelex_version` | string | The version of the Pipelex runtime |
+| `integration_mode` | string | How the runtime is run, as the caller declares it: `cli`, `python`, `fastapi` |
+| `plugin_name` | string | A plugin, by the name it is registered under |
+| `callback_name` | string | A callback a plugin registered, by its module and qualified name: `my_plugin.runtime.release_workers` |
+| `override_paths` | list of strings | The override files merged over the base configuration file in `file.path`, as a list of paths |
+| `backup_path` | string | The backup a migration writes before it rewrites the file in `file.path` |
+| `migration_steps` | list of strings | The titles of the migration ledger's steps a stale configuration file was read through, as a list |
+| `has_blocked_steps` | boolean | Whether a stale configuration file needs a migration step that cannot be applied for the user |
+| `file_count` | integer | The number of result files a delivery stored |
+| `storage_key` | string | The key a delivery stores a result file under, which ends in the file's name |
+| `env_var` | string | The name of an environment variable, never its value |
+| `default_value` | integer | The value a setting falls back to when its environment variable holds none it can use |
+| `auth_mode` | string | The authentication mode the API server's `AUTH_MODE` names |
+| `claim_type` | string | The type a token's claim was decoded as, by its Python name, where the claim is refused and its value is not logged: `str`, `int`, `dict` |
+| `error.type`, `error.message` | string | A handled exception's class name and its text, as [Exceptions](#exceptions) describes |
+| `error_domain` | string | Who fixes a failure, as an error report classifies it: `input`, `config`, `runtime` |
+| `error_category` | string | A failure's Pipelex classification, as an error report carries it |
+| `retryable` | boolean | Whether retrying the failed call as it was can help, as an error report says |
+| `detail` | string | The explanation an API error response gives its caller |
+| `provider_status_code` | integer | The HTTP status an inference provider answered a failed call with |
+| `provider_request_id` | string | The id an inference provider gave a failed call |
+
+`pipe_code`, `pipe_type`, `output_concept`, `concept_ref`, `concept_code`, `domain_code` and `stuff_name` are in the console's [style map](#the-style-map), which colours their values wherever they appear. A concept missing from the table is added to it in the change that first logs it.
+
+### Exceptions
+
+An exception rides the record, never the message. Spliced into the text, `{exc}` makes the message vary, loses the exception's type and traceback, and gets only the pattern half of the [redaction](#redaction), where a field also has its control characters escaped. So:
+
+- **At ERROR and CRITICAL**, inside the `except` block, pass `include_exception=True`: the record carries the exception, and each sink writes its type and its traceback its own way. That is for an exception the code handles where it logs it, whose traceback nobody else will see, and above all for the catcher of an unexpected failure, the root of a CLI command or the API server's error handler, which logs it there and prints no traceback of its own: the `console` sink renders it under the line, and the `json` and `otlp` sinks write it to the log store, which a traceback printed on the console alone never reaches. A CLI command's root also names the exception's type and message in its own output, which is not a log record, so the terminal says why the command failed whatever the sink and the level, under a `json` sink writing to a file as under a level above ERROR.
+- **An exception logged and then re-raised carries no traceback, at ERROR too**: it rides as `error_fields`, since whoever catches it owns its traceback, and a line that carried it as well would print it a second time, ahead of the catcher's own report.
+- **A secondary failure carries no traceback either**: a cleanup that fails while another exception propagates, a tracer that will not close, a library that will not tear down, a delivery that fails after the run did, rides as `error_fields`, at ERROR too. Python chains the propagating exception onto it as its context, so its traceback would print the primary's text, a `ValidationError`'s refused input included, under a line that is not about it, while the primary's own catcher reports it. A cleanup that runs either way, a plugin's teardown callback, follows the same rule.
+- **A `ValidationError` the code swallows carries no traceback**, at any level: its traceback ends in its own text, which quotes every value it refused, so it rides as `error_fields`, which writes it as below.
+- **At WARNING and below**, an exception the code expected and handled rides as two fields, `error.type`, its class's name, and `error.message`, its text, with no traceback, through `error_fields` (`pipelex.tools.log.error_fields`): `fields={"package_address": address, **error_fields(exc=exc)}`. A warning promises a degradation that was handled, and a traceback of Pipelex's own frames repeated on every emission of an expected failure says nothing a reader can act on; the facade's `warning` takes no `include_exception` for that reason. Where the diagnosis is the cause chain rather than the exception's own text, as when a fetch fails in git underneath, `error_fields(exc=exc, text=...)` carries the chain instead. The console cuts `error.message` only past 2000 characters, where it cuts every other field's value at 80, so the chain reaches the terminal whole without a dependency's raw output flooding it.
+- **A pydantic `ValidationError` never reaches a field as its own text**, which quotes every value it refused, a run's input or a model's response among them: `error_fields` writes it as its locations and reasons alone, `limits.burst: Input should be a valid integer`, whichever line logs it. A reason is pydantic's own message, kept only when nothing in it came from the input: the error is one of pydantic's built-in types, its message is the one pydantic renders, and its context is empty or holds only values the schema gives, a bound such as `max_length`, the values or tags it expects, a discriminator's name, a pattern, a class. Any other error is written as its location and its type alone, `date: value_error`: a custom validator's message, a `value_error`, an `assertion_error` or a `PydanticCustomError`'s, is the validator's text, which can quote the very value it rejected, and several of pydantic's own templates quote the input as well, the unknown tag of a discriminated union (`item: union_tag_invalid`), the character a UUID could not parse, a parser's own complaint. An `extra_forbidden` error is located at its parent, `limits: Extra inputs are not permitted`, or carries no location at the root, since the last part of its location is the key the caller sent. A `text=` given in its place is carried as given.
+
+`error.type` is the OpenTelemetry key for the class of error an operation ended with. `error.message` is the key OpenTelemetry gave an error's text before deprecating that general attribute in favour of domain-specific ones; Pipelex keeps it as `error.type`'s companion because the `exception.*` keys belong to the sinks, which write them for a record that carries the exception itself and prefix a field spelling one.
+
+### What a line never carries
+
+- **No run identifier in the text.** `request_id`, `pipeline_run_id` and `pipe_run_id` are stamped on every record by the [run-scoped context](#the-run-scoped-context); a message repeating one is noise, and a field passing one is only for a call that speaks about a run it is not running under.
+- **No payload contents, at any level.** No prompt text, no base64 data, no raw response and no whole object: a size, a count, a hash or a code instead, as the [level table](#log-levels) already says of every level.
+- **No markup and no emoji in a message.** Colour is the console sink's job: it colours a value by its field's name and draws the few [layouts](#layouts), and its emoji are its own per-logger decoration. Markup in a message travels to every sink as literal tags, the console's included, since it reads no message as markup (see [Messages are plain text](#messages-are-plain-text)). Markup keeps its place in the CLI's own output and in the pretty-print channel, which are presentation to a person and not log records.
+
+### Choosing a level
+
+The [level table](#log-levels) states what a line at each level means, and choosing the level of a call follows from it. There is no DEV level.
+
+- **ERROR** says a run failed or data was lost, and that somebody should look; it carries an exception it handles with `include_exception=True`, and one it re-raises, a secondary failure and a swallowed `ValidationError` as `error_fields`.
+- **WARNING** must be actionable: a degradation that was handled, or a misconfiguration the user can fix. A warning nobody can act on moves down to DEBUG, or up to ERROR when something was in fact lost.
+- **INFO** marks a lifecycle milestone, and there are few of them, because Pipelex is also a library and a library says little at INFO. The [summary events](#summary-events) are the one exception in number, an event for each inference call and each live pipe run: they are INFO because the dashboards built from them read the default production level, and a host that wants Pipelex quieter at INFO raises their loggers' level, as that section shows.
+- **DEBUG** answers a question you would ask on reading a log a user sent: which file was read, which fallback was taken, why a model was left out.
+- **VERBOSE** follows the runtime step by step, for Pipelex's own developers.
 
 ## Related Documentation
 
 - [Logging Configuration](../configuration/config-practical/logging-config.md) - Configure log behavior and select the sink in `pipelex.toml`
 - [Log Sink Plugins](../under-the-hood/log-sink-plugins.md) - The sink seam, the built-in sinks and how to write one
 - [CLI](./cli/index.md) - Commands that surface runtime logs during development
+- [Log-Call Guard](../contribute/log-calls.md) - The check that holds Pipelex's own log calls to the conventions above, and its baseline
 
 
 ## Observer Data Extraction
@@ -17771,7 +18059,7 @@ The record shape is also invariant to server-side observability settings: teleme
 
 ## Cost semantics
 
-`cost` is computed by `compute_tokens_usage_cost` (`pipelex/cogt/usage/cost_registry.py`) from the rates stamped on the internal record at inference time — the same cost engine and the same canonical total as the CLI cost table: input_non_cached + input_cached + output component costs, with the cached-discount fallback (cached input at 50% of the input rate when no explicit cached rate exists). Categories the cost engine excludes from totals (audio, reasoning, prediction) are excluded here too. A run-level total is the sum of per-record `cost` values.
+`cost` is computed by `compute_tokens_usage_cost` (`pipelex/cogt/usage/usage_cost.py`) from the rates stamped on the internal record at inference time — the same cost engine and the same canonical total as the CLI cost table: input_non_cached + input_cached + output component costs, with the cached-discount fallback (cached input at 50% of the input rate when no explicit cached rate exists). Categories the cost engine excludes from totals (audio, reasoning, prediction) are excluded here too. A run-level total is the sum of per-record `cost` values.
 
 `cost: null` means "unrated" (no rate table: own-GPU models, mock/dry runs) — distinct from `0.0`, which is a rated call that cost nothing.
 
@@ -17812,7 +18100,7 @@ Every inference call emits a `UsageReportEvent` carrying `node_id` (from `trace_
 - **`UsageAggregator`** (`pipelex/tracing/usage_aggregator.py`) projects it into a flat list — one record per call, `node_id` dropped. That list becomes `pipe_output.tokens_usages`, trimmed to [`TokensUsageRecord`](tokens-usage-wire-records.md) at the client boundary, and feeds the console cost table and the CSV.
 - **`usage_attribution`** (`pipelex/tracing/usage_attribution.py`) projects it into per-node totals — `node_id` kept, calls folded together. Those totals become `NodeSpec.usage` and `GraphSpec.usage`, assembled by `GraphSpecAssembler`.
 
-The two projections are deliberately separate — `tokens_usages` is a shipped, `extra="forbid"` client contract, and a graph is not the place to re-litigate its record shape. What they are *not* allowed to do is disagree on arithmetic, so both compute every dollar through the same `compute_tokens_usage_cost` (`pipelex/cogt/usage/cost_registry.py`) and define a token total the same way `AggregatedCosts.total_nb_tokens` does.
+The two projections are deliberately separate — `tokens_usages` is a shipped, `extra="forbid"` client contract, and a graph is not the place to re-litigate its record shape. What they are *not* allowed to do is disagree on arithmetic, so both compute every dollar through the same `compute_tokens_usage_cost` (`pipelex/cogt/usage/usage_cost.py`) and define a token total the same way `AggregatedCosts.total_nb_tokens` does.
 
 ```mermaid
 flowchart TB
@@ -17939,7 +18227,7 @@ So usage is deliberately assembler-only. That gap is *asserted* rather than norm
 | `pipelex/tracing/usage_attribution.py` | `UsageAccumulator`, `roll_up`, `attribute_usage` |
 | `pipelex/tracing/graphspec_assembler.py` | Folds `UsageReportEvent`, attributes in pass 2 |
 | `pipelex/tracing/usage_aggregator.py` | The other projection — the flat `tokens_usages` list |
-| `pipelex/cogt/usage/cost_registry.py` | `compute_tokens_usage_cost` — the one cost engine |
+| `pipelex/cogt/usage/usage_cost.py` | `compute_tokens_usage_cost` — the one cost engine |
 
 ## Related pages
 
@@ -20769,9 +21057,13 @@ What an out-of-tree backend plugin imports *is* the contract. The published surf
 | `DocGenWorkerAbstract` | `pipelex.cogt.doc_gen.doc_gen_worker_abstract` | the document-generation worker contract |
 | `RenderJob`, `RenderedDocument`, `RenderResources`, `LoadedResource` | `pipelex.cogt.doc_gen.render_job` | the job a document engine prints, the file it returns, and how it reads a file the document names, with that file's media type |
 | `NbTokensByCategoryDict`, `TokenCategory` | `pipelex.cogt.usage.token_category` | the token usage a worker reports |
+| `PricingUnit` | `pipelex.cogt.usage.pricing_unit` | what a usage counts: tokens, or requests or pages priced as tokens |
+| `record_unit_priced_usage` | `pipelex.cogt.usage.usage_cost` | records a call billed by the request or by the page on its usage |
 | `BaseModelTypeVar` | `pipelex.tools.typing.pydantic_utils` | the schema type variable of a structured-output signature |
 | `CogtError`, `SdkTypeError`, `ImgGenGenerationError`, `ImgGenParameterError`, `InferenceErrorCategory` | `pipelex.cogt.exceptions` | the inference error bases and categories a worker raises with |
 | `LLMCapabilityError` | `pipelex.cogt.exceptions` | a request the model refuses, raised by an LLM request check |
+
+A worker implements the provider half of a call, `_gen_text` or `_extract_pages` for instance, and records the usage the provider answered with on its job's report. The base around it logs the event every call ends with, `Inference call ends`, with that usage, its cost, its duration and its outcome, so a worker logs nothing for the call itself (see [Summary events](../tools/logging.md#summary-events)). A provider that bills by the request or by the page rather than by the token is recorded with `record_unit_priced_usage(tokens_usage=…, pricing_unit=PricingUnit.REQUEST, nb_units=1)`, which writes each unit as a million tokens in and out so the per-million rates price one unit, and marks the usage so the event keeps the call's cost and writes no token counts; a worker never writes those counts itself.
 
 **Building on an OpenAI- or Anthropic-compatible service**
 
@@ -21977,9 +22269,9 @@ class LogSinkPlugin:
 | Sink | What it does | Where it reads its settings |
 |------|--------------|-----------------------------|
 | `json` | One JSON object per line on the configured stream: `time`, `severity`, `logger`, `message`, `exception` when there is one, `trace_id`, `span_id` and `trace_flags` in hex when OpenTelemetry's current span names a trace, under the keys OpenTelemetry specifies for trace context in a JSON log that is not OTLP, `pipelex.trace_id` and `pipelex.span_id` in hex when a Pipelex span is active, then the fields, the context identifiers and `data` flat beside them, a field named like one of those keys under a `field_` prefix on every line, a non-finite float as the string `"NaN"`, `"Infinity"` or `"-Infinity"`. The key names are the ones the CloudWatch agent, the Google Cloud Logging agent and any OTLP collector ingest without a parser, and no ANSI ever. What the hosted plane's runner and worker select. | `console_log_target` |
-| `console` | The Rich handler with the emoji formatter and every `[runtime.log.rich_log]` setting, byte for byte what the console showed before sinks existed. Rich, the `cli` extra, is imported when the handler is built, and a process that selects another sink never loads it through this path. | `console_log_target`, `[runtime.log.rich_log]` |
+| `console` | The Rich handler with the emoji formatter and every `[runtime.log.rich_log]` setting, which reads no message as markup, shows a record's fields after its message, coloured by name, and renders the layouts a call names (see [Console rendering](../tools/logging.md#console-rendering)). Rich, the `cli` extra, is imported when the handler is built, and a process that selects another sink never loads it through this path. | `console_log_target`, `[runtime.log.rich_log]` |
 | `otlp` | The OpenTelemetry logs signal: a `LoggerProvider` carrying the same service identity as the tracer, a `BatchLogRecordProcessor` and the OTLP HTTP log exporter. The message is the body, the level maps onto the OTel severity scale, the fields, identifiers and `data` ride as attributes (a mapping as JSON text), an exception lands under the `exception.*` semantic-convention keys, each record is filed under OpenTelemetry's current span, with the active Pipelex span as the `pipelex.trace_id` and `pipelex.span_id` attributes, and a collector receives the logs beside the spans the runtime already exports. The keys the sink writes itself, the `code.*` source location, the two `pipelex.*` keys and the `exception.*` set, are reserved on every record whether or not it carries an exception, so a field named like one of them rides under a `field_` prefix rather than being overwritten. A filter on the handler rejects the records of the sink's own export path, the SDK's by logger name and the transport's by the context value the SDK sets around an export, before the handler's lock is taken, so an export failure never re-enters the pipeline and a shutdown never waits on itself. | `[runtime.log.otlp]` |
-| `gcp` | Google Cloud Logging through the `google-cloud-logging` client library, behind the `gcp-logging` extra. Each record becomes one struct entry: the level maps onto the Cloud Logging severity scale (which has nothing below `DEBUG`, so `VERBOSE` and `DEV` both land there), the message, the logger, the exception and the fields become the JSON payload, the run-scoped identifiers become the entry's labels, which is what Cloud Logging indexes, the entry's `trace`, `spanId` and `traceSampled` name OpenTelemetry's current span, the trace project-qualified, and the active Pipelex span rides in the payload as `pipelex.trace_id` and `pipelex.span_id`. The entries leave through the client library's background-thread transport, which batches them off the calling thread. The factory refreshes the credentials once before that transport starts, so credentials Google refuses stop the boot with `GcpLogSinkCredentialsError` rather than losing every record in silence. **Most processes on Google Cloud want `json` instead**: a platform whose logging agent reads the container's stdout, Cloud Run and GKE among them, ingests what that sink writes and needs no client at all; `gcp` is for a process with no such agent in front of it, or one writing to a log or a project that is not the ambient one. | `[runtime.log.gcp]` |
+| `gcp` | Google Cloud Logging through the `google-cloud-logging` client library, behind the `gcp-logging` extra. Each record becomes one struct entry: the level maps onto the Cloud Logging severity scale (which has nothing below `DEBUG`, so `VERBOSE` lands there), the message, the logger, the exception and the fields become the JSON payload, the run-scoped identifiers become the entry's labels, which is what Cloud Logging indexes, the entry's `trace`, `spanId` and `traceSampled` name OpenTelemetry's current span, the trace project-qualified, and the active Pipelex span rides in the payload as `pipelex.trace_id` and `pipelex.span_id`. The entries leave through the client library's background-thread transport, which batches them off the calling thread. The factory refreshes the credentials once before that transport starts, so credentials Google refuses stop the boot with `GcpLogSinkCredentialsError` rather than losing every record in silence. **Most processes on Google Cloud want `json` instead**: a platform whose logging agent reads the container's stdout, Cloud Run and GKE among them, ingests what that sink writes and needs no client at all; `gcp` is for a process with no such agent in front of it, or one writing to a log or a project that is not the ambient one. | `[runtime.log.gcp]` |
 
 The `otlp` factory imports the OpenTelemetry logs SDK when it runs, and the `gcp` factory the Google Cloud Logging client library, never at register, so registering the built-ins imports neither, which the import-light guard pins.
 
@@ -22173,7 +22465,7 @@ def render(self, *, job: RenderJob, resources: RenderResources) -> RenderedDocum
 - **`RenderResources.load(uri=…, position=…)`** is how an engine reads a file its document names, such as an image or a stylesheet. It resolves `pipelex-storage://` keys through the run's storage provider, decodes `data:` URLs, fetches `https://` through the SSRF guard, and refuses what the run's read scope does not allow, a local path included, with `UriReadRefusedError`. An engine reads nothing any other way. It returns a **`LoadedResource`**: the file's bytes as `data`, and as `mime_type` the media type the file's source gives it, described below.
 - **`RenderedDocument`** holds the bytes. Their MIME type and suffix are the format's.
 
-`render` is synchronous and runs on a thread of a print pool of its own, never on the event loop's default executor, which the engine's reads need, while `RenderResources.load` hands each read back to the event loop the print started from. An engine keeps no state from one print into the next. It signals a document it cannot print by raising `DocGenRenderError`, which passes through; anything else it raises, beyond a Pipelex error, is reported as a `DocGenRenderError` naming the engine and the file.
+`render` is synchronous and runs on a thread of a print pool of its own, never on the event loop's default executor, which the engine's reads need, while `RenderResources.load` hands each read back to the event loop the print started from. The print stage that calls it ends the print with the event every inference call ends with, `Inference call ends`, carrying no tokens and no cost since an engine reports none (see [Summary events](../tools/logging.md#summary-events)), logged on the coroutine that awaits the thread, so a print cancelled from outside ends `cancelled` while the thread finishes its render; an engine overrides `render` alone and logs nothing for the print itself. An engine keeps no state from one print into the next. It signals a document it cannot print by raising `DocGenRenderError`, which passes through; anything else it raises, beyond a Pipelex error, is reported as a `DocGenRenderError` naming the engine and the file.
 
 The contract is what an engine uses in `pipelex.cogt.doc_gen`: the worker; the render job, its resources, the `LoadedResource` they return and the rendered document (`render_job.py`); the formats and sources (`doc_gen_format.py`); `DocGenRenderError`, the one error of `exceptions.py` an engine raises; the layout tree (`layout_tree.py`); the template check request and the findings a checker returns (`template_check.py`), with the input shapes the request carries (`InputShape` and `InputShapeKind` in `input_shape.py`); and the two modules of the next section. The rest of the package is Pipelex's own side of the print. An engine reaches Pipelex only through the contract and the registration seam every plugin uses, which also hands a worker its model spec, its backend, its SDK clients and its reporting delegate: anything else in Pipelex may move or change in an ordinary release, while a breaking change to the contract moves `PLUGIN_API_VERSION`. A piece an engine is missing is added to the contract, rather than imported from elsewhere in Pipelex.
 
@@ -24089,6 +24381,115 @@ The guard refuses to pass vacuously: a missing or malformed mirror, a workflow t
 Use an action GitHub created, one an organization of the enterprise owns, or one a pattern allows. When no allowed action does the job, a `run:` step calling the tool or the API directly usually does. When the action is worth allowing, ask an administrator to add it to the organization's policy, then mirror the new pattern in `.github/actions-allowlist.toml` in the same pull request as the workflow that uses it.
 
 
+## Log-Call Guard
+
+# Log-call guard
+
+Pipelex's log calls follow the [log-call conventions](../tools/logging.md#log-call-conventions): a fixed message, its values in `fields`, no markup. Most of them are for review; the ones that can be read off the source are held by `make check-log-calls` on every call: a message at INFO and above is a literal written at the call, and no message holds Rich markup at any level. This page is the guard's specification. The calls that broke the rules when the guard arrived were listed in a committed baseline that can only shrink, so that new code was held to the conventions from the start while the existing calls were converted. Every one of them has been converted since: the baseline lists no call, and since it can only shrink, it stays empty, so every log call is held to the rules.
+
+## What it reads
+
+The guard parses every Python module in `pipelex/`, except the facade's own package `pipelex/tools/log/`, and in the API server's `api/pipelex_api/`, which logs through the same facade. It reads the calls of the `log` facade, however a module reaches it: the name it imports `log` under, from `pipelex` or from `pipelex.tools.log.log`, an alias, a relative import and a star import included, or an attribute path through a module it imports, `pipelex.log.warning(...)` after `import pipelex`, `m.log.info(...)` after `from pipelex.tools.log import log as m`, `x.log.info(...)` after `import pipelex.tools.log.log as x`. The receiver is read where the call is made, through the bindings of its name that can reach the call, as a message's names are below: it is the facade when one of them imports the facade, so a parameter or a local named `log`, a stdlib logger say, is not the facade, and neither is a `log` imported in another function. A call's message is its first positional argument, or its `content=` keyword, and its `title=` and `inline=` keywords count as part of it, since the dispatch renders both into the message. A title or an inline title that is statically `None`, `title=None` or a name bound only to `None` and literals, is no message text at all. A `**` expansion of a dict literal whose keys are all strings passes its `content`, `title` and `inline` entries like keywords, `log.warning(**{"content": f"Value {value}"})` being read as `log.warning(content=f"Value {value}")`; any other `**` expansion in a facade call, `log.warning(**params)`, could carry the message or a title, so the call is refused as `non-literal`, at every level, since neither rule can read through it.
+
+## The rules
+
+### A literal message at INFO and above
+
+On `log.info`, `log.warning`, `log.error` and `log.critical`, the message is a literal written at the call. These are accepted:
+
+- a string constant, implicit concatenation of constants included;
+- an f-string without a placeholder;
+- a `+` between literals, or a conditional expression between literals;
+- a name whose every binding that can reach the call is one of the above, `msg += " the library"` and `msg = msg + " the library"` included when what is added is a literal.
+
+Anything else is refused, under the name of its form:
+
+| Rule | What it refuses |
+| --- | --- |
+| `f-string` | An f-string with a placeholder, `f"Loaded '{alias}'"` |
+| `percent-format` | A `%` format, `"Loaded %s" % alias`, or a name formatted with `%=` |
+| `concatenation` | A `+` with a side that is not a literal, `"Loaded " + alias`, or a name extended with `+=` by something that is not |
+| `format-call` | A `.format()` call, `"Loaded {}".format(alias)` |
+| `non-literal` | Any other expression: a parameter, an attribute, a call's result, a mapping or a model, and a `**` expansion the guard cannot read |
+
+A name is resolved by Python's own scoping. The scope the call is made in comes first, a comprehension reading as part of the scope it is written in; then the enclosing functions, a class body never being one; then the module.
+
+Within that scope, only the bindings that can reach the read count, by the scope's control flow: along straight-line code, the nearest binding before the read; across the branches of an `if`, a `try` or a `match`, the nearest on each path, a handler seeing whatever its `try` body had bound by then; in a loop, a binding later in its body too, which the next pass carries back; and after a `return`, a `raise`, a `break` or a `continue`, nothing. So `msg = "Loaded"`, `log.info(msg)`, then `msg = f"Could not load {alias}"` and `raise ValueError(msg)` passes: the later binding cannot reach the call, and stays out of its signature. A binding's own value is read where that binding stands, so in `msg = msg + "red]Loaded"` the `msg` added to is the one bound before. Where the flow depends on what runs, the guard counts what may: a `with` body may stop at any line, since its context manager may swallow an exception, and a comprehension's body may run any number of times. A module name read from a class body counts the module's bindings that reach the class statement; read from a function, also every module binding made after the function's definition, since the function may be called at any later point. A `global` or `nonlocal` assignment counts as a binding of the scope that owns the name, and reaches every read of it, since the function making it may run at any time. One index of every scope's bindings and control flow is built per module, in one walk, then each scope's flow is run once, so a lookup never reads a scope again.
+
+A binding is what Python counts as one: an assignment to the name itself or through a tuple, a list or a starred target, an annotated or augmented assignment, a `:=`, a `for`, `with` or `except ... as` target, a comprehension target, a `match` capture, a parameter of a function or a lambda, an import and a definition. An assignment that only mentions the name, `cache[msg] = 1` or `msg.attr = value`, does not rebind it. A name bound to an f-string is refused as an `f-string`, the report naming the line of the binding; a name bound by anything the guard does not read, a parameter, a loop or comprehension target, a `with` or `except` target, a `match` capture, an unpacking, an import, or not bound at all, is `non-literal`. A name bound in an enclosing function is not followed, and is `non-literal` too, whatever the module binds under the same name.
+
+The `non-literal` rule is the guard's choice rather than the conventions' letter: it refuses a message built elsewhere and passed in, by a helper or a caller, because nothing can tell that such a message is fixed, and every one the first census found was in fact built from values. A message that must vary is a fixed message with fields. A structured content, a mapping or a model logged as the message, is `non-literal` at INFO and above for the same reason: its values belong in fields, and its payload belongs nowhere.
+
+`log.debug` and `log.verbose` are outside this rule: a person at a terminal reads them, and an f-string is allowed there.
+
+### No markup at any level
+
+On every method, `log.verbose` and `log.debug` included, no literal text of a message, its title or its inline title holds a Rich markup tag. The literal text is the string constants written at the call, the literal parts of an f-string, the format string of a `%` or a `.format()`, and the literals a name read as above is bound to. It is read the way it reaches the console: a `+` whose operands are known, named literals, `+=` extensions and a name rebuilt from itself included, is folded into one text before the scan, so `"[" + "red]Loaded"` holds `[red]`, while a value the guard cannot read keeps the texts around it apart.
+
+A markup tag is what Rich reads as one, matched with Rich's own tag pattern:
+
+- a closing tag, `[/red]` or `[/]`;
+- an `@` handler, `[@click=app.bell]`;
+- an opening tag whose text Rich parses as a style, `[red]`, `[bold green]`, `[on blue]`, `[link=https://pipelex.com]`, or names a style of Rich's default theme, `[repr.number]`.
+
+A bracketed word that is no style, `list[int]`, `[Errno 2]` or `items[index]`, is text and passes, and so does a tag escaped with a backslash. The tests that check the messages a live run logs, described under [Messages are plain text](../tools/logging.md#messages-are-plain-text), read tags by this same rule, the guard's `find_markup_tags`, so the source and the run are held to one definition.
+
+## The baseline
+
+`log_call_baseline.toml`, at the repo root, lists the calls exempted from the rules until they are converted. It started with every call that broke one when the guard arrived, and lists none now that they are all converted. Its key is the call's file and enclosing qualified name, `<relative_path>::<qualified_name>`, the classes and functions joined by dots, or `<module>` for a call made at module level. Under the key, each call is listed by its **signature**, once per call that carries it. A signature is the call's method, its message's source text with any `**` expansion it cannot read, the rules it breaks between brackets, and, after `where`, every binding the guard read to judge it, sorted, which is every binding that can reach the names it read, a binding it does not read written as what binds it (`<parameter>`, `<for target>`, `<enclosing function>`, `<unbound>`). In a baseline that still listed calls, two entries would read like these, made up for the example:
+
+```toml
+version = 1
+
+["pipelex/example/bundle_loader.py::BundleLoader.load"]
+calls = [
+  "info: f\"Loaded the bundle '{bundle_path}' with {pipe_count} pipes\" [f-string]",
+]
+
+["pipelex/example/bundle_loader.py::report_load_failure"]
+calls = [
+  "warning: message [f-string] where message = f\"Could not load the bundle '{bundle_path}': {load_error}\"",
+]
+```
+
+So the identity of a call is what it logs, not only how the call is written: rewording the f-string a grandfathered `log.warning(message)` is bound to, or adding markup to a module constant its message concatenates, changes its signature, and the exemption is spent. A line number never enters the baseline, so an edit elsewhere in a file moves nothing. A signature is rendered the same on every Python the check runs on: `ast.unparse` writes an f-string by quoting rules that changed with Python 3.12, so the guard writes f-strings itself, and everything else through `ast.unparse`, whose output for other expressions does not move. The file is written through the repo's TOML writer (`pipelex/tools/misc/toml_utils.py`, tomlkit), laid out exactly as `make format` leaves it, so a prune moves nothing else.
+
+The comparison is exact, both ways:
+
+- **A call the baseline does not list fails the check.** That is every new call that breaks a rule, and a second identical call beside a listed one.
+- **A listed signature no call carries any more fails the check too**, until it is removed from the file: the call now complies, or it moved to another function, or its message, a binding of it or the rules it breaks changed. The check names the stale signature.
+
+So changing a listed call's message, or moving the call, is converting it: its old signature goes stale, and the new form must comply, since nothing lists it.
+
+### It only shrinks
+
+Agreeing with the tree is not enough, since a change could add a violating call and its entry together. So the check also holds the baseline to the one committed at a trusted revision, the base the change merges into, read with `git show <ref>:log_call_baseline.toml`: a signature the working baseline lists more times than the trusted one, a new entry or a higher count, fails, named under its key with both counts. Removing an entry, or a call, always passes. A trusted revision that runs the guard but holds no baseline file has an empty one; a revision from before the guard existed has nothing to compare with, and the check says so and runs against the tree alone. A trusted revision that does not resolve, or whose baseline is of another `version`, fails the check: a gate that cannot compare does not pass. A future change to the signature's format bumps `version` and has to teach the comparison to read the previous one.
+
+The baseline is never added to. It is the debt the conversion of the existing calls pays off, and it ends empty.
+
+## Running it
+
+`make check-log-calls`, alias `make clc`, runs `pipelex-dev check-log-calls --quiet --against-merge-base origin/dev`, so a local run holds the baseline to the one at the merge base of `HEAD` and `origin/dev`, and says plainly when that merge base does not resolve, `origin/dev` not fetched for instance. `make check-log-calls LOG_CALL_BASELINE_REF=<ref>` compares with another revision. It is part of `make agent-check` and `make check`. CI runs it as the `Lint (log calls)` job, which `Lint (all)` requires, fetching the pull request's base and passing it as `LOG_CALL_BASELINE_REF`, and in the pre-main fresh check the same way; a manual run of the fresh check has no pull request base, and says it checks the tree alone. Run directly, the command takes these options:
+
+- `--quiet` keeps a pass to one line, which says how many calls the baseline still lists and, when it compared, that it adds nothing to the trusted revision; a failure always prints in full.
+- `--prune` removes the stale signatures from the baseline, then checks. It never adds one, so a call the baseline does not list still fails.
+- `--report` prints the baseline's calls by package area, the largest first, and gates nothing: the measure of what is left to convert.
+- `--against <ref>` holds the baseline to the one committed at `<ref>`, which must resolve.
+- `--against-merge-base <ref>` holds it to the one at the merge base of `HEAD` and `<ref>`, and skips the comparison, saying so, when that merge base does not resolve. It and `--against` are exclusive.
+
+A failure lists each call the baseline does not list, at its file and line, with its enclosing qualified name and every rule it breaks, then each rule's remedy, then each stale signature under its key, then each signature added since the trusted revision.
+
+## Converting a call
+
+1. Rewrite the call by the [conventions](../tools/logging.md#log-call-conventions): a fixed message, its values in `fields` under the names of the vocabulary table, a handled exception through `error_fields` at WARNING and below or `include_exception=True` at ERROR and above, except one that is re-raised, one that failed while another propagated and a swallowed `ValidationError`, which ride as `error_fields` at every level.
+2. Run `make check-log-calls`. It reports the call's signature as stale; editing what a listed call logs without converting it reports the old signature as stale and the new one as unlisted.
+3. Remove the signature, by hand or with `.venv/bin/pipelex-dev check-log-calls --prune`, and commit the file with the change.
+
+`pipelex/libraries/library_manager.py` is the worked example: every one of its calls follows the conventions, its warnings as fixed messages with fields, and it has no baseline entry.
+
+There is no escape hatch, no comment that exempts a call: a message that has to vary is a fixed message with fields.
+
+
 ## Test Duration Map
 
 # The Test Duration Map
@@ -25326,14 +25727,15 @@ The rules this encodes:
 - **The retry honours the [schema-version floor](#schema-versions-and-why-every-run-replays-everything).** A file that declares a version below `min_supported_schema_version` is one `pipelex migrate` refuses; the retry declines it through the same predicate rather than carrying it forward under-migrated, and the user's own error — with the `migration` block naming the floor — is what they see.
 - **The retry never becomes the failure.** Anything that goes wrong inside it — a ledger that will not load, a file that will not parse — makes it decline, and the error the *configuration* produced is what the user sees. Their error names the key to fix; ours would name our packaging. A file that cannot be re-read abandons the whole retry rather than being skipped, because skipping it would drop a layer from the merge and a re-validation that then succeeded would boot on a configuration the user does not have.
 - **The main configuration's warning waits for the logger.** That configuration is what configures logging, so when its retry succeeds there is no logger yet — the loader parks the warning (`config_manager.take_stale_configuration_warning()`) and the boot emits it right after `log.configure`. The telemetry and service loaders run after that point and warn directly. The warning is the same either way; only *when* it is said moves.
-- **The inference backend loader parks its warning too, and for a different reason: a caller, not boot order.** By the time backends load, logging has been configured for a while. What that loader has instead is `pipelex doctor`, which probes the backend files by loading the whole library **once per backend** — so a loader that logged for itself would repeat one stale directory's warning a dozen times in one report. It hands the warning over instead (`take_stale_configuration_warning()`), and the caller that owes the user a copy takes it: the models-manager setup emits exactly one per boot, the doctor's per-backend probe simply never asks, and no abstract interface widens to carry it. One warning per load covering every stale file, not one per file and not one per backend.
-- **The warning names `pipelex migrate` only for a file the command would reach.** The retry replays whatever the loader merged, and a loader pointed at a directory of its own — an embedder's `config_dir=`, or this repository's `tests/pipelex_{run_mode}.toml` — merges files [outside the walk](#the-commands). For those the warning says the file is the caller's to update where it lives, and does not name a command that would then report nothing to do; a load that spans both gets both sentences, each naming its own files. Same rule as [the remedy on a validation error](#every-surface-reports-it-the-same-way-and-none-of-them-says-start-over): *a remedy is named only where it would write*. The walk is `config_manager.existing_config_dirs`, which is also where `config_directories_to_migrate` reads it — one derivation, read from both ends, so a boot cannot promise what the command declines. Reach is per *surface*, not per path: the file must sit in the directory **its own surface** owns under one of those roots, so a `telemetry.toml` dropped into `inference/backends/` is out of reach exactly as it was before any surface owned a subdirectory.
+- **The inference backend loader parks its warning too, and for a different reason: a caller, not boot order.** By the time backends load, logging has been configured for a while. What that loader has instead is `pipelex doctor`, which probes the backend files by loading the whole library **once per backend** — so a loader that logged for itself would repeat one stale directory's warning a dozen times in one report. It hands the warning over instead (`take_stale_configuration_warning()`), and the caller that owes the user a copy takes it: the models-manager setup emits it exactly once per boot, the doctor's per-backend probe simply never asks, and no abstract interface widens to carry it. One warning per load, not one per backend probe.
+- **The warning names `pipelex migrate` only for a file the command would reach.** The retry replays whatever the loader merged, and a loader pointed at a directory of its own — an embedder's `config_dir=`, or this repository's `tests/pipelex_{run_mode}.toml` — merges files [outside the walk](#the-commands). For those the warning says the file is the caller's to update where it lives, and does not name a command that would then report nothing to do; a load that spans both gets both remedies, each on the lines of its own files. Same rule as [the remedy on a validation error](#every-surface-reports-it-the-same-way-and-none-of-them-says-start-over): *a remedy is named only where it would write*. The walk is `config_manager.existing_config_dirs`, which is also where `config_directories_to_migrate` reads it — one derivation, read from both ends, so a boot cannot promise what the command declines. Reach is per *surface*, not per path: the file must sit in the directory **its own surface** owns under one of those roots, so a `telemetry.toml` dropped into `inference/backends/` is out of reach exactly as it was before any surface owned a subdirectory.
+- **The warning is a line per stale file.** Each line is a fixed message naming the file's remedy, `pipelex migrate` or an edit where the file lives, with the file in `file.path`, the titles of the ledger steps the replay carried in `migration_steps` and whether one of them is blocked in `has_blocked_steps`. The message follows the [log-call conventions](tools/logging.md#log-call-conventions): the files are values, so they ride fields rather than the text, and a list of paths in one field would be cut short on the console, which writes each field on one line at a fixed width. Everything on the line but the path is ledger text; nothing read from the user's file reaches it.
 - **The healthy path is untouched.** The replay runs only on the failure path, so a current configuration never reads a ledger, never re-parses a document, and never even imports the migration engine. (Not "never loads tomlkit": the ordinary configuration read has always imported it. What a healthy boot avoids is the second, DOM-level read.) Replay neutrality is what makes the retry free when it does run.
 - **One shared helper**, called by each configuration-surface loader — and that helper is also where `[meta] schema_version` is stripped. The strip belongs there and **not** in the generic TOML reader, which also reads `.mthds` files, backend definitions and the kit index, none of which reserve that key.
 
 **The helper owns the failure path, not the load.** The loaders do different things between their merge and their validate — the main configuration deep-merges programmatic overrides, telemetry substitutes `${VAR}` placeholders, the service configuration does nothing, and the inference backend loader does the most of any of them: it pops `[defaults]` out of the document, splits the header-shaped keys off each remaining root table, and validates the *merge* of the two rather than the document. A helper that owned the whole load would have to be told about every one of them. It is given the surface id and the same ordered path list the loader merged, and it hands back the migrated merge plus a `MigrationPlan` per file; each loader re-runs its own step over that and re-validates. The overrides in particular have to be re-applied by the caller: they are a layer of the *load*, and the replay only ever sees the *files*.
 
-> **A surface whose files are independent documents calls the helper once per file.** The helper deep-merges the paths it is given, which is exactly right for a tier stack: `pipelex.toml` beneath `pipelex_local.toml` beneath `pipelex_override.toml` are layers of one configuration, and the thing that has to validate is their merge. Backend definitions are not layers of anything — `openai.toml` and `portkey.toml` are separate documents that happen to share a directory, and merging them would produce a backend nobody has. So that loader passes one path per call and keeps the results apart, and composes one warning covering every file the round recovered.
+> **A surface whose files are independent documents calls the helper once per file.** The helper deep-merges the paths it is given, which is exactly right for a tier stack: `pipelex.toml` beneath `pipelex_local.toml` beneath `pipelex_override.toml` are layers of one configuration, and the thing that has to validate is their merge. Backend definitions are not layers of anything — `openai.toml` and `portkey.toml` are separate documents that happen to share a directory, and merging them would produce a backend nobody has. So that loader passes one path per call and keeps the results apart, and parks one warning covering every file the round recovered.
 
 > **The migration engine is imported inside the retry, not at the top of the module, and that is what makes "the healthy path is untouched" literal rather than approximate.** It is not what keeps the boot inside the kernel layer: the engine and the applier it uses (`pipelex.fix_ops`) are both kernel-layer, because the retry runs inside every kernel-layer boot that meets a stale file, so the replay path must load zero interpreter modules just as the healthy one does (see [`hub-layering.md`](contribute/hub-layering.md)). `tests/unit/pipelex/test_runtime_boot_closure.py` boots over a stale file to hold it to that.
 
@@ -27768,12 +28170,12 @@ The server writes structured logs: one JSON object per line, on **stderr**, with
 An error response produces exactly one line. A caller mistake:
 
 ```json
-{"time": "2026-09-18T13:53:17.919Z", "severity": "WARNING", "logger": "pipelex_api.exception_handlers", "message": "API error 422: InvalidModelCategory", "request_id": "01M2TCP02W04RZG6DTM8AR508C", "event": "api_error", "route": "/v1/models", "error_type": "InvalidModelCategory", "error_domain": "input", "retryable": false, "status": 422, "detail": "Invalid model category. Valid values: extract, img_gen, judgment, llm, search"}
+{"time": "2026-09-18T13:53:17.919Z", "severity": "WARNING", "logger": "pipelex_api.exception_handlers", "message": "A request ended in an error response", "request_id": "01M2TCP02W04RZG6DTM8AR508C", "url.path": "/v1/models", "error.type": "InvalidModelCategory", "error_domain": "input", "retryable": false, "http.response.status_code": 422, "detail": "Invalid model category. Valid values: extract, img_gen, judgment, llm, search"}
 ```
 
 A server fault looks the same at `ERROR`, and carries the traceback under an `exception` key.
 
-The `message` is a short, stable sentence built from the HTTP status and the error type — both of them values the server chose. Nothing a caller supplied ever reaches it: the caller-facing explanation rides the `detail` field instead, so a body crafted with newlines or quotes cannot break the line or forge a key. Two layers keep the `detail` value safe to write. Before any sink sees a record, the Pipelex runtime's redaction processor replaces a control character in a field's value with its printable escape, so a newline a caller sent reads as `\n` in `detail`, and replaces a credential it recognises, an `Authorization` header's token or an API key, with `[REDACTED]`. The sink then escapes what it writes, so a quote or an `=` stays inside its value. The processor is configured under `[runtime.log.redaction]` and is on by default.
+The `message` is the same sentence on every error line, `A request ended in an error response`, whichever failure it reports, so it is the key a query or an alert selects this server's error stream by, following the [log-call conventions](../tools/logging.md#log-call-conventions). Everything about the failure, the HTTP status and the error type included, rides a field of its own, and nothing a caller supplied ever reaches the message: the caller-facing explanation rides the `detail` field instead, so a body crafted with newlines or quotes cannot break the line or forge a key. Two layers keep the `detail` value safe to write. Before any sink sees a record, the Pipelex runtime's redaction processor replaces a control character in a field's value with its printable escape, so a newline a caller sent reads as `\n` in `detail`, and replaces a credential it recognises, an `Authorization` header's token or an API key, with `[REDACTED]`. The sink then escapes what it writes, so a quote or an `=` stays inside its value. The processor is configured under `[runtime.log.redaction]` and is on by default.
 
 ## The fields a line carries
 
@@ -27789,32 +28191,47 @@ These keys come from the sink itself and are on every line written by the proces
 | `trace_id`, `span_id`, `trace_flags` | The process's current OpenTelemetry span, in lowercase hex, when one names a trace. This server registers no tracer and instruments nothing, so as shipped no line carries them; they appear only when the deployment runs it under OpenTelemetry instrumentation of its own that makes a span current |
 | `pipelex.trace_id`, `pipelex.span_id` | The Pipelex span a runtime line was logged in, the pipe's or the LLM call's, in lowercase hex. Present on the runtime's lines inside a live run the runtime traces, which it does when AI span tracing is enabled on your own PostHog; never on the server's own lines, an error line included |
 
-The two pairs name different traces. Pipelex's spans belong to a trace of their own, which only Pipelex's exporters receive, so if you export them to a backend of your own, such as Langfuse, an OTLP collector or your PostHog, join a line to them on `pipelex.trace_id` and `pipelex.span_id`. To gather a run's lines whether or not anything traces, use `request_id` or `pipeline_run_id`. How each sink writes both pairs is in the Pipelex documentation's [trace context](https://docs.pipelex.com/0.69.0/tools/logging/#the-trace-context) section.
+The two pairs name different traces. Pipelex's spans belong to a trace of their own, which only Pipelex's exporters receive, so if you export them to a backend of your own, such as Langfuse, an OTLP collector or your PostHog, join a line to them on `pipelex.trace_id` and `pipelex.span_id`. To gather a run's lines whether or not anything traces, use `request_id` or `pipeline_run_id`. How each sink writes both pairs is in the Pipelex documentation's [trace context](../tools/logging.md#the-trace-context) section.
 
 `request_id` reaches a line in one of two ways, depending on which process writes it. In this server's own process, the request-id middleware binds it on the runtime's log context for the whole request, so every record emitted there while the request is in flight carries it: the server's own lines, like the example above, and the lines the Pipelex runtime emits from inside a run executed in-process (`orchestration_mode = "direct"`), without any call site passing it along. A run dispatched to a worker, under a distributed `orchestration_mode` such as `temporal`, happens in another process, which that binding does not reach, so the id travels with the run instead: both run routes, `POST /v1/execute` and `POST /v1/start`, put it on the run's metadata, and the worker binds it from there while it runs the run's workflow and activities, so the lines written inside them carry the same id. A line the worker writes outside those bindings does not, such as the one the orchestration SDK logs after an activity has failed. One path does not carry it at all yet: when `POST /v1/validate` dispatches its dry run to a worker, the lines that worker writes for it have no `request_id`. The value is the one echoed in the response's `X-Request-ID` header and in the problem document's `request_id` member, so a caller reporting a failure hands you the key to its log lines.
 
-The remaining keys are what the error handlers attach to an `event: "api_error"` record:
+The remaining keys are what the error handlers attach to an error line. The ones OpenTelemetry's semantic conventions define keep their keys verbatim, and the rest are spelled as the runtime's own lines spell them, so a query written for the runtime's lines finds these too:
 
 | Key | What it is |
 | --- | --- |
-| `event` | Always `api_error` on an error line — the one key a query filters this server's error stream on |
-| `route` | The request's URL path |
-| `status` | The HTTP status actually sent, including any API-level override |
-| `error_type` | The class or `ErrorType` name the response reports |
+| `url.path` | The request's URL path |
+| `http.response.status_code` | The HTTP status actually sent, including any API-level override |
+| `error.type` | The class or `ErrorType` name the response reports, which the response body carries as `error_type` |
 | `error_domain` | `input`, `config`, `runtime`, … — who fixes it |
 | `error_category` | A Pipelex classification, on the failures it classifies; `unknown` on the catch-all 500 |
 | `retryable` | Whether a blind retry can help, when the failure says |
 | `detail` | The operator-facing explanation, the same text the response body carries — on an API-authored failure only, see below |
-| `user_id` | The authenticated caller, when auth bound one |
+| `user.id` | The authenticated caller, when auth bound one. An identity the server refused, a token's `user_id` claim or a forwarded `X-User-Id` that is not a path-safe segment, is never written under it: the warning about the refusal carries the claim's type as `claim_type`, and no value at all for the header |
 | `pipe_code` | The pipe the request named, on a run route whose body parsed |
 | `pipeline_run_id` | The run the request named, on a run route whose body parsed |
-| `provider`, `model`, `provider_status_code`, `provider_request_id` | The inference provider's own identifiers, on a failure that reached one |
+| `backend_name`, `model_handle` | The inference backend that served the model and the handle the pipe named it by, on a failure that reached one; the response body carries them as `provider` and `model`. `backend_name` is only ever the backend the error names, which a worker attributes its failure to: a failure no worker attributed carries none, even when the provider's own metadata names who answered, `openai` or `gateway`, since that is neither a backend's name nor an SDK's as the backends configuration spells them, and the record leaves it off rather than write it under `backend_name` or `sdk` |
+| `provider_status_code`, `provider_request_id` | The inference provider's own status and request id, on a failure that reached one |
 
 A key whose value is not set for this request is **absent** from the line rather than written as `null`, so a query filtering on presence gets an honest answer.
 
-`detail` is the one field whose absence follows the failure's origin rather than the request's shape, and it is worth knowing which way round. A failure this API authored itself — a validation error, an unknown model category — carries `detail` on the record. A failure that arrives as a Pipelex `ErrorReport`, which is most `5xx` and every domain error, does not: the response body still carries a `detail`, but the record does not, because the body's text has been through disclosure redaction and the cause has not. So a `4xx` from that path logs as `API error 422: SomeError` with no explanation and no traceback, and the response is where the explanation is. Build an operator query on `error_type` and `route`, which every line carries, rather than on `detail`.
+The record took these keys when the server's lines were brought to the log-call conventions, and it dropped two things it carried before: the `event` key, whose one value, `api_error`, the fixed message now plays the part of, and the message built from the status and the error type, `API error 422: InvalidModelCategory`. A query, a dashboard or an alert written for the earlier record moves to the keys of this one:
 
-Every field in that table is a **record attribute**, which is a different thing from the message. A structured sink — `json` here, and the OTLP sink — writes them beside the message as keys. The Rich console sink renders the message alone and ignores them entirely, so a deployment that switches the sink to `"console"` does not get a more readable version of these lines: it gets `API error 500: PipelexConfigError` and nothing else. That is a reason to keep `sink = "json"` wherever the lines are being read by anything other than a person at a terminal.
+| Earlier record | This record |
+| --- | --- |
+| `event` = `api_error` | `message` = `A request ended in an error response` |
+| `message` = `API error <status>: <error type>` | `message` = `A request ended in an error response`, with `http.response.status_code` and `error.type` |
+| `route` | `url.path` |
+| `user_id` | `user.id` |
+| `error_type` | `error.type` |
+| `status` | `http.response.status_code` |
+| `provider` | `backend_name` |
+| `model` | `model_handle` |
+
+The other keys, `error_domain`, `error_category`, `retryable`, `detail`, `pipe_code`, `pipeline_run_id`, `provider_status_code` and `provider_request_id`, kept their names.
+
+`detail` is the one field whose absence follows the failure's origin rather than the request's shape, and it is worth knowing which way round. A failure this API authored itself — a validation error, an unknown model category — carries `detail` on the record. A failure that arrives as a Pipelex `ErrorReport`, which is most `5xx` and every domain error, does not: the response body still carries a `detail`, but the record does not, because the body's text has been through disclosure redaction and the cause has not. So a `4xx` from that path logs its `error.type` with no explanation and no traceback, and the response is where the explanation is. Build an operator query on `error.type` and `url.path`, which every line carries, rather than on `detail`.
+
+Every field in that table is a **record attribute**, which is a different thing from the message. A structured sink — `json` here, and the OTLP sink — writes them beside the message as keys. The Rich console sink shows them after the message as a `key=value` suffix, each value on one line and cut short when long, a handled exception's `error.message` at a far more generous length, and leaves out the run identifiers (`request_id`, `pipeline_run_id`), which a person at a terminal does not need on every line, so `A request ended in an error response` is followed by the path, the status, the error type and the rest of the fields above. That rendering is for a person reading a terminal; keep `sink = "json"` wherever the lines are read by anything else.
 
 Disposition follows the HTTP status, not the error domain: a `4xx` is a caller mistake and logs at `WARNING` without a traceback; a `5xx` is a server fault and logs at `ERROR` with one. See [Error Responses](error-responses.md) for the response side of the same failure.
 
