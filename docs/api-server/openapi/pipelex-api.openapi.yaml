@@ -3204,9 +3204,11 @@ components:
 
         Closed, as the standard requires: `question` is the instruction, a plain text template, and the kind
 
-        is decided by which of `options` and `levels` the question declares, under the single form''s rules.
+        is decided by which of `options` and `levels` the question declares, under the single form''s rules,
 
-        Its key in `questions` names the output field holding its verdict.'
+        which `PipeJudgeBlueprint` checks, since a refusal names the question and only its key in `questions`
+
+        does. That key also names the output field holding its verdict.'
     JudgeRatingLevel:
       properties:
         label:

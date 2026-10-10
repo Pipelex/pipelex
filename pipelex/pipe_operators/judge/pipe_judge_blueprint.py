@@ -82,8 +82,9 @@ class JudgeQuestionBlueprint(BaseModel):
     """One question of a PipeJudge asking several: what it asks, and the fields the single form sets on the pipe.
 
     Closed, as the standard requires: `question` is the instruction, a plain text template, and the kind
-    is decided by which of `options` and `levels` the question declares, under the single form's rules.
-    Its key in `questions` names the output field holding its verdict.
+    is decided by which of `options` and `levels` the question declares, under the single form's rules,
+    which `PipeJudgeBlueprint` checks, since a refusal names the question and only its key in `questions`
+    does. That key also names the output field holding its verdict.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -108,11 +109,6 @@ class JudgeQuestionBlueprint(BaseModel):
             msg = "Each question of `questions` asks something, so its `question` cannot be empty."
             raise ValueError(msg)
         return raw_table
-
-    @model_validator(mode="after")
-    def validate_question_kind(self) -> Self:
-        _validate_question_kind(options=self.options, levels=self.levels, criteria=self.criteria, threshold=self.threshold, noun="question")
-        return self
 
     @property
     def judgment_kind(self) -> JudgmentKind:
@@ -196,7 +192,9 @@ class PipeJudgeBlueprint(PipeBlueprint):
     @model_validator(mode="after")
     def validate_question_kind(self) -> Self:
         if self.questions is None:
-            _validate_question_kind(options=self.options, levels=self.levels, criteria=self.criteria, threshold=self.threshold, noun="PipeJudge")
+            _validate_question_kind(
+                options=self.options, levels=self.levels, criteria=self.criteria, threshold=self.threshold, subject="this PipeJudge"
+            )
             return self
         if not self.questions:
             msg = "A PipeJudge's `questions` holds at least one question, and this one holds none: add a question, or ask one in `question`."
@@ -216,6 +214,14 @@ class PipeJudgeBlueprint(PipeBlueprint):
                     f"move `{kind_field}` into the question it belongs to."
                 )
                 raise ValueError(msg)
+        for question_name, question in self.questions.items():
+            _validate_question_kind(
+                options=question.options,
+                levels=question.levels,
+                criteria=question.criteria,
+                threshold=question.threshold,
+                subject=f"the question '{question_name}'",
+            )
         return self
 
     @property
@@ -300,11 +306,11 @@ def _validate_question_kind(
     levels: list[str | JudgeRatingLevel] | None,
     criteria: JudgeYesNoCriteria | None,
     threshold: float | None,
-    noun: str,
+    subject: str,
 ) -> None:
-    """The single form's rules on the fields deciding a question's kind, for a pipe or for one of its questions, as `noun` names it."""
+    """The single form's rules on the fields deciding a question's kind, for a pipe or for one of its questions, as `subject` names it."""
     if options is not None and levels is not None:
-        msg = f"A {noun} declares `options` for a choice question or `levels` for a rating question, not both."
+        msg = f"A question declares `options` for a choice question or `levels` for a rating question, not both, and {subject} declares both."
         raise ValueError(msg)
     if options is not None or levels is not None:
         kind_field = "options" if options is not None else "levels"
@@ -312,52 +318,54 @@ def _validate_question_kind(
         for yes_no_field, yes_no_value in (("criteria", criteria), ("threshold", threshold)):
             if yes_no_value is not None:
                 msg = (
-                    f"`{yes_no_field}` applies to a yes/no question only, and this {noun} declares `{kind_field}`, "
+                    f"`{yes_no_field}` applies to a yes/no question only, and {subject} declares `{kind_field}`, "
                     f"which makes it a {judgment_kind} question. Remove `{yes_no_field}`."
                 )
                 raise ValueError(msg)
     if options is not None:
         if len(options) < 2:
-            msg = f"A choice question needs at least two `options` to choose between, and this one declares {len(options)}."
+            msg = f"A choice question needs at least two `options` to choose between, and {subject} declares {len(options)}."
             raise ValueError(msg)
         if any(not option.strip() for option in options):
-            msg = "Every key of `options` names an option, so none may be empty."
+            msg = f"Every key of `options` names an option, so none may be empty, and {subject} declares an empty one."
             raise ValueError(msg)
     if levels is not None:
-        _validate_levels(levels=levels)
+        _validate_levels(levels=levels, subject=subject)
     if threshold is not None and not 0 < threshold < 1:
-        msg = f"`threshold` is a probability of yes strictly between 0 and 1, and this {noun} declares {threshold}."
+        msg = f"`threshold` is a probability of yes strictly between 0 and 1, and {subject} declares {threshold}."
         raise ValueError(msg)
 
 
-def _validate_levels(*, levels: list[str | JudgeRatingLevel]) -> None:
+def _validate_levels(*, levels: list[str | JudgeRatingLevel], subject: str) -> None:
     """A scale of at least two levels, none empty, its labels all or none and distinct, since a label is what the verdict reports."""
     if len(levels) < 2:
-        msg = f"A rating question needs at least two `levels` on its scale, and this one declares {len(levels)}."
+        msg = f"A rating question needs at least two `levels` on its scale, and {subject} declares {len(levels)}."
         raise ValueError(msg)
     labels: list[str] = []
     for index_level, level in enumerate(levels):
         if isinstance(level, str):
             if not level.strip():
-                msg = f"Every level of a rating question describes a situation, so none may be empty: level {index_level} is."
+                msg = f"Every level of a rating question describes a situation, so none may be empty, and level {index_level} of {subject} is."
                 raise ValueError(msg)
             continue
         if level.label is None and level.description is None:
-            msg = f"A rating level written as a table carries a `label`, a `description` or both, and level {index_level} carries neither."
+            msg = (
+                f"A rating level written as a table carries a `label`, a `description` or both, and level {index_level} of {subject} carries neither."
+            )
             raise ValueError(msg)
         for field_name, field_value in (("label", level.label), ("description", level.description)):
             if field_value is not None and not field_value.strip():
-                msg = f"A rating level's `{field_name}` cannot be empty, and level {index_level}'s is."
+                msg = f"A rating level's `{field_name}` cannot be empty, and that of level {index_level} of {subject} is."
                 raise ValueError(msg)
         if level.label is not None:
             labels.append(level.label)
     if labels and len(labels) != len(levels):
-        msg = "On a rating scale every level carries a `label` or none does, and this one labels some of its levels only."
+        msg = f"On a rating scale every level carries a `label` or none does, and {subject} labels some of its levels only."
         raise ValueError(msg)
     duplicated_labels = sorted({label for label in labels if labels.count(label) > 1})
     if duplicated_labels:
         repeated = ", ".join(f"'{label}'" for label in duplicated_labels)
-        msg = f"A rating verdict reports the label of its level, so the labels of one scale are distinct, and {repeated} is repeated."
+        msg = f"A rating verdict reports the label of its level, so the labels of one scale are distinct, and {subject} repeats {repeated}."
         raise ValueError(msg)
 
 
