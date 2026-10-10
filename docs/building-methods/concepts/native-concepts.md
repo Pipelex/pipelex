@@ -258,12 +258,15 @@ class ChoiceContent(StuffContent):
 
 class RatingContent(StuffContent):
     level: int  # the index of the selected level, 0 being the first
+    label: str | None = None  # the selected level's label, when the scale declares labels
     confidence: float | None = None  # from 0 to 1
     probabilities: dict[str, float] | None = None  # keyed by level index written as text: "0", "1", ...
     position: float | None = None  # a continuous position, from 0 to the last level's index
 ```
 
-A `Choice` renders as its key and a `Rating` as its level, so `$team` in a later prompt reads `billing` and `$severity` reads `2`. Branch on them with a `PipeCondition`: `expression = "team.choice"` routes by the key, and `expression = "'severe' if severity.level >= 2 else 'mild'"` by the level.
+A `Rating`'s `label` is not a measure. The MTHDS standard defines it as the name of the selected level, when the scale declares labels. A `PipeJudge` declares no labelled levels yet, so a `Rating` it produces carries no `label`; a `PipeLLM` whose output is `Rating`, or any other producer, may fill it like any optional member. The `level` stays the verdict either way.
+
+A `Choice` renders as its key, and a `Rating` as its label when it has one and as its level otherwise, so `$team` in a later prompt reads `billing`, and `$severity` reads `Workaround available` for a rating carrying that label and `1` for one carrying none. Branch on them with a `PipeCondition`: `expression = "team.choice"` routes by the key, and `expression = "'severe' if severity.level >= 2 else 'mild'"` by the level, which every `Rating` has, labelled or not.
 
 A measure is only as good as its producer. A language model asked to fill a verdict — a `PipeLLM` whose output is `YesNo`, `Choice` or `Rating` — sees the uncertainty members, optional and described, and may fill them with its own estimate of its verdict. That estimate is worth having, and it is not the probability a dedicated judging model measures over the options it was given: a `Choice` written by a `PipeLLM` has no declared option set behind it, so its `probabilities` are keyed by whatever the model wrote. When a `PipeCondition` gates on a probability, read which producer wrote it, and guard against its absence: `approved.probability is not none and approved.probability >= 0.8`.
 

@@ -232,9 +232,10 @@ class TestOutOfMatrixNatives:
                 "native.Rating",
                 [
                     {"kind": "number", "name": "level", "required": True, "integer": True},
+                    {"kind": "text", "name": "label", "required": False},
                     {"kind": "number", "name": "position", "required": False, "integer": False},
                 ],
-                {"level": 0, "position": 0.0},
+                {"level": 0, "label": "label_value", "position": 0.0},
             ),
         ],
     )
