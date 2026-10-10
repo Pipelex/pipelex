@@ -35,6 +35,14 @@ class MarkdownFormattingTestData:
     # address beside its text prints at every use: its text alone fits a budget, what it formats into does not.
     REUSED_REFERENCE: ClassVar[str] = "[a][r] " * 4000 + "\n\n[r]: https://example.com/" + "y" * 20000
 
+    # A twenty-thousand-character address around ten thousand spans, alternating italic and plain: each span carries the
+    # address, so the structure written out, as JSON or as its repr, writes it ten thousand times, two hundred megabytes
+    # out of forty kilobytes of text.
+    LINK_AROUND_MANY_SPANS: ClassVar[str] = "[" + "*a*b" * 5000 + "](https://example.com/" + "y" * 20000 + ")"
+
+    # The same address around three spans, an ordinary text whose result carries the address three times.
+    LINK_AROUND_FEW_SPANS: ClassVar[str] = "[*a* b *c*](https://example.com/" + "y" * 20000 + ")"
+
     # A report section repeated into about thirty thousand characters: an ordinary long text, well within one budget.
     LONG_REPORT: ClassVar[str] = "## Findings\n\nSome *text* with a [link](https://a.co), `code` and more.\n\n- one\n- two\n\n" * 300
 

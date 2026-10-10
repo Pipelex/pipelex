@@ -3,6 +3,7 @@ import tracemalloc
 import pytest
 from jinja2.exceptions import TemplateError
 from pydantic import BaseModel
+from pytest_mock import MockerFixture
 
 from pipelex.cogt.doc_gen import formatted_markdown
 from pipelex.cogt.doc_gen.exceptions import MarkdownFormattingBudgetError
@@ -16,7 +17,7 @@ from pipelex.tools.jinja2.jinja2_render_budget import (
     spending_from,
 )
 from pipelex.tools.markdown import markdown_formatting, markdown_rules
-from pipelex.tools.markdown.markdown_parser import table_cells_bound
+from pipelex.tools.markdown.markdown_parser import markdown_syntax_tree, table_cells_bound
 from tests.unit.pipelex.tools.markdown.test_data import MarkdownFormattingTestData
 
 # What a conversion refused for its tables may hold before the refusal: its source and the scan of its lines, never the
@@ -74,6 +75,29 @@ class TestFormattedMarkdown:
     def test_a_reference_used_thousands_of_times_is_refused_before_it_is_built(self) -> None:
         with pytest.raises(MarkdownFormattingBudgetError):
             format_markdown(markdown=MarkdownFormattingTestData.REUSED_REFERENCE)
+
+    def test_a_long_address_around_many_spans_is_refused_before_the_tree_is_built(self, mocker: MockerFixture) -> None:
+        """Outside a render and inside one: each span carries the address, so the bound counts it once per span."""
+        tree_builder = mocker.patch("pipelex.tools.markdown.markdown_formatting.markdown_syntax_tree", wraps=markdown_syntax_tree)
+        with pytest.raises(MarkdownFormattingBudgetError):
+            format_markdown(markdown=MarkdownFormattingTestData.LINK_AROUND_MANY_SPANS)
+        budget = RenderBudget(total=DEFAULT_RENDER_BUDGET_UNITS)
+        with spending_from(budget=budget), pytest.raises(RenderBudgetExceededError, match="formatting Markdown"):
+            format_markdown(markdown=MarkdownFormattingTestData.LINK_AROUND_MANY_SPANS)
+        tree_builder.assert_not_called()
+
+    def test_inside_a_render_a_link_s_address_is_charged_with_every_span_that_carries_it(self) -> None:
+        markdown = MarkdownFormattingTestData.LINK_AROUND_FEW_SPANS
+        budget = RenderBudget(total=DEFAULT_RENDER_BUDGET_UNITS)
+        with spending_from(budget=budget):
+            blocks = format_markdown(markdown=markdown).blocks
+        assert len(blocks) == 1
+        paragraph = blocks[0]
+        assert isinstance(paragraph, FormattedParagraph)
+        linked_spans = [span for span in paragraph.spans if isinstance(span, TextSpan) and span.link]
+        assert len(linked_spans) == 3
+        spent = DEFAULT_RENDER_BUDGET_UNITS - budget.remaining
+        assert spent >= MARKDOWN_UNITS_PER_CHARACTER * len(markdown) + sum(len(span.link or "") for span in linked_spans)
 
     def test_outside_a_render_an_ordinary_long_text_formats(self) -> None:
         formatted = format_markdown(markdown=MarkdownFormattingTestData.LONG_REPORT)

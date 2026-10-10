@@ -111,6 +111,11 @@ class TestPlainDataTemplateEnvironment:
         with pytest.raises(RenderBudgetExceededError, match="formatting Markdown"):
             converted_twice.render(notes=notes)
 
+    def test_markdown_of_a_long_address_around_many_spans_is_refused(self) -> None:
+        template = make_plain_data_template_environment().from_string("{% set formatted = notes | markdown %}{{ formatted.blocks }}")
+        with pytest.raises(RenderBudgetExceededError, match="formatting Markdown"):
+            template.render(notes=MarkdownFormattingTestData.LINK_AROUND_MANY_SPANS)
+
     def test_markdown_of_a_missing_value_fails_the_render(self) -> None:
         template = make_plain_data_template_environment().from_string("{{ invoice.notes | markdown }}")
         with pytest.raises(UndefinedError):

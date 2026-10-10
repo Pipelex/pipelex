@@ -260,21 +260,27 @@ def format_markdown_within_budget(*, markdown_text: str, budget: RenderBudget) -
 def _formatted_size_bound(*, tokens: Sequence["Token"]) -> int:
     """At most what the result made of `tokens` takes: a part for every token that opens or stands alone, with its text.
 
-    A token holds a reference link's destination as it prints it, so a reference used ten thousand times counts ten
-    thousand times, as an engine that prints a link's address beside its text prints it.
+    Every token inside a link counts the link's address too, since each span printed from it carries the address: one
+    shared string in memory, but written once per span by whatever writes the structure out, its JSON or its repr,
+    so a long address around ten thousand spans counts ten thousand times. A token holds a reference link's
+    destination as it prints it, so a reference used ten thousand times counts ten thousand times as well.
     """
     total = 0
     pending: list[Sequence[Token]] = [tokens]
     while pending:
+        # The length of the address of the link the tokens sit inside, 0 outside any.
+        link_length = 0
         for token in pending.pop():
             if token.nesting < 0:
+                if token.type == "link_close":
+                    link_length = 0
                 continue
-            total += _PART_UNITS
+            total += _PART_UNITS + link_length
             if token.type != "inline":
                 total += len(token.content)
-            href = token.attrGet("href")
-            if isinstance(href, str):
-                total += len(href)
+            if token.type == "link_open":
+                href = token.attrGet("href")
+                link_length = len(href) if isinstance(href, str) else 0
             if token.children:
                 pending.append(token.children)
     return total
@@ -469,12 +475,14 @@ class _MarkdownFormatter:
 
 
 def _spans_length(*, spans: Sequence[FormattedSpan]) -> int:
-    """The characters spans hold: their texts, since every span of a link shares its one address."""
+    """The characters spans hold: their texts, and the address of a link once for every span that carries it, which
+    whatever writes the structure out writes once per span.
+    """
     total = 0
     for span in spans:
         match span:
             case TextSpan():
-                total += len(span.text)
+                total += len(span.text) + len(span.link or "")
             case LineBreakSpan():
                 total += 1
     return total
