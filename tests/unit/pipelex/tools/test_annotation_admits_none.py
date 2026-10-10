@@ -1,4 +1,4 @@
-from typing import Any, Literal, Optional, Union
+from typing import Annotated, Any, Literal, Optional, Union
 
 import pytest
 
@@ -24,6 +24,8 @@ class TestAnnotationAdmitsNone:
             pytest.param(Literal["fallback", None], id="literal_listing_none"),  # ruff: ignore[redundant-none-literal] — a Literal listing None is the test subject
             pytest.param(Literal["fallback"] | None, id="pep604_literal_none"),
             pytest.param(str | Any, id="union_with_any"),
+            pytest.param(Annotated[str | None, "note"] | int, id="union_with_annotated_optional_arm"),
+            pytest.param(Annotated[str | None, "note"], id="annotated_optional"),
         ],
     )
     def test_admits_none(self, annotation: Any):
@@ -37,6 +39,7 @@ class TestAnnotationAdmitsNone:
             pytest.param(list[str | None], id="list_of_optional_items"),
             pytest.param(str | int, id="pep604_union_multi_arm"),
             pytest.param(Literal["fallback", "other"], id="literal_without_none"),
+            pytest.param(Annotated[str, "note"] | int, id="union_with_annotated_required_arm"),
         ],
     )
     def test_refuses_none(self, annotation: Any):

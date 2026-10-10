@@ -1,5 +1,5 @@
 import types
-from typing import Any, Literal, Union, get_args, get_origin
+from typing import Annotated, Any, Literal, Union, get_args, get_origin
 
 
 def unwrap_optional(annotation: Any) -> Any:
@@ -28,10 +28,12 @@ def unwrap_optional(annotation: Any) -> Any:
 
 
 def annotation_admits_none(*, annotation: Any) -> bool:
-    """Whether a field annotation admits `None`: `None` itself, `Any`, `object`, a `Literal` listing `None`, or a union with such an arm."""
+    """Whether an annotation admits `None`: `None` itself, `Any`, `object`, a `Literal` listing `None`, or a union or `Annotated` holding one."""
     if annotation is None or annotation is type(None) or annotation is Any or annotation is object:
         return True
     origin = get_origin(annotation)
+    if origin is Annotated:
+        return annotation_admits_none(annotation=get_args(annotation)[0])
     if origin is Literal:
         return None in get_args(annotation)
     if origin is Union or origin is types.UnionType:
