@@ -685,8 +685,8 @@ class TestInferenceCallSummary:
                 await _StandInLLMWorker(error=LLMCompletionError(message="provider refused")).gen_text(llm_job=_llm_job())
 
         succeeded, failed = _summaries(caplog)
-        assert rendered_text(record=succeeded).plain == "🧠: gpt-test chat · 1,200 → 300 tokens · $0.0018 · done in 1.25 s"
-        assert rendered_text(record=failed).plain == "🧠: gpt-test chat · failed after 1.25 s error.type=LLMCompletionError"
+        assert rendered_text(record=succeeded).plain == "gpt-test chat · 1,200 → 300 tokens · $0.0018 · done in 1.25 s"
+        assert rendered_text(record=failed).plain == "gpt-test chat · failed after 1.25 s error.type=LLMCompletionError"
 
     @pytest.mark.parametrize(("refuse_call", "refusal_type", "operation"), REFUSAL_CASES, ids=REFUSAL_IDS)
     @pytest.mark.asyncio
@@ -738,7 +738,7 @@ class TestInferenceCallSummary:
         fields = _fields(record)
         assert (fields["outcome"], fields["duration_ms"]) == ("cancelled", DURATION_MS)
         assert "error.type" not in fields
-        assert rendered_text(record=record).plain == "🧠: gpt-test chat · cancelled after 1.25 s"
+        assert rendered_text(record=record).plain == "gpt-test chat · cancelled after 1.25 s"
 
     @pytest.mark.parametrize("provider_error", [None, LLMCompletionError(message="provider refused")], ids=["the call succeeds", "the call fails"])
     @pytest.mark.asyncio

@@ -7,6 +7,7 @@ from pytest_mock import MockerFixture
 from pipelex.libraries.library_factory import LibraryFactory
 from pipelex.libraries.library_manager import LibraryManager
 from pipelex.tools.log.error_fields import ERROR_MESSAGE_FIELD, ERROR_TYPE_FIELD
+from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 
 
 class TestMthdsVersionWarning:
@@ -24,14 +25,14 @@ class TestMthdsVersionWarning:
         )
 
         mock_log.warning.assert_called_once()
-        assert mock_log.warning.call_args.args == (
-            "A package requires another MTHDS standard version than this runtime's; some features may not work correctly",
-        )
-        assert mock_log.warning.call_args.kwargs["fields"] == {
+        assert mock_log.warning.call_args.args == ("A package requires another MTHDS standard version than this runtime's",)
+        fields = mock_log.warning.call_args.kwargs["fields"]
+        assert {name: fields[name] for name in ("package_address", "mthds_version_constraint", "mthds_standard_version")} == {
             "package_address": "github.com/org/pkg",
             "mthds_version_constraint": "^2.0.0",
             "mthds_standard_version": "1.0.0",
         }
+        assert fields[USER_ACTION_FIELD]
 
     def test_no_warning_when_version_satisfied(self, mocker: MockerFixture) -> None:
         """No warning emitted when current MTHDS standard version satisfies the constraint."""
@@ -57,7 +58,7 @@ class TestMthdsVersionWarning:
         )
 
         mock_log.warning.assert_called_once()
-        assert mock_log.warning.call_args.args == ("The mthds_version constraint of a package could not be parsed",)
+        assert mock_log.warning.call_args.args == ("The MTHDS version constraint of a package could not be parsed",)
         fields = mock_log.warning.call_args.kwargs["fields"]
         assert fields["package_address"] == "github.com/org/pkg"
         assert fields["mthds_version_constraint"] == ">>>garbage"

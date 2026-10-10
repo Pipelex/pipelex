@@ -22,6 +22,9 @@ unbalanced quote or bracket whose tail reads as another pair. A key is written t
 line break, a space, an equals sign or an escape sequence can forge neither a line nor a pair. Redaction has already
 run when the console renders a record, so what is rendered is what the scrub left.
 
+A record's advice, its ``user_action`` field, is not part of the suffix: it prints whole on a line of its own under the
+record, after ``ADVICE_MARK``, since it is what the reader acts on.
+
 Colour follows the name the field was given, from ``FIELD_STYLES``, wherever the field appears, and whatever
 collision prefix it landed under; a field outside the map renders dimmed. The map is one table in code, the
 colours the pipe announcement has always used. Nothing here imports Rich: the suffix is a list of
@@ -40,7 +43,7 @@ from pydantic import BaseModel
 
 from pipelex.tools.log.error_fields import ERROR_MESSAGE_FIELD
 from pipelex.tools.log.log_context import PIPE_RUN_ID_FIELD, PIPELINE_RUN_ID_FIELD, REQUEST_ID_FIELD
-from pipelex.tools.log.log_fields import DATA_FIELD, attached_field_names, given_field_name
+from pipelex.tools.log.log_fields import DATA_FIELD, USER_ACTION_FIELD, attached_field_names, given_field_name
 from pipelex.tools.log.log_sink import json_fallback, spell_non_finite
 
 if TYPE_CHECKING:
@@ -105,6 +108,10 @@ ESCAPE = "\\"
 # otherwise read as the end of a pair, the start of the next or an escape, so the suffix cannot be forged.
 QUOTED_CHARACTERS = frozenset({FIELD_SEPARATOR, KEY_VALUE_SEPARATOR, QUOTE, ESCAPE})
 
+# What starts the line the advice of a record prints on, under the record, and the style the advice is printed in.
+ADVICE_MARK = "→ "
+ADVICE_STYLE = "cyan"
+
 # A segment of the suffix: its text, and the Rich style it is printed in.
 StyledSegment = tuple[str, str]
 
@@ -134,11 +141,12 @@ def field_style(*, name: str) -> str:
 def field_suffix_segments(*, fields: Mapping[str, Any], presented_fields: frozenset[str]) -> list[StyledSegment]:
     """The suffix for these fields, a space before each ``key=value``, as styled segments; none when nothing is left to show.
 
-    The run identifiers, ``data`` and the fields a layout already presented are left out.
+    The run identifiers, ``data``, the fields a layout already presented and the advice, which prints on a line of its
+    own, are left out.
     """
     segments: list[StyledSegment] = []
     for name, value in fields.items():
-        if name in CONSOLE_HIDDEN_FIELDS or name in presented_fields:
+        if name in CONSOLE_HIDDEN_FIELDS or name in presented_fields or given_field_name(name=name) == USER_ACTION_FIELD:
             continue
         segments.append((FIELD_SEPARATOR, ""))
         # The key is written like a value: a name a caller chose can hold a line break that would forge a
@@ -146,6 +154,23 @@ def field_suffix_segments(*, fields: Mapping[str, Any], presented_fields: frozen
         segments.append((f"{format_field_value(value=name)}{KEY_VALUE_SEPARATOR}", FIELD_KEY_STYLE))
         rendered_value = format_field_value(value=value, max_length=field_max_length(name=name), is_cut_at_start=field_is_cut_at_start(name=name))
         segments.append((rendered_value, field_style(name=name)))
+    return segments
+
+
+def advice_segments(*, fields: Mapping[str, Any]) -> list[StyledSegment]:
+    """The advice the fields carry under ``USER_ACTION_FIELD``, as the line printed under the record; none when they carry none.
+
+    The advice is written whole, on one line, since it is the part of the record its reader acts on: a string as
+    itself, anything else as compact JSON, every character a terminal would act on escaped. Read off the name the
+    caller gave rather than the one it landed on, as the style is.
+    """
+    segments: list[StyledSegment] = []
+    for name, value in fields.items():
+        if given_field_name(name=name) != USER_ACTION_FIELD:
+            continue
+        string_text = _string_value_text(value=value)
+        advice = one_line_text(text=string_text if string_text is not None else _non_string_text(value=value))
+        segments.append((f"\n{ADVICE_MARK}{advice}", ADVICE_STYLE))
     return segments
 
 

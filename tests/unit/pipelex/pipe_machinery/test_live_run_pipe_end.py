@@ -287,9 +287,9 @@ class TestLiveRunPipeEnd:
 
         lines = [rendered_text(record=record).plain for record in _records(caplog, message=PIPE_RUN_ENDS_MESSAGE)]
         assert lines == [
-            "🧠:    ↳ EndingPipe: describe_company done in 1.25 s",
-            "🧠: EndingPipe: build_profile done in 1.25 s",
-            "🧠: EndingPipe: describe_company failed after 1.25 s error.type=PipeRunError",
+            "   ↳ EndingPipe: describe_company done in 1.25 s",
+            "EndingPipe: build_profile done in 1.25 s",
+            "EndingPipe: describe_company failed after 1.25 s error.type=PipeRunError",
         ]
 
     async def test_the_json_sink_writes_the_duration_and_the_depth_as_numbers(self, caplog: pytest.LogCaptureFixture) -> None:
@@ -370,4 +370,4 @@ class TestLiveRunPipeEnd:
             "duration_ms": DURATION_MS,
             "outcome": "cancelled",
         }
-        assert rendered_text(record=run_end).plain == "🧠: EndingPipe: describe_company cancelled after 1.25 s"
+        assert rendered_text(record=run_end).plain == "EndingPipe: describe_company cancelled after 1.25 s"

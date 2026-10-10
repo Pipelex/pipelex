@@ -20,6 +20,7 @@ from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inf
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.providers.google.google_factory import GoogleFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.tools.log.error_fields import error_fields
 
 
 class GoogleImgGenWorker(ImgGenWorkerAbstract):
@@ -54,29 +55,25 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
         try:
             # First, try to use the loop captured at creation time if it's still running
             if self._event_loop is not None and self._event_loop.is_running():
-                # Schedule cleanup on the captured loop and store reference to prevent garbage collection
-                task = self._event_loop.create_task(self.genai_async_client.aclose())
-                # Add a callback to log any errors that occur during cleanup
-                task.add_done_callback(lambda t: log.debug(f"Google async client cleanup error: {t.exception()}") if t.exception() else None)
+                # Schedule cleanup on the captured loop
+                GoogleFactory.schedule_client_close(event_loop=self._event_loop, close_coroutine=self.genai_async_client.aclose())
                 return
 
             # Otherwise, try to get the current running loop
             try:
                 current_loop = asyncio.get_running_loop()
-                # Schedule cleanup on the current running loop and store reference to prevent garbage collection
-                task = current_loop.create_task(self.genai_async_client.aclose())
-                # Add a callback to log any errors that occur during cleanup
-                task.add_done_callback(lambda t: log.debug(f"Google async client cleanup error: {t.exception()}") if t.exception() else None)
+                # Schedule cleanup on the current running loop
+                GoogleFactory.schedule_client_close(event_loop=current_loop, close_coroutine=self.genai_async_client.aclose())
             except RuntimeError:
                 # No running event loop, we can safely use asyncio.run()
                 try:
                     asyncio.run(self.genai_async_client.aclose())
                 except Exception as exc:  # ruff: ignore[blind-except]
                     # Best-effort: asyncio.run() runs aclose(), whose failure surface is not enumerable; teardown must never fail.
-                    log.debug(f"Error closing Google async client during teardown: {exc}")
+                    log.debug("A Google async client could not be closed", fields=error_fields(exc=exc))
         except Exception as exc:  # ruff: ignore[blind-except]
             # Best-effort cleanup boundary: teardown must never fail, whatever client/event-loop close throws.
-            log.debug(f"Error during Google async client teardown: {exc}")
+            log.debug("A Google async client could not be closed", fields=error_fields(exc=exc))
 
     @override
     async def _gen_image(
@@ -135,7 +132,7 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
 
         usage_metadata: genai_types.GenerateContentResponseUsageMetadata | None = response.usage_metadata
         if not usage_metadata:
-            log.warning("No usage metadata returned from Google")
+            log.warning("Google returned no usage metadata")
 
         if usage_metadata and (img_gen_tokens_usage := img_gen_job.job_report.img_gen_tokens_usage):
             request_tokens = GoogleFactory.extract_token_usage(usage_metadata)

@@ -19,7 +19,7 @@ The API reads its settings from environment variables. With Docker, the easiest 
 OPENAI_API_KEY=your-openai-api-key
 
 # Authentication for the API itself (optional — defaults to AUTH_MODE=none)
-AUTH_MODE=none                 # one of: none | api_key | jwt
+AUTH_MODE=none                 # one of: none | api_key | jwt (any other value refuses to start)
 API_KEY=your-api-key           # used when AUTH_MODE=api_key
 JWT_SECRET_KEY=your-jwt-secret # used when AUTH_MODE=jwt
 

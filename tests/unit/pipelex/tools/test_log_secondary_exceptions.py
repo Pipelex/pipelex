@@ -102,7 +102,7 @@ class TestSecondaryExceptionsCarryNoPayload:
         raw = json_buffer.getvalue()
         assert _PAYLOAD not in raw
         (line,) = _lines_of(buffer=json_buffer, logger_name="pipelex.pipe_run.delivery_executor")
-        assert line[MESSAGE_KEY] == "The absence record of the main output is malformed, so the delivery has no result to render"
+        assert line[MESSAGE_KEY] == "The absence record of the main output is malformed"
         assert line[ERROR_TYPE_FIELD] == "ValidationError"
         assert line[ERROR_MESSAGE_FIELD].startswith("kind: Input should be ")
         assert "reason: Input should be a valid string" in line[ERROR_MESSAGE_FIELD]

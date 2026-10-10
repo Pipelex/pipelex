@@ -162,8 +162,8 @@ class WorkingMemoryFactory(BaseModel):
                 else:
                     # Fallback to TextContent if we can't get the proper class
                     log.debug(
-                        f"Could not get structure class '{structure_class_name}' for "
-                        f"concept '{named_stuff_spec.concept.code}', falling back to TextContent",
+                        f"The structure class '{structure_class_name}' of concept '{named_stuff_spec.concept.code}' "
+                        "is not available, and TextContent is used in its place",
                     )
                     text_typed_named_stuff_spec = TypedNamedStuffSpec.make_from_named(
                         named=named_stuff_spec,
@@ -174,7 +174,7 @@ class WorkingMemoryFactory(BaseModel):
             except ValidationError as exc:
                 # Fallback to TextContent when the typed stuff spec fails pydantic validation
                 log.warning(
-                    "The structure class of an input's concept could not be used, so the input is mocked as text",
+                    "An input whose concept's structure class could not be used was mocked as text",
                     fields={
                         "stuff_name": named_stuff_spec.variable_name,
                         "concept_ref": named_stuff_spec.concept.concept_ref,
@@ -209,7 +209,7 @@ class WorkingMemoryFactory(BaseModel):
         if structure_class and issubclass(structure_class, StuffContent):
             return TypedNamedStuffSpec.make_from_named(named=named, structure_class=structure_class)
         log.debug(
-            f"Could not get structure class '{structure_class_name}' for concept '{concept.code}', falling back to TextContent",
+            f"The structure class '{structure_class_name}' of concept '{concept.code}' is not available, and TextContent is used in its place",
         )
         return TypedNamedStuffSpec.make_from_named(named=named, structure_class=TextContent)
 
@@ -283,7 +283,7 @@ class WorkingMemoryFactory(BaseModel):
                 # Mock build (polyfactory) or content validation (pydantic) failed for this dynamic
                 # class — fall back to text content. Unexpected errors propagate.
                 log.warning(
-                    "A mock input could not be built from its concept's structure, so a text stand-in is used",
+                    "A text stand-in was used for a mock input its structure could not build",
                     fields={
                         "stuff_name": typed_named_stuff_spec.variable_name,
                         "concept_ref": typed_named_stuff_spec.concept.concept_ref,

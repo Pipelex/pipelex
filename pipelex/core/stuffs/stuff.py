@@ -146,7 +146,7 @@ class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffConte
             if names_match:
                 content_dict = content.smart_dump()
                 validated_content = content_type.model_validate(content_dict)
-                log.verbose(f"Model validation passed: converted {type(content).__name__} to {content_type.__name__}")
+                log.verbose(f"A {type(content).__name__} content was validated and converted to {content_type.__name__}")
                 return validated_content
         except ValidationError as exc:
             formatted_error = format_pydantic_validation_error(exc)

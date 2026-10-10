@@ -26,6 +26,11 @@ if TYPE_CHECKING:
 # The attribute a ``dict`` or ``list`` content is carried under, JSON-ready, beside its console rendering.
 DATA_FIELD = "data"
 
+# The field a line's advice rides in: what its reader should do about the event, one imperative sentence, the name
+# Pipelex's error reports give their advice. The message says what happened; the advice varies with the cause while
+# the event does not, so it stays out of the message. The console prints it on a line of its own under the record.
+USER_ACTION_FIELD = "user_action"
+
 # The prefix an entry takes when its name is one the record already owns.
 COLLIDING_FIELD_PREFIX = "field_"
 

@@ -182,7 +182,7 @@ class MethodCloneCache:
                     except OSError:
                         # A concurrent request installed the same SHA between the check and the
                         # rename; its copy is identical (same commit), so use it.
-                        log.debug(f"Method clone cache: lost the install race for {fetched.commit_sha}, reusing the winner's copy")
+                        log.debug(f"A concurrent request installed method clone {fetched.commit_sha} first, and its copy is used")
                 self._evict()
                 return self._package_from_clone(ref=ref, clone_dir=target_dir, commit_sha=fetched.commit_sha)
         finally:

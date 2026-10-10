@@ -5952,10 +5952,6 @@ rationale = "Setter: installs the log_config; single operand."
 param = "content"
 rationale = "Logs the content; single operand (formatting keyword-only)."
 
-["pipelex/tools/log/log_formatter.py::emoji_for_channel"]
-param = "channel_name"
-rationale = "Renders the channel_name; single operand."
-
 ["pipelex/tools/markdown/markdown_parser.py::_join_text_fragments"]
 param = "state"
 rationale = "markdown-it rule callback: the inline ruler calls each rule with its state positionally."
