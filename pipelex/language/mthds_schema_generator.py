@@ -21,7 +21,7 @@ from pipelex.pipe_machinery.validation import (
     SEQUENCE_STEP_BATCH_OVER_PATTERN,
     STORED_NAME_PATTERN,
 )
-from pipelex.pipe_operators.judge.pipe_judge_blueprint import JudgeRatingLevel, PipeJudgeBlueprint
+from pipelex.pipe_operators.judge.pipe_judge_blueprint import QUESTION_KIND_FIELDS, JudgeQuestionBlueprint, JudgeRatingLevel, PipeJudgeBlueprint
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
 from pipelex.tools.misc.package_utils import get_package_version
 
@@ -80,6 +80,7 @@ def generate_mthds_schema() -> dict[str, Any]:
     schema = _constrain_stored_names(schema)
     schema = _constrain_batch_over(schema)
     schema = _constrain_rating_levels(schema)
+    schema = _constrain_judge_questions(schema)
 
     return _add_taplo_metadata(schema)
 
@@ -396,7 +397,7 @@ def _set_batch_over_grammar(*, step_schema: dict[str, Any], pattern: str, descri
 
 
 def _constrain_rating_levels(schema: dict[str, Any]) -> dict[str, Any]:
-    """Make a PipeJudge's `levels` label every level or none, as its load does.
+    """Make the `levels` of a PipeJudge, and of each of its `questions`, label every level or none, as its load does.
 
     A level is a string, which is its description, or a closed `{label, description}` table, and the load
     refuses a scale labelling some of its levels only, since a `Rating` verdict reports the label of its
@@ -405,9 +406,16 @@ def _constrain_rating_levels(schema: dict[str, Any]) -> dict[str, Any]:
     """
     schema = copy.deepcopy(schema)
     definitions = schema.get("definitions", {})
-    levels_schema = definitions.get(PipeJudgeBlueprint.__name__, {}).get("properties", {}).get("levels")
-    if levels_schema is None or JudgeRatingLevel.__name__ not in definitions:
+    if JudgeRatingLevel.__name__ not in definitions:
         return schema
+    for definition_name in (PipeJudgeBlueprint.__name__, JudgeQuestionBlueprint.__name__):
+        levels_schema = definitions.get(definition_name, {}).get("properties", {}).get("levels")
+        if levels_schema is not None:
+            _split_levels_scale(levels_schema=levels_schema, definition_name=definition_name)
+    return schema
+
+
+def _split_levels_scale(*, levels_schema: dict[str, Any], definition_name: str) -> None:
     level_ref = {"$ref": f"#/definitions/{JudgeRatingLevel.__name__}"}
     unlabelled_level = {"allOf": [level_ref, {"properties": {"label": {"type": "null"}}}]}
     labelled_level = {"allOf": [copy.deepcopy(level_ref), {"required": ["label"], "properties": {"label": {"type": "string"}}}]}
@@ -415,7 +423,7 @@ def _constrain_rating_levels(schema: dict[str, Any]) -> dict[str, Any]:
     arms: list[dict[str, Any]] = levels_schema.get("anyOf", [])
     array_arms = [arm for arm in arms if arm.get("type") == "array"]
     if len(array_arms) != 1:
-        msg = f"Expected one array arm on {PipeJudgeBlueprint.__name__}.levels, found {len(array_arms)}"
+        msg = f"Expected one array arm on {definition_name}.levels, found {len(array_arms)}"
         raise RuntimeError(msg)
     array_arm = array_arms[0]
     scale_arms = [
@@ -423,6 +431,28 @@ def _constrain_rating_levels(schema: dict[str, Any]) -> dict[str, Any]:
         {**copy.deepcopy(array_arm), "items": labelled_level},
     ]
     levels_schema["anyOf"] = [scale_arm for arm in arms for scale_arm in (scale_arms if arm is array_arm else [arm])]
+
+
+def _constrain_judge_questions(schema: dict[str, Any]) -> dict[str, Any]:
+    """Make a PipeJudge ask one `question` or several `questions`, and keep the kind fields off one asking several, as its load does.
+
+    Exactly one of `question` and `questions` is set, which Draft 4 says with a `oneOf` of the two
+    `required`. A PipeJudge asking several sets `options`, `levels`, `criteria` and `threshold` on each
+    question rather than on the pipe, which a `not` refuses, and its `questions` holds at least one
+    question. The grammar of a question's key, a field name of the output's structure, is left to the
+    load, since a Python identifier admits letters no portable pattern spells.
+    """
+    schema = copy.deepcopy(schema)
+    judge_schema = schema.get("definitions", {}).get(PipeJudgeBlueprint.__name__)
+    if judge_schema is None:
+        return schema
+    judge_schema["oneOf"] = [{"required": ["question"]}, {"required": ["questions"]}]
+    judge_schema["not"] = {"required": ["questions"], "anyOf": [{"required": [kind_field]} for kind_field in QUESTION_KIND_FIELDS]}
+    questions_schema = judge_schema.get("properties", {}).get("questions")
+    if questions_schema is not None:
+        for arm in questions_schema.get("anyOf", [questions_schema]):
+            if arm.get("type") == "object":
+                arm["minProperties"] = 1
     return schema
 
 

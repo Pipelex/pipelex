@@ -10,7 +10,15 @@ user-prompt assembly (`pipelex.kernel.prompt_assembly`). What the evidence holds
 business, so an input reaches the judging model only when the prompt reads it. An optional input the run
 was not given renders as the template's guard says, and the assembly skips its files, numbering and
 handing over none of them.
+
+A step asks one question, `run_judgment`, whose verdict native is the result, or several,
+`run_multi_judgment`, whose verdicts fill a structure field by field. Either way it is one request to the
+judging model, every question answered independently over the same evidence.
 """
+
+from typing import NamedTuple
+
+from pydantic import BaseModel, ConfigDict
 
 from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import JudgmentAssignment
@@ -19,6 +27,7 @@ from pipelex.cogt.exceptions import JudgmentAnswerMismatchError, JudgmentModelMi
 from pipelex.cogt.judgment.judgment_models import (
     ChoiceAnswer,
     JudgmentAnswer,
+    JudgmentOutcome,
     JudgmentPrompt,
     JudgmentQuestion,
     JudgmentRefusal,
@@ -34,10 +43,12 @@ from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.choice_content import ChoiceContent
+from pipelex.core.stuffs.non_null_any import class_field_may_hold_nothing, field_admits_none
 from pipelex.core.stuffs.rating_content import RatingContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
-from pipelex.kernel.judgment_results import JudgmentResult
+from pipelex.kernel.exceptions import JudgmentOutputFieldsError
+from pipelex.kernel.judgment_results import JudgmentResult, MultiJudgmentResult, QuestionJudgment
 from pipelex.kernel.memory_ops import store_result
 from pipelex.kernel.prompt_assembly import UserPromptContent, assemble_user_prompt
 from pipelex.runtime_hub import get_content_generator, get_model_deck
@@ -51,6 +62,28 @@ JUDGMENT_QUESTION_KEY = "question"
 
 # A yes/no verdict reads its reported probability against this when the step declares no threshold.
 DEFAULT_YES_NO_THRESHOLD = 0.5
+
+
+class AskedQuestion(BaseModel):
+    """One question of a judgment asking several, with the threshold its yes/no verdict reads its probability against.
+
+    The question's instructions are still the authored template, rendered against memory when the step
+    runs. The threshold is the operator's policy, so it travels beside the question rather than in it,
+    and a question of another kind never carries one.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    question: JudgmentQuestion
+    threshold: float | None = None
+
+
+class _AskedJudgment(NamedTuple):
+    """What one request to the judging model was and returned: the evidence, the questions as asked, and their outcomes by key."""
+
+    prompt: JudgmentPrompt
+    questions: dict[str, JudgmentQuestion]
+    outcomes: dict[str, JudgmentOutcome]
 
 
 def judgment_setting_of_choice(*, judgment_choice: JudgmentModelChoice | None = None, pipe_code: str | None = None) -> JudgmentSetting:
@@ -116,7 +149,7 @@ async def run_judgment(
     result_name: str | None = None,
     result_code: str | None = None,
 ) -> JudgmentResult:
-    """A whole judgment step: assemble the evidence, render the question, judge, read the verdict, store.
+    """A whole judgment step asking one question: assemble the evidence, render the question, judge, read the verdict, store.
 
     The evidence is assembled as a PipeLLM's user prompt is, its images and documents numbered into
     `[Image N]` and `[Document N]` tokens. The question arrives as the cogt question with its
@@ -133,24 +166,17 @@ async def run_judgment(
     refining concept as every operator stores a refinement.
     """
     with job_metadata.log_context():
-        assembled_prompt = await assemble_user_prompt(prompt_content=prompt_content, context_provider=memory, templating_style=templating_style)
-        judgment_prompt = JudgmentPrompt(text=assembled_prompt.text, images=assembled_prompt.images, documents=assembled_prompt.documents)
-        rendered_question = await render_template(
-            template=question.instructions,
-            category=TemplateCategory.BASIC,
-            context=memory.generate_context(),
-            templating_style=templating_style,
-        )
-        asked_question = question.model_copy(update={"instructions": rendered_question})
-        judgment_assignment = JudgmentAssignment(
+        asked_judgment = await _ask_judgment(
+            memory=memory,
+            prompt_content=prompt_content,
+            questions={JUDGMENT_QUESTION_KEY: question},
+            judgment_setting=judgment_setting,
             job_metadata=job_metadata,
             cogt_run_params=cogt_run_params,
-            prompt=judgment_prompt,
-            questions={JUDGMENT_QUESTION_KEY: asked_question},
-            judgment_setting=judgment_setting,
+            templating_style=templating_style,
         )
-        outcomes = await get_content_generator().make_judgment_answers(judgment_assignment=judgment_assignment)
-        outcome = outcomes[JUDGMENT_QUESTION_KEY]
+        asked_question = asked_judgment.questions[JUDGMENT_QUESTION_KEY]
+        outcome = asked_judgment.outcomes[JUDGMENT_QUESTION_KEY]
         if isinstance(outcome, JudgmentRefusal):
             raise JudgmentRefusedError(pipe_code=job_metadata.pipe_code, model_handle=judgment_setting.model)
         content, threshold_applied = make_verdict_content(
@@ -164,12 +190,156 @@ async def run_judgment(
         return JudgmentResult(
             memory=store_result(memory=memory, concept=concept, content=content, result_name=result_name, result_code=result_code),
             content=content,
-            prompt=judgment_prompt,
-            rendered_question=rendered_question,
+            prompt=asked_judgment.prompt,
+            rendered_question=asked_question.instructions,
             judgment_setting=judgment_setting,
             answer=outcome,
             threshold_applied=threshold_applied,
         )
+
+
+async def run_multi_judgment(
+    *,
+    memory: WorkingMemory,
+    prompt_content: UserPromptContent,
+    questions: dict[str, AskedQuestion],
+    judgment_setting: JudgmentSetting,
+    concept: Concept,
+    output_class: type[StuffContent],
+    job_metadata: JobMetadata,
+    cogt_run_params: CogtRunParams,
+    templating_style: TemplatingStyle,
+    result_name: str | None = None,
+    result_code: str | None = None,
+) -> MultiJudgmentResult:
+    """A whole judgment step asking several questions over one evidence, in one request, and filling a structure with their verdicts.
+
+    The evidence is assembled and each question rendered as `run_judgment` does, and every question goes
+    in one job keyed by its name, which is also the name of the field of `output_class` holding its
+    verdict. The caller resolves `output_class`, the structure class of the output concept, and hands it
+    down, as PipeLLM's object path does, since the kernel does not read the concept library: its fields
+    must be exactly the questions' names, which `JudgmentOutputFieldsError` refuses before the judging
+    model is called. Each answer becomes its verdict native under the single form's rules, the question's
+    own threshold deciding a yes/no verdict.
+
+    A refusal stores nothing in its question's field when that field may hold nothing, by
+    `class_field_may_hold_nothing`, the rule the load's concept walk reads a class by: its type admits
+    `None`, or it is neither required nor given a default. The refusal is logged and recorded in the
+    result's `judgments`. Any other refused question raises `JudgmentRefusedError`, a content error naming
+    the step, the model and the question: leaving a defaulted field out would fill in its default, a
+    verdict nobody gave. The verdicts are handed to `output_class` by field name, whatever alias a field
+    carries. A dry run answers every question and never refuses.
+    """
+    with job_metadata.log_context():
+        _check_questions_are_the_output_fields(question_names=list(questions), output_class=output_class)
+        asked_judgment = await _ask_judgment(
+            memory=memory,
+            prompt_content=prompt_content,
+            questions={question_name: asked_question.question for question_name, asked_question in questions.items()},
+            judgment_setting=judgment_setting,
+            job_metadata=job_metadata,
+            cogt_run_params=cogt_run_params,
+            templating_style=templating_style,
+        )
+        field_values: dict[str, object] = {}
+        judgments: dict[str, QuestionJudgment] = {}
+        for question_name, asked_question in questions.items():
+            question = asked_judgment.questions[question_name]
+            outcome = asked_judgment.outcomes[question_name]
+            if isinstance(outcome, JudgmentRefusal):
+                field_info = output_class.model_fields[question_name]
+                if not class_field_may_hold_nothing(field_info=field_info):
+                    raise JudgmentRefusedError(pipe_code=job_metadata.pipe_code, model_handle=judgment_setting.model, question_name=question_name)
+                log.warning(
+                    "A judgment's model declined a question, and its field holds nothing",
+                    fields={"pipe_code": job_metadata.pipe_code, "model_handle": judgment_setting.model, "judgment_question": question_name},
+                )
+                # A field whose type admits nothing is given it outright, as a required one must be and as one carrying a
+                # default must be lest the default fill in; any other field that may hold nothing has `None` for default.
+                if field_admits_none(field_info=field_info):
+                    field_values[question_name] = None
+                judgments[question_name] = QuestionJudgment(rendered_question=question.instructions, outcome=outcome)
+                continue
+            verdict, threshold_applied = make_verdict_content(
+                question=question, answer=outcome, threshold=asked_question.threshold, is_dry=cogt_run_params.run_mode.is_dry
+            )
+            if threshold_applied is False:
+                log.warning(
+                    "A judgment's model reported no probability, and its own verdict stands",
+                    fields={
+                        "pipe_code": job_metadata.pipe_code,
+                        "threshold": asked_question.threshold,
+                        "model_handle": judgment_setting.model,
+                        "judgment_question": question_name,
+                    },
+                )
+            # Handed over as plain data, so a field typed by a concept refining the verdict native, whose class
+            # subclasses the native's, is built as that class rather than refusing the native's instance.
+            field_values[question_name] = verdict.model_dump()
+            judgments[question_name] = QuestionJudgment(rendered_question=question.instructions, outcome=outcome, threshold_applied=threshold_applied)
+        # Keyed by field name, the name each question goes by, so a field carrying an alias still receives its verdict.
+        content = output_class.model_validate(field_values, by_alias=False, by_name=True)
+        return MultiJudgmentResult(
+            memory=store_result(memory=memory, concept=concept, content=content, result_name=result_name, result_code=result_code),
+            content=content,
+            prompt=asked_judgment.prompt,
+            judgment_setting=judgment_setting,
+            judgments=judgments,
+        )
+
+
+def _check_questions_are_the_output_fields(*, question_names: list[str], output_class: type[StuffContent]) -> None:
+    """Refuse an output class whose fields are not exactly the questions' names, naming every name on either side."""
+    field_names = list(output_class.model_fields)
+    unasked_fields = [field_name for field_name in field_names if field_name not in question_names]
+    homeless_questions = [question_name for question_name in question_names if question_name not in field_names]
+    if not unasked_fields and not homeless_questions:
+        return
+    complaints: list[str] = []
+    if unasked_fields:
+        complaints.append(f"no question answers its fields {', '.join(repr(field_name) for field_name in unasked_fields)}")
+    if homeless_questions:
+        complaints.append(f"it has no field for the questions {', '.join(repr(question_name) for question_name in homeless_questions)}")
+    msg = (
+        f"A judgment asking several questions fills the field of each question's name, and the output class '{output_class.__name__}' "
+        f"does not hold exactly the questions' fields: {'; '.join(complaints)}."
+    )
+    raise JudgmentOutputFieldsError(msg)
+
+
+async def _ask_judgment(
+    *,
+    memory: WorkingMemory,
+    prompt_content: UserPromptContent,
+    questions: dict[str, JudgmentQuestion],
+    judgment_setting: JudgmentSetting,
+    job_metadata: JobMetadata,
+    cogt_run_params: CogtRunParams,
+    templating_style: TemplatingStyle,
+) -> _AskedJudgment:
+    """One request to the judging model: the evidence assembled, every question rendered as a `BASIC` template, all sent in one job."""
+    with job_metadata.log_context():
+        assembled_prompt = await assemble_user_prompt(prompt_content=prompt_content, context_provider=memory, templating_style=templating_style)
+        judgment_prompt = JudgmentPrompt(text=assembled_prompt.text, images=assembled_prompt.images, documents=assembled_prompt.documents)
+        context = memory.generate_context()
+        asked_questions: dict[str, JudgmentQuestion] = {}
+        for question_key, question in questions.items():
+            rendered_question = await render_template(
+                template=question.instructions,
+                category=TemplateCategory.BASIC,
+                context=context,
+                templating_style=templating_style,
+            )
+            asked_questions[question_key] = question.model_copy(update={"instructions": rendered_question})
+        judgment_assignment = JudgmentAssignment(
+            job_metadata=job_metadata,
+            cogt_run_params=cogt_run_params,
+            prompt=judgment_prompt,
+            questions=asked_questions,
+            judgment_setting=judgment_setting,
+        )
+        outcomes = await get_content_generator().make_judgment_answers(judgment_assignment=judgment_assignment)
+        return _AskedJudgment(prompt=judgment_prompt, questions=asked_questions, outcomes=outcomes)
 
 
 def make_verdict_content(

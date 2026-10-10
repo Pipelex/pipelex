@@ -20,6 +20,13 @@ class PipeJudgeTestCases:
 
     SEVERITY_LABELS: ClassVar[list[str]] = ["Cosmetic", "Degraded", "Blocking"]
 
+    # The questions the triage asks about the urgent message, by name, exactly as sent.
+    TRIAGE_QUESTIONS: ClassVar[dict[str, str]] = {
+        "urgent": "Does this message need an answer today?",
+        "team": "Which team should handle this message?",
+        "severity": "How severe is the problem this message reports?",
+    }
+
     # The verdicts a live judgment returns, measured on the deck's default judgment model.
     EXPECTED_URGENT_PROBABILITY: ClassVar[float] = 0.98
     EXPECTED_BILLING_PROBABILITY: ClassVar[float] = 1.0

@@ -3164,6 +3164,51 @@ components:
         has no effect on this arm (unlike `rendered_markdown`, which rides both arms because failure
 
         text is exactly what a human surface wants).'
+    JudgeQuestionBlueprint:
+      properties:
+        question:
+          type: string
+          title: Question
+        options:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          title: Options
+        levels:
+          anyOf:
+          - items:
+              anyOf:
+              - type: string
+              - $ref: '#/components/schemas/JudgeRatingLevel'
+            type: array
+          - type: 'null'
+          title: Levels
+        criteria:
+          anyOf:
+          - $ref: '#/components/schemas/JudgeYesNoCriteria'
+          - type: 'null'
+        threshold:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Threshold
+      additionalProperties: false
+      type: object
+      required:
+      - question
+      title: JudgeQuestionBlueprint
+      description: 'One question of a PipeJudge asking several: what it asks, and the fields the single form sets on the pipe.
+
+
+        Closed, as the standard requires: `question` is the instruction, a plain text template, and the kind
+
+        is decided by which of `options` and `levels` the question declares, under the single form''s rules,
+
+        which `PipeJudgeBlueprint` checks, since a refusal names the question and only its key in `questions`
+
+        does. That key also names the output field holding its verdict.'
     JudgeRatingLevel:
       properties:
         label:
@@ -5226,8 +5271,17 @@ components:
           type: string
           title: Prompt
         question:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
           title: Question
+        questions:
+          anyOf:
+          - additionalProperties:
+              $ref: '#/components/schemas/JudgeQuestionBlueprint'
+            type: object
+          - type: 'null'
+          title: Questions
         model:
           anyOf:
           - $ref: '#/components/schemas/JudgmentSetting'
@@ -5266,19 +5320,23 @@ components:
       - description
       - output
       - prompt
-      - question
       title: PipeJudgeBlueprint
-      description: 'Asks a judging model one closed question about the evidence its prompt presents: yes/no, a choice, or
-        a rating.
+      description: 'Asks a judging model closed questions about the evidence its prompt presents: yes/no, a choice, or a rating.
 
 
         `prompt` is the evidence template, rendered and checked as a PipeLLM''s prompt is, the images and
 
-        documents it reads presented to the model as files. `question` is the instruction, a plain text
+        documents it reads presented to the model as files. The single form asks one `question`, a plain
 
-        template. The kind is decided by which of `options` and `levels` the pipe declares, never by a
+        text template, and produces its verdict native; the multi form asks the several `questions` of a
 
-        field of its own. Every declared input is read by the prompt or by the question.'
+        table keyed by name over the same evidence in one request, and fills a structure whose fields are
+
+        those names with one verdict each. A question''s kind is decided by which of `options` and `levels`
+
+        it declares, never by a field of its own, and the single form declares them on the pipe. Every
+
+        declared input is read by the prompt or by a question.'
     PipeLLMBlueprint:
       properties:
         source:

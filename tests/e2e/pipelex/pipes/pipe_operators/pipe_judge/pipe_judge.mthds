@@ -1,5 +1,17 @@
 domain      = "pipe_judge_e2e"
-description = "Test PipeJudge with one question of each kind, each asked about the evidence its prompt presents"
+description = "Test PipeJudge with one question of each kind, each asked about the evidence its prompt presents, and with several asked at once"
+
+[concept.Team]
+description = "The team that handles a message"
+refines     = "Choice"
+
+[concept.MessageTriage]
+description = "What a triage of an inbox message found"
+
+[concept.MessageTriage.structure]
+urgent   = { type = "concept", concept_ref = "YesNo", description = "Whether the message needs an answer today", required = true }
+team     = { type = "concept", concept_ref = "Team", description = "The team that should handle the message", required = true }
+severity = { type = "concept", concept_ref = "Rating", description = "How severe the problem the message reports is" }
 
 [pipe.judge_urgent_e2e]
 type = "PipeJudge"
@@ -79,6 +91,34 @@ A bug report filed by a user:
 @report
 """
 question = "How severe is the bug this report describes?"
+levels = [
+  { label = "Cosmetic", description = "nothing stops working" },
+  { label = "Degraded", description = "a workaround exists" },
+  { label = "Blocking", description = "users cannot do their work at all" },
+]
+
+[pipe.triage_message_e2e]
+type = "PipeJudge"
+description = "Triage a message: whether it is urgent, which team handles it, and how severe its problem is"
+inputs = { message = "Text" }
+output = "MessageTriage"
+model = "@default-judgment"
+prompt = """
+A message from someone writing to the inbox:
+@message
+"""
+
+[pipe.triage_message_e2e.questions.urgent]
+question  = "Does this message need an answer today?"
+criteria  = { yes = "Something is broken or blocked for the sender right now", no = "The sender can wait for a reply" }
+threshold = 0.7
+
+[pipe.triage_message_e2e.questions.team]
+question = "Which team should handle this message?"
+options  = { billing = "Charges, invoices, refunds and subscriptions", technical = "Errors, outages and features that do not work", other = "" }
+
+[pipe.triage_message_e2e.questions.severity]
+question = "How severe is the problem this message reports?"
 levels = [
   { label = "Cosmetic", description = "nothing stops working" },
   { label = "Degraded", description = "a workaround exists" },

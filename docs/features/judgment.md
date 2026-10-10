@@ -16,10 +16,11 @@ Many steps of a method come down to a closed question: is this message urgent, w
 - **Three kinds of question** — A yes/no question with criteria for both answers, a choice among declared options, or a rating on a scale of declared levels, each with a label, a description or both, the kind read from the fields the pipe declares
 - **Measured probabilities** — Each verdict carries the probabilities the model measured, so a method can act on how sure it is as well as on what it decided
 - **Thresholds** — A yes/no question can declare the probability at or above which its verdict is yes
+- **Several questions in one request** — A step can ask several questions about the same evidence, each of its own kind, and fill a structure with one verdict per question, each in the field of its question's name
 - **The evidence is a prompt** — The model judges what the step's prompt renders and nothing else, so the author decides what it sees, down to one field of a larger value; the images and documents the prompt reads are sent as files to a model that reads them
 - **Labels on a rating** — When the scale's levels carry labels, the verdict carries the label of the level chosen, copied from the declaration
-- **No verdict from a refusal** — A model that declines to answer fails the step with an error naming the pipe and the model, rather than a verdict read off its silence
-- **Checked when the method loads** — A step with no model, an input neither its prompt nor its question reads, an output that disagrees with its kind of question, or a file its prompt reads that its model does not is refused before any run spends anything
+- **No verdict from a refusal** — A model that declines to answer fails the step with an error naming the pipe and the model, rather than a verdict read off its silence; a step asking several questions leaves the declined question's field holding nothing instead when that field is optional with no default, and fails when it is required or carries a `default_value`
+- **Checked when the method loads** — A step with no model, an input neither its prompt nor its questions read, an output that disagrees with its kind of question or a structure whose fields are not exactly its questions, or a file its prompt reads that its model does not is refused before any run spends anything
 
 ## Usage in Pipelines
 

@@ -19,7 +19,7 @@ from pipelex.system.job_metadata import JobMetadata, RunMetadata
 
 
 class FakeJudgmentWorker(JudgmentWorkerAbstract):
-    """A worker that answers whatever it was told to, including the wrong thing, and records whether it was reached."""
+    """A worker that answers whatever it was told to, including the wrong thing, and records the jobs it was given."""
 
     def __init__(
         self,
@@ -33,10 +33,12 @@ class FakeJudgmentWorker(JudgmentWorkerAbstract):
         self._answers = answers or {}
         self._raises = raises
         self.was_called = False
+        self.judged_jobs: list[JudgmentJob] = []
 
     @override
     async def _judge(self, judgment_job: JudgmentJob) -> dict[str, JudgmentOutcome]:
         self.was_called = True
+        self.judged_jobs.append(judgment_job)
         if self._raises is not None:
             raise self._raises
         return self._answers

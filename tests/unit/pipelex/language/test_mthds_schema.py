@@ -292,12 +292,50 @@ class TestMthdsSchemaGeneration:
             pytest.param({"question": "is it?"}, False, id="question-alone"),
             pytest.param({"prompt": "@message"}, False, id="prompt-alone"),
             pytest.param({}, False, id="neither"),
+            pytest.param(
+                {
+                    "prompt": "@message",
+                    "questions": {"urgent": {"question": "is it?", "threshold": 0.7}, "team": {"question": "who?", "options": {"a": ""}}},
+                },
+                True,
+                id="prompt-and-questions",
+            ),
+            pytest.param(
+                {"prompt": "@message", "question": "is it?", "questions": {"urgent": {"question": "is it?"}}}, False, id="question-and-questions"
+            ),
+            pytest.param({"prompt": "@message", "questions": {}}, False, id="no-question-in-questions"),
+            pytest.param({"prompt": "@message", "questions": {"urgent": {"threshold": 0.7}}}, False, id="question-table-without-question"),
+            pytest.param(
+                {"prompt": "@message", "questions": {"urgent": {"question": "is it?", "prompt": "@message"}}}, False, id="unknown-key-in-a-question"
+            ),
+            pytest.param(
+                {"prompt": "@message", "questions": {"urgent": {"question": "is it?"}}, "threshold": 0.7}, False, id="threshold-on-the-pipe"
+            ),
+            pytest.param(
+                {"prompt": "@message", "questions": {"urgent": {"question": "is it?"}}, "options": {"a": ""}}, False, id="options-on-the-pipe"
+            ),
+            pytest.param(
+                {"prompt": "@message", "questions": {"urgent": {"question": "is it?"}}, "levels": ["a", "b"]}, False, id="levels-on-the-pipe"
+            ),
+            pytest.param(
+                {"prompt": "@message", "questions": {"urgent": {"question": "is it?"}}, "criteria": {"yes": "y", "no": "n"}},
+                False,
+                id="criteria-on-the-pipe",
+            ),
+            pytest.param(
+                {"prompt": "@message", "questions": {"severity": {"question": "how bad?", "levels": [{"label": "Low"}, "High"]}}},
+                False,
+                id="a-question-labelling-some-levels-only",
+            ),
         ],
     )
     def test_pipe_judge_takes_its_evidence_prompt_and_its_question(
         self, schema: dict[str, Any], judge_fields: dict[str, Any], should_validate: bool
     ) -> None:
-        """A PipeJudge writes the evidence in `prompt` and asks about it in `question`, both required, as its blueprint reads them."""
+        """A PipeJudge writes the evidence in `prompt` and asks about it in one `question` or several `questions`, as its blueprint reads them.
+
+        Asking several, the kind fields go on each question, never on the pipe, and `questions` holds at least one question.
+        """
         validator = _pipe_union_oneof_validator(schema)
         table = {"type": "PipeJudge", "description": "A judge", "output": "YesNo", **judge_fields}
         assert validator.is_valid(table) is should_validate, f"{sorted(judge_fields)} should {'' if should_validate else 'not '}validate"

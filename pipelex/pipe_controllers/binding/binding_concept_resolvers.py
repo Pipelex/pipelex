@@ -36,7 +36,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.native.pinned_blueprints import make_pinned_native_blueprint
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.qualified_ref import QualifiedRef
-from pipelex.core.stuffs.non_null_any import field_admits_none
+from pipelex.core.stuffs.non_null_any import class_field_may_hold_nothing
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.libraries.concept.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
@@ -306,11 +306,7 @@ class LibraryConceptWalkResolver(ConceptWalkResolver):
         return WalkableConcept(concept_ref=concept_key, shape=ConceptShape.STRUCTURE, fields=walkable_fields)
 
     def _walkable_field_from_class_field(self, *, name: str, field_info: FieldInfo, package_alias: str | None) -> WalkableField:
-        # A class states what a field may hold through its annotation: one that admits `None` may hold nothing, whether it
-        # is required or has a default, and so does one left unrequired with no default. `NonNullAny` is the one `Any` that
-        # refuses `None`, as a generated class spells a required open field.
-        is_nullable = field_admits_none(field_info=field_info)
-        may_hold_nothing = is_nullable or (not field_info.is_required() and field_info.default is None and field_info.default_factory is None)
+        may_hold_nothing = class_field_may_hold_nothing(field_info=field_info)
         annotation, _ = _strip_optional(annotation=field_info.annotation)
         is_list = get_origin(annotation) is list
         if is_list:

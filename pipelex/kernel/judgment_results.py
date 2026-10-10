@@ -1,4 +1,4 @@
-"""What a kernel judgment call hands back.
+"""What a kernel judgment call hands back, for a judgment asking one question and for one asking several.
 
 Four intermediates ride along because the kernel is where they are produced and the interpreter's
 execution-graph tracer records them: the assembled evidence prompt, the rendered question, the
@@ -12,7 +12,7 @@ the base `StuffContent`, so use `kajson` rather than a plain `model_dump()`.
 
 from pydantic import BaseModel, ConfigDict
 
-from pipelex.cogt.judgment.judgment_models import JudgmentAnswer, JudgmentPrompt
+from pipelex.cogt.judgment.judgment_models import JudgmentAnswer, JudgmentOutcome, JudgmentPrompt
 from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -38,3 +38,37 @@ class JudgmentResult(BaseModel):
     judgment_setting: JudgmentSetting
     answer: JudgmentAnswer
     threshold_applied: bool | None = None
+
+
+class QuestionJudgment(BaseModel):
+    """What became of one question of a judgment asking several.
+
+    `rendered_question` is the question as the model was asked it. `outcome` is the judging model's raw
+    outcome: an answer, which carries a distribution the verdict native's rendering does not show, or a
+    refusal, which left the question's field absent. `threshold_applied` reads as `JudgmentResult`'s does
+    for this question, and is `None` for a refusal.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    rendered_question: str
+    outcome: JudgmentOutcome
+    threshold_applied: bool | None = None
+
+
+class MultiJudgmentResult(BaseModel):
+    """The outcome of a kernel judgment call asking several questions over one evidence.
+
+    `content` is the output structure, holding the verdict native of each question in the field of its
+    name, a refused question's field holding nothing. `prompt` is the evidence as the model was
+    given it, and `judgments` says, by question name, what each question was asked as and what the model
+    answered, refusals included.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    memory: WorkingMemory
+    content: StuffContent
+    prompt: JudgmentPrompt
+    judgment_setting: JudgmentSetting
+    judgments: dict[str, QuestionJudgment]
