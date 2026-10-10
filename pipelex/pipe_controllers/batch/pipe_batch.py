@@ -102,19 +102,22 @@ class PipeBatch(PipeController):
     ) -> None:
         batch_params = pipe_run_params.batch_params or self.batch_params or BatchParams.make_default()
         input_list_stuff_name = batch_params.input_list_stuff_name
+        # The list is named as its author wrote it, never by the private name a sequence binds a dotted `batch_over` under.
+        list_label = batch_params.input_list_label
         if not self.inputs.is_variable_existing(variable_name=input_list_stuff_name):
-            msg = f"Batch input list named '{input_list_stuff_name}' is not in PipeBatch '{self.code}' input requirements: {self.inputs}"
+            input_names = ", ".join(f"'{input_name}'" for input_name in self.inputs.variables) or "none"
+            msg = f"The list '{list_label}' that PipeBatch '{self.code}' batches over is not among its inputs: {input_names}."
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
         if not working_memory.is_stuff_exists(input_list_stuff_name):
-            msg = f"Input list stuff '{input_list_stuff_name}' required by this PipeBatch '{self.code}' not found in working memory"
+            msg = f"The list '{list_label}' that PipeBatch '{self.code}' batches over is not in working memory."
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
         input_stuff = working_memory.get_stuff(input_list_stuff_name)
         if not isinstance(input_stuff.content, ListContent):
             msg = (
-                f"Input list stuff '{input_list_stuff_name}' of PipeBatch '{self.code}' must be ListContent, "
-                f"got {input_stuff.stuff_name or 'unnamed'} = {type(input_stuff.content)}. stuff: {input_stuff}"
+                f"The value '{list_label}' that PipeBatch '{self.code}' batches over is not a list: it holds a "
+                f"'{input_stuff.concept.concept_ref}', and a batch runs its pipe once per item of a list."
             )
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 

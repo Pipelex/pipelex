@@ -681,6 +681,8 @@ class PipeSequence(PipeController):
         """
         last_step = self.sequential_sub_pipes[-1]
         last_step_concept: Concept
+        # How the messages below name the last step after "the last step", each form carrying its own leading separator: a binding
+        # step as written is an appositive, set off by commas, while a pipe step's code is a plain name.
         last_step_label: str
         is_last_step_output_optional: bool
         effective_last_step_output_multiplicity: VariableMultiplicity | None
@@ -693,7 +695,7 @@ class PipeSequence(PipeController):
                 self._refuse_escaping_absence(taint_analysis=self._analyze_taint(visited_pipes=None, typed_flow=typed_flow))
                 return
             last_step_concept = binding_spec.concept
-            last_step_label = f"the {last_step.label}"
+            last_step_label = f", the {last_step.label},"
             # A binding's own maybe-absence is the taint pass's to report, as its result's taint.
             is_last_step_output_optional = False
             effective_last_step_output_multiplicity = binding_spec.multiplicity
@@ -704,7 +706,7 @@ class PipeSequence(PipeController):
                 return
             last_step_pipe = get_required_pipe(pipe_code=last_step_pipe_code)
             last_step_concept = last_step_pipe.output.concept
-            last_step_label = f"'{last_step_pipe.code}'"
+            last_step_label = f" '{last_step_pipe.code}'"
             # What the step stores under its result, resolved exactly the way the run path and the typed flow resolve it
             # (`SubPipe.result_spec`): the pipe's declared multiplicity with the step's `nb_output` or `multiple_output`
             # override, or, for a batched step, the variable list of its branches' results, whatever count it asks for.
@@ -737,7 +739,7 @@ class PipeSequence(PipeController):
         if not get_concept_library().is_compatible(tested_concept=last_step_concept, wanted_concept=self.output.concept):
             msg = (
                 f"PipeSequence concept mismatch: the output concept '{last_step_concept.concept_ref}' "
-                f"of the last step {last_step_label} of sequence pipe '{self.code}' "
+                f"of the last step{last_step_label} of sequence pipe '{self.code}' "
                 f"is not compatible with the output concept '{self.output.concept.concept_ref}' of the sequence."
             )
             raise PipeValidationError(
@@ -758,7 +760,7 @@ class PipeSequence(PipeController):
             declared_output_ref = self.output.to_bundle_representation(relative_to_domain=self.domain_code)
             msg = (
                 f"PipeSequence output multiplicity mismatch: the sequence '{self.code}' declares its output as "
-                f"'{declared_output_ref}', but its last step {last_step_label} yields '{expected_output_ref}'. "
+                f"'{declared_output_ref}', but its last step{last_step_label} yields '{expected_output_ref}'. "
                 f"Update the sequence's output to '{expected_output_ref}' (or change the last step)."
             )
             raise PipeValidationError(
