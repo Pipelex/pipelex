@@ -83,19 +83,15 @@ class GoogleLLMWorker(LLMWorkerAbstract):
         try:
             # First, try to use the loop captured at creation time if it's still running
             if self._event_loop is not None and self._event_loop.is_running():
-                # Schedule cleanup on the captured loop and store reference to prevent garbage collection
-                task = self._event_loop.create_task(self.genai_async_client.aclose())
-                # Add a callback to log any errors that occur during cleanup
-                task.add_done_callback(lambda done: GoogleFactory.log_client_close_failure(close_task=done))
+                # Schedule cleanup on the captured loop
+                GoogleFactory.schedule_client_close(event_loop=self._event_loop, close_coroutine=self.genai_async_client.aclose())
                 return
 
             # Otherwise, try to get the current running loop
             try:
                 current_loop = asyncio.get_running_loop()
-                # Schedule cleanup on the current running loop and store reference to prevent garbage collection
-                task = current_loop.create_task(self.genai_async_client.aclose())
-                # Add a callback to log any errors that occur during cleanup
-                task.add_done_callback(lambda done: GoogleFactory.log_client_close_failure(close_task=done))
+                # Schedule cleanup on the current running loop
+                GoogleFactory.schedule_client_close(event_loop=current_loop, close_coroutine=self.genai_async_client.aclose())
             except RuntimeError:
                 # No running event loop, we can safely use asyncio.run()
                 try:
