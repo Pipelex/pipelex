@@ -9,9 +9,11 @@ from pipelex.tools.jinja2.exceptions import Jinja2ContextError
 from pipelex.tools.jinja2.html_renderable import HtmlRenderable
 from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
+from pipelex.tools.jinja2.jinja2_render_budget import DEFAULT_RENDER_BUDGET_UNITS, RenderBudget, active_render_budget
 from pipelex.tools.jinja2.renderable_dispatch import type_implements
 from pipelex.tools.jinja2.tag_renderable import TagRenderable
 from pipelex.tools.jinja2.text_format_renderable import TextFormatRenderable
+from pipelex.tools.markdown.markdown_formatting import FormattedMarkdown, format_markdown_within_budget
 from pipelex.tools.markdown.markdown_parser import render_markdown_as_html
 from pipelex.tools.templating.templating_style import TagStyle
 from pipelex.tools.templating.text_format import TextFormat
@@ -217,3 +219,27 @@ def markdown_to_html(value: Any) -> Markup:
     # `str()` of a strict undefined raises, and of a lenient one is empty.
     source_text = value if isinstance(value, str) else str(value)
     return Markup(render_markdown_as_html(source_text))  # ruff: ignore[unsafe-markup-use] - raw HTML in the source is escaped by the parser
+
+
+def markdown_to_formatted(value: Any) -> FormattedMarkdown:
+    """Read a text as Markdown for a document engine to print: the `markdown` filter of plain-data templates.
+
+    It is for Markdown held in a text field, such as an invoice's notes, in a template a document engine fills itself,
+    such as a Word template's tags. It reads its value as the HTML templates' filter does (`markdown_to_html`): None
+    gives nothing, a text is read as Markdown, anything else as its string form, and an undefined value prints the way
+    the template prints one anywhere else, which fails a strict template's render.
+
+    The result is a `FormattedMarkdown` (`markdown_formatting.py`, which the document engine contract names in
+    `pipelex/cogt/doc_gen/formatted_markdown.py`), which the engine's `finalize` turns into its own form when it
+    prints, which prints as its plain text where nothing does, and which is false when it holds nothing, as for None
+    or a blank text. The conversion is charged to the render's budget, or, called outside any render, to a budget of
+    its own, as large as one render's.
+    """
+    if value is None:
+        return FormattedMarkdown(blocks=[])
+    # `str()` of a strict undefined raises, and of a lenient one is empty.
+    source_text = value if isinstance(value, str) else str(value)
+    budget = active_render_budget()
+    if budget is None:
+        budget = RenderBudget(total=DEFAULT_RENDER_BUDGET_UNITS)
+    return format_markdown_within_budget(markdown_text=source_text, budget=budget)
