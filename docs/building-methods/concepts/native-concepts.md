@@ -264,7 +264,7 @@ class RatingContent(StuffContent):
     position: float | None = None  # a continuous position, from 0 to the last level's index
 ```
 
-A `Rating`'s `label` is not a measure. The MTHDS standard defines it as the name of the selected level, when the scale declares labels. A `PipeJudge` declares no labelled levels yet, so a `Rating` it produces carries no `label`; a `PipeLLM` whose output is `Rating`, or any other producer, may fill it like any optional member. The `level` stays the verdict either way.
+A `Rating`'s `label` is not a measure. The MTHDS standard defines it as the name of the selected level, when the scale declares labels. A `PipeJudge` whose levels carry labels fills it with the label of the level it chose, copied from its declaration, and one whose levels carry none leaves it absent; a `PipeLLM` whose output is `Rating`, or any other producer, may fill it like any optional member. The `level` stays the verdict either way.
 
 A `Choice` renders as its key, and a `Rating` as its label when it has one and as its level otherwise, so `$team` in a later prompt reads `billing`, and `$severity` reads `Workaround available` for a rating carrying that label and `1` for one carrying none. Branch on them with a `PipeCondition`: `expression = "team.choice"` routes by the key, and `expression = "'severe' if severity.level >= 2 else 'mild'"` by the level, which every `Rating` has, labelled or not.
 

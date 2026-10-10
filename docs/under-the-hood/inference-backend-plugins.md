@@ -268,6 +268,12 @@ What an out-of-tree backend plugin imports *is* the contract. The published surf
 | `SearchResultContent` | `pipelex.core.stuffs.search_result_content` | a search result |
 | `DocumentContent` | `pipelex.core.stuffs.document_content` | a source document a search result cites |
 | `JudgmentWorkerAbstract` | `pipelex.cogt.judgment.judgment_worker_abstract` | the judgment worker contract |
+| `JudgmentJob` | `pipelex.cogt.judgment.judgment_job` | the judgment job: one prompt, and the questions asked about it by key |
+| `JudgmentPrompt` | `pipelex.cogt.judgment.judgment_models` | the evidence a judgment presents: the rendered prompt text, with the images and documents it numbers |
+| `JudgmentKind`, `JudgmentQuestion`, `YesNoQuestion`, `YesNoCriteria`, `ChoiceQuestion`, `RatingQuestion`, `RatingLevel` | `pipelex.cogt.judgment.judgment_models` | the closed questions a judgment asks: yes/no with optional criteria for both sides, a choice among described options, a rating on a scale of levels each with a label, a description or both |
+| `JudgmentAnswer`, `YesNoAnswer`, `ChoiceAnswer`, `RatingAnswer`, `JudgmentRefusal`, `JudgmentOutcome` | `pipelex.cogt.judgment.judgment_models` | what a judgment worker returns per question: an answer of the question's kind, or a refusal when the model declines it |
+| `PromptImage` | `pipelex.cogt.image.prompt_image` | an image a prompt presents, by URI, inline or as bytes |
+| `PromptDocument` | `pipelex.cogt.document.prompt_document` | a document a prompt presents, by URI, inline or as bytes |
 | `DocGenWorkerAbstract` | `pipelex.cogt.doc_gen.doc_gen_worker_abstract` | the document-generation worker contract |
 | `RenderJob`, `RenderedDocument`, `RenderResources`, `LoadedResource` | `pipelex.cogt.doc_gen.render_job` | the job a document engine prints, the file it returns, and how it reads a file the document names, with that file's media type |
 | `NbTokensByCategoryDict`, `TokenCategory` | `pipelex.cogt.usage.token_category` | the token usage a worker reports |
@@ -276,6 +282,7 @@ What an out-of-tree backend plugin imports *is* the contract. The published surf
 | `BaseModelTypeVar` | `pipelex.tools.typing.pydantic_utils` | the schema type variable of a structured-output signature |
 | `CogtError`, `SdkTypeError`, `ImgGenGenerationError`, `ImgGenParameterError`, `InferenceErrorCategory` | `pipelex.cogt.exceptions` | the inference error bases and categories a worker raises with |
 | `LLMCapabilityError` | `pipelex.cogt.exceptions` | a request the model refuses, raised by an LLM request check |
+| `JudgmentJobFailureError`, `JudgmentModelNotFoundError`, `JudgmentCapabilityError`, `JudgmentAnswerMismatchError` | `pipelex.cogt.exceptions` | the judgment family's errors a worker raises: a failed call, a model the service does not serve, a file the model cannot read, answers that do not match the questions |
 
 A worker implements the provider half of a call, `_gen_text` or `_extract_pages` for instance, and records the usage the provider answered with on its job's report. The base around it logs the event every call ends with, `Inference call ends`, with that usage, its cost, its duration and its outcome, so a worker logs nothing for the call itself (see [Summary events](../tools/logging.md#summary-events)). A provider that bills by the request or by the page rather than by the token is recorded with `record_unit_priced_usage(tokens_usage=…, pricing_unit=PricingUnit.REQUEST, nb_units=1)`, which writes each unit as a million tokens in and out so the per-million rates price one unit, and marks the usage so the event keeps the call's cost and writes no token counts; a worker never writes those counts itself.
 
