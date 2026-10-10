@@ -20,17 +20,24 @@ bytes it produces, and can produce far more than it reads, so it is charged befo
 character of its source and every cell of its tables (`table_cells_bound`), since the table rule pads a short
 row with empty cells; and its output, bounded from the parsed tokens (`html_length_bound`), must fit what is
 left before it renders, since a reference link's destination and title are written once and printed at
-every link that uses the reference.
+every link that uses the reference. The formatting a document engine prints from (`markdown_formatting.py`) is
+charged the same way, so both parse through `charged_parse`, which holds that order.
+
+A converter that walks the syntax tree rather than the flat tokens, the built-in PDF engine and that formatting,
+builds it with `markdown_syntax_tree`, which caps how deep inline markup nests first (`cap_inline_nesting`):
+markdown-it caps the nesting of blocks, but not that of emphasis, and the tree and every walk of it recurse once
+per level, so four hundred nested `*a ` would overflow Python's stack.
 """
 
 import re
 from collections.abc import Sequence
 from functools import cache
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any, Final, NamedTuple, Protocol
 
 from markdown_it import MarkdownIt
+from markdown_it.tree import SyntaxTreeNode
 
-from pipelex.tools.jinja2.jinja2_render_budget import MARKDOWN_UNITS_PER_CHARACTER, active_render_budget
+from pipelex.tools.jinja2.jinja2_render_budget import MARKDOWN_UNITS_PER_CHARACTER, RenderBudget, active_render_budget
 
 if TYPE_CHECKING:
     from markdown_it.rules_inline import StateInline
@@ -51,6 +58,10 @@ _LINE_ENDING: Final = re.compile(r"\r\n?|\n")
 
 # What a table's delimiter row is made of, once its container's indentation and `>` markers are left out.
 _DELIMITER_ROW_CHARACTERS: Final = frozenset("|-: \t")
+
+# How deep inline markup may nest in a syntax tree, emphasis inside emphasis inside a link, an image's alt text one
+# level below the image: far beyond what a written text nests, and far within Python's stack for a walk of the tree.
+MAX_INLINE_NESTING: Final = 50
 
 
 @cache
@@ -107,15 +118,83 @@ def render_markdown_as_html(markdown_text: str) -> str:
     if budget is None:
         html: str = parser.render(markdown_text)
         return html
-    # The length first: the table scan reads every line, so it runs only once the source is affordable.
-    budget.charge(units=MARKDOWN_UNITS_PER_CHARACTER * len(markdown_text), operation=_CONVERTING)
-    budget.charge(units=MARKDOWN_UNITS_PER_CHARACTER * table_cells_bound(markdown_text=markdown_text), operation=_CONVERTING)
-    env: dict[str, Any] = {}
-    tokens = parser.parse(markdown_text, env)
-    budget.afford(units=html_length_bound(tokens=tokens), operation=_CONVERTING)
-    rendered: str = parser.renderer.render(tokens, parser.options, env)
+    parsed = charged_parse(markdown_text=markdown_text, budget=budget, operation=_CONVERTING, output_bound=html_length_bound)
+    rendered: str = parser.renderer.render(parsed.tokens, parser.options, parsed.env)
     budget.charge(units=len(rendered), operation=_CONVERTING)
     return rendered
+
+
+class TokensBound(Protocol):
+    """At most the work units of what a conversion builds out of parsed tokens, taken without building it."""
+
+    def __call__(self, *, tokens: Sequence["Token"]) -> int: ...
+
+
+class ParsedMarkdown(NamedTuple):
+    """A Markdown text's tokens, and the environment the parser filled, holding its reference definitions."""
+
+    tokens: list["Token"]
+    env: dict[str, Any]
+
+
+def charged_parse(*, markdown_text: str, budget: RenderBudget, operation: str, output_bound: TokensBound) -> ParsedMarkdown:
+    """Parse a Markdown text for a conversion charged to `budget`, refusing it at the first step the budget cannot afford.
+
+    In this order: its length, before anything reads it, since the table scan reads every line; then the cells of its
+    tables, before the parser pads them (`table_cells_bound`); then the parse; and then what the conversion builds out
+    of the tokens, bounded from them by `output_bound`, must fit what is left. The caller builds its output and
+    charges what it built.
+
+    Raises:
+        RenderBudgetExceededError: a step would overdraw the budget, `operation` naming the conversion.
+    """
+    budget.charge(units=MARKDOWN_UNITS_PER_CHARACTER * len(markdown_text), operation=operation)
+    budget.charge(units=MARKDOWN_UNITS_PER_CHARACTER * table_cells_bound(markdown_text=markdown_text), operation=operation)
+    env: dict[str, Any] = {}
+    tokens = get_markdown_parser().parse(markdown_text, env)
+    budget.afford(units=output_bound(tokens=tokens), operation=operation)
+    return ParsedMarkdown(tokens=tokens, env=env)
+
+
+def markdown_syntax_tree(*, tokens: Sequence["Token"]) -> SyntaxTreeNode:
+    """The syntax tree of parsed tokens, their inline nesting capped first (`cap_inline_nesting`)."""
+    cap_inline_nesting(tokens=tokens)
+    return SyntaxTreeNode(tokens)
+
+
+def cap_inline_nesting(*, tokens: Sequence["Token"]) -> None:
+    """Drop the inline markup of `tokens` that nests deeper than `MAX_INLINE_NESTING`, keeping its text.
+
+    markdown-it caps the nesting of blocks at twenty, but emphasis is paired up after its delimiters are read, so it
+    nests as deep as the text asks: four hundred `*a ` before a word and four hundred ` c*` after it nest four hundred
+    deep. The cap walks the flat tokens, each inline token's children and each image's, the alt text, one level below
+    the image; past it, an opening token is dropped with its closing one, and an image keeps no children, printing its
+    alt text as written. The tokens are changed in place.
+    """
+    pending: list[tuple[Token, int]] = [(token, 0) for token in tokens if token.children]
+    while pending:
+        parent, depth = pending.pop()
+        kept: list[Token] = []
+        # For each opening token not yet closed, whether it was dropped, so its closing token is dropped with it.
+        open_dropped: list[bool] = []
+        for child in parent.children or []:
+            if child.nesting > 0:
+                is_dropped = depth >= MAX_INLINE_NESTING
+                open_dropped.append(is_dropped)
+                if is_dropped:
+                    continue
+                depth += 1
+            elif child.nesting < 0 and open_dropped:
+                if open_dropped.pop():
+                    continue
+                depth -= 1
+            if child.children:
+                if depth + 1 > MAX_INLINE_NESTING:
+                    child.children = None
+                else:
+                    pending.append((child, depth + 1))
+            kept.append(child)
+        parent.children = kept
 
 
 def table_cells_bound(*, markdown_text: str) -> int:
