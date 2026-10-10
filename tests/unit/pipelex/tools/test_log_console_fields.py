@@ -11,6 +11,8 @@ from pipelex.tools.log.console_fields import (
     FIELD_KEY_STYLE,
     FIELD_STYLES,
     FIELD_VALUE_MAX_LENGTH,
+    FINDING_MESSAGE_FIELD,
+    LEFT_CUT_FIELDS,
     TRUNCATION_MARK,
     UNMAPPED_FIELD_STYLE,
 )
@@ -165,6 +167,65 @@ class TestConsoleFields:
 
         assert text.plain.endswith(f"error.message={'y' * (ERROR_MESSAGE_MAX_LENGTH - len(TRUNCATION_MARK))}{TRUNCATION_MARK}")
         assert "y" * ERROR_MESSAGE_MAX_LENGTH not in text.plain
+
+    @pytest.mark.parametrize("path_field", sorted(LEFT_CUT_FIELDS))
+    def test_a_long_path_is_cut_at_its_start_so_the_file_name_stays(self, path_field: str) -> None:
+        """Cut at its end, a long path kept the directory every line of a run shares and lost the file's name."""
+        long_path = "/Users/someone/projects/acme/" + "nested-directory/" * 8 + "invoice_template_v2.docx"
+        text = rendered_text(record=record_with_fields(message="Read", extra={path_field: long_path, "excerpt": "x" * 500}))
+
+        kept_tail = long_path[len(long_path) - FIELD_VALUE_MAX_LENGTH + len(TRUNCATION_MARK) :]
+        assert f"{path_field}={TRUNCATION_MARK}{kept_tail} " in text.plain
+        assert kept_tail.endswith("/invoice_template_v2.docx")
+        assert "/Users/someone" not in text.plain
+        assert text.plain.endswith(f"excerpt={'x' * (FIELD_VALUE_MAX_LENGTH - len(TRUNCATION_MARK))}{TRUNCATION_MARK}")
+
+    @pytest.mark.parametrize(
+        ("topic", "file_name"),
+        [
+            ("a space", "file fake=value.txt"),
+            ("an equals sign", "file=fake.txt"),
+        ],
+    )
+    def test_a_long_quoted_path_is_cut_before_it_is_quoted_so_its_quotes_stay_balanced(self, topic: str, file_name: str) -> None:
+        """Cut after quoting, the path lost its opening quote, and its tail read as a pair of its own: ``file.path=…/file fake=value.txt"``."""
+        long_path = "/Users/someone/projects/acme/" + "nested-directory/" * 8 + file_name
+        text = rendered_text(record=record_with_fields(message="Read", extra={"file.path": long_path, "attempt": 2}))
+
+        kept_tail = long_path[len(long_path) - FIELD_VALUE_MAX_LENGTH + len(TRUNCATION_MARK) :]
+        assert text.plain.endswith(f'file.path="{TRUNCATION_MARK}{kept_tail}" attempt=2'), topic
+        assert kept_tail.endswith(f"/{file_name}"), topic
+
+    def test_a_long_quoted_value_is_cut_before_it_is_quoted_so_its_closing_quote_stays(self) -> None:
+        """Cut after quoting, a long spaced value lost its closing quote, and every pair after it read as part of it."""
+        excerpt = "two words " * 20
+        text = rendered_text(record=record_with_fields(message="Read", extra={"excerpt": excerpt, "attempt": 2}))
+
+        kept_head = excerpt[: FIELD_VALUE_MAX_LENGTH - len(TRUNCATION_MARK)]
+        assert text.plain.endswith(f'excerpt="{kept_head}{TRUNCATION_MARK}" attempt=2')
+
+    def test_a_cut_never_splits_an_escape(self) -> None:
+        """A quote escaped at the cut kept its backslash and lost the quote, and the backslash then escaped the closing one."""
+        excerpt = "x" * (FIELD_VALUE_MAX_LENGTH - len(TRUNCATION_MARK) - 1) + '"' + "y" * 40
+        text = rendered_text(record=record_with_fields(message="Read", extra={"excerpt": excerpt, "attempt": 2}))
+
+        assert text.plain.endswith(f'excerpt="{"x" * (FIELD_VALUE_MAX_LENGTH - len(TRUNCATION_MARK) - 1)}\\"{TRUNCATION_MARK}" attempt=2')
+
+    def test_a_short_path_is_written_whole(self) -> None:
+        text = rendered_text(record=record_with_fields(message="Read", extra={"file.path": "/repo/.pipelex/pipelex.toml"}))
+
+        assert text.plain.endswith("file.path=/repo/.pipelex/pipelex.toml")
+
+    def test_a_template_finding_gets_the_error_message_cut(self) -> None:
+        """The finding is the actionable part of a PipeDocGen template warning, and the common cut lost it to a fragment."""
+        finding = "The placeholder 'invoice.lines' is read as a list but the step's input 'invoice' declares it a single " + "Line; " * 20
+        flood = "z" * (2 * ERROR_MESSAGE_MAX_LENGTH)
+        whole = rendered_text(record=record_with_fields(message="Checked", extra={FINDING_MESSAGE_FIELD: finding}))
+        flooded = rendered_text(record=record_with_fields(message="Checked", extra={FINDING_MESSAGE_FIELD: flood}))
+
+        assert len(finding) > FIELD_VALUE_MAX_LENGTH
+        assert whole.plain.endswith(f'{FINDING_MESSAGE_FIELD}="' + finding.replace('"', '\\"') + '"')
+        assert flooded.plain.endswith(f"{FINDING_MESSAGE_FIELD}={'z' * (ERROR_MESSAGE_MAX_LENGTH - len(TRUNCATION_MARK))}{TRUNCATION_MARK}")
 
     def test_a_field_is_styled_by_its_name_and_a_field_outside_the_map_is_dimmed(self) -> None:
         text = rendered_text(

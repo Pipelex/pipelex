@@ -30,12 +30,8 @@ from pipelex.methods.exceptions import (
 )
 from pipelex.methods.fetching import fetch_method_package
 from pipelex.methods.method_ref import MethodRef, looks_like_method_ref, parse_method_ref
-from pipelex.methods.structures_check import (
-    STRUCTURES_REFUSAL_REMEDY,
-    STRUCTURES_REFUSAL_RULE,
-    describe_structured_content_violations,
-    scan_structured_content_classes,
-)
+from pipelex.methods.structures_check import describe_structured_content_violations, scan_structured_content_classes
+from pipelex.system.telemetry.otel_constants import OTelLogAttr
 
 # The remedy every refusal ends with. It names no directory: on a host, the runtime's own store is not the caller's to write.
 MANUAL_INSTALL_HINT = "install the package where this runtime runs (for example with `mthds install <address>`)"
@@ -87,8 +83,8 @@ def find_vendored_method(*, full_address: str, methods_dirs: list[Path]) -> Inst
         version = vendored.manifest.version
         if lookup.ref.tag not in {version, f"v{version}"}:
             log.warning(
-                f"Method '{lookup.ref.address}' is shipped with the request at version {version} while the reference pins "
-                f"'@{lookup.ref.tag}'; using the shipped copy."
+                "A method reference pins a tag, and the copy shipped with the request is another version, which is used",
+                fields={"method_ref": lookup.ref.ref_str, "package_version": version},
             )
     return vendored
 
@@ -99,13 +95,13 @@ def _warn_on_tag_mismatch(*, installed: InstalledMethod, ref: MethodRef | None) 
         return
     if installed.provenance is not None and installed.provenance.tag == ref.tag:
         return
-    if installed.provenance is None:
-        installed_desc = "of unrecorded provenance"
-    else:
-        installed_desc = f"fetched at tag '{installed.provenance.tag}'" if installed.provenance.tag else "fetched with no tag"
+    mismatch_fields: dict[str, str | None] = {"method_ref": ref.ref_str, OTelLogAttr.FILE_PATH: str(installed.path)}
+    if installed.provenance is not None:
+        # Absent when the copy's provenance was never recorded, and None when the copy was fetched with no tag.
+        mismatch_fields["installed_tag"] = installed.provenance.tag
     log.warning(
-        f"Method '{ref.address}' is already installed at '{installed.path}' ({installed_desc}) while the reference pins "
-        f"'@{ref.tag}'; using the installed copy. Remove '{installed.path}' to re-fetch at the pinned tag."
+        "A method reference pins a tag the installed copy was not fetched at, so the installed copy is used; removing it re-fetches the pinned tag",
+        fields=mismatch_fields,
     )
 
 
@@ -190,10 +186,11 @@ def resolve_address_based_method(
 
         violations = scan_structured_content_classes(package_dir=fetched.package_dir)
         if violations:
-            details = describe_structured_content_violations(violations=violations)
+            # The remedy is in the message, which the console never cuts; `STRUCTURES_REFUSAL_REMEDY` says it at length in the refusal.
             log.warning(
-                f"Method '{fetched.full_address}' declares Python structure classes ({details}). It runs locally, but "
-                f"{STRUCTURES_REFUSAL_RULE} — hosted execution would refuse it. {STRUCTURES_REFUSAL_REMEDY}"
+                "A fetched method declares Python structure classes: it runs locally, but hosted execution refuses them, "
+                "so declare these types as MTHDS concepts with inline structures",
+                fields={"package_address": fetched.full_address, "structure_classes": describe_structured_content_violations(violations=violations)},
             )
 
         name = fetched.manifest.name or fetched.package_dir.name
@@ -210,5 +207,8 @@ def resolve_address_based_method(
     finally:
         shutil.rmtree(clone_dir, ignore_errors=True)
 
-    log.info(f"Fetched method '{fetched.full_address}' at commit {fetched.commit_sha} and installed it into '{installed.path}'")
+    log.info(
+        "Fetched a method package and installed it",
+        fields={"package_address": fetched.full_address, "commit_sha": fetched.commit_sha, OTelLogAttr.FILE_PATH: str(installed.path)},
+    )
     return installed

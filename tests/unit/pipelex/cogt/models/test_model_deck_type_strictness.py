@@ -1,7 +1,9 @@
 """The deck's own bindings and refusals hold a bare handle to the model type it is named for."""
 
 import pytest
+from pytest_mock import MockerFixture
 
+from pipelex import log
 from pipelex.cogt.config_cogt import ModelDeckConfig
 from pipelex.cogt.exceptions import ImgGenHandleNotFoundError, LLMHandleNotFoundError, ModelChoiceNotFoundError, ModelDeckPresetValidatonError
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
@@ -123,6 +125,36 @@ class TestModelDeckTypeStrictness:
 
         with pytest.raises(ModelDeckPresetValidatonError, match=r"Failed to validate all LLM presets: LLM preset 'painter': .* but not as an LLM"):
             model_deck.validate_registered_models()
+
+    def test_a_deck_that_logs_its_unresolvable_presets_warns_once_per_model_type_with_the_same_fields(self, mocker: MockerFixture) -> None:
+        """Each model type's refusal is logged through one helper, so every one of them names its type, preset and model alike."""
+        model_deck = _make_deck(
+            llm_presets={"painter": LLMSetting(model="img-painter", temperature=0.5)},
+            img_gen_presets={"writer": ImgGenSetting(model="claude-x")},
+            missing_presets_reaction=ProblemReaction.LOG,
+        )
+        warning_spy = mocker.patch.object(log, "warning")
+
+        model_deck.validate_registered_models()
+
+        assert [call.args for call in warning_spy.call_args_list] == [("A preset of the model deck names a model the deck cannot resolve",)] * 2
+        llm_fields, img_gen_fields = [call.kwargs["fields"] for call in warning_spy.call_args_list]
+        assert llm_fields == {
+            "model_type": ModelType.LLM,
+            "preset_id": "painter",
+            "model_handle": "img-painter",
+            "error.type": "LLMHandleNotFoundError",
+            "error.message": "LLM preset 'painter': Model handle 'img-painter' is served by the model deck, but not as an LLM",
+        }
+        assert img_gen_fields == {
+            "model_type": ModelType.IMG_GEN,
+            "preset_id": "writer",
+            "model_handle": "claude-x",
+            "error.type": "ImgGenHandleNotFoundError",
+            "error.message": (
+                "Image generation preset 'writer': Model handle 'claude-x' is served by the model deck, but not as an image-generation model"
+            ),
+        }
 
     def test_an_llm_override_naming_an_image_generation_model_is_refused_with_the_llms_alone(self) -> None:
         model_deck = _make_deck()

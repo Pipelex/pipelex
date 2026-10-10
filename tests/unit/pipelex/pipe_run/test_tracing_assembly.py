@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import UTC, datetime
 
 import pytest
@@ -15,6 +16,7 @@ from pipelex.pipe_run.tracing_assembly import TracingAssembly, assemble_tracing,
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.tools.log.log_context import PIPELINE_RUN_ID_FIELD, REQUEST_ID_FIELD, get_log_context
 from pipelex.tracing.exceptions import EventLogReadError, EventLogSetupError
 from pipelex.tracing.trace_events import UsageReportEvent
 
@@ -168,6 +170,29 @@ class TestTracingAssembly:
         assert result.graph_assembly_error is not None
         assert result.usage_assembly_error is not None
         event_log.close.assert_called_once()
+
+    def test_a_line_it_logs_names_the_run_when_nothing_bound_it(self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture) -> None:
+        """The durable-execution activity `act_assemble_tracing` runs this under no binding of the run.
+
+        The assembly's lines dropped `pipeline_run_id` from their fields on the assumption that the run's context binds
+        it, which holds under `PipeRun` and not in the activity, so an activity's failed read named no run at all.
+        """
+        self._enable_tracing(mocker)
+        event_log = mocker.MagicMock()
+        event_log.read_events = mocker.MagicMock(side_effect=OSError("file vanished"))
+        mocker.patch(f"{_MODULE}.make_event_log", return_value=event_log)
+        run_metadata = RunMetadata(
+            storage_scope="test/scope", read_scope=None, user_id="tracing-assembly-test", pipeline_run_id="plr-activity", request_id="req-activity"
+        )
+        assert get_log_context() is None
+
+        with caplog.at_level(logging.WARNING, logger=_MODULE):
+            assemble_tracing(pipeline_run_id="plr-activity", assemble_graph=True, assemble_usage=True, run_metadata=run_metadata)
+
+        (record,) = [record for record in caplog.records if record.getMessage() == "Tracing assembly could not read the run's trace events"]
+        assert getattr(record, PIPELINE_RUN_ID_FIELD) == "plr-activity"
+        assert getattr(record, REQUEST_ID_FIELD) == "req-activity"
+        assert get_log_context() is None, "the binding is released when the assembly returns"
 
     def test_make_event_log_setup_error_is_caught(self, mocker: MockerFixture) -> None:
         """A construction-time backend failure degrades instead of aborting the run.

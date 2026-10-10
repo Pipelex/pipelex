@@ -60,6 +60,7 @@ class TestTheMarkupSettingRetirement:
         assert project_file.read_text(encoding="utf-8") == FILE_SETTING_MARKUP, "a boot writes nothing"
         parked = loader.take_stale_configuration_warning()
         assert parked is not None
-        assert str(project_file) in parked
-        assert "The console reads no log message as markup" in parked
-        assert "Run `pipelex migrate`" in parked
+        (stale_file,) = parked.files
+        assert stale_file.file_path == project_file
+        assert any("The console reads no log message as markup" in step for step in stale_file.migration_steps)
+        assert stale_file.is_reached_by_migrate

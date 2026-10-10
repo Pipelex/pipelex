@@ -263,7 +263,10 @@ class PipeRunParams(BaseModel):
             # pipe fails — a mismatch here should not happen in normal flow. We log rather than
             # raise: this runs inside run_pipe()'s `finally`, where raising would mask the
             # in-flight exception.
-            log.error(f"Pipe code '{pipe_code}' was not the last pipe in the stack, it was '{popped_pipe_code}'")
+            log.error(
+                "The pipe stack is unbalanced: the pipe popped is not the last one pushed",
+                fields={"pipe_code": pipe_code, "popped_pipe_code": popped_pipe_code},
+            )
 
     def push_pipe_layer(self, pipe_code: str) -> None:
         if self.pipe_layers and self.pipe_layers[-1] == pipe_code:

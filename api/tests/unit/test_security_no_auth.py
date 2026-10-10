@@ -1,9 +1,12 @@
+import logging
 from typing import Annotated
 
 import pytest
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 from pipelex.system.storage_scope import SINGLE_TENANT_USER_ID
+from pipelex.system.telemetry.otel_constants import OTelLogAttr
+from pipelex.tools.log.log_fields import carried_attributes
 from pytest_mock import MockerFixture
 
 from pipelex_api.exception_handlers import register_exception_handlers
@@ -110,7 +113,7 @@ class TestNoAuthForwardedHeaders:
             "a:99999",  # URI port delimiter
         ],
     )
-    def test_path_unsafe_forwarded_user_id_rejected(self, mocker: MockerFixture, unsafe_user_id: str):
+    def test_path_unsafe_forwarded_user_id_rejected(self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture, unsafe_user_id: str):
         r"""A forwarded `X-User-Id` that is not a single path-safe segment fails closed.
 
         `user_id` is the owner segment of every storage key, so a value
@@ -123,10 +126,21 @@ class TestNoAuthForwardedHeaders:
         mocker.patch("pipelex_api.security.get_optional_env", return_value="true")
         client = _build_client()
         headers: dict[str, str] = {ForwardedIdentityHeader.USER_ID: unsafe_user_id}
-        response = client.get(RoutePath.WHOAMI, headers=headers)
+        with caplog.at_level(logging.WARNING):
+            response = client.get(RoutePath.WHOAMI, headers=headers)
         assert response.status_code == 400
         assert response.headers["content-type"] == "application/problem+json"
         assert response.json()["error_type"] == "BadRequest"
+        # The refused header names no caller, so it is never logged as `user.id`, nor logged at all: anyone reaching
+        # the server could otherwise have any text recorded as a user.
+        (record,) = [
+            record
+            for record in caplog.records
+            if record.getMessage() == "A forwarded X-User-Id is not a path-safe segment, and the request is refused"
+        ]
+        carried = carried_attributes(record=record)
+        assert OTelLogAttr.USER_ID not in carried
+        assert unsafe_user_id not in carried.values()
 
     @pytest.mark.parametrize(
         "opaque_user_id",

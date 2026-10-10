@@ -19,7 +19,6 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from pipelex import log
 from pipelex.core.validation import report_validation_error
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_surface import (
@@ -142,5 +141,5 @@ def _telemetry_config_the_ledger_can_explain(
         telemetry_config = TelemetryConfig.model_validate(substituted)
     except (UnknownVarPrefixError, ValidationError):
         return None
-    log.warning(stale_configuration_warning(plans=replayed.plans, walked_dirs=config_manager.existing_config_dirs))
+    stale_configuration_warning(plans=replayed.plans, walked_dirs=config_manager.existing_config_dirs).emit()
     return telemetry_config

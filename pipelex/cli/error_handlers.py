@@ -76,6 +76,22 @@ def print_traceback_if_requested(*, console: Console) -> None:
         console.print(Traceback())
 
 
+def print_unexpected_failure(*, console: Console, title: str, exc: BaseException) -> None:
+    """Print a command's own report of an unexpected failure: the title, then the exception's type and message.
+
+    The catcher logs the failure at ERROR with its traceback, which the `console` sink renders under the line and a
+    structured sink writes to its log store. This report is the CLI's output, not a log record, so the terminal names
+    the cause whatever the sink and the level: under the `json` sink writing to a file, or a level above ERROR, it is
+    the only place the person running the command reads it. It prints no traceback, which the `console` sink already
+    shows under the log line.
+    """
+    exception_text = str(exc)
+    cause = f"{type(exc).__name__}: {exception_text}" if exception_text else type(exc).__name__
+    console.print(f"\n[bold red]{escape(title)}[/bold red]\n")
+    # The cause is plain text, a type such as `list[int]` included, so it is escaped before Rich reads markup in it.
+    console.print(f"  {escape(cause)}\n")
+
+
 def display_error_panel(
     *, console: Console, title: str, fields: list[tuple[str, str]], error_message: str | None, tip: str, links: list[tuple[str, str]]
 ) -> None:

@@ -17,6 +17,7 @@ from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
 from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.misc.async_utils import gather_bounded
 from pipelex.urls import URLs
 
@@ -29,6 +30,27 @@ if TYPE_CHECKING:
 # When a single PipeBatch fans out over more than this many items, log a one-time advisory pointing at
 # durable execution — bounded fan-out is a basic backpressure effort, not durable, rate-limited execution.
 LARGE_BATCH_ADVISORY_THRESHOLD = 100
+
+
+def warn_of_large_batch(*, pipe_code: str, item_count: int, max_concurrency: int | None) -> None:
+    """Advise a durable execution backend for a batch past ``LARGE_BATCH_ADVISORY_THRESHOLD`` items.
+
+    Each case has its own message, which says what the fan-out is: bounded, it is backpressure, and unbounded it is not
+    even that. ``max_concurrency`` is always an integer, so a log query reads one type: it is absent from the line when
+    the configuration's ``"unbounded"`` resolved to no bound at all.
+    """
+    if max_concurrency is None:
+        log.warning(
+            "A PipeBatch fans out over a large list with unbounded fan-out, which is neither backpressure nor durable execution; "
+            "for a workload this size, consider a durable execution backend for rate-limited, resumable runs",
+            fields={"pipe_code": pipe_code, "item_count": item_count, OTelLogAttr.URL_FULL: URLs.durable_execution},
+        )
+        return
+    log.warning(
+        "A PipeBatch fans out over a large list with bounded fan-out, which is backpressure and not durable execution; "
+        "for a workload this size, consider a durable execution backend for rate-limited, resumable runs",
+        fields={"pipe_code": pipe_code, "item_count": item_count, "max_concurrency": max_concurrency, OTelLogAttr.URL_FULL: URLs.durable_execution},
+    )
 
 
 class PipeBatch(PipeController):
@@ -133,12 +155,7 @@ class PipeBatch(PipeController):
         # `PipeRunParams.batch_max_concurrency`.
         max_concurrency = pipe_run_params.batch_max_concurrency
         if item_count > LARGE_BATCH_ADVISORY_THRESHOLD:
-            log.warning(
-                f"PipeBatch '{self.code}' is fanning out over {item_count} items. Bounded fan-out "
-                f"(max_concurrency={max_concurrency if max_concurrency is not None else 'unbounded'}) is a basic backpressure "
-                f"effort, not durable execution — for a workload this size, consider a durable execution backend for "
-                f"rate-limited, resumable runs: {URLs.durable_execution}"
-            )
+            warn_of_large_batch(pipe_code=self.code, item_count=item_count, max_concurrency=max_concurrency)
 
         item_concept = self.inputs.get_required_stuff_spec(input_list_stuff_name).concept
 

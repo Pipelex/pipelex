@@ -20,6 +20,7 @@ from pipelex.core.pipes.pipe_io_artifacts import (
 from pipelex.graph.mermaidflow.mermaid_html import render_mermaid_html_async, render_mermaid_html_with_data_async
 from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
 from pipelex.graph.reactflow.reactflow_html import generate_reactflow_html_async
+from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.misc.string_utils import snake_to_title_case
 
 if TYPE_CHECKING:
@@ -204,7 +205,10 @@ def save_graph_outputs_to_dir(
             # directory would describe this graph's data with another method's declarations. Said out
             # loud, because the agent CLI's directory is the user's own bundle directory.
             file_path.unlink()
-            log.warning(f"Removed {file_name} at {file_path}: the graphspec written beside it carries no I/O artifacts of its own")
+            log.warning(
+                "Removed an I/O artifact an earlier run left beside the graphspec, which carries none of its own",
+                fields={OTelLogAttr.FILE_PATH: str(file_path)},
+            )
 
     if graph_outputs.mermaidflow_mmd is not None:
         file_path = output_dir / "mermaidflow.mmd"

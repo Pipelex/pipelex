@@ -18,6 +18,7 @@ import pytest
 from pydantic import BaseModel
 
 from pipelex.system.configuration.config_loader import ConfigLoader
+from pipelex.tools.log.console_fields import ERROR_MESSAGE_MAX_LENGTH, FIELD_VALUE_MAX_LENGTH, FINDING_MESSAGE_FIELD
 from pipelex.tools.log.json_log_sink import EXCEPTION_KEY, LOGGER_KEY, MESSAGE_KEY, SEVERITY_KEY, TIME_KEY, JsonLogFormatter, JsonLogSink
 from pipelex.tools.log.log import Log
 from pipelex.tools.log.log_config import LogConfig
@@ -90,6 +91,23 @@ class TestJsonLogSink:
         assert "pipe_run_id" not in scanned
         assert structured[DATA_FIELD] == {"key": "value", "nested": {"flag": True}}
         assert structured[MESSAGE_KEY].startswith("Config:")
+
+    def test_the_console_s_cuts_never_reach_a_structured_line(self, json_log: tuple[Log, io.StringIO]) -> None:
+        """The console cuts a long value, a path at its start and a template finding past its own length; the json sink writes each whole."""
+        fresh, buffer = json_log
+        long_path = "/Users/someone/projects/acme/" + "nested-directory/" * 8 + "invoice_template_v2.docx"
+        long_finding = "The placeholder 'invoice.lines' is read as a list " + "z" * (2 * ERROR_MESSAGE_MAX_LENGTH)
+        long_excerpt = "x" * (2 * FIELD_VALUE_MAX_LENGTH)
+
+        fresh.warning(
+            "Checked", fields={"file.path": long_path, "template_file": long_path, FINDING_MESSAGE_FIELD: long_finding, "excerpt": long_excerpt}
+        )
+
+        (checked,) = _own_lines(buffer)
+        assert checked["file.path"] == long_path
+        assert checked["template_file"] == long_path
+        assert checked[FINDING_MESSAGE_FIELD] == long_finding
+        assert checked["excerpt"] == long_excerpt
 
     def test_a_field_value_carrying_a_newline_is_still_one_line_and_forges_nothing(self, json_log: tuple[Log, io.StringIO]) -> None:
         """Redaction neutralises the control characters in a field value before the sink writes it, so a caller cannot forge a line or a field."""

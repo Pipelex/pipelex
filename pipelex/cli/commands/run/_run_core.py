@@ -23,6 +23,7 @@ from pipelex.cli.error_handlers import (
     handle_model_choice_error,
     handle_validate_bundle_error,
     print_traceback_if_requested,
+    print_unexpected_failure,
 )
 from pipelex.config import get_config
 from pipelex.core.concepts.exceptions import ConceptValueError
@@ -566,10 +567,13 @@ def execute_run(
 
     except Exception as exc:
         # CLI command root: any unexpected failure is reported to the user and exits non-zero via typer.Exit.
-        log.error(f"Error executing pipeline: {exc}")
-        console = get_console()
-        console.print("\n[bold red]Failed to execute pipeline[/bold red]\n")
-        console.print_exception(show_locals=True)
+        # This is the catcher every re-raised failure hands its traceback to, so the traceback rides the log record,
+        # where the `console` sink renders it under the line and the `json` and `otlp` sinks write it to the log
+        # store; printing it on the console as well would show it twice. The CLI's own output names the exception's
+        # type and message, so the terminal says why the run failed whatever the sink and the level. The console
+        # renders no locals unless the configuration asks it to, since they hold the run's working memory.
+        print_unexpected_failure(console=get_console(), title="Failed to execute pipeline", exc=exc)
+        log.error("The pipeline could not be executed", include_exception=True)
         raise typer.Exit(1) from exc
 
     finally:

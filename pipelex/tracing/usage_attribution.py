@@ -227,7 +227,7 @@ def _walk_subtree(
         if node_id in subtree_by_node:
             continue
         if node_id in in_progress:
-            log.warning(f"Cycle in graph node parentage at '{node_id}'; subtree usage rollup will be incomplete")
+            log.warning("The node parentage of a graph has a cycle, so a subtree's usage rollup is incomplete", fields={"node_id": node_id})
             continue
 
         in_progress.add(node_id)

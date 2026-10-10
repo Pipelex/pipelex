@@ -9,10 +9,12 @@ execution-locus gate refuses Python where it must, and each resolution failure m
 distinct `error_type` + status as RFC 7807 `problem+json`.
 """
 
+import logging
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pipelex.methods.exceptions import MethodFetchError
@@ -106,6 +108,36 @@ class TestMethodRefRun:
             "tag": "v0.1.0",
             "commit_sha": STUB_METHOD_COMMIT_SHA,
         }
+
+    @pytest.mark.parametrize(
+        ("method_ref", "expected_tag"),
+        [
+            (_METHOD_REF, "v0.1.0"),
+            (STUB_METHOD_ADDRESS, None),
+        ],
+    )
+    def test_the_resolution_line_names_the_tag_and_the_commit_the_run_executes(
+        self,
+        mocker: MockerFixture,
+        install_method_package: Callable[..., Path],
+        caplog: pytest.LogCaptureFixture,
+        method_ref: str,
+        expected_tag: str | None,
+    ):
+        """An operator reads off this line which version of the package a hosted run executed."""
+        install_method_package(files={"documents.mthds": VALID_MTHDS})
+        client, _ = _build_client(mocker)
+
+        with caplog.at_level(logging.INFO, logger="pipelex_api.method_source"):
+            response = client.post("/v1/execute", json={"method_ref": method_ref, "inputs": {"text": "hi"}})
+
+        assert response.status_code == 200, response.text
+        (resolution_record,) = [record for record in caplog.records if record.getMessage() == "A method_ref was resolved to a package"]
+        record_fields = vars(resolution_record)
+        assert record_fields["method_ref"] == method_ref
+        assert record_fields["package_address"] == STUB_METHOD_ADDRESS
+        assert record_fields["fetched_tag"] == expected_tag
+        assert record_fields["commit_sha"] == STUB_METHOD_COMMIT_SHA
 
     def test_request_pipe_code_overrides_manifest_main_pipe(self, mocker: MockerFixture, install_method_package: Callable[..., Path]):
         install_method_package(files={"documents.mthds": VALID_MTHDS})

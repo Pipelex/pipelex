@@ -24,7 +24,7 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 from pipelex_api.error_types import ErrorType
 from pipelex_api.errors import raise_validation_error
-from pipelex_api.exception_handlers import API_ERROR_EVENT, register_exception_handlers
+from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware
 
 _SHIPPED_PIPELEX_CONFIG = Path(__file__).parents[2] / ".pipelex" / "pipelex.toml"
@@ -54,10 +54,14 @@ def _build_client() -> TestClient:
     return TestClient(RequestIdMiddleware(app))
 
 
+# The message every error line carries, whichever handler produced it: the key the error stream is selected by.
+_ERROR_MESSAGE = "A request ended in an error response"
+
+
 def _api_error_record(caplog: pytest.LogCaptureFixture) -> logging.LogRecord:
-    """The one `api_error` record the request emitted."""
-    records = [record for record in caplog.records if getattr(record, "event", None) == API_ERROR_EVENT]
-    assert len(records) == 1, f"expected exactly one api_error record, got {len(records)}"
+    """The one error record the request emitted."""
+    records = [record for record in caplog.records if record.getMessage() == _ERROR_MESSAGE]
+    assert len(records) == 1, f"expected exactly one error record, got {len(records)}"
     return records[0]
 
 
@@ -88,9 +92,9 @@ class TestErrorLogRecords:
         assert log_section["console_log_target"] == ConsoleTarget.STDERR
         assert log_section["pretty_print_mode"] == PrettyPrintMode.SILENT
 
-    def test_request_id_and_route_ride_the_error_record(self, caplog: pytest.LogCaptureFixture):
+    def test_request_id_and_url_path_ride_the_error_record(self, caplog: pytest.LogCaptureFixture):
         # The two identifiers an operator starts from. `request_id` arrives from the log context
-        # the middleware bound for the request; `route` from the field set the handler ships.
+        # the middleware bound for the request; `url.path` from the field set the handler ships.
         # Neither is interpolated into the message, which is the whole point of the change.
         with caplog.at_level(logging.WARNING):
             response = _build_client().get("/pipelex-failure")
@@ -98,21 +102,20 @@ class TestErrorLogRecords:
         record = _api_error_record(caplog)
         assert record.levelno == logging.ERROR
         assert getattr(record, "request_id", None) == response.headers[REQUEST_ID_HEADER]
-        assert getattr(record, "route", None) == "/pipelex-failure"
-        assert getattr(record, "error_type", None) == "PipelexConfigError"
-        assert record.getMessage() == "API error 500: PipelexConfigError"
+        assert getattr(record, "url.path", None) == "/pipelex-failure"
+        assert getattr(record, "error.type", None) == "PipelexConfigError"
 
     def test_a_caller_mistake_records_a_warning_carrying_the_same_identifiers(self, caplog: pytest.LogCaptureFixture):
-        # A 4xx is a caller mistake, so it lands at `warning` — but it carries the same two
-        # identifiers, so one query over `event` returns the whole error stream of a request.
+        # A 4xx is a caller mistake, so it lands at `warning` — but it carries the same message and
+        # the same two identifiers, so one query over the message returns the whole error stream of a request.
         with caplog.at_level(logging.WARNING):
             response = _build_client().get("/caller-mistake", params={"detail": "the input is malformed"})
         assert response.status_code == 422
         record = _api_error_record(caplog)
         assert record.levelno == logging.WARNING
         assert getattr(record, "request_id", None) == response.headers[REQUEST_ID_HEADER]
-        assert getattr(record, "route", None) == "/caller-mistake"
-        assert getattr(record, "status", None) == 422
+        assert getattr(record, "url.path", None) == "/caller-mistake"
+        assert getattr(record, "http.response.status_code", None) == 422
 
     def test_the_json_sink_writes_one_object_per_line_with_the_fields_flat(self, caplog: pytest.LogCaptureFixture):
         # The shape the runner's configured sink puts on stderr: the sink's own keys, then every
@@ -121,12 +124,12 @@ class TestErrorLogRecords:
             response = _build_client().get("/pipelex-failure")
         payload = _rendered_json(_api_error_record(caplog))
         assert payload["severity"] == "ERROR"
-        assert payload["message"] == "API error 500: PipelexConfigError"
-        assert payload["event"] == API_ERROR_EVENT
+        assert payload["message"] == _ERROR_MESSAGE
+        assert "event" not in payload
         assert payload["request_id"] == response.headers[REQUEST_ID_HEADER]
-        assert payload["route"] == "/pipelex-failure"
-        assert payload["status"] == 500
-        assert payload["error_type"] == "PipelexConfigError"
+        assert payload["url.path"] == "/pipelex-failure"
+        assert payload["http.response.status_code"] == 500
+        assert payload["error.type"] == "PipelexConfigError"
         assert payload["error_domain"] == "config"
         # `retryable` is absent rather than false: pipelex populates it only on a classifiable
         # failure, and a field with no value is dropped rather than written as a null a query
@@ -163,9 +166,9 @@ class TestErrorLogRecords:
         assert response.status_code == 422
         payload = _rendered_json(_api_error_record(caplog))
         assert payload["detail"] == logged_detail
-        assert payload["event"] == API_ERROR_EVENT, "a crafted detail forged or overwrote a field"
-        assert payload["status"] == 422, "a crafted detail forged or overwrote a field"
-        assert crafted_detail not in payload["message"], "caller input reached the message"
+        assert "event" not in payload, "a crafted detail forged a field"
+        assert payload["http.response.status_code"] == 422, "a crafted detail forged or overwrote a field"
+        assert payload["message"] == _ERROR_MESSAGE, "caller input reached the message"
 
     def test_a_credential_echoed_into_a_detail_is_redacted_on_the_line(self, caplog: pytest.LogCaptureFixture):
         # A validation message can echo what the caller sent, header text included. The runtime's

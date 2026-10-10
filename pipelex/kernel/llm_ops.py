@@ -161,7 +161,12 @@ def concrete_llm_model_handle(model: str) -> str:
         match reference.kind:
             case ModelReferenceKind.PRESET | ModelReferenceKind.ALIAS:
                 if current in seen:
-                    log.warning(f"Cycle resolving model reference '{model}' at '{current}'; reporting it unresolved")
+                    # DEBUG, not WARNING: this only feeds a display field, and a run that uses the reference meets
+                    # the same deck through the model deck's own resolution, which reports it there
+                    log.debug(
+                        "A model reference leads back to itself, so it is reported unresolved",
+                        fields={"model_handle": model, "revisited_model_handle": current},
+                    )
                     return current
                 seen.add(current)
                 try:
@@ -173,7 +178,10 @@ def concrete_llm_model_handle(model: str) -> str:
                 current = setting.model
             case ModelReferenceKind.WATERFALL | ModelReferenceKind.HANDLE:
                 return current
-    log.warning(f"Model reference '{model}' did not resolve within {_MAX_MODEL_RESOLUTION_HOPS} hops")
+    log.debug(
+        "A model reference did not resolve within the hop limit, so it is reported unresolved",
+        fields={"model_handle": model, "hop_count": _MAX_MODEL_RESOLUTION_HOPS},
+    )
     return current
 
 

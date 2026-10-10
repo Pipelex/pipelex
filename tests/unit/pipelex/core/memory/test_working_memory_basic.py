@@ -1,6 +1,11 @@
+import pytest
+from pytest_mock import MockerFixture
+
+from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from tests.unit.pipelex.core.memory.conftest import TestWorkingMemoryData
 
@@ -40,3 +45,17 @@ class TestWorkingMemoryBasic:
         empty_memory = WorkingMemoryFactory.make_empty()
         assert len(empty_memory.root) == 0
         assert len(empty_memory.aliases) == 0
+
+    @pytest.mark.parametrize("key", ["_draft", MAIN_STUFF_NAME])
+    def test_a_name_reserved_for_params_warns_once_naming_it(self, mocker: MockerFixture, key: str):
+        """A stuff named with the params underscore warns once, the name as a field, stored under that name or as the main stuff."""
+        warning_mock = mocker.patch("pipelex.core.memory.working_memory.log.warning")
+        stuff = StuffFactory.make_stuff(
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
+            name="_draft",
+            content=TextContent(text="A draft"),
+        )
+
+        WorkingMemory(root={key: stuff})
+
+        warning_mock.assert_called_once_with("A stuff name starts with an underscore, which is reserved for params", fields={"stuff_name": "_draft"})

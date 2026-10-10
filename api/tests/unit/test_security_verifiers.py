@@ -1,5 +1,6 @@
 """Tests for verify_jwt and verify_api_key in api/security."""
 
+import logging
 from typing import Annotated
 
 import jwt
@@ -7,6 +8,8 @@ import pytest
 from fastapi import Depends, FastAPI, Request
 from fastapi.testclient import TestClient
 from pipelex.system.storage_scope import SINGLE_TENANT_USER_ID
+from pipelex.system.telemetry.otel_constants import OTelLogAttr
+from pipelex.tools.log.log_fields import carried_attributes
 from pytest_mock import MockerFixture
 
 from pipelex_api.exception_handlers import register_exception_handlers
@@ -115,6 +118,37 @@ class TestSecurityVerifiers:
         assert response.headers["content-type"] == "application/problem+json"
         assert response.headers["WWW-Authenticate"] == "Bearer"
         assert response.json()["error_type"] == "InvalidToken"
+
+    @pytest.mark.parametrize(
+        ("refused_claim", "expected_claim_type"),
+        [
+            (42, "int"),
+            ({"tenant": "acme"}, "dict"),
+            (["acme"], "list"),
+            ("../etc/passwd", "str"),
+        ],
+    )
+    def test_a_refused_user_id_claim_is_logged_as_its_type_never_as_user_id(
+        self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture, refused_claim: object, expected_claim_type: str
+    ):
+        """`user.id` names an authenticated caller and is a string on every line; a refused claim is neither.
+
+        The line used to carry the claim as decoded under `user.id`, an integer or an object on some lines, which split
+        the field's type, and a value a token issuer put there under a key meaning the caller.
+        """
+        mocker.patch("pipelex_api.security.get_optional_env", return_value=JWT_SECRET)
+        client = _build_jwt_client()
+        token = jwt.encode({"user_id": refused_claim}, JWT_SECRET, algorithm="HS256")
+
+        with caplog.at_level(logging.WARNING):
+            response = client.get(RoutePath.WHOAMI, headers={"Authorization": f"Bearer {token}"})
+
+        assert response.status_code == 401
+        (record,) = [record for record in caplog.records if record.getMessage() == "A JWT's user_id claim is not a path-safe segment"]
+        carried = carried_attributes(record=record)
+        assert carried.get("claim_type") == expected_claim_type
+        assert OTelLogAttr.USER_ID not in carried
+        assert refused_claim not in carried.values()
 
     @pytest.mark.parametrize(
         "opaque_user_id",

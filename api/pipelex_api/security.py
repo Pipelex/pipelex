@@ -14,6 +14,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pipelex import log
 from pipelex.system.environment import get_optional_env
 from pipelex.system.storage_scope import SINGLE_TENANT_USER_ID
+from pipelex.tools.log.error_fields import error_fields
 from pydantic import BaseModel, Field
 
 from pipelex_api.error_types import ErrorType
@@ -124,7 +125,7 @@ def get_auth_mode() -> AuthMode:
     try:
         return AuthMode(raw)
     except ValueError:
-        log.warning(f"Unknown AUTH_MODE '{raw}', falling back to 'none'")
+        log.warning("AUTH_MODE names no known mode, so the server falls back to no authentication", fields={"env_var": "AUTH_MODE", "auth_mode": raw})
         return AuthMode.NONE
 
 
@@ -165,7 +166,9 @@ async def verify_jwt(
             log.warning("JWT missing user_id claim")
             raise_unauthenticated("Invalid token: missing user_id claim", error_type=ErrorType.INVALID_TOKEN)
         if not isinstance(user_id, str) or not is_safe_user_id(user_id):
-            log.warning(f"JWT user_id claim is not a path-safe segment: {user_id!r}")
+            # The claim is refused, so it is not `user.id`, which names an authenticated caller and is always a string:
+            # the line carries the type the claim was decoded as, and never its value.
+            log.warning("A JWT's user_id claim is not a path-safe segment", fields={"claim_type": type(user_id).__name__})
             raise_unauthenticated("Invalid token: user_id claim must be a single path-safe segment", error_type=ErrorType.INVALID_TOKEN)
         if user_id == SINGLE_TENANT_USER_ID:
             # Path-safe, but reserved for the no-user-model deployment. An
@@ -186,7 +189,7 @@ async def verify_jwt(
         log.warning("JWT token has expired")
         raise_unauthenticated("Token expired", error_type=ErrorType.TOKEN_EXPIRED)
     except jwt.InvalidTokenError as exc:
-        log.warning(f"JWT validation failed: {exc!s}")
+        log.warning("A JWT failed validation", fields=error_fields(exc=exc))
         raise_unauthenticated("Invalid token", error_type=ErrorType.INVALID_TOKEN)
 
 
@@ -247,7 +250,8 @@ async def no_auth(request: Request) -> None:
     if not is_safe_user_id(user_id):
         # A non-empty but path-unsafe id: the proxy intended to authenticate
         # someone and sent a malformed value. Fail closed.
-        log.warning(f"Forwarded X-User-Id is not a path-safe segment, rejecting: {user_id!r}")
+        # No value: the header is refused, so it names no caller, and it is whatever text anyone reaching the server sent.
+        log.warning("A forwarded X-User-Id is not a path-safe segment, and the request is refused")
         raise_bad_request("Forwarded X-User-Id must be a single path-safe segment", error_type=ErrorType.BAD_REQUEST)
 
     _set_request_user(request, user_id=user_id)
@@ -262,7 +266,7 @@ async def get_request_user(request: Request) -> RequestUser | None:
     Usage in route handlers:
         async def my_endpoint(user: Annotated[RequestUser | None, Depends(get_request_user)]):
             if user:
-                log.info(f"Request from {user.user_id}")
+                log.debug("Serving a request", fields={OTelLogAttr.USER_ID: user.user_id})
     """
     return getattr(request.state, "user", None)
 

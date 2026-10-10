@@ -269,10 +269,7 @@ class ImgGenArgsFactory:
         match prompt_taxonomy:
             case PromptTaxonomy.POSITIVE_ONLY:
                 if negative_text:
-                    log.warning(
-                        f"A negative prompt was provided but the model's prompt taxonomy is '{PromptTaxonomy.POSITIVE_ONLY}', "
-                        "which does not support negative prompts. The negative prompt will be silently ignored."
-                    )
+                    log.warning("A negative prompt was given to an image model that takes none, so it is ignored")
                 return {"prompt": positive_text}
             case PromptTaxonomy.WITH_NEGATIVE:
                 args_dict: dict[str, Any] = {"prompt": positive_text}
@@ -503,7 +500,10 @@ class ImgGenArgsFactory:
                     acceptable_steps = [1, 2, 4, 8]
                     if num_inference_steps not in acceptable_steps:
                         # TODO: prevent this when building presets and params
-                        log.warning(f"Number of inference steps {num_inference_steps} for SDXL Lightning must be one of {acceptable_steps}")
+                        log.warning(
+                            "SDXL Lightning takes 1, 2, 4 or 8 inference steps, so the requested number is replaced by 4",
+                            fields={"nb_steps": num_inference_steps},
+                        )
                         num_inference_steps = 4
                 else:
                     num_inference_steps = get_config().inference.img_gen.get_num_inference_steps(

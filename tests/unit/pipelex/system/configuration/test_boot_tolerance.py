@@ -36,6 +36,8 @@ from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.system.configuration.config_surface import (
     PIPELEX_CONFIG_SURFACE_ID,
     TELEMETRY_CONFIG_SURFACE_ID,
+    StaleConfigurationFile,
+    StaleConfigurationWarning,
     replay_surface_files_in_memory,
     stale_configuration_warning,
 )
@@ -295,9 +297,76 @@ class TestWhatTheWarningSays:
 
         warning = stale_configuration_warning(plans=plans, walked_dirs=[tmp_path])
 
-        assert str(stale) in warning
-        assert "pipelex migrate" in warning
-        assert "Nothing was written" in warning
+        assert [stale_file.file_path for stale_file in warning.files] == [stale]
+        assert warning.files[0].is_reached_by_migrate
+
+    def test_each_stale_file_is_a_line_of_its_own_with_a_fixed_message(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """The shape the log-call conventions give it: the message names the remedy, the file rides a field.
+
+        One line per file rather than one listing them all, because a field the console cuts at
+        its width cannot carry a list of paths a person has to read, and the message cannot carry
+        them without becoming a different string on every boot. The two files sit on either side
+        of the walk, so the two lines name the two remedies, and neither message mentions a path.
+        """
+        walked = tmp_path / "walked"
+        walked.mkdir()
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        inside_file, inside_plans = self._stale_telemetry_plans(directory=walked)
+        outside_file, outside_plans = self._stale_telemetry_plans(directory=outside)
+        warning_spy = mocker.patch.object(log, "warning")
+
+        stale_configuration_warning(plans=inside_plans + outside_plans, walked_dirs=[walked]).emit()
+
+        assert warning_spy.call_count == 2
+        inside_call, outside_call = warning_spy.call_args_list
+        assert "run `pipelex migrate` to update it" in inside_call.args[0]
+        assert "`pipelex migrate` does not reach it, so update it where it lives" in outside_call.args[0]
+        assert inside_call.kwargs["fields"] == {
+            "file.path": str(inside_file),
+            "migration_steps": ["Nest the flat telemetry settings under [custom_posthog]"],
+            "has_blocked_steps": False,
+        }
+        assert outside_call.kwargs["fields"]["file.path"] == str(outside_file)
+        for call in (inside_call, outside_call):
+            assert str(tmp_path) not in call.args[0]
+
+    @pytest.mark.parametrize(
+        ("topic", "is_reached_by_migrate", "has_blocked_steps", "expected_remedy"),
+        [
+            ("in reach", True, False, "run `pipelex migrate` to update it"),
+            ("in reach, blocked", True, True, "run `pipelex migrate` to update it, and make by hand the changes it reports it cannot apply"),
+            ("out of reach", False, False, "`pipelex migrate` does not reach it, so update it where it lives"),
+            (
+                "out of reach, blocked",
+                False,
+                True,
+                "`pipelex migrate` does not reach it, so update it where it lives, including changes no migration can apply for you",
+            ),
+        ],
+    )
+    def test_each_message_says_nothing_was_written_and_a_blocked_file_says_so(
+        self, tmp_path: Path, mocker: MockerFixture, topic: str, is_reached_by_migrate: bool, has_blocked_steps: bool, expected_remedy: str
+    ) -> None:
+        """The warning used to be one text that said nothing was written, and that some of what a file needs cannot be applied for
+        the user, with `pipelex migrate` reporting it; a fixed message per file must keep saying both.
+        """
+        stale_file = StaleConfigurationFile(
+            file_path=tmp_path / "pipelex.toml",
+            is_reached_by_migrate=is_reached_by_migrate,
+            migration_steps=["Rename the default log level"],
+            has_blocked_steps=has_blocked_steps,
+        )
+        warning_spy = mocker.patch.object(log, "warning")
+
+        StaleConfigurationWarning(files=[stale_file]).emit()
+
+        warning_spy.assert_called_once()
+        message = warning_spy.call_args.args[0]
+        assert message == (
+            f"A configuration file is out of date and was read as if it had been migrated, and nothing was written; {expected_remedy}"
+        ), topic
+        assert warning_spy.call_args.kwargs["fields"]["has_blocked_steps"] is has_blocked_steps
 
     def test_it_says_what_the_ledger_carried_and_nothing_read_from_the_file(self, tmp_path: Path) -> None:
         """Ledger text only, the same rule the migration report obeys — a boot warning is read in
@@ -307,8 +376,8 @@ class TestWhatTheWarningSays:
 
         warning = stale_configuration_warning(plans=plans, walked_dirs=[tmp_path])
 
-        assert "Nest the flat telemetry settings under [custom_posthog]" in warning
-        assert "phc_a_secret_the_user_owns" not in warning
+        assert warning.files[0].migration_steps == ["Nest the flat telemetry settings under [custom_posthog]"]
+        assert "phc_a_secret_the_user_owns" not in repr(warning.files[0].log_fields())
 
     def test_a_file_outside_the_walk_is_not_offered_the_command(self, tmp_path: Path) -> None:
         """`Pipelex.make(config_dir=…)` outside the two walked directories is the live case.
@@ -324,18 +393,15 @@ class TestWhatTheWarningSays:
 
         warning = stale_configuration_warning(plans=plans, walked_dirs=[tmp_path / "global", tmp_path / "project"])
 
-        assert str(stale) in warning
-        assert "Nothing was written" in warning
-        assert "does not reach" in warning
-        assert "yours to update where it lives" in warning
-        assert "Run `pipelex migrate`" not in warning
+        assert [stale_file.file_path for stale_file in warning.files] == [stale]
+        assert not warning.files[0].is_reached_by_migrate
 
     def test_a_walk_of_one_file_in_and_one_out_names_each_side(self, tmp_path: Path) -> None:
-        """The mixed case is reachable, and a single closing sentence would be wrong for one of them.
+        """The mixed case is reachable, and a single remedy would be wrong for one of them.
 
         A load merges tiers from several directories at once — under unit testing it also merges
         this repository's own `tests/pipelex_{run_mode}.toml`, which is outside the walk by design.
-        So the warning splits the files rather than picking one verb for all of them.
+        So each file carries its own reach rather than the load picking one remedy for all of them.
         """
         walked = tmp_path / "walked"
         walked.mkdir()
@@ -346,8 +412,10 @@ class TestWhatTheWarningSays:
 
         warning = stale_configuration_warning(plans=inside_plans + outside_plans, walked_dirs=[walked])
 
-        assert f"Run `pipelex migrate` to bring '{inside_file}' up to date." in warning
-        assert f"`pipelex migrate` does not reach '{outside_file}' — that file is yours to update where it lives." in warning
+        assert [(stale_file.file_path, stale_file.is_reached_by_migrate) for stale_file in warning.files] == [
+            (inside_file, True),
+            (outside_file, False),
+        ]
 
     def test_a_file_in_a_directory_its_own_surface_does_not_own_is_out_of_reach(self, tmp_path: Path) -> None:
         """The walk reaches `inference/backends/` now — but for the surface that owns it, not for any file in it.
@@ -362,8 +430,7 @@ class TestWhatTheWarningSays:
 
         warning = stale_configuration_warning(plans=plans, walked_dirs=[tmp_path])
 
-        assert "does not reach" in warning
-        assert "Run `pipelex migrate`" not in warning
+        assert not warning.files[0].is_reached_by_migrate
 
     def test_a_file_in_the_directory_its_surface_owns_is_in_reach(self, tmp_path: Path, synthetic_migration_dir: Path) -> None:
         """The other half, and the one the fourth surface needs: reach follows the surface's own directory.
@@ -389,8 +456,7 @@ class TestWhatTheWarningSays:
 
         warning = stale_configuration_warning(plans=replayed.plans, walked_dirs=[tmp_path])
 
-        assert "Run `pipelex migrate` to bring the files up to date." in warning
-        assert "does not reach" not in warning
+        assert warning.files[0].is_reached_by_migrate
 
     def test_a_directory_no_surface_owns_stays_out_of_reach(self, tmp_path: Path, synthetic_migration_dir: Path) -> None:
         """`inference/deck/` is beside a directory the walk now enters and is still never entered itself.
@@ -415,8 +481,7 @@ class TestWhatTheWarningSays:
 
         warning = stale_configuration_warning(plans=replayed.plans, walked_dirs=[tmp_path])
 
-        assert "does not reach" in warning
-        assert "Run `pipelex migrate`" not in warning
+        assert not warning.files[0].is_reached_by_migrate
 
     def test_a_file_symlinked_out_of_a_walked_directory_is_still_in_reach(self, tmp_path: Path) -> None:
         """Where the file points is not where the command looks for it.
@@ -439,8 +504,7 @@ class TestWhatTheWarningSays:
         assert replayed is not None
         warning = stale_configuration_warning(plans=replayed.plans, walked_dirs=[walked])
 
-        assert "Run `pipelex migrate` to bring the files up to date." in warning
-        assert "does not reach" not in warning
+        assert warning.files[0].is_reached_by_migrate
 
 
 class TestTheTelemetryLoader:
@@ -456,13 +520,14 @@ class TestTheTelemetryLoader:
         stale = global_dir / "telemetry.toml"
         stale.write_text(old_shape_telemetry_document(), encoding="utf-8")
         before = stale.read_bytes()
-        warning = mocker.patch.object(telemetry_loader_module.log, "warning")
+        warning = mocker.patch.object(log, "warning")
 
         config = load_telemetry_config(secrets_provider=secrets_provider)
 
         assert config.custom_posthog is not None
         assert stale.read_bytes() == before, "a tolerated boot writes nothing"
         assert "pipelex migrate" in warning.call_args.args[0]
+        assert warning.call_args.kwargs["fields"]["file.path"] == str(stale)
 
     def test_a_file_the_ledger_cannot_explain_still_raises(
         self,
@@ -552,7 +617,7 @@ class TestTheMainConfigurationLoader:
         assert config.runtime.log.default_log_level is LogLevel.DEBUG
         parked = loader.take_stale_configuration_warning()
         assert parked is not None
-        assert "pipelex migrate" in parked
+        assert [stale_file.is_reached_by_migrate for stale_file in parked.files] == [True]
         assert loader.take_stale_configuration_warning() is None, "a warning is emitted once"
 
     def test_the_warning_reads_the_walk_off_the_loader_rather_than_deriving_its_own(
@@ -586,8 +651,7 @@ class TestTheMainConfigurationLoader:
 
         parked = loader.take_stale_configuration_warning()
         assert parked is not None
-        assert "does not reach" in parked
-        assert "Run `pipelex migrate`" not in parked
+        assert [stale_file.is_reached_by_migrate for stale_file in parked.files] == [False]
 
     @pytest.mark.usefixtures("fake_dirs")
     def test_a_healthy_configuration_parks_no_warning(self) -> None:

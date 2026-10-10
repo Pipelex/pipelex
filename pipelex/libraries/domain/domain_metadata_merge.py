@@ -4,7 +4,7 @@ from pipelex import log
 def merge_domain_metadata_field(
     *,
     domain_code: str,
-    field_label: str,
+    metadata_field: str,
     established: str | None,
     incoming: str | None,
     show_values_on_conflict: bool,
@@ -26,13 +26,13 @@ def merge_domain_metadata_field(
     - both non-empty and different -> keep the first, **warn** (a genuine double-declaration the author should resolve).
 
     Args:
-        domain_code: The domain these values belong to (used in the warning message).
-        field_label: Singular human-readable field name used in the warning, pluralized with "s"
-            (e.g. "description" -> "descriptions", "system_prompt" -> "system_prompts").
+        domain_code: The domain these values belong to, named in the warning.
+        metadata_field: The name of the domain's field being merged ("description", "system_prompt", "main_pipe"),
+            named in the warning.
         established: The value already merged for this domain (may be empty/None).
         incoming: The value from the file being merged now (may be empty/None).
-        show_values_on_conflict: Whether to include both values in the conflict warning. True for short
-            fields (description); False for long ones (system_prompt) whose contents would flood the log.
+        show_values_on_conflict: Whether the conflict warning carries both values as fields. True for short
+            fields (description); False for a prompt (system_prompt), whose contents a log line never carries.
 
     Returns:
         The merged value (the established value wins on a genuine conflict).
@@ -42,12 +42,8 @@ def merge_domain_metadata_field(
     if not established:
         return incoming
     if established != incoming:
+        conflict_fields: dict[str, str] = {"domain_code": domain_code, "metadata_field": metadata_field}
         if show_values_on_conflict:
-            log.warning(
-                f"Domain '{domain_code}' declared with different {field_label}s: '{established}' vs '{incoming}'. Keeping the first.",
-            )
-        else:
-            log.warning(
-                f"Domain '{domain_code}' declared with different {field_label}s. Keeping the first.",
-            )
+            conflict_fields.update(established_value=established, incoming_value=incoming)
+        log.warning("Two declarations of one domain give one of its fields different values, so the first is kept", fields=conflict_fields)
     return established

@@ -111,6 +111,7 @@ from pipelex.system.telemetry.telemetry_manager_abstract import (
 from pipelex.test_extras.registry_test_models import TestRegistryModels
 from pipelex.tools.jinja2.jinja2_template_loader import TemplateLoader
 from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.package_utils import get_package_info
 from pipelex.tools.misc.pretty import PrettyPrintMode, require_rich_for_rendering
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
@@ -126,6 +127,13 @@ if TYPE_CHECKING:
 PACKAGE_NAME, PACKAGE_VERSION = get_package_info()
 
 _HubSlotImplT = TypeVar("_HubSlotImplT")
+
+
+def _callable_name(*, function: Callable[..., object]) -> str:
+    """A callable as its module and qualified name, which is what names a plugin's callback on a line with no traceback."""
+    qualified_name = getattr(function, "__qualname__", None) or type(function).__qualname__
+    module_name = getattr(function, "__module__", None)
+    return f"{module_name}.{qualified_name}" if module_name else qualified_name
 
 
 BACKEND_LIBRARY_REFUSED: tuple[type[Exception], ...] = (
@@ -251,7 +259,7 @@ class RuntimeBoot(metaclass=MetaSingleton):
         log.configure(log_config=log_config)
         self.runtime_hub.set_pretty_print_mode(mode=log_config.pretty_print_mode)
         if (stale_warning := config_manager.take_stale_configuration_warning()) is not None:
-            log.warning(stale_warning)
+            stale_warning.emit()
 
         # tools
         self.class_registry: ClassRegistryAbstract | None = None
@@ -685,10 +693,15 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         for teardown_callback in reversed(self._plugin_registrar.teardown_callbacks):
             try:
                 teardown_callback()
-            except Exception as teardown_exc:  # ruff: ignore[blind-except]
+            except Exception as callback_error:  # ruff: ignore[blind-except]
                 # (2) a plugin-registered callback is unbounded third-party code; its exception surface
                 # cannot be enumerated, and the remaining callbacks still have resources to release.
-                log.error(f"A plugin teardown callback failed and was skipped: {teardown_exc}")
+                # As fields with no traceback: a failed boot runs these callbacks while its own error propagates,
+                # and Python chains that error onto this one, so a traceback would print the boot error's text.
+                log.error(
+                    "A plugin teardown callback failed, and the remaining callbacks still run",
+                    fields={"callback_name": _callable_name(function=teardown_callback), **error_fields(exc=callback_error)},
+                )
 
     def _teardown_runtime(self) -> None:
         """Release what the runtime boot acquired, and the process-global *state* with it.
@@ -848,10 +861,12 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             if self.telemetry_manager is not None:
                 try:
                     self.telemetry_manager.teardown()
-                except Exception as telemetry_exc:  # ruff: ignore[blind-except]
+                except Exception as teardown_error:  # ruff: ignore[blind-except]
                     # (2) an injected telemetry manager is unbounded code; its exception surface cannot
                     # be enumerated, and the releases below must happen regardless.
-                    log.error(f"Telemetry teardown failed while releasing a failed boot: {telemetry_exc}")
+                    # As fields with no traceback: the boot error is chained onto this one, so a traceback would print
+                    # the boot error's text, which the boot's own caller reports.
+                    log.error("The telemetry teardown failed while a failed boot was being released", fields=error_fields(exc=teardown_error))
             self.runtime_hub.reset_boot_state()
             class_registry_scoping.reset()
             KajsonManager.teardown()
@@ -929,7 +944,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # and the delete-on-failure handler above is behind us, so a reader can never adopt an instance
         # that is about to be removed from the registry.
         runtime_boot.is_ready = True
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} runtime ready")
+        log.debug("The Pipelex runtime is ready", fields={"pipelex_version": PACKAGE_VERSION, "integration_mode": integration_mode})
         return runtime_boot
 
     @classmethod

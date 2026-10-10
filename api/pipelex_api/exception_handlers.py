@@ -27,7 +27,7 @@ every module that imports a handler at once.
 """
 
 import math
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import FastAPI, Request, Response
@@ -36,6 +36,8 @@ from fastapi.responses import JSONResponse
 from pipelex import log
 from pipelex.base_exceptions import DisclosureMode, ErrorDomain, ErrorReport, PipelexError
 from pipelex.plugins.registrar import HttpErrorMapperFn
+from pipelex.system.telemetry.otel_constants import OTelLogAttr
+from pipelex.tools.log.error_fields import ERROR_TYPE_FIELD
 from starlette.requests import ClientDisconnect
 
 from pipelex_api.error_types import ErrorType
@@ -54,10 +56,6 @@ if TYPE_CHECKING:
 # A Starlette/FastAPI async exception handler: `(request, exc) -> response`.
 _ExceptionHandler = Callable[[Request, Exception], Awaitable[Response]]
 
-# The value of the `event` field every error record carries: the one key a log sink filters this
-# server's error stream on, whichever of the handlers below produced the record.
-API_ERROR_EVENT = "api_error"
-
 
 def _user_id_of(request: Request) -> str | None:
     """Return the authenticated caller's id, when one is on the request.
@@ -71,7 +69,7 @@ def _user_id_of(request: Request) -> str | None:
     pre-auth, on the static-API-key surface (no per-caller identity), or for
     `AUTH_MODE=none` without the forwarded-identity opt-in: `_emit_api_error`
     drops `None`-valued fields, so the attribute is absent from the record
-    rather than carried as `user_id: null`.
+    rather than carried as `user.id: null`.
     """
     user: RequestUser | None = getattr(request.state, "user", None)
     return user.user_id if user is not None else None
@@ -110,16 +108,19 @@ def _pipeline_run_id_of(request: Request) -> str | None:
 def _request_fields(request: Request) -> dict[str, Any]:
     """Return the request-scoped attributes every error record carries.
 
-    Single source of truth for the `route` / `user_id` / `pipe_code` /
+    Single source of truth for the `url.path` / `user.id` / `pipe_code` /
     `pipeline_run_id` set, so the three log paths (`_log_error_report`,
-    `_log_api_authored_error`, `handle_unexpected_error`) cannot drift.
+    `_log_api_authored_error`, `handle_unexpected_error`) cannot drift. The
+    path and the caller take their OpenTelemetry keys, the pipe and the run
+    the runtime's own field names, so a query written for the runtime's lines
+    finds these too.
 
     `request_id` is deliberately NOT here. `RequestIdMiddleware` binds it on the
     runtime's log context for the whole request, so it is already an attribute of
     every record emitted underneath — including the ones pipelex emits from inside
     a run, which this module never sees. Repeating it would give one value two
-    sources. `route` is here rather than on that context because the runtime
-    reserves the context for its three run identifiers, and a route path is not
+    sources. The path is here rather than on that context because the runtime
+    reserves the context for its three run identifiers, and a URL path is not
     one of them; a field is the seam it offers for everything else.
 
     Each value is `None` when the corresponding state is not bound on this request;
@@ -127,8 +128,8 @@ def _request_fields(request: Request) -> dict[str, Any]:
     record rather than carried as `pipe_code: null`.
     """
     return {
-        "route": request.url.path,
-        "user_id": _user_id_of(request),
+        "url.path": request.url.path,
+        OTelLogAttr.USER_ID: _user_id_of(request),
         "pipe_code": _pipe_code_of(request),
         "pipeline_run_id": _pipeline_run_id_of(request),
     }
@@ -156,30 +157,20 @@ def _retry_after_header(report: ErrorReport) -> dict[str, str]:
     return {"Retry-After": str(max(0, math.ceil(seconds)))}
 
 
-def _error_summary(attributes: Mapping[str, Any]) -> str:
-    """Return the human-readable message an `api_error` record carries.
-
-    Built from server-authored values only — the HTTP status and the error type,
-    both of which the API or pipelex chose. Nothing a caller supplied ever reaches
-    the message: `detail` is caller-controlled on several routes, and the route
-    path is percent-decoded from the request line, so both ride fields instead,
-    where a structured sink serializes them as values and a crafted newline stays
-    inside one. The message says which failure it is; the fields say everything
-    about it.
-    """
-    status = attributes.get("status")
-    error_type = attributes.get("error_type")
-    return f"API error {status}: {error_type}" if error_type else f"API error {status}"
-
-
 def _emit_api_error(*, fields: dict[str, Any], as_error: bool) -> None:
-    """Emit one `event=api_error` record: a summary message, everything else a record attribute.
+    """Emit one error record: a fixed message, everything about the failure a record attribute.
 
-    The fields are handed to the runtime's log call as `fields=`, so each one
-    becomes an attribute of the record and the selected sink decides how it goes
-    on the wire — a key of its own on the JSON sink's line, an OTLP attribute on
-    the collector's. Nothing is flattened into the message here any more, which
-    is what retires the API's own `key=value` rendering and its escaping with it.
+    The message is the same on every error line, whichever handler produced it, so it is the key a
+    query or an alert selects this server's error stream by; there is no separate `event` field
+    beside it. Nothing about the failure reaches the message, the status and the error type
+    included: a log store groups and counts lines by their message, and `detail` is
+    caller-controlled on several routes while the URL path is percent-decoded from the request
+    line, so both ride fields, where a structured sink serializes them as values and a crafted
+    newline stays inside one.
+
+    The fields are handed to the runtime's log call as `fields=`, so each one becomes an attribute
+    of the record and the selected sink decides how it goes on the wire — a key of its own on the
+    JSON sink's line, an OTLP attribute on the collector's.
 
     `None`-valued fields are dropped, so an identifier this request never bound is
     absent rather than carried as a null. `as_error` picks the level — `error`
@@ -187,11 +178,10 @@ def _emit_api_error(*, fields: dict[str, Any], as_error: bool) -> None:
     `INPUT`-domain caller mistakes.
     """
     attributes = {key: value for key, value in fields.items() if value is not None}
-    summary = _error_summary(attributes)
     if as_error:
-        log.error(summary, fields=attributes, include_exception=True)
+        log.error("A request ended in an error response", fields=attributes, include_exception=True)
     else:
-        log.warning(summary, fields=attributes)
+        log.warning("A request ended in an error response", fields=attributes)
 
 
 def _emit_at_error_level(status: int) -> bool:
@@ -216,9 +206,9 @@ def _log_error_report(report: ErrorReport, *, request: Request, status: int | No
     mistakes, the provider-429 passthrough, and API-level 4xx overrides like
     the 409 conflict), a 5xx logs at `error` with the traceback. The fields
     mirror the response so the two never drift.
-    `user_id` rides every record when auth bound a caller — without it, the
+    `user.id` rides every record when auth bound a caller — without it, the
     storage / pipeline-backend leg of a failure carries only `request_id` and
-    `route`, and tying the failure to the caller requires correlating the
+    `url.path`, and tying the failure to the caller requires correlating the
     request id across unrelated records (Phase 3 deleted the per-route
     `log.error(... user=...)` lines those failures used to emit).
 
@@ -229,15 +219,18 @@ def _log_error_report(report: ErrorReport, *, request: Request, status: int | No
     """
     effective_status = status if status is not None else report.http_status
     fields: dict[str, Any] = {
-        "event": API_ERROR_EVENT,
         **_request_fields(request),
-        "error_type": report.error_type,
+        ERROR_TYPE_FIELD: report.error_type,
         "error_category": report.error_category,
         "error_domain": report.error_domain,
         "retryable": report.retryable,
-        "status": effective_status,
-        "provider": report.provider,
-        "model": report.model,
+        OTelLogAttr.HTTP_RESPONSE_STATUS_CODE: effective_status,
+        # A report's `provider` is the backend the error names, which a worker attributes its failure to, and its `model`
+        # the handle the pipe named. The provider the SDK's metadata names, `openai` or `gateway`, is no backend's name
+        # and no SDK's as the backends configuration names them, so it is left off: an unattributed failure has no
+        # `backend_name` rather than a second spelling of the same backend.
+        "backend_name": report.provider,
+        "model_handle": report.model,
     }
     metadata = report.provider_metadata
     if metadata is not None:
@@ -252,9 +245,9 @@ def _log_api_authored_error(*, document: dict[str, Any], status: int, request: R
     Shares the disposition rule and the common-key set of `_log_error_report`
     so every error response — a pipelex `ErrorReport` translated to RFC 7807
     *or* an API-authored 4xx/5xx raised by an `pipelex_api.errors` helper — produces
-    one `event=api_error` record a downstream sink can filter uniformly on
-    `event`, `request_id`, `route`, `error_type`, `error_domain`, `retryable`,
-    and `status`. Without this, an API-owned 500 (a `raise_internal_server_error`
+    one error record a downstream sink can filter uniformly on its message and
+    on `request_id`, `url.path`, `error.type`, `error_domain`, `retryable`
+    and `http.response.status_code`. Without this, an API-owned 500 (a `raise_internal_server_error`
     site — `/version`'s missing-package case is the canonical example)
     would land with zero operator output, since `handle_api_error` only
     serializes the response.
@@ -265,8 +258,8 @@ def _log_api_authored_error(*, document: dict[str, Any], status: int, request: R
       `build_problem_document_from_api_error` does not apply strict-disclosure
       redaction (only `build_problem_document` does for pipelex domain errors).
       Carrying the message preserves the operator-facing cause in the record.
-    - API-authored docs omit `error_category`, `provider`, `model`, and
-      `provider_metadata.*` — those are inference-domain classifiers pipelex
+    - API-authored docs omit `error_category`, `backend_name`, `model_handle`,
+      `provider_status_code` and `provider_request_id` — those are inference-domain classifiers pipelex
       sets only on classifiable failures and the API never authors itself.
 
     A 4xx logs at `warning` without a traceback; a 5xx logs at `error` with
@@ -275,12 +268,11 @@ def _log_api_authored_error(*, document: dict[str, Any], status: int, request: R
     shape.
     """
     fields: dict[str, Any] = {
-        "event": API_ERROR_EVENT,
         **_request_fields(request),
-        "error_type": document.get("error_type"),
+        ERROR_TYPE_FIELD: document.get("error_type"),
         "error_domain": document.get("error_domain"),
         "retryable": document.get("retryable"),
-        "status": status,
+        OTelLogAttr.HTTP_RESPONSE_STATUS_CODE: status,
         "detail": document.get("detail"),
     }
     _emit_api_error(fields=fields, as_error=_emit_at_error_level(status))
@@ -485,12 +477,11 @@ async def handle_unexpected_error(request: Request, exc: Exception) -> Response:
     request_id = request_id_of(request)
     _emit_api_error(
         fields={
-            "event": API_ERROR_EVENT,
             **_request_fields(request),
-            "error_type": type(exc).__name__,
+            ERROR_TYPE_FIELD: type(exc).__name__,
             "error_category": "unknown",
             "error_domain": ErrorDomain.RUNTIME,
-            "status": 500,
+            OTelLogAttr.HTTP_RESPONSE_STATUS_CODE: 500,
         },
         as_error=True,
     )
@@ -526,7 +517,7 @@ async def handle_api_error(request: Request, exc: Exception) -> Response:
     and `request_id`) onto a copy of it — the same two values, read from the same
     place, as the pipelex-error and request-validation paths use. It then
     serializes that document, re-attaches any `WWW-Authenticate` challenge header,
-    and emits the structured `event=api_error` record so an API-owned 500 from any
+    and emits the structured error record so an API-owned 500 from any
     route is observable (a `raise_internal_server_error` site like `version.py`'s
     missing-package case is the canonical example — it has no preceding
     `log.error` at the call site). `exc` is typed `Exception` to match Starlette's
@@ -614,7 +605,7 @@ async def handle_request_validation_error(request: Request, exc: Exception) -> R
         request_id=request_id_of(request),
         error_domain=ErrorDomain.INPUT,
     )
-    # Same `event=api_error` record as an explicit `raise_validation_error`,
+    # Same error record as an explicit `raise_validation_error`,
     # so FastAPI's automatic-validation 422s aren't silent in operator logs.
     _log_api_authored_error(document=document, status=422, request=request)
     return JSONResponse(status_code=422, content=document, media_type=PROBLEM_JSON_MEDIA_TYPE)

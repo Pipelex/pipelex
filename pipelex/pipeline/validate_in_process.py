@@ -36,6 +36,7 @@ from pipelex.pipeline.liftable_pipes import LiftablePipeEntry, build_liftable_pi
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.pipeline.validation_report import PipelexValidationReport, build_validation_report
 from pipelex.system.caller_identity import CallerIdentity, scoped_caller_identity
+from pipelex.tools.log.error_fields import error_fields
 
 if TYPE_CHECKING:
     from pipelex.graph.graphspec import GraphSpec
@@ -74,7 +75,7 @@ async def validate_bundles_in_process(
             When omitted, the graph arm keeps the existing default of targeting the
             selected bundle `main_pipe`. Bare and qualified refs are accepted according
             to the loaded pipe library's normal resolution rules.
-        log_context: Label used in graph-arm degradation and teardown-failure logs.
+        log_context: Label the graph-arm degradation and teardown-failure lines carry in their ``caller`` field.
         caller_identity: Who asked for the validation, when the host knows it. It is the
             ambient caller for the whole pass — the sweep's telemetry event and every dry run,
             the graph arm's included — so none of it falls back to the telemetry stream's
@@ -178,9 +179,11 @@ async def _validate_bundles_in_scope(
                 # succeeded. Mirrors act_dry_validate's finally.
                 if body_succeeded:
                     raise
+                # As fields and no traceback: the validation error is chained onto this one, so its traceback would
+                # print the validation error's text, which can quote the bundle, and which its own catcher reports.
                 log.error(
-                    f"{log_context}: library teardown also failed after a body error; "
-                    f"raising the original error. Suppressed teardown error: {teardown_error}"
+                    "The teardown of the validation library also failed after the validation failed; the original error is raised",
+                    fields={"caller": log_context, "library_id": validation_library_id, **error_fields(exc=teardown_error)},
                 )
     return build_validation_report(
         blueprints=result.blueprints,

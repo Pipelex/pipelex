@@ -257,10 +257,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeFuncOutput:
-        log.info(
-            f"🚨 For your information, the dry run of PipeFunc '{self.code}' is not actually running the python function \
-            but only validating the inputs and return type."
-        )
+        log.debug("The dry run of a PipeFunc validates its inputs and return type without running the function", fields={"pipe_code": self.code})
         # Sandbox-hosted mode: the customer function is not registered in THIS process (its source only
         # travels on the crate to the sandbox), so its return type cannot be inspected here. Build the
         # mock output from the DECLARED output concept's structure class instead — mirroring PipeLLM's

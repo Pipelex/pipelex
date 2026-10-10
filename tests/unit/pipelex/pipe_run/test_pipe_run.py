@@ -121,6 +121,31 @@ class TestPipeRun:
         assert record_fields.get("delivery_status") == expected_status
         assert record_fields.get("pipeline_run_id") == "plr-delivery-log"
 
+    async def test_the_failure_line_names_the_pipe_as_the_pipe_run_lines_do(self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture) -> None:
+        """`pipe_code` carried the qualified reference here and the bare code on `Pipe run starts`, so one query missed this line."""
+        mock_router = mocker.AsyncMock()
+        mock_router.run = mocker.AsyncMock(side_effect=RuntimeError("router blew up"))
+        mocker.patch("pipelex.pipe_run.pipe_run.DeliveryExecutor")
+        mock_job = mocker.MagicMock()
+        mock_job.pipe.code = "describe_company"
+        mock_job.pipe.pipe_ref = "company.describe_company"
+        mock_job.job_metadata = JobMetadata(
+            run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-failure-line", storage_scope="test/scope", read_scope=None)
+        )
+
+        with pytest.raises(RuntimeError, match="router blew up"), caplog.at_level(logging.ERROR, logger=pipe_run_module.__name__):
+            await PipeRun(pipe_router=mock_router).run(pipe_job=mock_job)
+
+        (failure_record,) = [
+            record for record in caplog.records if record.name == pipe_run_module.__name__ and record.getMessage() == "Pipe execution failed"
+        ]
+        record_fields = vars(failure_record)
+        assert record_fields["pipe_code"] == "describe_company"
+        assert record_fields["pipe_ref"] == "company.describe_company"
+        assert record_fields["error.type"] == "RuntimeError"
+        assert record_fields["error.message"] == "router blew up"
+        assert failure_record.exc_info is None
+
     async def test_run_success_no_delivery_when_none(self, mocker: MockerFixture) -> None:
         """When delivery_assignment is None, the delivery executor is not called."""
         mock_output = mocker.MagicMock()

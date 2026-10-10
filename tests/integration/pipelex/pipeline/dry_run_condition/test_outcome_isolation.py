@@ -6,19 +6,22 @@ after the condition read the value a live run falls back to when nothing matches
 """
 
 from collections.abc import Sequence
+from typing import Any
 
 import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.core.memory import working_memory as working_memory_module
+from pipelex.core.memory.working_memory import STUFF_REPLACED_MESSAGE
 from pipelex.pipeline.dry_run_pipeline import dry_run_pipeline
 from tests.integration.pipelex.pipeline.dry_run_condition.graph_reading import input_named, node_by_code, only_output
 from tests.integration.pipelex.pipeline.dry_run_condition.test_data import DryRunConditionTestData
 
 
-def _replaced_key_warnings(warning_calls: Sequence[object], *, key: str) -> list[str]:
-    needle = f"Key '{key}' already exists in WorkingMemory and will be replaced"
-    return [str(call) for call in warning_calls if needle in str(call)]
+def _replacements_of(debug_calls: Sequence[Any], *, stuff_name: str) -> list[str]:
+    return [
+        str(call) for call in debug_calls if call.args == (STUFF_REPLACED_MESSAGE,) and call.kwargs.get("fields", {}).get("stuff_name") == stuff_name
+    ]
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -37,11 +40,11 @@ class TestDryRunConditionOutcomeIsolation:
 
     async def test_no_outcome_replaces_a_sibling_value_in_the_slot(self, mocker: MockerFixture) -> None:
         """`follow_up` holds nothing before the condition, so no outcome may find it already written."""
-        warning_spy = mocker.spy(working_memory_module.log, "warning")
+        debug_spy = mocker.spy(working_memory_module.log, "debug")
 
         await dry_run_pipeline(mthds_contents=[DryRunConditionTestData.REPORT_SHAPE_MTHDS])
 
-        assert _replaced_key_warnings(warning_spy.call_args_list, key="follow_up") == []
+        assert _replacements_of(debug_spy.call_args_list, stuff_name="follow_up") == []
 
     async def test_the_default_outcome_names_the_shared_stuff(self) -> None:
         """The default outcome runs last, so its value is the one the next step reads."""
