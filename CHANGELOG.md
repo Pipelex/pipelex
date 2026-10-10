@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`Rating` carries the label of its level**: the `Rating` native has an optional `label`, the name its scale's declaration gives the selected level, as the MTHDS standard's native set pinned at `5.0.0` defines it, held in `RatingContent.label` and stated by the input-form descriptor, the I/O contracts and the generated Python and TypeScript types. A `Rating` renders in a prompt as its label when it has one and as its level otherwise, so `$severity` reads `Workaround available` rather than `1`, and its JSON rendering carries the label only when present; a `PipeLLM` whose output is `Rating` may fill it like any optional member. Since a crate materializes the pinned definition, a crate whose methods use `Rating` gets a new normalized fingerprint, and types generated before this release gain the field when `pipelex codegen types` regenerates them.
+
 ## [v0.81.0] - 2026-10-10
 
 ### Added
