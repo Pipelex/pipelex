@@ -31,7 +31,7 @@ A pipe that references a sub-pipe from a package that isn't loaded is reported a
 Execute pipelines with mocked LLM responses to test pipeline logic, data flow, and orchestration without making API calls.
 
 - **Mock generation** — Format-compliant mock values for constrained fields, including structured outputs
-- **Judgments rendered, not answered** — A dry `PipeJudge` renders its evidence prompt and its question as a live run does, then answers with a mock verdict of the right kind carrying no probability; on a scale whose levels carry labels, the mock level carries its declared label
+- **Judgments rendered, not answered** — A dry `PipeJudge` renders its evidence prompt and its questions as a live run does, then answers each with a mock verdict of the right kind carrying no probability; on a scale whose levels carry labels, the mock level carries its declared label
 - **Configurable mock behavior** — Control mock list sizes, template handling, and response formats
 - **Full pipeline execution** — Working memory, controllers, and data flow all work as in production
 - **No credentials needed** — A dry run boots without inference credentials, on both `pipelex run --dry-run` and `pipelex-agent run --dry-run`, and so does `pipelex validate`. Such a boot loads every enabled backend with all its models but resolves none of their keys, so validation and dry runs give the same verdict on a machine that holds no key at all as on one that holds them all: presets, the default models and a bare handle such as `model = "gpt-4o-mini"` resolve alike

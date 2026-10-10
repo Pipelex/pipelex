@@ -1,10 +1,13 @@
-"""E2E tests for PipeJudge: one question of each kind, asked about the evidence its prompt presents, on the default judgment model."""
+"""E2E tests for PipeJudge: one question of each kind, and several at once, asked about the evidence its prompt presents."""
 
 import pytest
 
 from pipelex import pretty_print
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.stuffs.choice_content import ChoiceContent
+from pipelex.core.stuffs.rating_content import RatingContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.e2e.pipelex.pipes.pipe_operators.pipe_judge.test_data import PipeJudgeTestCases
@@ -116,3 +119,40 @@ class TestPipeJudge:
             assert set(verdict.probabilities) == {"0", "1", "2"}
             assert verdict.position is not None
             assert abs(verdict.position - PipeJudgeTestCases.EXPECTED_BLOCKING_POSITION) <= PROBABILITY_TOLERANCE * 2
+
+    async def test_several_questions_fill_a_structure(self, pipe_run_mode: PipeRunMode) -> None:
+        """One request asks every question about the same evidence, and each verdict fills the field of its question's name."""
+        runner = PipelexMTHDSProtocol(library_dirs=LIBRARY_DIRS, pipe_run_mode=pipe_run_mode)
+        pipeline_response = await runner.execute(
+            pipe_code="triage_message_e2e",
+            inputs={"message": TextContent(text=PipeJudgeTestCases.URGENT_MESSAGE)},
+        )
+
+        pipe_output = pipeline_response.pipe_output
+        assert pipe_output is not None
+        graph_spec = pipe_output.graph_spec
+        assert graph_spec is not None
+        (judge_node,) = [node for node in graph_spec.nodes if node.pipe_code == "triage_message_e2e"]
+        execution_data = judge_node.execution_data
+        assert execution_data["rendered_prompt"] == PipeJudgeTestCases.URGENT_EVIDENCE
+        assert {name: question["rendered_question"] for name, question in execution_data["questions"].items()} == PipeJudgeTestCases.TRIAGE_QUESTIONS
+        assert {name: question["judgment_kind"] for name, question in execution_data["questions"].items()} == {
+            "urgent": "yes_no",
+            "team": "choice",
+            "severity": "rating",
+        }
+        # Read field by field off the structure's plain data, each verdict typed by its native's class.
+        triage = pipe_output.main_stuff.content.model_dump()
+        if pipe_run_mode.is_live:
+            pretty_print(triage, title="Several judgments")
+            pretty_print(execution_data["questions"], title="Their outcomes")
+            urgent = YesNoContent.model_validate(triage["urgent"])
+            # The declared threshold of 0.7 decides the urgency from the probability.
+            assert urgent.yes_no is True
+            assert urgent.probability is not None
+            assert abs(urgent.probability - PipeJudgeTestCases.EXPECTED_URGENT_PROBABILITY) <= PROBABILITY_TOLERANCE
+            assert ChoiceContent.model_validate(triage["team"]).choice == "technical"
+            assert triage["severity"] is not None
+            severity = RatingContent.model_validate(triage["severity"])
+            assert severity.level == PipeJudgeTestCases.EXPECTED_BLOCKING_LEVEL
+            assert severity.label == "Blocking"

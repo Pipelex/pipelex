@@ -20,7 +20,7 @@ Here are the primary pipe operators available in Pipelex:
 -   [**`PipeExtract`**](./PipeExtract.md): Performs Optical Character Recognition (OCR) on images and PDF documents to extract text and embedded images, and fetches and extracts content from web pages.
 -   [**`PipeImgGen`**](./PipeImgGen.md): Generates images from a text prompt using models like GPT Image, Flux, or other image generation models.
 -   [**`PipeSearch`**](./PipeSearch.md): Searches the web using a configurable search provider and returns structured results with an answer and source citations.
--   [**`PipeJudge`**](./PipeJudge.md): Asks a judgment model one closed question about the evidence its prompt presents, and returns a `YesNo`, a `Choice` or a `Rating` verdict with the probabilities the model measured.
+-   [**`PipeJudge`**](./PipeJudge.md): Asks a judgment model a closed question about the evidence its prompt presents, and returns a `YesNo`, a `Choice` or a `Rating` verdict with the probabilities the model measured, or asks several in one request and fills a structure with their verdicts.
 -   [**`PipeFunc`**](./PipeFunc.md): An escape hatch that allows you to execute any custom Python function, giving you maximum flexibility.
 -   [**`PipeCompose`**](./PipeCompose.md): Composes outputs deterministically from working memory — renders Jinja2 templates for formatted reports or complex prompts, or constructs structured objects by mapping fields from inputs, without an LLM.
 -   [**`PipeDocGen`**](./PipeDocGen.md): Generates a document file from its inputs, calling no AI model: a PDF laid out from a structure or formatted from a Markdown report, and with the Pipelex document generation plugin a PDF from an HTML template, an Excel workbook, a Word document or a PowerPoint deck.
@@ -121,11 +121,12 @@ Searches the web and returns structured results with sources.
 
 ## PipeJudge
 
-Asks a judgment model one closed question about the evidence its prompt presents.
+Asks a judgment model closed questions about the evidence its prompt presents.
 
 ### Key Features
 
 - Yes/no, choice and rating questions, the kind read from the fields the pipe declares
+- Several questions in one request, their verdicts filling the fields of a structure named after them
 - Verdicts carrying the probabilities the model measured, and a threshold for a yes/no
 - The evidence written as a prompt template, rendered as a `PipeLLM`'s prompt is, its images and documents sent as files to a model that reads them
 - Two-sided criteria for a yes/no, and rating levels that may carry labels, which the verdict reports
