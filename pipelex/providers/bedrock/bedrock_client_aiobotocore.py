@@ -14,9 +14,9 @@ if TYPE_CHECKING:
 
 class BedrockClientAiobotocore(BedrockClientProtocol):
     def __init__(self, aws_region: str):
-        log.debug(f"Init BedrockClientAiobotocore with region '{aws_region}'")
         self.aws_region = aws_region
         self.session = get_session()
+        log.debug(f"A Bedrock client was made on aiobotocore for region '{aws_region}'")
 
     @override
     async def chat(

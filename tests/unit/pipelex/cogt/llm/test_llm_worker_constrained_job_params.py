@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from pipelex.cogt.llm.llm_job import LLMJob
     from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
-FIXED_TEMPERATURE_WARNING = "The model takes a fixed temperature, so it is used in place of the requested one"
+FIXED_TEMPERATURE_WARNING = "The model's fixed temperature was used in place of the requested one"
 
 
 def _make_model(

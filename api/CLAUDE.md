@@ -230,7 +230,8 @@ if upload_size > MAX_UPLOAD_BYTES:
 
 ## Authentication
 
-- Three modes via `AUTH_MODE` env var: `none` (default), `jwt`, `api_key`
+- The `AUTH_MODE` env var names an `AuthMode` member: `none` (default), `jwt`, `api_key`
+- Unset or empty means `none`; any other value raises `InvalidAuthModeError` when `main.py` selects the dependency at import, so the server refuses to boot. The match is exact, case included, and there is no fallback: a mistyped mode must never serve the routes unauthenticated
 - `none`: No auth (self-hosted default, or behind API Gateway in hosted version)
 - `jwt`: Validate `Authorization: Bearer <jwt>` using `JWT_SECRET_KEY`
 - `api_key`: Validate `Authorization: Bearer <key>` against `API_KEY` env var

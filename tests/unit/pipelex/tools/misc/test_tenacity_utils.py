@@ -5,6 +5,7 @@ import pytest
 from pytest_mock import MockerFixture
 from tenacity import Retrying, retry_base, retry_if_exception_type, retry_if_result, stop_after_attempt, wait_fixed
 
+from pipelex.tools.log.error_fields import ERROR_TYPE_FIELD
 from pipelex.tools.misc import tenacity_utils
 from pipelex.tools.misc.tenacity_utils import log_retry
 
@@ -44,7 +45,7 @@ class TestLogRetry:
                 "retry on an exception",
                 _fail_once_with_value_error,
                 retry_if_exception_type(ValueError),
-                {"attempt_number": 1, "wait_seconds": WAIT_SECONDS, "exception_type": "ValueError"},
+                {"attempt_number": 1, "wait_seconds": WAIT_SECONDS, ERROR_TYPE_FIELD: "ValueError"},
             ),
             (
                 "retry on a result",

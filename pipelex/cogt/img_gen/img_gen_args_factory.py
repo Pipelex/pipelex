@@ -37,6 +37,7 @@ from pipelex.cogt.img_gen.img_gen_model_rules import (
     SpecificTaxonomy,
 )
 from pipelex.config import get_config
+from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl
 
@@ -269,7 +270,7 @@ class ImgGenArgsFactory:
         match prompt_taxonomy:
             case PromptTaxonomy.POSITIVE_ONLY:
                 if negative_text:
-                    log.warning("A negative prompt was given to an image model that takes none, so it is ignored")
+                    log.warning("A negative prompt given to an image model that takes none was ignored")
                 return {"prompt": positive_text}
             case PromptTaxonomy.WITH_NEGATIVE:
                 args_dict: dict[str, Any] = {"prompt": positive_text}
@@ -501,8 +502,8 @@ class ImgGenArgsFactory:
                     if num_inference_steps not in acceptable_steps:
                         # TODO: prevent this when building presets and params
                         log.warning(
-                            "SDXL Lightning takes 1, 2, 4 or 8 inference steps, so the requested number is replaced by 4",
-                            fields={"nb_steps": num_inference_steps},
+                            "An unsupported number of inference steps for SDXL Lightning was replaced by 4",
+                            fields={"nb_steps": num_inference_steps, USER_ACTION_FIELD: "Request 1, 2, 4 or 8 inference steps"},
                         )
                         num_inference_steps = 4
                 else:
