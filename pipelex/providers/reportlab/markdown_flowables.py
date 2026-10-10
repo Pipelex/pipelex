@@ -2,7 +2,9 @@
 
 The Markdown is parsed by the one parser Pipelex formats Markdown with (`get_markdown_parser`), so a PDF reads it
 exactly as the `markdown` filter of HTML templates does, and the converter walks markdown-it's syntax tree rather
-than its flat token stream, so a nested list lives inside its item and each list numbers its own items.
+than its flat token stream, so a nested list lives inside its item and each list numbers its own items. The rules it
+shares with the engines of the other formats, the link rule, the bullets by depth, a list's start, a heading's level,
+a code block's text and the plain text of nodes, are the document engine contract's (`formatted_markdown.py`).
 
 What it prints:
 
@@ -18,13 +20,12 @@ become links: any other target prints its text alone. A Markdown image is never 
 italics, as `[image: alt]`. A node the converter does not know prints its text, and never fails the document.
 """
 
-from urllib.parse import urlsplit
-
 from markdown_it.tree import SyntaxTreeNode
 from reportlab.lib.styles import ParagraphStyle  # type: ignore[import-untyped]
 from reportlab.pdfbase import pdfmetrics  # type: ignore[import-untyped]
 from reportlab.platypus import Flowable, HRFlowable, ListFlowable, Paragraph, Preformatted, Spacer  # type: ignore[import-untyped]
 
+from pipelex.cogt.doc_gen.formatted_markdown import code_text, heading_level, is_linked_href, list_bullet, list_start, plain_text
 from pipelex.providers.reportlab.pdf_elements import (
     BOX_PADDING,
     LINK_COLOR_HEX,
@@ -45,10 +46,6 @@ from pipelex.providers.reportlab.pdf_elements import (
 )
 from pipelex.tools.markdown.markdown_parser import get_markdown_parser
 
-LINKED_SCHEMES = frozenset({"http", "https", "mailto"})
-
-# The bullets of nested bullet lists, by depth, alternating: both are in the bundled sans face.
-_BULLETS = ("•", "–")
 _MINIMUM_LIST_INDENT = 14.0
 _BULLET_GAP = 6.0
 _QUOTE_INDENT = 2 * BOX_PADDING
@@ -83,7 +80,7 @@ class _MarkdownWriter:
                 style = self._styles.list_body if list_depth else self._styles.body
                 return [Paragraph(inline_markup(nodes=node.children), style)]
             case "heading":
-                heading = Paragraph(inline_markup(nodes=node.children), self._styles.heading(level=_heading_level(tag=node.tag)))
+                heading = Paragraph(inline_markup(nodes=node.children), self._styles.heading(level=heading_level(tag=node.tag)))
                 if is_contained:
                     return [heading]
                 return [heading_break(), heading]
@@ -111,8 +108,9 @@ class _MarkdownWriter:
         if not items:
             return []
         is_ordered = node.type == "ordered_list"
-        start = _list_start(node=node) if is_ordered else 1
-        bullet = _BULLETS[list_depth % len(_BULLETS)]
+        start = list_start(start=node.attrs.get("start")) if is_ordered else 1
+        # Both bullets are in the bundled sans face.
+        bullet = list_bullet(depth=list_depth + 1)
         labels = [f"{start + index}." for index in range(len(items))] if is_ordered else [bullet]
         font_size = self._styles.body.fontSize
         label_width = max(pdfmetrics.stringWidth(label, SANS_FONT, font_size) for label in labels)
@@ -177,7 +175,7 @@ class _MarkdownWriter:
                 return self._styles.cell_header if is_header else self._styles.cell
 
     def _code(self, *, text: str, available_width: float) -> list[Flowable]:
-        code = text.rstrip("\n").expandtabs(4)
+        code = code_text(content=text)
         if not code.strip():
             return []
         code_style = self._styles.code
@@ -225,48 +223,6 @@ def _link_markup(*, node: SyntaxTreeNode) -> str:
     if not isinstance(href, str) or not is_linked_href(href=href):
         return label
     return f'<a href="{escape_attribute(value=href)}" color="{LINK_COLOR_HEX}">{label}</a>'
-
-
-def is_linked_href(*, href: str) -> bool:
-    """Whether a link target becomes a link in the PDF: only `http`, `https` and `mailto` do."""
-    try:
-        scheme = urlsplit(href.strip()).scheme
-    except ValueError:
-        return False
-    return scheme.lower() in LINKED_SCHEMES
-
-
-def plain_text(*, nodes: list[SyntaxTreeNode]) -> str:
-    """The text of Markdown nodes without their markup, as it reads once printed: what a table column is measured by."""
-    parts: list[str] = []
-    for node in nodes:
-        match node.type:
-            case "softbreak":
-                parts.append(" ")
-            case "hardbreak":
-                parts.append("\n")
-            case "image":
-                parts.append(f"[image: {plain_text(nodes=node.children).strip() or node.content}]")
-            case _:
-                if node.children:
-                    parts.append(plain_text(nodes=node.children))
-                else:
-                    parts.append(node.content)
-    return "".join(parts)
-
-
-def _heading_level(*, tag: str) -> int:
-    if len(tag) == 2 and tag[0] == "h" and tag[1].isdigit():
-        return int(tag[1])
-    return 6
-
-
-def _list_start(*, node: SyntaxTreeNode) -> int:
-    start = node.attrs.get("start", 1)
-    try:
-        return int(start)
-    except (TypeError, ValueError):
-        return 1
 
 
 def _cell_alignment(*, node: SyntaxTreeNode) -> str | None:

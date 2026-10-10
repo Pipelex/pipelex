@@ -68,6 +68,8 @@ EXPECTED_THIRD_PARTY_ROOTS: frozenset[str] = frozenset(
         "httpx",
         "instructor",
         "jinja2",
+        # The document engine contract's Markdown formatting walks markdown-it's syntax tree (`doc_gen/formatted_markdown.py`).
+        "markdown_it",
         "opentelemetry",
         "polyfactory",
         "pydantic",

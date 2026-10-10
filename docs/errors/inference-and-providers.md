@@ -58,6 +58,7 @@ own page. Classes are grouped by subsystem.
 - [`LLMPromptSpecError`](llm-prompt-spec-error.md) — LLM prompt spec
 - [`LLMSettingRefusedError`](llm-setting-refused-error.md) — LLM setting refused
 - [`LLMSettingsValidationError`](llm-settings-validation-error.md) — LLM settings validation
+- [`MarkdownFormattingBudgetError`](markdown-formatting-budget-error.md) — Markdown formatting budget exceeded
 - [`ModelChoiceNotFoundError`](model-choice-not-found-error.md) — Model choice not found
 - [`ModelDeckNotFoundError`](model-deck-not-found-error.md) — Model deck not found
 - [`ModelDeckPresetValidatonError`](model-deck-preset-validaton-error.md) — Model deck preset validaton

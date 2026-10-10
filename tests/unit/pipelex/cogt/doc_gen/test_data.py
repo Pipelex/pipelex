@@ -34,3 +34,44 @@ class LayoutDisplayTestData:
         ("a text among numbers", [1, "2"], False),
         ("dates", [datetime.date(2026, 9, 29)], False),
     ]
+
+
+class FormattedMarkdownTestData:
+    """Markdown texts the formatting tests read, and what each formats into."""
+
+    # A header of three thousand columns over three hundred one-character rows: nine hundred thousand cells, which the
+    # table rule pads every row to, out of about ten kilobytes of text.
+    PADDED_TABLE: ClassVar[str] = "|" + "a|" * 3000 + "\n|" + "-|" * 3000 + "\n" + "|a\n" * 300
+
+    # A reference link used four thousand times, whose twenty-thousand-character address an engine printing a link's
+    # address beside its text prints at every use: its text alone fits a budget, what it formats into does not.
+    REUSED_REFERENCE: ClassVar[str] = "[a][r] " * 4000 + "\n\n[r]: https://example.com/" + "y" * 20000
+
+    # A report section repeated into about thirty thousand characters: an ordinary long text, well within one budget.
+    LONG_REPORT: ClassVar[str] = "## Findings\n\nSome *text* with a [link](https://a.co), `code` and more.\n\n- one\n- two\n\n" * 300
+
+    # The text an invoice's notes hold, and its plain text.
+    NOTES: ClassVar[str] = "Payment by **bank transfer** within 30 days.\n\n- *Late* fees apply\n- IBAN on request"
+    NOTES_PLAIN_TEXT: ClassVar[str] = "Payment by bank transfer within 30 days.\n• Late fees apply\n• IBAN on request"
+
+    # Every kind of block, and its plain text: list items indented by depth, a later paragraph of an item indented
+    # under its marker, table cells separated by tabs, a code block as written, and the rule left out.
+    EVERY_BLOCK: ClassVar[str] = (
+        "# Report\n\n"
+        "Some **bold** text, a [link](https://pipelex.com) and `code`.  \nOn its own line.\n\n"
+        "- one\n  - two\n\n  more about one\n\n"
+        "3. three\n4. four\n\n"
+        "> Quoted *words*\n\n"
+        "---\n\n"
+        "| Item | Qty |\n| --- | --: |\n| Tea | 2 |\n\n"
+        "```\nprint('x')\n```\n"
+    )
+    EVERY_BLOCK_PLAIN_TEXT: ClassVar[str] = (
+        "Report\n"
+        "Some bold text, a link and code.\nOn its own line.\n"
+        "• one\n  – two\n  more about one\n"
+        "3. three\n4. four\n"
+        "Quoted words\n"
+        "Item\tQty\nTea\t2\n"
+        "print('x')"
+    )

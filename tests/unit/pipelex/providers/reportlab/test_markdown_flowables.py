@@ -5,8 +5,9 @@ from markdown_it.token import Token
 from markdown_it.tree import SyntaxTreeNode
 from reportlab.platypus import Paragraph  # type: ignore[import-untyped]
 
+from pipelex.cogt.doc_gen.formatted_markdown import is_linked_href, plain_text
 from pipelex.cogt.doc_gen.layout_tree import MarkdownBlock
-from pipelex.providers.reportlab.markdown_flowables import inline_markup, is_linked_href, markdown_nodes_to_flowables, plain_text
+from pipelex.providers.reportlab.markdown_flowables import inline_markup, markdown_nodes_to_flowables
 from pipelex.providers.reportlab.pdf_elements import MONO_FONT, build_pdf_styles
 from pipelex.tools.markdown.markdown_parser import get_markdown_parser
 from tests.unit.pipelex.providers.reportlab.reportlab_test_helpers import (
