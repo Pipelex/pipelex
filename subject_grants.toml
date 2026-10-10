@@ -6656,10 +6656,6 @@ rationale = "Keyed accessor by the uri; single operand."
 param = "data"
 rationale = "Keyed accessor by the data; single operand."
 
-["pipelex/tools/tabular/csv_codec.py::_annotation_allows_none"]
-param = "annotation"
-rationale = "Validates/checks the annotation; single operand."
-
 ["pipelex/tools/tabular/csv_codec.py::_assert_single_char_delimiter"]
 param = "delimiter"
 rationale = "Validates/checks the delimiter; single operand."

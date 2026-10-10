@@ -10,6 +10,7 @@ from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.exceptions import ConceptStructureClassNotFoundError
+from pipelex.core.stuffs.non_null_any import NonNullAny
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.libraries.concept.concept_library_abstract import ConceptLibraryAbstract
@@ -58,6 +59,8 @@ class _VesselRecord(StructuredContent):
     pilot: str | None = "the harbour pilot"
     escort: str | None = Field(default_factory=_default_escort)
     draught: float = 4.5
+    manifest: NonNullAny
+    remarks: Any
 
 
 def _concept(*, code: str, structure_class_name: str, domain_code: str = "harbour", **kwargs: Any) -> Concept:
@@ -190,6 +193,8 @@ class TestLibraryConceptWalkResolver:
             pytest.param("pilot", BindingValueKind.TEXT, None, False, True, id="nullable-with-a-default"),
             pytest.param("escort", BindingValueKind.TEXT, None, False, True, id="nullable-with-a-default-factory"),
             pytest.param("draught", BindingValueKind.NUMBER, None, False, False, id="not-nullable-with-a-default"),
+            pytest.param("manifest", BindingValueKind.UNDERIVABLE, None, False, False, id="required-non-null-any"),
+            pytest.param("remarks", BindingValueKind.UNDERIVABLE, None, False, True, id="required-but-any"),
         ],
     )
     def test_a_class_backed_concept_is_walked_through_its_class_fields(

@@ -42,22 +42,30 @@ class TestTsZodEmitter:
         content = emit_ts_zod(resolve_concepts_from_crate(pipeline_crate))[0].content
         # A concept reference is a forward-safe lazy schema; the literal-with-default is a defaulted enum.
         assert "score: z.lazy(() => ScoreSchema).nullish()" in content
-        assert 'status: z.enum(["draft", "final"]).nullable().default("draft")' in content
+        assert 'status: z.enum(["draft", "final"]).default("draft")' in content
 
-    def test_non_required_fields_are_null_tolerant(self, pipeline_crate: LibraryCrate):
-        """Both non-required spellings must accept the explicit `null` the runtime puts on the wire.
+    def test_a_field_that_may_hold_nothing_is_null_tolerant(self, pipeline_crate: LibraryCrate):
+        """A field that may hold nothing must accept the explicit `null` the runtime puts on the wire.
 
         An unset optional field is dumped as `"key": null` (the generated runtime class annotates it
         `X | None` and `dump_for_transport()` carries no `exclude_none`), so a `.optional()` schema —
-        `T | undefined` in zod — rejects the engine's own payload. `.nullish()` and `.nullable()` are
-        the two null-tolerant spellings; `.optional()` alone must appear nowhere.
+        `T | undefined` in zod — rejects the engine's own payload. `.optional()` must appear nowhere.
         """
         content = emit_ts_zod(resolve_concepts_from_crate(pipeline_crate))[0].content
         assert ".optional()" not in content
         # No default: the wire may omit the key *or* null it, and `.nullish()` describes exactly that.
         assert "rationale: z.string().nullish()" in content
-        # With a default: absent applies the default, explicit null stays null.
-        assert 'status: z.enum(["draft", "final"]).nullable().default("draft")' in content
+
+    def test_a_defaulted_field_is_never_null(self, pipeline_crate: LibraryCrate):
+        """A defaulted field never holds nothing, so its schema refuses `null` and an omitted key takes the default.
+
+        The runtime class annotates it `X = Field(default=…)` and refuses an explicit `None`, so the engine always
+        serializes a value there. A `.nullable()` in front of the default would type the parsed field `T | null`
+        and describe a payload the engine never produces.
+        """
+        content = emit_ts_zod(resolve_concepts_from_crate(pipeline_crate))[0].content
+        assert 'status: z.enum(["draft", "final"]).default("draft")' in content
+        assert ".nullable()" not in content
 
     def test_an_overlong_field_breaks_its_whole_member_chain(self, every_type_kind_crate: LibraryCrate):
         """Prettier breaks by call count, not by expression, so the break cannot be a `z.enum` special case.
@@ -69,7 +77,7 @@ class TestTsZodEmitter:
         """
         content = emit_ts_zod(resolve_concepts_from_crate(every_type_kind_crate))[0].content
 
-        assert '  default_summary_style: z\n    .string()\n    .nullable()\n    .default("a concise executive summary"),' in content
+        assert '  default_summary_style: z\n    .string()\n    .default("a concise executive summary for the board"),' in content
         assert "  per_reviewer_summary_style_overrides: z\n    .record(z.string(), z.string())\n    .nullish()," in content
         # A single call has no chain to break: prettier explodes the enum members in place instead.
         assert '  workflow_state: z.enum([\n    "awaiting_triage",' in content
@@ -77,8 +85,8 @@ class TestTsZodEmitter:
     def test_a_broken_chain_keeps_a_call_that_fits_on_its_own_line(self, every_type_kind_crate: LibraryCrate):
         """Prettier re-measures every call once the chain is broken, and one that now fits stays flat.
 
-        The counterpart to the test above: `.nullable()` costs width on every defaulted field, so an
-        ordinary three-choice enum reaches the break on nothing but that — and then sits far inside the
+        The counterpart to the test above: `.default(…)` costs width on every defaulted field, so an
+        ordinary four-choice enum reaches the break on nothing but that — and then sits far inside the
         print width at indent 4. Exploding its members anyway produces a shape prettier folds straight
         back, changing the artifact's bytes on the consumer's first format run. The threshold is exact:
         a call is left flat while `indent + len(call)` fits, and `fallback_state` above is the same
@@ -86,7 +94,7 @@ class TestTsZodEmitter:
         """
         content = emit_ts_zod(resolve_concepts_from_crate(every_type_kind_crate))[0].content
 
-        assert '  escalation_severity: z\n    .enum(["low", "medium", "high"])\n    .nullable()\n    .default("medium"),' in content
+        assert '  escalation_severity: z\n    .enum(["low", "medium", "high", "critical"])\n    .default("medium"),' in content
 
     def test_an_exploded_choice_keeps_its_own_commas(self, every_type_kind_crate: LibraryCrate):
         """A choice is authored text and may carry a comma; split on it, the emission stops being TypeScript.
@@ -136,9 +144,9 @@ class TestTsZodEmitter:
 
     def test_temporal_defaults_emit_iso_wire_strings(self, temporal_defaults_crate: LibraryCrate):
         content = emit_ts_zod(resolve_concepts_from_crate(temporal_defaults_crate))[0].content
-        assert 'starts_on: z.string().nullable().default("2026-07-11")' in content
-        assert 'recorded_at: z.string().nullable().default("2026-07-11T09:30:00")' in content
-        assert 'starts_at: z.string().nullable().default("09:30:00")' in content
+        assert 'starts_on: z.string().default("2026-07-11")' in content
+        assert 'recorded_at: z.string().default("2026-07-11T09:30:00")' in content
+        assert 'starts_at: z.string().default("09:30:00")' in content
 
     def test_dict_defaults_are_canonical(self, reordered_dict_default_crates: tuple[LibraryCrate, LibraryCrate]):
         first_crate, second_crate = reordered_dict_default_crates
@@ -190,8 +198,8 @@ class TestTsZodEmitter:
         assert "export const NodeSchema: z.ZodType<Node> = z.object({" in content
         assert "next: z.lazy(() => NodeSchema).nullish()" in content
 
-    def test_recursive_defaulted_field_declares_a_nullable_type(self):
-        """The other explicit-type branch: a defaulted field infers `T | null` with no `?` marker."""
+    def test_recursive_defaulted_field_declares_a_non_null_type(self):
+        """The other explicit-type branch: a defaulted field infers `T`, with no `?` marker and no `null`."""
         crate = LibraryCrate(
             concepts={
                 "graph.Node": ConceptBlueprint(
@@ -212,8 +220,8 @@ class TestTsZodEmitter:
 
         content = emit_ts_zod(resolve_concepts_from_crate(crate))[0].content
 
-        assert "export type Node = {\n  next?: Node | null;\n  label: string | null;\n  depth: number;\n};" in content
-        assert 'label: z.string().nullable().default("root")' in content
+        assert "export type Node = {\n  next?: Node | null;\n  label: string;\n  depth: number;\n};" in content
+        assert 'label: z.string().default("root")' in content
         assert "depth: z.number().int()," in content
 
     def test_mutually_recursive_concepts_use_explicit_types_and_annotated_schemas(self):

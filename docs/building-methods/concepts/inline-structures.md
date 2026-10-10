@@ -57,7 +57,7 @@ Each field can specify:
 - **type**: The data type (required for detailed definitions)
 - **description**: Human-readable description
 - **required**: Whether the field must be present in the payload (defaults to `false`)
-- **default_value**: Default value applied when the field is omitted. A field cannot declare both `required = true` and a `default_value` — a default makes absence legal, which contradicts requiring the field, so the pair is rejected at validation
+- **default_value**: Default value applied when the field is omitted. A field cannot declare both `required = true` and a `default_value` — a default makes absence legal, which contradicts requiring the field, so the pair is rejected at validation. A defaulted field never holds nothing: a value that sets it to `null` is refused, so leave the key out to get the default
 - **choices**: For `enum`-like fields, a list of valid values
 - **item_type**: For `list` fields, the type of list items
 - **key_type** and **value_type**: For `dict` fields, the types of keys and values
@@ -299,6 +299,8 @@ bio = { type = "text", description = "User bio" }  # Optional (default)
 ```
 
 In this example, `username` and `email` are mandatory, while `bio` is optional.
+
+Only an optional field with no `default_value` may hold nothing, and it is the only kind of field a value may set to `null`. A required field refuses `null`, a required field naming `native.Anything` included, which takes any value but `null`, and so does a defaulted one. This is the rule a [binding step](../pipes/understanding-optionality.md#binding-steps-under-absence) reading a field relies on: binding a required or defaulted field never records an absence.
 
 ## Generating Python Classes
 
