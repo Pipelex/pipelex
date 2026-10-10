@@ -1,3 +1,4 @@
+from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.html_content import HtmlContent
@@ -147,6 +148,17 @@ class TestWorkingMemoryGenerateContext:
         assert context["main_text"] is context["primary_text"]
         assert context["backup_text"] is context["secondary_text"]
         assert context[MAIN_STUFF_NAME] is context["primary_text"]
+
+    def test_generate_context_leaves_out_an_alias_whose_target_was_resolved_absent(self, memory_with_aliases: WorkingMemory):
+        """The alias outlives its target's resolution as an absence; the context holds neither, so a template reads both as absent."""
+        memory_with_aliases.record_resolved_absence(
+            AbsenceRecord(variable_name="secondary_text", kind=AbsenceKind.DECLARED_ABSENT, reason="nothing to back up", producing_pipe="backup")
+        )
+
+        context = memory_with_aliases.generate_context()
+
+        assert sorted(context) == sorted(["primary_text", "main_text", MAIN_STUFF_NAME])
+        assert context["main_text"] is context["primary_text"]
 
     def test_generate_context_complex_list(self, complex_list_memory: WorkingMemory):
         """Test generate_context with complex list content."""

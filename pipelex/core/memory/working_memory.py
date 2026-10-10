@@ -295,12 +295,15 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
         for name, stuff in self.root.items():
             artefact_dict[name] = stuff.make_artefact()
         for alias, target in self.aliases.items():
-            artefact_dict[alias] = artefact_dict[target]
+            # An alias outlives its target's resolution as an absence (`record_resolved_absence`), and then names nothing.
+            if target in artefact_dict:
+                artefact_dict[alias] = artefact_dict[target]
         return artefact_dict
 
     @override
     def is_variable_present(self, *, name: str) -> bool:
-        return self.is_stuff_exists(name=name)
+        # Read as `get_optional_stuff` reads: an alias whose target was later resolved absent outlives it and holds nothing.
+        return self.get_optional_stuff(name=name) is not None
 
     @override
     def get_typed_object_or_attribute(self, name: str, *, wanted_type: type[Any] | None = None, accept_list: bool = False) -> Any:

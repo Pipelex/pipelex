@@ -100,8 +100,9 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
             with self.locating_model_choice(field_name="model"):
                 check_judgment_choice_with_deck(judgment_choice=self.judgment_choice)
 
-        # Only the prompt presents files: a question is sent as plain text, so an image or a document it
-        # read would reach the model as a dangling token naming no file.
+        # Only the prompt presents files: the question is rendered against the raw context with no token
+        # parameters, so an image or a document it read would be written into the question sent to the
+        # vendor as the content's string form, such as its storage URL, rather than presented as a file.
         question_file_paths = [
             *(image_reference.variable_path for image_reference in self.question_image_references or []),
             *(document_reference.variable_path for document_reference in self.question_document_references or []),

@@ -14,6 +14,7 @@ from pipelex.cogt.image.prompt_image import PromptImageUri
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.document_content import DocumentContent
@@ -200,6 +201,23 @@ class TestPromptAssembly:
         assert assembled.text == "Note: Handle with care."
         assert assembled.images == []
         assert assembled.documents == []
+
+    async def test_an_optional_image_reached_through_an_alias_to_a_resolved_absent_slot_is_skipped(self) -> None:
+        """The alias outlives its target's resolution as an absence, and the slot it names holds nothing to present."""
+        memory = _every_kind_of_file()
+        memory.add_alias("snapshot", target="photo")
+        memory.record_resolved_absence(
+            AbsenceRecord(variable_name="photo", kind=AbsenceKind.DECLARED_ABSENT, reason="no photo was taken", producing_pipe="take_photo")
+        )
+        content = UserPromptContent(
+            template=_template("Note: $note{% if snapshot %} $snapshot{% endif %}"),
+            image_references=[ImageReference(variable_path="snapshot", kind=ImageReferenceKind.DIRECT, is_optional=True)],
+        )
+
+        assembled = await assemble_user_prompt(prompt_content=content, context_provider=memory, templating_style=_STYLE)
+
+        assert assembled.text == "Note: Handle with care."
+        assert assembled.images == []
 
     async def test_a_present_optional_file_is_attached_and_numbered(self) -> None:
         """Being declared optional changes nothing for a file that is there, a dotted path into a present input included."""
