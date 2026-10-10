@@ -26,6 +26,10 @@
 
 - **`ConfigModelError` and `ConfigModel`'s conversion helpers (Breaking)**: `ConfigModel.transform_dict_str_to_enum`, `transform_dict_of_floats_str_to_enum`, `transform_dict_keys_str_to_enum` and `transform_list_of_str_to_enum` are gone, and with them `ConfigModelError`, which only they raised. A configuration model holding enums in a container annotates them with `LaxEnum` from `pipelex.system.configuration.config_model`, `list[LaxEnum[MyEnum]]`, and pydantic converts the strings itself.
 
+### Removed
+
+- **`[inference.gateway_test]` (Breaking)**: the maintainer-only section whose `config_id_substitutions` map swapped the Pipelex Gateway's model configurations is gone, with its `GatewayTestConfig` model and the `gateway_test` field of `InferenceConfig`, as nothing has read it since the Gateway backend left in 0.73.0. **Migration:** run `pipelex migrate`, which deletes the section from the file on disk (ledger entry `pipelex-config@8`).
+
 ### Security
 
 - **The API server refuses to start on an unknown `AUTH_MODE` (Breaking)**: a value that is not exactly `none`, `jwt` or `api_key`, such as `jwtt` or `JWT`, now stops the server at startup with `InvalidAuthModeError`, whose message names the valid modes, where the server used to log a warning and serve every `/v1` route without authentication. An unset or empty `AUTH_MODE` still means `none`. A deployment that booted on a mistyped mode sets it to the mode it meant.

@@ -430,8 +430,8 @@ class ImgGenArgsFactory:
                 | AspectRatioTaxonomy.GEMINI_3_FLASH
                 | AspectRatioTaxonomy.GEMINI_3_FLASH_LITE
             ):
-                # The Google native worker and the gateway build their own `image_config`
-                # from the job params; this path validates the (aspect_ratio, size) pair
+                # The Google native worker builds its own `image_config` from the job
+                # params; this path validates the (aspect_ratio, size) pair
                 # against the taxonomy's published grids and exposes the ratio literal.
                 resolved = ImgGenGeminiMapping.resolve_image_config(
                     aspect_ratio_taxonomy,

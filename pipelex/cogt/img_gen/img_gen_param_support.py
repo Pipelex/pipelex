@@ -10,10 +10,9 @@ Used by:
 - `PipeImgGen` blueprint validation, to surface config errors at load time.
 
 Unknown-taxonomy policy: if a rule value cannot be parsed into the expected
-taxonomy enum, the check abstains (returns supported=True). Some backends
-(e.g. the Pipelex gateway) carry rules whose taxonomy strings predate this
-factory, and those rules are consumed by a different worker — abstaining
-prevents false negatives in those cases.
+taxonomy enum, the check abstains (returns supported=True). A backend file
+written before this factory may carry rules whose taxonomy strings it cannot
+parse, and abstaining prevents false negatives in that case.
 """
 
 from typing import NamedTuple
