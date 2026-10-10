@@ -39,7 +39,6 @@ ConceptRefineError | Concept refine | https://docs.pipelex.com/latest/errors/con
 ConceptStringError | Concept string | https://docs.pipelex.com/latest/errors/concept-string-error/
 ConceptStructureGeneratorError | Concept structure generator | https://docs.pipelex.com/latest/errors/concept-structure-generator-error/
 ConceptStructureValidationError | Concept structure validation | https://docs.pipelex.com/latest/errors/concept-structure-validation-error/
-ConfigModelError | Config model | https://docs.pipelex.com/latest/errors/config-model-error/
 ConfigValidationError | Config validation | https://docs.pipelex.com/latest/errors/config-validation-error/
 ConstructFieldBlueprintTypeError | Construct field blueprint type | https://docs.pipelex.com/latest/errors/construct-field-blueprint-type-error/
 ConstructFieldBlueprintValueError | Construct field blueprint value | https://docs.pipelex.com/latest/errors/construct-field-blueprint-value-error/

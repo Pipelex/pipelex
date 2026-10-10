@@ -1,7 +1,6 @@
 import pytest
 
-from pipelex.tools.log.log_config import CallerInfoTemplate, LogConfig
-from pipelex.tools.log.log_levels import LogLevel
+from pipelex.tools.log.log_config import CallerInfoTemplate
 
 
 class TestLogConfigUtilities:
@@ -19,13 +18,3 @@ class TestLogConfigUtilities:
     )
     def test_caller_info_template_mapping(self, template_key: CallerInfoTemplate, expected_template: str) -> None:
         assert CallerInfoTemplate.for_template_key(template_key) == expected_template
-
-    def test_validate_package_log_levels_converts_strings_to_enum(self) -> None:
-        package_levels = {"pipelex": "DEBUG", "pipelex.tools": "INFO"}
-
-        validated_levels = LogConfig.validate_package_log_levels(package_levels)
-
-        assert validated_levels == {
-            "pipelex": LogLevel.DEBUG,
-            "pipelex.tools": LogLevel.INFO,
-        }

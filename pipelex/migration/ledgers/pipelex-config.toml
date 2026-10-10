@@ -12,7 +12,7 @@ id = "pipelex-config"
 title = "The main Pipelex configuration"
 base_file = "pipelex.toml"
 tier_glob = "pipelex_*.toml"
-current_schema_version = 7
+current_schema_version = 8
 min_supported_schema_version = 0
 
 # This entry is inserted *below* the reshape rather than appended above it, and the order is what
@@ -506,3 +506,24 @@ its tags: put the values in `fields`, which the console colours by name.
 kind = "delete_key"
 table_path = ["runtime", "log", "rich_log"]
 key = "is_markup_enabled"
+
+[[migration]]
+id = "pipelex-config@8"
+to_schema_version = 8
+introduced_in = "0.82.0"
+breaking = true
+safety = "safe"
+title = "Drop the maintainer-only [inference.gateway_test] section"
+description = """
+`[inference.gateway_test]` held the `config_id_substitutions` map that let Pipelex staff swap the \
+Pipelex Gateway's model configurations while testing, and it went unread when the Gateway backend left \
+the runtime in 0.73.0. The section is gone from the configuration, and a file still carrying it loses it.
+"""
+guidance = """
+Nothing to decide: the map was empty unless a maintainer filled it, and nothing has read it since \
+0.73.0, so dropping it changes no behaviour.
+"""
+
+[[migration.ops]]
+kind = "delete_table"
+table_path = ["inference", "gateway_test"]

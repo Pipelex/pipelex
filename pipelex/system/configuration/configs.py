@@ -95,14 +95,8 @@ class ObserverConfig(ConfigModel):
 
 
 class ScanConfig(ConfigModel):
-    excluded_dirs: frozenset[str]
-
-    @field_validator("excluded_dirs", mode="before")
-    @classmethod
-    def validate_excluded_dirs(cls, value: list[str] | frozenset[str]) -> frozenset[str]:
-        if isinstance(value, frozenset):
-            return value
-        return frozenset(value)
+    # Lax so the TOML array converts to a set; a string or a number is still refused.
+    excluded_dirs: frozenset[str] = Field(strict=False)
 
 
 class BuilderConfig(ConfigModel):
