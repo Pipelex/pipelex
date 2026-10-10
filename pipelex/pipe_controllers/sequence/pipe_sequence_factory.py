@@ -61,13 +61,16 @@ class PipeSequenceFactory(PipeFactoryProtocol[PipeSequenceBlueprint, PipeSequenc
                 sequential_sub_pipes.append(BindingStep(from_path=step.from_path, output_name=step.result))
                 continue
             pipe_step = step
+            batch_over_path: str | None = None
             if step.batch_over is not None and is_dotted_batch_over(batch_over=step.batch_over):
-                private_name = make_private_binding_name(path=step.batch_over, taken_names=taken_names)
+                batch_over_path = step.batch_over
+                private_name = make_private_binding_name(path=batch_over_path, taken_names=taken_names)
                 taken_names.add(private_name)
-                sequential_sub_pipes.append(BindingStep(from_path=step.batch_over, output_name=private_name, is_dotted_batch_over=True))
-                # A copy, never validated again: the private name is the runtime's own, outside the names an author writes.
+                sequential_sub_pipes.append(BindingStep(from_path=batch_over_path, output_name=private_name, is_dotted_batch_over=True))
+                # A copy, never validated again: the private name is the runtime's own, outside the names an author writes. The batch
+                # keeps the path, so its refusals name the `batch_over` the author wrote.
                 pipe_step = step.model_copy(update={"batch_over": private_name})
-            sequential_sub_pipes.append(SubPipeFactory.make_from_blueprint(blueprint=pipe_step))
+            sequential_sub_pipes.append(SubPipeFactory.make_from_blueprint(blueprint=pipe_step, batch_over_path=batch_over_path))
 
         return PipeSequence(
             domain_code=domain_code,

@@ -58,6 +58,27 @@ class TestBindingDerivationRefusals:
         assert message_fragment in str(raised.value)
         assert f"'{failed_segment}'" in str(raised.value)
 
+    @pytest.mark.parametrize(
+        ("path", "root", "closing_clause"),
+        [
+            pytest.param("invoice.total.amount", INVOICE, "so the segment 'amount' cannot follow it.", id="past-a-plain-field"),
+            pytest.param("invoice.metadata.code", INVOICE, "so the segment 'code' cannot follow it.", id="past-a-dict-field"),
+            pytest.param(
+                "note.text", make_root("native.Text"), "so it is a leaf and the segment 'text' cannot follow it.", id="into-a-single-field-native"
+            ),
+            pytest.param("anything.name", make_root("native.Anything"), "so the segment 'name' has no structure to walk.", id="into-no-structure"),
+        ],
+    )
+    def test_a_leaf_refusal_ends_at_its_clause(self, path: str, root: BindingRoot, closing_clause: str):
+        """The clause already says the value has no fields to walk, so no sentence after it says so again."""
+        with pytest.raises(BindingPathUnresolvedError) as raised:
+            derive_binding(path=path, root=root, resolver=RESOLVER)
+
+        message = str(raised.value)
+        assert message.endswith(closing_clause)
+        assert message.count("no fields") <= 1
+        assert raised.value.available_fields == []
+
     def test_an_unknown_field_lists_every_field_available_there(self):
         with pytest.raises(BindingPathUnresolvedError) as raised:
             derive_binding(path="invoice.totl", root=INVOICE, resolver=RESOLVER)

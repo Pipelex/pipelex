@@ -13,8 +13,16 @@ class SubPipeFactory:
     def make_from_blueprint(
         cls,
         blueprint: SubPipeBlueprint,
+        *,
+        batch_over_path: str | None = None,
     ) -> SubPipe:
-        """Create a SubPipe from a SubPipeBlueprint."""
+        """Create a SubPipe from a SubPipeBlueprint.
+
+        Args:
+            blueprint: The step, its `batch_over` a name in working memory.
+            batch_over_path: The dotted `batch_over` its author wrote, when a PipeSequence rewrote it into a binding under the
+                private name the blueprint now batches over, so that messages name the path rather than that name.
+        """
         batch_params: BatchParams | None = None
         output_multiplicity: VariableMultiplicity | None = None
 
@@ -22,6 +30,7 @@ class SubPipeFactory:
             batch_params = BatchParams.make_batch_params(
                 input_list_name=blueprint.batch_over,
                 input_item_name=blueprint.batch_as,
+                batch_over_path=batch_over_path,
             )
             output_multiplicity = True
             if blueprint.nb_output:

@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, field_validator
 
-from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
+from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError, WorkingMemoryTypeError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError, PipeRunInputsError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
@@ -89,18 +89,33 @@ class SubPipe(BaseModel):
         if batch_params := self.batch_params:
             sub_pipe_run_params.batch_params = batch_params
 
+            # The list is named as its author wrote it: a dotted `batch_over` is stored under a private name, which the messages of
+            # the working memory's own errors would name, so neither is quoted here.
+            list_label = batch_params.input_list_label
             try:
                 working_memory.get_typed_object_or_attribute(name=batch_params.input_list_stuff_name, wanted_type=ListContent)
             except WorkingMemoryStuffNotFoundError as exc:
                 msg = (
-                    f"Input list stuff named '{batch_params.input_list_stuff_name}' required by sub_pipe '{self.pipe_code}' "
-                    f"of pipe '{calling_pipe_code}' not found in working memory: {exc}"
+                    f"The list '{list_label}' that the step running pipe '{self.pipe_code}' of pipe '{calling_pipe_code}' batches over "
+                    "is not in working memory."
                 )
                 raise PipeRunInputsError(
                     message=msg,
                     run_mode=sub_pipe_run_params.run_mode,
                     pipe_code=self.pipe_code,
-                    variable_name=batch_params.input_list_stuff_name,
+                    variable_name=list_label,
+                    concept_code=None,
+                ) from exc
+            except WorkingMemoryTypeError as exc:
+                msg = (
+                    f"The value '{list_label}' that the step running pipe '{self.pipe_code}' of pipe '{calling_pipe_code}' batches over "
+                    "is not a list: a batch runs its pipe once per item of a list."
+                )
+                raise PipeRunInputsError(
+                    message=msg,
+                    run_mode=sub_pipe_run_params.run_mode,
+                    pipe_code=self.pipe_code,
+                    variable_name=list_label,
                     concept_code=None,
                 ) from exc
 
