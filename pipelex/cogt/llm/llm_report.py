@@ -4,6 +4,7 @@ from typing import Any, Literal
 from pydantic import BaseModel
 
 from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
+from pipelex.cogt.usage.pricing_unit import PricingUnit
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.system.job_metadata import JobMetadata
 
@@ -69,3 +70,5 @@ class LLMTokensUsage(BaseModel):
     unit_costs: CostsByCategoryDict
     inference_model_id: str
     nb_tokens_by_category: NbTokensByCategoryDict
+    # What the counts are: tokens, or requests or pages recorded as a million tokens each so the rates price one.
+    pricing_unit: PricingUnit = PricingUnit.TOKEN

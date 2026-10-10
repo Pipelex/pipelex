@@ -7,9 +7,11 @@ from pipelex.cogt.exceptions import CogtError, ExtractCapabilityError, ExtractIn
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput
+from pipelex.cogt.inference.inference_call_summary import InferenceCallSummary, InferenceOperation
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
+from pipelex.cogt.usage.pricing_unit import PricingUnit
+from pipelex.cogt.usage.usage_cost import record_unit_priced_usage
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.job_metadata import UnitJobId
 from pipelex.tools.misc.filetype_utils import IMAGE_FORMAT_KEY, describe_file_format, describe_format_keys, format_key_from_mime_type
@@ -108,42 +110,49 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
         )
         raise ExtractInputFormatError(msg)
 
+    def _call_summary(self, *, extract_job: ExtractJob) -> InferenceCallSummary:
+        """The event the call ends with, its model and its usage read off the worker and the job it reports when it ends."""
+        return InferenceCallSummary(
+            operation=InferenceOperation.EXTRACT,
+            model_handle=self.inference_model.name,
+            read_inference_model=lambda: self.inference_model,
+            read_tokens_usage=lambda: extract_job.job_report.extract_tokens_usage,
+        )
+
     async def extract_pages(
         self,
         extract_job: ExtractJob,
     ) -> ExtractOutput:
-        # Verify that the job is valid
-        extract_job.validate_before_execution()
+        # The call ends with its summary event whichever way it ends, a refusal by the checks below included
+        with self._call_summary(extract_job=extract_job):
+            # Verify that the job is valid
+            extract_job.validate_before_execution()
 
-        # Verify feasibility
-        self._check_can_perform_job(extract_job=extract_job)
-        # TODO: check can generate object (where it will be appropriate)
+            # Verify feasibility
+            self._check_can_perform_job(extract_job=extract_job)
+            # TODO: check can generate object (where it will be appropriate)
 
-        # metadata
-        extract_job.job_metadata.unit_job_id = UnitJobId.EXTRACT_PAGES
+            # metadata
+            extract_job.job_metadata.unit_job_id = UnitJobId.EXTRACT_PAGES
 
-        # Prepare job
-        extract_job.extract_job_before_start(inference_model=self.inference_model)
+            # Prepare job
+            extract_job.extract_job_before_start(inference_model=self.inference_model)
 
-        # Execute job
-        try:
-            result = await self._extract_pages(extract_job=extract_job)
-        except CogtError as exc:
-            exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
-            raise
+            # Execute job
+            try:
+                result = await self._extract_pages(extract_job=extract_job)
+            except CogtError as exc:
+                exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
+                raise
 
-        # Populate page count as fallback usage (only if no real usage was reported)
-        if (extract_tokens_usage := extract_job.job_report.extract_tokens_usage) and not extract_tokens_usage.nb_tokens_by_category:
-            nb_tokens: NbTokensByCategoryDict = {
-                TokenCategory.INPUT: len(result.pages) * 1_000_000,
-                TokenCategory.OUTPUT: len(result.pages) * 1_000_000,
-            }
-            extract_tokens_usage.nb_tokens_by_category = nb_tokens
+            # Price the call by its pages when the provider reported no usage
+            if (extract_tokens_usage := extract_job.job_report.extract_tokens_usage) and not extract_tokens_usage.nb_tokens_by_category:
+                record_unit_priced_usage(tokens_usage=extract_tokens_usage, pricing_unit=PricingUnit.PAGE, nb_units=len(result.pages))
 
-        # Report job
-        extract_job.extract_job_after_complete()
-        if self.reporting_delegate:
-            self.reporting_delegate.report_inference_job(inference_job=extract_job)
+            # Report job
+            extract_job.extract_job_after_complete()
+            if self.reporting_delegate:
+                self.reporting_delegate.report_inference_job(inference_job=extract_job)
 
         return result
 

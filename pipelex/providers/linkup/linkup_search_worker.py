@@ -24,7 +24,8 @@ from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_job import SearchJob
 from pipelex.cogt.search.search_worker_abstract import SearchWorkerAbstract
 from pipelex.cogt.search.structured_search_payload import extract_structured_search_payload
-from pipelex.cogt.usage.token_category import TokenCategory
+from pipelex.cogt.usage.pricing_unit import PricingUnit
+from pipelex.cogt.usage.usage_cost import record_unit_priced_usage
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.providers.linkup.linkup_exceptions import LinkupSearchEmptyResultError, LinkupSearchResponseError
@@ -88,9 +89,9 @@ class LinkupSearchWorker(SearchWorkerAbstract):
                 model_handle=self.inference_model.name,
             ) from sdk_exc
 
-        # Per-request cost model: costs are defined per million, so 1 request = 1_000_000
+        # Linkup bills by the request, which the usage records as one request priced at the model's rate
         if search_tokens_usage := search_job.job_report.search_tokens_usage:
-            search_tokens_usage.nb_tokens_by_category = {TokenCategory.INPUT: 1_000_000, TokenCategory.OUTPUT: 1_000_000}
+            record_unit_priced_usage(tokens_usage=search_tokens_usage, pricing_unit=PricingUnit.REQUEST, nb_units=1)
 
         sources: list[DocumentContent] = []
         for source in response.sources:
@@ -160,9 +161,9 @@ class LinkupSearchWorker(SearchWorkerAbstract):
                 model_handle=self.inference_model.name,
             ) from sdk_exc
 
-        # Per-request cost model: costs are defined per million, so 1 request = 1_000_000
+        # Linkup bills by the request, which the usage records as one request priced at the model's rate
         if search_tokens_usage := search_job.job_report.search_tokens_usage:
-            search_tokens_usage.nb_tokens_by_category = {TokenCategory.INPUT: 1_000_000, TokenCategory.OUTPUT: 1_000_000}
+            record_unit_priced_usage(tokens_usage=search_tokens_usage, pricing_unit=PricingUnit.REQUEST, nb_units=1)
 
         # The contract of a structured search is the structured payload itself — it is validated against
         # the caller's output structure class, which has nowhere to put sources. Asking for them wraps the

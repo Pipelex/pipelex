@@ -14,4 +14,3 @@ AnyTokensUsage = Annotated[
     LLMTokensUsage | ImgGenTokensUsage | ExtractTokensUsage | SearchTokensUsage | JudgmentTokensUsage,
     Field(discriminator="model_type"),
 ]
-TokensUsage = AnyTokensUsage

@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import BaseModel, ConfigDict
 
-from pipelex.cogt.usage.cost_registry import compute_tokens_usage_cost
+from pipelex.cogt.usage.usage_cost import compute_tokens_usage_cost
 from pipelex.reporting.reporting_types import AnyTokensUsage
 
 if TYPE_CHECKING:

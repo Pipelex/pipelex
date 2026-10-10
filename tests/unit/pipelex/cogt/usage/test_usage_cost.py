@@ -1,12 +1,17 @@
 import pytest
 
 from pipelex.cogt.usage.cost_category import CostCategory
-from pipelex.cogt.usage.cost_registry import CostRegistry, compute_tokens_usage_cost
+from pipelex.cogt.usage.cost_registry import CostRegistry
+from pipelex.cogt.usage.usage_cost import compute_tokens_usage_cost, compute_total_cost
 from pipelex.reporting.reporting_types import AnyTokensUsage
 from tests.unit.pipelex.cogt.usage.test_data import RATED_EXPECTED_COST, UsageFixtures
 
 
 class TestComputeTokensUsageCost:
+    def test_total_cost_adds_up_the_components(self):
+        """A call's total is what it read uncached, plus what it read from the cache, plus what it wrote."""
+        assert compute_total_cost(input_non_cached_cost=1.0, input_cached_cost=0.5, output_cost=2.0) == 3.5
+
     def test_none_when_unrated(self):
         """No rate table (own-GPU, dry/mock run) means no cost claim — None, not 0.0."""
         assert compute_tokens_usage_cost(UsageFixtures.unrated_usage()) is None
@@ -27,7 +32,7 @@ class TestComputeTokensUsageCost:
     def test_parity_with_cost_registry_per_record(self, tokens_usage: AnyTokensUsage):
         """The wire cost equals the canonical CostRegistry total for the same record — one cost engine, no drift."""
         cost_report = CostRegistry.complete_cost_report(tokens_usage=tokens_usage)
-        registry_total = CostRegistry.compute_total_cost(
+        registry_total = compute_total_cost(
             input_non_cached_cost=cost_report.costs_by_token_category[CostCategory.INPUT_NON_CACHED],
             input_cached_cost=cost_report.costs_by_token_category[CostCategory.INPUT_CACHED],
             output_cost=cost_report.costs_by_token_category.get(CostCategory.OUTPUT, 0.0),
