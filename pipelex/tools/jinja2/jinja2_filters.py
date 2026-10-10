@@ -5,6 +5,7 @@ from jinja2 import pass_context
 from jinja2.runtime import Context, Undefined
 from markupsafe import Markup
 
+from pipelex.cogt.doc_gen.formatted_markdown import FormattedMarkdown, format_markdown
 from pipelex.tools.jinja2.exceptions import Jinja2ContextError
 from pipelex.tools.jinja2.html_renderable import HtmlRenderable
 from pipelex.tools.jinja2.image_registry import ImageRegistry
@@ -217,3 +218,22 @@ def markdown_to_html(value: Any) -> Markup:
     # `str()` of a strict undefined raises, and of a lenient one is empty.
     source_text = value if isinstance(value, str) else str(value)
     return Markup(render_markdown_as_html(source_text))  # ruff: ignore[unsafe-markup-use] - raw HTML in the source is escaped by the parser
+
+
+def markdown_to_formatted(value: Any) -> FormattedMarkdown:
+    """Read a text as Markdown for a document engine to print: the `markdown` filter of plain-data templates.
+
+    It is for Markdown held in a text field, such as an invoice's notes, in a template a document engine fills itself,
+    such as a Word template's tags. It reads its value as the HTML templates' filter does (`markdown_to_html`): None
+    gives nothing, a text is read as Markdown, anything else as its string form, and an undefined value prints the way
+    the template prints one anywhere else, which fails a strict template's render.
+
+    The result is the contract's `FormattedMarkdown` (`formatted_markdown.py`), which the engine's `finalize` turns
+    into its own form when it prints, and which prints as its plain text where nothing does. The conversion is charged
+    to the render's budget.
+    """
+    if value is None:
+        return FormattedMarkdown(blocks=[])
+    # `str()` of a strict undefined raises, and of a lenient one is empty.
+    source_text = value if isinstance(value, str) else str(value)
+    return format_markdown(markdown=source_text)
