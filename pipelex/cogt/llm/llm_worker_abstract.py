@@ -201,12 +201,12 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         # Skip if telemetry is disabled (no otel_context)
         if otel_context is None:
-            log.verbose("OTel: the job carries no otel_context, so no LLM span is started")
+            log.verbose("No LLM span was started, since the job carries no OpenTelemetry context")
             return None
 
         tracer = TelemetryManagerAbstract.get_instance_tracer()
         if tracer is None:
-            log.verbose("OTel: no tracer is available, so no LLM span is started")
+            log.verbose("No LLM span was started, since no tracer is available")
             return None
 
         unit_job_id = job_metadata.unit_job_id
@@ -418,7 +418,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         requested_temperature = self._scaled_temperature(inference_model=self.inference_model, temperature=llm_job.job_params.temperature)
         if fixed_temperature is not None and requested_temperature != fixed_temperature:
             log.warning(
-                "The model takes a fixed temperature, so it is used in place of the requested one",
+                "The model's fixed temperature was used in place of the requested one",
                 fields={
                     "model_handle": self.inference_model.name,
                     "backend_name": self.inference_model.backend_name,

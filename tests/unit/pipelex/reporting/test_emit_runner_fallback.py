@@ -44,6 +44,8 @@ DATA_INCLUSION_OFF = DataInclusionConfig(
     error_stack_traces=False,
 )
 
+_ENGAGED_MESSAGE = "Usage events are emitted through this process's activity event log"
+
 
 def _make_llm_job(
     pipeline_run_id: str,
@@ -326,7 +328,7 @@ class TestEmitRunnerFallback:
         mocker: MockerFixture,
         caplog: pytest.LogCaptureFixture,
     ) -> None:
-        """The 'activity-side emission engaged' INFO log fires only on the first emission per process."""
+        """The INFO line saying usage events go through the activity event log fires only on the first emission per process."""
         _enable_ndjson_tracing(mocker, tmp_path)
 
         manager = ReportingManager()
@@ -337,7 +339,7 @@ class TestEmitRunnerFallback:
             for _ in range(100):
                 manager.report_inference_job(_make_llm_job("run_abc", trace_context=trace_context))
 
-        engaged_records = [record for record in caplog.records if "activity-side usage event emission engaged" in record.message.lower()]
+        engaged_records = [record for record in caplog.records if record.getMessage() == _ENGAGED_MESSAGE]
         assert len(engaged_records) == 1
 
     def test_engaged_log_emitted_once_even_with_multiple_managers(
@@ -360,7 +362,7 @@ class TestEmitRunnerFallback:
             manager_b.setup()
             manager_b.report_inference_job(_make_llm_job("run_abc", trace_context=trace_context))
 
-        engaged_records = [record for record in caplog.records if "activity-side usage event emission engaged" in record.message.lower()]
+        engaged_records = [record for record in caplog.records if record.getMessage() == _ENGAGED_MESSAGE]
         assert len(engaged_records) == 1
 
     def test_retried_activity_emits_duplicate_usage_event_documenting_r2(

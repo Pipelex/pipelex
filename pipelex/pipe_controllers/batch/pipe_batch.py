@@ -18,6 +18,7 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.telemetry.otel_constants import OTelLogAttr
+from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pipelex.tools.misc.async_utils import gather_bounded
 from pipelex.urls import URLs
 
@@ -35,22 +36,16 @@ LARGE_BATCH_ADVISORY_THRESHOLD = 100
 def warn_of_large_batch(*, pipe_code: str, item_count: int, max_concurrency: int | None) -> None:
     """Advise a durable execution backend for a batch past ``LARGE_BATCH_ADVISORY_THRESHOLD`` items.
 
-    Each case has its own message, which says what the fan-out is: bounded, it is backpressure, and unbounded it is not
-    even that. ``max_concurrency`` is always an integer, so a log query reads one type: it is absent from the line when
-    the configuration's ``"unbounded"`` resolved to no bound at all.
+    Bounded or not, the fan-out is one event: a bound is backpressure, and neither is durable, rate-limited execution.
+    ``max_concurrency`` is always an integer, so a log query reads one type: it is absent from the line when the
+    configuration's ``"unbounded"`` resolved to no bound at all.
     """
-    if max_concurrency is None:
-        log.warning(
-            "A PipeBatch fans out over a large list with unbounded fan-out, which is neither backpressure nor durable execution; "
-            "for a workload this size, consider a durable execution backend for rate-limited, resumable runs",
-            fields={"pipe_code": pipe_code, "item_count": item_count, OTelLogAttr.URL_FULL: URLs.durable_execution},
-        )
-        return
-    log.warning(
-        "A PipeBatch fans out over a large list with bounded fan-out, which is backpressure and not durable execution; "
-        "for a workload this size, consider a durable execution backend for rate-limited, resumable runs",
-        fields={"pipe_code": pipe_code, "item_count": item_count, "max_concurrency": max_concurrency, OTelLogAttr.URL_FULL: URLs.durable_execution},
-    )
+    fields: dict[str, str | int] = {"pipe_code": pipe_code, "item_count": item_count}
+    if max_concurrency is not None:
+        fields["max_concurrency"] = max_concurrency
+    fields[OTelLogAttr.URL_FULL] = URLs.durable_execution
+    fields[USER_ACTION_FIELD] = "Consider a durable execution backend for rate-limited, resumable runs"
+    log.warning("A PipeBatch fans out over a large list without durable execution", fields=fields)
 
 
 class PipeBatch(PipeController):

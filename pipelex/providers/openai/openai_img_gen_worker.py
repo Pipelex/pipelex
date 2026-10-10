@@ -76,7 +76,7 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
             # only valid on the images.edit route (images.generate rejects it with a 400).
             if "image" in args_dict:
                 if args_dict.pop("moderation", None) is not None:
-                    log.warning("OpenAI images.edit does not accept 'moderation'; dropping the kwarg")
+                    log.warning("The moderation setting was dropped from an OpenAI image edit, which takes none")
                 images_response = cast("ImagesResponse", await self.openai_client.images.edit(**args_dict))
             else:
                 images_response = cast("ImagesResponse", await self.openai_client.images.generate(**args_dict))

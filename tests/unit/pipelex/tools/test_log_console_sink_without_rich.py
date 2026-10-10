@@ -34,6 +34,7 @@ _GUARD_SCRIPT = textwrap.dedent(
         rich_log_config=RichLogConfig(
             is_show_time=False,
             is_show_level=True,
+            is_show_path=False,
             is_link_path_enabled=True,
             highlighter_name=HighlighterName.JSON,
             is_rich_tracebacks=True,

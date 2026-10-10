@@ -36,7 +36,7 @@ def _is_valid_structure_class(*, structure_class_name: str) -> bool:
         return True
     if get_class_registry().has_class(name=structure_class_name):
         log.warning(
-            "A class registered under a concept's structure class name is not a StuffContent subclass, so the concept does not use it",
+            "A concept's registered structure class is not a StuffContent and was not used",
             fields={"structure_class_name": structure_class_name},
         )
     return False

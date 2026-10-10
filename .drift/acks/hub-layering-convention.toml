@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:81bac50d761cef4a2fae569e987ff576588869e0d05eb25e8037cb83959c0680"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-07T13:45:51Z"
-rationale = "real-catch: the guard now declares pipelex.hosted in KERNEL_LAYER_PACKAGES. hub-layering.md's declared-package list names it, and the paragraph accounting for every top-level package says why it is declared in its first commit: a hosted run boots nothing and reads config, builds the pipelex-sdk client and maps the run without loading an interpreter module, while what needs a bundle parsed stays in pipelex.cli. The kernel-layer import-closure test gained its three entry points and measures it clean."
+digest = "sha256:a6c9b398552db5a716bbd6fe02c68c4f10a1bcae770e232be643c55b52585880"
+reviewed_by = "Claude (Opus 5.5)"
+reviewed_at = "2026-10-10T11:27:08Z"
+rationale = "clean-pass: runtime_hub.py rewords two warnings (a second set_config, and a live run forced dry under a keyless boot, whose advice now rides user_action) and imports USER_ACTION_FIELD from pipelex.tools.log.log_fields, a kernel-layer leaf; no accessor was added, moved or removed and KERNEL_LAYER_PACKAGES is unchanged. Ran the page's two mechanical checks from the code: every public function and class defined at module level in runtime_hub.py and interpreter_hub.py appears in the partition tables, and every package of the guard's KERNEL_LAYER_PACKAGES is named under the layer rule. check-hub-layering passes with the new import. Nothing was stale."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:fda2237457fe0b6830ff2ae8f720698735bec4c3"
 "pipelex/interpreter_hub.py" = "blob:327e75d0fbb5bdf46f6cbf06024f83840f0106d0"
-"pipelex/runtime_hub.py" = "blob:05f84b9604b9f904e7df96d222b8856123ce9e91"
+"pipelex/runtime_hub.py" = "blob:65beba670c857897858b75fd17bbbc03ba84e750"

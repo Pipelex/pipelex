@@ -305,7 +305,7 @@ class TestConsoleFields:
             ),
         )
 
-        assert text.plain == "🧠: Running pipe_code=compose_company output_concept=Company pipe_type=PipeLLM attempt=2"
+        assert text.plain == "Running pipe_code=compose_company output_concept=Company pipe_type=PipeLLM attempt=2"
         assert styles_of(text=text, fragment="compose_company") == [FIELD_STYLES["pipe_code"]] == ["red"]
         assert styles_of(text=text, fragment="Company") == [FIELD_STYLES["output_concept"]] == ["bold green"]
         assert styles_of(text=text, fragment="PipeLLM") == [FIELD_STYLES["pipe_type"]] == ["white"]
@@ -322,7 +322,7 @@ class TestConsoleFields:
 
         text = rendered_text(record=record)
 
-        assert text.plain == f"🧠: Running {COLLIDING_FIELD_PREFIX}pipe_code=compose_company"
+        assert text.plain == f"Running {COLLIDING_FIELD_PREFIX}pipe_code=compose_company"
         assert styles_of(text=text, fragment="compose_company") == [FIELD_STYLES["pipe_code"]]
 
     def test_what_a_record_factory_or_the_runtime_stamped_is_not_shown(self) -> None:
@@ -332,7 +332,7 @@ class TestConsoleFields:
 
         text = rendered_text(record=record)
 
-        assert text.plain == "🧠: Stamped files=7"
+        assert text.plain == "Stamped files=7"
         assert FIELD_NAMES_MARK not in text.plain
 
     def test_a_record_the_fields_channel_never_saw_renders_its_message_alone(self) -> None:

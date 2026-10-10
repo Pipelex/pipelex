@@ -23,6 +23,7 @@ from pipelex.pipe_controllers.absence_taint import (
     SequenceTaintAnalysis,
     TaintTriggerScan,
     is_plural_step_result,
+    optional_input_taints,
     scan_taint_triggers,
 )
 from pipelex.pipe_controllers.binding.binding_derivation import BindingDerivation
@@ -42,7 +43,7 @@ from pipelex.pipe_controllers.sequence.sequence_typed_flow import (
     step_memory_writes,
 )
 from pipelex.pipe_controllers.sub_pipe import SubPipe
-from pipelex.pipe_machinery.memory_writes import MemoryWrite, SlotTaint, is_same_value_spec, taint_after_write
+from pipelex.pipe_machinery.memory_writes import MemoryWrite, SlotTaint, is_same_value_spec, taint_after_write, write_after_lift
 from pipelex.pipe_machinery.validation import is_valid_input_name, suggest_plain_name
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams, output_multiplicity_to_apply
 from pipelex.system.job_metadata import JobMetadata
@@ -814,13 +815,7 @@ class PipeSequence(PipeController):
         it lifts on nothing, and only the `!` lint reads what it consumes. That keeps a caller's needed inputs, which read
         `memory_writes` for every nested controller, from walking each nested controller's needs a second time.
         """
-        slot_taints: dict[str, SlotTaint] = {}
-        for input_name, stuff_spec in self.inputs.root.items():
-            if stuff_spec.presence.is_optional and not stuff_spec.is_multiple():
-                slot_taints[input_name] = SlotTaint(
-                    source=f"optional input '{input_name}' of pipe '{self.code}'",
-                    origin_slot_name=input_name,
-                )
+        slot_taints = optional_input_taints(pipe=self)
 
         liftable_steps: list[LiftableStepInfo] = []
         force_consumptions: list[ForceConsumptionInfo] = []
@@ -908,26 +903,23 @@ class PipeSequence(PipeController):
                 step_writes = typed_flow.memory_writes_by_pipe_step[step_index]
             else:
                 step_writes = step_memory_writes(step=sequential_sub_pipe, step_pipe=sub_pipe, visited_pipes=writes_visited_pipes)
-            for written_name, memory_write in step_writes.items():
+            for written_name, step_write in step_writes.items():
+                memory_write = step_write
                 if step_lifted and trigger_taint is not None:
-                    # The whole step lifts: what it always stores resolves exactly like the runtime
-                    # `_make_lifted_output` resolves its companion slots — a singular slot goes absent,
-                    # a plural slot becomes a guaranteed empty list (D4) — and a name only some runs
-                    # store is left as it was.
-                    if not memory_write.is_always_written:
-                        continue
-                    if memory_write.stuff_spec is not None and memory_write.stuff_spec.is_multiple():
-                        slot_taints.pop(written_name, None)
-                    else:
-                        slot_taints[written_name] = SlotTaint(
+                    # The step may be lifted, and may also run: what it always stores resolves exactly like the runtime
+                    # `_make_lifted_output` resolves its companion slots, a singular slot going absent and a plural slot
+                    # becoming a guaranteed empty list (D4), while a name only some runs store keeps what a run leaves.
+                    memory_write = write_after_lift(
+                        memory_write=step_write,
+                        lift_taint=SlotTaint(
                             source=trigger_taint.source,
                             origin_slot_name=trigger_taint.origin_slot_name,
                             chain=(
                                 *trigger_taint.chain,
                                 f"pipe '{sub_pipe.code}' may be skipped when '{trigger_scan.trigger_names[0]}' is absent → slot '{written_name}'",
                             ),
-                        )
-                    continue
+                        ),
+                    )
                 written_taint = taint_after_write(prior_taint=slot_taints.get(written_name), memory_write=memory_write)
                 if written_taint is None:
                     slot_taints.pop(written_name, None)

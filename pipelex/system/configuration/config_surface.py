@@ -39,6 +39,7 @@ from pipelex.migration.exceptions import MigrationLedgerError
 from pipelex.migration.ledger import MigrationLedger, load_ledger_cached, packaged_migration_dir
 from pipelex.migration.plan import MigrationPlan
 from pipelex.system.telemetry.otel_constants import OTelLogAttr
+from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pipelex.tools.misc.json_utils import deep_update
 
 # The reserved in-file table and key. Every configuration-surface reader tolerates them and
@@ -269,46 +270,35 @@ class StaleConfigurationWarning(NamedTuple):
     A loader builds it when its retry succeeds and either emits it there or parks it for the caller
     that owes the user the one copy of it (`take_stale_configuration_warning` on the main
     configuration's loader and on the inference backend library). **It is emitted as one line per
-    stale file**, each a fixed message naming that file's remedy with the file in `file.path`: the
-    file list is a value, a value rides a field, and a field the console cuts at its width cannot
-    carry a list of paths a person has to read. A load that spans files in and out of the walk
+    stale file**, each the same fixed message with the file in `file.path` and that file's remedy in
+    `user_action`: the file list is a value, a value rides a field, and a field the console cuts at its
+    width cannot carry a list of paths a person has to read. A load that spans files in and out of the walk
     therefore gets both remedies, each on the lines of its own files.
     """
 
     files: list[StaleConfigurationFile]
 
     def emit(self) -> None:
-        """One line per stale file, a fixed message naming that file's remedy.
+        """One line per stale file, one fixed message, with that file's remedy as its advice.
 
         The remedy is the command where it reaches the file, with the changes it reports it cannot apply where some
-        steps are blocked, and the file's own place where it does not. Every message says that nothing was written,
-        which is why the same warning comes back at the next boot.
+        steps are blocked, and the file's own place where it does not. The message says that the file was migrated in
+        memory only, which is why the same warning comes back at the next boot. Whatever its remedy, a stale file is one
+        event, so a log store counts every stale file under the one message.
         """
         for stale_file in self.files:
             if stale_file.is_reached_by_migrate and stale_file.has_blocked_steps:
-                log.warning(
-                    "A configuration file is out of date and was read as if it had been migrated, and nothing was written; "
-                    "run `pipelex migrate` to update it, and make by hand the changes it reports it cannot apply",
-                    fields=stale_file.log_fields(),
-                )
+                user_action = "Run pipelex migrate to update it, and make by hand the changes it reports it cannot apply"
             elif stale_file.is_reached_by_migrate:
-                log.warning(
-                    "A configuration file is out of date and was read as if it had been migrated, and nothing was written; "
-                    "run `pipelex migrate` to update it",
-                    fields=stale_file.log_fields(),
-                )
+                user_action = "Run pipelex migrate to update it"
             elif stale_file.has_blocked_steps:
-                log.warning(
-                    "A configuration file is out of date and was read as if it had been migrated, and nothing was written; "
-                    "`pipelex migrate` does not reach it, so update it where it lives, including changes no migration can apply for you",
-                    fields=stale_file.log_fields(),
-                )
+                user_action = "Update it where it lives, with the changes no migration can apply, since pipelex migrate does not reach it"
             else:
-                log.warning(
-                    "A configuration file is out of date and was read as if it had been migrated, and nothing was written; "
-                    "`pipelex migrate` does not reach it, so update it where it lives",
-                    fields=stale_file.log_fields(),
-                )
+                user_action = "Update it where it lives, since pipelex migrate does not reach it"
+            log.warning(
+                "A configuration file is out of date and was migrated in memory only",
+                fields={**stale_file.log_fields(), USER_ACTION_FIELD: user_action},
+            )
 
 
 def stale_configuration_warning(*, plans: Sequence[MigrationPlan], walked_dirs: Sequence[Path]) -> StaleConfigurationWarning:
