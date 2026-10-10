@@ -51,11 +51,12 @@ class JudgmentWorkerAbstract(InferenceWorkerAbstract):
         judgment_job: JudgmentJob,
     ) -> dict[str, JudgmentAnswer]:
         """Answer every question in the job over its state, keyed as the questions were."""
-        judgment_job.validate_before_execution()
-        judgment_job.job_metadata.unit_job_id = UnitJobId.JUDGMENT_ANSWER
-        judgment_job.judgment_job_before_start(inference_model=self.inference_model)
-
+        # The call ends with its summary event whichever way it ends, a refusal by the checks included
         with self._call_summary(judgment_job=judgment_job):
+            judgment_job.validate_before_execution()
+            judgment_job.job_metadata.unit_job_id = UnitJobId.JUDGMENT_ANSWER
+            judgment_job.judgment_job_before_start(inference_model=self.inference_model)
+
             try:
                 self._check_can_read_files(judgment_job=judgment_job)
                 answers = await self._judge(judgment_job=judgment_job)

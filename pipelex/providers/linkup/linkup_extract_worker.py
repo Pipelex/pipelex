@@ -23,7 +23,8 @@ from pipelex.cogt.inference.error_classification import extract_linkup_metadata
 from pipelex.cogt.inference.error_classify import classify_inference_error
 from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.cogt.usage.token_category import TokenCategory
+from pipelex.cogt.usage.pricing_unit import PricingUnit
+from pipelex.cogt.usage.usage_cost import record_unit_priced_usage
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 
@@ -85,12 +86,9 @@ class LinkupExtractWorker(ExtractWorkerAbstract):
                 model_handle=self.inference_model.name,
             ) from sdk_exc
 
-        # Per-request cost model: costs are defined per million, so 1 request = 1_000_000
+        # Linkup bills by the request, which the usage records as one request priced at the model's rate
         if extract_tokens_usage := extract_job.job_report.extract_tokens_usage:
-            extract_tokens_usage.nb_tokens_by_category = {
-                TokenCategory.INPUT: 1_000_000,
-                TokenCategory.OUTPUT: 1_000_000,
-            }
+            record_unit_priced_usage(tokens_usage=extract_tokens_usage, pricing_unit=PricingUnit.REQUEST, nb_units=1)
 
         max_images = job_params.max_nb_images
         extracted_images: list[ExtractedImageFromPage] = []

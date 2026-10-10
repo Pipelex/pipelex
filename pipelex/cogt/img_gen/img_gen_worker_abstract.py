@@ -61,20 +61,21 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
         self,
         img_gen_job: ImgGenJob,
     ) -> GeneratedImageRawDetails:
-        # Verify that the job is valid
-        img_gen_job.validate_before_execution()
-
-        # Verify feasibility
-        self._check_can_perform_job(img_gen_job=img_gen_job)
-
-        # metadata
-        img_gen_job.job_metadata.unit_job_id = UnitJobId.IMG_GEN_TEXT_TO_IMAGE
-
-        # Prepare job
-        img_gen_job.img_gen_job_before_start(inference_model=self.inference_model)
-
-        # Execute and report the job, which ends with its summary event whichever way it ends
+        # The call ends with its summary event whichever way it ends, a refusal by the checks below included
         with self._call_summary(img_gen_job=img_gen_job):
+            # Verify that the job is valid
+            img_gen_job.validate_before_execution()
+
+            # Verify feasibility
+            self._check_can_perform_job(img_gen_job=img_gen_job)
+
+            # metadata
+            img_gen_job.job_metadata.unit_job_id = UnitJobId.IMG_GEN_TEXT_TO_IMAGE
+
+            # Prepare job
+            img_gen_job.img_gen_job_before_start(inference_model=self.inference_model)
+
+            # Execute job
             try:
                 result = await self._gen_image(img_gen_job=img_gen_job)
             except CogtError as exc:
@@ -101,20 +102,21 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
         *,
         nb_images: int,
     ) -> list[GeneratedImageRawDetails]:
-        # Verify that the job is valid
-        img_gen_job.validate_before_execution()
-
-        # Verify feasibility
-        self._check_can_perform_job(img_gen_job=img_gen_job)
-
-        # metadata
-        img_gen_job.job_metadata.unit_job_id = UnitJobId.IMG_GEN_TEXT_TO_IMAGE
-
-        # Prepare job
-        img_gen_job.img_gen_job_before_start(inference_model=self.inference_model)
-
-        # Execute and report the job, which ends with its summary event whichever way it ends
+        # The call ends with its summary event whichever way it ends, a refusal by the checks below included
         with self._call_summary(img_gen_job=img_gen_job):
+            # Verify that the job is valid
+            img_gen_job.validate_before_execution()
+
+            # Verify feasibility
+            self._check_can_perform_job(img_gen_job=img_gen_job)
+
+            # metadata
+            img_gen_job.job_metadata.unit_job_id = UnitJobId.IMG_GEN_TEXT_TO_IMAGE
+
+            # Prepare job
+            img_gen_job.img_gen_job_before_start(inference_model=self.inference_model)
+
+            # Execute job
             try:
                 result = await self._gen_image_list(img_gen_job=img_gen_job, nb_images=nb_images)
             except CogtError as exc:

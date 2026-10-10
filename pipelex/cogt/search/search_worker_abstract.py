@@ -41,11 +41,12 @@ class SearchWorkerAbstract(InferenceWorkerAbstract):
         search_job: SearchJob,
     ) -> SearchResultContent:
         """Execute a search query and return a sourced answer with sources."""
-        search_job.validate_before_execution()
-        search_job.job_metadata.unit_job_id = UnitJobId.SEARCH_SOURCED_ANSWER
-        search_job.search_job_before_start(inference_model=self.inference_model)
-
+        # The call ends with its summary event whichever way it ends, a refusal by the job's validation included
         with self._call_summary(search_job=search_job):
+            search_job.validate_before_execution()
+            search_job.job_metadata.unit_job_id = UnitJobId.SEARCH_SOURCED_ANSWER
+            search_job.search_job_before_start(inference_model=self.inference_model)
+
             try:
                 result = await self._search_sourced_answer(search_job=search_job)
             except CogtError as exc:
@@ -72,11 +73,12 @@ class SearchWorkerAbstract(InferenceWorkerAbstract):
         schema: type[BaseModelTypeVar],
     ) -> dict[str, Any]:
         """Execute a search query and return structured data matching the schema."""
-        search_job.validate_before_execution()
-        search_job.job_metadata.unit_job_id = UnitJobId.SEARCH_STRUCTURED
-        search_job.search_job_before_start(inference_model=self.inference_model)
-
+        # The call ends with its summary event whichever way it ends, a refusal by the job's validation included
         with self._call_summary(search_job=search_job):
+            search_job.validate_before_execution()
+            search_job.job_metadata.unit_job_id = UnitJobId.SEARCH_STRUCTURED
+            search_job.search_job_before_start(inference_model=self.inference_model)
+
             try:
                 result = await self._search_structured(search_job=search_job, schema=schema)
             except CogtError as exc:

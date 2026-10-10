@@ -76,6 +76,7 @@ class TestConsoleLayouts:
                 USAGE_KEYS,
                 "gpt-5.6-terra chat · failed after 1.23 s error.type=LLMCompletionError",
             ),
+            ({"outcome": "cancelled"}, USAGE_KEYS, "gpt-5.6-terra chat · cancelled after 1.23 s"),
         ],
         ids=[
             "tokens and cost",
@@ -87,6 +88,7 @@ class TestConsoleLayouts:
             "no usage at all",
             "a free call",
             "a failure",
+            "a cancellation",
         ],
     )
     def test_the_inference_call_end_layout_draws_the_call_on_one_compact_line(
@@ -104,8 +106,9 @@ class TestConsoleLayouts:
             ({}, "EndingPipe: compose_company done in 840 ms"),
             ({"pipe_depth": 2, "duration_ms": 61_250.0}, "      ↳ EndingPipe: compose_company done in 61.25 s"),
             ({"outcome": "error", "error.type": "PipeRunError"}, "EndingPipe: compose_company failed after 840 ms error.type=PipeRunError"),
+            ({"outcome": "cancelled"}, "EndingPipe: compose_company cancelled after 840 ms"),
         ],
-        ids=["top level", "nested twice", "a failure"],
+        ids=["top level", "nested twice", "a failure", "a cancellation"],
     )
     def test_the_pipe_run_end_layout_draws_the_end_in_the_pipe_tree(self, overrides: dict[str, Any], expected: str) -> None:
         fields = {**PIPE_RUN_END_FIELDS, "pipe_type": "EndingPipe", **overrides}

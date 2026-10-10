@@ -178,6 +178,7 @@ PIPE_RUN_LAYOUT = PipeRunLayout(
 #: What a summary event says before its duration, by how the work ended.
 SUCCESS_ENDING = "done in"
 ERROR_ENDING = "failed after"
+CANCELLED_ENDING = "cancelled after"
 #: Below this many milliseconds a duration is written in milliseconds, and in seconds from it on.
 MILLISECONDS_PER_SECOND = 1000
 #: How many decimals of a dollar a cost is written to, before its trailing zeros are dropped.
@@ -185,16 +186,18 @@ COST_DECIMALS = 6
 
 
 def _endings(*, outcome: Any) -> dict[str, str]:
-    """The success ending and the error ending of a summary event, one of them empty, so each takes its own style.
+    """The success, error and cancelled endings of a summary event, all but one of them empty, so each takes its own style.
 
     Raises:
-        ValueError: If the outcome is neither ``success`` nor ``error``.
+        ValueError: If the outcome is not one of ``success``, ``error`` and ``cancelled``.
     """
     match Outcome(outcome):
         case Outcome.SUCCESS:
-            return {"success_ending": SUCCESS_ENDING, "error_ending": ""}
+            return {"success_ending": SUCCESS_ENDING, "error_ending": "", "cancelled_ending": ""}
         case Outcome.ERROR:
-            return {"success_ending": "", "error_ending": ERROR_ENDING}
+            return {"success_ending": "", "error_ending": ERROR_ENDING, "cancelled_ending": ""}
+        case Outcome.CANCELLED:
+            return {"success_ending": "", "error_ending": "", "cancelled_ending": CANCELLED_ENDING}
 
 
 def _is_number(*, value: Any) -> bool:
@@ -249,7 +252,7 @@ class PipeRunEndLayout(PipeRunLayout):
 
     ``PipeLLM: describe_company done in 1.25 s``, indented and behind ``↳`` at the depth of its announcement. It reads
     the pipe-run layout's depth, ``duration_ms`` and ``outcome``; a failure says ``failed after`` in red, and its
-    ``error.type`` follows as the suffix.
+    ``error.type`` follows as the suffix, and a cancelled run says ``cancelled after`` in yellow.
     """
 
     @override
@@ -271,7 +274,7 @@ PIPE_RUN_END_LAYOUT = PipeRunEndLayout(
     template=(
         "{indent}[yellow]{branch}[/yellow]{branch_gap}"
         f"{_styled_placeholder(field='pipe_type', suffix=':')} {_styled_placeholder(field='pipe_code')} "
-        "[dim]{success_ending}[/dim][bold red]{error_ending}[/bold red] {duration}"
+        "[dim]{success_ending}[/dim][bold red]{error_ending}[/bold red][yellow]{cancelled_ending}[/yellow] {duration}"
     ),
     presented_fields=frozenset({"pipe_type", "pipe_code", "output_concept", "pipe_depth", DURATION_MS_FIELD, OUTCOME_FIELD}),
 )
@@ -284,7 +287,8 @@ class InferenceCallEndLayout(ConsoleLayout):
     after it. A count or a cost the call did not report is left out with its separator. The model is drawn by its
     handle, and the keys that name the same model otherwise, ``gen_ai.request.model``, ``gen_ai.response.model``,
     ``backend_name`` and ``sdk``, are left off the line, which the ``json`` sink writes in full. A failure says
-    ``failed after`` in red, and its ``error.type`` follows as the suffix.
+    ``failed after`` in red, and its ``error.type`` follows as the suffix; a cancelled call says ``cancelled after`` in
+    yellow.
     """
 
     @override
@@ -316,7 +320,10 @@ class InferenceCallEndLayout(ConsoleLayout):
 
 
 INFERENCE_CALL_END_LAYOUT = InferenceCallEndLayout(
-    template="[cyan]{model_handle}[/cyan] [dim]{operation}[/dim]{usage} · [dim]{success_ending}[/dim][bold red]{error_ending}[/bold red] {duration}",
+    template=(
+        "[cyan]{model_handle}[/cyan] [dim]{operation}[/dim]{usage} · "
+        "[dim]{success_ending}[/dim][bold red]{error_ending}[/bold red][yellow]{cancelled_ending}[/yellow] {duration}"
+    ),
     presented_fields=frozenset(
         {
             GenAISpanAttr.OPERATION_NAME,

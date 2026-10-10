@@ -164,7 +164,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
 
             # Add rows for each model
             for model_key, aggregated_data in grouped_by_model.items():
-                row_total_cost = cls.compute_total_cost(
+                row_total_cost = compute_total_cost(
                     input_non_cached_cost=aggregated_data[report_field.COST_INPUT_NON_CACHED],
                     input_cached_cost=aggregated_data[report_field.COST_INPUT_CACHED],
                     output_cost=aggregated_data[report_field.COST_OUTPUT],
@@ -224,10 +224,6 @@ class CostRegistry(RootModel[CostRegistryRoot]):
             writer.writerows(records)
 
     @classmethod
-    def compute_total_cost(cls, *, input_non_cached_cost: float, input_cached_cost: float, output_cost: float) -> float:
-        return compute_total_cost(input_non_cached_cost=input_non_cached_cost, input_cached_cost=input_cached_cost, output_cost=output_cost)
-
-    @classmethod
     def aggregate_costs(cls, tokens_usages: Sequence[TokensUsage]) -> AggregatedCosts:
         """Aggregate token usages into flat records, per-model groups, and run totals — in one pass.
 
@@ -275,7 +271,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
             ]:
                 grouped_by_model[model_key][field] += record.get(field, 0)
 
-        total_cost = cls.compute_total_cost(
+        total_cost = compute_total_cost(
             input_non_cached_cost=sum(record.get(report_field.COST_INPUT_NON_CACHED, 0) for record in records),
             input_cached_cost=sum(record.get(report_field.COST_INPUT_CACHED, 0) for record in records),
             output_cost=sum(record.get(report_field.COST_OUTPUT, 0) for record in records),
@@ -306,7 +302,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
         report_field = LLMTokenCostReportField
         by_model: list[dict[str, Any]] = []
         for model_key, aggregated_data in aggregated.grouped_by_model.items():
-            model_cost = cls.compute_total_cost(
+            model_cost = compute_total_cost(
                 input_non_cached_cost=aggregated_data[report_field.COST_INPUT_NON_CACHED],
                 input_cached_cost=aggregated_data[report_field.COST_INPUT_CACHED],
                 output_cost=aggregated_data[report_field.COST_OUTPUT],
