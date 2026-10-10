@@ -189,6 +189,27 @@ class PipeJudgeBlueprintTestCases:
         ("output_with_brackets", _multi(output="MessageTriage[]"), "fills one structure with their verdicts"),
     ]
 
+    # A field written as null holds no value, so it neither sets a form nor clashes with the other one.
+    REFUSED_NULLS: ClassVar[list[tuple[str, dict[str, Any], str]]] = [
+        ("null_question_alone", {**_judge(), "question": None}, "the question is written in `question`, or several in `questions`"),
+        ("null_question_and_null_questions", {**_judge(), "question": None, "questions": None}, "or several in `questions`"),
+        ("null_question_in_a_question_table", _one_question(question=None), "writes what it asks in `question`, and this one sets none"),
+        ("null_prompt", {**_judge(), "prompt": None}, "judges the evidence its `prompt` presents, and this one sets no `prompt`"),
+    ]
+
+    ACCEPTED_NULLS: ClassVar[list[tuple[str, dict[str, Any]]]] = [
+        ("question_beside_null_questions", {**_judge(), "questions": None}),
+        ("questions_beside_null_question", {**_multi(), "question": None}),
+    ]
+
+    # Both forms, with every field a blueprint may carry, to round-trip through a dump.
+    ROUND_TRIPS: ClassVar[list[tuple[str, dict[str, Any]]]] = [
+        ("single_yes_no", _judge(model="@default-judgment", threshold=0.8, criteria={"yes": "Today", "no": "Later"})),
+        ("single_rating", _judge(output="Rating", levels=[{"label": "Low", "description": "Barely"}, {"label": "High"}])),
+        ("single_choice", _judge(output="Choice", options={"billing": "", "technical": "Errors"})),
+        ("several", _multi(model="@default-judgment")),
+    ]
+
     # Several questions: (test_id, blueprint fields, the kind each question resolves to).
     ACCEPTED_SEVERAL: ClassVar[list[tuple[str, dict[str, Any], dict[str, JudgmentKind]]]] = [
         (

@@ -35,6 +35,24 @@ class TestPipeJudgeBlueprint:
         assert blueprint.question is None, test_id
         assert blueprint.judgment_kind is None, test_id
 
+    @pytest.mark.parametrize(("test_id", "blueprint_fields", "message_fragment"), PipeJudgeBlueprintTestCases.REFUSED_NULLS)
+    def test_a_null_question_sets_no_form(self, test_id: str, blueprint_fields: dict[str, Any], message_fragment: str):
+        with pytest.raises(ValidationError) as exc_info:
+            PipeJudgeBlueprint.model_validate(blueprint_fields)
+        assert message_fragment in str(exc_info.value), test_id
+
+    @pytest.mark.parametrize(("test_id", "blueprint_fields"), PipeJudgeBlueprintTestCases.ACCEPTED_NULLS)
+    def test_a_null_beside_the_other_form_is_no_clash(self, test_id: str, blueprint_fields: dict[str, Any]):
+        blueprint = PipeJudgeBlueprint.model_validate(blueprint_fields)
+        assert (blueprint.question is None) != (blueprint.questions is None), test_id
+
+    @pytest.mark.parametrize("by_alias", [False, True])
+    @pytest.mark.parametrize(("test_id", "blueprint_fields"), PipeJudgeBlueprintTestCases.ROUND_TRIPS)
+    def test_a_blueprint_validates_from_its_own_dump(self, test_id: str, blueprint_fields: dict[str, Any], by_alias: bool):
+        """A dump writes every field, the form not taken as null, and validating it gives back the same blueprint."""
+        blueprint = PipeJudgeBlueprint.model_validate(blueprint_fields)
+        assert PipeJudgeBlueprint.model_validate(blueprint.model_dump(by_alias=by_alias)) == blueprint, test_id
+
     def test_a_question_of_several_carries_its_own_fields(self):
         blueprint = PipeJudgeBlueprint.model_validate(
             {

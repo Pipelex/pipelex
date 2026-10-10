@@ -100,7 +100,7 @@ class JudgeQuestionBlueprint(BaseModel):
         if not isinstance(values, dict):
             return values
         raw_table = cast("dict[str, Any]", values)
-        if "question" not in raw_table:
+        if raw_table.get("question") is None:
             msg = "Each question of `questions` writes what it asks in `question`, and this one sets none."
             raise ValueError(msg)
         question = raw_table["question"]
@@ -153,26 +153,29 @@ class PipeJudgeBlueprint(PipeBlueprint):
         """Name the field a bundle written for the old operator gets wrong, where pydantic would only say one is missing.
 
         Before this version `prompt` was a synonym of `question`, so a table setting `prompt` alone most
-        likely holds a question. A pipe asks one `question` or several `questions`, never both. An empty
-        prompt or question is refused here too.
+        likely holds a question. A pipe asks one `question` or several `questions`, never both. A field
+        written as null holds no value, as a dump writes the form not taken, so the form is read off the
+        values rather than the keys. An empty prompt or question is refused here too.
         """
         if not isinstance(values, dict):
             return values
         raw_table = cast("dict[str, Any]", values)
-        if "question" not in raw_table and "questions" not in raw_table:
+        sets_question = raw_table.get("question") is not None
+        sets_questions = raw_table.get("questions") is not None
+        if not sets_question and not sets_questions:
             msg = (
                 "A PipeJudge asks a question about the evidence of its prompt, and this one sets no `question`: "
                 "`prompt` holds the evidence the question is asked over, and the question is written in `question`, "
                 "or several in `questions`."
             )
             raise ValueError(msg)
-        if "question" in raw_table and "questions" in raw_table:
+        if sets_question and sets_questions:
             msg = (
                 "A PipeJudge asks one `question` or several `questions`, and this one sets both `question` and `questions`: "
                 "keep `question` for a single verdict, or move it into `questions`."
             )
             raise ValueError(msg)
-        if "prompt" not in raw_table:
+        if raw_table.get("prompt") is None:
             msg = (
                 "A PipeJudge judges the evidence its `prompt` presents, and this one sets no `prompt`: write the evidence "
                 'as a template that reads the inputs, such as `prompt = "@message"`.'
