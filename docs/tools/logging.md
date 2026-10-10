@@ -422,7 +422,7 @@ A test runs a small method live, with stand-in workers answering every model cal
 
 ## Log-call conventions
 
-Pipelex's own log calls, in `pipelex/` and in the API server's `api/pipelex_api/`, follow these conventions, so that a line written today can be grouped, counted and filtered in a log store tomorrow. The [log-call guard](../contribute/log-calls.md), `make check-log-calls`, holds every call to the ones that can be read off the source, the fixed message at INFO and above and the absence of markup; the rest is for review. Code of your own that logs through `log` is welcome to follow them too.
+Pipelex's own log calls, in `pipelex/` and in the API server's `api/pipelex_api/`, follow these conventions, so that a line written today can be grouped, counted and filtered in a log store tomorrow. The [log-call guard](../contribute/log-calls.md), `make check-log-calls`, holds every call to the ones that can be read off the source: the fixed message at INFO and above, the absence of markup, the mechanical rules of [wording a message](#wording-a-message), and no handled exception spliced into the text; the rest is for review. Code of your own that logs through `log` is welcome to follow them too.
 
 ### A fixed message
 
@@ -443,7 +443,7 @@ log.warning(
 
 ### Wording a message
 
-A message says what happened, and how it was handled when that matters, in one short sentence a reader takes in at a glance. The [log-call guard](../contribute/log-calls.md) holds every call to the rules below that can be read off the source; the rest is for review.
+A message says what happened, and how it was handled when that matters, in one short sentence a reader takes in at a glance. The [log-call guard](../contribute/log-calls.md) holds every call to the rules below that can be read off the source, a capital, no trailing period and no backtick at every level, no identifier and at most 80 characters at INFO and above; the rest is for review.
 
 - **One shape.** The subject comes first, then what happened to it, in the past tense or as a state: "A pipe of a dependency could not be loaded", "The routing profiles were read with override files merged over the base", "A stuff name starts with an underscore". A failure is "could not be", never "Failed to". The [summary events](#summary-events) and the pipe-run announcement keep their present-tense names, `Inference call ends`, `Pipe run ends` and `Pipe run starts`, which name events rather than tell what happened.
 - **Short.** At INFO and above a message holds at most 80 characters, so the line, its fields included, mostly stays on one line of a terminal. A consequence the reader needs goes in the sentence when it fits, "A model waterfall that leads back to itself resolves to no model", and the rest in fields; a second clause after "so" or ";" is a sign the sentence carries two things.
@@ -563,7 +563,7 @@ What varies goes in `fields`, named by the [naming convention](#naming-conventio
 
 ### Exceptions
 
-An exception rides the record, never the message. Spliced into the text, `{exc}` makes the message vary, loses the exception's type and traceback, and gets only the pattern half of the [redaction](#redaction), where a field also has its control characters escaped. So:
+An exception rides the record, never the message, at every level, DEBUG and VERBOSE included, as the [log-call guard](../contribute/log-calls.md#no-exception-in-the-text) holds every call to. Spliced into the text, `{exc}` makes the message vary, loses the exception's type and traceback, and gets only the pattern half of the [redaction](#redaction), where a field also has its control characters escaped. So:
 
 - **At ERROR and CRITICAL**, inside the `except` block, pass `include_exception=True`: the record carries the exception, and each sink writes its type and its traceback its own way. That is for an exception the code handles where it logs it, whose traceback nobody else will see, and above all for the catcher of an unexpected failure, the root of a CLI command or the API server's error handler, which logs it there and prints no traceback of its own: the `console` sink renders it under the line, and the `json` and `otlp` sinks write it to the log store, which a traceback printed on the console alone never reaches. A CLI command's root also names the exception's type and message in its own output, which is not a log record, so the terminal says why the command failed whatever the sink and the level, under a `json` sink writing to a file as under a level above ERROR.
 - **An exception logged and then re-raised carries no traceback, at ERROR too**: it rides as `error_fields`, since whoever catches it owns its traceback, and a line that carried it as well would print it a second time, ahead of the catcher's own report.
