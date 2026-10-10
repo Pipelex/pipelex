@@ -430,15 +430,6 @@ class TestCostRegistry:
         actual_cost = float(cost_str)
         assert abs(actual_cost - expected_scaled_cost) < 0.0001
 
-    def test_compute_total_cost(self):
-        """Test total cost computation."""
-        total = CostRegistry.compute_total_cost(
-            input_non_cached_cost=1.0,
-            input_cached_cost=0.5,
-            output_cost=2.0,
-        )
-        assert total == 3.5
-
     def test_generate_report_print_to_console_false_skips_console(self, job_metadata: JobMetadata, mocker: MockerFixture):
         """When print_to_console=False, the console.print is not called."""
         mock_console = mocker.MagicMock()

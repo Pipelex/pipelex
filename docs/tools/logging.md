@@ -17,7 +17,7 @@ Pipelex uses the standard Python log levels and adds two of its own, `VERBOSE` b
 |-------|-------|---------------------------------|
 | VERBOSE | 5 | Step-level tracing for Pipelex's own developers, following the runtime through its steps |
 | DEBUG | 10 | What you would need to diagnose a problem from a log a user sends |
-| INFO | 20 | A lifecycle milestone, and there are few of them |
+| INFO | 20 | A lifecycle milestone, and there are few of them, besides the [summary event](#summary-events) that ends each inference call and each live pipe run |
 | WARNING | 30 | A handled degradation, or a user misconfiguration worth fixing; a warning is actionable |
 | ERROR | 40 | A run failed or data was lost |
 | CRITICAL | 50 | The process cannot go on |
@@ -282,6 +282,8 @@ The registry holds these layouts:
 | Layout | Fields it presents | What it draws |
 | --- | --- | --- |
 | `LogLayout.PIPE_RUN` | `pipe_type`, `pipe_code`, `output_concept`, `pipe_depth` (an integer, `0` at the top level and at most `100`) | `PipeCompose: compose_company → Company`, indented three spaces per level of depth and behind `↳` when nested, in the style map's colours. A depth of another type, or out of range, falls back to the message. The pipe announcement names it, and only a live run announces itself, so the line carries no run mode |
+| `LogLayout.PIPE_RUN_END` | The pipe-run layout's fields, `duration_ms` and `outcome` | `PipeLLM: describe_company done in 1.25 s`, at the depth and in the colours of the line that announced the run, or `failed after 1.25 s` in red with `error.type` following as the suffix, or `cancelled after 1.25 s` in yellow. A duration is written in milliseconds under a second and in seconds from a second on. An unknown outcome, or a duration that is no number or is negative, falls back to the message. The [pipe-run end event](#the-pipe-run-end) names it |
+| `LogLayout.INFERENCE_CALL_END` | Every field of the [inference summary event](#the-inference-call-end) but `error.type` | `claude-5.5-sonnet chat · 2,048 → 512 tokens · $0.009216 · done in 1.23 s`: the model's handle, the operation, the tokens in and out, the cost and the duration, or `failed after` in red with `error.type` following as the suffix, or `cancelled after` in yellow. A count or a cost the call did not report is left out with its separator, and a cost under a millionth of a dollar is written `<$0.000001`, so it never reads as a free call's `$0`. The keys naming the model a second way, `gen_ai.request.model`, `gen_ai.response.model`, `backend_name` and `sdk`, are presented and not drawn, so the line stays short and the other sinks carry them. A count, a cost or a duration of the wrong type, or an unknown outcome, falls back to the message |
 
 A layout is a `ConsoleLayout`: a `template` of Rich markup whose placeholders are bare field names (`{pipe_code}`, never an attribute, an index or a format spec, which registration refuses), the `presented_fields` the suffix leaves out, and, for a shape a template cannot express alone, a subclass whose `derived_values` computes presentation values such as an indentation from the fields.
 
@@ -310,6 +312,96 @@ Optional inclusion of caller information in logs, prefixed to the console line:
 - Module name
 - Customizable format templates
 
+## Summary events
+
+Two kinds of work end with one event each, whichever way they end: an inference call and a live pipe run. Each event has a fixed message, carries what the work was, how long it took and how it ended as fields, and is logged once, when the work returns or raises, so a log store selects every one by its message and groups them by their fields. The event is the work's measurement and never part of its result: if its own fields cannot be built or logged, it is replaced by one WARNING, `A summary event could not be logged`, naming the event in `summary_event` with the failure's `error.type` and `error.message`, and the work returns or raises exactly as it would have. A handler that raises on the event, as a host's might on a full disk, gets that warning next, and when it refuses the warning too nothing more is logged: the failure of a log line never reaches the work. They are what an operator's dashboards are built from: a run's `json` output alone gives the latency and the cost of each operation on each model, and the failures by their class, with no span store and no text to parse.
+
+Both are logged at **INFO**. The dashboards read the events at the default production level, and a query over a run's `json` output computes latency and cost per operation and model from these events alone only if they are logged at that level. The pipe-run end pairs with the pipe-run announcement, `Pipe run starts`, which is logged at INFO already. Each event has a console layout that draws it on one short line, so a terminal stays readable. So an application that embeds Pipelex at the default level gets one line per inference call and one per live pipe run. A host that wants either one quiet raises its logger's level with `package_log_levels`: `pipelex-cogt-inference-inference_call_summary = "WARNING"` for the inference event, and `pipelex-pipe_machinery-pipe_abstract = "WARNING"` for the pipe-run end, which quiets the announcement too, since the two share that logger.
+
+The fields the two events share:
+
+| Field | Type | What it says |
+| --- | --- | --- |
+| `duration_ms` | number, in milliseconds | How long the work took, read off a monotonic clock, to the microsecond |
+| `outcome` | `success`, `error` or `cancelled` | Whether the work returned, failed, or was stopped from outside. An exception that is not an `Exception` stops work without the work failing, so it ends the work `cancelled`: a task cancelled, as a batch or a parallel controller cancels its siblings when one fails and as a client cancels a run, an interrupt, a generator closed or the interpreter exiting. So the siblings a failure cancels are not counted as failures of their own |
+| `error.type` | string | The class of the exception the work failed with, when `outcome` is `error` only. The exception's text stays off the event: the exception propagates to whoever handles it, which logs it there |
+
+### The inference call end
+
+Every inference call ends with `Inference call ends`, on the logger `pipelex.cogt.inference.inference_call_summary`: an LLM call, the generation of an image, an extraction, a search, a judgment or the print of a document. It is logged by the worker bases, `LLMWorkerAbstract`, `ImgGenWorkerAbstract`, `ExtractWorkerAbstract`, `SearchWorkerAbstract` and `JudgmentWorkerAbstract`, around the call their public method makes, the checks that may refuse the call before the provider is reached included, so every worker that subclasses them, a provider's or a plugin's, ends its calls with the event, a refused call too, and logs nothing for it itself. A document engine, a `DocGenWorkerAbstract`, overrides `render` alone, which the print stage, `render_document_and_store`, runs on a thread of the print pool: the stage logs the event around the print and the checks before it, the run's read scope, the engine's model and its installation, so a refused print ends with it too, and it logs it on the coroutine that awaits the thread, so a print cancelled from outside ends `cancelled` once, while the thread, which nothing stops, finishes its render and logs nothing more. An LLM call's event is logged as the call's span closes, just after the span has ended but while it is still the active Pipelex span, so it carries that span under `pipelex.trace_id` and `pipelex.span_id`; a call the checks refuse ends before its span starts and carries none.
+
+| Field | Type | What it says |
+| --- | --- | --- |
+| `gen_ai.operation.name` | string | The operation: `chat` for an LLM call, OpenTelemetry's name for it, and the family's own name where the conventions define none, `img_gen`, `extract`, `search`, `judgment` and `doc_gen` |
+| `model_handle` | string | The model's handle, as the model deck names it |
+| `backend_name` | string | The backend serving the model |
+| `sdk` | string | The SDK the backend reaches the model through |
+| `gen_ai.request.model` | string | The model requested, its handle, as on the LLM span |
+| `gen_ai.response.model` | string | The provider's id of the model serving the call, as on the LLM span |
+| `gen_ai.usage.input_tokens` | integer | The tokens the call read, when it reported them |
+| `gen_ai.usage.output_tokens` | integer | The tokens the call wrote, when it reported them |
+| `cost_usd` | number, in US dollars | What the call cost, when it reported usage and the model has rates |
+| `duration_ms`, `outcome`, `error.type` | | As above |
+
+A handle names one model per model type, so a query groups by `gen_ai.operation.name` and `model_handle` together. The model keys are read when the call ends, so a worker that names its model in the checks before the call is named on the event as on the call's span, and one that learns from the provider which model served the call is named after that model. A print that ended before its handle was resolved, refused by the read scope, or whose handle resolves to no model served here, names the model by its handle alone, under `model_handle` and `gen_ai.request.model`, and leaves off `backend_name`, `sdk` and `gen_ai.response.model`, which only a served model has. The usage is the one the call recorded on its job's report, the object the base hands to `ReportingProtocol.report_inference_job` when it reports the job and the reporting manager turns into a usage event, and the event prices it with `compute_tokens_usage_cost`, the cost engine the usage records and the run's cost report read, so a usage the cost report counts has the same price there as on the event. The event carries what the job recorded, though, and the cost report only what was reported: the search and judgment bases report a job whichever way it ends, while the LLM, image-generation and extraction bases report it only when it succeeds, so a failure of theirs the provider billed carries a cost on the event that the run's cost report does not count. A token count or a cost the call did not record is left off, never written as zero: a call that failed before the provider answered, or that the checks before it refused, recorded no usage, a model with no rates has no price, and a document engine reports no usage at all, so a print carries neither. A failure the provider billed, a search or a judgment whose answer a guard refused, carries the usage it recorded.
+
+Rates are per million tokens, so a call billed by the request or by the page records each unit as a million tokens in and out, and the rate table prices one unit: a Linkup search or fetch is one request, and an extraction whose provider reports no usage is priced by its pages. Its usage says so in its `pricing_unit`, `request` or `page` rather than `token`, and the event carries the call's cost and no token counts, since a request or a page is not a token. A worker records such a usage with `record_unit_priced_usage` (`pipelex.cogt.usage.usage_cost`), a plugin's worker as much as a provider's, and never writes the counts itself.
+
+```text
+INFO     🧠: claude-5.5-sonnet chat · 2,048 → 512 tokens · $0.009216 · done in 1.23 s
+INFO     🧠: claude-5.5-sonnet chat · failed after 2.40 s error.type=LLMCompletionError
+```
+
+```json
+{"time": "2026-10-09T23:08:37.099Z", "severity": "INFO", "logger": "pipelex.cogt.inference.inference_call_summary", "message": "Inference call ends", "pipeline_run_id": "0b2319a6-c511-4e1f-80f6-914cbab5f28b", "pipe_run_id": "0b63ab15-ff93-4c4f-9a2d-4f1c4f9901d4", "gen_ai.operation.name": "chat", "model_handle": "claude-5.5-sonnet", "backend_name": "anthropic", "sdk": "anthropic", "gen_ai.request.model": "claude-5.5-sonnet", "gen_ai.response.model": "claude-sonnet-5-5", "gen_ai.usage.input_tokens": 2048, "gen_ai.usage.output_tokens": 512, "cost_usd": 0.009216, "duration_ms": 1234.512, "outcome": "success"}
+```
+
+On Pipelex's LLM span, `gen_ai.operation.name` still holds Pipelex's unit-job id, `llm_gen_text` or `llm_gen_object`, which the PostHog exporter reads back to name the span; the event carries OpenTelemetry's operation name under that key, and the span is to follow it. Every other `gen_ai.*` key means the same on both.
+
+### The pipe-run end
+
+Every live pipe run ends with `Pipe run ends`, on the logger `pipelex.pipe_machinery.pipe_abstract`, the announcement's. `PipeAbstract.live_run_pipe` enters it with the announcement, under the run's `pipe_run_id`, and logs it when the run returns or raises, so every announced run ends once, a nested one before the pipe it runs under, and a dry run, which announces nothing, ends with nothing. It is logged as the pipe's own span closes, just after the span has ended but while it is still the active Pipelex span, so with telemetry on it carries the span of the pipe that ended under `pipelex.trace_id` and `pipelex.span_id`, as the lines of the run do, a nested pipe's its own and never its parent's; a run whose setup fails before its span is active still ends with the event, outside any span of its own.
+
+| Field | Type | What it says |
+| --- | --- | --- |
+| `pipe_type` | string | The pipe's class |
+| `pipe_code` | string | The pipe |
+| `output_concept` | string | The concept the pipe produces |
+| `pipe_depth` | integer | How deep the run is nested, `0` at the top level, as in the announcement |
+| `duration_ms`, `outcome`, `error.type` | | As above |
+
+```text
+INFO     🧠: PipeSequence: brief_company → Text
+INFO     🧠:    ↳ PipeLLM: describe_company → Text
+INFO     🧠: claude-5.5-sonnet chat · 1,000 → 200 tokens · $0.004 · done in 1.23 s
+INFO     🧠:    ↳ PipeLLM: describe_company done in 1.25 s
+INFO     🧠: PipeSequence: brief_company done in 1.31 s
+```
+
+```json
+{"time": "2026-10-09T23:08:37.127Z", "severity": "INFO", "logger": "pipelex.pipe_machinery.pipe_abstract", "message": "Pipe run ends", "pipeline_run_id": "0b2319a6-c511-4e1f-80f6-914cbab5f28b", "pipe_run_id": "0b63ab15-ff93-4c4f-9a2d-4f1c4f9901d4", "pipe_type": "PipeLLM", "pipe_code": "describe_company", "output_concept": "Text", "pipe_depth": 1, "duration_ms": 1250.663, "outcome": "success"}
+```
+
+### Pricing a run from its events
+
+A dashboard reads a run's `json` output, keeps the inference events and adds them up by operation and model:
+
+```python
+import json
+from collections import defaultdict
+
+calls = [record for record in map(json.loads, open("run.jsonl")) if record["message"] == "Inference call ends"]
+groups = defaultdict(list)
+for call in calls:
+    groups[call["gen_ai.operation.name"], call["model_handle"]].append(call)
+for (operation, model_handle), group in groups.items():
+    cost_usd = sum(call.get("cost_usd", 0) for call in group)
+    latency_ms = sum(call["duration_ms"] for call in group) / len(group)
+    print(operation, model_handle, len(group), f"${cost_usd:.4f}", f"{latency_ms:.0f} ms")
+```
+
+A test runs a small method live, with stand-in workers answering every model call on two models, and computes the cost and the latency of each operation and model from the `json` output alone.
+
 ## Log-call conventions
 
 Pipelex's own log calls, in `pipelex/` and in the API server's `api/pipelex_api/`, follow these conventions, so that a line written today can be grouped, counted and filtered in a log store tomorrow. The [log-call guard](../contribute/log-calls.md), `make check-log-calls`, holds every call to the ones that can be read off the source, the fixed message at INFO and above and the absence of markup; the rest is for review. Code of your own that logs through `log` is welcome to follow them too.
@@ -333,7 +425,7 @@ log.warning(
 
 ### Values in fields
 
-What varies goes in `fields`, named by the [naming convention](#naming-convention), and one concept has one name across the codebase, so that a query written for one line finds every line about the same thing. Pipelex's own concepts take the names in the table below. A concept the OpenTelemetry semantic conventions define takes their key verbatim: `file.path` for a path on disk and `file.name` for a file's name alone, `url.full` for a URL and `url.path` for the path of a request's URL, `server.address` for the host a request is sent to, `http.response.status_code` for the status of an HTTP response, `user.id` for the authenticated caller, never an identity the server refused, `error.type` for the class of an error, and the `gen_ai.*` keys for inference, such as `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.request.temperature`, `gen_ai.operation.name`, `gen_ai.usage.input_tokens` and `gen_ai.usage.output_tokens`. A `gen_ai.*` key means on a log line what it means on Pipelex's LLM span: `gen_ai.request.model` is the model's handle and `gen_ai.response.model` the provider's id of the model serving it. A line about an inference call carries them beside `model_handle`, `backend_name` and `sdk`, so it joins its span in a log store, while `model_handle` names the handle on every line about a model, inference or not. An OpenTelemetry key that more than one call site uses is spelled through a constant, so a misspelt one is an error the type checker reports rather than a field no query finds: `OTelLogAttr` in `pipelex/system/telemetry/otel_constants.py` holds those keys, `GenAISpanAttr` beside it the `gen_ai.*` ones, and `pipelex.tools.log.error_fields` the two error keys. A count is named `<what>_count` (`concept_count`) and a duration `duration_ms`, in milliseconds. A field carries one JSON type on every line that has it, `null` aside, so a query compares it one way: where the value would be an integer on some lines and a word on others, `unbounded` for instance, the field is left out of the lines the word would name, and the table says so.
+What varies goes in `fields`, named by the [naming convention](#naming-convention), and one concept has one name across the codebase, so that a query written for one line finds every line about the same thing. Pipelex's own concepts take the names in the table below. A concept the OpenTelemetry semantic conventions define takes their key verbatim: `file.path` for a path on disk and `file.name` for a file's name alone, `url.full` for a URL and `url.path` for the path of a request's URL, `server.address` for the host a request is sent to, `http.response.status_code` for the status of an HTTP response, `user.id` for the authenticated caller, never an identity the server refused, `error.type` for the class of an error, and the `gen_ai.*` keys for inference, such as `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.request.temperature`, `gen_ai.operation.name`, `gen_ai.usage.input_tokens` and `gen_ai.usage.output_tokens`. A `gen_ai.*` key means on a log line what it means on Pipelex's LLM span: `gen_ai.request.model` is the model's handle and `gen_ai.response.model` the provider's id of the model serving it. `gen_ai.operation.name` is the one exception for now, as [the inference call end](#the-inference-call-end) explains. A line about an inference call carries them beside `model_handle`, `backend_name` and `sdk`, so it joins its span in a log store, while `model_handle` names the handle on every line about a model, inference or not. An OpenTelemetry key that more than one call site uses is spelled through a constant, so a misspelt one is an error the type checker reports rather than a field no query finds: `OTelLogAttr` in `pipelex/system/telemetry/otel_constants.py` holds those keys, `GenAISpanAttr` beside it the `gen_ai.*` ones, and `pipelex.tools.log.error_fields` the two error keys. A count is named `<what>_count` (`concept_count`) and a duration `duration_ms`, in milliseconds. A field carries one JSON type on every line that has it, `null` aside, so a query compares it one way: where the value would be an integer on some lines and a word on others, `unbounded` for instance, the field is left out of the lines the word would name, and the table says so.
 
 | Field | Type | What it names |
 | --- | --- | --- |
@@ -386,6 +478,10 @@ What varies goes in `fields`, named by the [naming convention](#naming-conventio
 | `inference_job_type` | string | An inference job's class: `LLMJob`, `ImgGenJob` |
 | `image_size` | string | An image size as a generation request spells it, width by height: `2560x1440` |
 | `nb_steps` | integer | The number of inference steps an image generation job requests, spelled as its parameters spell it |
+| `cost_usd` | number | What an inference call cost, in US dollars, as the cost engine prices the usage it reported |
+| `duration_ms` | number | How long a unit of work took, in milliseconds |
+| `outcome` | string | How a unit of work ended, `success`, `error` or `cancelled`, on the [summary events](#summary-events) |
+| `summary_event` | string | The [summary event](#summary-events) a line is about, by its message: `Inference call ends` |
 | `node_id` | string | A node of a run's execution graph, as the graph tracer names it |
 | `trace_event_type` | string | A trace event's class: `PipeStartEvent` |
 | `writer_id`, `workflow_id` | string | The writer and the workflow a trace event names, as the event log records them |
@@ -441,7 +537,7 @@ The [level table](#log-levels) states what a line at each level means, and choos
 
 - **ERROR** says a run failed or data was lost, and that somebody should look; it carries an exception it handles with `include_exception=True`, and one it re-raises, a secondary failure and a swallowed `ValidationError` as `error_fields`.
 - **WARNING** must be actionable: a degradation that was handled, or a misconfiguration the user can fix. A warning nobody can act on moves down to DEBUG, or up to ERROR when something was in fact lost.
-- **INFO** marks a lifecycle milestone, and there are few of them, because Pipelex is also a library and a library is quiet at INFO.
+- **INFO** marks a lifecycle milestone, and there are few of them, because Pipelex is also a library and a library says little at INFO. The [summary events](#summary-events) are the one exception in number, an event for each inference call and each live pipe run: they are INFO because the dashboards built from them read the default production level, and a host that wants Pipelex quieter at INFO raises their loggers' level, as that section shows.
 - **DEBUG** answers a question you would ask on reading a log a user sent: which file was read, which fallback was taken, why a model was left out.
 - **VERBOSE** follows the runtime step by step, for Pipelex's own developers.
 

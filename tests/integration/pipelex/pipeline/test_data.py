@@ -511,3 +511,59 @@ inputs = { company = "Company", short_summary = "ShortSummary" }
 output = "Text"
 template = "{{ company.name }} works in {{ company.sector }}: {{ short_summary.text }}"
 """
+
+
+class SummaryEventsTestData:
+    """A small method run live on two models, every model call answered by a stand-in worker, to read the events it ends with."""
+
+    MAIN_PIPE: ClassVar[str] = "brief_company"
+
+    INPUTS: ClassVar[PipelineInputs] = {"brief": "Acme builds reusable rockets in Toulouse and sells launches to research labs."}
+
+    MTHDS: ClassVar[str] = """
+domain = "summary_events_check"
+description = "Describe a company, structure it and pitch it, on two models"
+main_pipe = "brief_company"
+
+[concept.Company]
+description = "A company"
+
+[concept.Company.structure]
+name = { type = "text", description = "The company's name" }
+sector = { type = "text", description = "The company's sector" }
+
+[pipe.brief_company]
+type = "PipeSequence"
+description = "Describe the company, structure it and pitch it"
+inputs = { brief = "Text" }
+output = "Text"
+steps = [
+  { pipe = "describe_company", result = "description" },
+  { pipe = "structure_company", result = "company" },
+  { pipe = "pitch_company", result = "pitch" },
+]
+
+[pipe.describe_company]
+type = "PipeLLM"
+description = "Describe the company the brief is about"
+inputs = { brief = "Text" }
+output = "Text"
+model = "$testing-text"
+prompt = "Describe the company this brief is about: $brief"
+
+[pipe.structure_company]
+type = "PipeLLM"
+description = "Structure the description as a company"
+inputs = { description = "Text" }
+output = "Company"
+model = "$testing-text"
+prompt = "Read the company out of this description: $description"
+
+[pipe.pitch_company]
+type = "PipeLLM"
+description = "Pitch the company in one sentence"
+inputs = { description = "Text" }
+output = "Text"
+model = "$writing-creative"
+prompt = "Pitch this company in one sentence: $description"
+"""

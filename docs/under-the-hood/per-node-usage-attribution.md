@@ -14,7 +14,7 @@ Every inference call emits a `UsageReportEvent` carrying `node_id` (from `trace_
 - **`UsageAggregator`** (`pipelex/tracing/usage_aggregator.py`) projects it into a flat list — one record per call, `node_id` dropped. That list becomes `pipe_output.tokens_usages`, trimmed to [`TokensUsageRecord`](tokens-usage-wire-records.md) at the client boundary, and feeds the console cost table and the CSV.
 - **`usage_attribution`** (`pipelex/tracing/usage_attribution.py`) projects it into per-node totals — `node_id` kept, calls folded together. Those totals become `NodeSpec.usage` and `GraphSpec.usage`, assembled by `GraphSpecAssembler`.
 
-The two projections are deliberately separate — `tokens_usages` is a shipped, `extra="forbid"` client contract, and a graph is not the place to re-litigate its record shape. What they are *not* allowed to do is disagree on arithmetic, so both compute every dollar through the same `compute_tokens_usage_cost` (`pipelex/cogt/usage/cost_registry.py`) and define a token total the same way `AggregatedCosts.total_nb_tokens` does.
+The two projections are deliberately separate — `tokens_usages` is a shipped, `extra="forbid"` client contract, and a graph is not the place to re-litigate its record shape. What they are *not* allowed to do is disagree on arithmetic, so both compute every dollar through the same `compute_tokens_usage_cost` (`pipelex/cogt/usage/usage_cost.py`) and define a token total the same way `AggregatedCosts.total_nb_tokens` does.
 
 ```mermaid
 flowchart TB
@@ -141,7 +141,7 @@ So usage is deliberately assembler-only. That gap is *asserted* rather than norm
 | `pipelex/tracing/usage_attribution.py` | `UsageAccumulator`, `roll_up`, `attribute_usage` |
 | `pipelex/tracing/graphspec_assembler.py` | Folds `UsageReportEvent`, attributes in pass 2 |
 | `pipelex/tracing/usage_aggregator.py` | The other projection — the flat `tokens_usages` list |
-| `pipelex/cogt/usage/cost_registry.py` | `compute_tokens_usage_cost` — the one cost engine |
+| `pipelex/cogt/usage/usage_cost.py` | `compute_tokens_usage_cost` — the one cost engine |
 
 ## Related pages
 

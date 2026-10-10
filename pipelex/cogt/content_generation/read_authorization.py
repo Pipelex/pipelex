@@ -5,8 +5,9 @@ assignment, and both orchestration modes call the same leaves — the in-process
 ``ContentGenerator`` and the Temporal activities — so the leaves are the one place every read and
 every hand-off to another reader share. Each leaf authorizes the URLs its assignment declares
 (``referenced_uris()``) as its first statement, before the dry-run branch, so a dry run refuses the
-method a live run would, and before any worker is built. See :mod:`pipelex.tools.uri.uri_read_scope`
-for the rule.
+method a live run would, and before any worker is built. The document print authorizes first in each
+branch instead, its live branch inside the summary event the print ends with, so a print the scope
+refuses ends with that event too. See :mod:`pipelex.tools.uri.uri_read_scope` for the rule.
 """
 
 from pipelex.system.job_metadata import JobMetadata
