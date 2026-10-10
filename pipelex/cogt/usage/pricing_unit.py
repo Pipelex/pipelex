@@ -2,9 +2,10 @@
 
 Rates are per million tokens, so a provider that bills by the request, or an extraction priced by its pages, records
 each unit as a million tokens in and out, and the rate table prices one unit. The cost is right, and the counts are not
-tokens: a dashboard of tokens must not add them up. The usage says which it holds in its ``pricing_unit``, so every
-reader of the counts tells them apart, the event an inference call ends with first, which keeps the cost and leaves
-the token counts off.
+tokens: a dashboard of tokens must not add them up. The usage says which it holds in its ``pricing_unit`` so a reader
+of the counts can tell them apart. Today one reader does, the event an inference call ends with, which keeps the cost
+and leaves the token counts off. The run's cost table and the run graph's usage still add a unit-priced call's counts
+to their token totals, and the client-facing ``TokensUsageRecord`` still carries them as tokens.
 """
 
 from enum import StrEnum

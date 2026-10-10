@@ -226,13 +226,19 @@ def format_duration(*, duration_ms: Any) -> str:
 def format_cost(*, cost_usd: Any) -> str:
     """A cost in US dollars to the millionth of a dollar, its trailing zeros dropped: ``$0.0123``, ``$0``.
 
+    A cost that rounds to nothing at that precision is written as under the millionth, ``<$0.000001``, so a call that
+    cost a little is never read as a free one, which alone is written ``$0``.
+
     Raises:
         TypeError: If the cost is not a number.
     """
     if not _is_number(value=cost_usd):
         msg = f"A cost must be a finite number of dollars, not {type(cost_usd).__name__}"
         raise TypeError(msg)
-    return f"${cost_usd:.{COST_DECIMALS}f}".rstrip("0").rstrip(".")
+    formatted = f"${cost_usd:.{COST_DECIMALS}f}".rstrip("0").rstrip(".")
+    if formatted == "$0" and cost_usd > 0:
+        return f"<${10**-COST_DECIMALS:.{COST_DECIMALS}f}"
+    return formatted
 
 
 def _format_token_count(*, nb_tokens: Any) -> str:

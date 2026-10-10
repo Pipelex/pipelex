@@ -6,7 +6,7 @@ arithmetic alone and imports nothing that renders, so a worker base prices the c
 console that the cost table prints through.
 
 It is also where a worker whose provider bills by the request, or an extraction priced by its pages, records that
-usage, with ``record_unit_priced_usage``, so the rates price each unit and every reader knows the counts are no tokens.
+usage, with ``record_unit_priced_usage``, so the rates price each unit and the usage says its counts are no tokens.
 """
 
 from typing import Literal
@@ -68,9 +68,10 @@ def record_unit_priced_usage(*, tokens_usage: TokensUsage, pricing_unit: Literal
     """Record a call billed by the request or by the page, rather than by the token, on its usage.
 
     The rates are per million tokens, so each unit is recorded as a million tokens in and out, and the rate table
-    prices one unit; the usage says it counts ``pricing_unit``, so a reader of tokens leaves the counts out, the event
-    an inference call ends with included, which keeps the call's cost and writes no token counts. Every worker that
-    prices this way, a provider's or a plugin's, records its usage through here.
+    prices one unit; the usage says it counts ``pricing_unit``, which the event an inference call ends with reads, so it
+    keeps the call's cost and writes no token counts. The other readers of the counts do not read it yet, as
+    ``pipelex.cogt.usage.pricing_unit`` says. Every worker that prices this way, a provider's or a plugin's, records its
+    usage through here.
 
     Args:
         tokens_usage: The usage on the job's report, which the worker base hands to the reporting path.

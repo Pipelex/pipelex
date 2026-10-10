@@ -9,6 +9,7 @@ logs through.
 
 from __future__ import annotations
 
+import contextlib
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Self
 
@@ -32,11 +33,12 @@ class SummaryEvent(ABC):
 
     The event is the work's measurement, never part of its result: if its fields cannot be built or logged, a call
     that succeeded must still succeed and one that failed must fail with its own exception. So a failure of the
-    event's own is logged once in its place, as a warning, and the work's outcome goes on unchanged.
+    event's own is logged once in its place, as a warning, and the work's outcome goes on unchanged; a warning the
+    handlers refuse in their turn is dropped, since nothing is left to say it with.
 
     Some work runs under a context that only exists part of the way, a span that is started after checks that may
     refuse the work. ``ends_here`` enters the event again for the inner block, so the event is logged when that block
-    ends, inside the context the block runs under, while a refusal before it still ends the work with its event, logged
+    ends, still under the context the block sets, while a refusal before it still ends the work with its event, logged
     when the outer block ends. The clock starts at the first entry, and the event is logged at the first exit, so
     nothing that can fail may follow the inner block inside the outer one.
 
@@ -76,7 +78,8 @@ class SummaryEvent(ABC):
         """The event again, to enter around the inner block whose end it is logged at.
 
         ``with pipelex_span_active(span=span), call_summary.ends_here():`` logs the event while the span is still the
-        active one, and the outer ``with call_summary:`` logs it only when the inner block was never reached.
+        active Pipelex span, so the line names it, even where the block has already ended the span itself, and the
+        outer ``with call_summary:`` logs it only when the inner block was never reached.
         """
         return self
 
@@ -89,12 +92,19 @@ class SummaryEvent(ABC):
         """Log the event with ``fields``, at INFO, under its fixed message and its console layout."""
 
     def _end(self, *, error: BaseException | None) -> None:
-        """Log the event the work ends with, having raised ``error`` or not, or the warning a failure of its own is logged as."""
+        """Log the event the work ends with, having raised ``error`` or not, or the warning a failure of its own is logged as.
+
+        Nothing raised here leaves it, the warning's own failure included, so the work's result or exception goes on as it came.
+        """
         try:
             duration_ms = elapsed_ms(started_at=self._started_at)
             fields = {**self._work_fields(), DURATION_MS_FIELD: duration_ms, **outcome_fields(error=error)}
             self._log_event(fields=fields)
         except Exception as event_error:  # ruff: ignore[blind-except]
             # (2) the work's fields are read from whatever the work recorded, a provider worker's usage included, a plugin's
-            # among them, so what building and logging them can raise cannot be enumerated, and the work's outcome must not change.
-            log.warning(SUMMARY_EVENT_FAILED_MESSAGE, fields={SUMMARY_EVENT_FIELD: self._message, **error_fields(exc=event_error)})
+            # among them, and the event goes through whatever handlers the host installed, so what building and logging it can
+            # raise cannot be enumerated, and the work's outcome must not change.
+            # (2) the warning goes through the same handlers, which may refuse it as they refused the event; then there is
+            # nowhere left to say so, and the work's outcome still must not change.
+            with contextlib.suppress(Exception):
+                log.warning(SUMMARY_EVENT_FAILED_MESSAGE, fields={SUMMARY_EVENT_FIELD: self._message, **error_fields(exc=event_error)})

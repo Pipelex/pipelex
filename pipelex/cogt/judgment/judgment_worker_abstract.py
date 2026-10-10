@@ -39,10 +39,11 @@ class JudgmentWorkerAbstract(InferenceWorkerAbstract):
         return f"Judgment using {self.inference_model.desc}"
 
     def _call_summary(self, *, judgment_job: JudgmentJob) -> InferenceCallSummary:
-        """The event the call ends with, its usage read off the job it reports."""
+        """The event the call ends with, its model and its usage read off the worker and the job it reports when it ends."""
         return InferenceCallSummary(
             operation=InferenceOperation.JUDGMENT,
-            inference_model=self.inference_model,
+            model_handle=self.inference_model.name,
+            read_inference_model=lambda: self.inference_model,
             read_tokens_usage=lambda: judgment_job.job_report.judgment_tokens_usage,
         )
 

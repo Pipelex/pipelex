@@ -5,6 +5,8 @@ import io
 import json
 import logging
 import math
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, cast
 
 import pytest
@@ -13,10 +15,27 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from typing_extensions import override
 
+from pipelex.cogt.content_generation import doc_gen_generate
+from pipelex.cogt.content_generation.assignment_models import RenderDocumentAssignment
+from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
+from pipelex.cogt.content_generation.doc_gen_generate import render_document_and_store
+from pipelex.cogt.doc_gen import doc_gen_engine
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
-from pipelex.cogt.doc_gen.layout_tree import LayoutDocument, MarkdownBlock
-from pipelex.cogt.doc_gen.render_job import RenderJob
-from pipelex.cogt.exceptions import ExtractCapabilityError, ImgGenParameterError, LLMCapabilityError, LLMCompletionError, SearchJobFailureError
+from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
+from pipelex.cogt.doc_gen.doc_gen_worker_abstract import DocGenWorkerAbstract
+from pipelex.cogt.doc_gen.doc_gen_worker_factory import DocGenWorkerFactory
+from pipelex.cogt.doc_gen.document_composition import DocumentComposition
+from pipelex.cogt.doc_gen.exceptions import DocGenEngineMissingError
+from pipelex.cogt.doc_gen.layout_tree import ImageBlock, LayoutBlock, LayoutDocument, MarkdownBlock
+from pipelex.cogt.doc_gen.render_job import RenderedDocument
+from pipelex.cogt.exceptions import (
+    ExtractCapabilityError,
+    ImgGenParameterError,
+    LLMCapabilityError,
+    LLMCompletionError,
+    ModelNotFoundError,
+    SearchJobFailureError,
+)
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams, ExtractJobReport
@@ -45,6 +64,7 @@ from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCateg
 from pipelex.cogt.usage.usage_cost import compute_tokens_usage_cost
 from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.telemetry.current_span import PIPELEX_SPAN_ID_KEY
 from pipelex.system.telemetry.otel_constants import GenAISpanAttr
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
@@ -52,15 +72,18 @@ from pipelex.tools.log.console_layouts import LogLayout
 from pipelex.tools.log.json_log_sink import LOGGER_KEY, MESSAGE_KEY, JsonLogSink
 from pipelex.tools.log.log_fields import LAYOUT_MARK, attached_field_names
 from pipelex.tools.log.summary_event import SUMMARY_EVENT_FAILED_MESSAGE
+from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
+from pipelex.tools.uri.exceptions import UriReadRefusedError
 from tests.helpers.console_log_rendering import rendered_text
 from tests.unit.pipelex.cogt.judgment.fake_judgment_worker import make_fake_judgment_job
-from tests.unit.pipelex.providers.reportlab.reportlab_test_helpers import StubRenderResources, get_test_renderer
+from tests.unit.pipelex.providers.reportlab.reportlab_test_helpers import reportlab_pdf_model
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Iterator
 
     from pytest_mock import MockerFixture
 
+    from pipelex.cogt.doc_gen.render_job import RenderJob, RenderResources
     from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
     from pipelex.cogt.judgment.judgment_job import JudgmentJob
     from pipelex.cogt.search.search_job import SearchJob
@@ -75,6 +98,17 @@ RATES = {CostCategory.INPUT: 1.0, CostCategory.OUTPUT: 2.0}
 STARTED_AT = 10.0
 ENDED_AT = 11.25
 DURATION_MS = 1250.0
+# The model a routing LLM worker names once `_before_job` has routed the call, and the one the provider says served it.
+ROUTED_MODEL = "gpt-test-routed"
+SERVED_MODEL = "gpt-test-2026-10-01"
+# The document engine's model keys, as the kit's `internal.toml` declares `reportlab-pdf`.
+REPORTLAB_MODEL_FIELDS: dict[str, Any] = {
+    "model_handle": "reportlab-pdf",
+    "backend_name": "internal",
+    "sdk": "reportlab",
+    GenAISpanAttr.REQUEST_MODEL: "reportlab-pdf",
+    GenAISpanAttr.RESPONSE_MODEL: "print-pdf",
+}
 RUN_TRACE_ID = 0x0123456789ABCDEF0123456789ABCDEF
 PIPE_SPAN_ID = 0x00000000000000AB
 
@@ -187,6 +221,79 @@ class _StandInJudgmentWorker(JudgmentWorkerAbstract):
         return {"is_urgent": YesNoAnswer(yes_no=True)}
 
 
+class _RoutingLLMWorker(_StandInLLMWorker):
+    """Names the model it routes the call to in `_before_job`, and learns from the provider which model served the call."""
+
+    def __init__(self) -> None:
+        super().__init__(usage=LLM_USAGE)
+        self._routed_model = "gpt-test"
+        self._served_model = "gpt-test-2026"
+
+    @override
+    async def _before_job(self, llm_job: LLMJob) -> None:
+        await super()._before_job(llm_job=llm_job)
+        self._routed_model = ROUTED_MODEL
+
+    @override
+    async def _gen_text(self, llm_job: LLMJob) -> str:
+        self._served_model = SERVED_MODEL
+        return await super()._gen_text(llm_job=llm_job)
+
+    @override
+    def _get_request_model_name(self) -> str:
+        return self._routed_model
+
+    @override
+    def _get_response_model_name(self) -> str:
+        return self._served_model
+
+
+class _BlockingEngine(DocGenWorkerAbstract):
+    """A document engine whose render waits until the test releases it, as a long print does."""
+
+    def __init__(self) -> None:
+        super().__init__(inference_model=reportlab_pdf_model())
+        self.has_started = threading.Event()
+        self.release = threading.Event()
+
+    @override
+    def render(self, *, job: RenderJob, resources: RenderResources) -> RenderedDocument:
+        self.has_started.set()
+        self.release.wait(timeout=10)
+        return RenderedDocument(data=b"%PDF-1.4")
+
+
+def _render_assignment(
+    *, model_handle: str = "reportlab-pdf", read_scope: str | None = None, image_url: str | None = None
+) -> RenderDocumentAssignment:
+    blocks: list[LayoutBlock] = [MarkdownBlock(markdown="Hello")]
+    if image_url is not None:
+        blocks.append(ImageBlock(url=image_url))
+    return RenderDocumentAssignment(
+        job_metadata=JobMetadata(
+            run_metadata=RunMetadata(user_id="pytest", storage_scope="org_abc/run", read_scope=read_scope, pipeline_run_id="plr-summary"),
+            pipe_code="print_summary",
+        ),
+        cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
+        composition=DocumentComposition(
+            format=DocGenFormat.PDF,
+            source=DocGenSource.LAYOUT,
+            filename="summary.pdf",
+            title="Summary",
+            layout=LayoutDocument(title="Summary", blocks=blocks),
+        ),
+        doc_gen_setting=DocGenSetting(model=model_handle),
+    )
+
+
+def _generated_content_factory(mocker: MockerFixture) -> Any:
+    """The factory a print stores its file through, standing in for the run's storage."""
+    factory = mocker.MagicMock()
+    factory.storage_provider = mocker.MagicMock(spec=StorageProviderAbstract)
+    factory.make_document_content = mocker.AsyncMock(return_value="the stored document")
+    return factory
+
+
 def _llm_job(*, otel_context: OtelContext | None = None, llm_prompt: LLMPrompt | None = None) -> LLMJob:
     return LLMJob(
         job_metadata=_job_metadata(otel_context=otel_context),
@@ -264,6 +371,20 @@ REFUSAL_CASES: list[tuple[Callable[[], Awaitable[None]], type[Exception], Infere
     (_refuse_extract, ExtractCapabilityError, InferenceOperation.EXTRACT),
 ]
 REFUSAL_IDS = ["an LLM without vision given a picture", "an image model given an input image", "a PDF extractor given an image"]
+# A print each check before the engine refuses: what the assignment asks, whether the engine's plugin is installed, the
+# refusal, and the model keys the event names it by, the handle alone where the print ended before the model resolved.
+FOREIGN_IMAGE = "pipelex-storage://org_other/assets/secret.png"
+DOC_GEN_REFUSAL_CASES: list[tuple[dict[str, Any], bool, type[Exception], dict[str, Any]]] = [
+    (
+        {"read_scope": "org_abc", "image_url": FOREIGN_IMAGE},
+        True,
+        UriReadRefusedError,
+        {"model_handle": "reportlab-pdf", GenAISpanAttr.REQUEST_MODEL: "reportlab-pdf"},
+    ),
+    ({"model_handle": "no-such-engine"}, True, ModelNotFoundError, {"model_handle": "no-such-engine", GenAISpanAttr.REQUEST_MODEL: "no-such-engine"}),
+    ({}, False, DocGenEngineMissingError, REPORTLAB_MODEL_FIELDS),
+]
+DOC_GEN_REFUSAL_IDS = ["an image outside the read scope", "an engine no model here serves", "an engine no plugin registers"]
 # A count the provider half recorded as nothing at all, which the cost engine cannot subtract from.
 BROKEN_USAGE = cast("NbTokensByCategoryDict", {TokenCategory.INPUT: None, TokenCategory.OUTPUT: 300})
 
@@ -425,29 +546,81 @@ class TestInferenceCallSummary:
             "outcome": "success",
         }
 
-    def test_a_document_print_ends_with_the_event_and_no_usage_at_all(self, caplog: pytest.LogCaptureFixture) -> None:
+    @pytest.mark.asyncio
+    async def test_a_document_print_ends_with_the_event_and_no_usage_at_all(self, caplog: pytest.LogCaptureFixture, mocker: MockerFixture) -> None:
         """A document engine reports no usage, so its event carries no tokens and no cost, rather than zeros."""
-        with caplog.at_level(logging.INFO, logger=SUMMARY_LOGGER):
-            job = RenderJob(
-                format=DocGenFormat.PDF,
-                source=DocGenSource.LAYOUT,
-                filename="summary.pdf",
-                title="Summary",
-                layout=LayoutDocument(title="Summary", blocks=[MarkdownBlock(markdown="Hello")]),
-            )
-            get_test_renderer().print_document(job=job, resources=StubRenderResources())
+        generated_content_factory = _generated_content_factory(mocker)
 
+        with caplog.at_level(logging.INFO, logger=SUMMARY_LOGGER):
+            stored = await render_document_and_store(_render_assignment(), generated_content_factory=generated_content_factory)
+
+        assert stored == "the stored document"
+        assert generated_content_factory.make_document_content.await_args.kwargs["data"].startswith(b"%PDF")
         (record,) = _summaries(caplog)
         assert _fields(record) == {
             GenAISpanAttr.OPERATION_NAME: "doc_gen",
-            "model_handle": "reportlab-pdf",
-            "backend_name": "internal",
-            "sdk": "reportlab",
-            GenAISpanAttr.REQUEST_MODEL: "reportlab-pdf",
-            GenAISpanAttr.RESPONSE_MODEL: "print-pdf",
+            **REPORTLAB_MODEL_FIELDS,
             "duration_ms": DURATION_MS,
             "outcome": "success",
         }
+
+    @pytest.mark.parametrize(
+        ("assignment_kwargs", "is_engine_installed", "refusal_type", "model_fields"), DOC_GEN_REFUSAL_CASES, ids=DOC_GEN_REFUSAL_IDS
+    )
+    @pytest.mark.asyncio
+    async def test_a_document_print_the_checks_refuse_ends_with_the_event_too(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        mocker: MockerFixture,
+        assignment_kwargs: dict[str, Any],
+        is_engine_installed: bool,
+        refusal_type: type[Exception],
+        model_fields: dict[str, Any],
+    ) -> None:
+        """The read scope, the engine's model and its installation are checked inside the event, as every other family's checks are."""
+        if not is_engine_installed:
+            mocker.patch.object(doc_gen_engine, "get_inference_backend_registry").return_value.has.return_value = False
+        generated_content_factory = _generated_content_factory(mocker)
+
+        with caplog.at_level(logging.INFO, logger=SUMMARY_LOGGER), pytest.raises(refusal_type):
+            await render_document_and_store(_render_assignment(**assignment_kwargs), generated_content_factory=generated_content_factory)
+
+        generated_content_factory.make_document_content.assert_not_awaited()
+        (record,) = _summaries(caplog)
+        assert _fields(record) == {
+            GenAISpanAttr.OPERATION_NAME: "doc_gen",
+            **model_fields,
+            "duration_ms": DURATION_MS,
+            "outcome": "error",
+            "error.type": refusal_type.__name__,
+        }
+
+    @pytest.mark.asyncio
+    async def test_a_document_print_cancelled_from_outside_ends_cancelled_once_whatever_its_thread_does_after(
+        self, caplog: pytest.LogCaptureFixture, mocker: MockerFixture
+    ) -> None:
+        """The event follows the coroutine awaiting the print: the engine's thread, which nothing stops, ends its render unheard."""
+        engine = _BlockingEngine()
+        mocker.patch.object(DocGenWorkerFactory, "make_doc_gen_worker", return_value=engine)
+        print_pool = ThreadPoolExecutor(max_workers=1)
+        mocker.patch.object(doc_gen_generate, "_PRINT_EXECUTOR", print_pool)
+
+        with caplog.at_level(logging.INFO, logger=SUMMARY_LOGGER):
+            print_task = asyncio.create_task(
+                render_document_and_store(_render_assignment(), generated_content_factory=_generated_content_factory(mocker))
+            )
+            assert await asyncio.to_thread(engine.has_started.wait, 10)
+            print_task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await print_task
+            engine.release.set()
+            # The engine's thread has returned from its render once the pool it ran on has shut down.
+            await asyncio.to_thread(print_pool.shutdown, wait=True)
+
+        (record,) = _summaries(caplog)
+        fields = _fields(record)
+        assert (fields["outcome"], fields["duration_ms"]) == ("cancelled", DURATION_MS)
+        assert "error.type" not in fields
 
     @pytest.mark.asyncio
     async def test_an_extraction_priced_by_its_pages_carries_its_cost_and_no_page_counts_as_tokens(self, caplog: pytest.LogCaptureFixture) -> None:
@@ -535,7 +708,7 @@ class TestInferenceCallSummary:
         assert {GenAISpanAttr.USAGE_INPUT_TOKENS, GenAISpanAttr.USAGE_OUTPUT_TOKENS, "cost_usd"}.isdisjoint(fields)
 
     @pytest.mark.asyncio
-    async def test_the_llm_event_is_logged_inside_the_calls_span_and_a_refused_call_names_none(
+    async def test_the_llm_event_carries_the_calls_span_and_a_refused_call_names_none(
         self, caplog: pytest.LogCaptureFixture, span_exporter: InMemorySpanExporter, json_lines: io.StringIO
     ) -> None:
         otel_context = OtelContext(trace_id=RUN_TRACE_ID, trace_name="some_pipe", trace_name_redacted="some_pipe", span_id=PIPE_SPAN_ID)
@@ -588,3 +761,18 @@ class TestInferenceCallSummary:
         failure_fields = _fields(failure)
         assert failure.levelno == logging.WARNING
         assert (failure_fields["summary_event"], failure_fields["error.type"]) == (INFERENCE_CALL_ENDS_MESSAGE, "TypeError")
+
+    @pytest.mark.asyncio
+    async def test_the_model_names_are_read_when_the_call_ends(self, caplog: pytest.LogCaptureFixture, span_exporter: InMemorySpanExporter) -> None:
+        """A worker routing the call in `_before_job` is named as its span names it, and the model the provider served is the one named."""
+        otel_context = OtelContext(trace_id=RUN_TRACE_ID, trace_name="some_pipe", trace_name_redacted="some_pipe", span_id=PIPE_SPAN_ID)
+
+        with caplog.at_level(logging.INFO, logger=SUMMARY_LOGGER):
+            await _RoutingLLMWorker().gen_text(llm_job=_llm_job(otel_context=otel_context))
+
+        (record,) = _summaries(caplog)
+        (span,) = span_exporter.get_finished_spans()
+        assert span.attributes is not None
+        fields = _fields(record)
+        assert fields[GenAISpanAttr.REQUEST_MODEL] == span.attributes[GenAISpanAttr.REQUEST_MODEL] == ROUTED_MODEL
+        assert fields[GenAISpanAttr.RESPONSE_MODEL] == SERVED_MODEL

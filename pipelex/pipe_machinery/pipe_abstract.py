@@ -70,8 +70,9 @@ class PipeRunEnd(SummaryEvent):
 
     The pair of the run's announcement: entered with it, under the run's `pipe_run_id`, and left once the run returns
     or raises, so every announced run ends with one event and a dry run, which announces nothing, with none. The run
-    enters `ends_here` around the block its span is active in, so the event is logged inside the pipe's own span, while
-    a failure before that block still ends the run with its event. The event carries the announcement's fields, then
+    enters `ends_here` around the block its span is active in, so the event is logged as the pipe's own span closes,
+    just after the block has ended it, while it is still the active Pipelex span, and carries that span's ids; a
+    failure before that block still ends the run with its event. The event carries the announcement's fields, then
     `duration_ms`, `outcome`, `error.type` on failure, and `cancelled` for a run stopped from outside. It never handles
     the exception it reads the outcome from, which goes on as it came.
 
@@ -1030,7 +1031,7 @@ class PipeAbstract(ABC, BaseModel):
         # comes back when the pipe returns, however it returns. A pipe lifted for absent optional
         # inputs never gets here: it has no run and no id, and its skip line carries the enclosing binding.
         # The run ends with its summary event, under the same binding, whichever way it ends: it is logged
-        # inside the pipe's own span when the run reaches it, and here when the setup before it fails.
+        # as the pipe's own span closes when the run reaches it, and here when the setup before it fails.
         pipe_run_fields = self._pipe_run_fields(pipe_run_params=pipe_run_params)
         with log.context(pipe_run_id=this_pipe_run_id), PipeRunEnd(pipe_fields=pipe_run_fields) as run_end:
             # A fixed message, the pipe in the fields: the console draws the pipe tree from them through
@@ -1080,7 +1081,8 @@ class PipeAbstract(ABC, BaseModel):
             # line inside the run names it under `pipelex.*`. OpenTelemetry's current context is left
             # alone, so a host's own instrumentation is never re-parented and a line's standard trace
             # fields keep naming the host's span, and the span's children still take their parent from
-            # `child_metadata`. The run's summary event is logged at the end of this block, inside the span.
+            # `child_metadata`. The run's summary event is logged at the end of this block, as the span closes:
+            # the span has ended by then, but it is still the active Pipelex span, so the event carries its ids.
             with pipelex_span_active(span=span), run_end.ends_here():
                 try:
                     pipe_output = await self._live_run_pipe(

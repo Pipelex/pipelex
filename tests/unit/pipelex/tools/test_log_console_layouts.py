@@ -71,6 +71,8 @@ class TestConsoleLayouts:
             ({}, ("cost_usd",), "gpt-5.6-terra chat · 12,288 → 567 tokens · done in 1.23 s"),
             ({"gen_ai.operation.name": "doc_gen", "model_handle": "reportlab-pdf"}, USAGE_KEYS, "reportlab-pdf doc_gen · done in 1.23 s"),
             ({"cost_usd": 0.0}, (), "gpt-5.6-terra chat · 12,288 → 567 tokens · $0 · done in 1.23 s"),
+            ({"cost_usd": 0.0000004}, (), "gpt-5.6-terra chat · 12,288 → 567 tokens · <$0.000001 · done in 1.23 s"),
+            ({"cost_usd": 0.0000006}, (), "gpt-5.6-terra chat · 12,288 → 567 tokens · $0.000001 · done in 1.23 s"),
             (
                 {"outcome": "error", "error.type": "LLMCompletionError"},
                 USAGE_KEYS,
@@ -87,6 +89,8 @@ class TestConsoleLayouts:
             "tokens alone",
             "no usage at all",
             "a free call",
+            "a cost below the last digit shown",
+            "a cost rounding up to the last digit shown",
             "a failure",
             "a cancellation",
         ],

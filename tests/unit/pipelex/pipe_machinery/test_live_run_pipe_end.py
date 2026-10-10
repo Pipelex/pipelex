@@ -310,7 +310,7 @@ class TestLiveRunPipeEnd:
         assert LogLayout.PIPE_RUN_END not in line.values()
 
     @pytest.mark.parametrize("fails", [False, True], ids=["the run succeeds", "the run fails"])
-    async def test_a_root_runs_end_is_logged_inside_its_own_span(
+    async def test_a_root_runs_end_carries_its_own_span(
         self, caplog: pytest.LogCaptureFixture, span_exporter: InMemorySpanExporter, json_lines: io.StringIO, fails: bool
     ) -> None:
         with caplog.at_level(logging.INFO, logger=PIPE_LOGGER):

@@ -173,13 +173,18 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         return self.inference_model.model_id
 
     def _call_summary(self, *, llm_job: LLMJob) -> InferenceCallSummary:
-        """The event the call ends with, its model named as the span names it and its usage read off the reported job."""
+        """The event the call ends with, its model named as the span names it and its usage read off the reported job.
+
+        The model names are read when the call ends, never here, before `_before_job` and the provider's answer, so a
+        worker that names its model in either is named the same way on the event and on the span.
+        """
         return InferenceCallSummary(
             operation=InferenceOperation.CHAT,
-            inference_model=self.inference_model,
+            model_handle=self.inference_model.name,
+            read_inference_model=lambda: self.inference_model,
             read_tokens_usage=lambda: llm_job.job_report.llm_tokens_usage,
-            request_model=self._get_request_model_name(),
-            response_model=self._get_response_model_name(),
+            read_request_model=self._get_request_model_name,
+            read_response_model=self._get_response_model_name,
         )
 
     def _start_otel_span_llm(self, llm_job: LLMJob, *, output_type: InferenceOutputType, output_class_name: str | None = None) -> Span | None:
@@ -507,7 +512,9 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             # The span is the Pipelex span active here until it ends, whichever way it ends, so a log line
             # during the call, a provider SDK's included, names it under `pipelex.*`; OpenTelemetry's current
             # context is left alone, and it is what the line's standard trace fields name. The summary event
-            # is logged at the end of this block, while the span is still the active one.
+            # is logged at the end of this block, as the span closes: the span has ended by then, on success in
+            # the job's after-step and on failure in the `finally` below, but it is still the active Pipelex span,
+            # so the event carries its ids.
             with pipelex_span_active(span=span), call_summary.ends_here():
                 try:
                     self.check_request(inference_model=self.inference_model, job_params=self._sent_job_params(llm_job=llm_job), is_structured=False)
@@ -551,7 +558,9 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             # The span is the Pipelex span active here until it ends, whichever way it ends, so a log line
             # during the call, a provider SDK's included, names it under `pipelex.*`; OpenTelemetry's current
             # context is left alone, and it is what the line's standard trace fields name. The summary event
-            # is logged at the end of this block, while the span is still the active one.
+            # is logged at the end of this block, as the span closes: the span has ended by then, on success in
+            # the job's after-step and on failure in the `finally` below, but it is still the active Pipelex span,
+            # so the event carries its ids.
             with pipelex_span_active(span=span), call_summary.ends_here():
                 try:
                     self.check_request(inference_model=self.inference_model, job_params=self._sent_job_params(llm_job=llm_job), is_structured=True)

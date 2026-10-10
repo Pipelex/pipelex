@@ -1,11 +1,13 @@
 """The one event an inference call ends with, whichever way it ends: what a dashboard of inference is built from.
 
 Every worker base wraps the call its public method makes in an ``InferenceCallSummary``, the LLM, image-generation,
-extraction, search, judgment and document-generation bases alike, so a provider's worker and a plugin's, which
-subclass those bases and implement only the provider half, end every call with the event and log nothing for it
-themselves. The block starts before the checks that may refuse the call, so a refused call ends with the event too.
-The event is logged once, when the call returns or raises, at INFO, under the fixed message ``Inference call ends``,
-so a log store selects every call by that message and groups them by its fields.
+extraction, search and judgment bases alike, so a provider's worker and a plugin's, which subclass those bases and
+implement only the provider half, end every call with the event and log nothing for it themselves. A document engine
+is a synchronous worker that overrides ``render`` alone, so its print is wrapped by the print stage that calls it,
+``render_document_and_store``, on the coroutine that awaits the engine's thread. The block starts before the checks
+that may refuse the call, so a refused call ends with the event too. The event is logged once, when the call returns or
+raises, at INFO, under the fixed message ``Inference call ends``, so a log store selects every call by that message
+and groups them by its fields.
 
 The fields are the call's dimensions. ``gen_ai.operation.name`` is the operation, OpenTelemetry's name where its
 semantic conventions define one (``chat`` for an LLM call) and the inference family's own name otherwise. The model
@@ -78,49 +80,65 @@ class InferenceCallSummary(SummaryEvent):
     leaving it logs the event, the outcome read off the exception leaving the block, if any, with ``cancelled`` for a
     call stopped from outside. It never handles that exception, which goes on as it came, and a failure to build or log
     the event is logged as a warning in its place, never raised. A worker base whose call runs under a span enters
-    ``ends_here`` around the block the span is active in, so the event is logged inside it.
+    ``ends_here`` around the block the span is active in, so the event is logged as the span closes and names it.
+
+    The model is read when the call ends, as everything else on the event is, so the event names it as the call left
+    it: a worker that routes the call in its checks, or learns from the provider which model served it, names that model.
+    A call whose handle resolved to no model served here, a document print refused before its model was resolved or for
+    want of one, names the model by its handle alone, and the keys only a served model has are left off.
 
     Args:
         operation: The call's operation, ``gen_ai.operation.name``.
-        inference_model: The model the worker calls.
+        model_handle: The handle the call asks for its model by, which names the model on the event when it resolves
+            to none served here.
+        read_inference_model: Reads the model serving the call when it ends; ``None`` when the handle resolved to none.
         read_tokens_usage: Reads the usage the call recorded, from the job report the worker hands to the reporting
             path, when the call ends; ``None`` for a family that reports no usage.
-        request_model: ``gen_ai.request.model``, the model's handle unless the worker names it otherwise.
-        response_model: ``gen_ai.response.model``, the provider's id of the model unless the worker names it otherwise.
+        read_request_model: Reads ``gen_ai.request.model`` when the call ends, the model's handle unless the worker names
+            it otherwise.
+        read_response_model: Reads ``gen_ai.response.model`` when the call ends, the provider's id of the model unless the
+            worker names it otherwise.
     """
 
     def __init__(
         self,
         *,
         operation: InferenceOperation,
-        inference_model: InferenceModelSpec,
+        model_handle: str,
+        read_inference_model: Callable[[], InferenceModelSpec | None],
         read_tokens_usage: Callable[[], TokensUsage | None] | None,
-        request_model: str | None = None,
-        response_model: str | None = None,
+        read_request_model: Callable[[], str] | None = None,
+        read_response_model: Callable[[], str] | None = None,
     ) -> None:
         super().__init__(message=INFERENCE_CALL_ENDS_MESSAGE)
         self._operation = operation
-        self._inference_model = inference_model
+        self._model_handle = model_handle
+        self._read_inference_model = read_inference_model
         self._read_tokens_usage = read_tokens_usage
-        self._request_model = request_model or inference_model.name
-        self._response_model = response_model or inference_model.model_id
+        self._read_request_model = read_request_model
+        self._read_response_model = read_response_model
 
     @override
     def _work_fields(self) -> dict[str, Any]:
         """The call's operation, its model under every key that names it, and the usage it recorded."""
-        return {
-            GenAISpanAttr.OPERATION_NAME: self._operation,
-            "model_handle": self._inference_model.name,
-            "backend_name": self._inference_model.backend_name,
-            "sdk": self._inference_model.sdk,
-            GenAISpanAttr.REQUEST_MODEL: self._request_model,
-            GenAISpanAttr.RESPONSE_MODEL: self._response_model,
-            **self._usage_fields(),
-        }
+        return {GenAISpanAttr.OPERATION_NAME: self._operation, **self._model_fields(), **self._usage_fields()}
 
     @override
     def _log_event(self, *, fields: dict[str, Any]) -> None:
         log.info(INFERENCE_CALL_ENDS_MESSAGE, fields=fields, layout=LogLayout.INFERENCE_CALL_END)
+
+    def _model_fields(self) -> dict[str, Any]:
+        """The model under every key that names it, read now; the handle alone for a model that resolved to none."""
+        inference_model = self._read_inference_model()
+        if inference_model is None:
+            return {"model_handle": self._model_handle, GenAISpanAttr.REQUEST_MODEL: self._model_handle}
+        return {
+            "model_handle": inference_model.name,
+            "backend_name": inference_model.backend_name,
+            "sdk": inference_model.sdk,
+            GenAISpanAttr.REQUEST_MODEL: self._read_request_model() if self._read_request_model is not None else inference_model.name,
+            GenAISpanAttr.RESPONSE_MODEL: self._read_response_model() if self._read_response_model is not None else inference_model.model_id,
+        }
 
     def _usage_fields(self) -> dict[str, Any]:
         """The tokens in and out and the cost the call recorded, each left out when it recorded none.

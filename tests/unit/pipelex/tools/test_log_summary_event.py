@@ -15,7 +15,7 @@ from pipelex.tools.log.summary_event import SUMMARY_EVENT_FAILED_MESSAGE, Summar
 from pipelex.tools.log.summary_fields import outcome_fields
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import Generator, Iterator
 
     from pytest_mock import MockerFixture
 
@@ -57,6 +57,20 @@ class WorkEnds(SummaryEvent):
         log.info(WORK_ENDS_MESSAGE, fields=fields)
 
 
+class _RefusingHandler(logging.Handler):
+    """A host's handler that raises on every record it is handed, as one writing to a full disk would, noting each message."""
+
+    def __init__(self) -> None:
+        super().__init__(level=logging.INFO)
+        self.refused: list[str] = []
+
+    @override
+    def emit(self, record: logging.LogRecord) -> None:
+        self.refused.append(record.getMessage())
+        msg = "No space left on device"
+        raise OSError(msg)
+
+
 def _refuse_before_the_call() -> None:
     msg = "refused before the call"
     raise RuntimeError(msg)
@@ -79,6 +93,18 @@ def fixed_clock(mocker: MockerFixture) -> None:
     """Every unit of work starts at the same reading and ends half a second later."""
     mocker.patch("pipelex.tools.log.summary_event.start_clock", return_value=STARTED_AT)
     mocker.patch("pipelex.tools.log.summary_fields.perf_counter", return_value=ENDED_AT)
+
+
+@pytest.fixture
+def refusing_handler() -> Iterator[_RefusingHandler]:
+    """A handler on the root logger that refuses every record at INFO and above, the event and its warning alike."""
+    handler = _RefusingHandler()
+    root_logger = logging.getLogger()
+    root_logger.addHandler(handler)
+    try:
+        yield handler
+    finally:
+        root_logger.removeHandler(handler)
 
 
 @pytest.mark.usefixtures("fixed_clock")
@@ -184,3 +210,20 @@ class TestLogSummaryEvent:
             "error.type": "TypeError",
             "error.message": "unsupported operand type(s) for -: 'NoneType' and 'int'",
         }
+
+    @pytest.mark.parametrize("work_error", [None, ValueError("the provider refused")], ids=["the work returned", "the work raised"])
+    def test_a_handler_refusing_the_event_and_its_warning_never_changes_the_works_outcome(
+        self, caplog: pytest.LogCaptureFixture, refusing_handler: _RefusingHandler, work_error: ValueError | None
+    ) -> None:
+        """The warning goes through the handlers that refused the event; when they refuse it too, the work still goes on as it came."""
+        with caplog.at_level(logging.INFO):
+            if work_error is None:
+                with WorkEnds():
+                    result = "the work's result"
+                assert result == "the work's result"
+            else:
+                with pytest.raises(ValueError, match="the provider refused") as raised, WorkEnds():
+                    raise work_error
+                assert raised.value is work_error
+
+        assert refusing_handler.refused == [WORK_ENDS_MESSAGE, SUMMARY_EVENT_FAILED_MESSAGE]

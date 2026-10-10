@@ -111,10 +111,11 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
         raise ExtractInputFormatError(msg)
 
     def _call_summary(self, *, extract_job: ExtractJob) -> InferenceCallSummary:
-        """The event the call ends with, its usage read off the job it reports."""
+        """The event the call ends with, its model and its usage read off the worker and the job it reports when it ends."""
         return InferenceCallSummary(
             operation=InferenceOperation.EXTRACT,
-            inference_model=self.inference_model,
+            model_handle=self.inference_model.name,
+            read_inference_model=lambda: self.inference_model,
             read_tokens_usage=lambda: extract_job.job_report.extract_tokens_usage,
         )
 
