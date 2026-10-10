@@ -4,9 +4,10 @@ The handler reads no message as Rich markup: a message is the caller's text, mad
 and prints as written, ``list[int]`` and ``[red]`` included. The colour is the sink's own: it renders a
 record's fields after its message as a styled ``key=value`` suffix, a record's advice on a line of its own
 under it, and a record that names a layout through that layout's template; what is shown and how it is
-coloured is in ``console_fields`` and ``console_layouts``. A line from another library than Pipelex starts
-with that library's package name, dimmed, as ``console_prefix`` decides; a Pipelex line has no prefix. A
-traceback printed as text, with Rich tracebacks off, goes under the line, after the suffix and the advice.
+coloured is in ``console_fields`` and ``console_layouts``. A line starts with its logger's package name,
+dimmed, when the ``package_prefix`` setting asks for it, as ``console_prefix`` decides: by default a line from
+another library than Pipelex does and a Pipelex line does not. A traceback printed as text, with Rich
+tracebacks off, goes under the line, after the suffix and the advice.
 
 Rich is the ``cli`` extra. It is imported when the handler is built and nowhere else in this module, so
 this module asks for Rich only where this sink is the one selected; a process that selects another sink
@@ -28,7 +29,7 @@ from typing_extensions import override
 
 from pipelex.tools.log.console_fields import advice_segments, attached_fields, field_suffix_segments
 from pipelex.tools.log.console_layouts import console_layout
-from pipelex.tools.log.console_prefix import foreign_package_name
+from pipelex.tools.log.console_prefix import prefixed_package_name
 from pipelex.tools.log.log_config import HighlighterName
 from pipelex.tools.log.log_fields import LAYOUT_MARK
 from pipelex.tools.log.log_sink import LogSink, LogSinkMethod, stream_for_target
@@ -47,7 +48,7 @@ CONSOLE_SINK_MISSING_MESSAGE = (
     f"or select the '{LogSinkMethod.JSON}' sink in [runtime.log] for a process with no terminal."
 )
 
-#: What follows another library's package name before its message, and the style the two are printed in.
+#: What follows a line's package name before its message, and the style the two are printed in.
 PACKAGE_PREFIX_SEPARATOR = ": "
 PACKAGE_PREFIX_STYLE = "dim"
 
@@ -69,6 +70,8 @@ class ConsoleLogSink(LogSink):
         from rich.logging import RichHandler
         from rich.text import Text
 
+        config = self._rich_log_config
+
         # Declared here because ``RichHandler`` is imported here, which is what keeps Rich off the import
         # path of a process that selected another sink. ``RichHandler`` overrides ``emit`` and does not
         # restore the ``try``/``handleError`` the stdlib's own handlers put around theirs, so anything
@@ -89,7 +92,7 @@ class ConsoleLogSink(LogSink):
             def render_message(self, record: logging.LogRecord, message: str) -> ConsoleRenderable:
                 """The message, or the layout the call named, then the fields as a styled ``key=value`` suffix, then any advice and traceback text.
 
-                A line from another library than Pipelex starts with that library's package name, dimmed. The message
+                A line starts with its logger's package name, dimmed, when ``package_prefix`` asks for it. The message
                 is plain text, read as no markup, and the prefix, the suffix and the advice are assembled as ``Text``
                 from styled segments around it after the highlighter has run on the message, so the highlighter never
                 reads a field's value. The advice, a ``user_action`` field, prints on a line of its own under the line.
@@ -127,7 +130,7 @@ class ConsoleLogSink(LogSink):
                 if message_text is None:
                     message_text = super().render_message(record, message_line)
                 if isinstance(message_text, Text):
-                    package_name = foreign_package_name(logger_name=record.name)
+                    package_name = prefixed_package_name(logger_name=record.name, package_prefix=config.package_prefix)
                     if package_name is not None:
                         message_text = Text.assemble((f"{package_name}{PACKAGE_PREFIX_SEPARATOR}", PACKAGE_PREFIX_STYLE), message_text)
                     segments = field_suffix_segments(fields=fields, presented_fields=presented_fields)
@@ -142,7 +145,6 @@ class ConsoleLogSink(LogSink):
                         message_text.append_text(Text(appended_text))
                 return message_text
 
-        config = self._rich_log_config
         highlighter: Highlighter
         match config.highlighter_name:
             case HighlighterName.JSON:

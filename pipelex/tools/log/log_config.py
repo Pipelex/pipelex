@@ -48,6 +48,19 @@ class CallerInfoTemplate(StrEnum):
                 return "{func} {module} {line}"
 
 
+class PackagePrefix(StrEnum):
+    """Which lines the ``console`` sink starts with their logger's top-level package name.
+
+    ``LIBRARIES`` names another library's package and leaves a line from ``pipelex`` or a ``pipelex_`` package bare,
+    ``ALL`` names the package of every line logged under a named logger, and ``NONE`` names none. A line logged on the
+    root logger names no package under any value.
+    """
+
+    LIBRARIES = "libraries"
+    ALL = "all"
+    NONE = "none"
+
+
 class RichLogConfig(ConfigModel):
     """The settings of the ``console`` sink's Rich handler. Read by the sink; this module imports no Rich."""
 
@@ -61,6 +74,7 @@ class RichLogConfig(ConfigModel):
     is_tracebacks_show_locals: bool
     tracebacks_suppress: list[str]
     keywords_to_hilight: list[str]
+    package_prefix: PackagePrefix = Field(strict=False)
 
 
 class OtlpLogSinkConfig(ConfigModel):

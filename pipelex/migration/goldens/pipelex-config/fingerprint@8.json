@@ -1228,6 +1228,17 @@
       "default": [],
       "open_node": false
     },
+    "runtime.log.rich_log.package_prefix": {
+      "value_type": "enum",
+      "required": true,
+      "enum_members": [
+        "all",
+        "libraries",
+        "none"
+      ],
+      "default": "libraries",
+      "open_node": false
+    },
     "runtime.log.rich_log.tracebacks_suppress": {
       "value_type": "list[str]",
       "required": true,

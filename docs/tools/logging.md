@@ -268,13 +268,15 @@ Every other sink writes `user_action` as the field it is, so a log store can cou
 
 ### Another library's lines
 
-A line has no prefix when its logger's top-level package is `pipelex` or starts with `pipelex_`, which covers the runtime, the API server's `pipelex_api` and a plugin whose package is named that way, and none when it was logged on the root logger. A line another library logged, an HTTP client's or a provider SDK's, starts with the top-level package of its logger, dimmed, so the reader still sees which library spoke:
+By default, a line has no prefix when its logger's top-level package is `pipelex` or starts with `pipelex_`, which covers the runtime, the API server's `pipelex_api` and a plugin whose package is named that way, and none when it was logged on the root logger. A line another library logged, an HTTP client's or a provider SDK's, starts with the top-level package of its logger, dimmed, so the reader still sees which library spoke:
 
 ```text
 INFO     httpx: HTTP Request: POST https://api.example.com/v1/chat/completions "HTTP/1.1 200 OK"
 ```
 
-Your own application's lines, logged through `log` from a module of `myapp`, start with `myapp: ` the same way. The package name is styled text the console adds, never part of the message, so no other sink writes it: they carry the logger's full name as the record's own.
+Your own application's lines, logged through `log` from a module of `myapp`, start with `myapp: ` the same way, and so does a plugin whose package is not named `pipelex_…`. The package name is styled text the console adds, never part of the message, so no other sink writes it: they carry the logger's full name as the record's own.
+
+The console setting `package_prefix` under `[runtime.log.rich_log]` changes which lines carry the prefix. The default, `libraries`, is the rule above; `all` puts it on every line, Pipelex's own included, where `pipelex: `, `pipelex_api: ` and a plugin's name tell apart which component spoke; `none` puts it on no line. A line logged on the root logger never carries one (see [Display options](../configuration/config-practical/logging-config.md#display-options)).
 
 ### The style map
 
