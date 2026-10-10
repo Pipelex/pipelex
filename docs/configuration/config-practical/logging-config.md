@@ -34,6 +34,7 @@ pipelex = "INFO"
 ```
 
 - Override log levels for specific packages
+- The defaults keep the HTTP clients under the inference SDKs quiet: `httpx = "WARNING"` and `httpcore = "INFO"`, with the same levels for `httpx2` and `httpcore2`, the forks openai 3.x sends its requests through, so an inference call prints no line of its own carrying the provider's endpoint URL
 - Use `-` instead of `.` in package names (e.g., `urllib3-connectionpool`)
 - A key works at any depth of the logger hierarchy, because Pipelex names every logger after the emitting module: `pipelex` governs the whole runtime, and `pipelex-pipe_operators-pipe_llm = "DEBUG"` opens one module while the rest of `pipelex` stays at its level
 

@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:befa3b014fb06f0fd7cdc943212d7d5b86f7eca17b5e8c7b8bb9b001af97b375"
+digest = "sha256:cf7d6bb91764d7e38386d38f133a9b721ac88591be65f4679a807eeb077c67cf"
 reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-10-10T00:27:59Z"
-rationale = "real-catch: StaleConfigurationWarning.emit in config_surface.py now words its messages 'and nothing was written' and has two more messages for a file with blocked steps, reached by pipelex migrate or not. Re-read docs/configuration: inference-backend-config.md quoted the old 'without being rewritten' line and now quotes the reached, unblocked message as the code emits it; telemetry-config.md and logging-config.md only say the boot warns and writes nothing, which still holds. No config model, default, validator or ledger entry moved: configs.py, config_cogt.py and pipelex/migration/ledgers/ are untouched."
+reviewed_at = "2026-10-10T01:52:31Z"
+rationale = "real-catch: pipelex/pipelex.toml gained two shipped defaults under [runtime.log.package_log_levels], httpx2 = WARNING and httpcore2 = INFO. Re-read docs/configuration: logging-config.md's Package-Specific Log Levels section now says the HTTP clients under the inference SDKs default to httpx WARNING and httpcore INFO with the same levels for their forks; its quantified claims (OFF silences only the loggers the section does not pin, silence for everything takes every entry of that section at OFF) are about the section as a set and still hold; the override example and the best-practice list name no default. No other configuration page names a package level. No model moved: configs.py and config_cogt.py are untouched, package_log_levels is an open dict[str, LogLevel] node, check-migration-schemas reported the fingerprint moved additively with no entry needed, and the head goldens defaults@7 and fingerprint@7 were regenerated with make umig; the ledgers need no entry."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:02f71cb4a6b01aebda59c2e31f262ef9c865e17b"
@@ -10,7 +10,7 @@ rationale = "real-catch: StaleConfigurationWarning.emit in config_surface.py now
 "pipelex/graph/graph_config.py" = "blob:dc0939a6d2730c0a10b88aa1a6e0b2dd583462a6"
 "pipelex/language/mthds_config.py" = "blob:353009ad8c59dc5266bdd9dfa42b1ad18b67dca7"
 "pipelex/methods/methods_config.py" = "blob:76ca9a0e64f8c10ef6a355aafd0d79d36b09f06a"
-"pipelex/pipelex.toml" = "blob:af0f9f1f117c404333866b8c60ae61d95afab962"
+"pipelex/pipelex.toml" = "blob:c9de2007e32ec4e0043fd9a153f0d4aabe3ae04a"
 "pipelex/system/configuration/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
 "pipelex/system/configuration/config_check.py" = "blob:2d5de29aba3d2ce205d3d82b4623f37b53108332"
 "pipelex/system/configuration/config_loader.py" = "blob:2850f6b39df6ad2afafefc4d431672cb6ee91ced"

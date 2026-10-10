@@ -1123,6 +1123,8 @@
         "google": "INFO",
         "httpx": "WARNING",
         "httpcore": "INFO",
+        "httpx2": "WARNING",
+        "httpcore2": "INFO",
         "openai": "INFO",
         "instructor": "INFO",
         "urllib3-connectionpool": "INFO",
