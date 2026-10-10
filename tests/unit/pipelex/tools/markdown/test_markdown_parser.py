@@ -100,6 +100,12 @@ class TestMarkdownParser:
         assert "README.md" in html
         assert html.count("<a ") == 1
 
+    def test_an_explicit_link_keeps_its_target_in_html_whatever_its_scheme(self) -> None:
+        html = render_markdown_as_html("[the readme](README.md), [files](ftp://example.com/file) and ![a chart](chart.png)")
+        assert '<a href="README.md">the readme</a>' in html
+        assert '<a href="ftp://example.com/file">files</a>' in html
+        assert '<img src="chart.png" alt="a chart" />' in html
+
     def test_tables_and_strikethrough_are_formatted(self) -> None:
         html = render_markdown_as_html("| a | b |\n| - | - |\n| 1 | 2 |\n\n~~gone~~")
         assert "<table>" in html
