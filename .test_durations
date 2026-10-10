@@ -14329,7 +14329,6 @@
     "tests/unit/pipelex/test_method_fetch_on_miss_config.py::TestIsMethodFetchOnMissEnabled::test_env_var_enables[true]": 0.0004,
     "tests/unit/pipelex/test_method_fetch_on_miss_config.py::TestIsMethodFetchOnMissEnabled::test_env_var_enables[yes]": 0.0003,
     "tests/unit/pipelex/test_method_fetch_on_miss_config.py::TestIsMethodFetchOnMissEnabled::test_unrecognized_env_value_falls_back_to_config": 0.0988,
-    "tests/unit/pipelex/test_pipelex_error_message_init.py::TestPipelexErrorMessageInit::test_message_set_and_error_report_succeeds[ConfigModelError]": 0.1062,
     "tests/unit/pipelex/test_pipelex_error_message_init.py::TestPipelexErrorMessageInit::test_message_set_and_error_report_succeeds[ConstructFieldBlueprintValueError]": 0.0005,
     "tests/unit/pipelex/test_pipelex_error_message_init.py::TestPipelexErrorMessageInit::test_message_set_and_error_report_succeeds[RoutingProfileBlueprintValueError]": 0.0012,
     "tests/unit/pipelex/test_pipelex_error_message_init.py::TestPipelexErrorMessageInit::test_no_subclass_shadows_message_setting_init": 0.8693,
