@@ -11,8 +11,8 @@ every variant through the same loader the runtime uses and holds it to the shipp
   declared only as another type does not count.
 
 The second check is scoped to the models only the variant names. A handle the shipped deck names
-too is not held to them here: some are served only through Pipelex, with no backend section
-of their own, and the shipped deck's default aliases have their own guard in `test_shipped_deck_defaults.py`.
+too is not held to them here: it is already exercised at boot, and the shipped deck's default
+aliases have their own guard in `test_shipped_deck_defaults.py`.
 """
 
 from collections.abc import Mapping
