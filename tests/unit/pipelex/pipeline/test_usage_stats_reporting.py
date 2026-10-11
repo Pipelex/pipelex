@@ -110,6 +110,7 @@ class TestUsageStatsReporting:
             tally.note_call(
                 model_handle=_SHIPPED_ANTHROPIC_MODEL,
                 backend_name="anthropic",
+                model_id=None,
                 failed=False,
                 failure_category=None,
                 images_generated=0,
@@ -118,6 +119,7 @@ class TestUsageStatsReporting:
         tally.note_call(
             model_handle=_SHIPPED_ANTHROPIC_MODEL,
             backend_name="anthropic",
+            model_id=None,
             failed=True,
             failure_category="capacity",
             images_generated=0,
@@ -153,19 +155,56 @@ class TestUsageStatsReporting:
         assert (model["input_tokens"], model["output_tokens"], model["cached_tokens"]) == (300, 60, 20)
         assert model["cost_usd"] == run["cost_usd"]
 
+    def test_a_call_that_fell_back_is_attributed_to_the_backend_that_made_it(self, mocker: MockerFixture) -> None:
+        """One handle served by two backends in one run: each backend's calls, failures and tokens are its own."""
+        tally = RunInferenceTally()
+        tally.note_call(
+            model_handle=_SHIPPED_ANTHROPIC_MODEL,
+            backend_name="anthropic",
+            model_id="claude-sonnet-4-anthropic-id",
+            failed=True,
+            failure_category="capacity",
+            images_generated=0,
+            pages_extracted=0,
+        )
+        tally.note_call(
+            model_handle=_SHIPPED_ANTHROPIC_MODEL,
+            backend_name="bedrock",
+            model_id="claude-sonnet-4-bedrock-id",
+            failed=False,
+            failure_category=None,
+            images_generated=0,
+            pages_extracted=0,
+        )
+        events: list[TraceEvent] = [
+            llm_usage_event(model_name=_SHIPPED_ANTHROPIC_MODEL, input_tokens=100, output_tokens=50, model_id="claude-sonnet-4-bedrock-id"),
+        ]
+        _, *model_events = build_run_usage_events(facts=_facts(mocker=mocker, events=events, tally=tally))
+        by_provider = {properties["provider"]: properties for properties in (_properties(usage_event=event) for event in model_events)}
+        assert set(by_provider) == {"anthropic", "bedrock"}
+        assert (by_provider["anthropic"]["calls"], by_provider["anthropic"]["failures"], by_provider["anthropic"]["input_tokens"]) == (1, 1, 0)
+        assert (by_provider["bedrock"]["calls"], by_provider["bedrock"]["failures"], by_provider["bedrock"]["input_tokens"]) == (1, 0, 100)
+
     def test_unrated_model_leaves_the_run_cost_out(self, mocker: MockerFixture) -> None:
         """A model on a backend of the user's own is `custom` and `other`, and its missing rates leave the run's cost out."""
         tally = RunInferenceTally()
         tally.note_call(
             model_handle=_SHIPPED_ANTHROPIC_MODEL,
             backend_name="anthropic",
+            model_id=None,
             failed=False,
             failure_category=None,
             images_generated=0,
             pages_extracted=0,
         )
         tally.note_call(
-            model_handle="my-own-gpu-model", backend_name="my_gpu_box", failed=False, failure_category=None, images_generated=0, pages_extracted=0
+            model_handle="my-own-gpu-model",
+            backend_name="my_gpu_box",
+            model_id=None,
+            failed=False,
+            failure_category=None,
+            images_generated=0,
+            pages_extracted=0,
         )
         events: list[TraceEvent] = [
             llm_usage_event(model_name=_SHIPPED_ANTHROPIC_MODEL, input_tokens=10, output_tokens=5, sequence=0),

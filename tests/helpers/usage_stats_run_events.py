@@ -17,7 +17,14 @@ USAGE_STATS_INSTALLATION_ID = "0f8fad5b-d9cb-469f-a165-70867728950e"
 
 
 def llm_usage_event(
-    *, model_name: str, input_tokens: int, output_tokens: int, cached_tokens: int = 0, is_rated: bool = True, sequence: int = 0
+    *,
+    model_name: str,
+    input_tokens: int,
+    output_tokens: int,
+    cached_tokens: int = 0,
+    is_rated: bool = True,
+    sequence: int = 0,
+    model_id: str | None = None,
 ) -> UsageReportEvent:
     """One inference call's usage, as the call reports it; an unrated call carries no rate table, so no cost."""
     tokens_usage = LLMTokensUsage(
@@ -28,7 +35,7 @@ def llm_usage_event(
             job_category=JobCategory.LLM_JOB,
         ),
         inference_model_name=model_name,
-        inference_model_id=f"{model_name}-provider-id",
+        inference_model_id=model_id or f"{model_name}-provider-id",
         unit_costs={CostCategory.INPUT: 0.003, CostCategory.OUTPUT: 0.015} if is_rated else {},
         nb_tokens_by_category={
             TokenCategory.INPUT: input_tokens,

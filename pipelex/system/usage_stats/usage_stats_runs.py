@@ -25,10 +25,12 @@ UNCLASSIFIED_FAILURE_CATEGORY = "unknown"
 
 
 class ModelCallTally:
-    """The calls a run made to one model, as their summary events saw them end."""
+    """The calls a run made to one model through one backend, as their summary events saw them end."""
 
     def __init__(self, *, backend_name: str) -> None:
         self.backend_name = backend_name
+        #: The backend's own identifiers of the model, which the run's usage reports name, to tell its usage apart.
+        self.model_ids: set[str] = set()
         self.calls = 0
         self.failures = 0
         self.failures_by_category: dict[str, int] = dict.fromkeys(FAILURE_CATEGORIES, 0)
@@ -37,19 +39,24 @@ class ModelCallTally:
 
 
 class RunInferenceTally:
-    """The inference calls of one run, by model handle; calls whose model never resolved count only in the totals."""
+    """The inference calls of one run, by model handle and backend; calls whose model never resolved count only in the totals.
+
+    A handle can be served by more than one backend in one run, as when a call falls back to another, so each pair is
+    tallied on its own and each call is attributed to the backend that made it.
+    """
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self.calls = 0
         self.failures = 0
-        self.models: dict[str, ModelCallTally] = {}
+        self.models: dict[tuple[str, str], ModelCallTally] = {}
 
     def note_call(
         self,
         *,
         model_handle: str,
         backend_name: str | None,
+        model_id: str | None,
         failed: bool,
         failure_category: str | None,
         images_generated: int,
@@ -61,10 +68,12 @@ class RunInferenceTally:
                 self.failures += 1
             if backend_name is None:
                 return
-            model_tally = self.models.get(model_handle)
+            model_tally = self.models.get((model_handle, backend_name))
             if model_tally is None:
                 model_tally = ModelCallTally(backend_name=backend_name)
-                self.models[model_handle] = model_tally
+                self.models[model_handle, backend_name] = model_tally
+            if model_id is not None:
+                model_tally.model_ids.add(model_id)
             model_tally.calls += 1
             model_tally.images_generated += images_generated
             model_tally.pages_extracted += pages_extracted
@@ -72,6 +81,17 @@ class RunInferenceTally:
                 model_tally.failures += 1
                 category = failure_category if failure_category in model_tally.failures_by_category else UNCLASSIFIED_FAILURE_CATEGORY
                 model_tally.failures_by_category[category] += 1
+
+    def backend_for_usage(self, *, model_handle: str, model_id: str) -> str | None:
+        """The backend a usage report of `model_handle` came from: the one that called the model by `model_id`, else the
+        first that served the handle, and `None` when none did.
+        """
+        with self._lock:
+            serving = [model_tally for (handle, _), model_tally in self.models.items() if handle == model_handle]
+        for model_tally in serving:
+            if model_id in model_tally.model_ids:
+                return model_tally.backend_name
+        return serving[0].backend_name if serving else None
 
 
 _RUN_TALLY: ContextVar[RunInferenceTally | None] = ContextVar("pipelex_usage_stats_run_tally", default=None)

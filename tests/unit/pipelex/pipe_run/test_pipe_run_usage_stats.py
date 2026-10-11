@@ -50,7 +50,9 @@ def _job(*, mocker: MockerFixture, is_traced: bool) -> Any:
 def _note_one_call() -> None:
     tally = current_run_tally()
     assert tally is not None
-    tally.note_call(model_handle=_MODEL, backend_name="anthropic", failed=False, failure_category=None, images_generated=0, pages_extracted=0)
+    tally.note_call(
+        model_handle=_MODEL, backend_name="anthropic", model_id=None, failed=False, failure_category=None, images_generated=0, pages_extracted=0
+    )
 
 
 def _call_then_fail(pipe_job: Any) -> Any:

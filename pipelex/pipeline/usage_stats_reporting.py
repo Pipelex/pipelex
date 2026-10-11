@@ -285,7 +285,6 @@ class _ModelUsageRow:
 def _model_usage_rows(*, tally: RunInferenceTally | None, events: Sequence[TraceEvent]) -> dict[tuple[UsageStatsProvider, str], _ModelUsageRow]:
     """The run's models as `model_used` reports them, merged by provider and reported model."""
     rows: dict[tuple[UsageStatsProvider, str], _ModelUsageRow] = {}
-    backend_by_handle: dict[str, str] = {}
 
     def row_for(*, model_handle: str, backend_name: str | None) -> _ModelUsageRow:
         provider = UsageStatsProvider.for_backend(backend_name=backend_name)
@@ -295,9 +294,8 @@ def _model_usage_rows(*, tally: RunInferenceTally | None, events: Sequence[Trace
         return rows[key]
 
     if tally is not None:
-        for model_handle, model_tally in tally.models.items():
-            backend_by_handle[model_handle] = model_tally.backend_name
-            row = row_for(model_handle=model_handle, backend_name=model_tally.backend_name)
+        for (tallied_handle, tallied_backend), model_tally in tally.models.items():
+            row = row_for(model_handle=tallied_handle, backend_name=tallied_backend)
             row.tallied_calls += model_tally.calls
             row.failures += model_tally.failures
             for category, count in model_tally.failures_by_category.items():
@@ -310,7 +308,10 @@ def _model_usage_rows(*, tally: RunInferenceTally | None, events: Sequence[Trace
             continue
         tokens_usage = event.tokens_usage
         model_handle = tokens_usage.inference_model_name
-        row = row_for(model_handle=model_handle, backend_name=backend_by_handle.get(model_handle))
+        reporting_backend = (
+            tally.backend_for_usage(model_handle=model_handle, model_id=tokens_usage.inference_model_id) if tally is not None else None
+        )
+        row = row_for(model_handle=model_handle, backend_name=reporting_backend)
         row.usage_reports += 1
         if tokens_usage.pricing_unit.counts_tokens:
             nb_tokens_by_category = tokens_usage.nb_tokens_by_category
