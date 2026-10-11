@@ -10,8 +10,8 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 
 from pipelex.system.usage_stats.usage_stats_contract import NOTICE_VERSION, TOOL_NAME, UsageStatsOffBy
+from pipelex.system.usage_stats.usage_stats_core import UsageStatsState
 from pipelex.system.usage_stats.usage_stats_environment import is_ci, is_container
-from pipelex.system.usage_stats.usage_stats_state import UsageStatsState
 from pipelex.system.usage_stats.usage_stats_switches import read_switches
 
 

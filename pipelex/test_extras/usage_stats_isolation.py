@@ -17,11 +17,9 @@ from typing import Any
 
 import pytest
 
-from pipelex.system.usage_stats import usage_stats_client, usage_stats_delivery
+from pipelex.system.usage_stats import usage_stats_client, usage_stats_core
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsEnvVar
-from pipelex.system.usage_stats.usage_stats_environment import is_loopback_origin
-from pipelex.system.usage_stats.usage_stats_state import UsageStatsState
-from pipelex.system.usage_stats.usage_stats_transport import PostVerdict
+from pipelex.system.usage_stats.usage_stats_core import PostVerdict, UsageStatsState, is_loopback_origin
 
 #: A loopback origin nothing listens on: a test that turns statistics on without a capture server of its own posts nowhere.
 USAGE_STATS_DEAD_LOOPBACK_ORIGIN = "http://127.0.0.1:9"
@@ -55,7 +53,7 @@ def usage_stats_guarded(*, home: Path) -> Generator[None, None, None]:
     background thread cannot fail a test.
     """
     refused_origins: list[str] = []
-    original_post_batch = usage_stats_delivery.post_batch
+    original_post_batch = usage_stats_core.post_batch
     original_start_detached_sender = usage_stats_client.start_detached_sender
 
     def guarded_post_batch(*, origin: str, events: list[dict[str, Any]], timeout_seconds: float) -> PostVerdict:
@@ -75,7 +73,7 @@ def usage_stats_guarded(*, home: Path) -> Generator[None, None, None]:
 
     with pytest.MonkeyPatch.context() as monkeypatch:
         monkeypatch.setattr(UsageStatsState, "make_for_current_home", staticmethod(make_test_state))
-        monkeypatch.setattr(usage_stats_delivery, "post_batch", guarded_post_batch)
+        monkeypatch.setattr(usage_stats_core, "post_batch", guarded_post_batch)
         monkeypatch.setattr(usage_stats_client, "start_detached_sender", guarded_start_detached_sender)
         yield
     if refused_origins:

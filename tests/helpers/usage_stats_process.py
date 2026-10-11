@@ -17,7 +17,7 @@ import pytest
 from pipelex.system.usage_stats import usage_stats_client
 from pipelex.system.usage_stats.usage_stats_client import reset_usage_stats_for_tests
 from pipelex.system.usage_stats.usage_stats_contract import CI_VARIABLES, CONTAINER_MARKER_VARIABLES, UsageStatsEnvVar
-from pipelex.system.usage_stats.usage_stats_state import UsageStatsState
+from pipelex.system.usage_stats.usage_stats_core import UsageStatsState
 from pipelex.test_extras.usage_stats_isolation import USAGE_STATS_DEAD_LOOPBACK_ORIGIN
 
 #: The variables that decide a process's statistics, cleared before a test sets the ones it needs.

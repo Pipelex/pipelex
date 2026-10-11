@@ -5,8 +5,16 @@ from pathlib import Path
 
 import pytest
 
-from pipelex.system.usage_stats.usage_stats_contract import SPOOL_MAX_FILES_PER_TOOL
-from pipelex.system.usage_stats.usage_stats_spool import CLAIM_MARKER, claim, pending_files, prune, read_spool_events, release, write_spool_file
+from pipelex.system.usage_stats.usage_stats_core import (
+    CLAIM_MARKER,
+    SPOOL_MAX_FILES_PER_TOOL,
+    claim,
+    pending_files,
+    prune,
+    read_spool_events,
+    release,
+    write_spool_file,
+)
 
 
 def _age(*, path: Path, seconds: float) -> None:

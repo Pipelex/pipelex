@@ -6,8 +6,7 @@ from typer.testing import CliRunner
 
 from pipelex.cli.commands.usage_stats_cmd import usage_stats_app
 from pipelex.system.usage_stats.usage_stats_contract import TOOL_NAME, UsageStatsEnvVar
-from pipelex.system.usage_stats.usage_stats_spool import pending_files, write_spool_file
-from pipelex.system.usage_stats.usage_stats_state import is_installation_id
+from pipelex.system.usage_stats.usage_stats_core import is_installation_id, pending_files, write_spool_file
 from tests.helpers.usage_stats_process import make_project_dir, usage_stats_switched_on
 
 _STATUS_FIELDS = {"tool", "enabled", "off_by", "installation_id", "notice_version", "internal", "ci", "container", "state_dir"}

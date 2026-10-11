@@ -17,9 +17,8 @@ from pipelex.system.usage_stats.usage_stats_contract import (
     UsageStatsOutcome,
     UsageStatsSurface,
 )
+from pipelex.system.usage_stats.usage_stats_core import UsageStatsState, pending_files, read_spool_events
 from pipelex.system.usage_stats.usage_stats_events import CommandCompletedProperties, UsageStatsEvent
-from pipelex.system.usage_stats.usage_stats_spool import pending_files, read_spool_events
-from pipelex.system.usage_stats.usage_stats_state import UsageStatsState
 from pipelex.test_extras.usage_stats_isolation import USAGE_STATS_DEAD_LOOPBACK_ORIGIN
 from tests.helpers.usage_stats_capture import capture_server
 from tests.helpers.usage_stats_process import make_project_dir

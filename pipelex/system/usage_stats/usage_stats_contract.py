@@ -6,8 +6,8 @@ The contract is `conformance/specs/usage-statistics.md`, whose machine-readable 
 check every constant and enum here against it, so a change to the contract that these do not follow fails
 the suite rather than reaching PostHog's gate, which drops what it does not know.
 
-This module imports nothing but the standard library: the detached sender (`usage_stats_sender`) reads it
-in a process started with `python -I -m`, which should load as little as it can.
+The facts the detached sender needs, the destination, the shared state's names, the spool's limits and the budgets,
+are in `usage_stats_core`, which the sender runs alone; the tests check them against the schema the same way.
 """
 
 from enum import StrEnum
@@ -17,11 +17,6 @@ SCHEMA_VERSION = 1
 
 #: The reporting tool's name, the `tool` property and the name of its spool directory.
 TOOL_NAME: Final = "pipelex"
-
-CAPTURE_HOST = "https://eu.i.posthog.com"
-BATCH_PATH = "/batch/"
-#: The project's ingestion token. It is public by design: it can only write events, and the gate decides what is kept.
-PROJECT_TOKEN = "phc_uQjSVbzNPJxA8bHxfevn7NMzB6PbC6aJQRB6ka6MxT7a"
 
 PERSON_PROFILE_PROPERTY = "$process_person_profile"
 
@@ -56,40 +51,6 @@ FALSY_VALUES: frozenset[str] = frozenset({"", "0", "false"})
 TOOL_SWITCH_OFF_VALUES: frozenset[str] = frozenset({"0", "false", "no", "off"})
 #: Values of `PIPELEX_USAGE_STATS` that have no effect, since a variable cannot turn statistics on over another switch.
 TOOL_SWITCH_NO_EFFECT_VALUES: frozenset[str] = frozenset({"", "1", "true", "yes", "on"})
-#: Values of the legacy `DISABLE_TELEMETRY` in `~/.mthds/config` that mean statistics are off.
-LEGACY_DISABLE_ON_VALUES: frozenset[str] = frozenset({"1", "true", "yes", "on"})
-
-#: The shared state directory, under the home directory.
-STATE_DIR_PARTS: tuple[str, ...] = (".mthds", "usage-stats")
-ID_FILE_NAME = "id"
-DISABLED_FILE_NAME = "disabled"
-LEGACY_MIGRATED_FILE_NAME = "legacy-migrated"
-NOTICE_FILE_PREFIX = "notice-v"
-INTERNAL_FILE_NAME = "internal"
-SPOOL_DIR_NAME = "spool"
-#: Today's `mthds` CLI configuration, under the home directory, and the key its opt-out is stored under.
-LEGACY_CONFIG_PARTS: tuple[str, ...] = (".mthds", "config")
-LEGACY_KEY = "DISABLE_TELEMETRY"
-#: Every tool's spool directory, which `disable`, `reset-id` and the legacy migration empty.
-SPOOL_TOOLS: tuple[str, ...] = ("pipelex", "plxt", "vscode-pipelex", "mthds")
-
-SPOOL_VERSION = 1
-SPOOL_MAX_FILES_PER_TOOL = 100
-SPOOL_MAX_AGE_DAYS = 30
-SPOOL_STALE_CLAIM_MINUTES = 10
-SPOOL_STALE_TEMP_MINUTES = 60
-#: A temporary identifier file older than this is a crashed writer's leftover, which any tool may delete.
-ID_STALE_TEMP_MINUTES = 60
-
-BUDGET_CLI_IN_PROCESS_MS = 1000
-BUDGET_PYTHON_EXIT_FLUSH_MS = 250
-BUDGET_SHUTDOWN_FLUSH_MS = 2000
-BUDGET_DETACHED_SENDER_MS = 10000
-BUDGET_BACKGROUND_POST_DELAY_MS = 10000
-
-#: Responses after which a sender deletes what it posted, since a resend would be refused again.
-PERMANENT_REFUSAL_STATUSES: frozenset[int] = frozenset({400, 401, 403, 413})
-
 CI_VARIABLES: tuple[str, ...] = (
     "CI",
     "CONTINUOUS_INTEGRATION",
@@ -435,5 +396,4 @@ OTHER_COMMAND = "other"
 
 #: The patterns of the contract the emitter's own values must match, in Python's `re.fullmatch`.
 RELEASE_VERSION_PATTERN = r"^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}([.-]?(a|b|rc|alpha|beta|dev|post|insider)[.]?[0-9]{0,4})?$"
-INSTALLATION_ID_PATTERN = r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
 MODEL_HANDLE_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}$"

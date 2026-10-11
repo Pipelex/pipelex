@@ -15,7 +15,7 @@ import typer
 
 from pipelex.system.usage_stats.usage_stats_client import is_pytest_process
 from pipelex.system.usage_stats.usage_stats_contract import NOTICE_DETAILS_URL
-from pipelex.system.usage_stats.usage_stats_state import UsageStatsState
+from pipelex.system.usage_stats.usage_stats_core import UsageStatsState
 from pipelex.system.usage_stats.usage_stats_status import describe_off_by, read_usage_stats_status
 from pipelex.system.usage_stats.usage_stats_switches import read_switches
 

@@ -5,7 +5,8 @@ PostHog client and OpenTelemetry, all of which it never touches. One client per 
 
 - **A CLI command** (`pipelex`, `pipelex-agent`) configures it before the command does any work, which reads every
   switch and prints the notice; the command's events are held in memory and, when it ends, written to the spool for a
-  detached sender, or posted in-process within one second in CI, in a container, or when the sender cannot start.
+  detached sender (`usage_stats_core`, run by its file path), or posted in-process within one second in CI, in a
+  container, or when the sender cannot start.
 - **A Python program, or a long-running process** such as the self-hosted API, configures it when it boots pipelex; a
   daemon thread posts events within ten seconds of their creation, and at exit (or at shutdown) what is left is flushed
   within the budget and spooled when it cannot be sent. Such a process never starts a child process.
@@ -27,10 +28,6 @@ from typing import Any, NamedTuple
 
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.usage_stats.usage_stats_contract import (
-    BUDGET_BACKGROUND_POST_DELAY_MS,
-    BUDGET_CLI_IN_PROCESS_MS,
-    BUDGET_PYTHON_EXIT_FLUSH_MS,
-    BUDGET_SHUTDOWN_FLUSH_MS,
     NOTICE_VERSION,
     TOOL_NAME,
     UsageStatsErrorDomain,
@@ -40,7 +37,19 @@ from pipelex.system.usage_stats.usage_stats_contract import (
     UsageStatsSurface,
     render_notice,
 )
-from pipelex.system.usage_stats.usage_stats_delivery import drain_spool, post_in_process, start_detached_sender
+from pipelex.system.usage_stats.usage_stats_core import (
+    BUDGET_BACKGROUND_POST_DELAY_MS,
+    BUDGET_CLI_IN_PROCESS_MS,
+    BUDGET_PYTHON_EXIT_FLUSH_MS,
+    BUDGET_SHUTDOWN_FLUSH_MS,
+    InstallationId,
+    PostVerdict,
+    UsageStatsState,
+    drain_spool,
+    post_in_process,
+    write_spool_file,
+)
+from pipelex.system.usage_stats.usage_stats_delivery import start_detached_sender
 from pipelex.system.usage_stats.usage_stats_environment import (
     current_arch,
     current_language_runtime,
@@ -53,10 +62,7 @@ from pipelex.system.usage_stats.usage_stats_environment import (
     resolve_endpoint,
 )
 from pipelex.system.usage_stats.usage_stats_events import CommonProperties, InitChoices, UsageStatsEvent, make_envelope
-from pipelex.system.usage_stats.usage_stats_spool import write_spool_file
-from pipelex.system.usage_stats.usage_stats_state import InstallationId, UsageStatsState
 from pipelex.system.usage_stats.usage_stats_switches import read_switches
-from pipelex.system.usage_stats.usage_stats_transport import PostVerdict
 from pipelex.tools.misc.package_utils import get_package_version
 
 #: How long the background thread waits after an event's creation for others to join its batch.

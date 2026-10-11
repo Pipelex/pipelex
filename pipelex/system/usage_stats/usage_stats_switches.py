@@ -16,8 +16,8 @@ import tomli
 from pipelex.system.configuration.config_loader import CONFIG_NAME, ConfigLoader
 from pipelex.system.environment import CONFIG_DIR_NAME
 from pipelex.system.usage_stats.usage_stats_contract import SETTING_KEY, SETTING_TABLE, UsageStatsEnvVar, UsageStatsOffBy
+from pipelex.system.usage_stats.usage_stats_core import UsageStatsState
 from pipelex.system.usage_stats.usage_stats_environment import is_truthy_flag, resolve_endpoint, tool_switch_says_off
-from pipelex.system.usage_stats.usage_stats_state import UsageStatsState
 
 #: pipelex's packaged configuration, which carries `[usage_stats] enabled = true`; a packager may ship `false`.
 PACKAGED_CONFIG_PATH = Path(__file__).resolve().parents[2] / CONFIG_NAME

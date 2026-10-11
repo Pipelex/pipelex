@@ -12,7 +12,6 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from pipelex.system.usage_stats.usage_stats_contract import (
-    CAPTURE_HOST,
     CI_VARIABLES,
     CONTAINER_CGROUP_FILE,
     CONTAINER_CGROUP_WORDS,
@@ -26,9 +25,8 @@ from pipelex.system.usage_stats.usage_stats_contract import (
     UsageStatsHost,
     UsageStatsOs,
 )
+from pipelex.system.usage_stats.usage_stats_core import CAPTURE_HOST, is_loopback_origin
 
-#: A loopback `http` origin with a port and no path: the only endpoint override the contract accepts.
-_LOOPBACK_ORIGIN = re.compile(r"^http://(127\.0\.0\.1|localhost|\[::1\]):([0-9]{1,5})$")
 _LEADING_RELEASE = re.compile(r"^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}")
 
 
@@ -67,15 +65,6 @@ def resolve_endpoint(*, env: Mapping[str, str]) -> str | None:
     if override is None:
         return CAPTURE_HOST
     return override if is_loopback_origin(origin=override) else None
-
-
-def is_loopback_origin(*, origin: str) -> bool:
-    """Whether `origin` is `http://127.0.0.1:<port>`, `http://localhost:<port>` or `http://[::1]:<port>`, with no path."""
-    match = _LOOPBACK_ORIGIN.fullmatch(origin)
-    if match is None:
-        return False
-    port = int(match.group(2))
-    return 0 < port < 65536
 
 
 def is_ci(*, env: Mapping[str, str]) -> bool:

@@ -8,9 +8,14 @@ from pathlib import Path
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.system.usage_stats.usage_stats_contract import SPOOL_TOOLS
-from pipelex.system.usage_stats.usage_stats_spool import write_spool_file
-from pipelex.system.usage_stats.usage_stats_state import InstallationId, UsageStatsState, is_installation_id, parse_legacy_config
+from pipelex.system.usage_stats.usage_stats_core import (
+    SPOOL_TOOLS,
+    InstallationId,
+    UsageStatsState,
+    is_installation_id,
+    parse_legacy_config,
+    write_spool_file,
+)
 
 
 def _seed_every_spool(*, state: UsageStatsState) -> None:
@@ -81,7 +86,7 @@ class TestUsageStatsState:
 
     def test_no_hard_links_means_nothing_persisted(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """A filesystem without hard links: the process uses its fresh identifier for itself alone."""
-        mocker.patch("pipelex.system.usage_stats.usage_stats_state.os.link", side_effect=OSError("no hard links here"))
+        mocker.patch("pipelex.system.usage_stats.usage_stats_core.os.link", side_effect=OSError("no hard links here"))
         state = UsageStatsState(home=tmp_path)
         installation_id = state.obtain_installation_id()
         assert installation_id.is_new

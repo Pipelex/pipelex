@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:dcfc3bc719d55c947d16df791e80431944d8d0a99fd8095b46ed14581422dce3"
+digest = "sha256:54b6a1b861335fe77e360ea508df2a7f8c739325bb348fb91b8aebd0abbd8256"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-11T17:53:48Z"
-rationale = "real-catch: pipelex init and pipelex-agent init now note where they set runs to execute and which backends they enabled, which the command_completed of init carries as init_execution and init_backend_<provider>, and pipelex build structures reaches generate_types with its own code_generated report. No option, output or exit code changed, so docs/tools/cli/ and the agent CLI guide stand; docs/setup/usage-statistics.md's command_completed row now names the init properties."
+reviewed_at = "2026-10-11T18:40:02Z"
+rationale = "clean-pass: the two CLI modules only import the shared state and its constants from usage_stats_core now that the detached sender is that one stdlib-only file; no option, output or exit code changed, so docs/tools/cli/ and the agent CLI guide stand."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -118,7 +118,7 @@ rationale = "real-catch: pipelex init and pipelex-agent init now note where they
 "pipelex/cli/commands/run/pipe_cmd.py" = "blob:f58885186d59142146eed340451b21832526af47"
 "pipelex/cli/commands/show_cmd.py" = "blob:4c87c70058ea3b15827d03a370f3345569a2b705"
 "pipelex/cli/commands/update_cmd.py" = "blob:b2db6170ddd9c67f17d88096ba1f1796a897557d"
-"pipelex/cli/commands/usage_stats_cmd.py" = "blob:2719197d1a2271a952d041c1abb4abb3918398da"
+"pipelex/cli/commands/usage_stats_cmd.py" = "blob:b3723c64f911d1b69e1e1aa126610a132a16e3da"
 "pipelex/cli/commands/validate/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/validate/_validate_core.py" = "blob:fbdc9ab24e434b57d57959a8fdfad1f0ea39a20d"
 "pipelex/cli/commands/validate/app.py" = "blob:33b6c2d374e456b2a47a27861f99c581945b21af"
