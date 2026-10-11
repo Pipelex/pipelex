@@ -215,6 +215,36 @@ class TestUsageStatsClient:
         assert received[-1] == queued_uuid
         assert pending_files(spool_dir=settings.state.spool_dir(tool=TOOL_NAME)) == []
 
+    def test_thread_survives_an_error_in_a_post(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """An error escaping one post loses that batch alone: a flush does not wait for it, and later events are posted."""
+        original_post_in_process = usage_stats_client.post_in_process
+        calls: list[int] = []
+
+        def fails_once(**kwargs: Any) -> Any:
+            calls.append(1)
+            if len(calls) == 1:
+                msg = "an unexpected failure"
+                raise RuntimeError(msg)
+            return original_post_in_process(**kwargs)
+
+        mocker.patch.object(usage_stats_client, "post_in_process", side_effect=fails_once)
+        with capture_server() as server:
+            settings = _settings(tmp_path=tmp_path, origin=server.origin, delivery=UsageStatsDelivery.LONG_RUNNING)
+            client = UsageStatsClient(settings=settings)
+            client.record(event=_COMMAND_EVENT)
+            deadline = time.monotonic() + 5
+            while not calls and time.monotonic() < deadline:
+                time.sleep(0.02)
+            time.sleep(0.1)
+            started = time.monotonic()
+            client.flush()
+            assert time.monotonic() - started < 1
+            client.record(event=_COMMAND_EVENT)
+            deadline = time.monotonic() + 5
+            while not server.events and time.monotonic() < deadline:
+                time.sleep(0.05)
+            assert len(server.events) == 1
+
     def test_thread_drops_events_once_disabled(self, tmp_path: Path) -> None:
         """A `disabled` file created after the event, before its post, keeps it from being sent."""
         with capture_server() as server:

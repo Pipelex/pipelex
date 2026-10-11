@@ -27,6 +27,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, NamedTuple
 
+from pipelex import log
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.usage_stats.usage_stats_contract import (
     NOTICE_VERSION,
@@ -65,6 +66,7 @@ from pipelex.system.usage_stats.usage_stats_environment import (
 )
 from pipelex.system.usage_stats.usage_stats_events import CommonProperties, InitChoices, UsageStatsEvent, make_envelope
 from pipelex.system.usage_stats.usage_stats_switches import read_switches
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.package_utils import get_package_version
 
 #: How long the background thread waits after an event's creation for others to join its batch.
@@ -135,7 +137,8 @@ class _BackgroundSender:
                 self._spool(events=[envelope])
                 return
             self._pending.append((time.monotonic(), envelope))
-            if self._thread is None:
+            if self._thread is None or not self._thread.is_alive():
+                # The first event starts the thread, and a later one starts it again should it ever have ended.
                 self._thread = threading.Thread(target=self._run, name="pipelex-usage-stats", daemon=True)
                 self._thread.start()
             self._condition.notify_all()
@@ -156,10 +159,16 @@ class _BackgroundSender:
                 self._pending.clear()
                 self._in_flight = batch
             deadline = oldest_created + BUDGET_BACKGROUND_POST_DELAY_MS / 1000
-            self._post(events=batch, deadline=deadline)
-            with self._condition:
-                self._in_flight = []
-                self._condition.notify_all()
+            try:
+                self._post(events=batch, deadline=deadline)
+            except Exception as exc:  # ruff: ignore[blind-except]
+                # (1) The root of the statistics thread, as a command's root is: an error escaping here would end the
+                # thread and leave every later event unsent. The batch is lost; the work it measured is not affected.
+                log.debug("A usage statistics batch could not be posted", fields=error_fields(exc=exc))
+            finally:
+                with self._condition:
+                    self._in_flight = []
+                    self._condition.notify_all()
 
     def _post(self, *, events: list[dict[str, Any]], deadline: float) -> None:
         origin = self._settings.origin
