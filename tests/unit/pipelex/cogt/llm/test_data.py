@@ -14,10 +14,11 @@ class CompletionStopTestData:
         ("anthropic normal", "end_turn", CompletionStopOutcome.NORMAL),
         ("anthropic paused", "pause_turn", CompletionStopOutcome.NORMAL),
         ("anthropic truncated", "max_tokens", CompletionStopOutcome.TRUNCATED),
-        ("anthropic context window", "model_context_window_exceeded", CompletionStopOutcome.TRUNCATED),
+        ("anthropic context window", "model_context_window_exceeded", CompletionStopOutcome.CONTEXT_WINDOW_EXCEEDED),
         ("anthropic refused", "refusal", CompletionStopOutcome.REFUSED),
         ("converse normal", "stop_sequence", CompletionStopOutcome.NORMAL),
         ("converse truncated", "max_tokens", CompletionStopOutcome.TRUNCATED),
+        ("converse context window", "model_context_window_exceeded", CompletionStopOutcome.CONTEXT_WINDOW_EXCEEDED),
         ("converse filtered", "content_filtered", CompletionStopOutcome.REFUSED),
         ("converse guardrail", "guardrail_intervened", CompletionStopOutcome.REFUSED),
         ("gemini normal", "STOP", CompletionStopOutcome.NORMAL),
@@ -29,7 +30,7 @@ class CompletionStopTestData:
         ("gemini privacy", "SPII", CompletionStopOutcome.REFUSED),
         ("mistral normal", "stop", CompletionStopOutcome.NORMAL),
         ("mistral truncated", "length", CompletionStopOutcome.TRUNCATED),
-        ("mistral context window", "model_length", CompletionStopOutcome.TRUNCATED),
+        ("mistral context window", "model_length", CompletionStopOutcome.CONTEXT_WINDOW_EXCEEDED),
     ]
 
     # (topic, status, incomplete reason, outcome)

@@ -11,7 +11,7 @@ from openai.types.chat.chat_completion import Choice
 from openai.types.responses.response import IncompleteDetails
 from types_aiobotocore_bedrock_runtime.literals import StopReasonType
 
-from pipelex.cogt.exceptions import LLMCompletionRefusedError, LLMCompletionTruncatedError
+from pipelex.cogt.exceptions import CompletionTruncationLimit, LLMCompletionRefusedError, LLMCompletionTruncatedError
 from pipelex.cogt.llm import completion_stop
 from pipelex.cogt.llm.completion_stop import (
     ANTHROPIC_STOP_REASONS,
@@ -141,17 +141,27 @@ class TestCompletionStop:
             output_tokens=12,
         )
 
-    def test_a_truncated_stop_raises_the_truncation(self) -> None:
+    @pytest.mark.parametrize(
+        ("outcome", "stop_reason", "expected_limit"),
+        [
+            (CompletionStopOutcome.TRUNCATED, "max_tokens", CompletionTruncationLimit.MAX_TOKENS),
+            (CompletionStopOutcome.CONTEXT_WINDOW_EXCEEDED, "model_context_window_exceeded", CompletionTruncationLimit.CONTEXT_WINDOW),
+        ],
+    )
+    def test_a_truncated_stop_raises_the_truncation_naming_its_limit(
+        self, outcome: CompletionStopOutcome, stop_reason: str, expected_limit: CompletionTruncationLimit
+    ) -> None:
         with pytest.raises(LLMCompletionTruncatedError) as exc_info:
             raise_for_completion_stop(
-                outcome=CompletionStopOutcome.TRUNCATED,
-                stop_reason="max_tokens",
+                outcome=outcome,
+                stop_reason=stop_reason,
                 model_handle="claude-test",
                 pipe_code="summarize",
                 max_tokens=4096,
                 output_tokens=4096,
             )
-        assert exc_info.value.stop_reason == "max_tokens"
+        assert exc_info.value.stop_reason == stop_reason
+        assert exc_info.value.truncation_limit == expected_limit
         assert exc_info.value.max_tokens == 4096
         assert exc_info.value.output_tokens == 4096
 

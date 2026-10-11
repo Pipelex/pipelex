@@ -25,19 +25,23 @@ from enum import StrEnum
 from types import MappingProxyType
 
 from pipelex import log
-from pipelex.cogt.exceptions import LLMCompletionRefusedError, LLMCompletionTruncatedError
+from pipelex.cogt.exceptions import CompletionTruncationLimit, LLMCompletionRefusedError, LLMCompletionTruncatedError
 
 
 class CompletionStopOutcome(StrEnum):
     """What a completion's stop value says about its text."""
 
     NORMAL = "normal"
+    # Cut at the output limit the request sent
     TRUNCATED = "truncated"
+    # Cut when the input and the output together filled the model's context window, which no higher output limit lifts
+    CONTEXT_WINDOW_EXCEEDED = "context_window_exceeded"
     REFUSED = "refused"
 
 
 _NORMAL = CompletionStopOutcome.NORMAL
 _TRUNCATED = CompletionStopOutcome.TRUNCATED
+_CONTEXT_WINDOW_EXCEEDED = CompletionStopOutcome.CONTEXT_WINDOW_EXCEEDED
 _REFUSED = CompletionStopOutcome.REFUSED
 
 # `openai.types.chat.chat_completion.Choice.finish_reason`, plus `refusal`, the value a gateway's strict OpenAI
@@ -62,7 +66,7 @@ ANTHROPIC_STOP_REASONS: Mapping[str, CompletionStopOutcome] = MappingProxyType(
         "tool_use": _NORMAL,
         "pause_turn": _NORMAL,
         "max_tokens": _TRUNCATED,
-        "model_context_window_exceeded": _TRUNCATED,
+        "model_context_window_exceeded": _CONTEXT_WINDOW_EXCEEDED,
         "refusal": _REFUSED,
     }
 )
@@ -78,7 +82,7 @@ BEDROCK_CONVERSE_STOP_REASONS: Mapping[str, CompletionStopOutcome] = MappingProx
         "malformed_model_output": _NORMAL,
         "malformed_tool_use": _NORMAL,
         "max_tokens": _TRUNCATED,
-        "model_context_window_exceeded": _TRUNCATED,
+        "model_context_window_exceeded": _CONTEXT_WINDOW_EXCEEDED,
         "content_filtered": _REFUSED,
         "guardrail_intervened": _REFUSED,
     }
@@ -109,15 +113,16 @@ GEMINI_FINISH_REASONS: Mapping[str, CompletionStopOutcome] = MappingProxyType(
     }
 )
 
-# `mistralai.client.models.ChatCompletionChoiceFinishReason`. Its `error` is neither a cut nor a refusal, and a
-# gateway in strict mode maps it to `stop`, so the text is returned as before.
+# `mistralai.client.models.ChatCompletionChoiceFinishReason`. Its `length` is the request's output limit and its
+# `model_length` the model's context window. Its `error` is neither a cut nor a refusal, and a gateway in strict mode
+# maps it to `stop`, so the text is returned as before.
 MISTRAL_FINISH_REASONS: Mapping[str, CompletionStopOutcome] = MappingProxyType(
     {
         "stop": _NORMAL,
         "tool_calls": _NORMAL,
         "error": _NORMAL,
         "length": _TRUNCATED,
-        "model_length": _TRUNCATED,
+        "model_length": _CONTEXT_WINDOW_EXCEEDED,
     }
 )
 
@@ -183,7 +188,7 @@ def _log_unknown_stop(*, model_handle: str, stop_value: object) -> None:
 
 
 def classify_stop_reason(*, stop_reason: str | None, model_handle: str) -> CompletionStopOutcome:
-    """Read a completion's stop value, from any vocabulary the classifier knows, as normal, truncated or refused.
+    """Read a completion's stop value, from any vocabulary the classifier knows, as normal, cut short or refused.
 
     Args:
         stop_reason: The provider's stop value: a finish reason, a stop reason or Converse's stop reason. None when
@@ -274,19 +279,25 @@ def raise_for_completion_stop(
         output_tokens: The output tokens the provider counted, when it counted them.
 
     Raises:
-        LLMCompletionTruncatedError: When the text was cut before the model finished it.
+        LLMCompletionTruncatedError: When the text was cut before the model finished it, at its output limit or at
+            its context window, which the error carries as its `truncation_limit`.
         LLMCompletionRefusedError: When the model refused, or a content filter stopped the text.
     """
+    truncation_limit: CompletionTruncationLimit
     match outcome:
         case CompletionStopOutcome.NORMAL:
             return
-        case CompletionStopOutcome.TRUNCATED:
-            raise LLMCompletionTruncatedError(
-                model_handle=model_handle,
-                stop_reason=stop_reason,
-                pipe_code=pipe_code,
-                max_tokens=max_tokens,
-                output_tokens=output_tokens,
-            )
         case CompletionStopOutcome.REFUSED:
             raise LLMCompletionRefusedError(model_handle=model_handle, stop_reason=stop_reason, pipe_code=pipe_code)
+        case CompletionStopOutcome.TRUNCATED:
+            truncation_limit = CompletionTruncationLimit.MAX_TOKENS
+        case CompletionStopOutcome.CONTEXT_WINDOW_EXCEEDED:
+            truncation_limit = CompletionTruncationLimit.CONTEXT_WINDOW
+    raise LLMCompletionTruncatedError(
+        model_handle=model_handle,
+        stop_reason=stop_reason,
+        truncation_limit=truncation_limit,
+        pipe_code=pipe_code,
+        max_tokens=max_tokens,
+        output_tokens=output_tokens,
+    )

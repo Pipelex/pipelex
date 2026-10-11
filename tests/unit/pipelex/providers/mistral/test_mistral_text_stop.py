@@ -6,7 +6,7 @@ import pytest
 from mistralai.client.models import AssistantMessage, ChatCompletionChoice, ChatCompletionResponse, UsageInfo
 from mistralai.client.types import UnrecognizedStr
 
-from pipelex.cogt.exceptions import LLMCompletionRefusedError, LLMCompletionTruncatedError
+from pipelex.cogt.exceptions import CompletionTruncationLimit, LLMCompletionRefusedError, LLMCompletionTruncatedError
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from tests.helpers.completion_stop import STOP_TEST_PARTIAL_TEXT, STOP_TEST_PIPE_CODE, make_text_llm_job
 from tests.helpers.mistral_request import make_worker
@@ -30,15 +30,15 @@ def _response(*, finish_reason: ChatCompletionChoiceFinishReason, text: str) -> 
 @pytest.mark.asyncio(loop_scope="class")
 class TestMistralTextStop:
     @pytest.mark.parametrize(
-        ("finish_reason", "text"),
+        ("finish_reason", "text", "expected_limit"),
         [
-            ("length", STOP_TEST_PARTIAL_TEXT),
-            ("length", ""),
-            ("model_length", STOP_TEST_PARTIAL_TEXT),
+            ("length", STOP_TEST_PARTIAL_TEXT, CompletionTruncationLimit.MAX_TOKENS),
+            ("length", "", CompletionTruncationLimit.MAX_TOKENS),
+            ("model_length", STOP_TEST_PARTIAL_TEXT, CompletionTruncationLimit.CONTEXT_WINDOW),
         ],
     )
     async def test_a_text_cut_at_its_length_raises_the_truncation(
-        self, mocker: MockerFixture, finish_reason: ChatCompletionChoiceFinishReason, text: str
+        self, mocker: MockerFixture, finish_reason: ChatCompletionChoiceFinishReason, text: str, expected_limit: CompletionTruncationLimit
     ) -> None:
         worker, _ = make_worker(mocker, thinking_mode=ThinkingMode.NONE, response=_response(finish_reason=finish_reason, text=text))
 
@@ -47,6 +47,7 @@ class TestMistralTextStop:
 
         error = exc_info.value
         assert error.stop_reason == finish_reason
+        assert error.truncation_limit == expected_limit
         assert error.pipe_code == STOP_TEST_PIPE_CODE
         assert error.max_tokens == 4096
         assert error.output_tokens == 4096
