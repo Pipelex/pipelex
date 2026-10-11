@@ -300,6 +300,19 @@ class TestUsageStatsClient:
             configure_usage_stats_for_runtime(integration_mode=IntegrationMode.PYTHON)
             assert get_usage_stats_client() is None
 
+    def test_a_command_that_could_not_configure_statistics_keeps_them_off(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """A transient failure leaves `pipelex-agent --format json` without statistics: pipelex booting inside it builds no
+        program's client, which would print the runtime notice on the stderr the command keeps for JSON.
+        """
+        with usage_stats_switched_on(monkeypatch=monkeypatch, home=tmp_path / "home", cwd=make_project_dir(parent=tmp_path)) as state:
+            mocker.patch.object(UsageStatsState, "make_for_current_home", side_effect=[RuntimeError("Could not determine home directory."), state])
+            assert configure_usage_stats_for_cli(surface=UsageStatsSurface.PIPELEX_AGENT, is_machine_read=True) is None
+            configure_usage_stats_for_runtime(integration_mode=IntegrationMode.PYTHON)
+            assert get_usage_stats_client() is None
+            assert capsys.readouterr().err == ""
+
     @pytest.mark.skipif(not CAN_LOCK_DIRECTORIES, reason="needs a directory this process cannot traverse")
     def test_configuration_never_fails_for_a_state_that_cannot_be_looked_into(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]

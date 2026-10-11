@@ -393,6 +393,9 @@ class _ProcessUsageStats:
         self.is_pytest = False
         self.embedder_host: UsageStatsHost | None = None
         self.runtime_notice_written = False
+        #: Whether a CLI command decides this process's statistics, even when it could not configure them: booting
+        #: pipelex inside the command then builds no client of its own.
+        self.is_cli_command = False
 
 
 _PROCESS = _ProcessUsageStats()
@@ -490,8 +493,10 @@ def configure_usage_stats_for_cli(*, surface: UsageStatsSurface, is_machine_read
 
     Returns:
         The command's client, or `None` when the switches could not be read at all, as when no home directory can be
-        found: the command then runs without statistics.
+        found: the command then runs without statistics, and pipelex booting inside it does not configure them again.
     """
+    with _PROCESS.lock:
+        _PROCESS.is_cli_command = True
     try:
         state = UsageStatsState.make_for_current_home()
         with _PROCESS.lock:
@@ -533,7 +538,7 @@ def show_usage_stats_notice() -> None:
 
 
 def configure_usage_stats_for_runtime(*, integration_mode: IntegrationMode) -> None:
-    """Read every switch when a process boots pipelex, unless a CLI command already did; `pytest` mode turns statistics off.
+    """Read every switch when a process boots pipelex, unless a CLI command decides them; `pytest` mode turns statistics off.
 
     A Python program or a long-running process writes the notice to stderr once per process, at startup, and records no
     marker, since nothing says a person reads that stream. Switches that cannot be read at all leave the process without
@@ -548,7 +553,9 @@ def configure_usage_stats_for_runtime(*, integration_mode: IntegrationMode) -> N
                 _PROCESS.client = UsageStatsClient(
                     settings=existing.settings._replace(off_by=(*existing.settings.off_by, UsageStatsOffBy.INTEGRATION_MODE))
                 )
-        if _PROCESS.client is not None:
+        if _PROCESS.client is not None or _PROCESS.is_cli_command:
+            # A CLI command's client stands, and a command that could not configure one runs without statistics: a
+            # program's client built now would print the runtime notice on a stderr the command may keep for JSON.
             return
         surface, delivery = _surface_and_delivery_for(integration=integration or UsageStatsIntegration.PYTHON)
         try:
@@ -636,3 +643,4 @@ def reset_usage_stats_for_tests() -> None:
         _PROCESS.is_pytest = False
         _PROCESS.embedder_host = None
         _PROCESS.runtime_notice_written = False
+        _PROCESS.is_cli_command = False
