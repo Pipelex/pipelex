@@ -255,6 +255,13 @@ class UsageStatsCodegenTarget(StrEnum):
     OTHER = "other"
 
 
+class UsageStatsInitExecution(StrEnum):
+    """Where `init` set runs to execute."""
+
+    LOCAL = "local"
+    HOSTED = "hosted"
+
+
 class UsageStatsProvider(StrEnum):
     """The backend a model was called through: one pipelex ships, one our own plugins add, or `custom`."""
 
@@ -311,6 +318,16 @@ class UsageStatsProvider(StrEnum):
             ):
                 return False
 
+    @classmethod
+    def for_backend(cls, *, backend_name: str | None) -> "UsageStatsProvider":
+        """The provider a backend is reported as: its own name when pipelex or our plugins ship it, `custom` otherwise."""
+        if not backend_name:
+            return UsageStatsProvider.CUSTOM
+        try:
+            return UsageStatsProvider(backend_name)
+        except ValueError:
+            return UsageStatsProvider.CUSTOM
+
     @property
     def serves_every_shipped_table(self) -> bool:
         """Whether the backend serves the models of every backend table pipelex ships, as Manifold, the hosted gateway, does."""
@@ -346,10 +363,13 @@ class UsageStatsProvider(StrEnum):
 #: The model name a custom backend, or a model the release does not ship, is sent as.
 OTHER_MODEL = "other"
 
+#: The `command` value of `init`, on either CLI, the only command whose `command_completed` carries the `init_*` properties.
+INIT_COMMAND = "init"
+
 #: The `command` values of the `pipelex` CLI, by their path in its command tree.
 PIPELEX_COMMANDS: frozenset[str] = frozenset(
     {
-        "init",
+        INIT_COMMAND,
         "login",
         "doctor",
         "update",
@@ -386,7 +406,7 @@ PIPELEX_COMMANDS: frozenset[str] = frozenset(
 #: The `command` values of the `pipelex-agent` CLI.
 PIPELEX_AGENT_COMMANDS: frozenset[str] = frozenset(
     {
-        "init",
+        INIT_COMMAND,
         "run bundle",
         "run method",
         "run pipe",

@@ -11,13 +11,14 @@ commands never send, queue or print the notice.
 
 import time
 from collections.abc import Callable, Sequence
-from typing import NamedTuple, TypeVar
+from typing import Any, NamedTuple, Protocol, TypeVar, runtime_checkable
 
 import click
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.system.usage_stats.usage_stats_client import configure_usage_stats_for_cli, get_usage_stats_client
 from pipelex.system.usage_stats.usage_stats_contract import (
+    INIT_COMMAND,
     OTHER_COMMAND,
     PIPELEX_AGENT_COMMANDS,
     PIPELEX_COMMANDS,
@@ -38,6 +39,15 @@ _ERROR_FORMAT_OPTION = "--error-format"
 _JSON = "json"
 
 ResultT = TypeVar("ResultT")
+
+
+@runtime_checkable
+class RoutesToDefaultCommand(Protocol):
+    """A command group that runs one of its commands when an invocation names none, as `pipelex validate --all` runs `validate pipe`."""
+
+    def default_command_for(self, *, args: Sequence[str]) -> str | None:
+        """The command `args`, the arguments after the group's name, are routed to when they name none; `None` otherwise."""
+        ...
 
 
 class CliInvocation(NamedTuple):
@@ -126,8 +136,9 @@ def _is_machine_read_surface(*, surface: UsageStatsSurface) -> bool:
 def resolve_invocation(*, root: click.Group, args: Sequence[str], surface: UsageStatsSurface) -> CliInvocation:
     """Find the command an invocation runs by walking its arguments down the click tree, reading no argument's value.
 
-    The command is its path of names in the tree, `other` when the schema does not list it (or no command has that
-    name), and `None` when nothing is counted: help, the version, no command at all, or the statistics group.
+    The command is its path of names in the tree, aliases and a group's default routing resolved, `other` when the schema
+    does not list it (or no command has that name), and `None` when nothing is counted: help, the version, no command at
+    all, or the statistics group.
     """
     not_counted = CliInvocation(command=None, is_statistics_group=False, is_machine_read=False)
     help_names = {"--help"}
@@ -135,6 +146,14 @@ def resolve_invocation(*, root: click.Group, args: Sequence[str], surface: Usage
     path: list[str] = []
     index_arg = 0
     while isinstance(current, click.Group):
+        if isinstance(current, RoutesToDefaultCommand):
+            default_name = current.default_command_for(args=args[index_arg:])
+            default_command = current.commands.get(default_name) if default_name is not None else None
+            if default_name is not None and default_command is not None:
+                # The group routes the arguments to its default command, whose path is what ran: no argument is consumed.
+                path.append(default_name)
+                current = default_command
+                continue
         if index_arg >= len(args):
             # A group with no command under it: its help, or a usage error, but no command was run.
             return not_counted
@@ -220,6 +239,9 @@ def run_with_usage_stats(
             error_domain = None
             if outcome.is_failed:
                 error_domain = usage_stats_error_domain(error=failure) if failure is not None else client.command_error_domain
+            init_properties: dict[str, Any] = {}
+            if client.command_init_choices is not None and invocation.command == INIT_COMMAND:
+                init_properties = client.command_init_choices.as_properties()
             client.record(
                 event=UsageStatsEvent(
                     name=UsageStatsEventName.COMMAND_COMPLETED,
@@ -229,6 +251,7 @@ def run_with_usage_stats(
                         error_domain=error_domain,
                         duration_ms=bounded_duration_ms(seconds=time.monotonic() - started),
                         hosted=True if client.is_command_hosted else None,
+                        **init_properties,
                     ),
                 )
             )

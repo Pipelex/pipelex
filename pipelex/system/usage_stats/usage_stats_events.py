@@ -23,6 +23,7 @@ from pipelex.system.usage_stats.usage_stats_contract import (
     UsageStatsErrorDomain,
     UsageStatsEventName,
     UsageStatsHost,
+    UsageStatsInitExecution,
     UsageStatsIntegration,
     UsageStatsMethodSource,
     UsageStatsOs,
@@ -43,6 +44,8 @@ MAX_IMAGES = 1_000_000
 MAX_PAGES = 10_000_000
 MAX_COST_USD = 1_000_000.0
 MAX_VALIDATION_ITEMS = 100_000
+#: The prefix of the `command_completed` property saying whether `init` enabled a provider's backend.
+INIT_BACKEND_PREFIX = "init_backend_"
 
 
 def bounded(*, value: int, maximum: int) -> int:
@@ -85,12 +88,57 @@ class CommonProperties(UsageStatsProperties):
     notice_version: int
 
 
+class InitChoices(UsageStatsProperties):
+    """What an `init` command set: where runs execute, and which backends it enabled, by the providers they report as.
+
+    Either is `None` when this `init` did not set it: a hosted setup enables no backend, and a step it skipped sets nothing.
+    """
+
+    execution: UsageStatsInitExecution | None = None
+    enabled_providers: frozenset[UsageStatsProvider] | None = None
+
+    def as_properties(self) -> dict[str, Any]:
+        """The `init_*` properties of the command's `command_completed`: one boolean per provider once backends were set."""
+        properties: dict[str, Any] = {}
+        if self.execution is not None:
+            properties["init_execution"] = self.execution
+        if self.enabled_providers is not None:
+            for provider in UsageStatsProvider:
+                properties[f"{INIT_BACKEND_PREFIX}{provider}"] = provider in self.enabled_providers
+        return properties
+
+
 class CommandCompletedProperties(UsageStatsProperties):
+    """A command's end; the `init_*` properties only on `init`, from its `InitChoices`."""
+
     command: str
     outcome: UsageStatsOutcome
     error_domain: UsageStatsErrorDomain | None = None
     duration_ms: int
     hosted: bool | None = None
+    init_execution: UsageStatsInitExecution | None = None
+    init_backend_anthropic: bool | None = None
+    init_backend_azure_openai: bool | None = None
+    init_backend_bedrock: bool | None = None
+    init_backend_blackboxai: bool | None = None
+    init_backend_fal: bool | None = None
+    init_backend_google: bool | None = None
+    init_backend_groq: bool | None = None
+    init_backend_huggingface: bool | None = None
+    init_backend_internal: bool | None = None
+    init_backend_linkup: bool | None = None
+    init_backend_minimax: bool | None = None
+    init_backend_mistral: bool | None = None
+    init_backend_ollama: bool | None = None
+    init_backend_openai: bool | None = None
+    init_backend_openrouter: bool | None = None
+    init_backend_portkey: bool | None = None
+    init_backend_scaleway: bool | None = None
+    init_backend_typesafe: bool | None = None
+    init_backend_vertexai: bool | None = None
+    init_backend_xai: bool | None = None
+    init_backend_pipelex_manifold: bool | None = None
+    init_backend_custom: bool | None = None
 
 
 class BundleShape(UsageStatsProperties):

@@ -52,7 +52,7 @@ from pipelex.system.usage_stats.usage_stats_environment import (
     release_version,
     resolve_endpoint,
 )
-from pipelex.system.usage_stats.usage_stats_events import CommonProperties, UsageStatsEvent, make_envelope
+from pipelex.system.usage_stats.usage_stats_events import CommonProperties, InitChoices, UsageStatsEvent, make_envelope
 from pipelex.system.usage_stats.usage_stats_spool import write_spool_file
 from pipelex.system.usage_stats.usage_stats_state import InstallationId, UsageStatsState
 from pipelex.system.usage_stats.usage_stats_switches import read_switches
@@ -206,6 +206,8 @@ class UsageStatsClient:
         self.command_error_domain: UsageStatsErrorDomain | None = None
         #: Whether the command sent its work to the hosted API, which holds the rest of what it did.
         self.is_command_hosted = False
+        #: What an `init` command set, for its `command_completed`.
+        self.command_init_choices: InitChoices | None = None
 
     @property
     def is_enabled(self) -> bool:
@@ -218,6 +220,17 @@ class UsageStatsClient:
     def note_command_hosted(self) -> None:
         """Record that the command sent its work to the hosted API, for its `command_completed`."""
         self.is_command_hosted = True
+
+    def note_command_init_choices(self, *, init_choices: InitChoices) -> None:
+        """Record what an `init` command set, for its `command_completed`; a later note completes an earlier one."""
+        current = self.command_init_choices
+        if current is None:
+            self.command_init_choices = init_choices
+            return
+        self.command_init_choices = InitChoices(
+            execution=init_choices.execution or current.execution,
+            enabled_providers=init_choices.enabled_providers if init_choices.enabled_providers is not None else current.enabled_providers,
+        )
 
     def reset_after_fork(self) -> None:
         """In a forked child: drop the parent's lock, its held events and its thread, which the child does not have."""
@@ -535,6 +548,13 @@ def note_command_hosted() -> None:
     client = _PROCESS.client
     if client is not None:
         client.note_command_hosted()
+
+
+def note_command_init_choices(*, init_choices: InitChoices) -> None:
+    """Record, for the running `init` command's `command_completed`, where it set runs to execute and which backends it enabled."""
+    client = _PROCESS.client
+    if client is not None:
+        client.note_command_init_choices(init_choices=init_choices)
 
 
 def flush_usage_stats() -> None:

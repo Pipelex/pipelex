@@ -1,0 +1,239 @@
+import json
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
+
+import click
+import pytest
+import typer
+
+from pipelex.cli._cli import app as pipelex_app
+from pipelex.cli.agent_cli._agent_cli import app as agent_app
+from pipelex.cli.commands.init.init_usage_stats import note_init_backends, note_init_execution
+from pipelex.cli.usage_stats_cli import resolve_invocation, run_with_usage_stats
+from pipelex.hosted.run_config import RunExecution
+from pipelex.system.usage_stats.usage_stats_client import note_command_error_domain, note_command_hosted
+from pipelex.system.usage_stats.usage_stats_contract import (
+    UsageStatsEnvVar,
+    UsageStatsErrorDomain,
+    UsageStatsProvider,
+    UsageStatsSurface,
+    render_notice,
+)
+from tests.helpers.usage_stats_process import make_project_dir, usage_stats_switched_on
+from tests.helpers.usage_stats_schema import assert_envelope_is_valid
+
+_ROOTS: dict[UsageStatsSurface, click.Command] = {
+    UsageStatsSurface.PIPELEX: typer.main.get_command(pipelex_app),
+    UsageStatsSurface.PIPELEX_AGENT: typer.main.get_command(agent_app),
+}
+
+
+def _root_of(surface: UsageStatsSurface) -> click.Group:
+    root = _ROOTS[surface]
+    assert isinstance(root, click.Group)
+    return root
+
+
+def _run(*, surface: UsageStatsSurface, args: list[str], invoke: Callable[[], Any]) -> None:
+    run_with_usage_stats(root=_root_of(surface), args=args, surface=surface, strip_flags=frozenset({"--no-logo"}), invoke=invoke)
+
+
+def _debug_events(stderr: str) -> list[dict[str, Any]]:
+    return [json.loads(line)["usage_stats_debug"] for line in stderr.splitlines() if line.startswith('{"usage_stats_debug"')]
+
+
+def _succeed() -> None:
+    return None
+
+
+def _fail_with_input_error() -> None:
+    note_command_error_domain(error_domain=UsageStatsErrorDomain.INPUT)
+    raise SystemExit(1)
+
+
+def _interrupted() -> None:
+    raise KeyboardInterrupt
+
+
+def _cancelled_exit() -> None:
+    raise SystemExit(130)
+
+
+def _hosted_run() -> None:
+    note_command_hosted()
+
+
+def _local_init() -> None:
+    note_init_backends(backend_keys=["anthropic", "my_company_gateway"])
+    note_init_execution(execution=RunExecution.LOCAL)
+
+
+def _hosted_init() -> None:
+    note_init_execution(execution=RunExecution.HOSTED)
+
+
+class TestUsageStatsCli:
+    @pytest.mark.parametrize(
+        ("surface", "args", "command", "is_machine_read"),
+        [
+            (UsageStatsSurface.PIPELEX, ["validate", "bundle", "x.mthds"], "validate bundle", False),
+            (UsageStatsSurface.PIPELEX, ["validate", "--all"], "validate pipe", False),
+            (UsageStatsSurface.PIPELEX, ["validate", "my_pipe", "--library-dir", "x"], "validate pipe", False),
+            (UsageStatsSurface.PIPELEX, ["codegen", "types", "x.mthds", "--target", "ts-zod"], "codegen types", False),
+            (UsageStatsSurface.PIPELEX, ["run", "x.mthds"], "other", False),
+            (UsageStatsSurface.PIPELEX, ["no-such-command"], "other", False),
+            (UsageStatsSurface.PIPELEX, ["--help"], None, False),
+            (UsageStatsSurface.PIPELEX, ["--version"], None, False),
+            (UsageStatsSurface.PIPELEX, ["-V"], None, False),
+            (UsageStatsSurface.PIPELEX, [], None, False),
+            (UsageStatsSurface.PIPELEX, ["show"], None, False),
+            (UsageStatsSurface.PIPELEX, ["run", "bundle", "x.mthds", "--help"], None, False),
+            (UsageStatsSurface.PIPELEX, ["usage-stats", "status"], None, False),
+            (UsageStatsSurface.PIPELEX_AGENT, ["validate", "bundle", "x.mthds"], "validate bundle", False),
+            (UsageStatsSurface.PIPELEX_AGENT, ["validate", "bundle", "x.mthds", "--format", "json"], "validate bundle", True),
+            (UsageStatsSurface.PIPELEX_AGENT, ["validate", "bundle", "x.mthds", "--format=json"], "validate bundle", True),
+            (UsageStatsSurface.PIPELEX_AGENT, ["validate", "bundle", "x.mthds", "--error-format", "json"], "validate bundle", True),
+            (
+                UsageStatsSurface.PIPELEX_AGENT,
+                ["validate", "bundle", "x.mthds", "--format", "json", "--error-format", "markdown"],
+                "validate bundle",
+                False,
+            ),
+            (UsageStatsSurface.PIPELEX_AGENT, ["inputs", "pipe", "my_pipe"], "inputs pipe", True),
+            (UsageStatsSurface.PIPELEX_AGENT, ["models"], "models", False),
+        ],
+    )
+    def test_invocation_is_resolved_without_reading_arguments(
+        self, surface: UsageStatsSurface, args: list[str], command: str | None, is_machine_read: bool
+    ) -> None:
+        """The command is its path in the tree, never an argument; a JSON error stream is a machine contract."""
+        invocation = resolve_invocation(root=_root_of(surface), args=args, surface=surface)
+        assert invocation.command == command
+        assert invocation.is_machine_read is is_machine_read
+        assert invocation.is_statistics_group is (args[:1] == ["usage-stats"])
+
+    def test_notice_once_then_command_completed(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """The notice goes to stderr before the command works, once per machine; the command's event follows."""
+        with usage_stats_switched_on(monkeypatch=monkeypatch, home=tmp_path / "home", cwd=make_project_dir(parent=tmp_path), is_debug=True) as state:
+            _run(surface=UsageStatsSurface.PIPELEX, args=["--no-logo", "validate", "bundle", "secret_name.mthds"], invoke=_succeed)
+            first = capsys.readouterr()
+            assert first.out == ""
+            assert first.err.splitlines()[0] == render_notice()
+            assert state.notice_marker(version=1).exists()
+            events = _debug_events(first.err)
+            assert len(events) == 1
+            assert_envelope_is_valid(events[0])
+            assert events[0]["properties"]["command"] == "validate bundle"
+            assert events[0]["properties"]["outcome"] == "succeeded"
+            assert events[0]["properties"]["notice_version"] == 1
+            assert "secret_name" not in first.err
+            _run(surface=UsageStatsSurface.PIPELEX, args=["validate", "bundle", "x.mthds"], invoke=_succeed)
+            second = capsys.readouterr()
+            assert render_notice() not in second.err
+            assert len(_debug_events(second.err)) == 1
+
+    def test_machine_read_stderr_gets_no_notice(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """Under JSON errors the notice is neither printed nor recorded, and the command's statistics are still sent."""
+        with usage_stats_switched_on(monkeypatch=monkeypatch, home=tmp_path / "home", cwd=make_project_dir(parent=tmp_path), is_debug=True) as state:
+            with pytest.raises(SystemExit):
+                _run(
+                    surface=UsageStatsSurface.PIPELEX_AGENT, args=["validate", "bundle", "x.mthds", "--format", "json"], invoke=_fail_with_input_error
+                )
+            captured = capsys.readouterr()
+        assert render_notice() not in captured.err
+        assert not state.notice_marker(version=1).exists()
+        events = _debug_events(captured.err)
+        assert len(events) == 1
+        assert_envelope_is_valid(events[0])
+        assert events[0]["properties"]["surface"] == "pipelex-agent"
+        assert events[0]["properties"]["outcome"] == "failed"
+        assert events[0]["properties"]["error_domain"] == "input"
+
+    @pytest.mark.parametrize(
+        ("invoke", "expected"),
+        [
+            (_succeed, {"outcome": "succeeded"}),
+            (_fail_with_input_error, {"outcome": "failed", "error_domain": "input"}),
+            (_interrupted, {"outcome": "cancelled"}),
+            (_cancelled_exit, {"outcome": "cancelled"}),
+            (_hosted_run, {"outcome": "succeeded", "hosted": True}),
+        ],
+    )
+    def test_outcome_of_the_command(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        invoke: Callable[[], Any],
+        expected: dict[str, Any],
+    ) -> None:
+        with usage_stats_switched_on(monkeypatch=monkeypatch, home=tmp_path / "home", cwd=make_project_dir(parent=tmp_path), is_debug=True):
+            try:
+                _run(surface=UsageStatsSurface.PIPELEX, args=["run", "bundle", "x.mthds"], invoke=invoke)
+            except (SystemExit, KeyboardInterrupt):
+                pass
+            events = _debug_events(capsys.readouterr().err)
+        assert len(events) == 1
+        assert_envelope_is_valid(events[0])
+        properties = events[0]["properties"]
+        for name, value in expected.items():
+            assert properties[name] == value
+        assert ("error_domain" in properties) is ("error_domain" in expected)
+        assert ("hosted" in properties) is ("hosted" in expected)
+
+    @pytest.mark.parametrize(
+        ("surface", "args", "invoke", "expected"),
+        [
+            (UsageStatsSurface.PIPELEX, ["init"], _local_init, {"init_execution": "local", "anthropic": True, "custom": True, "openai": False}),
+            (UsageStatsSurface.PIPELEX_AGENT, ["init", "--config", "{}"], _hosted_init, {"init_execution": "hosted"}),
+            (UsageStatsSurface.PIPELEX, ["init", "routing"], _succeed, {}),
+            (UsageStatsSurface.PIPELEX, ["run", "bundle", "x.mthds"], _local_init, {}),
+        ],
+    )
+    def test_init_reports_what_it_set(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        surface: UsageStatsSurface,
+        args: list[str],
+        invoke: Callable[[], Any],
+        expected: dict[str, Any],
+    ) -> None:
+        """`init` says where it set runs to execute and, once it set backends, a boolean for every provider; no other command carries them."""
+        with usage_stats_switched_on(monkeypatch=monkeypatch, home=tmp_path / "home", cwd=make_project_dir(parent=tmp_path), is_debug=True):
+            _run(surface=surface, args=args, invoke=invoke)
+            events = _debug_events(capsys.readouterr().err)
+        assert len(events) == 1
+        assert_envelope_is_valid(events[0])
+        properties = events[0]["properties"]
+        init_properties = {name: value for name, value in properties.items() if name.startswith("init_")}
+        assert init_properties.get("init_execution") == expected.get("init_execution")
+        backends = {name.removeprefix("init_backend_"): value for name, value in init_properties.items() if name.startswith("init_backend_")}
+        expected_backends = {name: value for name, value in expected.items() if name != "init_execution"}
+        if expected_backends:
+            assert set(backends) == {provider.value for provider in UsageStatsProvider}
+            assert {name for name, value in backends.items() if value} == {name for name, value in expected_backends.items() if value}
+        else:
+            assert backends == {}
+
+    @pytest.mark.parametrize("args", [["--help"], ["usage-stats", "status"], ["show"]])
+    def test_uncounted_invocations_touch_nothing(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], args: list[str]
+    ) -> None:
+        with usage_stats_switched_on(monkeypatch=monkeypatch, home=tmp_path / "home", cwd=make_project_dir(parent=tmp_path), is_debug=True) as state:
+            _run(surface=UsageStatsSurface.PIPELEX, args=args, invoke=_succeed)
+            captured = capsys.readouterr()
+        assert captured.err == ""
+        assert not state.state_dir.exists()
+
+    def test_statistics_off_print_and_write_nothing(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        with usage_stats_switched_on(monkeypatch=monkeypatch, home=tmp_path / "home", cwd=make_project_dir(parent=tmp_path), is_debug=True) as state:
+            monkeypatch.setenv(UsageStatsEnvVar.DO_NOT_TRACK, "1")
+            _run(surface=UsageStatsSurface.PIPELEX, args=["validate", "bundle", "x.mthds"], invoke=_succeed)
+            captured = capsys.readouterr()
+        assert captured.err == ""
+        assert not state.state_dir.exists()

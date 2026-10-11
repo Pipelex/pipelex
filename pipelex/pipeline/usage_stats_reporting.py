@@ -220,16 +220,6 @@ def input_kinds_of(*, working_memory: WorkingMemory | None) -> tuple[bool, bool]
 # -------------------------------------------------------------------------------------------------
 
 
-def provider_for_backend(*, backend_name: str | None) -> UsageStatsProvider:
-    """The provider a backend is reported as: its own name when pipelex or our plugins ship it, `custom` otherwise."""
-    if not backend_name:
-        return UsageStatsProvider.CUSTOM
-    try:
-        return UsageStatsProvider(backend_name)
-    except ValueError:
-        return UsageStatsProvider.CUSTOM
-
-
 @cache
 def shipped_backend_models() -> dict[str, frozenset[str]]:
     """The model names each backend table of this release's kit declares, by backend name."""
@@ -298,7 +288,7 @@ def _model_usage_rows(*, tally: RunInferenceTally | None, events: Sequence[Trace
     backend_by_handle: dict[str, str] = {}
 
     def row_for(*, model_handle: str, backend_name: str | None) -> _ModelUsageRow:
-        provider = provider_for_backend(backend_name=backend_name)
+        provider = UsageStatsProvider.for_backend(backend_name=backend_name)
         key = (provider, reported_model(provider=provider, model_handle=model_handle))
         if key not in rows:
             rows[key] = _ModelUsageRow()
@@ -579,6 +569,11 @@ class CodeGenerationReport:
         self._pipes = 0
         self._concepts = 0
         self._declared_outcome: UsageStatsCodegenOutcome | None = None
+
+    @property
+    def artifact(self) -> UsageStatsCodegenArtifact:
+        """What the generation produces, as its `code_generated` reports it."""
+        return self._artifact
 
     def __enter__(self) -> Self:
         self._started_at = time.monotonic()
