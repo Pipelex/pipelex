@@ -33,6 +33,8 @@ These two categories are managed by separate steps. `init_config()` copies only 
 | `pipelex init telemetry` | `telemetry` | Telemetry config template copy |
 | `pipelex init credentials` | `credentials` | Credential setup for enabled backends |
 
+Every one of them first shows the [usage statistics](../setup/usage-statistics.md) notice on stderr when statistics are on, through `show_usage_stats_notice()`, which the `init` Typer command in `pipelex/cli/_cli.py` calls before `init_cmd()`, so `pipelex doctor --fix`, which calls `init_cmd()` itself, does not show it. A first run that has just printed the notice does not print it again, and showing it records no marker.
+
 All commands except `credentials` perform a **full reset** (overwrite existing files) — every setting in the file is replaced by the template's. That is why init is not the answer to a configuration file that has fallen behind the current schema: [`pipelex migrate`](../tools/cli/migrate.md) rewrites such a file in place and keeps what is in it.
 
 ### Inputs

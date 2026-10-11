@@ -95,6 +95,12 @@ class ConfigLoader:
         real project root.
 
         Returns the directory containing the marker, or None if not found.
+
+        Raises:
+            OSError: When whether a marker exists cannot be told, as when a directory on the way up may not be
+                traversed. Each marker is stat'ed rather than asked `Path.exists()`, which from Python 3.14 swallows
+                every `OSError` and answers `False`.
+            RuntimeError: When no home directory can be found.
         """
         current = start_dir.resolve()
         home_dir = Path.home().resolve()
@@ -102,8 +108,11 @@ class ConfigLoader:
             if current == home_dir:
                 return None
             for marker in PROJECT_ROOT_MARKERS:
-                if (current / marker).exists():
-                    return current
+                try:
+                    (current / marker).stat()
+                except (FileNotFoundError, NotADirectoryError):
+                    continue
+                return current
             parent = current.parent
             if parent == current:
                 return None

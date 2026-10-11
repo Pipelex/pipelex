@@ -32,6 +32,7 @@ from pipelex.cli.commands.init.backends import (
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.credentials import prompt_credentials
 from pipelex.cli.commands.init.ide_extension import suggest_extension_install_if_needed
+from pipelex.cli.commands.init.init_usage_stats import note_init_backends, note_init_execution
 from pipelex.cli.commands.init.routing import customize_routing_profile
 from pipelex.cli.commands.init.setup_path import (
     DEFAULT_SETUP_PATH,
@@ -528,10 +529,12 @@ def execute_initialization(*, console: Console, inspection: InitInspection, choi
                     pipelex_toml_path=inspection.pipelex_toml_path,
                     project_config_dir=config_manager.project_config_dir,
                 )
+                note_init_execution(execution=setup_path.run_execution)
                 if choices.interactive:
                     _suggest_extension(console=console)
             case SetupPath.LOCAL | None:
                 customize_backends_config(is_first_time_setup=first_time_setup, target_config_dir=target_config_dir)
+                note_init_backends(backend_keys=get_selected_backend_keys(backends_toml_path))
 
                 # Automatically set up routing after backends (unless routing is the specific focus)
                 if not inspection.check_routing:
@@ -547,6 +550,7 @@ def execute_initialization(*, console: Console, inspection: InitInspection, choi
                         pipelex_toml_path=inspection.pipelex_toml_path,
                         project_config_dir=config_manager.project_config_dir,
                     )
+                    note_init_execution(execution=setup_path.run_execution)
 
     # Step 2.5: Prompt for missing credentials, which only runs on this machine use
     runs_hosted = (setup_path is not None and setup_path.is_hosted) or inspection.keeps_hosted_runs

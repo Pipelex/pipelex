@@ -1,6 +1,8 @@
 """Main entry point for the agent CLI."""
 
-from typing import Annotated
+import sys
+from collections.abc import Sequence
+from typing import Annotated, Any
 
 import typer
 from click import Command, Context
@@ -21,11 +23,39 @@ from pipelex.cli.agent_cli.commands.migrate_cmd import agent_migrate_cmd
 from pipelex.cli.agent_cli.commands.models_cmd import agent_models_cmd
 from pipelex.cli.agent_cli.commands.run.app import run_app
 from pipelex.cli.agent_cli.commands.validate.app import validate_app
+from pipelex.cli.usage_stats_cli import run_with_usage_stats
 from pipelex.cli.version_report import version_report_lines
+from pipelex.system.usage_stats.usage_stats_contract import UsageStatsSurface
 
 
 class PipelexAgentCLI(TyperGroup):
     """Custom Typer group for pipelex-agent CLI."""
+
+    @override
+    def main(
+        self,
+        args: Sequence[str] | None = None,
+        prog_name: str | None = None,
+        complete_var: str | None = None,
+        standalone_mode: bool = True,
+        windows_expand_args: bool = True,
+        **extra: Any,
+    ) -> Any:
+        """Run the command between the start and the end of its usage statistics (`pipelex.cli.usage_stats_cli`)."""
+        return run_with_usage_stats(
+            root=self,
+            args=list(args) if args is not None else sys.argv[1:],
+            surface=UsageStatsSurface.PIPELEX_AGENT,
+            strip_flags=frozenset(),
+            invoke=lambda: super(PipelexAgentCLI, self).main(
+                args=args,
+                prog_name=prog_name,
+                complete_var=complete_var,
+                standalone_mode=standalone_mode,
+                windows_expand_args=windows_expand_args,
+                **extra,
+            ),
+        )
 
     @override
     def list_commands(self, ctx: Context) -> list[str]:

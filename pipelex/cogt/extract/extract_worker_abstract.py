@@ -124,7 +124,7 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
         extract_job: ExtractJob,
     ) -> ExtractOutput:
         # The call ends with its summary event whichever way it ends, a refusal by the checks below included
-        with self._call_summary(extract_job=extract_job):
+        with self._call_summary(extract_job=extract_job) as call_summary:
             # Verify that the job is valid
             extract_job.validate_before_execution()
 
@@ -144,6 +144,8 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
             except CogtError as exc:
                 exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
                 raise
+
+            call_summary.count_pages_extracted(count=len(result.pages))
 
             # Price the call by its pages when the provider reported no usage
             if (extract_tokens_usage := extract_job.job_report.extract_tokens_usage) and not extract_tokens_usage.nb_tokens_by_category:

@@ -234,6 +234,10 @@ make test      # the unit tests
 
 The [contributing guide](https://github.com/Pipelex/pipelex/blob/main/CONTRIBUTING.md) says how to configure `.env`, name a branch and open a pull request.
 
+## Usage statistics
+
+Pipelex collects anonymous usage statistics: counts of commands, runs, pipe types, models and tokens, and the country your IP address maps to; the address itself is never stored. It never collects your methods, prompts, inputs, outputs, file names or pipe names. To turn it off, run `pipelex usage-stats disable` or set `DO_NOT_TRACK=1`. The [usage statistics page](https://docs.pipelex.com/latest/setup/usage-statistics/) lists what is collected and every way to turn it off.
+
 ## Community
 
 Ask questions and share what you build on [Discord](https://go.pipelex.com/discord), report a bug in [GitHub Issues](https://github.com/Pipelex/pipelex/issues), propose an idea in [Discussions](https://github.com/Pipelex/pipelex/discussions), and watch demos on [YouTube](https://www.youtube.com/@PipelexAI).

@@ -38,9 +38,11 @@ from typing import TYPE_CHECKING, Any
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.exceptions import find_inference_error_category_in_chain
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.cogt.usage.usage_cost import compute_tokens_usage_cost
 from pipelex.system.telemetry.otel_constants import GenAISpanAttr
+from pipelex.system.usage_stats.usage_stats_runs import current_run_tally
 from pipelex.tools.log.console_layouts import LogLayout
 from pipelex.tools.log.summary_event import SummaryEvent
 from pipelex.tools.log.summary_fields import COST_USD_FIELD
@@ -117,6 +119,45 @@ class InferenceCallSummary(SummaryEvent):
         self._read_tokens_usage = read_tokens_usage
         self._read_request_model = read_request_model
         self._read_response_model = read_response_model
+        self._images_generated = 0
+        self._pages_extracted = 0
+
+    def count_images_generated(self, *, count: int) -> None:
+        """Count the images the call generated, for the usage statistics of the run it belongs to."""
+        self._images_generated += count
+
+    def count_pages_extracted(self, *, count: int) -> None:
+        """Count the document pages the call extracted, for the usage statistics of the run it belongs to."""
+        self._pages_extracted += count
+
+    @override
+    def _end(self, *, error: BaseException | None) -> None:
+        """Log the event, then note the call in the usage-statistics tally of the run it belongs to, when one is tallying."""
+        super()._end(error=error)
+        self._note_in_run_tally(error=error)
+
+    def _note_in_run_tally(self, *, error: BaseException | None) -> None:
+        """Note how the call ended in its run's tally: its model and backend, and, for a failure, the runtime's category.
+
+        A call stopped from outside is a call, not a failure. A call whose handle resolved to no model counts in the run's
+        totals only, since no backend served it.
+        """
+        run_tally = current_run_tally()
+        if run_tally is None:
+            return
+        inference_model = self._read_inference_model()
+        failed = isinstance(error, Exception)
+        failure_category: str | None = None
+        if isinstance(error, Exception):
+            failure_category = find_inference_error_category_in_chain(error)
+        run_tally.note_call(
+            model_handle=inference_model.name if inference_model is not None else self._model_handle,
+            backend_name=inference_model.backend_name if inference_model is not None else None,
+            failed=failed,
+            failure_category=failure_category,
+            images_generated=self._images_generated,
+            pages_extracted=self._pages_extracted,
+        )
 
     @override
     def _work_fields(self) -> dict[str, Any]:

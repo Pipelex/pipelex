@@ -1,4 +1,6 @@
-from typing import Annotated
+import sys
+from collections.abc import Sequence
+from typing import Annotated, Any
 
 import typer
 from click import Command, Context
@@ -19,13 +21,17 @@ from pipelex.cli.commands.resolve_cmd import resolve_cmd
 from pipelex.cli.commands.run.app import run_app
 from pipelex.cli.commands.show_cmd import show_app
 from pipelex.cli.commands.update_cmd import update_cmd
+from pipelex.cli.commands.usage_stats_cmd import usage_stats_app
 from pipelex.cli.commands.validate.app import validate_app
 from pipelex.cli.commands.which_cmd import which_cmd
 from pipelex.cli.deck_notice import warn_if_deck_stale
 from pipelex.cli.error_handlers import set_traceback_requested
 from pipelex.cli.readiness import check_readiness
+from pipelex.cli.usage_stats_cli import STATISTICS_GROUP_NAME, run_with_usage_stats
 from pipelex.cli.version_report import version_report_lines
 from pipelex.runtime_hub import get_console
+from pipelex.system.usage_stats.usage_stats_client import show_usage_stats_notice
+from pipelex.system.usage_stats.usage_stats_contract import UsageStatsSurface
 from pipelex.tools.misc.package_utils import get_package_version
 
 # Core commands in display order (natural ordering doesn't work between Typer groups and commands).
@@ -45,11 +51,43 @@ _CORE_COMMAND_ORDER: list[str] = [
     "show",
     "which",
     "plugins",
+    "usage-stats",
 ]
+
+#: The global flags `PipelexCLI.make_context` removes wherever they appear on the command line.
+_GLOBAL_FLAGS: frozenset[str] = frozenset({"--no-logo", "--traceback"})
+#: The commands that run before the readiness checks, which they diagnose, repair or do not need.
+_COMMANDS_WITHOUT_READINESS_CHECKS: frozenset[str] = frozenset({"init", "login", "doctor", "update", "migrate", "which", STATISTICS_GROUP_NAME})
 
 
 class PipelexCLI(TyperGroup):
     """Custom CLI group that handles global options like --no-logo."""
+
+    @override
+    def main(
+        self,
+        args: Sequence[str] | None = None,
+        prog_name: str | None = None,
+        complete_var: str | None = None,
+        standalone_mode: bool = True,
+        windows_expand_args: bool = True,
+        **extra: Any,
+    ) -> Any:
+        """Run the command between the start and the end of its usage statistics (`pipelex.cli.usage_stats_cli`)."""
+        return run_with_usage_stats(
+            root=self,
+            args=list(args) if args is not None else sys.argv[1:],
+            surface=UsageStatsSurface.PIPELEX,
+            strip_flags=_GLOBAL_FLAGS,
+            invoke=lambda: super(PipelexCLI, self).main(
+                args=args,
+                prog_name=prog_name,
+                complete_var=complete_var,
+                standalone_mode=standalone_mode,
+                windows_expand_args=windows_expand_args,
+                **extra,
+            ),
+        )
 
     @override
     def list_commands(self, ctx: Context) -> list[str]:
@@ -126,6 +164,10 @@ def app_callback(
         ),
     ] = False,
 ) -> None:
+    # The statistics group prints what it was asked for and nothing else: its JSON status is read by other programs.
+    if ctx.invoked_subcommand == STATISTICS_GROUP_NAME:
+        return
+
     console = get_console()
     package_version = get_package_version()
 
@@ -153,7 +195,7 @@ def app_callback(
 """
         )
     # Skip checks if no command is being run (e.g., just --help) or if running setup/diagnostic commands
-    if ctx.invoked_subcommand is None or ctx.invoked_subcommand in {"init", "login", "doctor", "update", "migrate", "which"}:
+    if ctx.invoked_subcommand is None or ctx.invoked_subcommand in _COMMANDS_WITHOUT_READINESS_CHECKS:
         return
 
     # Check system readiness (dependencies and venv for dev installs)
@@ -207,6 +249,8 @@ def init_command(
 
       telemetry    Reset telemetry preferences
     """
+    # `pipelex init` carries the usage statistics notice's text whenever they are on, ahead of its own output.
+    show_usage_stats_notice()
     init_cmd(focus=focus, local=local)
 
 
@@ -288,3 +332,8 @@ app.add_typer(graph_app, name="graph", help="Generate and render execution graph
 app.add_typer(show_app, name="show", help="Show configuration, pipes, and list AI models")
 app.command(name="which", help="Locate where a pipe is defined, similar to 'which' for executables")(which_cmd)
 app.add_typer(plugins_app, name="plugins", help="Inspect the discovered plugins (inference backends, orchestrators) and their contributions")
+app.add_typer(
+    usage_stats_app,
+    name=STATISTICS_GROUP_NAME,
+    help="See and change the anonymous usage statistics of every Pipelex tool on this machine (status, disable, enable, reset-id)",
+)

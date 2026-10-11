@@ -207,7 +207,7 @@ class BundleValidator:
         # Mirrors runtime_bridge.direct_orchestrator.DirectOrchestrator.execute. Being the sweep's own
         # router, it also notes the innermost pipe each failure left (see `_DryRunSweepRouter`).
         self._pipe_router = _DryRunSweepRouter(observer=ObserverNoOp())
-        self._pipe_run: PipeRunProtocol = PipeRun(pipe_router=self._pipe_router)
+        self._pipe_run: PipeRunProtocol = PipeRun(pipe_router=self._pipe_router, reports_usage_stats=False)
 
     async def acquire_and_validate(
         self,

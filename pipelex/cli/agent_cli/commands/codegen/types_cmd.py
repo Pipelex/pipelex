@@ -28,6 +28,8 @@ from pipelex.codegen.emitters.types_emitter import emit_types
 from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.pipelex import Pipelex
+from pipelex.pipeline.usage_stats_reporting import CodeGenerationReport, usage_stats_codegen_target
+from pipelex.system.usage_stats.usage_stats_contract import UsageStatsCodegenArtifact
 from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:
@@ -77,25 +79,27 @@ def agent_codegen_types_cmd(
     try:
         combined_dirs: list[Path] = [*(paths or []), *(Path(lib_dir) for lib_dir in library_dir or [])]
 
-        crate: LibraryCrate
-        try:
-            crate = load_normalized_crate(library_dirs=combined_dirs or None)
-        except (LibraryLoadingError, PipeLibraryError) as exc:
-            # Negative verdict: the library is structurally invalid, so no crate can be produced.
-            agent_error(f"Cannot resolve — the library is invalid: {exc}", error_type=type(exc).__name__, cause=exc, exit_code=1)
-        except FileNotFoundError as exc:
-            # No verdict: the closure could not even be assembled.
-            agent_error(f"Cannot resolve — {exc}", error_type="FileNotFoundError", cause=exc, exit_code=2)
+        with CodeGenerationReport(artifact=UsageStatsCodegenArtifact.TYPES, target=usage_stats_codegen_target(target=target)) as generation_report:
+            crate: LibraryCrate
+            try:
+                crate = load_normalized_crate(library_dirs=combined_dirs or None)
+            except (LibraryLoadingError, PipeLibraryError) as exc:
+                # Negative verdict: the library is structurally invalid, so no crate can be produced.
+                agent_error(f"Cannot resolve — the library is invalid: {exc}", error_type=type(exc).__name__, cause=exc, exit_code=1)
+            except FileNotFoundError as exc:
+                # No verdict: the closure could not even be assembled.
+                agent_error(f"Cannot resolve — {exc}", error_type="FileNotFoundError", cause=exc, exit_code=2)
+            generation_report.describe(crate=crate)
 
-        emitted = emit_types(crate, target=target)
-        report = write_stamped_projection(
-            emitted,
-            output_dir=output_root,
-            crate_fingerprint=crate.fingerprint,
-            engine_version=get_package_version(),
-            kind=CodegenKind.TYPES,
-            target=target,
-        )
+            emitted = emit_types(crate, target=target)
+            report = write_stamped_projection(
+                emitted,
+                output_dir=output_root,
+                crate_fingerprint=crate.fingerprint,
+                engine_version=get_package_version(),
+                kind=CodegenKind.TYPES,
+                target=target,
+            )
         result: dict[str, Any] = {
             "success": True,
             "kind": str(CodegenKind.TYPES),

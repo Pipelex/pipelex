@@ -18,7 +18,9 @@ VENV_RUFF := "$(VIRTUAL_ENV)/bin/ruff"
 VENV_PYRIGHT := "$(VIRTUAL_ENV)/bin/pyright"
 VENV_MYPY := "$(VIRTUAL_ENV)/bin/mypy"
 VENV_PIPELEX := "$(VIRTUAL_ENV)/bin/pipelex"
-VENV_MKDOCS := "$(VIRTUAL_ENV)/bin/mkdocs"
+# Material for MkDocs prints a MkDocs 2.0 warning on every `mkdocs` run; we stay on MkDocs 1.x
+# (capped below 2 in pyproject.toml) until the docs move to Zensical.
+VENV_MKDOCS := NO_MKDOCS_2_WARNING=true "$(VIRTUAL_ENV)/bin/mkdocs"
 VENV_MIKE := "$(VIRTUAL_ENV)/bin/mike"
 VENV_PYLINT := "$(VIRTUAL_ENV)/bin/pylint"
 VENV_PLXT := RUST_LOG=warn "$(VIRTUAL_ENV)/bin/plxt"

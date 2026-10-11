@@ -24,9 +24,11 @@ from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_machinery.rendering.input_renderer import InputsTemplateFormat, NoInputsRequiredError, render_inputs, render_inputs_toml
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.default_file_names import DEFAULT_INPUTS_FILE_NAME, DEFAULT_INPUTS_TOML_FILE_NAME
+from pipelex.pipeline.usage_stats_reporting import CodeGenerationReport
 from pipelex.runtime_hub import get_telemetry_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
+from pipelex.system.usage_stats.usage_stats_contract import UsageStatsCodegenArtifact
 from pipelex.tools.misc.file_utils import ensure_directory_for_file_path, save_text_to_path
 from pipelex.tools.misc.package_utils import get_package_version
 
@@ -64,13 +66,14 @@ def codegen_inputs_cmd(
     make_pipelex_for_cli(context=ErrorContext.VALIDATION, needs_inference=False)
 
     try:
-        with get_telemetry_manager().telemetry_context():
+        with get_telemetry_manager().telemetry_context(), CodeGenerationReport(artifact=UsageStatsCodegenArtifact.INPUTS) as generation_report:
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
             tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
             tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND}")
 
             combined_dirs: list[Path] = [*(paths or []), *(library_dir or [])]
             crate = load_normalized_crate_or_exit(library_dirs=combined_dirs or None)
+            generation_report.describe(crate=crate)
 
             pipe_ref = pipe or _default_main_pipe_ref(crate=crate)
             try:
@@ -83,6 +86,8 @@ def codegen_inputs_cmd(
                 content, default_file_name = _render(the_pipe=the_pipe, template_format=template_format, explicit=explicit)
             except NoInputsRequiredError as exc:
                 typer.secho(str(exc), fg=typer.colors.YELLOW)
+                # A pipe with no inputs has none to template: nothing failed.
+                generation_report.declare_succeeded()
                 raise typer.Exit(0) from exc
 
             destination = Path(output).expanduser() if output else Path("results") / default_file_name

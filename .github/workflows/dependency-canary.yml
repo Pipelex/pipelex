@@ -15,6 +15,10 @@ concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: true
 
+# No pipelex process a job starts reports anonymous usage statistics (docs/setup/usage-statistics.md).
+env:
+  DO_NOT_TRACK: "1"
+
 jobs:
   # 1. Resolve every dependency to the latest version still allowed by our
   #    declared ranges, then run the suite AND real CLI commands. Catches

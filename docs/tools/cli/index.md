@@ -34,6 +34,7 @@ The Pipelex CLI is organized into several command groups:
 | [**run**](run.md) | Execute pipelines, on this machine or on the hosted Pipelex API |
 | [**run method by address**](run-by-address.md) | Fetch and run a method straight from a public GitHub repository |
 | [**build**](build/index.md) | Generate concept structures and example inputs and outputs for a pipe |
+| [**usage-stats**](usage-stats.md) | See and change the anonymous usage statistics of every Pipelex tool on the machine |
 
 ## Global flags
 

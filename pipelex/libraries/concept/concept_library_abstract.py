@@ -51,6 +51,10 @@ class ConceptLibraryAbstract(ConceptProviderAbstract):
         pass
 
     @abstractmethod
+    def list_own_concepts(self) -> list[Concept]:
+        """The concepts the loaded method declares itself: neither a native nor one a dependency package contributed."""
+
+    @abstractmethod
     def setup(self) -> None:
         pass
 

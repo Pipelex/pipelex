@@ -205,9 +205,22 @@ class InterpreterConfig(ConfigModel):
     builder: BuilderConfig
 
 
+class UsageStatsConfig(ConfigModel):
+    """`[usage_stats]`: whether pipelex may send its anonymous usage statistics.
+
+    The switch is read from two files alone, never from this merged model: pipelex's packaged configuration, where a
+    packager may ship `false`, and the project's own `.pipelex/pipelex.toml`, where a team commits `false`; both can only
+    turn statistics off (`pipelex.system.usage_stats.usage_stats_switches`). The model declares the table so that a file
+    carrying it loads, and validates it like every other setting.
+    """
+
+    enabled: bool
+
+
 class PipelexConfig(ConfigRoot):
     runtime: RuntimeConfig
     inference: InferenceConfig
     interpreter: InterpreterConfig
     run: RunConfig
     kit: KitConfig
+    usage_stats: UsageStatsConfig

@@ -38,6 +38,7 @@ class LLMJob(InferenceJobAbstract):
             inference_model_name=inference_model.name,
             unit_costs=inference_model.costs,
             inference_model_id=inference_model.model_id,
+            backend_name=inference_model.backend_name,
             nb_tokens_by_category={},
         )
 

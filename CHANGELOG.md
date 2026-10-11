@@ -1,5 +1,31 @@
 # Changelog
 
+## [v0.84.0] - 2026-10-12
+
+### Highlights
+
+**pipelex now reports anonymous usage statistics, on by default.** Commands, runs, validations and code generations are counted with closed-list properties only, never a method, a prompt, an input or an output, and `DO_NOT_TRACK`, `PIPELEX_USAGE_STATS=0`, `pipelex usage-stats disable` or `[usage_stats] enabled = false` in a project turn them off.
+
+### Added
+
+- **Anonymous usage statistics**: pipelex now reports anonymous counts of its use to Pipelex, on by default: a `command_completed` per command of the `pipelex` and `pipelex-agent` CLIs, a `run_completed` per run however it ended, with a `model_used` per model when the run's usage events were read, a `method_validated` per validation and a `code_generated` per code generation, whatever started them. Every property is a count, a boolean or a value from a closed list: no method, pipe code, concept name, prompt, input, output, file name, error message or argument is ever sent, and a model outside the backend tables pipelex ships is sent as `other`. The first command with statistics on prints a notice on stderr, once per machine, except where stderr is a machine contract (`pipelex-agent` with JSON errors), and `pipelex init` shows the same text on stderr whenever statistics are on, once per run. Statistics stay off under `DO_NOT_TRACK`, `PIPELEX_USAGE_STATS=0`, `pipelex usage-stats disable`, the `mthds` CLI's former `DISABLE_TELEMETRY` opt-out, `[usage_stats] enabled = false` in a project's `.pipelex/pipelex.toml` or in the packaged configuration, a `~/.mthds/usage-stats/` pipelex cannot look into, and the `pytest` integration mode; the [usage statistics page](https://docs.pipelex.com/latest/setup/usage-statistics/) lists what is collected. A dedicated client sends them to PostHog's EU region, from a detached sender after a CLI command and from a daemon thread in a Python program or the API server; `telemetry.toml` and the telemetry you configure are untouched.
+- **`pipelex usage-stats`**: `status` (with `--format json`), `disable`, `enable` and `reset-id` show and change the statistics of every Pipelex tool on the machine, through the state they share in `~/.mthds/usage-stats/`. `PIPELEX_USAGE_STATS_DEBUG` prints each event to stderr as a JSON line instead of sending it, and `PIPELEX_USAGE_STATS_ENDPOINT` sends to a loopback origin for tests. Each queued file names the endpoint its events were queued for, and a sender posts the files naming its own origin and those naming none, so events queued under the variable never reach PostHog.
+- **`[usage_stats] enabled`**: a new `pipelex.toml` section, `true` in the packaged configuration. Set to `false` in a project's `.pipelex/pipelex.toml` it turns statistics off for everyone working in the project; it is read from the project's own file, never from `~/.pipelex/`, and a file that cannot be read turns them off too.
+- **Token usage names the backend that served the call**: `LLMTokensUsage`, `ImgGenTokensUsage`, `ExtractTokensUsage`, `SearchTokensUsage` and `JudgmentTokensUsage` gain `backend_name`, set by the job from the backend whose worker ran it, so a run's usage events credit each call to its own backend even when two backends call the model by the same id, as after a fallback. A synthetic report no backend made, a dry run's, leaves it `None`.
+- **`@default-judgment-vision`**: the judgment deck names a second alias, for a judgment model that reads images, beside `@default-judgment`, which stays TypeSafe's text-only `jev-1.13.0`. It points at OpenAI's `gpt-6-luna`, which judges through OpenAI's Decisions API; no inference backend of Pipelex calls that API yet, so on your own keys a `PipeJudge` naming the alias finds no model when it runs. Run `pipelex update` to bring the alias into an installed deck.
+
+### Changed
+
+- **`ConceptLibraryAbstract.list_own_concepts` (Breaking)**: the concept library declares the concepts a loaded method declares itself, without the natives and the concepts of its dependency packages, so a custom implementation of `ConceptLibraryAbstract` implements it.
+
+### Fixed
+
+- **A `{% filter %}` block prints its result as a `{{ }}` tag does**: a filter block whose filter returns something other than text, such as `{% filter markdown %}…{% endfilter %}` in a document template or `{% filter length %}`, now prints its result as a `{{ }}` tag prints a value, through the environment's `finalize` and then as text, where it used to fail the render with a type error naming a Python type. A block whose filter returns text prints as before, and the printed result is charged to the render's budget like any printed value.
+
+### Security
+
+- **`uv.lock` refreshed past the open Dependabot alerts**: the lock the `pipelex/pipelex-api` Docker image installs from now holds patched releases of `anyio`, `datamodel-code-generator`, `multidict`, `oauthlib` and `urllib3`, and a development checkout also gets patched `docling`, `transformers`, `torch`, `accelerate`, `fsspec` and `setuptools` through the `docling` extra and a patched `Werkzeug` through the `dev` extra. No `pyproject.toml` range moved, so an application installing the `pipelex` wheel picks these releases up through its own resolution.
+
 ## [v0.83.0] - 2026-10-11
 
 ### Added

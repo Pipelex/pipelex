@@ -37,6 +37,10 @@ on:
         type: string
         required: true
 
+# No pipelex process a job starts reports anonymous usage statistics (docs/setup/usage-statistics.md).
+env:
+  DO_NOT_TRACK: "1"
+
 jobs:
   publish:
     name: Build, smoke-test, push and confirm the image

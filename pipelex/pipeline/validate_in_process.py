@@ -33,6 +33,7 @@ from pipelex.pipeline.build_pipe_io_artifacts import build_pipe_io_artifacts
 from pipelex.pipeline.controller_taint import collect_controller_taint_analyses
 from pipelex.pipeline.input_form import qualify_current_library_crate
 from pipelex.pipeline.liftable_pipes import LiftablePipeEntry, build_liftable_pipes
+from pipelex.pipeline.usage_stats_reporting import MethodValidationReport
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.pipeline.validation_report import PipelexValidationReport, build_validation_report
 from pipelex.system.caller_identity import CallerIdentity, scoped_caller_identity
@@ -90,7 +91,7 @@ async def validate_bundles_in_process(
     Raises:
         PipelexError: When the bundle is invalid (parse, static validation, or dry-run failure).
     """
-    with scoped_caller_identity(caller_identity=caller_identity):
+    with scoped_caller_identity(caller_identity=caller_identity), MethodValidationReport() as validation_report:
         return await _validate_bundles_in_scope(
             mthds_contents=mthds_contents,
             mthds_sources=mthds_sources,
@@ -99,6 +100,7 @@ async def validate_bundles_in_process(
             graph_pipe_code=graph_pipe_code,
             log_context=log_context,
             library_dirs_are_callers=library_dirs_are_callers,
+            validation_report=validation_report,
         )
 
 
@@ -111,8 +113,9 @@ async def _validate_bundles_in_scope(
     graph_pipe_code: str | None,
     log_context: str,
     library_dirs_are_callers: bool,
+    validation_report: MethodValidationReport,
 ) -> PipelexValidationReport:
-    """The body of :func:`validate_bundles_in_process`, run inside the caller's scope."""
+    """The body of :func:`validate_bundles_in_process`, run inside the caller's scope and timed by `validation_report`."""
     # `validate_bundle` deliberately leaves its validation library OPEN and current on
     # success (the CLI surfaces consume it before process exit). This entry point is
     # long-lived, so restore the caller's current-library and tear the validation library
@@ -141,6 +144,7 @@ async def _validate_bundles_in_scope(
         # current — the graph arm and the finally must target the SAME library even if
         # something inside the window later moves the contextvar.
         validation_library_id = get_current_library_id_or_none()
+        validation_report.describe(pipes=result.pipes)
         # One crate qualification per validate pass — the descriptors and the hint lint read the same one.
         qualified_crate = qualify_current_library_crate()
         # The three I/O artifacts come from the one builder a run uses too, so a validate report and
@@ -155,6 +159,7 @@ async def _validate_bundles_in_scope(
             entry_pipe_refs=collect_entry_pipe_refs(result.blueprints),
             qualified_crate=qualified_crate,
         )
+        validation_report.count_warnings(count=len(warnings))
         graph_target_ref = graph_pipe_code if graph_pipe_code is not None else select_primary_blueprint(result.blueprints).main_pipe_ref
         graph_spec: GraphSpec | None = await best_effort_graph_spec(
             pipe_ref=graph_target_ref,

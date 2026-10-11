@@ -7,6 +7,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref }}
   cancel-in-progress: true
 
+# No pipelex process a job starts reports anonymous usage statistics (docs/setup/usage-statistics.md).
+env:
+  DO_NOT_TRACK: "1"
+
 jobs:
 # --------------------------------------------------------------------------
 # 1.  Ruff + plxt — single job (target-version = min supported, in pyproject.toml)
