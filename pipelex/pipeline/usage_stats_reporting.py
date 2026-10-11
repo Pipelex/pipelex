@@ -31,6 +31,7 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.interpreter_hub import get_concept_library
 from pipelex.kit.paths import get_kit_configs_dir
+from pipelex.libraries.exceptions import LibraryError
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
@@ -496,9 +497,9 @@ class MethodValidationReport:
             return
         try:
             self._record(exc_value=exc_value)
-        except Exception as report_error:  # ruff: ignore[blind-except]
-            # (2) Building the event walks the bundle's pipes, plugin-provided pipe types included, whose surface cannot
-            # be enumerated. A statistic that cannot be built is lost; it never replaces the verdict it describes.
+        except (ValueError, OSError) as report_error:
+            # An event that will not validate, a state that cannot be read: a statistic that cannot be built is lost,
+            # and it never replaces the verdict it describes.
             log.debug("A usage statistics event could not be built", fields=error_fields(exc=report_error))
 
     def _record(self, *, exc_value: BaseException | None) -> None:
@@ -538,9 +539,9 @@ class MethodValidationReport:
         try:
             self._pipes = list(pipes)
             self._concepts = get_concept_library().list_own_concepts()
-        except Exception as describe_error:  # ruff: ignore[blind-except]
-            # (2) The concept library is whatever the validation loaded, plugin-provided concepts included, and its
-            # surface cannot be enumerated; describing it for a statistic must never break the validation itself.
+        except (RuntimeError, LibraryError) as describe_error:
+            # No interpreter hub or no library manager set up (`RuntimeError`), or no current library (`LibraryError`):
+            # describing the bundle for a statistic must never break the validation itself.
             self._could_not_describe = True
             log.debug("A validated bundle could not be described for usage statistics", fields=error_fields(exc=describe_error))
 

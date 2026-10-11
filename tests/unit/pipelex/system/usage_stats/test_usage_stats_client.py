@@ -1,4 +1,5 @@
 import json
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -224,16 +225,26 @@ class TestUsageStatsClient:
         assert received[-1] == queued_uuid
         assert pending_files(spool_dir=settings.state.spool_dir(tool=TOOL_NAME)) == []
 
-    def test_thread_survives_an_error_in_a_post(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """An error escaping one post loses that batch alone: a flush does not wait for it, and later events are posted."""
+    @pytest.mark.parametrize(
+        ("error", "ends_the_thread"),
+        [(OSError("a state that cannot be read"), False), (RuntimeError("a bug in the sender"), True)],
+    )
+    def test_thread_after_an_error_in_a_post(
+        self, tmp_path: Path, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch, error: Exception, ends_the_thread: bool
+    ) -> None:
+        """A recoverable error loses its batch alone; any other ends the thread with its traceback, and the next event starts a new one.
+
+        Either way a flush does not wait for the lost batch, and later events are posted.
+        """
+        thread_errors: list[threading.ExceptHookArgs] = []
+        monkeypatch.setattr(threading, "excepthook", thread_errors.append)
         original_post_in_process = usage_stats_client.post_in_process
         calls: list[int] = []
 
         def fails_once(**kwargs: Any) -> Any:
             calls.append(1)
             if len(calls) == 1:
-                msg = "an unexpected failure"
-                raise RuntimeError(msg)
+                raise error
             return original_post_in_process(**kwargs)
 
         mocker.patch.object(usage_stats_client, "post_in_process", side_effect=fails_once)
@@ -244,7 +255,15 @@ class TestUsageStatsClient:
             deadline = time.monotonic() + 5
             while not calls and time.monotonic() < deadline:
                 time.sleep(0.02)
-            time.sleep(0.1)
+            if ends_the_thread:
+                while not thread_errors and time.monotonic() < deadline:
+                    time.sleep(0.02)
+                ended_thread = thread_errors[0].thread
+                assert ended_thread is not None
+                ended_thread.join(timeout=5)
+                assert not ended_thread.is_alive()
+            else:
+                time.sleep(0.1)
             started = time.monotonic()
             client.flush()
             assert time.monotonic() - started < 1
@@ -253,6 +272,7 @@ class TestUsageStatsClient:
             while not server.events and time.monotonic() < deadline:
                 time.sleep(0.05)
             assert len(server.events) == 1
+        assert [type(thread_error.exc_value) for thread_error in thread_errors] == ([type(error)] if ends_the_thread else [])
 
     def test_thread_drops_events_once_disabled(self, tmp_path: Path) -> None:
         """A `disabled` file created after the event, before its post, keeps it from being sent."""

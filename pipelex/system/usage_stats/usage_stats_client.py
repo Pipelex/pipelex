@@ -161,9 +161,10 @@ class _BackgroundSender:
             deadline = oldest_created + BUDGET_BACKGROUND_POST_DELAY_MS / 1000
             try:
                 self._post(events=batch, deadline=deadline)
-            except Exception as exc:  # ruff: ignore[blind-except]
-                # (1) The root of the statistics thread, as a command's root is: an error escaping here would end the
-                # thread and leave every later event unsent. The batch is lost; the work it measured is not affected.
+            except (OSError, ValueError) as exc:
+                # A filesystem failure no reader of the state absorbed (`OSError`), or a path or value the standard
+                # library rejected (`ValueError`): the batch is lost, the thread lives on. Any other error is a bug,
+                # which ends the thread with its traceback; `enqueue` starts a new one for the next event.
                 log.debug("A usage statistics batch could not be posted", fields=error_fields(exc=exc))
             finally:
                 with self._condition:

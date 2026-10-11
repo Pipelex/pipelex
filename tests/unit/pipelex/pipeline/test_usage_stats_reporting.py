@@ -295,7 +295,7 @@ class TestUsageStatsReporting:
             report.describe(pipes=[])
             steps.append("validated")
         assert steps == ["validated"]
-        mocker.patch("pipelex.pipeline.usage_stats_reporting.bundle_shape_of", side_effect=AttributeError("a pipe of an unknown kind"))
+        mocker.patch("pipelex.pipeline.usage_stats_reporting.bundle_shape_of", side_effect=ValueError("an event that will not validate"))
         with pytest.raises(ValidateBundleError):
             _validate_raising(error=ValidateBundleError(message=_SECRET_MESSAGE))
         assert recorded == []

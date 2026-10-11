@@ -195,8 +195,8 @@ class TestPipeRunUsageStats:
         router_run: Any,
         raised: type[BaseException] | None,
     ) -> None:
-        """Whatever fails while the run's statistics are built, the run ends as it would have without them."""
-        mocker.patch.object(pipe_run_module, "report_run_usage", side_effect=TypeError("an unexpected failure"))
+        """A statistic that cannot be built, as when the state cannot be read, leaves the run to end as it would have."""
+        mocker.patch.object(pipe_run_module, "report_run_usage", side_effect=OSError("a state that cannot be read"))
         router = mocker.AsyncMock()
         router.run = mocker.AsyncMock(side_effect=router_run)
         with usage_stats_switched_on(monkeypatch=monkeypatch, home=tmp_path / "home", cwd=make_project_dir(parent=tmp_path), is_debug=True):
