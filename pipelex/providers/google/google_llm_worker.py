@@ -17,6 +17,7 @@ from pipelex.cogt.inference.error_classification import (
 )
 from pipelex.cogt.inference.error_classify import classify_inference_error
 from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.llm.completion_stop import classify_prompt_block_reason
 from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
@@ -260,14 +261,25 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 model_handle=self.inference_model.name,
             ) from sdk_exc
 
-        # Extract text from response (skips thinking parts)
-        text_content = GoogleFactory.extract_text_from_response(response=response, model_desc=self.inference_model.desc)
-
         # Track token usage if available
         if llm_job.job_report.llm_tokens_usage and response.usage_metadata:
             llm_job.job_report.llm_tokens_usage.nb_tokens_by_category = GoogleFactory.extract_token_usage(response.usage_metadata)
 
-        return text_content
+        # Read before the text, so a candidate cut or filtered with no text left is reported for what stopped it
+        if response.candidates:
+            if finish_reason := response.candidates[0].finish_reason:
+                self._check_completion_stop(llm_job=llm_job, stop_reason=finish_reason.value, max_tokens=job_params.max_tokens)
+        elif response.prompt_feedback and (block_reason := response.prompt_feedback.block_reason):
+            # A blocked prompt gets no candidate at all, its block reason in the prompt feedback: a refusal, named for its reason
+            self._raise_for_completion_stop(
+                llm_job=llm_job,
+                outcome=classify_prompt_block_reason(block_reason=block_reason.value, model_handle=self.inference_model.name),
+                stop_reason=block_reason.value,
+                max_tokens=job_params.max_tokens,
+            )
+
+        # Extract text from response (skips thinking parts)
+        return GoogleFactory.extract_text_from_response(response=response, model_desc=self.inference_model.desc)
 
     def _validates_structured_output_strictly(self) -> bool:
         """Whether ``instructor`` validates a structured response in pydantic's strict mode.

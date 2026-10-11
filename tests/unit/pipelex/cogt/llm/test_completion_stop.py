@@ -1,0 +1,179 @@
+from __future__ import annotations
+
+import typing
+from typing import TYPE_CHECKING
+
+import pytest
+from anthropic.types import StopReason
+from google.genai.types import BlockedReason, FinishReason
+from mistralai.client.models.chatcompletionchoice import ChatCompletionChoiceFinishReason
+from openai.types.chat.chat_completion import Choice
+from openai.types.responses.response import IncompleteDetails
+from types_aiobotocore_bedrock_runtime.literals import StopReasonType
+
+from pipelex.cogt.exceptions import CompletionTruncationLimit, LLMCompletionRefusedError, LLMCompletionTruncatedError
+from pipelex.cogt.llm import completion_stop
+from pipelex.cogt.llm.completion_stop import (
+    ANTHROPIC_STOP_REASONS,
+    BEDROCK_CONVERSE_STOP_REASONS,
+    GEMINI_BLOCK_REASONS,
+    GEMINI_FINISH_REASONS,
+    MISTRAL_FINISH_REASONS,
+    OPENAI_CHAT_FINISH_REASONS,
+    OPENAI_RESPONSES_INCOMPLETE_REASONS,
+    STOP_REASON_VOCABULARIES,
+    CompletionStopOutcome,
+    classify_prompt_block_reason,
+    classify_responses_stop,
+    classify_stop_reason,
+    raise_for_completion_stop,
+)
+from tests.unit.pipelex.cogt.llm.test_data import CompletionStopTestData
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
+
+
+def _literal_values(annotation: object) -> set[str]:
+    """The string values of a `Literal`, looked for inside an `Optional` or a union with an open string type."""
+    values: set[str] = set()
+    for argument in typing.get_args(annotation):
+        if isinstance(argument, str):
+            values.add(argument)
+        else:
+            values.update(_literal_values(argument))
+    return values
+
+
+class TestCompletionStop:
+    @pytest.mark.parametrize(("_topic", "stop_reason", "expected_outcome"), CompletionStopTestData.STOP_REASON_CASES)
+    def test_each_vocabulary_is_classified(self, _topic: str, stop_reason: str, expected_outcome: CompletionStopOutcome) -> None:
+        assert classify_stop_reason(stop_reason=stop_reason, model_handle="test-model") == expected_outcome
+
+    def test_a_gemini_value_is_read_whatever_its_case(self) -> None:
+        assert classify_stop_reason(stop_reason="max_tokens", model_handle="gemini-test") == CompletionStopOutcome.TRUNCATED
+        assert classify_stop_reason(stop_reason="Safety", model_handle="gemini-test") == CompletionStopOutcome.REFUSED
+
+    def test_an_unknown_value_is_logged_and_taken_as_normal(self, mocker: MockerFixture) -> None:
+        """A value no vocabulary knows warns, naming the model and the value, and fails nothing."""
+        warning = mocker.patch.object(completion_stop.log, "warning")
+
+        outcome = classify_stop_reason(stop_reason="brand_new_stop", model_handle="claude-test")
+
+        assert outcome == CompletionStopOutcome.NORMAL
+        warning.assert_called_once_with(
+            "An LLM stop reason was not recognized, so it was taken as normal",
+            fields={"model_handle": "claude-test", "stop_reason": "brand_new_stop"},
+        )
+
+    def test_a_missing_value_is_normal_without_a_word(self, mocker: MockerFixture) -> None:
+        warning = mocker.patch.object(completion_stop.log, "warning")
+
+        assert classify_stop_reason(stop_reason=None, model_handle="test-model") == CompletionStopOutcome.NORMAL
+        warning.assert_not_called()
+
+    @pytest.mark.parametrize(("_topic", "status", "incomplete_reason", "expected_outcome"), CompletionStopTestData.RESPONSES_CASES)
+    def test_a_responses_answer_is_classified(
+        self, _topic: str, status: str | None, incomplete_reason: str | None, expected_outcome: CompletionStopOutcome
+    ) -> None:
+        outcome = classify_responses_stop(status=status, incomplete_reason=incomplete_reason, model_handle="gpt-test")
+        assert outcome == expected_outcome
+
+    @pytest.mark.parametrize("incomplete_reason", ["brand_new_reason", None])
+    def test_an_incomplete_answer_without_a_known_reason_is_logged_and_taken_as_truncated(
+        self, mocker: MockerFixture, incomplete_reason: str | None
+    ) -> None:
+        """The incomplete status alone says the text is unfinished, so a missing or unknown reason never makes it normal."""
+        warning = mocker.patch.object(completion_stop.log, "warning")
+
+        outcome = classify_responses_stop(status="incomplete", incomplete_reason=incomplete_reason, model_handle="gpt-test")
+
+        assert outcome == CompletionStopOutcome.TRUNCATED
+        warning.assert_called_once_with(
+            "An incomplete answer gave no known reason, so it was taken as truncated",
+            fields={"model_handle": "gpt-test", "stop_reason": "incomplete", "incomplete_reason": incomplete_reason},
+        )
+
+    @pytest.mark.parametrize("block_reason", [member.value for member in BlockedReason])
+    def test_every_gemini_block_reason_is_a_refusal(self, mocker: MockerFixture, block_reason: str) -> None:
+        warning = mocker.patch.object(completion_stop.log, "warning")
+
+        assert classify_prompt_block_reason(block_reason=block_reason, model_handle="gemini-test") == CompletionStopOutcome.REFUSED
+        warning.assert_not_called()
+
+    def test_an_unknown_gemini_block_reason_is_logged_and_taken_as_a_refusal(self, mocker: MockerFixture) -> None:
+        warning = mocker.patch.object(completion_stop.log, "warning")
+
+        outcome = classify_prompt_block_reason(block_reason="BRAND_NEW_BLOCK", model_handle="gemini-test")
+
+        assert outcome == CompletionStopOutcome.REFUSED
+        warning.assert_called_once_with(
+            "A blocked prompt gave an unknown reason, so it was taken as a refusal",
+            fields={"model_handle": "gemini-test", "block_reason": "BRAND_NEW_BLOCK"},
+        )
+
+    def test_the_vocabularies_agree_on_every_shared_value(self) -> None:
+        """Read as one table, no two vocabularies may read the same case-folded value differently."""
+        readings: dict[str, set[CompletionStopOutcome]] = {}
+        for vocabulary in STOP_REASON_VOCABULARIES:
+            for value, outcome in vocabulary.items():
+                readings.setdefault(value.casefold(), set()).add(outcome)
+        conflicting = {value: outcomes for value, outcomes in readings.items() if len(outcomes) > 1}
+        assert not conflicting
+
+    def test_each_vocabulary_covers_its_sdk_type(self) -> None:
+        """Each table holds every value its provider SDK's own type lists, plus only the additions it documents."""
+        assert set(OPENAI_CHAT_FINISH_REASONS) == _literal_values(Choice.model_fields["finish_reason"].annotation) | {"refusal"}
+        assert set(ANTHROPIC_STOP_REASONS) == _literal_values(StopReason) | {"model_context_window_exceeded"}
+        assert set(BEDROCK_CONVERSE_STOP_REASONS) == _literal_values(StopReasonType)
+        assert set(GEMINI_FINISH_REASONS) == {member.value for member in FinishReason}
+        assert set(MISTRAL_FINISH_REASONS) == _literal_values(ChatCompletionChoiceFinishReason)
+        assert set(OPENAI_RESPONSES_INCOMPLETE_REASONS) == _literal_values(IncompleteDetails.model_fields["reason"].annotation)
+        assert set(GEMINI_BLOCK_REASONS) == {member.value for member in BlockedReason}
+
+    def test_a_normal_stop_raises_nothing(self) -> None:
+        raise_for_completion_stop(
+            outcome=CompletionStopOutcome.NORMAL,
+            stop_reason="end_turn",
+            model_handle="claude-test",
+            pipe_code="summarize",
+            max_tokens=4096,
+            output_tokens=12,
+        )
+
+    @pytest.mark.parametrize(
+        ("outcome", "stop_reason", "expected_limit"),
+        [
+            (CompletionStopOutcome.TRUNCATED, "max_tokens", CompletionTruncationLimit.MAX_TOKENS),
+            (CompletionStopOutcome.CONTEXT_WINDOW_EXCEEDED, "model_context_window_exceeded", CompletionTruncationLimit.CONTEXT_WINDOW),
+        ],
+    )
+    def test_a_truncated_stop_raises_the_truncation_naming_its_limit(
+        self, outcome: CompletionStopOutcome, stop_reason: str, expected_limit: CompletionTruncationLimit
+    ) -> None:
+        with pytest.raises(LLMCompletionTruncatedError) as exc_info:
+            raise_for_completion_stop(
+                outcome=outcome,
+                stop_reason=stop_reason,
+                model_handle="claude-test",
+                pipe_code="summarize",
+                max_tokens=4096,
+                output_tokens=4096,
+            )
+        assert exc_info.value.stop_reason == stop_reason
+        assert exc_info.value.truncation_limit == expected_limit
+        assert exc_info.value.max_tokens == 4096
+        assert exc_info.value.output_tokens == 4096
+
+    def test_a_refused_stop_raises_the_refusal(self) -> None:
+        with pytest.raises(LLMCompletionRefusedError) as exc_info:
+            raise_for_completion_stop(
+                outcome=CompletionStopOutcome.REFUSED,
+                stop_reason="content_filtered",
+                model_handle="claude-test",
+                pipe_code="summarize",
+                max_tokens=4096,
+                output_tokens=0,
+            )
+        assert exc_info.value.stop_reason == "content_filtered"
+        assert exc_info.value.pipe_code == "summarize"

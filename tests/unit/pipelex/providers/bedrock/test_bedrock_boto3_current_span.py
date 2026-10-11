@@ -46,9 +46,9 @@ class TestBedrockBoto3CurrentSpan:
         llm_span = tracer.start_span("llm call")
 
         with tracer.start_as_current_span("host") as host_span, pipelex_span_active(span=llm_span):
-            text, _ = await client.chat(messages=[], system_text=None, model="some-model", temperature=0.5)
+            chat_result = await client.chat(messages=[], system_text=None, model="some-model", temperature=0.5)
 
-        assert text == "answer"
+        assert chat_result.text == "answer"
         assert recording.seen_log_span_ids == [llm_span.get_span_context().span_id]
         assert recording.seen_log_current_span_ids == [host_span.get_span_context().span_id]
         assert recording.seen_current_spans == [host_span]
