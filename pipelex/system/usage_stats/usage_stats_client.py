@@ -44,6 +44,7 @@ from pipelex.system.usage_stats.usage_stats_core import (
     BUDGET_SHUTDOWN_FLUSH_MS,
     InstallationId,
     PostVerdict,
+    SpoolContent,
     UsageStatsState,
     drain_spool,
     post_in_process,
@@ -171,11 +172,12 @@ class _BackgroundSender:
                 pass
 
     def _spool(self, *, events: list[dict[str, Any]]) -> None:
-        if not events or self._settings.state.read_installation_id() != self._own_id:
+        origin = self._settings.origin
+        if not events or origin is None or self._settings.state.read_installation_id() != self._own_id:
             # A process-local identifier is this process's alone: its events are never persisted.
             return
         try:
-            write_spool_file(spool_dir=self._settings.state.spool_dir(tool=TOOL_NAME), events=events)
+            write_spool_file(spool_dir=self._settings.state.spool_dir(tool=TOOL_NAME), content=SpoolContent(endpoint=origin, events=events))
         except OSError:
             return
 
@@ -327,7 +329,7 @@ class UsageStatsClient:
             return
         try:
             state.ensure_state_dir()
-            spool_file = write_spool_file(spool_dir=state.spool_dir(tool=TOOL_NAME), events=events)
+            spool_file = write_spool_file(spool_dir=state.spool_dir(tool=TOOL_NAME), content=SpoolContent(endpoint=origin, events=events))
         except OSError:
             self._post_in_process(events=events, origin=origin, own_id=installation_id.value, may_spool=False)
             return
@@ -342,7 +344,9 @@ class UsageStatsClient:
             case PostVerdict.RETRY:
                 if may_spool:
                     try:
-                        write_spool_file(spool_dir=self.settings.state.spool_dir(tool=TOOL_NAME), events=posted)
+                        write_spool_file(
+                            spool_dir=self.settings.state.spool_dir(tool=TOOL_NAME), content=SpoolContent(endpoint=origin, events=posted)
+                        )
                     except OSError:
                         return
             case PostVerdict.ACCEPTED | PostVerdict.REFUSED | None:

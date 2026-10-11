@@ -17,7 +17,7 @@ from pipelex.system.usage_stats.usage_stats_contract import (
     UsageStatsOutcome,
     UsageStatsSurface,
 )
-from pipelex.system.usage_stats.usage_stats_core import UsageStatsState, pending_files, read_spool_events
+from pipelex.system.usage_stats.usage_stats_core import SpoolContent, UsageStatsState, pending_files, read_spool_file
 from pipelex.system.usage_stats.usage_stats_events import CommandCompletedProperties, UsageStatsEvent
 from pipelex.test_extras.usage_stats_isolation import USAGE_STATS_DEAD_LOOPBACK_ORIGIN
 from tests.helpers.usage_stats_capture import capture_server
@@ -54,7 +54,7 @@ def _settings(
 def _spooled_events(*, state: UsageStatsState) -> list[dict[str, Any]]:
     events: list[dict[str, Any]] = []
     for spool_file in pending_files(spool_dir=state.spool_dir(tool=TOOL_NAME)):
-        events.extend(read_spool_events(path=spool_file) or [])
+        events.extend((read_spool_file(path=spool_file) or SpoolContent(endpoint=None, events=[])).events)
     return events
 
 
@@ -112,6 +112,10 @@ class TestUsageStatsClient:
         client.record(event=_COMMAND_EVENT)
         client.finish_command()
         start.assert_called_once_with(state=settings.state, origin="http://127.0.0.1:8123")
+        spool_files = pending_files(spool_dir=settings.state.spool_dir(tool=TOOL_NAME))
+        assert [(read_spool_file(path=spool_file) or SpoolContent(endpoint=None, events=[])).endpoint for spool_file in spool_files] == [
+            "http://127.0.0.1:8123"
+        ]
         spooled = _spooled_events(state=settings.state)
         assert [event["event"] for event in spooled] == ["command_completed"]
         assert_envelope_is_valid(spooled[0])

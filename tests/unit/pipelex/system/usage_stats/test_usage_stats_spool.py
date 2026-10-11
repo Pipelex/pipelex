@@ -8,10 +8,11 @@ import pytest
 from pipelex.system.usage_stats.usage_stats_core import (
     CLAIM_MARKER,
     SPOOL_MAX_FILES_PER_TOOL,
+    SpoolContent,
     claim,
     pending_files,
     prune,
-    read_spool_events,
+    read_spool_file,
     release,
     write_spool_file,
 )
@@ -26,27 +27,45 @@ class TestUsageStatsSpool:
     def test_written_file_holds_its_events(self, tmp_path: Path) -> None:
         """A spool file is `<created-ms>-<random>.json` holding `spool_version` 1 and the events, and no temporary is left."""
         events = [{"event": "command_completed", "uuid": "a"}, {"event": "run_completed", "uuid": "b"}]
-        spool_file = write_spool_file(spool_dir=tmp_path, events=events)
+        spool_file = write_spool_file(spool_dir=tmp_path, content=SpoolContent(endpoint=None, events=events))
         created_ms, _, rest = spool_file.name.partition("-")
         assert created_ms.isdigit()
         assert rest.endswith(".json")
         assert json.loads(spool_file.read_text(encoding="utf-8")) == {"spool_version": 1, "events": events}
-        assert read_spool_events(path=spool_file) == events
+        assert read_spool_file(path=spool_file) == SpoolContent(endpoint=None, events=events)
         assert [entry.name for entry in tmp_path.iterdir()] == [spool_file.name]
+
+    def test_written_file_records_the_endpoint_it_was_queued_for(self, tmp_path: Path) -> None:
+        events = [{"event": "command_completed", "uuid": "a"}]
+        spool_file = write_spool_file(spool_dir=tmp_path, content=SpoolContent(endpoint="http://127.0.0.1:8123", events=events))
+        assert json.loads(spool_file.read_text(encoding="utf-8")) == {"spool_version": 1, "endpoint": "http://127.0.0.1:8123", "events": events}
+        content = read_spool_file(path=spool_file)
+        assert content is not None
+        assert content == SpoolContent(endpoint="http://127.0.0.1:8123", events=events)
+        assert content.is_queued_for(origin="http://127.0.0.1:8123")
+        assert not content.is_queued_for(origin="https://eu.i.posthog.com")
+        assert SpoolContent(endpoint=None, events=events).is_queued_for(origin="https://eu.i.posthog.com")
 
     @pytest.mark.parametrize(
         "content",
-        ['{"spool_version": 2, "events": []}', '{"spool_version": 1, "events": {}}', '{"spool_version": 1, "events": [1]}', "[]", "not json"],
+        [
+            '{"spool_version": 2, "events": []}',
+            '{"spool_version": 1, "events": {}}',
+            '{"spool_version": 1, "events": [1]}',
+            '{"spool_version": 1, "endpoint": 8123, "events": []}',
+            "[]",
+            "not json",
+        ],
     )
     def test_file_of_another_shape_is_not_read(self, tmp_path: Path, content: str) -> None:
         path = tmp_path / "1-abc.json"
         path.write_text(content, encoding="utf-8")
-        assert read_spool_events(path=path) is None
+        assert read_spool_file(path=path) is None
 
     def test_spool_keeps_at_most_its_limit_deleting_the_oldest(self, tmp_path: Path) -> None:
         for index_file in range(SPOOL_MAX_FILES_PER_TOOL + 3):
             (tmp_path / f"{1000 + index_file}-seed.json").write_text('{"spool_version": 1, "events": []}', encoding="utf-8")
-        newest = write_spool_file(spool_dir=tmp_path, events=[])
+        newest = write_spool_file(spool_dir=tmp_path, content=SpoolContent(endpoint=None, events=[]))
         waiting = pending_files(spool_dir=tmp_path)
         assert len(waiting) == SPOOL_MAX_FILES_PER_TOOL
         assert waiting[-1] == newest
@@ -54,7 +73,7 @@ class TestUsageStatsSpool:
 
     def test_claim_and_release(self, tmp_path: Path) -> None:
         """A claimed file is no longer pending, a second claim fails, and a release gives it back under its name."""
-        spool_file = write_spool_file(spool_dir=tmp_path, events=[])
+        spool_file = write_spool_file(spool_dir=tmp_path, content=SpoolContent(endpoint=None, events=[]))
         claimed = claim(path=spool_file)
         assert claimed is not None
         assert CLAIM_MARKER in claimed.name

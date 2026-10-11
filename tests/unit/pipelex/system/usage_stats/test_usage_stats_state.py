@@ -11,6 +11,7 @@ from pytest_mock import MockerFixture
 from pipelex.system.usage_stats.usage_stats_core import (
     SPOOL_TOOLS,
     InstallationId,
+    SpoolContent,
     UsageStatsState,
     is_installation_id,
     parse_legacy_config,
@@ -20,7 +21,7 @@ from pipelex.system.usage_stats.usage_stats_core import (
 
 def _seed_every_spool(*, state: UsageStatsState) -> None:
     for tool in SPOOL_TOOLS:
-        write_spool_file(spool_dir=state.spool_dir(tool=tool), events=[{"event": "command_completed"}])
+        write_spool_file(spool_dir=state.spool_dir(tool=tool), content=SpoolContent(endpoint=None, events=[{"event": "command_completed"}]))
 
 
 def _spooled_files(*, state: UsageStatsState) -> list[Path]:

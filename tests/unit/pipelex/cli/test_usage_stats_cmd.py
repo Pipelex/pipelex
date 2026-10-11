@@ -6,7 +6,7 @@ from typer.testing import CliRunner
 
 from pipelex.cli.commands.usage_stats_cmd import usage_stats_app
 from pipelex.system.usage_stats.usage_stats_contract import TOOL_NAME, UsageStatsEnvVar
-from pipelex.system.usage_stats.usage_stats_core import is_installation_id, pending_files, write_spool_file
+from pipelex.system.usage_stats.usage_stats_core import SpoolContent, is_installation_id, pending_files, write_spool_file
 from tests.helpers.usage_stats_process import make_project_dir, usage_stats_switched_on
 
 _STATUS_FIELDS = {"tool", "enabled", "off_by", "installation_id", "notice_version", "internal", "ci", "container", "state_dir"}
@@ -37,7 +37,7 @@ class TestUsageStatsCmd:
         """`disable` empties every spool, `enable` names the switches still off, `reset-id` prints a new identifier."""
         with usage_stats_switched_on(monkeypatch=monkeypatch, home=tmp_path / "home", cwd=make_project_dir(parent=tmp_path)) as state:
             first_id = state.obtain_installation_id().value
-            write_spool_file(spool_dir=state.spool_dir(tool="mthds"), events=[])
+            write_spool_file(spool_dir=state.spool_dir(tool="mthds"), content=SpoolContent(endpoint=None, events=[]))
             runner = CliRunner()
 
             assert runner.invoke(usage_stats_app, ["disable"]).exit_code == 0
@@ -55,7 +55,7 @@ class TestUsageStatsCmd:
             monkeypatch.delenv(UsageStatsEnvVar.DO_NOT_TRACK)
             assert json.loads(runner.invoke(usage_stats_app, ["status", "--format", "json"]).stdout)["enabled"] is True
 
-            write_spool_file(spool_dir=state.spool_dir(tool=TOOL_NAME), events=[])
+            write_spool_file(spool_dir=state.spool_dir(tool=TOOL_NAME), content=SpoolContent(endpoint=None, events=[]))
             reset = runner.invoke(usage_stats_app, ["reset-id"])
             assert reset.exit_code == 0
             new_id = reset.stdout.strip()

@@ -109,6 +109,6 @@ A send never delays you by more than these budgets, and a failure to send never 
 ## For developers
 
 - **`PIPELEX_USAGE_STATS_DEBUG`**, set to anything but empty, `0` or `false`, prints each event to stderr as one JSON line, `{"usage_stats_debug": {...}}`, instead of sending it. The switches still decide, so nothing is printed while statistics are off.
-- **`PIPELEX_USAGE_STATS_ENDPOINT`**, for tests, sends the events to a loopback `http` origin such as `http://127.0.0.1:8123` instead of PostHog. Any other value turns statistics off.
+- **`PIPELEX_USAGE_STATS_ENDPOINT`**, for tests, sends the events to a loopback `http` origin such as `http://127.0.0.1:8123` instead of PostHog. Any other value turns statistics off. An event queued while it is set is only ever sent to that origin, and an event queued without it never goes there.
 - **`PIPELEX_USAGE_STATS_HOST`** names the tool that embeds Pipelex, from a closed list (`cocode`, `mthds-agent`, `other`), so its runs can be told apart.
 - Pipelex's own continuous integration sets `DO_NOT_TRACK=1`, and its test suites turn statistics off and keep the shared state in a temporary directory.

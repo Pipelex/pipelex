@@ -1,4 +1,5 @@
 import ast
+import json
 import subprocess  # ruff: ignore[suspicious-subprocess-import] — runs the detached sender module the way a command does
 import sys
 import time
@@ -13,8 +14,10 @@ from pipelex.system.usage_stats import usage_stats_core
 from pipelex.system.usage_stats.usage_stats_contract import TOOL_NAME
 from pipelex.system.usage_stats.usage_stats_core import (
     BATCH_PATH,
+    CAPTURE_HOST,
     PROJECT_TOKEN,
     PostVerdict,
+    SpoolContent,
     UsageStatsState,
     drain_spool,
     pending_files,
@@ -63,7 +66,9 @@ class TestUsageStatsDelivery:
     def test_answer_decides_what_happens_to_the_file(self, tmp_path: Path, status: int, verdict: PostVerdict, is_kept: bool) -> None:
         """Accepted or refused for good deletes the file; anything else gives it back, resent later with its uuid."""
         state, installation_id = _state_with_id(home=tmp_path)
-        spool_file = write_spool_file(spool_dir=state.spool_dir(tool=TOOL_NAME), events=[_event(distinct_id=installation_id, uuid="u-1")])
+        spool_file = write_spool_file(
+            spool_dir=state.spool_dir(tool=TOOL_NAME), content=SpoolContent(endpoint=None, events=[_event(distinct_id=installation_id, uuid="u-1")])
+        )
         with capture_server(statuses=[status]) as server:
             drain_spool(state=state, tool=TOOL_NAME, origin=server.origin, budget_ms=2000)
         assert pending_files(spool_dir=state.spool_dir(tool=TOOL_NAME)) == ([spool_file] if is_kept else [])
@@ -72,7 +77,9 @@ class TestUsageStatsDelivery:
 
     def test_unreachable_endpoint_keeps_the_file(self, tmp_path: Path) -> None:
         state, installation_id = _state_with_id(home=tmp_path)
-        spool_file = write_spool_file(spool_dir=state.spool_dir(tool=TOOL_NAME), events=[_event(distinct_id=installation_id, uuid="u-1")])
+        spool_file = write_spool_file(
+            spool_dir=state.spool_dir(tool=TOOL_NAME), content=SpoolContent(endpoint=None, events=[_event(distinct_id=installation_id, uuid="u-1")])
+        )
         drain_spool(state=state, tool=TOOL_NAME, origin="http://127.0.0.1:9", budget_ms=1000)
         assert pending_files(spool_dir=state.spool_dir(tool=TOOL_NAME)) == [spool_file]
 
@@ -80,7 +87,7 @@ class TestUsageStatsDelivery:
         """Before each post the sender reads `id`: events made under an identifier `reset-id` replaced never leave."""
         state, installation_id = _state_with_id(home=tmp_path)
         events = [_event(distinct_id=installation_id, uuid="kept"), _event(distinct_id="0f8fad5b-d9cb-469f-a165-70867728950e", uuid="dropped")]
-        write_spool_file(spool_dir=state.spool_dir(tool=TOOL_NAME), events=events)
+        write_spool_file(spool_dir=state.spool_dir(tool=TOOL_NAME), content=SpoolContent(endpoint=None, events=events))
         with capture_server() as server:
             drain_spool(state=state, tool=TOOL_NAME, origin=server.origin, budget_ms=2000)
         assert [event["uuid"] for event in server.events] == ["kept"]
@@ -88,7 +95,9 @@ class TestUsageStatsDelivery:
     def test_nothing_is_sent_once_disabled_or_migrated(self, tmp_path: Path) -> None:
         """A `disabled` file, or a legacy opt-out migrated before the post, sends nothing and deletes the queue."""
         state, installation_id = _state_with_id(home=tmp_path)
-        write_spool_file(spool_dir=state.spool_dir(tool=TOOL_NAME), events=[_event(distinct_id=installation_id, uuid="u-1")])
+        write_spool_file(
+            spool_dir=state.spool_dir(tool=TOOL_NAME), content=SpoolContent(endpoint=None, events=[_event(distinct_id=installation_id, uuid="u-1")])
+        )
         state.legacy_config.write_text("DISABLE_TELEMETRY=true\n", encoding="utf-8")
         with capture_server() as server:
             drain_spool(state=state, tool=TOOL_NAME, origin=server.origin, budget_ms=2000)
@@ -107,7 +116,9 @@ class TestUsageStatsDelivery:
     def test_nothing_is_sent_while_a_legacy_opt_out_cannot_be_migrated(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """A legacy opt-out the migration cannot carry over, its state being unwritable, still says off before each post."""
         state, installation_id = _state_with_id(home=tmp_path)
-        write_spool_file(spool_dir=state.spool_dir(tool=TOOL_NAME), events=[_event(distinct_id=installation_id, uuid="u-1")])
+        write_spool_file(
+            spool_dir=state.spool_dir(tool=TOOL_NAME), content=SpoolContent(endpoint=None, events=[_event(distinct_id=installation_id, uuid="u-1")])
+        )
         state.legacy_config.write_text("DISABLE_TELEMETRY=true\n", encoding="utf-8")
         mocker.patch.object(UsageStatsState, "disable", side_effect=OSError("read-only state"))
         with capture_server() as server:
@@ -123,10 +134,35 @@ class TestUsageStatsDelivery:
         assert (verdict, posted) == (None, [])
         assert state.legacy_opt_out_is_pending()
 
+    def test_sender_posts_a_file_only_to_the_endpoint_it_was_queued_for(self, tmp_path: Path) -> None:
+        """Events queued for PostHog never reach a loopback endpoint, nor events queued for one loopback endpoint another."""
+        state, installation_id = _state_with_id(home=tmp_path)
+        spool_dir = state.spool_dir(tool=TOOL_NAME)
+        spool_dir.mkdir(parents=True)
+        for created_ms, endpoint in ((1000, CAPTURE_HOST), (1001, "http://127.0.0.1:9")):
+            payload = {"spool_version": 1, "endpoint": endpoint, "events": [_event(distinct_id=installation_id, uuid=f"queued-for-{created_ms}")]}
+            (spool_dir / f"{int(time.time() * 1000) - created_ms}-elsewhere.json").write_text(json.dumps(payload), encoding="utf-8")
+        with capture_server() as server:
+            write_spool_file(
+                spool_dir=spool_dir, content=SpoolContent(endpoint=server.origin, events=[_event(distinct_id=installation_id, uuid="mine")])
+            )
+            write_spool_file(spool_dir=spool_dir, content=SpoolContent(endpoint=None, events=[_event(distinct_id=installation_id, uuid="any")]))
+            drain_spool(state=state, tool=TOOL_NAME, origin=server.origin, budget_ms=2000)
+        assert sorted(event["uuid"] for event in server.events) == ["any", "mine"]
+        assert sorted(path.name for path in pending_files(spool_dir=spool_dir)) == sorted(
+            path.name for path in spool_dir.iterdir() if path.name.endswith("-elsewhere.json")
+        )
+        assert len(pending_files(spool_dir=spool_dir)) == 2
+
     def test_sender_drains_only_its_own_tool(self, tmp_path: Path) -> None:
         state, installation_id = _state_with_id(home=tmp_path)
-        write_spool_file(spool_dir=state.spool_dir(tool="plxt"), events=[_event(distinct_id=installation_id, uuid="plxt-1")])
-        write_spool_file(spool_dir=state.spool_dir(tool=TOOL_NAME), events=[_event(distinct_id=installation_id, uuid="pipelex-1")])
+        write_spool_file(
+            spool_dir=state.spool_dir(tool="plxt"), content=SpoolContent(endpoint=None, events=[_event(distinct_id=installation_id, uuid="plxt-1")])
+        )
+        write_spool_file(
+            spool_dir=state.spool_dir(tool=TOOL_NAME),
+            content=SpoolContent(endpoint=None, events=[_event(distinct_id=installation_id, uuid="pipelex-1")]),
+        )
         with capture_server() as server:
             assert sender_main(argv=["--home", str(tmp_path), "--origin", server.origin, "--tool", TOOL_NAME]) == 0
         assert [event["uuid"] for event in server.events] == ["pipelex-1"]
@@ -135,7 +171,9 @@ class TestUsageStatsDelivery:
     @pytest.mark.parametrize("origin", ["https://example.com", "http://10.0.0.1:8123", "http://127.0.0.1:8123/batch/"])
     def test_sender_refuses_any_other_origin(self, tmp_path: Path, origin: str) -> None:
         state, installation_id = _state_with_id(home=tmp_path)
-        write_spool_file(spool_dir=state.spool_dir(tool=TOOL_NAME), events=[_event(distinct_id=installation_id, uuid="u-1")])
+        write_spool_file(
+            spool_dir=state.spool_dir(tool=TOOL_NAME), content=SpoolContent(endpoint=None, events=[_event(distinct_id=installation_id, uuid="u-1")])
+        )
         assert sender_main(argv=["--home", str(tmp_path), "--origin", origin, "--tool", TOOL_NAME]) == 2
         assert len(pending_files(spool_dir=state.spool_dir(tool=TOOL_NAME))) == 1
 
@@ -150,7 +188,9 @@ class TestUsageStatsDelivery:
 
     def test_drain_returns_within_its_budget_and_keeps_the_file(self, tmp_path: Path) -> None:
         state, installation_id = _state_with_id(home=tmp_path)
-        write_spool_file(spool_dir=state.spool_dir(tool=TOOL_NAME), events=[_event(distinct_id=installation_id, uuid="u-1")])
+        write_spool_file(
+            spool_dir=state.spool_dir(tool=TOOL_NAME), content=SpoolContent(endpoint=None, events=[_event(distinct_id=installation_id, uuid="u-1")])
+        )
         with trickling_server(seconds_per_byte=0.1) as origin:
             started = time.monotonic()
             drain_spool(state=state, tool=TOOL_NAME, origin=origin, budget_ms=500)
@@ -161,7 +201,9 @@ class TestUsageStatsDelivery:
     def test_detached_sender_file_posts_the_queue(self, tmp_path: Path) -> None:
         """The sender's file run by path in isolated mode, as a command starts it, posts the queue and leaves it empty."""
         state, installation_id = _state_with_id(home=tmp_path)
-        write_spool_file(spool_dir=state.spool_dir(tool=TOOL_NAME), events=[_event(distinct_id=installation_id, uuid="u-1")])
+        write_spool_file(
+            spool_dir=state.spool_dir(tool=TOOL_NAME), content=SpoolContent(endpoint=None, events=[_event(distinct_id=installation_id, uuid="u-1")])
+        )
         with capture_server() as server:
             completed = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] — a fixed argument list, no shell
                 sender_command(executable=sys.executable, home=tmp_path, origin=server.origin, tool=TOOL_NAME),
@@ -198,7 +240,9 @@ class TestUsageStatsDelivery:
         assert cannot_import.returncode != 0
         home = tmp_path / "home"
         state, installation_id = _state_with_id(home=home)
-        write_spool_file(spool_dir=state.spool_dir(tool=TOOL_NAME), events=[_event(distinct_id=installation_id, uuid="u-1")])
+        write_spool_file(
+            spool_dir=state.spool_dir(tool=TOOL_NAME), content=SpoolContent(endpoint=None, events=[_event(distinct_id=installation_id, uuid="u-1")])
+        )
         mocker.patch.object(sys, "executable", str(bare_python))
         with capture_server() as server:
             assert start_detached_sender(state=state, origin=server.origin)

@@ -15,10 +15,12 @@ The rest of the package imports what it needs from here, so the in-process paths
   notice N was shown; `internal` marks a team machine; and `spool/<tool>/` queues each tool's unsent events. A
   filesystem failure is never raised from a reader: statistics are a measurement, never part of what the person asked
   for, so an unreadable state reads as absent.
-- **The spool**: a file is named `<created-ms>-<random>.json` and holds `{"spool_version": 1, "events": [...]}`. It is
-  written under a name starting with a dot and renamed into place, so a reader never sees it partial, and readers
-  ignore names starting with a dot. A sender claims a file by renaming it to `<name>.sending-<random>`, so two senders
-  never post one file, and after its attempt deletes it or renames it back.
+- **The spool**: a file is named `<created-ms>-<random>.json` and holds `{"spool_version": 1, "events": [...]}`, to
+  which pipelex adds `"endpoint"`, the origin the events were queued for: a sender posts a file only to that origin,
+  and a file naming none, as the contract's shape names none, to any. It is written under a name starting with a dot
+  and renamed into place, so a reader never sees it partial, and readers ignore names starting with a dot. A sender
+  claims a file by renaming it to `<name>.sending-<random>`, so two senders never post one file, and after its attempt
+  deletes it or renames it back.
 - **The post**: `POST <origin>/batch/` with `{"api_key": <project token>, "batch": [...]}` and nothing else, so no SDK
   library property, no `sent_at`. Redirects are never followed, so a batch can never be carried anywhere but the
   origin it was addressed to, and a loopback origin is reached without a proxy. A post returns within the time left in
@@ -396,6 +398,8 @@ class UsageStatsState:
 # -------------------------------------------------------------------------------------------------
 
 SPOOL_FILE_SUFFIX = ".json"
+#: The key under which pipelex records the endpoint a file's events were queued for, beside the contract's two.
+SPOOL_ENDPOINT_KEY = "endpoint"
 CLAIM_MARKER = ".sending-"
 _TEMP_PREFIX = ".tmp-"
 
@@ -421,8 +425,27 @@ def pending_files(*, spool_dir: Path) -> list[Path]:
     return sorted(entries, key=lambda entry: (_created_ms(path=entry) or 0, entry.name))
 
 
-def write_spool_file(*, spool_dir: Path, events: list[dict[str, Any]]) -> Path:
-    """Queue `events` in a new file, then keep at most the contract's number of files, deleting the oldest.
+class SpoolContent(NamedTuple):
+    """What a spool file holds: the endpoint its events were queued for, when it names one, and the events."""
+
+    endpoint: str | None
+    events: list[dict[str, Any]]
+
+    def is_queued_for(self, *, origin: str) -> bool:
+        """Whether a sender posting to `origin` may post these events: the file names that endpoint, or names none."""
+        return self.endpoint is None or self.endpoint == origin
+
+
+def _spool_payload(*, content: SpoolContent) -> str:
+    payload: dict[str, Any] = {"spool_version": SPOOL_VERSION}
+    if content.endpoint is not None:
+        payload[SPOOL_ENDPOINT_KEY] = content.endpoint
+    payload["events"] = content.events
+    return json.dumps(payload)
+
+
+def write_spool_file(*, spool_dir: Path, content: SpoolContent) -> Path:
+    """Queue events in a new file, then keep at most the contract's number of files, deleting the oldest.
 
     Raises:
         OSError: when the file could not be written.
@@ -431,7 +454,7 @@ def write_spool_file(*, spool_dir: Path, events: list[dict[str, Any]]) -> Path:
     final_path = spool_dir / f"{int(time.time() * 1000)}-{secrets.token_hex(6)}{SPOOL_FILE_SUFFIX}"
     temporary = spool_dir / f"{_TEMP_PREFIX}{secrets.token_hex(6)}"
     try:
-        temporary.write_text(json.dumps({"spool_version": SPOOL_VERSION, "events": events}), encoding="utf-8")
+        temporary.write_text(_spool_payload(content=content), encoding="utf-8")
         temporary.rename(final_path)
     finally:
         temporary.unlink(missing_ok=True)
@@ -445,8 +468,8 @@ def _enforce_file_limit(*, spool_dir: Path) -> None:
         oldest.unlink(missing_ok=True)
 
 
-def read_spool_events(*, path: Path) -> list[dict[str, Any]] | None:
-    """The events a spool file holds, or `None` for a file that is not one: unreadable, not JSON, or of another shape."""
+def read_spool_file(*, path: Path) -> SpoolContent | None:
+    """What a spool file holds, or `None` for a file that is not one: unreadable, not JSON, or of another shape."""
     try:
         payload: object = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
@@ -455,23 +478,26 @@ def read_spool_events(*, path: Path) -> list[dict[str, Any]] | None:
         return None
     payload_dict = cast("dict[str, Any]", payload)
     events: object = payload_dict.get("events")
+    endpoint: object = payload_dict.get(SPOOL_ENDPOINT_KEY)
     if payload_dict.get("spool_version") != SPOOL_VERSION or not isinstance(events, list):
+        return None
+    if endpoint is not None and not isinstance(endpoint, str):
         return None
     event_list = cast("list[object]", events)
     if not all(isinstance(event, dict) for event in event_list):
         return None
-    return cast("list[dict[str, Any]]", event_list)
+    return SpoolContent(endpoint=endpoint, events=cast("list[dict[str, Any]]", event_list))
 
 
-def rewrite_spool_file(*, path: Path, events: list[dict[str, Any]]) -> None:
-    """Replace the events of a file this sender has claimed, as a whole.
+def rewrite_spool_file(*, path: Path, content: SpoolContent) -> None:
+    """Replace what a file this sender has claimed holds, as a whole.
 
     Raises:
         OSError: when the file could not be replaced.
     """
     temporary = path.parent / f"{_TEMP_PREFIX}{secrets.token_hex(6)}"
     try:
-        temporary.write_text(json.dumps({"spool_version": SPOOL_VERSION, "events": events}), encoding="utf-8")
+        temporary.write_text(_spool_payload(content=content), encoding="utf-8")
         Path(temporary).replace(path)
     finally:
         temporary.unlink(missing_ok=True)
@@ -641,17 +667,21 @@ def screen_events(*, state: UsageStatsState, events: list[dict[str, Any]], own_i
 
 def send_claimed_file(*, state: UsageStatsState, claimed: Path, origin: str, deadline: float, own_id: str | None) -> PostVerdict | None:
     """Post a file this sender claimed, then delete it or give it back by PostHog's answer; `None` when nothing was posted."""
-    events = read_spool_events(path=claimed)
-    if events is None:
+    content = read_spool_file(path=claimed)
+    if content is None:
         claimed.unlink(missing_ok=True)
         return None
+    if not content.is_queued_for(origin=origin):
+        release(claimed=claimed)
+        return None
+    events = content.events
     kept = screen_events(state=state, events=events, own_id=own_id)
     if not kept:
         claimed.unlink(missing_ok=True)
         return None
     if len(kept) != len(events):
         try:
-            rewrite_spool_file(path=claimed, events=kept)
+            rewrite_spool_file(path=claimed, content=content._replace(events=kept))
         except OSError:
             # The dropped events must never be sent: a file that cannot be rewritten without them is deleted with them.
             claimed.unlink(missing_ok=True)
@@ -665,7 +695,11 @@ def send_claimed_file(*, state: UsageStatsState, claimed: Path, origin: str, dea
 
 
 def drain_spool(*, state: UsageStatsState, tool: str, origin: str, budget_ms: int, only: Path | None = None, own_id: str | None = None) -> None:
-    """Post the files of `tool`'s spool, oldest first, within `budget_ms`; with `only`, that one file alone."""
+    """Post the files of `tool`'s spool queued for `origin`, oldest first, within `budget_ms`; with `only`, that one file alone.
+
+    A file queued for another endpoint is left for a sender posting there, so events queued under a test's loopback
+    override never reach PostHog, and events queued for PostHog never reach a loopback endpoint.
+    """
     deadline = time.monotonic() + budget_ms / 1000
     spool_dir = state.spool_dir(tool=tool)
     candidates: list[Path]
@@ -677,6 +711,9 @@ def drain_spool(*, state: UsageStatsState, tool: str, origin: str, budget_ms: in
     for candidate in candidates:
         if time.monotonic() >= deadline:
             return
+        content = read_spool_file(path=candidate)
+        if content is not None and not content.is_queued_for(origin=origin):
+            continue
         claimed = claim(path=candidate)
         if claimed is None:
             continue
