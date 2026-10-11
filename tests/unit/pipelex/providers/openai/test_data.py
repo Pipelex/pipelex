@@ -60,3 +60,23 @@ class OpenAIErrorHandlingTestData:
             "safety filters",
         ),
     ]
+
+
+class GatewayStopTestData:
+    """Stop values a gateway in non-strict mode passes through the chat-completions shape in each provider's vocabulary.
+
+    Each tuple: (topic, finish_reason, content); the content is partial or empty, as the gateway sets it.
+    """
+
+    TRUNCATION_CASES: ClassVar[list[tuple[str, str, str]]] = [
+        ("claude cut at max_tokens", "max_tokens", "The contract binds the parties to"),
+        ("claude cut with nothing written", "max_tokens", ""),
+        ("gemini cut at max_tokens", "MAX_TOKENS", "The contract binds the parties to"),
+        ("strict mode cut", "length", "The contract binds the parties to"),
+    ]
+
+    REFUSAL_CASES: ClassVar[list[tuple[str, str, str]]] = [
+        ("bedrock content filter", "content_filtered", ""),
+        ("claude refusal", "refusal", ""),
+        ("gemini safety stop after partial text", "SAFETY", "The contract binds the parties to"),
+    ]

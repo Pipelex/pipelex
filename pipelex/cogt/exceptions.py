@@ -396,6 +396,110 @@ class LLMCompletionError(CogtError):
     pass
 
 
+class CompletionTruncationLimit(StrEnum):
+    """The limit a truncated text completion hit, which decides what can lift it."""
+
+    # The output limit the request sent: a higher max_tokens, or a shorter input, leaves room for the text
+    MAX_TOKENS = "max_tokens"
+    # The model's context window, which the input and the output filled together: a higher max_tokens cannot help
+    CONTEXT_WINDOW = "context_window"
+
+
+class LLMCompletionTruncatedError(LLMCompletionError):
+    """A text completion stopped before the model finished it: it hit its output limit, or its context window.
+
+    A worker raises it when its provider's stop signal says the text was cut (see
+    `pipelex.cogt.llm.completion_stop`), instead of handing back the partial or empty text as a result. It
+    is a content error, in the input domain, and not retryable: the same request stops at the same limit,
+    and the remedy is the author's or the caller's. Which remedy depends on the limit hit, carried as
+    `truncation_limit`: at the output limit, a higher `max_tokens` on the pipe or a shorter input, or, when the
+    request sent no `max_tokens` and the provider's default cut the text, a `max_tokens` set on the pipe up to
+    the model's limit, a lower reasoning effort or a shorter input; at the context window, which the input and
+    the output filled together, a shorter input, less thinking or a model with a larger window, never a higher
+    `max_tokens`. The message names only the pipe, the model's deck handle, the provider's stop value and the
+    token counts, never the partial text or the provider's body, so it is kept verbatim for the caller.
+    """
+
+    error_category = InferenceErrorCategory.CONTENT
+    _authors_caller_facing_message = True
+
+    def __init__(
+        self,
+        *,
+        model_handle: str,
+        stop_reason: str,
+        truncation_limit: CompletionTruncationLimit,
+        pipe_code: str | None = None,
+        max_tokens: int | None = None,
+        output_tokens: int | None = None,
+    ):
+        subject = f"the text of pipe '{pipe_code}'" if pipe_code else "its text"
+        details = [f"stop reason '{stop_reason}'"]
+        if output_tokens is not None:
+            details.append(f"{output_tokens} output tokens used")
+        if max_tokens is not None:
+            details.append(f"max_tokens set to {max_tokens}")
+        what_happened: str
+        next_step: str
+        match truncation_limit:
+            case CompletionTruncationLimit.MAX_TOKENS:
+                what_happened = "was cut off"
+                if max_tokens is not None:
+                    next_step = "Raise the pipe's max_tokens, or shorten its input." if pipe_code else "Raise max_tokens, or shorten the input."
+                else:
+                    # The request left the limit to the provider's default, so there is no max_tokens of the pipe's to raise
+                    details.append("no max_tokens sent")
+                    next_step = (
+                        "Set the pipe's max_tokens up to the model's limit, lower its reasoning effort, or shorten its input."
+                        if pipe_code
+                        else "Set max_tokens up to the model's limit, lower the reasoning effort, or shorten the input."
+                    )
+            case CompletionTruncationLimit.CONTEXT_WINDOW:
+                what_happened = "filled its context window"
+                next_step = (
+                    "Shorten the pipe's input, lower its reasoning effort, or choose a model with a larger context window."
+                    if pipe_code
+                    else "Shorten the input, lower the reasoning effort, or choose a model with a larger context window."
+                )
+        message = (
+            f"The model '{model_handle}' {what_happened} before it finished {subject} ({', '.join(details)}), so the text is incomplete. {next_step}"
+        )
+        super().__init__(message, user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail=next_step))
+        self.model_handle = model_handle
+        self.stop_reason = stop_reason
+        self.truncation_limit = truncation_limit
+        self.pipe_code = pipe_code
+        self.max_tokens = max_tokens
+        self.output_tokens = output_tokens
+
+
+class LLMCompletionRefusedError(LLMCompletionError):
+    """A text completion the model declined to write, or that a provider's safety filter stopped.
+
+    A worker raises it when its provider's stop signal says the model refused or a filter cut the text (see
+    `pipelex.cogt.llm.completion_stop`), instead of handing back the partial or empty text as a result. It
+    is a content error, in the input domain, and not retryable: what a model declines or a filter blocks is
+    the prompt and the input it was given, so the remedy is to revise them. The message names only the pipe,
+    the model's deck handle and the provider's stop value, never the partial text or the provider's body, so
+    it is kept verbatim for the caller.
+    """
+
+    error_category = InferenceErrorCategory.CONTENT
+    _authors_caller_facing_message = True
+
+    def __init__(self, *, model_handle: str, stop_reason: str, pipe_code: str | None = None):
+        subject = f"the text of pipe '{pipe_code}'" if pipe_code else "its text"
+        next_step = "Revise the pipe's prompt or its input." if pipe_code else "Revise the prompt or the input."
+        message = (
+            f"The model '{model_handle}' declined to finish {subject}, or a content filter stopped it (stop reason '{stop_reason}'), "
+            f"so the text cannot be used. {next_step}"
+        )
+        super().__init__(message, user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail=next_step))
+        self.model_handle = model_handle
+        self.stop_reason = stop_reason
+        self.pipe_code = pipe_code
+
+
 class LLMAssignmentError(CogtError):
     pass
 

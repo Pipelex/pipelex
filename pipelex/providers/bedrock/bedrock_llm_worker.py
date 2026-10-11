@@ -3,8 +3,8 @@ from typing import Any
 from botocore.exceptions import ClientError
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import LLMCapabilityError, SdkTypeError
-from pipelex.cogt.inference.error_classification import extract_bedrock_metadata
+from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, SdkTypeError
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_bedrock_metadata
 from pipelex.cogt.inference.error_classify import classify_inference_error
 from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.llm.llm_job import LLMJob
@@ -67,13 +67,14 @@ class BedrockLLMWorker(LLMWorkerAbstract):
         job_params = llm_job.applied_job_params or llm_job.job_params
         message = BedrockFactory.make_simple_message(llm_job=llm_job)
 
+        max_tokens = job_params.max_tokens or self.default_max_tokens
         try:
-            bedrock_response_text, nb_tokens_by_category = await self.bedrock_client_for_text.chat(
+            chat_result = await self.bedrock_client_for_text.chat(
                 messages=message.to_dict_list(),
                 system_text=llm_job.llm_prompt.system_text,
                 model=self.inference_model.model_id,
                 temperature=job_params.temperature if self.inference_model.accepts_temperature else None,
-                max_tokens=job_params.max_tokens or self.default_max_tokens,
+                max_tokens=max_tokens,
             )
         except ClientError as exc:
             metadata = extract_bedrock_metadata(exc)
@@ -86,9 +87,21 @@ class BedrockLLMWorker(LLMWorkerAbstract):
                 model_handle=self.inference_model.name,
             ) from exc
 
-        if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and nb_tokens_by_category:
-            llm_tokens_usage.nb_tokens_by_category = nb_tokens_by_category
-        return bedrock_response_text
+        if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and chat_result.nb_tokens_by_category:
+            llm_tokens_usage.nb_tokens_by_category = chat_result.nb_tokens_by_category
+
+        self._check_completion_stop(llm_job=llm_job, stop_reason=chat_result.stop_reason, max_tokens=max_tokens)
+        if not chat_result.text:
+            msg = f"Bedrock returned no text with model: {self.inference_model.desc}"
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.CONTENT,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="Bedrock returned an empty text response — try rephrasing the prompt or using a different model",
+                ),
+            )
+        return chat_result.text
 
     @override
     async def _gen_object(

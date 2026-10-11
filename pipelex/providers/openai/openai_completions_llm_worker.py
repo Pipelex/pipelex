@@ -176,17 +176,12 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
                 ),
             )
 
-        finish_reason = response.choices[0].finish_reason
-        if finish_reason == "content_filter":
-            msg = f"OpenAI response was filtered by content policy for model: {self.inference_model.desc}"
-            raise LLMCompletionError(
-                msg,
-                error_category=InferenceErrorCategory.CONTENT,
-                user_action=UserAction(
-                    kind=UserActionKind.CHANGE_INPUT,
-                    detail="Content was rejected by safety filters — revise the prompt",
-                ),
-            )
+        if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := response.usage):
+            llm_tokens_usage.nb_tokens_by_category = self.openai_completions_factory.make_nb_tokens_by_category(usage=usage)
+
+        # The finish reason is read in every vocabulary: a gateway in non-strict mode passes each provider's own
+        # value through this shape, Claude's `max_tokens` and `refusal` or Bedrock's `content_filtered` among them.
+        self._check_completion_stop(llm_job=llm_job, stop_reason=response.choices[0].finish_reason, max_tokens=job_params.max_tokens)
 
         openai_message: ChatCompletionMessage = response.choices[0].message
         response_text = openai_message.content
@@ -202,8 +197,6 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
                 ),
             )
 
-        if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := response.usage):
-            llm_tokens_usage.nb_tokens_by_category = self.openai_completions_factory.make_nb_tokens_by_category(usage=usage)
         return response_text
 
     @override
