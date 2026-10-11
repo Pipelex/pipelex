@@ -644,7 +644,7 @@ You now understand the building blocks: pipes, sequences, inputs, and structured
 
 ## Configure API Access
 
-To run pipelines on your own machine, Pipelex needs access to AI models. **You have two options**: your own provider keys, or models running locally. Nothing reports to Pipelex either way. This is the setup `pipelex init` runs when you answer **On this machine, with your own provider keys** to its question "Where should your runs execute?". If you would rather hold no provider keys at all, take its default answer, the hosted Pipelex API, which signs you in for a Pipelex API key instead (see [Run It Yourself](./run-it-yourself.md) and [`pipelex login`](../tools/cli/login.md)).
+To run pipelines on your own machine, Pipelex needs access to AI models. **You have two options**: your own provider keys, or models running locally. Your methods, prompts, inputs and outputs never reach Pipelex either way; only anonymous [usage statistics](../setup/usage-statistics.md) do, which you can turn off. This is the setup `pipelex init` runs when you answer **On this machine, with your own provider keys** to its question "Where should your runs execute?". If you would rather hold no provider keys at all, take its default answer, the hosted Pipelex API, which signs you in for a Pipelex API key instead (see [Run It Yourself](./run-it-yourself.md) and [`pipelex login`](../tools/cli/login.md)).
 
 ### Option 1: Bring Your Own API Keys
 
@@ -788,6 +788,7 @@ The deck files `pipelex init` installs resolve their defaults to these models, a
 - **Image generation** — the general and premium tiers are GPT Image 2, the small tier is GPT Image 1 mini, both served by `openai` and `azure_openai`.
 - **Document extraction** — `default-extract-document` tries Mistral OCR, which needs your Mistral key, and otherwise reads a PDF's text layer locally with pypdfium2, which needs no key but recovers no text from a scanned page. `default-extract-image` and `default-premium` are Mistral OCR only. `default-text-from-pdf` and `default-no-inference` always read the PDF locally and call no model. See [Document Extraction](../features/document-extraction.md#the-default-extractor).
 - **Web search and web pages** — everything in `4_search_deck.toml`, and `default-extract-web-page` in `3_extract_deck.toml`, resolve to Linkup, so a method that searches the web or extracts from a web page needs a Linkup key.
+- **Judgment** — the deck names no default judgment model, so a `PipeJudge` names its model. `default-judgment` is TypeSafe's `jev-1.13.0`, which needs a TypeSafe key and reads text alone. `default-judgment-vision`, for a judgment whose prompt presents an image, is OpenAI's `gpt-6-luna`, which no backend of Pipelex serves as a judgment model yet. See [PipeJudge](../building-methods/pipes/pipe-operators/PipeJudge.md#the-judgment-model).
 
 With an OpenAI or Azure OpenAI key alone, the language and image defaults run as shipped. With any other provider, OpenRouter included, point the aliases at models it serves, as the next paragraph describes; the models each provider serves are listed under `~/.pipelex/inference/backends/`. A few presets name a model directly rather than through an alias, `retrieval-cheap`, `retrieval-premium`, `engineering-code-cheap` and `engineering-code-cheaper`, so they need overriding too. On OpenRouter, the presets that set a reasoning effort, `deep-analysis`, `quick-reasoning` and `retrieval-premium`, also need overriding without it, because its models are declared without reasoning support.
 
@@ -1793,7 +1794,7 @@ Many steps of a method come down to a closed question: is this message urgent, w
 
 Put a PipeJudge where a method needs a decision, then route on the verdict: a `PipeCondition` whose expression is `routing.choice` sends each item to the branch its judgment chose, and one comparing `approved.probability` with a bound gates a step on the model's certainty. To judge every item of a list, map the PipeJudge over it with a `PipeBatch`.
 
-No judgment model is served out of the box: a judgment names its model, such as the deck's `@default-judgment` alias for TypeSafe's model, which needs a `TYPESAFE_API_KEY`.
+No judgment model is served out of the box: a judgment names its model, such as the deck's `@default-judgment` alias for TypeSafe's model, which needs a `TYPESAFE_API_KEY`. TypeSafe's model reads text alone, and a judgment whose prompt presents an image names the deck's `@default-judgment-vision` alias instead, for OpenAI's `gpt-6-luna`, which no inference backend of Pipelex serves on your own keys yet.
 
 ## Related Documentation
 
@@ -2067,7 +2068,7 @@ Production-ready monitoring for your AI methods.
 
 ## Overview
 
-Pipelex provides comprehensive telemetry and observability capabilities to monitor your AI methods in production. Track costs, latency, errors, and execution patterns across multiple destinations. Every destination is yours, opt-in and configurable per integration mode (CLI, pytest, API), and nothing reports to Pipelex.
+Pipelex provides comprehensive telemetry and observability capabilities to monitor your AI methods in production. Track costs, latency, errors, and execution patterns across multiple destinations. Every destination is yours, opt-in and configurable per integration mode (CLI, pytest, API), and none of it reports to Pipelex. The anonymous [usage statistics](../setup/usage-statistics.md) Pipelex collects are separate, with switches of their own.
 
 ## Langfuse Integration
 
@@ -8128,7 +8129,7 @@ The output must be that native or a concept refining it, and `Dynamic` is neithe
 
 **The question is plain text.** `question` is a template as well, with the same shorthand, but it presents no file: it suits the instruction itself and a short parameter such as `"Is the message about $topic?"`. The evidence belongs in the prompt, and a question that reads an `Image` or a `Document` is refused when the method loads, since only the prompt presents files.
 
-**Images and documents are sent as files.** An `Image` or a `Document` the prompt reads, a single value or a list, reaches the model as a file rather than as text, and a numbered token such as `[Image 1]` marks the place in the rendered prompt where the prompt reads it. Whether a model reads files is stated in its model configuration, and a `PipeJudge` whose prompt reads an image or a document is refused when the method loads if its model does not read that kind of file, with a message naming the variable and what the model reads. An input declared `Dynamic` names no kind of value, so the prompt renders it as text, as a `PipeLLM`'s does, and an image it holds reaches the model as its address rather than as a file. A document given to the run in a format the model does not read is refused when the run starts, before any step spends anything. TypeSafe's model reads text only, so turn a document into text with a [`PipeExtract`](PipeExtract.md) step first.
+**Images and documents are sent as files.** An `Image` or a `Document` the prompt reads, a single value or a list, reaches the model as a file rather than as text, and a numbered token such as `[Image 1]` marks the place in the rendered prompt where the prompt reads it. Whether a model reads files is stated in its model configuration, and a `PipeJudge` whose prompt reads an image or a document is refused when the method loads if its model does not read that kind of file, with a message naming the variable and what the model reads. An input declared `Dynamic` names no kind of value, so the prompt renders it as text, as a `PipeLLM`'s does, and an image it holds reaches the model as its address rather than as a file. A document given to the run in a format the model does not read is refused when the run starts, before any step spends anything. TypeSafe's model reads text only: a prompt that presents an image names `@default-judgment-vision`, the deck's alias for a judgment model that reads images (see [the judgment model](#the-judgment-model)), and a document is turned into text with a [`PipeExtract`](PipeExtract.md) step first.
 
 **The verdict.** A yes/no question's verdict follows from its probability: yes when the probability of yes is at least the `threshold`, which defaults to `0.5`. A model that reports no probability gives its own verdict, and a declared threshold then cannot apply, which the run logs as a warning. A choice's verdict is the key of the option chosen, with the model's `confidence` and the `probabilities` of every option when it reports them. A rating's verdict is the index of the level chosen, `0` being the first level declared, with the model's `confidence`, the `probabilities` of every level keyed by its index written as text, and a continuous `position` on the scale, when it reports them. When the scale's levels carry labels, the verdict's `label` is the label of the level chosen, copied from the pipe's declaration.
 
@@ -8189,6 +8190,8 @@ levels   = [{ label = "Minor" }, { label = "Major" }, { label = "Blocking" }]
 ### The judgment model
 
 No judgment model is served out of the box: the model deck names no default for judgments, so a `PipeJudge` names its model in its `model` field, and a `PipeJudge` that names none is refused when the method loads. The deck's `@default-judgment` alias points at TypeSafe's model, which works once a `TYPESAFE_API_KEY` is set (see [the inference backend configuration](../../../configuration/config-technical/inference-backend-config.md)). To let your pipes leave `model` out, set a `choice_default` under `[judgment]` in your model deck.
+
+TypeSafe's model reads text alone, so the deck also names `@default-judgment-vision` for a `PipeJudge` whose prompt presents an image, as a `PipeExtract` over a web page names `@default-extract-web-page`. It points at OpenAI's `gpt-6-luna`, a judgment model that reads images through OpenAI's Decisions API. No inference backend of Pipelex calls that API yet, so on your own keys a step naming the alias finds no model when it runs.
 
 ### MTHDS Parameters
 
@@ -10107,6 +10110,7 @@ The Pipelex CLI is organized into several command groups:
 | [**run**](run.md) | Execute pipelines, on this machine or on the hosted Pipelex API |
 | [**run method by address**](run-by-address.md) | Fetch and run a method straight from a public GitHub repository |
 | [**build**](build/index.md) | Generate concept structures and example inputs and outputs for a pipe |
+| [**usage-stats**](usage-stats.md) | See and change the anonymous usage statistics of every Pipelex tool on the machine |
 
 ## Global flags
 
@@ -10191,6 +10195,8 @@ pipelex init --local [FOCUS]
 ```
 
 By default, `pipelex init` writes to the home configuration directory (`~/.pipelex/`, or `PIPELEX_HOME`; see [Configuration](../../configuration/index.md#the-home-configuration-directory-pipelex_home)). Use `--local` to create a project-level `.pipelex/` directory at the detected project root. Credentials always remain in the home configuration directory regardless of `--local`.
+
+Whenever [usage statistics](../../setup/usage-statistics.md) are on, `pipelex init` shows their notice on stderr ahead of its own output, once per run; with them off, it shows nothing about them.
 
 !!! note "Config updates not yet supported"
     The `pipelex init` command always performs a full reset of the configuration. Incremental config updates will be supported in a future release.
@@ -11471,6 +11477,66 @@ pipelex show backends --all
 
 
 
+## Usage Stats
+
+# Usage Stats
+
+`pipelex usage-stats` shows and changes Pipelex's anonymous usage statistics for every Pipelex tool on the machine: pipelex and `pipelex-agent`, `plxt`, the VS Code extension and the `mthds` CLI, which all read the same state in `~/.mthds/usage-stats/`. [Usage Statistics](../../setup/usage-statistics.md) says what is collected and every other way to turn the statistics off.
+
+These commands never send anything and never print the notice. They exit with `0` unless they could not do what they say, such as a state directory that cannot be written, and then print why on stderr and exit with `1`.
+
+## status
+
+```bash
+pipelex usage-stats status
+pipelex usage-stats status --format json
+```
+
+Prints whether statistics are on, every switch that turns them off, the installation identifier, the notice version seen on the machine, whether it is marked as one of the Pipelex team's, whether the process is in CI or in a container, and the shared state directory. It changes nothing: it creates no identifier and turns no former `mthds` opt-out into the machine's choice.
+
+With `--format json`, it prints one JSON object on stdout, the form other tools read:
+
+```json
+{
+  "tool": "pipelex",
+  "enabled": false,
+  "off_by": ["machine_choice"],
+  "installation_id": "0f8fad5b-d9cb-469f-a165-70867728950e",
+  "notice_version": 1,
+  "internal": false,
+  "ci": false,
+  "container": false,
+  "state_dir": "/home/alice/.mthds/usage-stats"
+}
+```
+
+`off_by` lists the switches that say off, in the order [Turning them off](../../setup/usage-statistics.md#turning-them-off) gives, and is empty when statistics are on. `installation_id` is `null` until a tool has drawn one.
+
+## disable
+
+```bash
+pipelex usage-stats disable
+```
+
+Turns statistics off on this machine for every Pipelex tool, and deletes every event any tool still had waiting to be sent.
+
+## enable
+
+```bash
+pipelex usage-stats enable
+```
+
+Turns the machine's choice back on, including after a former `mthds telemetry disable`, and names every other switch that still keeps statistics off, such as `DO_NOT_TRACK` in your environment or a project's `[usage_stats] enabled = false`.
+
+## reset-id
+
+```bash
+pipelex usage-stats reset-id
+```
+
+Deletes every event waiting to be sent and the installation identifier, draws a new one and prints it on stdout. Events made under the old identifier are never sent afterwards.
+
+
 ## Pkg
 
 # Package Commands
@@ -12349,6 +12415,10 @@ For the structured commands, exactly one such object is written to stderr per fa
 
 `fmt` and `lint` are raw passthroughs to the `plxt` binary and bypass the JSON output contract, producing native `plxt` output instead.
 
+## Usage Statistics
+
+`pipelex-agent` sends Pipelex's [anonymous usage statistics](../../setup/usage-statistics.md) as `pipelex` does: one `command_completed` per command, plus the events of the runs, validations and code generations it performs, all off under `DO_NOT_TRACK=1`, `PIPELEX_USAGE_STATS=0` or `pipelex usage-stats disable`. When the invocation's errors are JSON, with `--error-format json` or with `--format json` and no `--error-format`, stderr is a machine contract, so the one-time notice is neither printed nor recorded there; the next command whose stderr a person reads prints it. The `plxt` that `fmt` and `lint` start reports nothing of its own. There is no `usage-stats` group on this CLI: [`pipelex usage-stats`](usage-stats.md) shows and changes the statistics for both.
+
 ## Graph Visualization
 
 Graph visualization is available through the `validate bundle` subcommand with the `--graph` flag, and through `run` subcommands where it is enabled by default. Use `--no-graph` on `run` to disable it.
@@ -12422,13 +12492,14 @@ In addition to the base `pipelex.toml`, Pipelex applies override files from **in
 
 ## Configuration Structure
 
-The configuration is organized into five main sections. The first three mirror the layers of the runtime:
+The configuration is organized into these main sections. The first three mirror the layers of the runtime:
 
 1. `[runtime]` - process-scoped infrastructure: storage, secrets, logging, cloud credentials, outbound network posture, reporting, tracing, observation, and the plugin denylist
 2. `[inference]` - the model-calling seam: the model deck, LLM, image generation, extraction, the default templating style, and dry-run mocks
 3. `[interpreter]` - library-scoped method machinery: MTHDS parsing, pipe runs, pipe functions, pipeline execution, source scanning, and the builder
 4. `[run]` - where `pipelex run` and `pipelex-agent run` execute a method by default: on this machine or on the hosted Pipelex API, see [Run Configuration](config-practical/run-config.md)
 5. `[kit]` - settings for the `pipelex-dev` kit tooling
+6. `[usage_stats]` - `enabled = false` turns off Pipelex's anonymous usage statistics for everyone working in the project; it is read from the project's own `.pipelex/pipelex.toml` and from the configuration Pipelex is packaged with, never from `~/.pipelex/`, and `true` has no effect, see [Usage Statistics](../setup/usage-statistics.md)
 
 Each section contains multiple subsections for specific features and functionalities. A setting's address tells you which layer owns it: `[runtime.*]` applies to any process, whatever it loads; `[interpreter.*]` only means something once a method is loaded.
 
@@ -13203,7 +13274,7 @@ Pipelex loads `~/.pipelex/.env`, then the `.env` of the working directory, and e
 Telemetry configuration is stored in `.pipelex/telemetry.toml`. This file controls **your custom telemetry** destinations—where you want to send observability data for your own analytics and monitoring.
 
 !!! info "One Telemetry Stream, Yours"
-    The runtime has a single telemetry stream, and it is the one you configure in this file and send to your own backends. Nothing reports to Pipelex.
+    The runtime has a single telemetry stream, and it is the one you configure in this file and send to your own backends. Nothing in this file reports to Pipelex. The anonymous usage statistics Pipelex collects are separate: this file neither configures nor reaches them, and [Usage Statistics](../../setup/usage-statistics.md) says how to turn them off.
 
     For an overview, see [Telemetry Setup](../../setup/telemetry.md).
 
@@ -15946,7 +16017,10 @@ See [Observer Provider Injection](../advanced/observer-provider-injection.md) fo
 
 # Telemetry
 
-**Pipelex sends no telemetry to Pipelex.** The only telemetry the runtime produces is yours: you configure it in `telemetry.toml`, it is off until you turn it on, and it goes to analytics and monitoring systems you operate.
+**The telemetry you configure in `telemetry.toml` never reports to Pipelex.** It is yours: it is off until you turn it on, and it goes to analytics and monitoring systems you operate.
+
+!!! note "Usage statistics are separate"
+    Pipelex does collect anonymous usage statistics, counts of commands, runs, pipe types, models and tokens, through a client of their own that `telemetry.toml` neither configures nor reaches. They never carry your methods, prompts, inputs, outputs, file names or pipe names, and you turn them off with `pipelex usage-stats disable` or `DO_NOT_TRACK=1`. See [Usage Statistics](usage-statistics.md).
 
 ## Your Telemetry Streams
 
@@ -16062,7 +16136,7 @@ These are labels for grouping, not content: they land in the reserved identity f
 
 We take your privacy seriously:
 
-- Nothing reports to Pipelex: every stream is one you configure, sent to a system you operate
+- Nothing in `telemetry.toml` reports to Pipelex: every stream is one you configure, sent to a system you operate; the anonymous [usage statistics](usage-statistics.md) are separate and have switches of their own
 - Your `telemetry.toml` gives you full control over what data is captured
 - PostHog tracing includes privacy controls to redact sensitive content
 - All telemetry can be completely disabled
@@ -16070,6 +16144,122 @@ We take your privacy seriously:
 For detailed configuration options, see [Telemetry Configuration](../configuration/config-practical/telemetry-config.md).
 
 For more information about our data practices, see our [Privacy Policy](https://go.pipelex.com/privacy-policy).
+
+
+## Usage Statistics
+
+# Usage Statistics
+
+Pipelex collects **anonymous usage statistics**: counts of commands, runs, pipe types, models and tokens, and the country your IP address maps to. The address itself is never stored. Pipelex never collects your methods, prompts, inputs, outputs, file names or pipe names. The statistics tell us which features, pipe types and models people use, so we know where to put our work.
+
+They are on by default, and you can turn them off at any time, for one command, one project or the whole machine, as [Turning them off](#turning-them-off) explains.
+
+The first time a Pipelex tool runs with statistics on, it prints this notice on stderr, once per machine. A command whose stderr a program reads rather than a person, `pipelex-agent` with JSON errors (`--error-format json`, or `--format json` with no `--error-format`), neither prints nor records it, and still sends its statistics; the next command whose stderr a person reads prints it:
+
+> Pipelex collects anonymous usage statistics: counts of commands, runs, pipe types, models and tokens, and the country your IP address maps to; the address itself is never stored. It never collects your methods, prompts, inputs, outputs, file names or pipe names. To turn it off, run `pipelex usage-stats disable` or set DO_NOT_TRACK=1. Details: https://docs.pipelex.com/latest/setup/usage-statistics/
+
+`pipelex init` carries the same text: whenever statistics are on, it shows this notice on stderr ahead of its own output, even after the first run printed it. A first run that is itself `pipelex init` shows it once, not twice. Showing it there records nothing, and with statistics off it shows nothing.
+
+!!! note "Not your telemetry"
+    The usage statistics are separate from the telemetry you configure in `telemetry.toml`, which goes only to analytics and monitoring systems you operate and never to Pipelex. See [Telemetry](telemetry.md).
+
+## What is collected
+
+Every event is a count, a yes-or-no, or a value from a closed list. No property can hold text you wrote. Each event carries:
+
+- the tool and its version (`pipelex`, and the release), and the surface it ran from: the `pipelex` CLI, the `pipelex-agent` CLI, the API server or a Python program;
+- the operating system and processor family, the Python minor version, and whether the process ran in CI or in a container;
+- an anonymous **installation identifier**, a random UUID drawn once per machine and shared by every Pipelex tool on it, never derived from anything about the machine or you.
+
+The events themselves are:
+
+| Event | Sent | What it counts |
+| --- | --- | --- |
+| `command_completed` | once per command of the `pipelex` and `pipelex-agent` CLIs | the command's path in the command tree (`run bundle`, `validate pipe`, `init` and so on, a shorthand such as `pipelex validate my_pipe` counting as the command it runs; never its arguments or option values), its outcome, its duration, who could fix a failure (`input`, `config`, `runtime` or `other`), and whether it ran on the hosted API; for `init`, also where it set runs to execute and, when it set up backends on this machine, which backend kinds it enabled |
+| `run_completed` | once per run, whatever started it | the outcome, live or dry, the kind of source the method came from (a local bundle, an installed method, a published address), the duration, the bundle's size and nesting depth, which language features it used (batching, parallel branches, conditions, structured outputs, image and document inputs), how many pipes of each type ran, and its inference totals: calls, failures, tokens, images, pages and cost |
+| `model_used` | once per model a run used | the backend kind (`openai`, `anthropic`, `mistral`, and so on, `custom` for a backend Pipelex does not ship), the model's name in the backend tables Pipelex ships (`other` for any other), and that run's calls, failures by category, tokens, images, pages and cost for it |
+| `method_validated` | once per validation of a method | the verdict, the duration, the number of errors and warnings, and the bundle's size and depth |
+| `code_generated` | once per code generation | what was generated (types, input templates or structure classes), the target language, the outcome, the duration and the bundle's size |
+
+A run's token totals come from the run's own usage events: when you turn tracing or cost reporting off, the run reports that its usage is unknown and no `model_used` is sent. The statistics never turn tracing on.
+
+### What is never collected
+
+No event carries a method or its MTHDS source; a pipe code, concept name, domain name, class name or any other identifier you wrote; a prompt, input, output or generated content; a file name, path, URL or repository address; a method name, catalog id or run id; an error message, stack trace or exception; a command argument or option value; an environment variable's value; a hostname, user name or e-mail address; an IP address or any location finer than the country; the order in which a run's pipes executed.
+
+A test in Pipelex runs, validates and generates code from a method whose every name, prompt, input and error message holds a unique marker, and fails if the marker appears anywhere in what would be sent.
+
+## Turning them off
+
+Statistics are on unless any of these says off, and nothing can turn them back on over another switch that says off:
+
+| Switch | How to set it | Scope |
+| --- | --- | --- |
+| `DO_NOT_TRACK` | set to anything but empty, `0` or `false`, the [Console Do Not Track](https://consoledonottrack.com/) convention | the process, and every process it starts |
+| `PIPELEX_USAGE_STATS` | set to `0`, `false`, `no` or `off`; an unrecognised value also turns statistics off | the process, without silencing the rest of your tools the way `DO_NOT_TRACK` does |
+| The machine's choice | `pipelex usage-stats disable` | every Pipelex tool on the machine: pipelex, `plxt`, the VS Code extension and the `mthds` CLI |
+| The `mthds` CLI's former opt-out | `DISABLE_TELEMETRY=1` in `~/.mthds/config`, which `mthds telemetry disable` wrote before these statistics existed | every Pipelex tool on the machine: the first tool that runs turns it into the machine's choice |
+| The project setting | `[usage_stats] enabled = false` in the project's `.pipelex/pipelex.toml` | everyone working in the project, once the file is committed |
+| The packaged default | `[usage_stats] enabled = false` in the `pipelex.toml` Pipelex is packaged with, for a distribution or a corporate image | every user of that installation |
+| The `pytest` integration mode | Pipelex booted with `IntegrationMode.PYTEST`, as test suites do | the test process: no test suite reports |
+
+The project setting can only turn statistics off: `enabled = true` has no effect. It fails closed: a `.pipelex/pipelex.toml` that cannot be read, is not valid TOML, or holds an `enabled` that is not a boolean turns them off. Pipelex reads it from the project's own file, found from the working directory the way Pipelex finds its project configuration, and never from your home configuration in `~/.pipelex/`.
+
+```toml
+# .pipelex/pipelex.toml
+[usage_stats]
+enabled = false
+```
+
+Turning statistics off creates nothing and sends nothing: a process with statistics off writes nothing to the shared state, except when it turns the `mthds` CLI's former opt-out into the machine's choice.
+
+## The `usage-stats` commands
+
+`pipelex usage-stats` shows and changes the statistics of every Pipelex tool on the machine, `pipelex-agent` included, which has no group of its own. These commands never send anything, never print the notice, and exit with `0` unless they could not do what they say.
+
+| Command | What it does |
+| --- | --- |
+| `pipelex usage-stats status` | Prints whether statistics are on, every switch that turns them off, the installation identifier and the notice version seen. It changes nothing |
+| `pipelex usage-stats status --format json` | The same as one JSON object on stdout, the form other tools read |
+| `pipelex usage-stats disable` | Turns statistics off for every Pipelex tool on the machine and deletes every event still waiting to be sent |
+| `pipelex usage-stats enable` | Turns the machine's choice back on, and names any other switch that still keeps statistics off |
+| `pipelex usage-stats reset-id` | Deletes every event waiting to be sent and the installation identifier, draws a new one and prints it |
+
+```json
+{
+  "tool": "pipelex",
+  "enabled": false,
+  "off_by": ["machine_choice"],
+  "installation_id": "0f8fad5b-d9cb-469f-a165-70867728950e",
+  "notice_version": 1,
+  "internal": false,
+  "ci": false,
+  "container": false,
+  "state_dir": "/home/alice/.mthds/usage-stats"
+}
+```
+
+`off_by` names the switches that say off, in the order of the table above: `do_not_track`, `tool_variable`, `machine_choice`, `legacy_mthds_choice`, `project_setting`, `packaged_default`, `integration_mode`, and `invalid_endpoint_override` for the test-only endpoint variable below.
+
+## Where it is kept and where it goes
+
+Every Pipelex tool on a machine shares one directory, `~/.mthds/usage-stats/` (`%USERPROFILE%\.mthds\usage-stats\` on Windows), created with owner-only permissions. It holds the installation identifier, the machine's choice, a marker per notice version shown, and each tool's queue of events waiting to be sent, under `spool/`. A file there is created or deleted whole, so two tools running at once never undo each other's choice. When Pipelex cannot look into that directory, statistics stay off rather than risk ignoring a choice stored there, and your command runs as usual.
+
+Events go straight to PostHog's EU region, to a project that holds nothing but these statistics. PostHog discards the IP address after deriving the country from it, and keeps no finer location. No person profile is ever created. PostHog keeps the events for its retention period, and we delete the events of an installation on request, as our [Privacy Policy](https://go.pipelex.com/privacy-policy) explains: send us the identifier `pipelex usage-stats status` prints, after turning statistics off or running `pipelex usage-stats reset-id`.
+
+How an event leaves depends on the process:
+
+- **A CLI command** writes its events to its queue when it ends and starts a small detached sender process, then exits at once; the sender posts the queue within ten seconds. The sender is a single file that needs nothing but Python itself, so it delivers whichever way Pipelex was installed and never loads Pipelex. An event that cannot be sent, because you are offline for instance, stays queued for the next command's sender. In CI or in a container, where a detached process would be killed, the command posts its events itself within one second before exiting and, once PostHog has accepted them, what earlier commands left queued, within that same second.
+- **A Python program, or a long-running process** such as the API server, posts from a background thread within seconds of each event, and flushes what is left when Pipelex is torn down or the program exits, within a short time budget. Each time its events get through, what earlier processes left queued goes too, within the same budget.
+
+A send never delays you by more than these budgets, and a failure to send never changes what your command or your run does.
+
+## For developers
+
+- **`PIPELEX_USAGE_STATS_DEBUG`**, set to anything but empty, `0` or `false`, prints each event to stderr as one JSON line, `{"usage_stats_debug": {...}}`, instead of sending it. The switches still decide, so nothing is printed while statistics are off.
+- **`PIPELEX_USAGE_STATS_ENDPOINT`**, for tests, sends the events to a loopback `http` origin such as `http://127.0.0.1:8123` instead of PostHog. Any other value turns statistics off. Each queued file names the endpoint its events were queued for, and a sender posts only the files naming the origin it posts to, plus any file naming none, as earlier builds wrote them. So an event queued while the variable is set is only ever sent to that origin, and one queued for PostHog never goes there.
+- **`PIPELEX_USAGE_STATS_HOST`** names the tool that embeds Pipelex, from a closed list (`cocode`, `mthds-agent`, `other`), so its runs can be told apart.
+- Pipelex's own continuous integration sets `DO_NOT_TRACK=1`, and its test suites turn statistics off and keep the shared state in a temporary directory.
 
 
 # Advanced
@@ -19791,7 +19981,8 @@ The environment charges through the sandbox's hooks and one rewrite, all in `Pip
 - **Calls and operators** go through the sandbox's `call` and `call_binop` hooks, and every arithmetic operator is intercepted.
 - **Filters and tests** are wrapped before a template compiles. A filter or a test registered on the environment must have a cost in `FILTER_COSTS` or `TEST_COSTS` (`pipelex/tools/jinja2/jinja2_render_costs.py`), or the first compile fails with a `TypeError` naming it.
 - **Printed values** go through the environment's `finalize`, which charges the text it produces. A caller's own `finalize` is passed to the constructor and runs first.
-- **What no hook reaches**, which is loop iteration, `~`, comparisons, slices, list, tuple and dict literals and the template's static text, is routed through internal charging filters by a rewrite of the parsed template (`pipelex/tools/jinja2/jinja2_render_rewrite.py`). The rewrite changes what is charged, never what a template renders. A tuple used as a key, in a dict literal or an item read, is also charged for hashing, since a tuple hashes every element again each time.
+- **What no hook reaches**, which is loop iteration, `~`, comparisons, slices, list, tuple and dict literals, the template's static text and a `{% filter %}` block's result, is routed through internal filters by a rewrite of the parsed template (`pipelex/tools/jinja2/jinja2_render_rewrite.py`). The rewrite changes what is charged, never what a template that renders without it renders. A tuple used as a key, in a dict literal or an item read, is also charged for hashing, since a tuple hashes every element again each time.
+- **A filter block's result** is printed as a `{{ }}` tag prints a value. Jinja writes it out as it is, with neither `finalize` nor a conversion to text, so a filter returning something other than text, such as `{% filter length %}`, would otherwise fail the render. The rewrite hands the result to an internal filter that returns text as it is, unescaped under autoescape as Jinja leaves it, and passes any other result through `finalize`, the caller's own included, then converts it as a printed value is. Either way the result is charged as a print.
 - **Converting Markdown to HTML** is charged where it happens, in `pipelex/tools/markdown/markdown_parser.py`, since markupsafe converts a Markdown value through its `__html__` wherever an HTML template prints, escapes, joins or formats one, and no hook sees that call. The template makes its budget the active one while it renders, and the conversion charges it 2,048 units for every character of its source and every cell of its tables before it parses, then checks that its output, bounded from the parsed tokens, fits what is left before it renders, since a reference link is printed at every use. A conversion costs microseconds a character, so a render converts at most about 65,000 characters of Markdown, a document printed twice counting twice. Formatting Markdown for a document engine, which the `markdown` filter of plain-data templates does, is charged the same way, in `pipelex/tools/markdown/markdown_formatting.py`: both conversions parse through `charged_parse`, which holds the order of the charges.
 
 The budget is the same for every template category and is not a setting in `pipelex.toml`: it is a safety bound, not a tuning knob. `PipelexTemplateEnvironment` takes it as the `render_budget_units` constructor argument, which the tests use to exercise small budgets.
@@ -20198,6 +20389,8 @@ These two categories are managed by separate steps. `init_config()` copies only 
 | `pipelex init routing` | `routing` | Routing profile customization only |
 | `pipelex init telemetry` | `telemetry` | Telemetry config template copy |
 | `pipelex init credentials` | `credentials` | Credential setup for enabled backends |
+
+Every one of them first shows the [usage statistics](../setup/usage-statistics.md) notice on stderr when statistics are on, through `show_usage_stats_notice()`, which the `init` Typer command in `pipelex/cli/_cli.py` calls before `init_cmd()`, so `pipelex doctor --fix`, which calls `init_cmd()` itself, does not show it. A first run that has just printed the notice does not print it again, and showing it records no marker.
 
 All commands except `credentials` perform a **full reset** (overwrite existing files) — every setting in the file is replaced by the template's. That is why init is not the answer to a configuration file that has fallen behind the current schema: [`pipelex migrate`](../tools/cli/migrate.md) rewrites such a file in place and keeps what is in it.
 
@@ -22705,7 +22898,7 @@ A document should read the same whichever engine printed it, and a template shou
 
 `pipelex.cogt.doc_gen.template_environment` holds **`make_plain_data_template_environment()`**, the Jinja environment an engine fills a template file's tags in when it fills them itself, as a Word template's tags are filled through docxtpl. It is synchronous; sandboxed as every Pipelex template is, each render spending from a budget of its own (see [Template Sandbox](template-sandbox.md)); strict, so a missing value fails the render instead of printing as empty text; and it registers Jinja's built-in filters and one of Pipelex's, `markdown`, since the plain data it reads holds no stuff for Pipelex's other filters to work on.
 
-`{{ invoice.notes | markdown }}` reads a text as Markdown into a `FormattedMarkdown`, as the HTML templates' `markdown` filter reads it into HTML: None gives an empty one, any other value is read as its string form, and an undefined value fails the render, as it would anywhere in a strict template. An empty one is false, so a template leaves out a section whose notes are None, empty or blank by converting them once into a variable and testing it, `{% set notes = invoice.notes | markdown %}{% if notes %}…{{ notes }}…{% endif %}`: every conversion is charged to the render's budget, so testing `invoice.notes | markdown` and then printing `invoice.notes | markdown` converts the text twice and halves the length a render affords. How a `FormattedMarkdown` prints is the engine's business, so `make_plain_data_template_environment(finalize=…)` takes a function applied to every value a tag prints, before the environment converts it to text: an engine turns a `FormattedMarkdown` into its own form there and hands every other value back as it is. The environment wraps it to charge what is printed, which is why it is passed at construction rather than assigned afterwards. Without one, a `FormattedMarkdown` prints its plain text, so a place that cannot format, such as a document's properties, prints clean text rather than asterisks.
+`{{ invoice.notes | markdown }}` reads a text as Markdown into a `FormattedMarkdown`, as the HTML templates' `markdown` filter reads it into HTML: None gives an empty one, any other value is read as its string form, and an undefined value fails the render, as it would anywhere in a strict template. An empty one is false, so a template leaves out a section whose notes are None, empty or blank by converting them once into a variable and testing it, `{% set notes = invoice.notes | markdown %}{% if notes %}…{{ notes }}…{% endif %}`: every conversion is charged to the render's budget, so testing `invoice.notes | markdown` and then printing `invoice.notes | markdown` converts the text twice and halves the length a render affords. How a `FormattedMarkdown` prints is the engine's business, so `make_plain_data_template_environment(finalize=…)` takes a function applied to every value a tag prints, before the environment converts it to text: an engine turns a `FormattedMarkdown` into its own form there and hands every other value back as it is. The environment wraps it to charge what is printed, which is why it is passed at construction rather than assigned afterwards. A filter block prints through it too, so `{% filter markdown %}…{% endfilter %}` formats the text of its body as `{{ … | markdown }}` formats a text. The block reads its body as printed text, though, so a None value printed in it reaches the filter as the text `None`: an optional value is converted with the tag form, which turns None into an empty one. Without one, a `FormattedMarkdown` prints its plain text, so a place that cannot format, such as a document's properties, prints clean text rather than asterisks.
 
 ---
 
