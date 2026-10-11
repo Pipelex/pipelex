@@ -40,4 +40,7 @@ jobs:
         run: uv sync --frozen --no-install-project --extra docs
 
       - name: Check documentation build
+        # Silences Material for MkDocs' MkDocs 2.0 warning, as the Makefile's docs targets do.
+        env:
+          NO_MKDOCS_2_WARNING: "true"
         run: uv run --no-sync mkdocs build --strict
