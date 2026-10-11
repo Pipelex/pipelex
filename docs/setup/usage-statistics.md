@@ -101,8 +101,8 @@ Events go straight to PostHog's EU region, to a project that holds nothing but t
 
 How an event leaves depends on the process:
 
-- **A CLI command** writes its events to its queue when it ends and starts a small detached sender process, then exits at once; the sender posts the queue within ten seconds. The sender is a single file that needs nothing but Python itself, so it delivers whichever way Pipelex was installed and never loads Pipelex. An event that cannot be sent, because you are offline for instance, stays queued for the next command's sender. In CI or in a container, where a detached process would be killed, the command posts its events itself within one second before exiting.
-- **A Python program, or a long-running process** such as the API server, posts from a background thread within seconds of each event, and flushes what is left when Pipelex is torn down or the program exits, within a short time budget.
+- **A CLI command** writes its events to its queue when it ends and starts a small detached sender process, then exits at once; the sender posts the queue within ten seconds. The sender is a single file that needs nothing but Python itself, so it delivers whichever way Pipelex was installed and never loads Pipelex. An event that cannot be sent, because you are offline for instance, stays queued for the next command's sender. In CI or in a container, where a detached process would be killed, the command posts its events itself within one second before exiting, followed within that second by what earlier commands left queued.
+- **A Python program, or a long-running process** such as the API server, posts from a background thread within seconds of each event, and flushes what is left when Pipelex is torn down or the program exits, within a short time budget. Each time its events get through, what earlier processes left queued goes too, within the same budget.
 
 A send never delays you by more than these budgets, and a failure to send never changes what your command or your run does.
 

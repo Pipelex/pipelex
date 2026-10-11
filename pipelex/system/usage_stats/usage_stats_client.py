@@ -6,10 +6,11 @@ PostHog client and OpenTelemetry, all of which it never touches. One client per 
 - **A CLI command** (`pipelex`, `pipelex-agent`) configures it before the command does any work, which reads every
   switch and prints the notice; the command's events are held in memory and, when it ends, written to the spool for a
   detached sender (`usage_stats_core`, run by its file path), or posted in-process within one second in CI, in a
-  container, or when the sender cannot start.
+  container, or when the sender cannot start, followed within that second by what earlier commands queued.
 - **A Python program, or a long-running process** such as the self-hosted API, configures it when it boots pipelex; a
   daemon thread posts events within ten seconds of their creation, and at exit (or at shutdown) what is left is flushed
-  within the budget and spooled when it cannot be sent. Such a process never starts a child process.
+  within the budget and spooled when it cannot be sent. Each time its events get through, what earlier processes
+  queued goes too, within the same budget. Such a process never starts a child process.
 
 With `PIPELEX_USAGE_STATS_DEBUG`, each event is printed on stderr as one JSON line instead, and nothing is sent or
 spooled. The contract is `conformance/specs/usage-statistics.md`.
@@ -46,7 +47,7 @@ from pipelex.system.usage_stats.usage_stats_core import (
     PostVerdict,
     SpoolContent,
     UsageStatsState,
-    drain_spool,
+    drain_spool_until,
     post_in_process,
     write_spool_file,
 )
@@ -164,12 +165,16 @@ class _BackgroundSender:
         origin = self._settings.origin
         if origin is None:
             return
-        verdict, posted = post_in_process(state=self._settings.state, events=events, origin=origin, deadline=deadline, own_id=self._own_id)
+        state = self._settings.state
+        verdict, posted = post_in_process(state=state, events=events, origin=origin, deadline=deadline, own_id=self._own_id)
         match verdict:
             case PostVerdict.RETRY:
                 self._spool(events=posted)
             case PostVerdict.ACCEPTED | PostVerdict.REFUSED | None:
-                pass
+                if state.read_installation_id() == self._own_id:
+                    # PostHog answers, and this process sends under the machine's identifier: what earlier processes
+                    # queued under it goes too, within what is left of the batch's budget.
+                    drain_spool_until(state=state, tool=TOOL_NAME, origin=origin, deadline=deadline)
 
     def _spool(self, *, events: list[dict[str, Any]]) -> None:
         origin = self._settings.origin
@@ -335,22 +340,31 @@ class UsageStatsClient:
             return
         if start_detached_sender(state=state, origin=origin):
             return
-        drain_spool(state=state, tool=TOOL_NAME, origin=origin, budget_ms=BUDGET_CLI_IN_PROCESS_MS, only=spool_file)
+        drain_spool_until(state=state, tool=TOOL_NAME, origin=origin, deadline=time.monotonic() + BUDGET_CLI_IN_PROCESS_MS / 1000, first=spool_file)
 
     def _post_in_process(self, *, events: list[dict[str, Any]], origin: str, own_id: str, may_spool: bool) -> None:
+        """Post the command's events within its budget and, when PostHog answered, what earlier commands queued.
+
+        Args:
+            events: The command's events.
+            origin: Where they go.
+            own_id: The identifier they carry.
+            may_spool: Whether this process sends under the machine's identifier and can write the spool: only then are
+                its unsent events queued, and the events earlier processes queued sent.
+        """
+        state = self.settings.state
         deadline = time.monotonic() + BUDGET_CLI_IN_PROCESS_MS / 1000
-        verdict, posted = post_in_process(state=self.settings.state, events=events, origin=origin, deadline=deadline, own_id=own_id)
+        verdict, posted = post_in_process(state=state, events=events, origin=origin, deadline=deadline, own_id=own_id)
+        if not may_spool:
+            return
         match verdict:
             case PostVerdict.RETRY:
-                if may_spool:
-                    try:
-                        write_spool_file(
-                            spool_dir=self.settings.state.spool_dir(tool=TOOL_NAME), content=SpoolContent(endpoint=origin, events=posted)
-                        )
-                    except OSError:
-                        return
+                try:
+                    write_spool_file(spool_dir=state.spool_dir(tool=TOOL_NAME), content=SpoolContent(endpoint=origin, events=posted))
+                except OSError:
+                    return
             case PostVerdict.ACCEPTED | PostVerdict.REFUSED | None:
-                pass
+                drain_spool_until(state=state, tool=TOOL_NAME, origin=origin, deadline=deadline)
 
 
 # -------------------------------------------------------------------------------------------------

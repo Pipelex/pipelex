@@ -694,20 +694,23 @@ def send_claimed_file(*, state: UsageStatsState, claimed: Path, origin: str, dea
     return verdict
 
 
-def drain_spool(*, state: UsageStatsState, tool: str, origin: str, budget_ms: int, only: Path | None = None, own_id: str | None = None) -> None:
-    """Post the files of `tool`'s spool queued for `origin`, oldest first, within `budget_ms`; with `only`, that one file alone.
+def drain_spool(*, state: UsageStatsState, tool: str, origin: str, budget_ms: int) -> None:
+    """Post the files of `tool`'s spool queued for `origin`, oldest first, within `budget_ms`, as the detached sender does."""
+    drain_spool_until(state=state, tool=tool, origin=origin, deadline=time.monotonic() + budget_ms / 1000)
+
+
+def drain_spool_until(*, state: UsageStatsState, tool: str, origin: str, deadline: float, first: Path | None = None) -> None:
+    """Post the files of `tool`'s spool queued for `origin` until `deadline`: `first` when given, then the rest oldest first.
 
     A file queued for another endpoint is left for a sender posting there, so events queued under a test's loopback
-    override never reach PostHog, and events queued for PostHog never reach a loopback endpoint.
+    override never reach PostHog, and events queued for PostHog never reach a loopback endpoint. The events of each
+    file are checked against the identifier `id` holds, so a process whose identifier is its own alone never drains.
     """
-    deadline = time.monotonic() + budget_ms / 1000
     spool_dir = state.spool_dir(tool=tool)
-    candidates: list[Path]
-    if only is None:
-        prune(spool_dir=spool_dir)
-        candidates = pending_files(spool_dir=spool_dir)
-    else:
-        candidates = [only]
+    prune(spool_dir=spool_dir)
+    candidates = pending_files(spool_dir=spool_dir)
+    if first is not None:
+        candidates = [first, *(candidate for candidate in candidates if candidate != first)]
     for candidate in candidates:
         if time.monotonic() >= deadline:
             return
@@ -717,7 +720,7 @@ def drain_spool(*, state: UsageStatsState, tool: str, origin: str, budget_ms: in
         claimed = claim(path=candidate)
         if claimed is None:
             continue
-        send_claimed_file(state=state, claimed=claimed, origin=origin, deadline=deadline, own_id=own_id)
+        send_claimed_file(state=state, claimed=claimed, origin=origin, deadline=deadline, own_id=None)
 
 
 def post_in_process(

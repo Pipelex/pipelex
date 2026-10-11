@@ -17,7 +17,7 @@ from pipelex.system.usage_stats.usage_stats_contract import (
     UsageStatsOutcome,
     UsageStatsSurface,
 )
-from pipelex.system.usage_stats.usage_stats_core import SpoolContent, UsageStatsState, pending_files, read_spool_file
+from pipelex.system.usage_stats.usage_stats_core import SpoolContent, UsageStatsState, pending_files, read_spool_file, write_spool_file
 from pipelex.system.usage_stats.usage_stats_events import CommandCompletedProperties, UsageStatsEvent
 from pipelex.test_extras.usage_stats_isolation import USAGE_STATS_DEAD_LOOPBACK_ORIGIN
 from tests.helpers.usage_stats_capture import capture_server
@@ -56,6 +56,15 @@ def _spooled_events(*, state: UsageStatsState) -> list[dict[str, Any]]:
     for spool_file in pending_files(spool_dir=state.spool_dir(tool=TOOL_NAME)):
         events.extend((read_spool_file(path=spool_file) or SpoolContent(endpoint=None, events=[])).events)
     return events
+
+
+def _seed_spool(*, settings: UsageStatsSettings) -> str:
+    """Queue one event an earlier command left under the machine's identifier; its uuid."""
+    installation_id = settings.state.obtain_installation_id().value
+    queued_uuid = "00000000-0000-4000-8000-0000000000ee"
+    event: dict[str, Any] = {"event": "command_completed", "distinct_id": installation_id, "uuid": queued_uuid, "properties": {}}
+    write_spool_file(spool_dir=settings.state.spool_dir(tool=TOOL_NAME), content=SpoolContent(endpoint=None, events=[event]))
+    return queued_uuid
 
 
 class TestUsageStatsClient:
@@ -151,6 +160,21 @@ class TestUsageStatsClient:
         assert time.monotonic() - started < 2
         assert [event["event"] for event in _spooled_events(state=settings.state)] == ["command_completed"]
 
+    def test_in_process_posts_also_send_what_earlier_commands_queued(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """In CI, and when the detached sender cannot start, the command sends its own events first, then the spool."""
+        mocker.patch.object(usage_stats_client, "start_detached_sender", return_value=False)
+        with capture_server() as server:
+            for index_case, is_ci in enumerate((True, False)):
+                settings = _settings(tmp_path=tmp_path / f"case-{index_case}", origin=server.origin, is_ci=is_ci)
+                queued_uuid = _seed_spool(settings=settings)
+                client = UsageStatsClient(settings=settings)
+                client.record(event=_COMMAND_EVENT)
+                client.finish_command()
+                received = [event["uuid"] for event in server.events]
+                assert received[-1] == queued_uuid
+                assert len(received) == 2 * (index_case + 1)
+                assert pending_files(spool_dir=settings.state.spool_dir(tool=TOOL_NAME)) == []
+
     def test_process_local_identifier_is_never_persisted(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """A malformed `id`: the command posts in-process under an identifier of its own and spools nothing on failure."""
         start = mocker.patch.object(usage_stats_client, "start_detached_sender", return_value=True)
@@ -177,6 +201,18 @@ class TestUsageStatsClient:
                 time.sleep(0.05)
             assert len(server.events) == 2
         assert len({event["uuid"] for event in server.events}) == 2
+        assert pending_files(spool_dir=settings.state.spool_dir(tool=TOOL_NAME)) == []
+
+    def test_thread_also_sends_what_earlier_processes_queued(self, tmp_path: Path) -> None:
+        with capture_server() as server:
+            settings = _settings(tmp_path=tmp_path, origin=server.origin, delivery=UsageStatsDelivery.LONG_RUNNING)
+            queued_uuid = _seed_spool(settings=settings)
+            client = UsageStatsClient(settings=settings)
+            client.record(event=_COMMAND_EVENT)
+            client.flush()
+            received = [event["uuid"] for event in server.events]
+        assert len(received) == 2
+        assert received[-1] == queued_uuid
         assert pending_files(spool_dir=settings.state.spool_dir(tool=TOOL_NAME)) == []
 
     def test_thread_drops_events_once_disabled(self, tmp_path: Path) -> None:
