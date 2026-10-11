@@ -25,7 +25,7 @@ from pipelex.system.usage_stats.usage_stats_core import (
 )
 from pipelex.system.usage_stats.usage_stats_core import main as sender_main
 from pipelex.system.usage_stats.usage_stats_delivery import start_detached_sender
-from tests.helpers.usage_stats_capture import capture_server
+from tests.helpers.usage_stats_capture import capture_server, trickling_server
 from tests.helpers.usage_stats_process import stats_on_environment
 
 
@@ -118,6 +118,25 @@ class TestUsageStatsDelivery:
         state, installation_id = _state_with_id(home=tmp_path)
         write_spool_file(spool_dir=state.spool_dir(tool=TOOL_NAME), events=[_event(distinct_id=installation_id, uuid="u-1")])
         assert sender_main(argv=["--home", str(tmp_path), "--origin", origin, "--tool", TOOL_NAME]) == 2
+        assert len(pending_files(spool_dir=state.spool_dir(tool=TOOL_NAME))) == 1
+
+    def test_post_returns_within_its_budget_whatever_the_network_does(self) -> None:
+        """An answer trickling in byte by byte never trips a socket timeout; the post still returns within its budget."""
+        with trickling_server(seconds_per_byte=0.1) as origin:
+            started = time.monotonic()
+            verdict = post_batch(origin=origin, events=[_event(distinct_id="x", uuid="1")], timeout_seconds=0.5)
+            elapsed = time.monotonic() - started
+        assert verdict == PostVerdict.RETRY
+        assert elapsed < 1.5
+
+    def test_drain_returns_within_its_budget_and_keeps_the_file(self, tmp_path: Path) -> None:
+        state, installation_id = _state_with_id(home=tmp_path)
+        write_spool_file(spool_dir=state.spool_dir(tool=TOOL_NAME), events=[_event(distinct_id=installation_id, uuid="u-1")])
+        with trickling_server(seconds_per_byte=0.1) as origin:
+            started = time.monotonic()
+            drain_spool(state=state, tool=TOOL_NAME, origin=origin, budget_ms=500)
+            elapsed = time.monotonic() - started
+        assert elapsed < 1.5
         assert len(pending_files(spool_dir=state.spool_dir(tool=TOOL_NAME))) == 1
 
     def test_detached_sender_file_posts_the_queue(self, tmp_path: Path) -> None:

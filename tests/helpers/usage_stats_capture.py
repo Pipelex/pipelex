@@ -5,7 +5,9 @@ script is spent. Tests point `PIPELEX_USAGE_STATS_ENDPOINT` at its origin, the o
 """
 
 import json
+import socket
 import threading
+import time
 from collections.abc import Generator
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -80,3 +82,48 @@ def capture_server(*, statuses: list[int] | None = None) -> Generator[CaptureSer
         httpd.shutdown()
         httpd.server_close()
         thread.join(timeout=5)
+
+
+#: The answer a trickling server sends, one byte at a time.
+_TRICKLED_ANSWER = b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}"
+
+
+@contextmanager
+def trickling_server(*, seconds_per_byte: float) -> Generator[str, None, None]:
+    """Serve on `127.0.0.1` a server that reads a request and answers `200` one byte at a time; yield its origin.
+
+    No socket operation of the client waits long enough to time out, so only a deadline on the whole exchange ends the
+    request before the answer is complete.
+    """
+    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listener.bind(("127.0.0.1", 0))
+    listener.listen()
+    listener.settimeout(0.1)
+    stopping = threading.Event()
+
+    def serve() -> None:
+        while not stopping.is_set():
+            try:
+                connection, _ = listener.accept()
+            except OSError:
+                continue
+            with connection:
+                try:
+                    connection.settimeout(5)
+                    connection.recv(65536)
+                    for byte in _TRICKLED_ANSWER:
+                        if stopping.is_set():
+                            break
+                        connection.sendall(bytes([byte]))
+                        time.sleep(seconds_per_byte)
+                except OSError:
+                    continue
+
+    thread = threading.Thread(target=serve, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{listener.getsockname()[1]}"
+    finally:
+        stopping.set()
+        thread.join(timeout=5)
+        listener.close()

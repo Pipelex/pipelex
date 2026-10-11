@@ -21,7 +21,8 @@ The rest of the package imports what it needs from here, so the in-process paths
   never post one file, and after its attempt deletes it or renames it back.
 - **The post**: `POST <origin>/batch/` with `{"api_key": <project token>, "batch": [...]}` and nothing else, so no SDK
   library property, no `sent_at`. Redirects are never followed, so a batch can never be carried anywhere but the
-  origin it was addressed to, and a loopback origin is reached without a proxy.
+  origin it was addressed to, and a loopback origin is reached without a proxy. A post returns within the time left in
+  its budget whatever the network does, name resolution included.
 - **The checks before each post**: the legacy migration runs, nothing is sent when `disabled` exists, and every event
   whose `distinct_id` is not the current identifier is dropped, since it was made under one `reset-id` has replaced.
 
@@ -36,6 +37,7 @@ import os
 import re
 import secrets
 import sys
+import threading
 import time
 import urllib.request
 import uuid
@@ -568,10 +570,8 @@ def _make_opener(*, origin: str) -> urllib.request.OpenerDirector:
     return opener
 
 
-def post_batch(*, origin: str, events: list[dict[str, Any]], timeout_seconds: float) -> PostVerdict:
-    """Post `events` in one request that may take at most `timeout_seconds`; any failure to get an answer is `RETRY`."""
-    if timeout_seconds < MINIMUM_REQUEST_SECONDS:
-        return PostVerdict.RETRY
+def _request_verdict(*, origin: str, events: list[dict[str, Any]], timeout_seconds: float, answers: list[PostVerdict]) -> None:
+    """Make the request and append PostHog's answer to `answers`; any failure to get an answer is `RETRY`."""
     body = json.dumps({"api_key": PROJECT_TOKEN, "batch": events}).encode("utf-8")
     request = urllib.request.Request(  # ruff: ignore[suspicious-url-open-usage] — the origin is PostHog's capture host or a loopback override, both checked
         url=f"{origin.rstrip('/')}{BATCH_PATH}",
@@ -585,8 +585,35 @@ def post_batch(*, origin: str, events: list[dict[str, Any]], timeout_seconds: fl
             status: int = response.status
     except (OSError, http.client.HTTPException, ValueError):
         # No answer at all: a network failure, a timeout, a connection closed mid-answer or an origin the opener refused.
+        answers.append(PostVerdict.RETRY)
+        return
+    answers.append(verdict_for_status(status=status))
+
+
+def post_batch(*, origin: str, events: list[dict[str, Any]], timeout_seconds: float) -> PostVerdict:
+    """Post `events` in one request and return within `timeout_seconds`, whatever the network does.
+
+    A socket's timeout bounds each of its operations, never name resolution nor the whole exchange, so a slow resolver
+    or an answer trickling in byte by byte would hold the caller past its budget. The request runs on a daemon thread
+    instead, which the caller waits for no longer than its budget: a request still running then is `RETRY`, and is left
+    to finish or fail on its own. A resend carries the same `uuid`s, and PostHog keeps a single copy of each event.
+    """
+    if timeout_seconds < MINIMUM_REQUEST_SECONDS:
         return PostVerdict.RETRY
-    return verdict_for_status(status=status)
+    answers: list[PostVerdict] = []
+    request_thread = threading.Thread(
+        target=_request_verdict,
+        kwargs={"origin": origin, "events": events, "timeout_seconds": timeout_seconds, "answers": answers},
+        name="pipelex-usage-stats-post",
+        daemon=True,
+    )
+    try:
+        request_thread.start()
+    except RuntimeError:
+        # The interpreter can start no thread: the events stay to be sent another time.
+        return PostVerdict.RETRY
+    request_thread.join(timeout=timeout_seconds)
+    return answers[0] if answers else PostVerdict.RETRY
 
 
 # -------------------------------------------------------------------------------------------------
