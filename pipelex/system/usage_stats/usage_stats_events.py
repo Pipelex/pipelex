@@ -98,13 +98,19 @@ class InitChoices(UsageStatsProperties):
     enabled_providers: frozenset[UsageStatsProvider] | None = None
 
     def as_properties(self) -> dict[str, Any]:
-        """The `init_*` properties of the command's `command_completed`: one boolean per provider once backends were set."""
+        """The `init_*` properties of the command's `command_completed`: one boolean per provider once backends were set.
+
+        A provider the event has no field for is left out rather than refused, so a provider added to the contract's list
+        before the event's fields can never break the event; the contract tests keep the two lists equal.
+        """
         properties: dict[str, Any] = {}
         if self.execution is not None:
             properties["init_execution"] = self.execution
         if self.enabled_providers is not None:
             for provider in UsageStatsProvider:
-                properties[f"{INIT_BACKEND_PREFIX}{provider}"] = provider in self.enabled_providers
+                name = f"{INIT_BACKEND_PREFIX}{provider}"
+                if name in INIT_BACKEND_FIELDS:
+                    properties[name] = provider in self.enabled_providers
         return properties
 
 
@@ -139,6 +145,10 @@ class CommandCompletedProperties(UsageStatsProperties):
     init_backend_xai: bool | None = None
     init_backend_pipelex_manifold: bool | None = None
     init_backend_custom: bool | None = None
+
+
+#: The `init_backend_*` fields `command_completed` declares, one per provider of `UsageStatsProvider`.
+INIT_BACKEND_FIELDS: frozenset[str] = frozenset(name for name in CommandCompletedProperties.model_fields if name.startswith(INIT_BACKEND_PREFIX))
 
 
 class BundleShape(UsageStatsProperties):

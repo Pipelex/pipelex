@@ -1,6 +1,10 @@
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from pytest_mock import MockerFixture
+
+from pipelex.system.usage_stats import usage_stats_events
 from pipelex.system.usage_stats.usage_stats_contract import (
     CI_VARIABLES,
     CONTAINER_CGROUP_WORDS,
@@ -62,6 +66,7 @@ from pipelex.system.usage_stats.usage_stats_core import (
     SPOOL_TOOLS,
     STATE_DIR_PARTS,
 )
+from pipelex.system.usage_stats.usage_stats_events import INIT_BACKEND_FIELDS, INIT_BACKEND_PREFIX, CommandCompletedProperties, InitChoices
 from pipelex.system.usage_stats.usage_stats_switches import PACKAGED_CONFIG_PATH, packaged_default_says_off
 from tests.helpers.usage_stats_schema import declared_properties, load_usage_stats_schema
 
@@ -72,6 +77,11 @@ def _values(*, event: str, name: str) -> list[str]:
 
 def _values_by(*, event: str, name: str, selector: str) -> list[str]:
     return list(declared_properties(event_name=event)[name]["values_by"]["values"][selector])
+
+
+class _ProvidersWithANewcomer(StrEnum):
+    ANTHROPIC = "anthropic"
+    NEWCOMER = "newcomer"
 
 
 class TestUsageStatsContract:
@@ -166,6 +176,21 @@ class TestUsageStatsContract:
         assert [artifact.value for artifact in UsageStatsCodegenArtifact] == _values(event="code_generated", name="artifact")
         assert [target.value for target in UsageStatsCodegenTarget] == _values(event="code_generated", name="target")
         assert [provider.value for provider in UsageStatsProvider] == _values(event="model_used", name="provider")
+
+    def test_init_backend_fields_are_the_providers_and_the_schemas(self) -> None:
+        """A provider added to the list, to the event's fields or to the schema, is added to all three, or this fails."""
+        fields = {name for name in CommandCompletedProperties.model_fields if name.startswith(INIT_BACKEND_PREFIX)}
+        assert fields == INIT_BACKEND_FIELDS
+        assert fields == {f"{INIT_BACKEND_PREFIX}{provider}" for provider in UsageStatsProvider}
+        assert fields == {name for name in declared_properties(event_name="command_completed") if name.startswith(INIT_BACKEND_PREFIX)}
+
+    def test_a_provider_without_its_field_never_breaks_init_s_event(self, mocker: MockerFixture) -> None:
+        """A provider added to the list before the event's fields is left out of `init`'s `command_completed`, never refused."""
+        mocker.patch.object(usage_stats_events, "UsageStatsProvider", _ProvidersWithANewcomer)
+        properties = InitChoices(enabled_providers=frozenset({UsageStatsProvider.ANTHROPIC})).as_properties()
+        assert properties == {f"{INIT_BACKEND_PREFIX}anthropic": True}
+        event = CommandCompletedProperties(command="init", outcome=UsageStatsOutcome.SUCCEEDED, duration_ms=1, **properties)
+        assert event.init_backend_anthropic is True
 
     def test_command_lists_are_the_schemas(self) -> None:
         assert set(PIPELEX_COMMANDS) == set(_values_by(event="command_completed", name="command", selector=UsageStatsSurface.PIPELEX))
