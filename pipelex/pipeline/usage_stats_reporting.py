@@ -308,11 +308,8 @@ def _model_usage_rows(*, tally: RunInferenceTally | None, events: Sequence[Trace
         if not isinstance(event, UsageReportEvent):
             continue
         tokens_usage = event.tokens_usage
-        model_handle = tokens_usage.inference_model_name
-        reporting_backend = (
-            tally.backend_for_usage(model_handle=model_handle, model_id=tokens_usage.inference_model_id) if tally is not None else None
-        )
-        row = row_for(model_handle=model_handle, backend_name=reporting_backend)
+        # The report names the backend that served the call, which the tally's row for that call names too.
+        row = row_for(model_handle=tokens_usage.inference_model_name, backend_name=tokens_usage.backend_name)
         row.usage_reports += 1
         if tokens_usage.pricing_unit.counts_tokens:
             nb_tokens_by_category = tokens_usage.nb_tokens_by_category

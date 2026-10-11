@@ -69,6 +69,9 @@ class ExtractTokensUsage(BaseModel):
     inference_model_name: str
     unit_costs: CostsByCategoryDict
     inference_model_id: str
+    # The backend that served the call, which a fallback can make another than the first one tried, so the usage is
+    # credited to it even when two backends name the model alike; `None` for a synthetic report no backend made.
+    backend_name: str | None = None
     nb_tokens_by_category: NbTokensByCategoryDict
     # What the counts are: tokens, or requests or pages recorded as a million tokens each so the rates price one.
     pricing_unit: PricingUnit = PricingUnit.TOKEN

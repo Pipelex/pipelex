@@ -153,7 +153,6 @@ class InferenceCallSummary(SummaryEvent):
         run_tally.note_call(
             model_handle=inference_model.name if inference_model is not None else self._model_handle,
             backend_name=inference_model.backend_name if inference_model is not None else None,
-            model_id=inference_model.model_id if inference_model is not None else None,
             failed=failed,
             failure_category=failure_category,
             images_generated=self._images_generated,

@@ -50,9 +50,7 @@ def _job(*, mocker: MockerFixture, is_traced: bool) -> Any:
 def _note_one_call() -> None:
     tally = current_run_tally()
     assert tally is not None
-    tally.note_call(
-        model_handle=_MODEL, backend_name="anthropic", model_id=None, failed=False, failure_category=None, images_generated=0, pages_extracted=0
-    )
+    tally.note_call(model_handle=_MODEL, backend_name="anthropic", failed=False, failure_category=None, images_generated=0, pages_extracted=0)
 
 
 def _call_then_fail(pipe_job: Any) -> Any:
@@ -96,7 +94,7 @@ def run_seams(mocker: MockerFixture) -> MockType:
 
     Returns the stand-in for reading the run's trace events.
     """
-    events: list[TraceEvent] = [llm_usage_event(model_name=_MODEL, input_tokens=120, output_tokens=30)]
+    events: list[TraceEvent] = [llm_usage_event(model_name=_MODEL, backend_name="anthropic", input_tokens=120, output_tokens=30)]
     mocker.patch.object(pipe_run_module.GraphTracerManager, "get_instance", return_value=None)
     read_events = mocker.patch.object(pipe_run_module, "read_run_trace_events", return_value=RunTraceEvents(events=events, read_error=None))
     mocker.patch.object(pipe_run_module, "assemble_tracing_on_output")
