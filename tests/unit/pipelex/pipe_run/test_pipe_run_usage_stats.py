@@ -181,3 +181,28 @@ class TestPipeRunUsageStats:
             configure_usage_stats_for_runtime(integration_mode=IntegrationMode.PYTEST)
             await PipeRun(pipe_router=router).run(pipe_job=_job(mocker=mocker, is_traced=True))
             assert _debug_events(capsys.readouterr().err) == []
+
+    @pytest.mark.parametrize(("router_run", "raised"), [(_call_then_succeed, None), (_call_then_fail, PipelexError)])
+    @pytest.mark.usefixtures("run_seams")
+    async def test_a_statistic_never_changes_the_runs_result(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        router_run: Any,
+        raised: type[BaseException] | None,
+    ) -> None:
+        """Whatever fails while the run's statistics are built, the run ends as it would have without them."""
+        mocker.patch.object(pipe_run_module, "report_run_usage", side_effect=TypeError("an unexpected failure"))
+        router = mocker.AsyncMock()
+        router.run = mocker.AsyncMock(side_effect=router_run)
+        with usage_stats_switched_on(monkeypatch=monkeypatch, home=tmp_path / "home", cwd=make_project_dir(parent=tmp_path), is_debug=True):
+            configure_usage_stats_for_runtime(integration_mode=IntegrationMode.PYTHON)
+            pipe_run = PipeRun(pipe_router=router)
+            if raised is None:
+                await pipe_run.run(pipe_job=_job(mocker=mocker, is_traced=True))
+            else:
+                with pytest.raises(raised):
+                    await pipe_run.run(pipe_job=_job(mocker=mocker, is_traced=True))
+            assert _debug_events(capsys.readouterr().err) == []

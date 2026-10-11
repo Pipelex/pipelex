@@ -226,8 +226,10 @@ class PipeRun(PipeRunProtocol):
                     tally=usage_tally,
                 )
             )
-        except (PipelexError, ValueError, OSError) as report_error:
-            # A library that cannot describe the bundle, an event that will not validate, a state that cannot be read.
+        except Exception as report_error:  # ruff: ignore[blind-except]
+            # (2) Describing the run walks its own pipes and concepts, plugin-provided pipe types included, and their
+            # surface cannot be enumerated; a statistic must never change a run's result, so whatever fails here is
+            # logged and the event is not sent.
             log.debug("The usage statistics of a run could not be built", fields=error_fields(exc=report_error))
 
     @classmethod
