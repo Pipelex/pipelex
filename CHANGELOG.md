@@ -16,6 +16,10 @@
 
 - **A `{% filter %}` block prints its result as a `{{ }}` tag does**: a filter block whose filter returns something other than text, such as `{% filter markdown %}…{% endfilter %}` in a document template or `{% filter length %}`, now prints its result as a `{{ }}` tag prints a value, through the environment's `finalize` and then as text, where it used to fail the render with a type error naming a Python type. A block whose filter returns text prints as before, and the printed result is charged to the render's budget like any printed value.
 
+### Security
+
+- **`uv.lock` refreshed past the open Dependabot alerts**: the lock the `pipelex/pipelex-api` Docker image installs from now holds patched releases of `anyio`, `datamodel-code-generator`, `multidict`, `oauthlib` and `urllib3`, and a development checkout also gets patched `docling`, `transformers`, `torch`, `accelerate`, `fsspec` and `setuptools` through the `docling` extra and a patched `Werkzeug` through the `dev` extra. No `pyproject.toml` range moved, so an application installing the `pipelex` wheel picks these releases up through its own resolution.
+
 ## [v0.83.0] - 2026-10-11
 
 ### Added
