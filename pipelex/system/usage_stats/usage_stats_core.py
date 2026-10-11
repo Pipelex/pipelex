@@ -625,9 +625,11 @@ def _make_opener(*, origin: str) -> urllib.request.OpenerDirector:
     return opener
 
 
-def _request_verdict(*, origin: str, events: list[dict[str, Any]], timeout_seconds: float, answers: list[PostVerdict]) -> None:
-    """Make the request and append PostHog's answer to `answers`; any failure to get an answer is `RETRY`."""
-    body = json.dumps({"api_key": PROJECT_TOKEN, "batch": events}).encode("utf-8")
+def _request_verdict(*, origin: str, body: bytes, timeout_seconds: float, answers: list[PostVerdict]) -> None:
+    """Make the request and append PostHog's answer to `answers`; any failure to get an answer is `RETRY`.
+
+    It runs on its own thread and does network I/O only: the body is encoded before the thread starts.
+    """
     request = urllib.request.Request(  # ruff: ignore[suspicious-url-open-usage] — the origin is PostHog's capture host or a loopback override, both checked
         url=f"{origin.rstrip('/')}{BATCH_PATH}",
         data=body,
@@ -652,13 +654,21 @@ def post_batch(*, origin: str, events: list[dict[str, Any]], timeout_seconds: fl
     or an answer trickling in byte by byte would hold the caller past its budget. The request runs on a daemon thread
     instead, which the caller waits for no longer than its budget: a request still running then is `RETRY`, and is left
     to finish or fail on its own. A resend carries the same `uuid`s, and PostHog keeps a single copy of each event.
+
+    The body is encoded here, before the thread starts: events JSON cannot encode never will be, so they are `REFUSED`
+    and dropped, where an error on the thread would read as `RETRY` and queue them again forever.
     """
     if timeout_seconds < MINIMUM_REQUEST_SECONDS:
         return PostVerdict.RETRY
+    try:
+        body = json.dumps({"api_key": PROJECT_TOKEN, "batch": events}).encode("utf-8")
+    except (TypeError, ValueError):
+        # A value JSON has no form for (`TypeError`), or a circular reference (`ValueError`): refused for good.
+        return PostVerdict.REFUSED
     answers: list[PostVerdict] = []
     request_thread = threading.Thread(
         target=_request_verdict,
-        kwargs={"origin": origin, "events": events, "timeout_seconds": timeout_seconds, "answers": answers},
+        kwargs={"origin": origin, "body": body, "timeout_seconds": timeout_seconds, "answers": answers},
         name="pipelex-usage-stats-post",
         daemon=True,
     )

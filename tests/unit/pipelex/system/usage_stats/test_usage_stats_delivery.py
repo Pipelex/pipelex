@@ -2,6 +2,7 @@ import ast
 import json
 import subprocess  # ruff: ignore[suspicious-subprocess-import] — runs the detached sender module the way a command does
 import sys
+import threading
 import time
 import venv
 from pathlib import Path
@@ -181,6 +182,18 @@ class TestUsageStatsDelivery:
         )
         assert sender_main(argv=["--home", str(tmp_path), "--origin", origin, "--tool", TOOL_NAME]) == 2
         assert len(pending_files(spool_dir=state.spool_dir(tool=TOOL_NAME))) == 1
+
+    def test_events_that_cannot_be_encoded_are_refused_for_good(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A batch JSON cannot encode is refused, never posted and never queued again, and no thread dies of it."""
+        thread_errors: list[threading.ExceptHookArgs] = []
+        monkeypatch.setattr(threading, "excepthook", thread_errors.append)
+        unencodable = {**_event(distinct_id="x", uuid="1"), "properties": {"value": object()}}
+        with capture_server() as server:
+            verdict = post_batch(origin=server.origin, events=[unencodable], timeout_seconds=2)
+        assert verdict == PostVerdict.REFUSED
+        assert verdict.is_final
+        assert server.requests == []
+        assert thread_errors == []
 
     def test_post_returns_within_its_budget_whatever_the_network_does(self) -> None:
         """An answer trickling in byte by byte never trips a socket timeout; the post still returns within its budget."""
