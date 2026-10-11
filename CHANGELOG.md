@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- **A `{% filter %}` block prints its result as a `{{ }}` tag does**: a filter block whose filter returns something other than text, such as `{% filter markdown %}…{% endfilter %}` in a document template or `{% filter length %}`, now prints its result through the environment's `finalize`, then as text, exactly as `{{ … | markdown }}` or `{{ … | length }}` would, where it used to fail the render with a type error naming a Python type. A block whose filter returns text prints as before, and the printed result is charged to the render's budget like any printed value.
+- **A `{% filter %}` block prints its result as a `{{ }}` tag does**: a filter block whose filter returns something other than text, such as `{% filter markdown %}…{% endfilter %}` in a document template or `{% filter length %}`, now prints its result as a `{{ }}` tag prints a value, through the environment's `finalize` and then as text, where it used to fail the render with a type error naming a Python type. A block whose filter returns text prints as before, and the printed result is charged to the render's budget like any printed value.
 
 ## [v0.83.0] - 2026-10-11
 

@@ -112,6 +112,13 @@ class TestPlainDataTemplateEnvironment:
         notes = MarkdownFormattingTestData.NOTES
         assert environment.from_string(block_source).render(notes=notes) == environment.from_string(printed_source).render(notes=notes)
 
+    def test_a_markdown_filter_block_reads_none_printed_in_its_body_as_text(self) -> None:
+        # The block's body is printed before the filter reads it, so None arrives as the text "None"; the tag form
+        # is the one that turns None into nothing, as the docs say.
+        environment = make_plain_data_template_environment()
+        assert environment.from_string("[{% filter markdown %}{{ notes }}{% endfilter %}]").render(notes=None) == "[None]"
+        assert environment.from_string("[{{ notes | markdown }}]").render(notes=None) == "[]"
+
     def test_a_filter_after_markdown_in_a_block_prints_what_it_returns(self) -> None:
         environment = make_plain_data_template_environment(finalize=_kinds_of_formatted)
         template = environment.from_string("{% filter markdown | upper %}{{ notes }}{% endfilter %}")
