@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:80f01c960daaa396a3c754cca2f365af26d7a0f582c20601053df121b4d77fe7"
+digest = "sha256:66bf51a2e90466528e0059c0722fccebd1accb16236e9b81af538eb24a1b00ef"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-11T17:20:44Z"
-rationale = "real-catch: PipelexConfig gained a usage_stats section (UsageStatsConfig, enabled: bool) and pipelex/pipelex.toml ships [usage_stats] enabled = true with a prose comment. docs/configuration/index.md listed the top-level sections without it; it now names [usage_stats], says only false has an effect, read from the project's own .pipelex/pipelex.toml and the packaged file, never ~/.pipelex/, and links the new docs/setup/usage-statistics.md, which documents the switch and its fail-closed reading. telemetry-config.md no longer claims nothing reports to Pipelex without naming the statistics. The key is additive, so the defaults layer supplies it and no ledger entry is owed; the pipelex-config golden was regenerated and make tb passes."
+reviewed_at = "2026-10-11T20:09:33Z"
+rationale = "clean-pass: ConfigLoader.find_project_root now stats each marker instead of asking Path.exists(), which from Python 3.14 swallows every OSError; the markers, the walk and the home stop are unchanged, and a directory that cannot be traversed raises as it already did on 3.13. No config model, default or documented behaviour changed, so docs/configuration and the migration ledgers stand."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:293ef22ae123266e6a1886d4ffb07f455e5be9e3"
@@ -13,7 +13,7 @@ rationale = "real-catch: PipelexConfig gained a usage_stats section (UsageStatsC
 "pipelex/pipelex.toml" = "blob:95eed7d7186c0a6b25349893c002c16fc82b4d4d"
 "pipelex/system/configuration/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
 "pipelex/system/configuration/config_check.py" = "blob:2d5de29aba3d2ce205d3d82b4623f37b53108332"
-"pipelex/system/configuration/config_loader.py" = "blob:2850f6b39df6ad2afafefc4d431672cb6ee91ced"
+"pipelex/system/configuration/config_loader.py" = "blob:8703fc3e5a82d7c6a3d148ea195c25044c2f0fe0"
 "pipelex/system/configuration/config_model.py" = "blob:b7d141d559c0302f0d8c56859ae0a8edeb9bfdf0"
 "pipelex/system/configuration/config_root.py" = "blob:c7d43851270912d17413cfc6a511247d3c7cc160"
 "pipelex/system/configuration/config_surface.py" = "blob:49424a8103a5611f5b2885135dd699273bde57c8"
