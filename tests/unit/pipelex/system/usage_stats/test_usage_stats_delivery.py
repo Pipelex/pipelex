@@ -104,6 +104,25 @@ class TestUsageStatsDelivery:
         assert state.is_disabled()
         assert pending_files(spool_dir=state.spool_dir(tool=TOOL_NAME)) == []
 
+    def test_nothing_is_sent_while_a_legacy_opt_out_cannot_be_migrated(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """A legacy opt-out the migration cannot carry over, its state being unwritable, still says off before each post."""
+        state, installation_id = _state_with_id(home=tmp_path)
+        write_spool_file(spool_dir=state.spool_dir(tool=TOOL_NAME), events=[_event(distinct_id=installation_id, uuid="u-1")])
+        state.legacy_config.write_text("DISABLE_TELEMETRY=true\n", encoding="utf-8")
+        mocker.patch.object(UsageStatsState, "disable", side_effect=OSError("read-only state"))
+        with capture_server() as server:
+            drain_spool(state=state, tool=TOOL_NAME, origin=server.origin, budget_ms=2000)
+            verdict, posted = post_in_process(
+                state=state,
+                events=[_event(distinct_id=installation_id, uuid="u-2")],
+                origin=server.origin,
+                deadline=time.monotonic() + 1,
+                own_id=None,
+            )
+        assert server.requests == []
+        assert (verdict, posted) == (None, [])
+        assert state.legacy_opt_out_is_pending()
+
     def test_sender_drains_only_its_own_tool(self, tmp_path: Path) -> None:
         state, installation_id = _state_with_id(home=tmp_path)
         write_spool_file(spool_dir=state.spool_dir(tool="plxt"), events=[_event(distinct_id=installation_id, uuid="plxt-1")])

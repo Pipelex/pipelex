@@ -23,8 +23,9 @@ The rest of the package imports what it needs from here, so the in-process paths
   library property, no `sent_at`. Redirects are never followed, so a batch can never be carried anywhere but the
   origin it was addressed to, and a loopback origin is reached without a proxy. A post returns within the time left in
   its budget whatever the network does, name resolution included.
-- **The checks before each post**: the legacy migration runs, nothing is sent when `disabled` exists, and every event
-  whose `distinct_id` is not the current identifier is dropped, since it was made under one `reset-id` has replaced.
+- **The checks before each post**: the legacy migration runs, nothing is sent when `disabled` exists or when a legacy
+  opt-out the migration could not carry over is still pending, and every event whose `distinct_id` is not the current
+  identifier is dropped, since it was made under one `reset-id` has replaced.
 
 The contract is `conformance/specs/usage-statistics.md`, "Shared state" and "Delivery"; the constants here are checked
 against its schema by the tests, beside the ones of `usage_stats_contract`.
@@ -631,7 +632,8 @@ def screen_events(*, state: UsageStatsState, events: list[dict[str, Any]], own_i
             whose events are this process's own and still to be sent. A detached sender has none.
     """
     state.migrate_legacy_opt_out()
-    if state.is_disabled():
+    if state.is_disabled() or state.legacy_opt_out_is_pending():
+        # A legacy opt-out the migration could not carry over still says off.
         return None
     current_id = state.read_installation_id() or own_id
     return [event for event in events if event.get("distinct_id") == current_id]
