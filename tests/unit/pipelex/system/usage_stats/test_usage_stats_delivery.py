@@ -139,9 +139,14 @@ class TestUsageStatsDelivery:
         state, installation_id = _state_with_id(home=tmp_path)
         spool_dir = state.spool_dir(tool=TOOL_NAME)
         spool_dir.mkdir(parents=True)
-        for created_ms, endpoint in ((1000, CAPTURE_HOST), (1001, "http://127.0.0.1:9")):
-            payload = {"spool_version": 1, "endpoint": endpoint, "events": [_event(distinct_id=installation_id, uuid=f"queued-for-{created_ms}")]}
-            (spool_dir / f"{int(time.time() * 1000) - created_ms}-elsewhere.json").write_text(json.dumps(payload), encoding="utf-8")
+        queued_ms = int(time.time() * 1000) - 1000
+        for index_file, endpoint in enumerate((CAPTURE_HOST, "http://127.0.0.1:9")):
+            payload = {
+                "spool_version": 1,
+                "endpoint": endpoint,
+                "events": [_event(distinct_id=installation_id, uuid=f"queued-elsewhere-{index_file}")],
+            }
+            (spool_dir / f"{queued_ms}-elsewhere{index_file}.json").write_text(json.dumps(payload), encoding="utf-8")
         with capture_server() as server:
             write_spool_file(
                 spool_dir=spool_dir, content=SpoolContent(endpoint=server.origin, events=[_event(distinct_id=installation_id, uuid="mine")])
@@ -150,7 +155,7 @@ class TestUsageStatsDelivery:
             drain_spool(state=state, tool=TOOL_NAME, origin=server.origin, budget_ms=2000)
         assert sorted(event["uuid"] for event in server.events) == ["any", "mine"]
         assert sorted(path.name for path in pending_files(spool_dir=spool_dir)) == sorted(
-            path.name for path in spool_dir.iterdir() if path.name.endswith("-elsewhere.json")
+            path.name for path in spool_dir.iterdir() if "-elsewhere" in path.name
         )
         assert len(pending_files(spool_dir=spool_dir)) == 2
 
