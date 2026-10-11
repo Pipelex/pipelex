@@ -31,10 +31,9 @@ from tests.helpers.completion_stop import STOP_TEST_PARTIAL_TEXT, STOP_TEST_PIPE
 
 if TYPE_CHECKING:
     from typing import Literal
-    from unittest.mock import MagicMock
 
     from opentelemetry.sdk.trace import ReadableSpan
-    from pytest_mock import MockerFixture
+    from pytest_mock import MockerFixture, MockType
 
 INPUT_TOKENS = 50
 OUTPUT_TOKENS = 256
@@ -51,7 +50,7 @@ def _completion(*, finish_reason: Literal["stop", "length", "content_filter"]) -
     )
 
 
-def _make_worker(mocker: MockerFixture, *, response: ChatCompletion) -> tuple[OpenAICompletionsLLMWorker, MagicMock]:
+def _make_worker(mocker: MockerFixture, *, response: ChatCompletion) -> tuple[OpenAICompletionsLLMWorker, MockType]:
     """The worker built as its factory builds it, its SDK call answering with the response, its delegate recording."""
     sdk_client = AsyncOpenAI(api_key="test-key")
     mocker.patch.object(sdk_client.chat.completions, "create", new=mocker.AsyncMock(return_value=response))
@@ -103,7 +102,7 @@ def _only_span(exporter: InMemorySpanExporter) -> ReadableSpan:
     return span
 
 
-def _assert_reported_once_with_its_usage(*, reporting_delegate: MagicMock, llm_job: LLMJob) -> None:
+def _assert_reported_once_with_its_usage(*, reporting_delegate: MockType, llm_job: LLMJob) -> None:
     reporting_delegate.report_inference_job.assert_called_once_with(inference_job=llm_job)
     tokens_usage = llm_job.job_report.llm_tokens_usage
     assert tokens_usage is not None

@@ -523,6 +523,11 @@ What varies goes in `fields`, named by the [naming convention](#naming-conventio
 | `sdk` | string | The SDK a backend reaches a model through, as the backends configuration names it: `openai`, `bedrock_anthropic` |
 | `answered_model_id` | string | The provider's id of the model a provider says answered a call, where it is not the pinned id the call was made with, which `gen_ai.response.model` names |
 | `fixed_temperature` | number | The one temperature a model accepts, as its constraints declare it, used in place of the one requested |
+| `stop_reason` | string | Why a provider's answer says its text ended, in that provider's own vocabulary: `max_tokens`, `content_filtered`, `MAX_TOKENS`; for a Responses API answer, its status: `incomplete` |
+| `incomplete_reason` | string or `null` | The reason an `incomplete` Responses API answer gives in its details, `null` when it gives none |
+| `block_reason` | string | The reason a Gemini answer holding no candidate gives in its prompt feedback for blocking the prompt: `SAFETY` |
+| `requested_max_tokens`, `effective_max_tokens` | integer | The output limit a call was given, the pipe's setting or the model's default, and the lower one it sends instead |
+| `timeout_seconds` | integer | A call's timeout, in seconds, as the configuration sets it: a configured limit, not a measured duration, which `duration_ms` names |
 | `inference_job_type` | string | An inference job's class: `LLMJob`, `ImgGenJob` |
 | `image_size` | string | An image size as a generation request spells it, width by height: `2560x1440` |
 | `nb_steps` | integer | The number of inference steps an image generation job requests, spelled as its parameters spell it |

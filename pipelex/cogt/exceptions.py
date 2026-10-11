@@ -412,11 +412,12 @@ class LLMCompletionTruncatedError(LLMCompletionError):
     `pipelex.cogt.llm.completion_stop`), instead of handing back the partial or empty text as a result. It
     is a content error, in the input domain, and not retryable: the same request stops at the same limit,
     and the remedy is the author's or the caller's. Which remedy depends on the limit hit, carried as
-    `truncation_limit`: at the output limit, a higher `max_tokens` on the pipe or a shorter input; at the
-    context window, which the input and the output filled together, a shorter input, less thinking or a
-    model with a larger window, never a higher `max_tokens`. The message names only the pipe, the model's
-    deck handle, the provider's stop value and the token counts, never the partial text or the provider's
-    body, so it is kept verbatim for the caller.
+    `truncation_limit`: at the output limit, a higher `max_tokens` on the pipe or a shorter input, or, when the
+    request sent no `max_tokens` and the provider's default cut the text, a `max_tokens` set on the pipe up to
+    the model's limit, a lower reasoning effort or a shorter input; at the context window, which the input and
+    the output filled together, a shorter input, less thinking or a model with a larger window, never a higher
+    `max_tokens`. The message names only the pipe, the model's deck handle, the provider's stop value and the
+    token counts, never the partial text or the provider's body, so it is kept verbatim for the caller.
     """
 
     error_category = InferenceErrorCategory.CONTENT
@@ -443,7 +444,16 @@ class LLMCompletionTruncatedError(LLMCompletionError):
         match truncation_limit:
             case CompletionTruncationLimit.MAX_TOKENS:
                 what_happened = "was cut off"
-                next_step = "Raise the pipe's max_tokens, or shorten its input." if pipe_code else "Raise max_tokens, or shorten the input."
+                if max_tokens is not None:
+                    next_step = "Raise the pipe's max_tokens, or shorten its input." if pipe_code else "Raise max_tokens, or shorten the input."
+                else:
+                    # The request left the limit to the provider's default, so there is no max_tokens of the pipe's to raise
+                    details.append("no max_tokens sent")
+                    next_step = (
+                        "Set the pipe's max_tokens up to the model's limit, lower its reasoning effort, or shorten its input."
+                        if pipe_code
+                        else "Set max_tokens up to the model's limit, lower the reasoning effort, or shorten the input."
+                    )
             case CompletionTruncationLimit.CONTEXT_WINDOW:
                 what_happened = "filled its context window"
                 next_step = (

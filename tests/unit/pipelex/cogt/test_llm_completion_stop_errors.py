@@ -20,6 +20,7 @@ TRUNCATED_MESSAGE = (
     "(stop reason 'max_tokens', 4096 output tokens used, max_tokens set to 4096), so the text is incomplete. "
     "Raise the pipe's max_tokens, or shorten its input."
 )
+NO_MAX_TOKENS_NEXT_STEP = "Set the pipe's max_tokens up to the model's limit, lower its reasoning effort, or shorten its input."
 CONTEXT_WINDOW_NEXT_STEP = "Shorten the pipe's input, lower its reasoning effort, or choose a model with a larger context window."
 CONTEXT_WINDOW_MESSAGE = (
     "The model 'claude-5-sonnet' filled its context window before it finished the text of pipe 'ui_designer' "
@@ -67,6 +68,26 @@ class TestLLMCompletionStopErrors:
         assert error.user_action.kind == UserActionKind.CHANGE_INPUT
         assert error.user_action.detail == "Raise the pipe's max_tokens, or shorten its input."
 
+    def test_a_cut_with_no_max_tokens_sent_advises_setting_one_rather_than_raising_it(self) -> None:
+        """The provider's default cut the text, so there is no max_tokens of the pipe's to raise: the advice is to set one."""
+        error = LLMCompletionTruncatedError(
+            model_handle="gpt-test",
+            stop_reason="length",
+            truncation_limit=CompletionTruncationLimit.MAX_TOKENS,
+            pipe_code="ui_designer",
+            output_tokens=16384,
+        )
+
+        assert error.message == (
+            "The model 'gpt-test' was cut off before it finished the text of pipe 'ui_designer' "
+            "(stop reason 'length', 16384 output tokens used, no max_tokens sent), so the text is incomplete. "
+            f"{NO_MAX_TOKENS_NEXT_STEP}"
+        )
+        assert error.user_action is not None
+        assert error.user_action.kind == UserActionKind.CHANGE_INPUT
+        assert error.user_action.detail == NO_MAX_TOKENS_NEXT_STEP
+        assert "Raise" not in error.message
+
     def test_a_context_window_stop_advises_a_shorter_input_never_a_higher_max_tokens(self) -> None:
         """The input and the output filled the window together, so a higher max_tokens cannot lift it."""
         error = _context_window_error()
@@ -86,15 +107,24 @@ class TestLLMCompletionStopErrors:
         assert error.user_action.detail == "Revise the pipe's prompt or its input."
 
     def test_without_a_pipe_or_counts_the_messages_still_read_as_sentences(self) -> None:
-        truncated = LLMCompletionTruncatedError(model_handle="gpt-test", stop_reason="length", truncation_limit=CompletionTruncationLimit.MAX_TOKENS)
+        truncated = LLMCompletionTruncatedError(
+            model_handle="gpt-test", stop_reason="length", truncation_limit=CompletionTruncationLimit.MAX_TOKENS, max_tokens=2048
+        )
+        truncated_by_default = LLMCompletionTruncatedError(
+            model_handle="gpt-test", stop_reason="length", truncation_limit=CompletionTruncationLimit.MAX_TOKENS
+        )
         context_window = LLMCompletionTruncatedError(
             model_handle="mistral-test", stop_reason="model_length", truncation_limit=CompletionTruncationLimit.CONTEXT_WINDOW
         )
         refused = LLMCompletionRefusedError(model_handle="gpt-test", stop_reason="refusal")
 
         assert truncated.message == (
-            "The model 'gpt-test' was cut off before it finished its text (stop reason 'length'), so the text is incomplete. "
-            "Raise max_tokens, or shorten the input."
+            "The model 'gpt-test' was cut off before it finished its text (stop reason 'length', max_tokens set to 2048), "
+            "so the text is incomplete. Raise max_tokens, or shorten the input."
+        )
+        assert truncated_by_default.message == (
+            "The model 'gpt-test' was cut off before it finished its text (stop reason 'length', no max_tokens sent), "
+            "so the text is incomplete. Set max_tokens up to the model's limit, lower the reasoning effort, or shorten the input."
         )
         assert context_window.message == (
             "The model 'mistral-test' filled its context window before it finished its text (stop reason 'model_length'), "

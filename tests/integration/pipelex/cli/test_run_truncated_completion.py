@@ -106,7 +106,8 @@ class TestRunTruncatedCompletion:
         assert f"Failed to execute pipeline '{pipe_code}': Pipe '{pipe_code}' failed: " in stderr
         assert (
             f"The model '{model_handle}' was cut off before it finished the text of pipe '{pipe_code}' "
-            "(stop reason 'length', 64 output tokens used), so the text is incomplete. Raise the pipe's max_tokens, or shorten its input."
+            "(stop reason 'length', 64 output tokens used, no max_tokens sent), so the text is incomplete. "
+            "Set the pipe's max_tokens up to the model's limit, lower its reasoning effort, or shorten its input."
         ) in stderr
         assert TruncatedCompletionRunTestData.PARTIAL_TEXT not in stderr
         assert TruncatedCompletionRunTestData.PARTIAL_TEXT not in console.export_text()
