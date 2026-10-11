@@ -16,7 +16,7 @@ import tomli
 from pipelex.system.configuration.config_loader import CONFIG_NAME, ConfigLoader
 from pipelex.system.environment import CONFIG_DIR_NAME
 from pipelex.system.usage_stats.usage_stats_contract import SETTING_KEY, SETTING_TABLE, UsageStatsEnvVar, UsageStatsOffBy
-from pipelex.system.usage_stats.usage_stats_core import UsageStatsState
+from pipelex.system.usage_stats.usage_stats_core import UsageStatsState, path_exists
 from pipelex.system.usage_stats.usage_stats_environment import is_truthy_flag, resolve_endpoint, tool_switch_says_off
 
 #: pipelex's packaged configuration, which carries `[usage_stats] enabled = true`; a packager may ship `false`.
@@ -51,13 +51,23 @@ def project_setting_says_off(*, cwd: Path) -> bool:
 
     The project is found the way pipelex finds its project configuration: from `cwd`, walking up to the first directory
     holding a project marker, stopping at the home directory, which is never a project, and at the filesystem root. So
-    `~/.pipelex/pipelex.toml`, pipelex's home layer, is not a switch. No project, or no file there, means no setting.
+    `~/.pipelex/pipelex.toml`, pipelex's home layer, is not a switch. No project, or no file there, means no setting;
+    a project or a file that cannot be looked for is a file that cannot be read, which turns statistics off.
     """
-    project_root = ConfigLoader.find_project_root(cwd)
+    try:
+        project_root = ConfigLoader.find_project_root(cwd)
+    except (OSError, RuntimeError):
+        # A directory on the way up that cannot be looked into, or no home directory to stop at: the project's file
+        # cannot be read, which fails closed.
+        return True
     if project_root is None:
         return False
     config_path = project_root / CONFIG_DIR_NAME / CONFIG_NAME
-    if not config_path.exists():
+    config_exists = path_exists(path=config_path)
+    if config_exists is None:
+        # A file whose very existence cannot be told cannot be read either, which fails closed.
+        return True
+    if not config_exists:
         return False
     return setting_says_off(config_path=config_path)
 

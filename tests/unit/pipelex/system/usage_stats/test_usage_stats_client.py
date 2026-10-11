@@ -6,8 +6,17 @@ from typing import Any
 import pytest
 from pytest_mock import MockerFixture
 
+from pipelex.system.runtime import IntegrationMode
 from pipelex.system.usage_stats import usage_stats_client
-from pipelex.system.usage_stats.usage_stats_client import UsageStatsClient, UsageStatsDelivery, UsageStatsSettings, build_settings
+from pipelex.system.usage_stats.usage_stats_client import (
+    UsageStatsClient,
+    UsageStatsDelivery,
+    UsageStatsSettings,
+    build_settings,
+    configure_usage_stats_for_cli,
+    configure_usage_stats_for_runtime,
+    get_usage_stats_client,
+)
 from pipelex.system.usage_stats.usage_stats_contract import (
     TOOL_NAME,
     UsageStatsEnvVar,
@@ -21,7 +30,7 @@ from pipelex.system.usage_stats.usage_stats_core import SpoolContent, UsageStats
 from pipelex.system.usage_stats.usage_stats_events import CommandCompletedProperties, UsageStatsEvent
 from pipelex.test_extras.usage_stats_isolation import USAGE_STATS_DEAD_LOOPBACK_ORIGIN
 from tests.helpers.usage_stats_capture import capture_server
-from tests.helpers.usage_stats_process import make_project_dir
+from tests.helpers.usage_stats_process import CAN_LOCK_DIRECTORIES, locked_directory, make_project_dir, usage_stats_switched_on
 from tests.helpers.usage_stats_schema import assert_envelope_is_valid
 
 _COMMAND_EVENT = UsageStatsEvent(
@@ -262,3 +271,25 @@ class TestUsageStatsClient:
         client.reset_after_fork()
         client.finish_command()
         start.assert_not_called()
+
+    def test_configuration_never_fails_for_want_of_a_home(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+        """No home directory to find: a command and a booting process both run without statistics."""
+        with usage_stats_switched_on(monkeypatch=monkeypatch, home=tmp_path / "home", cwd=make_project_dir(parent=tmp_path)):
+            mocker.patch.object(UsageStatsState, "make_for_current_home", side_effect=RuntimeError("Could not determine home directory."))
+            assert configure_usage_stats_for_cli(surface=UsageStatsSurface.PIPELEX, is_machine_read=False) is None
+            configure_usage_stats_for_runtime(integration_mode=IntegrationMode.PYTHON)
+            assert get_usage_stats_client() is None
+
+    @pytest.mark.skipif(not CAN_LOCK_DIRECTORIES, reason="needs a directory this process cannot traverse")
+    def test_configuration_never_fails_for_a_state_that_cannot_be_looked_into(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """A state no one may traverse may hold `disabled`: the command runs with statistics off, and no notice is printed."""
+        with (
+            usage_stats_switched_on(monkeypatch=monkeypatch, home=tmp_path / "locked" / "home", cwd=make_project_dir(parent=tmp_path)),
+            locked_directory(path=tmp_path / "locked"),
+        ):
+            client = configure_usage_stats_for_cli(surface=UsageStatsSurface.PIPELEX, is_machine_read=False)
+            assert client is not None
+            assert UsageStatsOffBy.MACHINE_CHOICE in client.settings.off_by
+        assert capsys.readouterr().err == ""

@@ -17,6 +17,7 @@ from pipelex.system.usage_stats.usage_stats_core import (
     parse_legacy_config,
     write_spool_file,
 )
+from tests.helpers.usage_stats_process import CAN_LOCK_DIRECTORIES, locked_directory
 
 
 def _seed_every_spool(*, state: UsageStatsState) -> None:
@@ -167,3 +168,20 @@ class TestUsageStatsState:
         assert not state.is_internal()
         state.internal_file.touch()
         assert state.is_internal()
+
+    @pytest.mark.skipif(not CAN_LOCK_DIRECTORIES, reason="needs a directory this process cannot traverse")
+    def test_no_reader_raises_for_a_state_that_cannot_be_looked_into(self, tmp_path: Path) -> None:
+        """A directory above the state that may not be traversed: `disabled` fails closed, every other fact reads as absent."""
+        state = UsageStatsState(home=tmp_path / "locked" / "home")
+        with locked_directory(path=tmp_path / "locked"):
+            assert state.is_disabled() is True
+            assert state.is_internal() is False
+            assert state.seen_notice_version(up_to=1) == 0
+            assert state.notice_was_recorded(version=1) is False
+            assert state.read_installation_id() is None
+            assert state.obtain_installation_id().is_new
+            assert state.ensure_state_dir() is False
+            assert state.record_notice(version=1) is False
+            assert state.legacy_opt_out_is_pending() is False
+            state.migrate_legacy_opt_out()
+            state.delete_every_spool()

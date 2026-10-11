@@ -25,7 +25,7 @@ from pipelex.system.usage_stats.usage_stats_contract import (
     UsageStatsHost,
     UsageStatsOs,
 )
-from pipelex.system.usage_stats.usage_stats_core import CAPTURE_HOST, is_loopback_origin
+from pipelex.system.usage_stats.usage_stats_core import CAPTURE_HOST, is_loopback_origin, path_exists
 
 _LEADING_RELEASE = re.compile(r"^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}")
 
@@ -74,7 +74,7 @@ def is_ci(*, env: Mapping[str, str]) -> bool:
 
 def is_container(*, env: Mapping[str, str]) -> bool:
     """Whether the process runs in a container: a marker file, a marker variable that is not empty, or PID 1's cgroup."""
-    if any(Path(marker).exists() for marker in CONTAINER_MARKER_FILES):
+    if any(path_exists(path=Path(marker)) is True for marker in CONTAINER_MARKER_FILES):
         return True
     if any(env.get(variable, "").strip() for variable in CONTAINER_MARKER_VARIABLES):
         return True

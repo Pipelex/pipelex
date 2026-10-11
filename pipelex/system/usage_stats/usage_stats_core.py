@@ -14,7 +14,7 @@ The rest of the package imports what it needs from here, so the in-process paths
   tool; `legacy-migrated` records when the legacy `mthds` opt-out was last carried over; `notice-v<N>` records that
   notice N was shown; `internal` marks a team machine; and `spool/<tool>/` queues each tool's unsent events. A
   filesystem failure is never raised from a reader: statistics are a measurement, never part of what the person asked
-  for, so an unreadable state reads as absent.
+  for, so an unreadable state reads as absent, except `disabled`, which it may hold: statistics are then off.
 - **The spool**: a file is named `<created-ms>-<random>.json` and holds `{"spool_version": 1, "events": [...]}`, to
   which pipelex adds `"endpoint"`, the origin the events were queued for: a sender posts a file only to that origin,
   and a file naming none, as the contract's shape names none, to any. It is written under a name starting with a dot
@@ -127,6 +127,22 @@ class InstallationId(NamedTuple):
     is_new: bool
 
 
+def path_exists(*, path: Path) -> bool | None:
+    """Whether `path` exists, and `None` when that cannot be told, as when a directory above it may not be traversed."""
+    try:
+        return path.exists()
+    except OSError:
+        return None
+
+
+def delete_file(*, path: Path) -> None:
+    """Delete `path` if it exists; a file that cannot be deleted stays, and is met again by whoever looks next."""
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        return
+
+
 def new_installation_id() -> str:
     """A random UUID version 4 in its canonical lowercase form, derived from nothing about the machine or the person."""
     return str(uuid.uuid4())
@@ -180,9 +196,9 @@ class UsageStatsState:
         """Create the directory, mode 0700, when a tool first needs it; whether it exists now."""
         try:
             self.state_dir.mkdir(mode=_STATE_DIR_MODE, parents=True, exist_ok=True)
+            return self.state_dir.is_dir()
         except OSError:
             return False
-        return self.state_dir.is_dir()
 
     # ---------------------------------------------------------------------------------------------
     # The installation identifier
@@ -230,7 +246,7 @@ class UsageStatsState:
             finally:
                 os.close(descriptor)
         except OSError:
-            temporary.unlink(missing_ok=True)
+            delete_file(path=temporary)
             return process_local
 
         published: bool
@@ -241,9 +257,9 @@ class UsageStatsState:
             published = False
         except OSError:
             # A filesystem without hard links, or one that refuses them here: nothing is persisted.
-            temporary.unlink(missing_ok=True)
+            delete_file(path=temporary)
             return process_local
-        temporary.unlink(missing_ok=True)
+        delete_file(path=temporary)
 
         if published:
             return InstallationId(value=fresh_id, is_new=True)
@@ -283,17 +299,22 @@ class UsageStatsState:
     # ---------------------------------------------------------------------------------------------
 
     def is_disabled(self) -> bool:
-        return self.disabled_file.exists()
+        """Whether `disabled` exists; a state that cannot be looked into fails closed, since it may hold that choice."""
+        return path_exists(path=self.disabled_file) is not False
 
     def is_internal(self) -> bool:
-        return self.internal_file.exists()
+        return path_exists(path=self.internal_file) is True
 
     def seen_notice_version(self, *, up_to: int) -> int:
         """The highest notice version N, no higher than `up_to`, for which `notice-v<N>` exists, and 0 when none does."""
         for version in range(up_to, 0, -1):
-            if self.notice_marker(version=version).exists():
+            if path_exists(path=self.notice_marker(version=version)) is True:
                 return version
         return 0
+
+    def notice_was_recorded(self, *, version: int) -> bool:
+        """Whether `notice-v<version>` exists; a marker that cannot be looked for is absent, so the notice is printed."""
+        return path_exists(path=self.notice_marker(version=version)) is True
 
     def record_notice(self, *, version: int) -> bool:
         """Create `notice-v<version>`; whether it exists now. A notice that cannot be recorded is shown again next time."""
@@ -465,7 +486,7 @@ def write_spool_file(*, spool_dir: Path, content: SpoolContent) -> Path:
 def _enforce_file_limit(*, spool_dir: Path) -> None:
     waiting = pending_files(spool_dir=spool_dir)
     for oldest in waiting[: max(0, len(waiting) - SPOOL_MAX_FILES_PER_TOOL)]:
-        oldest.unlink(missing_ok=True)
+        delete_file(path=oldest)
 
 
 def read_spool_file(*, path: Path) -> SpoolContent | None:
@@ -545,14 +566,14 @@ def prune(*, spool_dir: Path) -> None:
         name = entry.name
         if name.startswith("."):
             if age_seconds > SPOOL_STALE_TEMP_MINUTES * 60:
-                entry.unlink(missing_ok=True)
+                delete_file(path=entry)
         elif CLAIM_MARKER in name:
             if age_seconds > SPOOL_STALE_CLAIM_MINUTES * 60:
                 release(claimed=entry)
         elif is_pending(path=entry):
             created_ms = _created_ms(path=entry) or 0
             if now * 1000 - created_ms > SPOOL_MAX_AGE_DAYS * 24 * 3600 * 1000:
-                entry.unlink(missing_ok=True)
+                delete_file(path=entry)
 
 
 # -------------------------------------------------------------------------------------------------
@@ -669,7 +690,7 @@ def send_claimed_file(*, state: UsageStatsState, claimed: Path, origin: str, dea
     """Post a file this sender claimed, then delete it or give it back by PostHog's answer; `None` when nothing was posted."""
     content = read_spool_file(path=claimed)
     if content is None:
-        claimed.unlink(missing_ok=True)
+        delete_file(path=claimed)
         return None
     if not content.is_queued_for(origin=origin):
         release(claimed=claimed)
@@ -677,18 +698,18 @@ def send_claimed_file(*, state: UsageStatsState, claimed: Path, origin: str, dea
     events = content.events
     kept = screen_events(state=state, events=events, own_id=own_id)
     if not kept:
-        claimed.unlink(missing_ok=True)
+        delete_file(path=claimed)
         return None
     if len(kept) != len(events):
         try:
             rewrite_spool_file(path=claimed, content=content._replace(events=kept))
         except OSError:
             # The dropped events must never be sent: a file that cannot be rewritten without them is deleted with them.
-            claimed.unlink(missing_ok=True)
+            delete_file(path=claimed)
             return None
     verdict = post_batch(origin=origin, events=kept, timeout_seconds=deadline - time.monotonic())
     if verdict.is_final:
-        claimed.unlink(missing_ok=True)
+        delete_file(path=claimed)
     else:
         release(claimed=claimed)
     return verdict

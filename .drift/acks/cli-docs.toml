@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:1d9b6a732e3c7864dd0592115d31e6b554064eb60c1e4a5e3c6bec0ad68586a2"
+digest = "sha256:b9587397a7e3d8c4093ee2f44b8f979c1bd4666c641ce8212d9ccd2827e63c96"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-11T18:55:34Z"
-rationale = "clean-pass: run_with_usage_stats now reports a command stopped at a prompt (Click's Abort from Ctrl-C or a declined confirmation, which Typer exits with 1) as cancelled in its command_completed; no option, output or exit code changed, so docs/tools/cli/ and the agent CLI guide stand."
+reviewed_at = "2026-10-11T18:59:14Z"
+rationale = "clean-pass: run_with_usage_stats now runs a command without statistics when they cannot be configured at all, and its end can no longer raise over the command's own exit; no option, output or exit code changed, so docs/tools/cli/ and the agent CLI guide stand, and docs/setup/usage-statistics.md says what an unreadable state does."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -132,5 +132,5 @@ rationale = "clean-pass: run_with_usage_stats now reports a command stopped at a
 "pipelex/cli/installed_methods.py" = "blob:f7818b7857a8350389cf196e32630e7b3c51818c"
 "pipelex/cli/method_resolver.py" = "blob:34612bb21e9aae60cd5244abfa111d554443533a"
 "pipelex/cli/readiness.py" = "blob:6d185324ed0784663e1dc78d1194a28312c54798"
-"pipelex/cli/usage_stats_cli.py" = "blob:fc6fc334d03a861ee806788c243e8770055377ca"
+"pipelex/cli/usage_stats_cli.py" = "blob:d04e2191e6f6a18027558a3e063f945be7b77679"
 "pipelex/cli/version_report.py" = "blob:f4a2311bb629bd77196ea2f6b031c166db0d362a"

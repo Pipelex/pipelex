@@ -13,7 +13,13 @@ from pipelex.cli.agent_cli._agent_cli import app as agent_app
 from pipelex.cli.commands.init.init_usage_stats import note_init_backends, note_init_execution
 from pipelex.cli.usage_stats_cli import resolve_invocation, run_with_usage_stats
 from pipelex.hosted.run_config import RunExecution
-from pipelex.system.usage_stats.usage_stats_client import note_command_error_domain, note_command_hosted
+from pipelex.system.runtime import IntegrationMode
+from pipelex.system.usage_stats.usage_stats_client import (
+    UsageStatsClient,
+    configure_usage_stats_for_runtime,
+    note_command_error_domain,
+    note_command_hosted,
+)
 from pipelex.system.usage_stats.usage_stats_contract import (
     UsageStatsEnvVar,
     UsageStatsErrorDomain,
@@ -21,6 +27,7 @@ from pipelex.system.usage_stats.usage_stats_contract import (
     UsageStatsSurface,
     render_notice,
 )
+from pipelex.system.usage_stats.usage_stats_core import UsageStatsState
 from tests.helpers.usage_stats_process import make_project_dir, usage_stats_switched_on
 from tests.helpers.usage_stats_schema import assert_envelope_is_valid
 
@@ -87,6 +94,11 @@ def _prompting_app() -> click.Command:
     prompting.command(name="ask")(_ask)
     prompting.command(name="confirm")(_confirm)
     return typer.main.get_command(prompting)
+
+
+def _replaces_its_client_then_is_cancelled() -> None:
+    configure_usage_stats_for_runtime(integration_mode=IntegrationMode.PYTEST)
+    raise SystemExit(130)
 
 
 class TestUsageStatsCli:
@@ -282,3 +294,30 @@ class TestUsageStatsCli:
             captured = capsys.readouterr()
         assert captured.err == ""
         assert not state.state_dir.exists()
+
+    def test_statistics_never_replace_the_commands_exit(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], mocker: MockerFixture
+    ) -> None:
+        """A delivery that raises leaves the command's own exit as it was, and the other client of the process still delivers."""
+        finish_command = mocker.patch.object(UsageStatsClient, "finish_command", autospec=True, side_effect=[OSError("unlink refused"), None])
+        with usage_stats_switched_on(monkeypatch=monkeypatch, home=tmp_path / "home", cwd=make_project_dir(parent=tmp_path), is_debug=True):
+            with pytest.raises(SystemExit) as exit_info:
+                _run(surface=UsageStatsSurface.PIPELEX, args=["run", "bundle", "x.mthds"], invoke=_replaces_its_client_then_is_cancelled)
+            capsys.readouterr()
+        assert exit_info.value.code == 130
+        assert finish_command.call_count == 2
+
+    def test_a_command_runs_without_statistics_when_they_cannot_be_read(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], mocker: MockerFixture
+    ) -> None:
+        with usage_stats_switched_on(monkeypatch=monkeypatch, home=tmp_path / "home", cwd=make_project_dir(parent=tmp_path), is_debug=True):
+            mocker.patch.object(UsageStatsState, "make_for_current_home", side_effect=RuntimeError("Could not determine home directory."))
+            run_with_usage_stats(
+                root=_root_of(UsageStatsSurface.PIPELEX),
+                args=["validate", "bundle", "x.mthds"],
+                surface=UsageStatsSurface.PIPELEX,
+                strip_flags=frozenset(),
+                invoke=_succeed,
+            )
+            captured = capsys.readouterr()
+        assert captured.err == ""

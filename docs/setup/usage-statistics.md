@@ -95,7 +95,7 @@ Turning statistics off creates nothing and sends nothing: a process with statist
 
 ## Where it is kept and where it goes
 
-Every Pipelex tool on a machine shares one directory, `~/.mthds/usage-stats/` (`%USERPROFILE%\.mthds\usage-stats\` on Windows), created with owner-only permissions. It holds the installation identifier, the machine's choice, a marker per notice version shown, and each tool's queue of events waiting to be sent, under `spool/`. A file there is created or deleted whole, so two tools running at once never undo each other's choice.
+Every Pipelex tool on a machine shares one directory, `~/.mthds/usage-stats/` (`%USERPROFILE%\.mthds\usage-stats\` on Windows), created with owner-only permissions. It holds the installation identifier, the machine's choice, a marker per notice version shown, and each tool's queue of events waiting to be sent, under `spool/`. A file there is created or deleted whole, so two tools running at once never undo each other's choice. When Pipelex cannot look into that directory, statistics stay off rather than risk ignoring a choice stored there, and your command runs as usual.
 
 Events go straight to PostHog's EU region, to a project that holds nothing but these statistics. PostHog discards the IP address after deriving the country from it, and keeps no finer location. No person profile is ever created. PostHog keeps the events for its retention period, and we delete the events of an installation on request, as our [Privacy Policy](https://go.pipelex.com/privacy-policy) explains: send us the identifier `pipelex usage-stats status` prints, after turning statistics off or running `pipelex usage-stats reset-id`.
 

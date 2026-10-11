@@ -6,7 +6,7 @@ from pipelex.system.usage_stats.usage_stats_contract import UsageStatsEnvVar, Us
 from pipelex.system.usage_stats.usage_stats_core import UsageStatsState, is_loopback_origin
 from pipelex.system.usage_stats.usage_stats_environment import declared_host, is_ci, is_debug, release_version, resolve_endpoint, tool_switch_says_off
 from pipelex.system.usage_stats.usage_stats_switches import packaged_default_says_off, project_setting_says_off, read_switches, setting_says_off
-from tests.helpers.usage_stats_process import make_project_dir
+from tests.helpers.usage_stats_process import CAN_LOCK_DIRECTORIES, locked_directory, make_project_dir
 from tests.unit.pipelex.system.usage_stats.test_data import UsageStatsSwitchCases
 
 
@@ -63,6 +63,15 @@ class TestUsageStatsSwitches:
         assert not project_setting_says_off(cwd=project_dir)
         (project_dir / ".pipelex" / "pipelex.toml").mkdir(parents=True)
         assert project_setting_says_off(cwd=project_dir)
+
+    @pytest.mark.skipif(not CAN_LOCK_DIRECTORIES, reason="needs a directory this process cannot traverse")
+    def test_project_that_cannot_be_looked_into_fails_closed(self, tmp_path: Path) -> None:
+        """A directory on the way up that may not be traversed hides the project's file, which counts as unreadable."""
+        with locked_directory(path=tmp_path / "locked"):
+            assert project_setting_says_off(cwd=tmp_path / "locked" / "project") is True
+            state = UsageStatsState(home=tmp_path / "home")
+            off_by = read_switches(state=state, env={}, cwd=tmp_path / "locked" / "project", is_pytest=False)
+        assert UsageStatsOffBy.PROJECT_SETTING in off_by
 
     def test_home_configuration_is_not_a_switch(self, tmp_path: Path) -> None:
         """`~/.pipelex/pipelex.toml` is pipelex's home layer, never read for the setting."""

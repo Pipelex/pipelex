@@ -478,28 +478,37 @@ def build_settings(
     )
 
 
-def configure_usage_stats_for_cli(*, surface: UsageStatsSurface, is_machine_read: bool) -> UsageStatsClient:
+def configure_usage_stats_for_cli(*, surface: UsageStatsSurface, is_machine_read: bool) -> UsageStatsClient | None:
     """Read every switch for a CLI command about to run, and print the notice unless its stderr is read by a program.
 
     The notice goes to stderr before the command does any work, then `notice-v<N>` records it for every tool on the
     machine; a marker that cannot be written leaves the notice to be printed again next time. Where stderr is a machine
     contract, the notice is neither printed nor recorded, and the command's statistics are still sent.
+
+    Returns:
+        The command's client, or `None` when the switches could not be read at all, as when no home directory can be
+        found: the command then runs without statistics.
     """
-    state = UsageStatsState.make_for_current_home()
-    with _PROCESS.lock:
-        settings = build_settings(
-            state=state,
-            env=os.environ,
-            cwd=_current_dir(),
-            is_pytest=_PROCESS.is_pytest,
-            surface=surface,
-            integration=UsageStatsIntegration.CLI,
-            delivery=UsageStatsDelivery.CLI_COMMAND,
-            embedder_host=_PROCESS.embedder_host,
-        )
-        client = UsageStatsClient(settings=settings)
-        _PROCESS.client = client
-    if client.is_enabled and not is_machine_read and not state.notice_marker(version=NOTICE_VERSION).exists():
+    try:
+        state = UsageStatsState.make_for_current_home()
+        with _PROCESS.lock:
+            settings = build_settings(
+                state=state,
+                env=os.environ,
+                cwd=_current_dir(),
+                is_pytest=_PROCESS.is_pytest,
+                surface=surface,
+                integration=UsageStatsIntegration.CLI,
+                delivery=UsageStatsDelivery.CLI_COMMAND,
+                embedder_host=_PROCESS.embedder_host,
+            )
+            client = UsageStatsClient(settings=settings)
+            _PROCESS.client = client
+    except (OSError, RuntimeError):
+        # No home directory (`Path.home()` raises `RuntimeError`), or a filesystem failure no reader absorbed: the
+        # command runs without statistics, which never stand in its way.
+        return None
+    if client.is_enabled and not is_machine_read and not state.notice_was_recorded(version=NOTICE_VERSION):
         write_stderr_line(line=render_notice())
         state.record_notice(version=NOTICE_VERSION)
     return client
@@ -509,7 +518,8 @@ def configure_usage_stats_for_runtime(*, integration_mode: IntegrationMode) -> N
     """Read every switch when a process boots pipelex, unless a CLI command already did; `pytest` mode turns statistics off.
 
     A Python program or a long-running process writes the notice to stderr once per process, at startup, and records no
-    marker, since nothing says a person reads that stream.
+    marker, since nothing says a person reads that stream. Switches that cannot be read at all leave the process without
+    statistics; booting pipelex never fails for them.
     """
     integration = _integration_for(integration_mode=integration_mode)
     with _PROCESS.lock:
@@ -523,16 +533,20 @@ def configure_usage_stats_for_runtime(*, integration_mode: IntegrationMode) -> N
         if _PROCESS.client is not None:
             return
         surface, delivery = _surface_and_delivery_for(integration=integration or UsageStatsIntegration.PYTHON)
-        settings = build_settings(
-            state=UsageStatsState.make_for_current_home(),
-            env=os.environ,
-            cwd=_current_dir(),
-            is_pytest=_PROCESS.is_pytest,
-            surface=surface,
-            integration=integration or UsageStatsIntegration.PYTHON,
-            delivery=delivery,
-            embedder_host=_PROCESS.embedder_host,
-        )
+        try:
+            settings = build_settings(
+                state=UsageStatsState.make_for_current_home(),
+                env=os.environ,
+                cwd=_current_dir(),
+                is_pytest=_PROCESS.is_pytest,
+                surface=surface,
+                integration=integration or UsageStatsIntegration.PYTHON,
+                delivery=delivery,
+                embedder_host=_PROCESS.embedder_host,
+            )
+        except (OSError, RuntimeError):
+            # No home directory, or a filesystem failure no reader absorbed: the process runs without statistics.
+            return
         client = UsageStatsClient(settings=settings)
         _PROCESS.client = client
         write_notice = client.is_enabled and not _PROCESS.runtime_notice_written

@@ -15,8 +15,9 @@ from typing import Any, NamedTuple, Protocol, TypeVar, runtime_checkable
 
 import click
 
+from pipelex import log
 from pipelex.base_exceptions import PipelexError
-from pipelex.system.usage_stats.usage_stats_client import configure_usage_stats_for_cli, get_usage_stats_client
+from pipelex.system.usage_stats.usage_stats_client import UsageStatsClient, configure_usage_stats_for_cli, get_usage_stats_client
 from pipelex.system.usage_stats.usage_stats_contract import (
     INIT_COMMAND,
     OTHER_COMMAND,
@@ -28,6 +29,7 @@ from pipelex.system.usage_stats.usage_stats_contract import (
 )
 from pipelex.system.usage_stats.usage_stats_events import CommandCompletedProperties, UsageStatsEvent, bounded_duration_ms
 from pipelex.system.usage_stats.usage_stats_runs import usage_stats_error_domain
+from pipelex.tools.log.error_fields import error_fields
 
 #: The statistics command group, `pipelex usage-stats`.
 STATISTICS_GROUP_NAME = "usage-stats"
@@ -241,6 +243,8 @@ def run_with_usage_stats(
         return invoke()
 
     client = configure_usage_stats_for_cli(surface=surface, is_machine_read=invocation.is_machine_read)
+    if client is None:
+        return invoke()
     started = time.monotonic()
     outcome = UsageStatsOutcome.FAILED
     failure: PipelexError | None = None
@@ -264,27 +268,48 @@ def run_with_usage_stats(
         raise
     finally:
         if client.is_enabled:
-            error_domain = None
-            if outcome.is_failed:
-                error_domain = usage_stats_error_domain(error=failure) if failure is not None else client.command_error_domain
-            init_properties: dict[str, Any] = {}
-            if client.command_init_choices is not None and invocation.command == INIT_COMMAND:
-                init_properties = client.command_init_choices.as_properties()
-            client.record(
-                event=UsageStatsEvent(
-                    name=UsageStatsEventName.COMMAND_COMPLETED,
-                    properties=CommandCompletedProperties(
-                        command=invocation.command,
-                        outcome=outcome,
-                        error_domain=error_domain,
-                        duration_ms=bounded_duration_ms(seconds=time.monotonic() - started),
-                        hosted=True if client.is_command_hosted else None,
-                        **init_properties,
-                    ),
-                )
+            _end_command(client=client, command=invocation.command, outcome=outcome, failure=failure, duration_seconds=time.monotonic() - started)
+
+
+def _end_command(
+    *, client: UsageStatsClient, command: str, outcome: UsageStatsOutcome, failure: PipelexError | None, duration_seconds: float
+) -> None:
+    """Record the command's `command_completed` and deliver what every client of the process holds; nothing here raises.
+
+    It runs while the command's own exit or error is on its way out, which statistics must never replace, and each step
+    runs whatever the one before it did.
+    """
+    try:
+        error_domain = None
+        if outcome.is_failed:
+            error_domain = usage_stats_error_domain(error=failure) if failure is not None else client.command_error_domain
+        init_properties: dict[str, Any] = {}
+        if client.command_init_choices is not None and command == INIT_COMMAND:
+            init_properties = client.command_init_choices.as_properties()
+        client.record(
+            event=UsageStatsEvent(
+                name=UsageStatsEventName.COMMAND_COMPLETED,
+                properties=CommandCompletedProperties(
+                    command=command,
+                    outcome=outcome,
+                    error_domain=error_domain,
+                    duration_ms=bounded_duration_ms(seconds=duration_seconds),
+                    hosted=True if client.is_command_hosted else None,
+                    **init_properties,
+                ),
             )
-            # The process's client may have been replaced while the command ran, never its events: finish both.
-            current_client = get_usage_stats_client()
-            client.finish_command()
-            if current_client is not None and current_client is not client:
-                current_client.finish_command()
+        )
+    except Exception as exc:  # ruff: ignore[blind-except]
+        # (1) The root of every command of both CLIs: the command's own exit or error is on its way out, and a
+        # statistic that cannot be built must never replace it.
+        log.debug("The command's usage statistics could not be recorded", fields=error_fields(exc=exc))
+    # The process's client may have been replaced while the command ran, never its events: finish both.
+    current_client = get_usage_stats_client()
+    finishing = [client] if current_client is None or current_client is client else [client, current_client]
+    for each_client in finishing:
+        try:
+            each_client.finish_command()
+        except Exception as exc:  # ruff: ignore[blind-except]
+            # (1) The root of every command of both CLIs, as above: delivery never replaces the command's exit, and
+            # one client's failure never keeps the other's events from leaving.
+            log.debug("The command's usage statistics could not be delivered", fields=error_fields(exc=exc))

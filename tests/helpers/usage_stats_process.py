@@ -8,6 +8,7 @@ process as in CI or a container, points the shared state at `home`, the endpoint
 """
 
 import os
+import sys
 from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
@@ -30,6 +31,21 @@ DECIDING_VARIABLES: tuple[str, ...] = (
     *CI_VARIABLES,
     *CONTAINER_MARKER_VARIABLES,
 )
+
+
+#: Whether a directory can be made untraversable for this process: not on Windows, and not for root, who traverses anything.
+CAN_LOCK_DIRECTORIES = sys.platform != "win32" and os.geteuid() != 0
+
+
+@contextmanager
+def locked_directory(*, path: Path) -> Generator[Path, None, None]:
+    """Make `path` a directory no one may list or traverse for the block, as a state directory above an unreadable home is."""
+    path.mkdir(parents=True, exist_ok=True)
+    path.chmod(0)
+    try:
+        yield path
+    finally:
+        path.chmod(0o700)
 
 
 def make_project_dir(*, parent: Path) -> Path:
