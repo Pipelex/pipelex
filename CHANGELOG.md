@@ -1,5 +1,20 @@
 # Changelog
 
+## [v0.83.0] - 2026-10-11
+
+### Added
+
+- **`LLMCompletionTruncatedError` and `LLMCompletionRefusedError`**: two subclasses of `LLMCompletionError`, the first for a text completion cut at its output limit or its context window, the second for one the model declined to write or a safety filter stopped. Both are content errors in the `input` domain, not retryable, answered with HTTP 422 and caller-facing under STRICT disclosure, and carry `model_handle`, `pipe_code` and the provider's `stop_reason`, a truncation also carrying the limit it hit as `truncation_limit`, `max_tokens` or `context_window`, the `output_tokens` used and the `max_tokens` sent; the message names the model, the pipe and those values, never the partial text. Each ends with a `change_input` next step fitted to what stopped the text: revise the prompt or the input after a refusal, raise the pipe's `max_tokens` or shorten its input at the output limit, set the pipe's `max_tokens` up to the model's limit when the request sent none, and shorten the input, lower the reasoning effort or choose a model with a larger window, never a higher `max_tokens`, at the context window.
+
+### Changed
+
+- **The Bedrock client's `chat` returns a `BedrockChatResult` (Breaking)**: `BedrockClientProtocol.chat` returns a named result holding the text, the token usage and Converse's `stopReason`, in place of a `(text, usage)` tuple, so a custom Bedrock client returns `read_converse_response(response=…)` or builds the result itself.
+- **A lowered Anthropic structured-output limit is said**: when a structured generation on an Anthropic model lowers `max_tokens` to fit its structured-output timeout, the call logs it, at warning level when the pipe set the limit and at debug level when it is the model's default, and an error the lowered limit can explain, a structured output that failed validation or came back incomplete, or a timeout, ends with a sentence saying the limit was lowered and to what, never a rate limit, an authentication failure, an overload, a server error or a lost connection.
+
+### Fixed
+
+- **A truncated, refused or filtered text no longer passes for a result (Breaking)**: every LLM worker, OpenAI chat completions whether direct or behind a gateway such as Portkey or OpenRouter, the OpenAI Responses API, Anthropic, Google, Bedrock and Mistral, now reads its response's stop value before it returns a text, so a text that stopped short fails its pipe with `LLMCompletionTruncatedError` or `LLMCompletionRefusedError` where it used to come back as a successful output, empty or partial, its billed usage still reported and recorded on its span. Each provider's vocabulary is read, including a gateway's pass-through of another provider's value such as `max_tokens` or `content_filtered`, an unknown value being logged at warning level and taken as normal, except that an `incomplete` Responses API answer is a truncation whatever its reason; a Gemini prompt blocked before any candidate is a refusal, and structured generation keeps its configured re-asks. A Bedrock answer is read for every text block it holds, so one holding none fails with an `LLMCompletionError` where it used to raise an `IndexError` when its message was empty, or a `KeyError` when its first block was not text.
+
 ## [v0.82.0] - 2026-10-10
 
 ### Added

@@ -146,12 +146,13 @@ class MistralLLMWorker(LLMWorkerAbstract):
         messages = await self.mistral_factory.make_simple_messages(llm_job=llm_job)
         reasoning_effort = self._resolve_reasoning_effort(inference_model=self.inference_model, job_params=job_params)
         self._log_reasoning_sent(api_name="Mistral", settings={"reasoning_effort": None if reasoning_effort is UNSET else reasoning_effort})
+        max_tokens = job_params.max_tokens or self.default_max_tokens
         try:
             response: ChatCompletionResponse | None = await self.mistral_client_for_text.chat.complete_async(
                 messages=messages,
                 model=self.inference_model.model_id,
                 temperature=job_params.temperature if self.inference_model.accepts_temperature else UNSET,
-                max_tokens=job_params.max_tokens or self.default_max_tokens,
+                max_tokens=max_tokens,
                 reasoning_effort=reasoning_effort,
             )
         except (MistralError, httpx.TransportError) as sdk_exc:
@@ -199,6 +200,12 @@ class MistralLLMWorker(LLMWorkerAbstract):
                     detail="Mistral returned a choice with no message — wait a moment, then run it again",
                 ),
             )
+        if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := response.usage):
+            llm_tokens_usage.nb_tokens_by_category = self.mistral_factory.make_nb_tokens_by_category(usage=usage)
+
+        # Read before the content, so a text cut with nothing written is reported for what stopped it
+        self._check_completion_stop(llm_job=llm_job, stop_reason=response.choices[0].finish_reason, max_tokens=max_tokens)
+
         mistral_response_content = message.content
         result_text: str
         if isinstance(mistral_response_content, str):
@@ -238,9 +245,6 @@ class MistralLLMWorker(LLMWorkerAbstract):
                     detail="Mistral returned an empty text response — try rephrasing the prompt or using a different model",
                 ),
             )
-
-        if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := response.usage):
-            llm_tokens_usage.nb_tokens_by_category = self.mistral_factory.make_nb_tokens_by_category(usage=usage)
 
         return result_text
 
