@@ -37,13 +37,36 @@ DECIDING_VARIABLES: tuple[str, ...] = (
 CAN_LOCK_DIRECTORIES = sys.platform != "win32" and os.geteuid() != 0
 
 
+def _exists_as_python_314_does(self: Path, *, follow_symlinks: bool = True) -> bool:
+    return os.path.exists(self) if follow_symlinks else os.path.lexists(self)
+
+
+def _is_dir_as_python_314_does(self: Path, *, follow_symlinks: bool = True) -> bool:
+    assert follow_symlinks, "the code under test never asks without following links"
+    return os.path.isdir(self)
+
+
+def _is_file_as_python_314_does(self: Path, *, follow_symlinks: bool = True) -> bool:
+    assert follow_symlinks, "the code under test never asks without following links"
+    return os.path.isfile(self)  # ruff: ignore[os-path-isfile] (`Path.is_file` is the method this stands in for)
+
+
 @contextmanager
 def locked_directory(*, path: Path) -> Generator[Path, None, None]:
-    """Make `path` a directory no one may list or traverse for the block, as a state directory above an unreadable home is."""
+    """Make `path` a directory no one may list or traverse for the block, as a state directory above an unreadable home is.
+
+    Within the block, `Path.exists()`, `Path.is_dir()` and `Path.is_file()` answer as Python 3.14's do, whatever the
+    interpreter: they swallow every `OSError` and answer `False`, where earlier versions raise one they do not expect.
+    Code that must tell "absent" from "cannot tell" is then held to the interpreter that hides the difference.
+    """
     path.mkdir(parents=True, exist_ok=True)
     path.chmod(0)
     try:
-        yield path
+        with pytest.MonkeyPatch.context() as patcher:
+            patcher.setattr(Path, "exists", _exists_as_python_314_does)
+            patcher.setattr(Path, "is_dir", _is_dir_as_python_314_does)
+            patcher.setattr(Path, "is_file", _is_file_as_python_314_does)
+            yield path
     finally:
         path.chmod(0o700)
 

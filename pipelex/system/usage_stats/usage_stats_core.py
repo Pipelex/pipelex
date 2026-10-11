@@ -128,11 +128,18 @@ class InstallationId(NamedTuple):
 
 
 def path_exists(*, path: Path) -> bool | None:
-    """Whether `path` exists, and `None` when that cannot be told, as when a directory above it may not be traversed."""
+    """Whether `path` exists, and `None` when that cannot be told, as when a directory above it may not be traversed.
+
+    It stats the path itself rather than asking `Path.exists()`, which from Python 3.14 swallows every `OSError` and
+    answers `False`, so a `disabled` file in a state that cannot be looked into would read as absent.
+    """
     try:
-        return path.exists()
+        path.stat()
+    except (FileNotFoundError, NotADirectoryError):
+        return False
     except OSError:
         return None
+    return True
 
 
 def delete_file(*, path: Path) -> None:
