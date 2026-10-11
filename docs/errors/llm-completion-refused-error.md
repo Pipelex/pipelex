@@ -9,7 +9,7 @@ description: "Reference for the `LLMCompletionRefusedError` Pipelex error class.
 
 A text completion the model declined to write, or that a provider's safety filter stopped.
 
-A provider answers such a completion as a success, often with no text at all and sometimes with the beginning of one, and a stop value saying why it ended: `content_filter` on OpenAI chat completions and on an `incomplete` Responses API answer, `refusal` on Anthropic, `content_filtered` and `guardrail_intervened` on Bedrock, and on Gemini `SAFETY`, `RECITATION`, `PROHIBITED_CONTENT`, `BLOCKLIST`, `SPII` and their kin. The worker raises this error instead of handing the text back, so the pipe fails rather than passing an empty or cut text for a result.
+A provider answers such a completion as a success, often with no text at all and sometimes with the beginning of one, and a stop value saying why it ended: `content_filter` on OpenAI chat completions and on an `incomplete` Responses API answer, `refusal` on Anthropic, `content_filtered` and `guardrail_intervened` on Bedrock, and on Gemini `SAFETY`, `RECITATION`, `PROHIBITED_CONTENT`, `BLOCKLIST`, `SPII` and their kin. A Gemini prompt blocked before the model wrote anything comes back with no candidate at all and its reason in the prompt feedback, `prompt_feedback.block_reason`, such as `SAFETY` or `PROHIBITED_CONTENT`: it is a refusal too, whatever the reason, and the error names that reason as its stop value. The worker raises this error instead of handing the text back, so the pipe fails rather than passing an empty or cut text for a result.
 
 The message names the model by its deck handle, the pipe and the stop value, then the next step:
 

@@ -12,7 +12,9 @@ and reads them as one: a gateway in non-strict mode passes each provider's own v
 completions shape, so that worker can receive any of them, and the values agree wherever two vocabularies share
 one. A value the classifier does not know is logged at warning level and taken as normal, so a value a provider
 adds later cannot fail every call. A missing value is taken as normal without a word, since some
-OpenAI-compatible servers send none.
+OpenAI-compatible servers send none. Two signals say on their own that the text is unusable, whatever reason comes
+with them: a Responses API answer whose status is `incomplete` is never normal, an unknown or missing reason being
+taken as a truncation, and a Gemini answer with no candidate whose prompt feedback names a block reason is a refusal.
 
 The classifier only turns a stop that was silently a success into an error. Structured generation is not read
 here: its stops are the structuring library's business, and its configured re-asks are left as they are.
@@ -128,6 +130,22 @@ OPENAI_RESPONSES_INCOMPLETE_REASONS: Mapping[str, CompletionStopOutcome] = Mappi
     }
 )
 
+# `google.genai.types.BlockedReason`, a Gemini answer's `prompt_feedback.block_reason`, read when the answer holds no
+# candidate: the prompt was blocked before the model wrote anything, so every value is a refusal, the unspecified
+# one included. It is not read with the stop values, which share some of its words with another meaning.
+GEMINI_BLOCK_REASONS: Mapping[str, CompletionStopOutcome] = MappingProxyType(
+    {
+        "BLOCKED_REASON_UNSPECIFIED": _REFUSED,
+        "SAFETY": _REFUSED,
+        "OTHER": _REFUSED,
+        "BLOCKLIST": _REFUSED,
+        "PROHIBITED_CONTENT": _REFUSED,
+        "IMAGE_SAFETY": _REFUSED,
+        "MODEL_ARMOR": _REFUSED,
+        "JAILBREAK": _REFUSED,
+    }
+)
+
 # Every vocabulary a worker's stop value can come from, read as one, whatever worker receives it.
 STOP_REASON_VOCABULARIES: tuple[Mapping[str, CompletionStopOutcome], ...] = (
     OPENAI_CHAT_FINISH_REASONS,
@@ -188,22 +206,51 @@ def classify_responses_stop(*, status: str | None, incomplete_reason: str | None
     """Read a Responses API answer's status, and its incomplete reason, as normal, truncated or refused.
 
     Only an `incomplete` status says the model did not finish; every other status is normal here, a failed or
-    cancelled answer being caught by the worker's own check for an answer with no text.
+    cancelled answer being caught by the worker's own check for an answer with no text. An incomplete answer is never
+    normal, since the status alone says its text is unfinished: its reason only tells a filter from a cut, and a
+    reason that is missing, the SDK typing both the details and their reason as optional, or that the classifier does
+    not know is taken as a cut and logged at warning level.
 
     Args:
         status: The answer's `status`. None when it carries none.
         incomplete_reason: The `incomplete_details.reason` of an incomplete answer. None when it carries none.
-        model_handle: The model's deck handle, named by the warning about an unknown reason.
+        model_handle: The model's deck handle, named by the warning about a missing or unknown reason.
 
     Returns:
-        The outcome the status and reason stand for: normal for an incomplete answer whose reason is missing or unknown.
+        The outcome the status and reason stand for: truncated for an incomplete answer whose reason is missing or unknown.
     """
     if status != OPENAI_RESPONSES_INCOMPLETE_STATUS:
         return _NORMAL
     outcome = OPENAI_RESPONSES_INCOMPLETE_REASONS.get(incomplete_reason) if incomplete_reason is not None else None
     if outcome is None:
-        _log_unknown_stop(model_handle=model_handle, stop_value=f"{status}: {incomplete_reason}")
-        return _NORMAL
+        log.warning(
+            "An incomplete answer gave no known reason, so it was taken as truncated",
+            fields={"model_handle": model_handle, "stop_reason": status, "incomplete_reason": incomplete_reason},
+        )
+        return _TRUNCATED
+    return outcome
+
+
+def classify_prompt_block_reason(*, block_reason: str, model_handle: str) -> CompletionStopOutcome:
+    """Read the block reason of a Gemini answer that holds no candidate, which is always a refusal.
+
+    The prompt was blocked before the model wrote anything, so whatever reason is given the text cannot be had: a
+    reason the classifier does not know is a refusal too, logged at warning level so the table can learn it.
+
+    Args:
+        block_reason: The answer's `prompt_feedback.block_reason`, as its value.
+        model_handle: The model's deck handle, named by the warning about an unknown reason.
+
+    Returns:
+        The refusal outcome.
+    """
+    outcome = GEMINI_BLOCK_REASONS.get(block_reason.upper())
+    if outcome is None:
+        log.warning(
+            "A blocked prompt gave an unknown reason, so it was taken as a refusal",
+            fields={"model_handle": model_handle, "block_reason": block_reason},
+        )
+        return _REFUSED
     return outcome
 
 

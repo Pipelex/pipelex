@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from anthropic.types import StopReason
-from google.genai.types import FinishReason
+from google.genai.types import BlockedReason, FinishReason
 from mistralai.client.models.chatcompletionchoice import ChatCompletionChoiceFinishReason
 from openai.types.chat.chat_completion import Choice
 from openai.types.responses.response import IncompleteDetails
@@ -16,12 +16,14 @@ from pipelex.cogt.llm import completion_stop
 from pipelex.cogt.llm.completion_stop import (
     ANTHROPIC_STOP_REASONS,
     BEDROCK_CONVERSE_STOP_REASONS,
+    GEMINI_BLOCK_REASONS,
     GEMINI_FINISH_REASONS,
     MISTRAL_FINISH_REASONS,
     OPENAI_CHAT_FINISH_REASONS,
     OPENAI_RESPONSES_INCOMPLETE_REASONS,
     STOP_REASON_VOCABULARIES,
     CompletionStopOutcome,
+    classify_prompt_block_reason,
     classify_responses_stop,
     classify_stop_reason,
     raise_for_completion_stop,
@@ -77,15 +79,37 @@ class TestCompletionStop:
         outcome = classify_responses_stop(status=status, incomplete_reason=incomplete_reason, model_handle="gpt-test")
         assert outcome == expected_outcome
 
-    def test_an_incomplete_answer_with_an_unknown_reason_is_logged_and_taken_as_normal(self, mocker: MockerFixture) -> None:
+    @pytest.mark.parametrize("incomplete_reason", ["brand_new_reason", None])
+    def test_an_incomplete_answer_without_a_known_reason_is_logged_and_taken_as_truncated(
+        self, mocker: MockerFixture, incomplete_reason: str | None
+    ) -> None:
+        """The incomplete status alone says the text is unfinished, so a missing or unknown reason never makes it normal."""
         warning = mocker.patch.object(completion_stop.log, "warning")
 
-        outcome = classify_responses_stop(status="incomplete", incomplete_reason="brand_new_reason", model_handle="gpt-test")
+        outcome = classify_responses_stop(status="incomplete", incomplete_reason=incomplete_reason, model_handle="gpt-test")
 
-        assert outcome == CompletionStopOutcome.NORMAL
+        assert outcome == CompletionStopOutcome.TRUNCATED
         warning.assert_called_once_with(
-            "An LLM stop reason was not recognized, so it was taken as normal",
-            fields={"model_handle": "gpt-test", "stop_reason": "incomplete: brand_new_reason"},
+            "An incomplete answer gave no known reason, so it was taken as truncated",
+            fields={"model_handle": "gpt-test", "stop_reason": "incomplete", "incomplete_reason": incomplete_reason},
+        )
+
+    @pytest.mark.parametrize("block_reason", [member.value for member in BlockedReason])
+    def test_every_gemini_block_reason_is_a_refusal(self, mocker: MockerFixture, block_reason: str) -> None:
+        warning = mocker.patch.object(completion_stop.log, "warning")
+
+        assert classify_prompt_block_reason(block_reason=block_reason, model_handle="gemini-test") == CompletionStopOutcome.REFUSED
+        warning.assert_not_called()
+
+    def test_an_unknown_gemini_block_reason_is_logged_and_taken_as_a_refusal(self, mocker: MockerFixture) -> None:
+        warning = mocker.patch.object(completion_stop.log, "warning")
+
+        outcome = classify_prompt_block_reason(block_reason="BRAND_NEW_BLOCK", model_handle="gemini-test")
+
+        assert outcome == CompletionStopOutcome.REFUSED
+        warning.assert_called_once_with(
+            "A blocked prompt gave an unknown reason, so it was taken as a refusal",
+            fields={"model_handle": "gemini-test", "block_reason": "BRAND_NEW_BLOCK"},
         )
 
     def test_the_vocabularies_agree_on_every_shared_value(self) -> None:
@@ -105,6 +129,7 @@ class TestCompletionStop:
         assert set(GEMINI_FINISH_REASONS) == {member.value for member in FinishReason}
         assert set(MISTRAL_FINISH_REASONS) == _literal_values(ChatCompletionChoiceFinishReason)
         assert set(OPENAI_RESPONSES_INCOMPLETE_REASONS) == _literal_values(IncompleteDetails.model_fields["reason"].annotation)
+        assert set(GEMINI_BLOCK_REASONS) == {member.value for member in BlockedReason}
 
     def test_a_normal_stop_raises_nothing(self) -> None:
         raise_for_completion_stop(

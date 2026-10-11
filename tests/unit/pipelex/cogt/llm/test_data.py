@@ -38,5 +38,6 @@ class CompletionStopTestData:
         ("no status", None, None, CompletionStopOutcome.NORMAL),
         ("truncated", "incomplete", "max_output_tokens", CompletionStopOutcome.TRUNCATED),
         ("filtered", "incomplete", "content_filter", CompletionStopOutcome.REFUSED),
+        ("incomplete with no reason", "incomplete", None, CompletionStopOutcome.TRUNCATED),
         ("failed", "failed", None, CompletionStopOutcome.NORMAL),
     ]

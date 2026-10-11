@@ -9,7 +9,7 @@ description: "Reference for the `LLMCompletionTruncatedError` Pipelex error clas
 
 A text completion stopped before the model finished it: it hit its output limit, or its context window.
 
-A provider answers such a completion as a success, with whatever text the model had written, empty or partial, and a stop value saying why it ended: `length` on OpenAI and Mistral, `max_tokens` on Anthropic and Bedrock, `MAX_TOKENS` on Gemini, an `incomplete` Responses API answer whose reason is `max_output_tokens`, and the context-window values `model_context_window_exceeded` and `model_length`. The worker raises this error instead of handing the text back, so the pipe fails rather than passing a truncated contract, summary or JSON for a result.
+A provider answers such a completion as a success, with whatever text the model had written, empty or partial, and a stop value saying why it ended: `length` on OpenAI and Mistral, `max_tokens` on Anthropic and Bedrock, `MAX_TOKENS` on Gemini, an `incomplete` Responses API answer whose reason is `max_output_tokens`, missing or unknown (the status alone says the text is unfinished, so its stop value is then `incomplete`), and the context-window values `model_context_window_exceeded` and `model_length`. The worker raises this error instead of handing the text back, so the pipe fails rather than passing a truncated contract, summary or JSON for a result.
 
 The message names the model by its deck handle, the pipe, the stop value, the output tokens used and the `max_tokens` the request sent, then the next step:
 

@@ -74,6 +74,20 @@ class TestOpenAIResponsesStop:
         assert error.output_tokens == 512
         assert STOP_TEST_PARTIAL_TEXT not in error.message
 
+    async def test_an_incomplete_answer_with_no_details_raises_the_truncation(self, mocker: MockerFixture) -> None:
+        """The incomplete status alone says the partial text is unfinished, whether or not its details give a reason."""
+        response = _response(status="incomplete", incomplete_reason=None, text=STOP_TEST_PARTIAL_TEXT)
+        worker, _ = make_worker(mocker, thinking_mode=ThinkingMode.NONE, response=response)
+
+        with pytest.raises(LLMCompletionTruncatedError) as exc_info:
+            await worker._gen_text(llm_job=make_text_llm_job(max_tokens=512))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
+        error = exc_info.value
+        assert error.stop_reason == "incomplete"
+        assert error.pipe_code == STOP_TEST_PIPE_CODE
+        assert error.output_tokens == 512
+        assert STOP_TEST_PARTIAL_TEXT not in error.message
+
     async def test_a_filtered_answer_raises_the_refusal(self, mocker: MockerFixture) -> None:
         response = _response(status="incomplete", incomplete_reason="content_filter", text=STOP_TEST_PARTIAL_TEXT)
         worker, _ = make_worker(mocker, thinking_mode=ThinkingMode.NONE, response=response)

@@ -6,7 +6,7 @@ import pytest
 from google import genai
 from google.genai import types as genai_types
 
-from pipelex.cogt.exceptions import LLMCompletionRefusedError, LLMCompletionTruncatedError
+from pipelex.cogt.exceptions import LLMCompletionError, LLMCompletionRefusedError, LLMCompletionTruncatedError
 from pipelex.providers.google.google_config import GoogleConfig
 from pipelex.providers.google.google_llm_worker import GoogleLLMWorker
 from tests.helpers.completion_stop import STOP_TEST_PARTIAL_TEXT, STOP_TEST_PIPE_CODE, make_text_llm_job
@@ -21,6 +21,15 @@ def _response(*, finish_reason: genai_types.FinishReason, text: str) -> genai_ty
     return genai_types.GenerateContentResponse(
         candidates=[genai_types.Candidate(content=content, finish_reason=finish_reason)],
         usage_metadata=genai_types.GenerateContentResponseUsageMetadata(prompt_token_count=80, candidates_token_count=1024),
+    )
+
+
+def _blocked_response(*, block_reason: genai_types.BlockedReason | None) -> genai_types.GenerateContentResponse:
+    """An answer with no candidate, as Gemini gives a blocked prompt, its block reason in the prompt feedback when given."""
+    return genai_types.GenerateContentResponse(
+        candidates=None,
+        prompt_feedback=genai_types.GenerateContentResponsePromptFeedback(block_reason=block_reason) if block_reason else None,
+        usage_metadata=genai_types.GenerateContentResponseUsageMetadata(prompt_token_count=80),
     )
 
 
@@ -67,6 +76,28 @@ class TestGoogleLLMWorkerTextStop:
             await worker._gen_text(llm_job=make_text_llm_job())  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.stop_reason == "SAFETY"
+
+    @pytest.mark.parametrize("block_reason", [genai_types.BlockedReason.SAFETY, genai_types.BlockedReason.PROHIBITED_CONTENT])
+    async def test_a_blocked_prompt_raises_the_refusal_naming_its_reason(
+        self, mocker: MockerFixture, block_reason: genai_types.BlockedReason
+    ) -> None:
+        worker = _text_worker(mocker, response=_blocked_response(block_reason=block_reason))
+
+        with pytest.raises(LLMCompletionRefusedError) as exc_info:
+            await worker._gen_text(llm_job=make_text_llm_job())  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
+        error = exc_info.value
+        assert error.stop_reason == block_reason.value
+        assert error.pipe_code == STOP_TEST_PIPE_CODE
+        assert f"stop reason '{block_reason.value}'" in error.message
+
+    async def test_no_candidate_and_no_block_reason_keeps_the_generic_error(self, mocker: MockerFixture) -> None:
+        worker = _text_worker(mocker, response=_blocked_response(block_reason=None))
+
+        with pytest.raises(LLMCompletionError, match="No candidates returned") as exc_info:
+            await worker._gen_text(llm_job=make_text_llm_job())  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
+        assert not isinstance(exc_info.value, LLMCompletionRefusedError)
 
     async def test_a_normal_stop_returns_the_text_unchanged(self, mocker: MockerFixture) -> None:
         worker = _text_worker(mocker, response=_response(finish_reason=genai_types.FinishReason.STOP, text=STOP_TEST_PARTIAL_TEXT))
