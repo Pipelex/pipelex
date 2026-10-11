@@ -30,8 +30,8 @@ from pipelex.tools.jinja2.exceptions import Jinja2TemplateBudgetError
 from pipelex.tools.jinja2.jinja2_environment import make_jinja2_env_without_loader
 from pipelex.tools.jinja2.jinja2_filters import markdown_to_html
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
-from pipelex.tools.jinja2.jinja2_render_budget import DEFAULT_RENDER_BUDGET_UNITS, RenderBudgetExceededError, active_render_budget
-from pipelex.tools.jinja2.jinja2_render_charging import CHARGED_MARK, INTERNAL_FILTERS
+from pipelex.tools.jinja2.jinja2_render_budget import DEFAULT_RENDER_BUDGET_UNITS, RenderBudget, RenderBudgetExceededError, active_render_budget
+from pipelex.tools.jinja2.jinja2_render_charging import CHARGED_MARK, INTERNAL_FILTERS, RENDER_BUDGET_KEY
 from pipelex.tools.jinja2.jinja2_render_costs import FILTER_COSTS, PLAIN_VALUE_METHOD_COSTS, REFUSED_PLAIN_VALUE_METHODS, TEST_COSTS
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async, render_jinja2_sync
 from pipelex.tools.jinja2.jinja2_sandbox import PipelexTemplateEnvironment
@@ -61,6 +61,15 @@ def _render_stock(template_source: str, *, autoescape: bool = False, is_async: b
     if is_async:
         return asyncio.run(template.render_async(**context))
     return template.render(**context)
+
+
+def _spent(template_source: str, *, is_async: bool = False, **context: Any) -> int:
+    """The units a render of `template_source` spends from its budget."""
+    budget = RenderBudget(total=DEFAULT_RENDER_BUDGET_UNITS)
+    # A render takes a budget handed in among its variables (`_with_render_budget`).
+    variables: dict[str, Any] = {**context, RENDER_BUDGET_KEY: budget}
+    _render(template_source, is_async=is_async, **variables)
+    return budget.total - budget.remaining
 
 
 def _refused_render_peak_bytes(render: Callable[[], object]) -> int:
@@ -258,6 +267,8 @@ _UNCHANGED = [
     ),
     pytest.param("{% macro wrap(x) %}[{{ x }}{{ caller() }}]{% endmacro %}{% call wrap(1) %}C{% endcall %}", id="macro_with_caller"),
     pytest.param("{% set x %}a{{ 1 }}{% endset %}{{ x }}{% filter upper %}b{{ 'c' }}{% endfilter %}", id="set_and_filter_blocks"),
+    # A filter block whose filter returns text prints it as it is, never escaped again under autoescape.
+    pytest.param("{% filter wordwrap(3) %}aaa <b> {{ x }}{% endfilter %}|{% filter replace('a', x) %}a<i>{% endfilter %}", id="text_filter_blocks"),
     pytest.param("{{ 2 ** 10 }}|{{ 7 // 2 }}|{{ 7 % 3 }}|{{ 1.5 * 2 }}|{{ 'ab' * 3 }}|{{ [1] * 3 }}|{{ -3 + 1 }}|{{ 1 / 4 }}", id="arithmetic"),
     pytest.param("{{ '%05.1f|%s' % (3.14159, 'x') }}|{{ '%(a)s-%(a)s' % {'a': 1} }}", id="percent_format"),
     pytest.param("{{ '{:>5}|{}|{x:.2f}'.format('a', 2, x=1.5) }}|{{ '%d items' | format(3) }}", id="str_format"),
@@ -626,6 +637,37 @@ class TestRenderBudget:
         # A 20 MB string of plain text prints under autoescape: its escaped length is counted, not guessed.
         big = "a" * 20_000_000
         assert len(_render("{{ big }}{{ big | escape }}", autoescape=True, big=big)) == 40_000_000
+
+    @pytest.mark.parametrize("is_async", [False, True])
+    def test_a_filter_block_prints_a_result_that_is_no_text_as_a_tag_prints_it(self, is_async: bool) -> None:
+        # Jinja writes a filter block's result out as it is, which fails the render's join for anything but text.
+        rendered = _render("{% filter length %}abc{% endfilter %}|{% filter list %}ab{% endfilter %}", is_async=is_async)
+        assert rendered == _render("{{ 'abc' | length }}|{{ 'ab' | list }}", is_async=is_async) == "3|['a', 'b']"
+
+    def test_a_filter_block_s_result_that_is_no_text_is_escaped_as_a_printed_value(self) -> None:
+        rendered = _render("{% filter list %}<{% endfilter %}", autoescape=True)
+        assert rendered == _render("{{ '<' | list }}", autoescape=True) == "[&#39;&lt;&#39;]"
+
+    def test_a_filter_block_s_result_goes_through_the_caller_s_finalize(self) -> None:
+        def blank_none(value: object) -> object:
+            return "" if value is None else value
+
+        env = PipelexTemplateEnvironment(finalize=blank_none)
+        # An empty body is false, so `default(none, true)` returns None, which the caller's finalize blanks.
+        assert env.from_string("[{% filter default(none, true) %}{% endfilter %}]").render() == "[]"
+
+    @pytest.mark.parametrize(
+        ("block_source", "printed_source"),
+        [
+            pytest.param("{% filter upper %}{{ big }}{% endfilter %}", "{{ big }}{{ big | upper }}", id="text"),
+            pytest.param("{% filter list %}{{ big }}{% endfilter %}", "{{ big }}{{ big | list }}", id="no_text"),
+        ],
+    )
+    @pytest.mark.parametrize("is_async", [False, True])
+    def test_a_filter_block_s_result_is_charged_as_a_print(self, block_source: str, printed_source: str, is_async: bool) -> None:
+        # The block prints its body's value, then the filter's result; the printed form prints the same two values.
+        big = "x" * 10_000
+        assert _spent(block_source, is_async=is_async, big=big) == _spent(printed_source, is_async=is_async, big=big)
 
     def test_caller_finalize_still_applies(self) -> None:
         def blank_none(value: object) -> object:
