@@ -23,6 +23,7 @@ from tests.helpers.pipe_io_artifacts import make_pipe_io_artifacts
 from tests.unit.pipelex.graph.conftest import make_graph_config
 
 _T0 = datetime(2025, 7, 1, 12, 0, 0, tzinfo=UTC)
+_REMOVAL_MESSAGE = "An I/O artifact an earlier run left beside the graphspec was removed"
 
 
 def _make_sequence_graphspec() -> GraphSpec:
@@ -287,7 +288,7 @@ class TestGraphspecCompanions:
 
         assert set(saved) == {"graphspec_json"}
         assert {path.name for path in tmp_path.iterdir()} == {"graphspec.json"}
-        removed_paths = [Path(call.kwargs["fields"]["file.path"]) for call in warning_spy.call_args_list if "Removed" in str(call.args[0])]
+        removed_paths = [Path(call.kwargs["fields"]["file.path"]) for call in warning_spy.call_args_list if call.args[0] == _REMOVAL_MESSAGE]
         assert {path.name for path in removed_paths} == {
             PIPE_IO_CONTRACTS_FILE_NAME,
             INPUT_FORM_FILE_NAME,
@@ -306,7 +307,7 @@ class TestGraphspecCompanions:
 
         save_graph_outputs_to_dir(graph_outputs=outputs, output_dir=tmp_path)
 
-        assert not [call for call in warning_spy.call_args_list if "Removed" in str(call.args[0])]
+        assert not [call for call in warning_spy.call_args_list if call.args[0] == _REMOVAL_MESSAGE]
 
     async def test_no_graphspec_leaves_the_directory_alone(self, tmp_path: Path) -> None:
         """Only a written graphspec owns the companions beside it: a mermaid-only run touches nothing else."""

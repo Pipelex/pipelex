@@ -1,3 +1,4 @@
+import keyword
 from datetime import date, datetime, time
 from enum import StrEnum
 from typing import Any, Self
@@ -47,6 +48,45 @@ class ConceptStructureBlueprintFieldType(StrEnum):
     CONCEPT = "concept"
 
 
+class FieldNameRefusal(StrEnum):
+    """Why a concept structure refuses a name for a field, by the first rule it breaks."""
+
+    # Not a Python identifier, or a Python keyword.
+    NOT_AN_IDENTIFIER = "not_an_identifier"
+    # One of `RESERVED_FIELD_NAMES`, an underscore-led pipe run parameter key included.
+    RESERVED = "reserved"
+    # Starts with an underscore, which is reserved for internal use.
+    UNDERSCORE = "underscore"
+
+
+def structure_field_name_refusal(*, field_name: str) -> FieldNameRefusal | None:
+    """Why a concept structure refuses this name for a field, or `None` when it admits it.
+
+    The one rule for a field name, which `ConceptBlueprint` applies to its `structure` keys: a Python
+    identifier that is not a Python keyword, is none of `RESERVED_FIELD_NAMES` and does not start with
+    an underscore. The rules are checked in that order, so a reserved name that starts with an
+    underscore is refused as reserved. A name that elsewhere stands for a field, such as the key of a
+    PipeJudge's `questions`, is held to the same rule.
+    """
+    if not field_name.isidentifier() or keyword.iskeyword(field_name):
+        return FieldNameRefusal.NOT_AN_IDENTIFIER
+    if field_name in RESERVED_FIELD_NAMES:
+        return FieldNameRefusal.RESERVED
+    if field_name.startswith("_"):
+        return FieldNameRefusal.UNDERSCORE
+    return None
+
+
+def is_admitted_structure_field_name(*, field_name: str) -> bool:
+    """Whether a concept structure admits this name for a field, by `structure_field_name_refusal`'s rule."""
+    return structure_field_name_refusal(field_name=field_name) is None
+
+
+def field_may_hold_nothing(*, required: bool, default_value: Any) -> bool:
+    """Whether a structure field's value may hold nothing: by the standard's rule, only when it is neither `required` nor defaulted."""
+    return not required and default_value is None
+
+
 class ConceptStructureBlueprint(BaseModel):
     """One field of a concept's structure table. Unknown keys are rejected — the field table's
     keys are strict, exactly like an input slot table's; hint *content* stays lenient (unknown
@@ -73,6 +113,11 @@ class ConceptStructureBlueprint(BaseModel):
     """MTHDS intent hints (spec: intent-hints.md) — non-normative presentation intent for this
     field as a site. Carried as authored through the crate; the site-over-concept merge is the
     consumer's. An empty table is equivalent to no hints and normalizes to absence."""
+
+    @property
+    def may_hold_nothing(self) -> bool:
+        """Whether a value of this field may hold nothing, by `field_may_hold_nothing`."""
+        return field_may_hold_nothing(required=self.required, default_value=self.default_value)
 
     @field_validator("hints", mode="after")
     @classmethod

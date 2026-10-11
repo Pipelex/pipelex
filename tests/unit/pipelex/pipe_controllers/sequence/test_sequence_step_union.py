@@ -113,7 +113,7 @@ class TestSequenceStepUnion:
             pytest.param('{ from = "invoice.total" }', "a binding step without `result`", id="I7-without-result"),
             pytest.param(
                 '{ from = "invoice.total", result = "total_amount", batch_over = "totals", batch_as = "total" }',
-                "cannot carry `batch_over`, `batch_as`",
+                "cannot carry `batch_over` or `batch_as`.",
                 id="I8-batch-fields",
             ),
             pytest.param('{ from = "invoice.lines[0]", result = "first_line" }', "is not a path", id="I9-subscript"),
@@ -193,7 +193,7 @@ branches = [
         errors = exc_info.value.validation_errors
         assert [error.error_type for error in errors] == [PipeValidationErrorType.BINDING_STEP_INVALID]
         assert errors[0].pipe_code == "acknowledge_invoice"
-        assert f"the dotted `batch_over` '{batch_over}' is not a path" in errors[0].message
+        assert f"The dotted `batch_over` '{batch_over}' of the step running pipe 'write_receipt' is not a path" in errors[0].message
 
     @pytest.mark.parametrize(
         "batch_over",

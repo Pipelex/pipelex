@@ -289,7 +289,7 @@ def _prune_older_backups(*, snapshot: FileSnapshot, backup: WrittenBackup) -> No
         # An older backup that would not go is a housekeeping failure on a file that is already
         # migrated and already backed up. Not the plan's to report as a failure of the file.
         log.warning(
-            "A change to a configuration file was backed up, but an older backup of the file could not be pruned",
+            "An older backup of a configuration file could not be pruned",
             fields={OTelLogAttr.FILE_PATH: str(snapshot.path), "backup_path": str(backup.path), **error_fields(exc=exc, text=exc.strerror)},
         )
 
@@ -314,7 +314,7 @@ def _discard_created_backup(*, backup: WrittenBackup, snapshot: FileSnapshot) ->
         backup.path.unlink(missing_ok=True)
     except OSError as exc:
         log.warning(
-            "A backup made for a removal that did not happen could not be removed, so it stays beside the file",
+            "A backup made for a removal that did not happen could not be removed",
             fields={OTelLogAttr.FILE_PATH: str(snapshot.path), "backup_path": str(backup.path), **error_fields(exc=exc, text=exc.strerror)},
         )
     return None
@@ -376,7 +376,7 @@ def _discard_backup(*, backup: WrittenBackup, snapshot: FileSnapshot, new_conten
         backup.path.unlink(missing_ok=True)
     except OSError as exc:
         log.warning(
-            "A backup made for a write that did not happen could not be removed, so it stays beside the file",
+            "A backup made for a write that did not happen could not be removed",
             fields={OTelLogAttr.FILE_PATH: str(snapshot.path), "backup_path": str(backup.path), **error_fields(exc=exc, text=exc.strerror)},
         )
 

@@ -13,6 +13,7 @@ from pipelex.system.environment import PIPELEX_HOME_ENV_KEY
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
+from pipelex.tools.log.error_fields import error_fields
 
 if TYPE_CHECKING:
     from pipelex.system.telemetry.telemetry_manager import TelemetryManager
@@ -39,7 +40,7 @@ def _fast_telemetry_teardown(self: "TelemetryManager") -> None:
         try:
             self._exception_capture.close()  # pyright: ignore[reportPrivateUsage]
         except Exception as exc:
-            log.debug(f"Error closing exception capture: {exc}")
+            log.debug("The exception capture could not be closed", fields=error_fields(exc=exc))
     if self._tracer_provider:  # pyright: ignore[reportPrivateUsage]
         try:
             self._tracer_provider.shutdown()  # pyright: ignore[reportPrivateUsage]

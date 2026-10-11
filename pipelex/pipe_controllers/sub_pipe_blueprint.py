@@ -25,29 +25,41 @@ class SubPipeBlueprint(BaseModel):
     batch_over: str | None = None
     batch_as: str | None = None
 
+    # Every refusal below names the step by the pipe it runs: the faulty fields are the step's, held by the sequence or the
+    # parallel that the error locates, not the pipe's, and the blueprint does not know the code of the pipe holding it.
+    @property
+    def step_label(self) -> str:
+        """How a message names the step, after "the": the step by the pipe it runs."""
+        return f"step running pipe '{self.pipe}'"
+
     @model_validator(mode="after")
     def validate_multiple_output(self) -> Self:
         if has_more_than_one_among_attributes_from_list(self, attributes_list=["nb_output", "multiple_output"]):
-            msg = "PipeStepBlueprint should have no more than '1' of nb_output or multiple_output"
+            msg = f"The {self.step_label} carries both `nb_output` and `multiple_output`: a step sets at most one of them."
             raise ValueError(msg)
         return self
 
     @model_validator(mode="after")
     def validate_batch_params(self) -> Self:
         if self.batch_over and not self.batch_as:
-            msg = f"In pipe '{self.pipe}': When 'batch_over' is specified, 'batch_as' must also be provided"
+            msg = (
+                f"The {self.step_label} carries `batch_over` without `batch_as`: a step batching over a list hands each item to its pipe "
+                "under the name `batch_as` gives it."
+            )
             raise ValueError(msg)
 
         if self.batch_as and not self.batch_over:
-            msg = f"In pipe '{self.pipe}': When 'batch_as' is specified, 'batch_over' must also be provided"
+            msg = (
+                f"The {self.step_label} carries `batch_as` without `batch_over`: `batch_as` names each item of the list a step batches over, "
+                "and `batch_over` names that list."
+            )
             raise ValueError(msg)
 
         if self.batch_over and self.batch_as and self.batch_over == self.batch_as:
             msg = (
-                f"In pipe '{self.pipe}': 'batch_as' ('{self.batch_as}') must not be the same as "
-                f"'batch_over' ('{self.batch_over}'). "
-                f"Use a plural for batch_over and the singular form for batch_as "
-                f"(e.g., batch_over='items', batch_as='item')."
+                f"The `batch_as` of the {self.step_label} is '{self.batch_as}', the same name as its `batch_over`: each item needs a name "
+                'of its own. Use a plural for `batch_over` and its singular for `batch_as`, such as `batch_over = "items"` and '
+                '`batch_as = "item"`.'
             )
             raise PipeValidationError(
                 message=msg,
@@ -62,7 +74,7 @@ class SubPipeBlueprint(BaseModel):
         if self.batch_over is None or not is_dotted_batch_over(batch_over=self.batch_over) or is_field_path(path=self.batch_over):
             return self
         msg = (
-            f"In pipe '{self.pipe}': the dotted `batch_over` '{self.batch_over}' is not a path. A dotted `batch_over` binds the list "
+            f"The dotted `batch_over` '{self.batch_over}' of the {self.step_label} is not a path. A dotted `batch_over` binds the list "
             f"at its path, as a binding step's `from` does, and a path is {PATH_GRAMMAR_DESCRIPTION}."
         )
         raise PipeValidationError(message=msg, error_type=PipeValidationErrorType.BINDING_STEP_INVALID, variable_names=[self.batch_over])
@@ -80,7 +92,7 @@ class SubPipeBlueprint(BaseModel):
         """
         for field_name, name in (("result", self.result), ("batch_as", self.batch_as)):
             if name is not None:
-                check_stored_name(name=name, field_label=f"The `{field_name}` of the step running pipe '{self.pipe}'")
+                check_stored_name(name=name, field_label=f"The `{field_name}` of the {self.step_label}")
         if self.batch_over is not None:
-            check_name_is_not_reserved(name=self.batch_over, field_label=f"The `batch_over` of the step running pipe '{self.pipe}'")
+            check_name_is_not_reserved(name=self.batch_over, field_label=f"The `batch_over` of the {self.step_label}")
         return self

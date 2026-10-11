@@ -166,6 +166,8 @@ The referenced value must be a list, and every item must carry the key attribute
 
 A `from` path and a `list_to_dict_keyed_by` name read public fields only: validation refuses a segment starting with an underscore, such as `{ from = "order._stuff" }`, for the reason the [Template Sandbox](../../../under-the-hood/template-sandbox.md) gives.
 
+A `from` path reaching a field that holds nothing, such as an optional `order.note` left unset, gives the target field nothing. A target field with a `default_value` is left unset and takes its default, since it never holds nothing; an optional one holds nothing; and a required one is refused. A Python class field typed `X | None` holds nothing whether it is required or defaulted. With `list_to_dict_keyed_by`, a path holding nothing is refused, since the modifier needs a list.
+
 ### Copying Whole Inputs Into Native Fields
 
 The `from` reference is not limited to dotted paths like `"customer.name"` — it can name a whole input variable. When the referenced input is a native stuff (`Text`, `Number`, `YesNo`, `Date`, `Time`, or a list of them) and the target field is native-typed, the composer automatically converts the content wrapper into the field's native value. This works for required and optional fields alike.

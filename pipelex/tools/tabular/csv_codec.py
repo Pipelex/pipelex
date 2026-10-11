@@ -31,6 +31,7 @@ from pipelex.tools.tabular.exceptions import (
     CsvFlatnessError,
     CsvReadError,
 )
+from pipelex.tools.typing.annotation_utils import annotation_admits_none
 
 if TYPE_CHECKING:
     from pydantic_core import ErrorDetails
@@ -81,13 +82,6 @@ def _is_flat_annotation(annotation: Any) -> bool:
             return all(isinstance(member.value, str) for member in annotation)
         return annotation in _FLAT_SCALAR_TYPES
     return False
-
-
-def _annotation_allows_none(annotation: Any) -> bool:
-    """Whether a field annotation accepts ``None`` (an ``Optional`` / ``... | None`` field)."""
-    if get_origin(annotation) in {Union, _UnionType}:
-        return any(arg is _NONE_TYPE for arg in get_args(annotation))
-    return annotation is _NONE_TYPE
 
 
 def flat_field_names(row_model: type[StuffContent]) -> list[str]:
@@ -320,8 +314,10 @@ def list_content_from_csv(
 
     Columns must match ``row_model``'s field names (no implicit remap): an extra column
     or a missing *required* column raises ``CsvColumnError``; a missing *optional* column
-    sets that field to ``None`` for all rows. Empty cells map to ``None`` BEFORE pydantic
-    validation (so they must target optional fields); remaining strings are coerced via
+    sets that field to ``None`` for all rows, or leaves a defaulted field that refuses ``None``
+    to its default. Empty cells map to ``None`` BEFORE pydantic validation (so they must target
+    optional fields), but are left out for a defaulted field that refuses ``None``, which then
+    takes its default; remaining strings are coerced via
     pydantic's lax validation. A coercion failure raises ``CsvCoercionError`` naming the
     1-based row/column and field. ``row_model`` must be CSV-flat (see ``flat_field_names``).
     """
@@ -351,13 +347,25 @@ def list_content_from_csv(
     # depending on a non-None field default (e.g. ``nickname: str | None = "anon"`` → None, not "anon").
     # A non-nullable defaulted field (e.g. ``count: int = 0``) is left absent so its own default
     # applies — forcing None there would fail validation, not honor the column's absence.
-    omitted_nullable_fields = {name for name in (field_name_set - header_set) if _annotation_allows_none(row_model.model_fields[name].annotation)}
+    omitted_nullable_fields = {
+        name for name in (field_name_set - header_set) if annotation_admits_none(annotation=row_model.model_fields[name].annotation)
+    }
+    # An empty cell is "no value" in the same way: a defaulted field that refuses None (a structure field with a
+    # `default_value` never holds nothing) is left out of the row so its default applies, as for an omitted column.
+    defaulted_non_nullable_fields = {
+        name
+        for name, field_info in row_model.model_fields.items()
+        if not field_info.is_required() and not annotation_admits_none(annotation=field_info.annotation)
+    }
 
     items: list[StuffContentType] = []
     for row_number, data_row in data_rows:
         cell_map = _row_to_dict(data_row, header=header)
-        # Empty cell -> None BEFORE validation (so it targets an optional field, or fails required).
-        row_data: dict[str, str | None] = {column: (value or None) for column, value in cell_map.items()}
+        # Empty cell -> None BEFORE validation (so it targets an optional field, or fails required), or left out
+        # for a defaulted field that refuses None.
+        row_data: dict[str, str | None] = {
+            column: (value or None) for column, value in cell_map.items() if value or column not in defaulted_non_nullable_fields
+        }
         for omitted_field in omitted_nullable_fields:
             row_data[omitted_field] = None
         try:

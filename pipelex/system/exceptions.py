@@ -66,7 +66,3 @@ class FatalError(TracebackMessageError):
 
 class ConfigValidationError(FatalError):
     pass
-
-
-class ConfigModelError(FatalError, ValueError):
-    pass

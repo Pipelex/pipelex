@@ -75,9 +75,9 @@ Vint Cerf,Computer Scientist,United States,1943,
 
 - A missing **required** column is an error.
 
-- A missing **optional** column is fine — that field is `None` for every row. (Pipelex's own writer always emits every column, so this only matters for hand-authored partial CSVs.)
+- A missing **optional** column is fine — a field with a `default_value` takes its default for every row, and any other optional field is `None` for every row. (Pipelex's own writer always emits every column, so this only matters for hand-authored partial CSVs.)
 
-- An **empty cell** becomes `None` before validation, so the field must be optional to accept it.
+- An **empty cell** means no value: a field with a `default_value` takes its default, any other optional field becomes `None`, and a required field refuses it.
 
 ### Type coercion
 
@@ -102,7 +102,7 @@ pipelex run bundle demo.mthds --save-csv out.csv
 pipelex run method my_method --save-csv out.csv
 ```
 
-The path is **literal and cwd-relative** — it is written exactly where you point it, not under `--output-dir`. Parent directories are created as needed. The output's main stuff must be a flat list; if it is not a list, or its row concept is not flat, you get a clear error rather than a malformed file. The header is derived from the row concept's structure — the class the run produced its rows with, or, for a run that produced no rows, the declared concept resolved by reloading the method — so an empty list still writes a correct header-only file. On write, `None` is rendered as an empty cell and booleans as lowercase `true`/`false`, so a value round-trips back through a read unchanged.
+The path is **literal and cwd-relative** — it is written exactly where you point it, not under `--output-dir`. Parent directories are created as needed. The output's main stuff must be a flat list; if it is not a list, or its row concept is not flat, you get a clear error rather than a malformed file. The header is derived from the row concept's structure — the class the run produced its rows with, or, for a run that produced no rows, the declared concept resolved by reloading the method — so an empty list still writes a correct header-only file. On write, `None` is rendered as an empty cell and booleans as lowercase `true`/`false`, so a value round-trips back through a read unchanged, except an empty text: it is written as an empty cell too, so it reads back as the field's default, or as `None` for an optional field without one.
 
 ## Round-trip example
 

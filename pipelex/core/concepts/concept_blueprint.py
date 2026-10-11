@@ -1,9 +1,13 @@
-import keyword
 from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict, SerializerFunctionWrapHandler, field_validator, model_serializer, model_validator
 
-from pipelex.core.concepts.concept_structure_blueprint import RESERVED_FIELD_NAMES, ConceptStructureBlueprint
+from pipelex.core.concepts.concept_structure_blueprint import (
+    RESERVED_FIELD_NAMES,
+    ConceptStructureBlueprint,
+    FieldNameRefusal,
+    structure_field_name_refusal,
+)
 from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
 
 ConceptStructureBlueprintType = str | ConceptStructureBlueprint
@@ -77,7 +81,10 @@ class ConceptBlueprint(BaseModel):
         cls, structure: str | dict[str, ConceptStructureBlueprintType] | None
     ) -> str | dict[str, ConceptStructureBlueprintType] | None:
         if isinstance(structure, dict):
-            invalid_identifier_fields = [field_name for field_name in structure if not field_name.isidentifier() or keyword.iskeyword(field_name)]
+            # One rule for a field name, shared with every name that stands for a field: each name is refused by
+            # the first rule it breaks, and each rule keeps its own message.
+            refusals = {field_name: structure_field_name_refusal(field_name=field_name) for field_name in structure}
+            invalid_identifier_fields = [field_name for field_name, refusal in refusals.items() if refusal is FieldNameRefusal.NOT_AN_IDENTIFIER]
             if invalid_identifier_fields:
                 invalid_list = ", ".join(f"'{name}'" for name in sorted(invalid_identifier_fields))
                 msg = (
@@ -87,7 +94,7 @@ class ConceptBlueprint(BaseModel):
                 raise ValueError(msg)
 
             # Check for reserved field names
-            reserved_fields_used = [field_name for field_name in structure if field_name in RESERVED_FIELD_NAMES]
+            reserved_fields_used = [field_name for field_name, refusal in refusals.items() if refusal is FieldNameRefusal.RESERVED]
             if reserved_fields_used:
                 fields_word = "field" if len(reserved_fields_used) == 1 else "fields"
                 reserved_fields_used_list = ", ".join(f"'{name}'" for name in sorted(reserved_fields_used))
@@ -100,7 +107,7 @@ class ConceptBlueprint(BaseModel):
                 raise ValueError(msg)
 
             # Check for field names starting with underscore (reserved for internal use)
-            underscore_fields = [field_name for field_name in structure if field_name.startswith("_")]
+            underscore_fields = [field_name for field_name, refusal in refusals.items() if refusal is FieldNameRefusal.UNDERSCORE]
             if underscore_fields:
                 fields_word = "field" if len(underscore_fields) == 1 else "fields"
                 underscore_list = ", ".join(f"'{name}'" for name in sorted(underscore_fields))

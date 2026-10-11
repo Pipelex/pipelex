@@ -3,6 +3,7 @@ from pytest_mock import MockerFixture
 
 from pipelex import log
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
+from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 
 
 class TestPipeAbstractNamespaceStrip:
@@ -28,8 +29,8 @@ class TestPipeAbstractNamespaceStrip:
         PipeAbstract.validate_pipe_code_syntax("domain.my_pipe")
 
         warning_spy.assert_called_once_with(
-            "A pipe code carries a namespace prefix, which was stripped: write the pipe code bare",
-            fields={"pipe_code": "my_pipe", "pipe_ref": "domain.my_pipe"},
+            "A namespace prefix was stripped from a pipe code",
+            fields={"pipe_code": "my_pipe", "pipe_ref": "domain.my_pipe", USER_ACTION_FIELD: "Write the pipe code bare"},
         )
 
     def test_validate_pipe_code_syntax_raises_for_invalid_after_strip(self) -> None:

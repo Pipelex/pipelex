@@ -97,3 +97,23 @@ class TestABackendFileIsADocumentNotAModel:
     )
     def test_a_root_key_whose_value_is_not_a_table_is_refused(self, document: dict[str, Any]) -> None:
         assert describe_model_spec_document_rejection(document=document) is not None
+
+    @pytest.mark.parametrize(
+        ("field_name", "value"),
+        [
+            pytest.param("costs", "free", id="costs_as_a_string"),
+            pytest.param("costs", {"input": "free"}, id="costs_with_a_string_price"),
+            pytest.param("listed_constraints", 5, id="listed_constraints_as_a_number"),
+            pytest.param("valued_constraints", [], id="valued_constraints_as_an_array"),
+            pytest.param("rules", "x", id="rules_as_a_string"),
+        ],
+    )
+    def test_a_member_of_the_wrong_type_is_a_rejection_not_a_crash(self, field_name: str, value: Any) -> None:
+        """The migration gate reports the reason; a bare `AttributeError` or `TypeError` used to escape it instead."""
+        document: dict[str, Any] = {"defaults": {"sdk": "openai"}, "gpt-4o": {field_name: value}}
+
+        rejection = describe_model_spec_document_rejection(document=document)
+
+        assert rejection is not None
+        assert "gpt-4o" in rejection
+        assert field_name in rejection

@@ -1,0 +1,7 @@
+{
+  "status": 400,
+  "error": {
+    "type": "invalid_request_error",
+    "code": "typesafe_unknown_model"
+  }
+}

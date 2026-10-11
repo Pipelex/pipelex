@@ -39,6 +39,7 @@ from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
 from pipelex.providers.mistral.mistral_exceptions import MistralExtractResponseError
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
 
 
@@ -261,7 +262,7 @@ class MistralFactory:
             return base64_str
         except ValueError as exc:
             # base64 decode/encode failed (binascii.Error / UnicodeDecodeError, both ValueError subclasses) — return the original string unmodified
-            log.debug(f"Error cleaning base64: {exc}")
+            log.debug("A base64 image could not be cleaned and was kept as it came", fields=error_fields(exc=exc))
             return base64_str
 
     @classmethod

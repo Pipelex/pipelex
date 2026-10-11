@@ -1,20 +1,23 @@
 """The ts-zod projection must accept the payload the runtime actually puts on the wire.
 
 The two sides read one authored crate. `ConceptFactory` builds the class an interpreted run stores in
-memory, and that class annotates every non-required field `X | None`; the transport dump keeps nulls on
+memory, and that class annotates every field that may hold nothing `X | None`; the transport dump keeps nulls on
 purpose (`dump_for_transport()` is a `model_dump(serialize_as_any=True)` with no `exclude_none`, and the
 composer spells `exclude_none=False` at its dump sites). So an unset optional field reaches a consumer as
 an explicit `"key": null`. `emit_ts_zod` writes the schema that consumer parses it with — and `.optional()`
 means `T | undefined` in zod, which *rejects* an explicit null. A projection that spelled it that way would
-refuse the engine's own output, with nothing in this repo going red.
+refuse the engine's own output, with nothing in this repo going red. A defaulted field is the other
+half: it never holds nothing, so the runtime class refuses an explicit `None` for it and the projection
+spells it a bare `.default(…)`, which refuses a `null` too.
 
 Three layers, on one shared crate:
 
 1. **Wire pin** — build the runtime class and dump it the way transport does, asserting the unset keys are
    present and null. This is the fact the projection must accommodate; if the transport dump ever flips to
    `exclude_none`, this reddens and forces the projection decision to be revisited alongside it.
-2. **Projection pin** — emit ts-zod for the same crate and require every non-required field to be
-   null-tolerant. Paired with (1), the cross-language contract is encoded here even where CI has no node.
+2. **Projection pin** — emit ts-zod for the same crate and require every field that may hold nothing to be
+   null-tolerant, and the defaulted one not to be. Paired with (1), the cross-language contract is encoded
+   here even where CI has no node.
 3. **Executable round-trip** — feed (1)'s JSON through the emitted schema under a real zod. Mandatory
    wherever the node toolchain is provisioned (`make test-ts-gates`, which is what CI runs); opportunistic
    on a machine without it, where the two always-on pins hold the line.
@@ -26,6 +29,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from pipelex.codegen.emitters.ts_zod import emit_ts_zod
 from pipelex.codegen.resolved_concepts import resolve_concepts_from_crate
@@ -75,8 +79,8 @@ _AUTHORED: dict[str, ConceptBlueprint] = {
     ),
 }
 
-# Every non-required field of `Payload`, i.e. every key the runtime can put on the wire as an explicit null.
-_NON_REQUIRED_FIELDS = ("note", "detail", "tags", "counts", "status")
+# Every field of `Payload` that may hold nothing, i.e. every key the runtime can put on the wire as an explicit null.
+_MAY_HOLD_NOTHING_FIELDS = ("note", "detail", "tags", "counts")
 
 
 def _authored_crate() -> LibraryCrate:
@@ -88,13 +92,8 @@ def _authored_crate() -> LibraryCrate:
 
 class TestTsZodWireAgreement:
     @pytest.fixture
-    def wire_payloads(self, load_empty_library: Any) -> list[dict[str, Any]]:
-        """What the runtime hands to transport for two ordinary instances, unset optionals and all.
-
-        The first leaves every optional unset — the shape the ledger item's hosted `PipeImgGen` run
-        produced. The second nulls the *defaulted* field explicitly, which a producer may do because the
-        generated annotation is `X | None`: that is the payload a bare `.default(…)` rejects.
-        """
+    def payload_class(self, load_empty_library: Any) -> type[StuffContent]:
+        """The runtime class an interpreted run stores a `Payload` in."""
         load_empty_library()
         registry = get_class_registry()
         classes: dict[str, Any] = {}
@@ -108,35 +107,52 @@ class TestTsZodWireAgreement:
             structure_class.model_rebuild(_types_namespace=classes)
 
         # `Detail` exists only to be referenced; `Payload` is the one that gets dumped.
-        payload_class = classes["Payload"]
+        payload_class: type[StuffContent] = classes["Payload"]
+        return payload_class
+
+    @pytest.fixture
+    def wire_payloads(self, payload_class: type[StuffContent]) -> list[dict[str, Any]]:
+        """What the runtime hands to transport for two ordinary instances, unset optionals and all.
+
+        The first leaves every optional unset — the shape the ledger item's hosted `PipeImgGen` run
+        produced — and so takes the defaulted field's default. The second sets the defaulted field.
+        """
         return [
-            payload_class(title="Everything optional left unset").model_dump(serialize_as_any=True),
-            payload_class(title="A producer nulling the defaulted field", status=None).model_dump(serialize_as_any=True),
+            payload_class.model_validate({"title": "Everything optional left unset"}).model_dump(serialize_as_any=True),
+            payload_class.model_validate({"title": "A producer setting the defaulted field", "status": "final"}).model_dump(serialize_as_any=True),
         ]
 
     def test_the_wire_carries_unset_optionals_as_explicit_nulls(self, wire_payloads: list[dict[str, Any]]):
         """The fact the projection has to accommodate — pinned here so it cannot change unnoticed."""
-        unset, nulled_default = wire_payloads
+        unset, set_default = wire_payloads
 
         assert unset["title"] == "Everything optional left unset"
-        for field_name in ("note", "detail", "tags", "counts"):
+        for field_name in _MAY_HOLD_NOTHING_FIELDS:
             assert field_name in unset, f"{field_name} was dropped from the transport dump"
             assert unset[field_name] is None, f"{field_name} is {unset[field_name]!r}, not the explicit null the wire carries"
-        # A defaulted field is not nulled when unset — the default is applied — but it can be nulled explicitly.
+        # A defaulted field is never nulled: unset, it holds its default.
         assert unset["status"] == "draft"
-        assert nulled_default["status"] is None
+        assert set_default["status"] == "final"
 
-    def test_every_non_required_field_projects_null_tolerant(self):
-        """`.optional()` alone is `T | undefined` in zod, and would reject the payload pinned above."""
+    def test_the_runtime_class_refuses_a_null_on_the_defaulted_field(self, payload_class: type[StuffContent]):
+        """A defaulted field never holds nothing, so no producer can put a `null` for it on the wire."""
+        with pytest.raises(ValidationError) as exc_info:
+            payload_class.model_validate({"title": "A producer nulling the defaulted field", "status": None})
+        assert [error["loc"] for error in exc_info.value.errors()] == [("status",)]
+
+    def test_the_projection_states_presence_as_the_runtime_does(self):
+        """`.optional()` alone is `T | undefined` in zod and would reject the nulls pinned above; `.nullable()` would admit a refused one."""
         content = emit_ts_zod(resolve_concepts_from_crate(normalize_crate(_authored_crate(), mthds_version=CRATE_TEST_VERSION)))[0].content
 
         assert ".optional()" not in content
-        for field_name in _NON_REQUIRED_FIELDS:
+        assert ".nullable()" not in content
+        for field_name in _MAY_HOLD_NOTHING_FIELDS:
             # Every field of this crate is short enough to stay on one line, so a missing match means the
             # field vanished from the projection rather than that it was broken across lines.
             line = next((line for line in content.splitlines() if line.strip().startswith(f"{field_name}: ")), None)
             assert line is not None, f"{field_name} has no field line in the emitted schema"
-            assert ".nullish()" in line or ".nullable()" in line, f"{field_name} is not null-tolerant: {line.strip()}"
+            assert ".nullish()" in line, f"{field_name} is not null-tolerant: {line.strip()}"
+        assert 'status: z.enum(["draft", "final"]).default("draft"),' in content
         # The nested concept's own optional field, reached through the reference rather than declared beside it.
         assert "weight: z.number().nullish()," in content
 
@@ -161,7 +177,9 @@ class TestTsZodWireAgreement:
             'import { readFileSync } from "node:fs";\n'
             'import { PayloadSchema } from "./types.ts";\n'
             'const wire = JSON.parse(readFileSync("wire.json", "utf-8"));\n'
-            "process.stdout.write(JSON.stringify(wire.map((one: unknown) => PayloadSchema.parse(one))));\n",
+            "const parsed = wire.map((one: unknown) => PayloadSchema.parse(one));\n"
+            'const nulledDefault = PayloadSchema.safeParse({ title: "A nulled default", status: null }).success;\n'
+            "process.stdout.write(JSON.stringify({ parsed, nulledDefault }));\n",
             encoding="utf-8",
         )
 
@@ -174,10 +192,13 @@ class TestTsZodWireAgreement:
         )
         assert run.returncode == 0, f"the emitted schema rejected the runtime's own payload:\n{run.stdout}\n{run.stderr}"
 
-        unset, nulled_default = json.loads(run.stdout)
+        result = json.loads(run.stdout)
+        unset, set_default = result["parsed"]
         # Nulls survive as nulls: the schema describes the wire, it does not fold `null` into `undefined`
         # (the binder uses one schema for both parse and serialize, so a transform would desynchronize them).
-        for field_name in ("note", "detail", "tags", "counts"):
+        for field_name in _MAY_HOLD_NOTHING_FIELDS:
             assert unset[field_name] is None, f"{field_name} came back as {unset[field_name]!r} instead of null"
         assert unset["status"] == "draft"
-        assert nulled_default["status"] is None
+        assert set_default["status"] == "final"
+        # The schema refuses the `null` the runtime class refuses.
+        assert result["nulledDefault"] is False

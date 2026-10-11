@@ -4,8 +4,7 @@ Keyed by `AspectRatioTaxonomy.GPT_IMAGE_LEGACY` / `GPT_IMAGE_2` and the sibling 
 and input-fidelity taxonomies — all `cogt`-owned enums — so this lives beside the args
 factory that consumes it rather than in the OpenAI adapter. More than one adapter serves
 these models: the `openai` and `azure_openai` decks both ship models carrying these
-taxonomies, and the gateway worker routes any model whose rules name one through the same
-args factory. No single adapter owns the mapping.
+taxonomies, and both go through the same args factory. No single adapter owns the mapping.
 
 Reference: https://platform.openai.com/docs/guides/image-generation
 """
@@ -189,7 +188,7 @@ class ImgGenGptMapping:
                 # A tier is a portable request, not a hand-picked size: note it quietly.
                 log.verbose("The image size a tier derives is above the model's 2560x1440 reliability boundary", fields=size_fields)
             else:
-                log.warning("The requested image size is valid but above the model's 2560x1440 reliability boundary", fields=size_fields)
+                log.warning("The requested image size is above the model's 2560x1440 reliability boundary", fields=size_fields)
 
     @classmethod
     def moderation_literal(cls, *, is_moderated: bool | None) -> GptImageModerationType | None:

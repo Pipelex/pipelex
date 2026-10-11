@@ -67,7 +67,6 @@ own page. Classes are grouped by subsystem.
 
 ## System & configuration
 
-- [`ConfigModelError`](config-model-error.md) — Config model
 - [`ConfigValidationError`](config-validation-error.md) — Config validation
 - [`CredentialsError`](credentials-error.md) — Missing or invalid credentials
 - [`EnvVarNotFoundError`](env-var-not-found-error.md) — Environment variable not set

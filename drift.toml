@@ -141,14 +141,18 @@ review = [
 verify_commands = []
 
 [contracts.logging-docs]
-description = "The logging doc restates the console's field rules and the handled-exception fields and must track the two modules that decide them."
+description = "The logging doc restates the console's field rules and the handled-exception fields, the log-sink page summarises what the console renders, and both must track the two modules that decide them."
 # The page restates, rule by rule, what the two modules decide: the style map (`FIELD_STYLES`) and
 # the fields it colours, the cut lengths (`FIELD_VALUE_MAX_LENGTH` and the generous ones in
 # `FIELD_MAX_LENGTHS`), the field names whose value is cut at its start (`LEFT_CUT_FIELD_SUFFIXES`,
 # `LEFT_CUT_FIELDS`), when a pydantic message is kept rather than its error type
 # (`SCHEMA_CONTEXT_KEYS`), and where an `extra_forbidden` error is located. A name added to one of
 # those sets, or a length moved, silently falsifies a sentence quantifying over it, which is the
-# staleness this contract exists to catch. The field-vocabulary table on the same page stays
+# staleness this contract exists to catch. The log-sink plugins page describes the `console` sink
+# in its table of built-in sinks and again where it explains why that sink is the default, and
+# both passages name what a terminal shows of a record, the fields after the message, their
+# colours and the advice line, so a change to what the console renders is reviewed there too, not
+# only on the logging page it links to. The field-vocabulary table on the logging page stays
 # outside any contract on purpose: its entries come from call sites everywhere, which no trigger
 # list could name, and a field joins the table in the change that first logs it. No verify
 # command: no gate checks these rules apart from the modules' own tests, which `make agent-test`
@@ -159,5 +163,6 @@ triggers = [
 ]
 review = [
   "docs/tools/logging.md",
+  "docs/under-the-hood/log-sink-plugins.md",
 ]
 verify_commands = []

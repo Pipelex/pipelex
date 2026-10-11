@@ -1,0 +1,36 @@
+{
+  "model": "jev-1.13.0",
+  "prompt": {
+    "text": "A message from a customer:\n<message>\nI was charged twice for order 4417 this morning. Please refund one of the two charges.\n</message>"
+  },
+  "questions": {
+    "refund": {
+      "kind": "yes_no",
+      "instructions": "Does the customer ask for a refund?"
+    },
+    "tone": {
+      "kind": "choice",
+      "instructions": "What is the tone of the message?",
+      "options": {
+        "calm": null,
+        "angry": null,
+        "anxious": null
+      }
+    },
+    "priority": {
+      "kind": "rating",
+      "instructions": "What priority should this message get?",
+      "levels": [
+        {
+          "label": "Low"
+        },
+        {
+          "label": "Normal"
+        },
+        {
+          "label": "High"
+        }
+      ]
+    }
+  }
+}

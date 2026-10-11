@@ -257,6 +257,8 @@ When `model` is specified as a table (inline LLM setting), it accepts the follow
 
 A setting the model it resolves to cannot take is refused when the method loads, before a run spends anything: validation runs the check the model's worker runs before every call, so a reasoning setting on a model that does not reason, a reasoning budget on a model taking only an effort, or a budget its `max_tokens` cannot hold is an `llm_setting_refused_by_model` error on the `model` or `model_to_structure` field holding the setting. The setting checked is the one the output is generated with: `model` for a single text, the structuring setting for anything else.
 
+A text the model cannot finish within `max_tokens`, or within its context window, fails the pipe with [`LLMCompletionTruncatedError`](../../../errors/llm-completion-truncated-error.md) rather than passing the partial text on as the pipe's output; a text the model refuses or a safety filter stops fails it with [`LLMCompletionRefusedError`](../../../errors/llm-completion-refused-error.md). The first names the output tokens used and the limit sent, so raising `max_tokens` or shortening the input is the fix; a model that reasons spends its reasoning from the same limit.
+
 !!! tip "More on Reasoning"
     For provider-specific behavior and model-specific examples, see [Reasoning Controls](../../../under-the-hood/reasoning-controls.md).
 

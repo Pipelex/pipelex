@@ -289,6 +289,8 @@ To improve performance and avoid loading unnecessary files, Pipelex automaticall
 
 Files in these directories will not be scanned, even if they contain `.mthds` files or structure classes.
 
+The list is the `excluded_dirs` array under `[interpreter.scan]` in `pipelex.toml`, each entry naming a directory; a value that is not an array, such as a single string, fails the boot.
+
 ## Project Organization
 
 **Golden rule:** Put `.mthds` files where they make sense in YOUR project. Pipelex finds them automatically.

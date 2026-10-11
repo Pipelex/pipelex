@@ -129,7 +129,7 @@ PLANTED_BACKEND_VALUE = "a_prompting_target_no_report_may_ever_render"
 
 # How each line of `stale_configuration_warning` opens. Matched in full rather than on a fragment: the
 # same boot also prints a deck-staleness notice, and "out of date" appears in both.
-STALE_CONFIGURATION_OPENING = "A configuration file is out of date and was read as if it had been migrated"
+STALE_CONFIGURATION_OPENING = "A configuration file is out of date and was migrated in memory only"
 
 
 def _old_shape_telemetry_document() -> str:

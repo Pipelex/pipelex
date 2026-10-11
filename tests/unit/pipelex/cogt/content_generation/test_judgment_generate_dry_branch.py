@@ -14,7 +14,9 @@ from pipelex.cogt.content_generation.judgment_generate import judgment_gen_answe
 from pipelex.cogt.judgment.judgment_models import (
     ChoiceAnswer,
     ChoiceQuestion,
+    JudgmentPrompt,
     RatingAnswer,
+    RatingLevel,
     RatingQuestion,
     YesNoAnswer,
     YesNoQuestion,
@@ -31,11 +33,13 @@ class TestJudgmentGenerateDryBranch:
                 run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="u", pipeline_run_id="run_judgment_dry")
             ),
             cogt_run_params=CogtRunParams(run_mode=run_mode),
-            state={"message": "the roof is on fire"},
+            prompt=JudgmentPrompt(text="A message from a customer: the roof is on fire"),
             questions={
                 "is_urgent": YesNoQuestion(instructions="Does this need an answer today?"),
                 "topic": ChoiceQuestion(instructions="What is this about?", options={"fire": None, "flood": "water damage"}),
-                "severity": RatingQuestion(instructions="How severe?", levels=["mild", "bad", "critical"]),
+                "severity": RatingQuestion(
+                    instructions="How severe?", levels=[RatingLevel(label="Mild"), RatingLevel(label="Bad"), RatingLevel(label="Critical")]
+                ),
             },
             judgment_setting=JudgmentSetting(model="mock-judgment-handle"),
         )

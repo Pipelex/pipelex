@@ -1,0 +1,37 @@
+{
+  "status": 200,
+  "body": {
+    "answers": {
+      "urgent": {
+        "kind": "yes_no",
+        "probability": 0.21
+      },
+      "team": {
+        "kind": "choice",
+        "choice": "accounts",
+        "confidence": 1.0,
+        "probabilities": {
+          "payments": 0.0,
+          "shipping": 0.0,
+          "accounts": 1.0,
+          "other": 0.0
+        }
+      },
+      "severity": {
+        "kind": "rating",
+        "level": 1,
+        "position": 1.42,
+        "confidence": 0.36,
+        "probabilities": {
+          "0": 0.0,
+          "1": 0.58,
+          "2": 0.42
+        }
+      }
+    },
+    "usage": {
+      "input_tokens": 503,
+      "output_tokens": 75
+    }
+  }
+}

@@ -12,7 +12,7 @@ from pipelex.cogt.image.prompt_image import PromptImage, PromptImageUri
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
 from pipelex.cogt.judgment.judgment_job import JudgmentJob
 from pipelex.cogt.judgment.judgment_job_factory import JudgmentJobFactory
-from pipelex.cogt.judgment.judgment_models import ChoiceQuestion, JudgmentQuestion, RatingQuestion, YesNoAnswer, YesNoQuestion
+from pipelex.cogt.judgment.judgment_models import ChoiceQuestion, JudgmentPrompt, JudgmentQuestion, RatingQuestion, YesNoAnswer, YesNoQuestion
 from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -22,6 +22,7 @@ from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.providers.typesafe.typesafe_judgment_worker import TypesafeJudgmentWorker
 from pipelex.reporting.reporting_protocol import ReportingNoOp
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
+from tests.unit.pipelex.cogt.judgment.test_data import described_levels
 from tests.unit.pipelex.providers.typesafe.test_data import TestData, load_recorded_response, rebuild_recorded_exception
 
 THREE_SHAPES_QUESTIONS: dict[str, JudgmentQuestion] = {
@@ -32,7 +33,7 @@ THREE_SHAPES_QUESTIONS: dict[str, JudgmentQuestion] = {
     ),
     "severity": RatingQuestion(
         instructions=TestData.THREE_SHAPES_INSTRUCTIONS["severity"],
-        levels=["Cosmetic", "Degraded with a workaround", "Blocking"],
+        levels=described_levels("Cosmetic", "Degraded with a workaround", "Blocking"),
     ),
 }
 
@@ -64,7 +65,9 @@ def _model(*, inputs: list[str] | None = None) -> InferenceModelSpec:
 
 def _job(questions: dict[str, JudgmentQuestion]) -> JudgmentJob:
     return JudgmentJobFactory.make_judgment_job(
-        state={"message": "Our production checkout has been returning 500s for every card payment since 09:14 UTC."},
+        prompt=JudgmentPrompt(
+            text="A message from a customer: Our production checkout has been returning 500s for every card payment since 09:14 UTC."
+        ),
         questions=questions,
         judgment_setting=JudgmentSetting(model="jev-1.13.0"),
         job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="u", pipeline_run_id="run_typesafe")),
@@ -76,29 +79,23 @@ class TestTypesafeJudgmentWorker:
     @pytest.mark.parametrize(
         ("inputs", "images", "documents"),
         [
-            pytest.param(
-                ["text", "images"], {"photo": [PromptImageUri(uri="pipelex-storage://s/photo.png", mime_type="image/png")]}, None, id="image"
-            ),
-            pytest.param(
-                ["text", "pdf"], None, {"claim": [PromptDocumentUri(uri="pipelex-storage://s/claim.pdf", mime_type="application/pdf")]}, id="document"
-            ),
+            pytest.param(["text", "images"], [PromptImageUri(uri="pipelex-storage://s/photo.png", mime_type="image/png")], [], id="image"),
+            pytest.param(["text", "pdf"], [], [PromptDocumentUri(uri="pipelex-storage://s/claim.pdf", mime_type="application/pdf")], id="document"),
         ],
     )
     async def test_a_job_carrying_files_is_refused_whatever_the_spec_claims(
         self,
         mocker: MockerFixture,
         inputs: list[str],
-        images: dict[str, list[PromptImage]] | None,
-        documents: dict[str, list[PromptDocument]] | None,
+        images: list[PromptImage],
+        documents: list[PromptDocument],
     ) -> None:
-        """TypeSafe judges a JSON state alone, so a spec claiming it reads files would have its files dropped from the request."""
+        """TypeSafe judges text alone, so a spec claiming it reads files would have its files dropped from the request."""
         client = mocker.Mock(spec=AsyncTypeSafeClient)
         client.system_one = mocker.AsyncMock(return_value=load_recorded_response(TestData.THREE_SHAPES))
         worker = TypesafeJudgmentWorker(sdk_instance=cast("AsyncTypeSafeClient", client), inference_model=_model(inputs=inputs))
         job = JudgmentJobFactory.make_judgment_job(
-            state={"message": "See the attached file."},
-            images=images,
-            documents=documents,
+            prompt=JudgmentPrompt(text="See the attached file: [Image 1] [Document 1]", images=images, documents=documents),
             questions={"is_urgent": YesNoQuestion(instructions=TestData.THREE_SHAPES_INSTRUCTIONS["is_urgent"])},
             judgment_setting=JudgmentSetting(model="jev-1.13.0"),
             job_metadata=JobMetadata(
@@ -125,7 +122,8 @@ class TestTypesafeJudgmentWorker:
         call = client.system_one.await_args
         assert call is not None
         sent_state, sent_questions = call.args
-        assert sent_state == job.state
+        # The rendered prompt goes out as the vendor's state, a string.
+        assert sent_state == job.prompt.text
         assert set(sent_questions) == set(THREE_SHAPES_QUESTIONS)
         assert isinstance(sent_questions["is_urgent"], TypesafeNoul)
         assert call.kwargs == {"model": "jev-1.13.0"}

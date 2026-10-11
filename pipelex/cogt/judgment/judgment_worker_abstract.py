@@ -13,7 +13,9 @@ from pipelex.cogt.judgment.judgment_models import (
     ChoiceAnswer,
     ChoiceQuestion,
     JudgmentAnswer,
+    JudgmentOutcome,
     JudgmentQuestion,
+    JudgmentRefusal,
     RatingAnswer,
     RatingQuestion,
     YesNoAnswer,
@@ -50,8 +52,12 @@ class JudgmentWorkerAbstract(InferenceWorkerAbstract):
     async def judge(
         self,
         judgment_job: JudgmentJob,
-    ) -> dict[str, JudgmentAnswer]:
-        """Answer every question in the job over its state, keyed as the questions were."""
+    ) -> dict[str, JudgmentOutcome]:
+        """Answer every question in the job over its prompt, keyed as the questions were.
+
+        A question the model refused comes back as a `JudgmentRefusal`, never as an exception: what a
+        refusal means is the operator's policy, decided by whoever called this.
+        """
         # The call ends with its summary event whichever way it ends, a refusal by the checks included
         with self._call_summary(judgment_job=judgment_job):
             judgment_job.validate_before_execution()
@@ -60,8 +66,8 @@ class JudgmentWorkerAbstract(InferenceWorkerAbstract):
 
             try:
                 self._check_can_read_files(judgment_job=judgment_job)
-                answers = await self._judge(judgment_job=judgment_job)
-                _check_answers_match_questions(judgment_job=judgment_job, answers=answers)
+                outcomes = await self._judge(judgment_job=judgment_job)
+                _check_outcomes_match_questions(judgment_job=judgment_job, outcomes=outcomes)
             except CogtError as exc:
                 exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
                 raise
@@ -77,16 +83,16 @@ class JudgmentWorkerAbstract(InferenceWorkerAbstract):
                 if self.reporting_delegate:
                     self.reporting_delegate.report_inference_job(inference_job=judgment_job)
 
-        return answers
+        return outcomes
 
     def _check_can_read_files(self, *, judgment_job: JudgmentJob) -> None:
-        """Refuse a job carrying files the model does not read, before the backend is called.
+        """Refuse a prompt presenting files the model does not read, before the backend is called.
 
         The model's spec states what it reads in `inputs`, in the LLM vocabulary: `images` for vision,
         a document format key such as `pdf` for documents. A model that reads text alone refuses any
         file here, which is how a text-only backend is protected without a line of its own.
         """
-        prompt_images = [image for images in judgment_job.images.values() for image in images]
+        prompt_images = judgment_job.prompt.images
         if prompt_images:
             if not self.inference_model.is_vision_supported:
                 msg = f"Judgment model '{self.inference_model.name}' does not read images, and the judgment was given {len(prompt_images)}."
@@ -100,7 +106,7 @@ class JudgmentWorkerAbstract(InferenceWorkerAbstract):
                 raise JudgmentCapabilityError(msg)
             check_prompt_images_are_images(model_name=self.inference_model.name, prompt_images=prompt_images)
 
-        prompt_documents = [document for documents in judgment_job.documents.values() for document in documents]
+        prompt_documents = judgment_job.prompt.documents
         if prompt_documents:
             if not self.inference_model.is_document_supported:
                 msg = f"Judgment model '{self.inference_model.name}' does not read documents, and the judgment was given {len(prompt_documents)}."
@@ -115,29 +121,33 @@ class JudgmentWorkerAbstract(InferenceWorkerAbstract):
     async def _judge(
         self,
         judgment_job: JudgmentJob,
-    ) -> dict[str, JudgmentAnswer]:
+    ) -> dict[str, JudgmentOutcome]:
         pass
 
 
-def _check_answers_match_questions(*, judgment_job: JudgmentJob, answers: dict[str, JudgmentAnswer]) -> None:
-    """Refuse an answer set that does not correspond, question for question, to what was asked.
+def _check_outcomes_match_questions(*, judgment_job: JudgmentJob, outcomes: dict[str, JudgmentOutcome]) -> None:
+    """Refuse an outcome set that does not correspond, question for question, to what was asked.
 
     Three ways a backend can get this wrong, and all are silent without this check: answering a
     question nobody asked (or dropping one), answering the right question in the wrong shape — a
     choice where a rating was asked for — and naming a verdict the question never offered, such as
     an option it does not list or a level beyond its scale. The caller reads the answers by key, by
     kind and by the option or level they name, so any of them would surface much later, as a
-    missing key, a verdict of the wrong type or a verdict routed nowhere.
+    missing key, a verdict of the wrong type or a verdict routed nowhere. A refusal is accepted for
+    any question asked, and only under a key that was asked.
     """
     asked = set(judgment_job.questions)
-    answered = set(answers)
+    answered = set(outcomes)
     if asked != answered:
         missing = sorted(asked - answered)
         unasked = sorted(answered - asked)
         msg = f"Judgment worker answered the wrong set of questions: missing {missing}, unasked {unasked}"
         raise JudgmentAnswerMismatchError(msg)
     for question_key, question in judgment_job.questions.items():
-        _check_answer_fits_question(question_key=question_key, question=question, answer=answers[question_key])
+        outcome = outcomes[question_key]
+        if isinstance(outcome, JudgmentRefusal):
+            continue
+        _check_answer_fits_question(question_key=question_key, question=question, answer=outcome)
 
 
 def _check_answer_fits_question(*, question_key: str, question: JudgmentQuestion, answer: JudgmentAnswer) -> None:

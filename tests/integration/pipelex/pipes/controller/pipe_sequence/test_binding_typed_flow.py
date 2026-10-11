@@ -646,7 +646,7 @@ class TestBindingTypedFlow:
             ),
             pytest.param(
                 "invalid_inadequate_output_multiplicity_binding",
-                ["page_views"],
+                ['its last step, the binding step { from = "pages.page_view", result = "page_views" }, yields'],
                 id="I17-plural-into-singular",
             ),
             pytest.param(
@@ -705,6 +705,51 @@ class TestBindingTypedFlow:
         mthds_content = _called_binding_bundle(called_pipe=called_pipe, step_count=step_count, output=output)
 
         _load_sequence(mthds_content=mthds_content, library_id=load_empty_library(), pipe_code="read_totals")
+
+    @pytest.mark.parametrize(
+        ("output", "from_path", "error_type", "message_fragment"),
+        [
+            pytest.param(
+                "Text",
+                "invoice.total",
+                PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
+                'the output concept \'native.Number\' of the last step, the binding step { from = "invoice.total", result = "bound" }, '
+                "of sequence pipe 'read_bound'",
+                id="another-concept",
+            ),
+            pytest.param(
+                "Number",
+                "invoice.amounts",
+                PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY,
+                'its last step, the binding step { from = "invoice.amounts", result = "bound" }, yields \'Number[]\'',
+                id="another-multiplicity",
+            ),
+        ],
+    )
+    def test_a_final_binding_the_output_refuses_is_set_off_by_commas(
+        self,
+        load_empty_library: Callable[[], str],
+        output: str,
+        from_path: str,
+        error_type: PipeValidationErrorType,
+        message_fragment: str,
+    ) -> None:
+        """The binding step as written is an appositive of "the last step", where a pipe step's code is a plain name after it."""
+        mthds_content = (
+            f"{_CALLED_BINDING_BUNDLE}\n"
+            "[pipe.read_bound]\n"
+            'type = "PipeSequence"\n'
+            'description = "Binds a value of an invoice that the output does not promise"\n'
+            'inputs = { invoice = "Invoice" }\n'
+            f'output = "{output}"\n'
+            f'steps = [{{ from = "{from_path}", result = "bound" }}]\n'
+        )
+
+        with pytest.raises(PipeValidationError) as exc_info:
+            _load_sequence(mthds_content=mthds_content, library_id=load_empty_library(), pipe_code="read_bound")
+
+        assert exc_info.value.error_type == error_type
+        assert message_fragment in str(exc_info.value)
 
     @pytest.mark.asyncio(loop_scope="class")
     async def test_a_single_binding_over_a_root_the_run_made_a_list_is_a_run_error(self) -> None:

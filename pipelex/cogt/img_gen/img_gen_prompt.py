@@ -33,7 +33,7 @@ class ImgGenPrompt(BaseModel):
                     raise ImgGenPromptError(msg)
             case ProblemReaction.LOG:
                 if self.positive_text == "":
-                    log.warning("ImgGen prompt positive_text should not be an empty string")
+                    log.warning("The positive text of an image generation prompt is empty")
 
     @override
     def __str__(self) -> str:

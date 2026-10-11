@@ -52,7 +52,7 @@ class TestModel(StructuredContent):
 
     name: str = Field(..., description="Name field")
     age: int | None = Field(default=None, description="Age field")
-    active: bool | None = Field(default=True, description="Active status")
+    active: bool = Field(default=True, description="Active status")
 '''
 
         assert result == expected_code
@@ -643,9 +643,9 @@ from typing import Any, Literal
 class PersonWithDefaults(StructuredContent):
     """Generated PersonWithDefaults class"""
 
-    name: str | None = Field(default="Anonymous", description="Person name")
-    age: int | None = Field(default=0, description="Person age")
-    active: bool | None = Field(default=True, description="Is active")
+    name: str = Field(default="Anonymous", description="Person name")
+    age: int = Field(default=0, description="Person age")
+    active: bool = Field(default=True, description="Is active")
 '''
 
         assert result == expected_code
@@ -830,8 +830,8 @@ class ComplexItem(StructuredContent):
     name: str = Field(..., description="Display name")
     tags: list[str] | None = Field(default=None, description="Associated tags")
     metadata: dict[str, str] | None = Field(default=None, description="Additional metadata")
-    active: bool | None = Field(default=True, description="Whether item is active")
-    priority: Literal["low", "medium", "high", "urgent"] | None = Field(default="medium", description="Priority level")
+    active: bool = Field(default=True, description="Whether item is active")
+    priority: Literal["low", "medium", "high", "urgent"] = Field(default="medium", description="Priority level")
 '''
 
         assert result == expected_code

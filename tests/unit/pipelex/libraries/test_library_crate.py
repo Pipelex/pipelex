@@ -9,7 +9,7 @@ from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from tests.unit.pipelex.libraries.test_library_crate_data import BlueprintSamples
 
-DOMAIN_FIELD_CONFLICT_MESSAGE = "Two declarations of one domain give one of its fields different values, so the first is kept"
+DOMAIN_FIELD_CONFLICT_MESSAGE = "Two declarations of a domain disagree on a field, and the first value is kept"
 
 
 class TestLibraryCrate:

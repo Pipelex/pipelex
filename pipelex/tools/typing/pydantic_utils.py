@@ -87,9 +87,12 @@ def analyze_pydantic_validation_error(exc: ValidationError) -> PydanticValidatio
     extra_fields = [f"'{'.'.join(map(str, err['loc']))}'" for err in exc.errors() if err["type"] == "extra_forbidden"]
     type_errors = [f"'{'.'.join(map(str, err['loc']))}': expected {err['type']}" for err in exc.errors() if err["type"] == "type_error"]
     value_errors = [f"'{'.'.join(map(str, err['loc']))}': {err['msg']}" for err in exc.errors() if err["type"] == "value_error"]
-    enum_errors = [
-        f"'{'.'.join(map(str, err['loc']))}': invalid enum value '{err.get('input', 'unknown')}'" for err in exc.errors() if err["type"] == "enum"
-    ]
+    enum_errors: list[str] = []
+    for err in exc.errors():
+        if err["type"] == "enum":
+            field_path = ".".join(map(str, err["loc"]))
+            expected = err.get("ctx", {}).get("expected", "unknown")
+            enum_errors.append(f"'{field_path}': invalid enum value '{err.get('input', 'unknown')}', expected {expected}")
     literal_errors: list[str] = []
     for err in exc.errors():
         if err["type"] == "literal_error":

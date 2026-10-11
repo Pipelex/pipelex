@@ -1,6 +1,9 @@
+import pytest
+
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import StepRole
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
+from pipelex.pipe_operators.judge.pipe_judge_blueprint import PipeJudgeBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_operators.structure.pipe_structure_blueprint import PipeStructureBlueprint
 
@@ -67,3 +70,46 @@ prompt = "Talk about $topic"
         assert set(bundle.pipe.keys()) == {"make_foo"}
         assert isinstance(bundle.pipe["make_foo"], PipeLLMBlueprint)
         assert bundle.elaboration_metadata is None
+
+    @pytest.mark.parametrize(
+        "judge_fields",
+        [
+            pytest.param('question = "Is it urgent?"', id="one_question"),
+            pytest.param('[pipe.judge_it.questions.urgent]\nquestion = "Is it urgent?"', id="several_questions"),
+        ],
+    )
+    def test_a_bundle_holding_a_pipe_judge_elaborates(self, judge_fields: str) -> None:
+        """The elaboration revalidates the whole bundle from its dump, the PipeJudge's form not taken included."""
+        mthds_content = f"""domain = "test_pipes"
+description = "A preliminary_text PipeLLM beside a PipeJudge"
+
+[concept]
+Foo = "A foo concept"
+
+[concept.Triage]
+description = "A triage"
+
+[concept.Triage.structure]
+urgent = {{ type = "concept", concept_ref = "YesNo", description = "Whether it is urgent", required = true }}
+
+[pipe.make_foo]
+type = "PipeLLM"
+description = "Make a Foo via preliminary text"
+inputs = {{ topic = "Text" }}
+output = "Foo"
+prompt = "Talk about $topic"
+structuring_method = "preliminary_text"
+
+[pipe.judge_it]
+type = "PipeJudge"
+description = "Judge a message"
+inputs = {{ message = "Text" }}
+output = "{"YesNo" if judge_fields.startswith("question") else "Triage"}"
+prompt = "@message"
+{judge_fields}
+"""
+        bundle = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
+
+        assert bundle.pipe is not None
+        assert set(bundle.pipe.keys()) == {"make_foo", "make_foo__draft_text", "make_foo__structure", "judge_it"}
+        assert isinstance(bundle.pipe["judge_it"], PipeJudgeBlueprint)

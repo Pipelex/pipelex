@@ -81,7 +81,7 @@ def render_run_cost_report(
             print_to_console=print_to_console,
         )
     except (OSError, UnicodeEncodeError, PipelexError) as cost_report_error:
-        log.warning("The cost report could not be generated; the run itself succeeded", fields=error_fields(exc=cost_report_error))
+        log.warning("The cost report of a successful run could not be generated", fields=error_fields(exc=cost_report_error))
 
 
 def render_cost_report_for_output(pipe_output: PipeOutput) -> None:

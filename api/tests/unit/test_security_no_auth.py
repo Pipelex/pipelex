@@ -134,9 +134,7 @@ class TestNoAuthForwardedHeaders:
         # The refused header names no caller, so it is never logged as `user.id`, nor logged at all: anyone reaching
         # the server could otherwise have any text recorded as a user.
         (record,) = [
-            record
-            for record in caplog.records
-            if record.getMessage() == "A forwarded X-User-Id is not a path-safe segment, and the request is refused"
+            record for record in caplog.records if record.getMessage() == "A forwarded user id is not a path-safe segment and the request was refused"
         ]
         carried = carried_attributes(record=record)
         assert OTelLogAttr.USER_ID not in carried

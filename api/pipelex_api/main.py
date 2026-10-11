@@ -187,7 +187,9 @@ fastapi_app.include_router(health_router)
 # detection before they have credentials).
 fastapi_app.include_router(version_router, prefix="/v1")
 
-# Register all other routes WITH authentication (auto-selects based on AUTH_MODE env var: none/jwt/api_key).
+# Register all other routes WITH authentication, the dependency selected by the AUTH_MODE env var. An
+# unrecognized AUTH_MODE raises `InvalidAuthModeError` here and the app fails to boot, the same fail-fast
+# posture as ERROR_DISCLOSURE above: a mistyped mode must never serve these routes unauthenticated.
 # The API mounts at `/v1` — the SDKs compose `{MTHDS_BASE_URL}/v1/{endpoint}` (master D10); no `/api/v1`
 # mount and no alias remain.
 auth_dependency = get_auth_dependency()

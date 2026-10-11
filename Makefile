@@ -18,7 +18,9 @@ VENV_RUFF := "$(VIRTUAL_ENV)/bin/ruff"
 VENV_PYRIGHT := "$(VIRTUAL_ENV)/bin/pyright"
 VENV_MYPY := "$(VIRTUAL_ENV)/bin/mypy"
 VENV_PIPELEX := "$(VIRTUAL_ENV)/bin/pipelex"
-VENV_MKDOCS := "$(VIRTUAL_ENV)/bin/mkdocs"
+# Material for MkDocs prints a MkDocs 2.0 warning on every `mkdocs` run; we stay on MkDocs 1.x
+# (capped below 2 in pyproject.toml) until the docs move to Zensical.
+VENV_MKDOCS := NO_MKDOCS_2_WARNING=true "$(VIRTUAL_ENV)/bin/mkdocs"
 VENV_MIKE := "$(VIRTUAL_ENV)/bin/mike"
 VENV_PYLINT := "$(VIRTUAL_ENV)/bin/pylint"
 VENV_PLXT := RUST_LOG=warn "$(VIRTUAL_ENV)/bin/plxt"
@@ -185,7 +187,7 @@ make check-rich-imports       - Refuse a module-level Rich import or reach outsi
 make cri                      - Shorthand -> check-rich-imports
 make check-actions-allowlist  - Refuse a workflow action outside the committed Actions allowlist
 make caa                      - Shorthand -> check-actions-allowlist
-make check-log-calls          - Refuse an interpolated log message at INFO+ and Rich markup in any log message, against a baseline that only shrinks from origin/dev's merge base (LOG_CALL_BASELINE_REF=<ref> to compare with another)
+make check-log-calls          - Refuse an interpolated log message at INFO+, Rich markup, a message worded against the conventions and a spliced exception, against a baseline that only shrinks from origin/dev's merge base (LOG_CALL_BASELINE_REF=<ref> to compare with another)
 make clc                      - Shorthand -> check-log-calls
 make check-TODOs              - Check for TODOs
 

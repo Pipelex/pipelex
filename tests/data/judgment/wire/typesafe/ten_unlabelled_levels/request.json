@@ -1,0 +1,44 @@
+{
+  "model": "jev-1.13.0",
+  "prompt": {
+    "text": "A message from a customer:\n<message>\nOur production checkout has been returning 500s for every card payment since 09:14 UTC. Nothing is going through. I have three customers on the phone right now. Please help.\n</message>"
+  },
+  "questions": {
+    "severity": {
+      "kind": "rating",
+      "instructions": "How severe is the reported issue?",
+      "levels": [
+        {
+          "description": "Severity level 0"
+        },
+        {
+          "description": "Severity level 1"
+        },
+        {
+          "description": "Severity level 2"
+        },
+        {
+          "description": "Severity level 3"
+        },
+        {
+          "description": "Severity level 4"
+        },
+        {
+          "description": "Severity level 5"
+        },
+        {
+          "description": "Severity level 6"
+        },
+        {
+          "description": "Severity level 7"
+        },
+        {
+          "description": "Severity level 8"
+        },
+        {
+          "description": "Severity level 9"
+        }
+      ]
+    }
+  }
+}

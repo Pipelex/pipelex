@@ -1,6 +1,6 @@
 """`YesNo` is read by position: a `boolean` where a caller supplies it, an `object` where a producer reports it.
 
-`Choice` and `Rating` are objects on both sides, with their pinned fields. The position is set once by
+`Choice` and `Rating` are objects on both sides, with their pinned fields, `Rating`'s `label` among them. The position is set once by
 `build_input_form` and `build_output_form` and read in `YesNo`'s row alone, so these tests reach a
 `YesNo` at every depth on each side: at the top, as a list's item, as a nested structure field, through
 a refinement, and through a reflected class field.
@@ -207,8 +207,10 @@ class TestVerdictNativesByPosition:
         for grade in (_field_by_name(verdicts, "grade"), output_form["verdict_forms.rating_out"].field):
             assert grade.kind == FieldKind.OBJECT
             grade_fields = fields_by_name(grade)
-            assert list(grade_fields) == ["level", "confidence", "probabilities", "position"], "Pinned-blueprint fields, in pinned order"
+            assert list(grade_fields) == ["level", "label", "confidence", "probabilities", "position"], "Pinned-blueprint fields, in pinned order"
             assert grade_fields["level"].kind == FieldKind.NUMBER
             assert grade_fields["level"].integer is True
             assert grade_fields["level"].required is True
+            assert grade_fields["label"].kind == FieldKind.TEXT
+            assert grade_fields["label"].required is False
             assert grade_fields["position"].required is False

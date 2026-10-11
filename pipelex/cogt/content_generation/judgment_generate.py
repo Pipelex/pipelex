@@ -6,8 +6,8 @@ runs it. The direct ``ContentGenerator`` calls it inline; a distributed orchestr
 an activity so the result is recorded in the run's history and any failure is converted to a
 terminal error.
 
-There is only one entry point here, where the search leaf has three. A judgment's answers are plain
-models of this package's own — no caller class travels down and no schema has to be shipped — so the
+There is only one entry point here, where the search leaf has three. A judgment's outcomes, answers
+and refusals, are plain models of this package's own — no caller class travels down and no schema has to be shipped — so the
 in-process arm and the boundary arm would be the same function, and there is nothing to split.
 """
 
@@ -16,7 +16,7 @@ from pipelex.cogt.content_generation.dry_mock import dry_judgment_gen_answers
 from pipelex.cogt.content_generation.read_authorization import authorize_assignment_reads
 from pipelex.cogt.judgment.judgment_job import JudgmentJob
 from pipelex.cogt.judgment.judgment_job_factory import JudgmentJobFactory
-from pipelex.cogt.judgment.judgment_models import JudgmentAnswer
+from pipelex.cogt.judgment.judgment_models import JudgmentOutcome
 from pipelex.cogt.judgment.judgment_worker_abstract import JudgmentWorkerAbstract
 from pipelex.cogt.judgment.judgment_worker_factory import JudgmentWorkerFactory
 from pipelex.cogt.model_backends.model_type import ModelType
@@ -34,16 +34,14 @@ def _make_judgment_worker(judgment_assignment: JudgmentAssignment) -> JudgmentWo
 
 def _make_judgment_job(judgment_assignment: JudgmentAssignment) -> JudgmentJob:
     return JudgmentJobFactory.make_judgment_job(
-        state=judgment_assignment.state,
-        images=judgment_assignment.images,
-        documents=judgment_assignment.documents,
+        prompt=judgment_assignment.prompt,
         questions=judgment_assignment.questions,
         judgment_setting=judgment_assignment.judgment_setting,
         job_metadata=judgment_assignment.job_metadata,
     )
 
 
-async def judgment_gen_answers(judgment_assignment: JudgmentAssignment) -> dict[str, JudgmentAnswer]:
+async def judgment_gen_answers(judgment_assignment: JudgmentAssignment) -> dict[str, JudgmentOutcome]:
     authorize_assignment_reads(job_metadata=judgment_assignment.job_metadata, uri_references=judgment_assignment.referenced_uris())
     if judgment_assignment.cogt_run_params.run_mode.is_dry:
         return dry_judgment_gen_answers(judgment_assignment)

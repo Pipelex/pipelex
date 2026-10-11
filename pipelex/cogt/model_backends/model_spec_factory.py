@@ -1,15 +1,16 @@
+import math
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
-from pipelex.cogt.img_gen.img_gen_model_rules import ImgGenArgTopic, ImgGenModelRules
+from pipelex.cogt.img_gen.img_gen_model_rules import ImgGenArgTopic
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import DEFAULT_MODEL_TYPE, ModelType
 from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
-from pipelex.system.configuration.config_model import ConfigModel
+from pipelex.system.configuration.config_model import ConfigModel, LaxEnum
 from pipelex.tools.typing.pydantic_utils import empty_dict_factory_of, empty_list_factory_of
 
 BackendModelSpecs = dict[str, Any]
@@ -27,55 +28,29 @@ class InferenceModelSpecBlueprint(ConfigModel):
     model_id: str | None = None
     inputs: list[str] = Field(default_factory=list)
     outputs: list[str] = Field(default_factory=list)
-    costs: CostsByCategoryDict | None = Field(default=None, strict=False)
+    costs: dict[LaxEnum[CostCategory], float] | None = None
     structure_method: StructureMethod | None = Field(default=None, strict=False)
     thinking_mode: ThinkingMode = Field(default=ThinkingMode.NONE, strict=False)
     max_tokens: int | None = None
     max_prompt_images: int | None = None
-    listed_constraints: list[ListedConstraint] = Field(default_factory=empty_list_factory_of(ListedConstraint))
-    valued_constraints: dict[ValuedConstraint, Any] = Field(default_factory=empty_dict_factory_of(ValuedConstraint))
-    rules: ImgGenModelRules | None = None
+    listed_constraints: list[LaxEnum[ListedConstraint]] = Field(default_factory=empty_list_factory_of(ListedConstraint))
+    valued_constraints: dict[LaxEnum[ValuedConstraint], Any] = Field(default_factory=empty_dict_factory_of(ValuedConstraint))
+    # The shared `ImgGenModelRules` stays strict: the code that consumes it holds real enums.
+    rules: dict[LaxEnum[ImgGenArgTopic], str] | None = None
     # Provider-side route for models a worker calls by raw path (no kit backend declares one; an out-of-tree plugin may). Our own
     # routing metadata, not a request header — which is why it is a declared field and not an `extra_headers` entry.
     endpoint_path: str | None = None
 
-    @field_validator("rules", mode="before")
-    @staticmethod
-    def validate_rules(value: dict[str, str] | None) -> ImgGenModelRules | None:
+    @field_validator("costs")
+    @classmethod
+    def validate_costs(cls, value: CostsByCategoryDict | None) -> CostsByCategoryDict | None:
         if value is None:
             return None
-        return ConfigModel.transform_dict_keys_str_to_enum(
-            input_dict=value,
-            key_enum_cls=ImgGenArgTopic,
-        )
-
-    @field_validator("costs", mode="before")
-    @staticmethod
-    def validate_costs(value: dict[str, float]) -> CostsByCategoryDict:
-        negative_costs = {key: val for key, val in value.items() if val < 0}
-        if negative_costs:
-            msg = f"Cost values must not be negative, got: {negative_costs}"
+        invalid_costs = {str(key): val for key, val in value.items() if not (math.isfinite(val) and val >= 0)}
+        if invalid_costs:
+            msg = f"Cost values must be finite and not negative, got: {invalid_costs}"
             raise ValueError(msg)
-        return ConfigModel.transform_dict_of_floats_str_to_enum(
-            input_dict=value,
-            key_enum_cls=CostCategory,
-        )
-
-    @field_validator("listed_constraints", mode="before")
-    @staticmethod
-    def validate_listed_constraints(value: list[str]) -> list[ListedConstraint]:
-        return ConfigModel.transform_list_of_str_to_enum(
-            input_list=value,
-            enum_cls=ListedConstraint,
-        )
-
-    @field_validator("valued_constraints", mode="before")
-    @staticmethod
-    def validate_valued_constraints(value: dict[str, Any]) -> dict[ValuedConstraint, Any]:
-        return ConfigModel.transform_dict_keys_str_to_enum(
-            input_dict=value,
-            key_enum_cls=ValuedConstraint,
-        )
+        return value
 
 
 class InferenceModelSpecFactory(BaseModel):

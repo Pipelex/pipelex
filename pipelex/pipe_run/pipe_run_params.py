@@ -119,6 +119,14 @@ def output_multiplicity_to_apply(
 class BatchParams(BaseModel):
     input_list_stuff_name: str
     input_item_stuff_name: str
+    # The dotted `batch_over` its author wrote, when a PipeSequence bound the list at that path under a private name, which
+    # `input_list_stuff_name` then holds; `None` when the list name is the author's own.
+    batch_over_path: str | None = None
+
+    @property
+    def input_list_label(self) -> str:
+        """How a message names the list: the path its author wrote, never the private name a sequence bound it under."""
+        return self.batch_over_path or self.input_list_stuff_name
 
     @classmethod
     def make_batch_params(
@@ -126,10 +134,12 @@ class BatchParams(BaseModel):
         *,
         input_list_name: str,
         input_item_name: str,
+        batch_over_path: str | None = None,
     ) -> BatchParams:
         return BatchParams(
             input_list_stuff_name=input_list_name,
             input_item_stuff_name=input_item_name,
+            batch_over_path=batch_over_path,
         )
 
     @classmethod
@@ -264,7 +274,7 @@ class PipeRunParams(BaseModel):
             # raise: this runs inside run_pipe()'s `finally`, where raising would mask the
             # in-flight exception.
             log.error(
-                "The pipe stack is unbalanced: the pipe popped is not the last one pushed",
+                "The pipe popped off the pipe stack is not the last one pushed",
                 fields={"pipe_code": pipe_code, "popped_pipe_code": popped_pipe_code},
             )
 

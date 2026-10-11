@@ -17,6 +17,7 @@ from pipelex.cogt.inference.error_classification import (
 )
 from pipelex.cogt.inference.error_classify import classify_inference_error
 from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.llm.completion_stop import classify_prompt_block_reason
 from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
@@ -31,6 +32,7 @@ from pipelex.config import get_config
 from pipelex.providers.google.google_exceptions import GoogleLLMWorkerError
 from pipelex.providers.google.google_factory import GoogleFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 if TYPE_CHECKING:
@@ -82,29 +84,25 @@ class GoogleLLMWorker(LLMWorkerAbstract):
         try:
             # First, try to use the loop captured at creation time if it's still running
             if self._event_loop is not None and self._event_loop.is_running():
-                # Schedule cleanup on the captured loop and store reference to prevent garbage collection
-                task = self._event_loop.create_task(self.genai_async_client.aclose())
-                # Add a callback to log any errors that occur during cleanup
-                task.add_done_callback(lambda t: log.debug(f"Google async client cleanup error: {t.exception()}") if t.exception() else None)
+                # Schedule cleanup on the captured loop
+                GoogleFactory.schedule_client_close(event_loop=self._event_loop, close_coroutine=self.genai_async_client.aclose())
                 return
 
             # Otherwise, try to get the current running loop
             try:
                 current_loop = asyncio.get_running_loop()
-                # Schedule cleanup on the current running loop and store reference to prevent garbage collection
-                task = current_loop.create_task(self.genai_async_client.aclose())
-                # Add a callback to log any errors that occur during cleanup
-                task.add_done_callback(lambda t: log.debug(f"Google async client cleanup error: {t.exception()}") if t.exception() else None)
+                # Schedule cleanup on the current running loop
+                GoogleFactory.schedule_client_close(event_loop=current_loop, close_coroutine=self.genai_async_client.aclose())
             except RuntimeError:
                 # No running event loop, we can safely use asyncio.run()
                 try:
                     asyncio.run(self.genai_async_client.aclose())
                 except Exception as exc:  # ruff: ignore[blind-except]
                     # Best-effort: asyncio.run() runs aclose(), whose failure surface is not enumerable; teardown must never fail.
-                    log.debug(f"Error closing Google async client during teardown: {exc}")
+                    log.debug("A Google async client could not be closed", fields=error_fields(exc=exc))
         except Exception as exc:  # ruff: ignore[blind-except]
             # Best-effort cleanup boundary: teardown must never fail, whatever client/event-loop close throws.
-            log.debug(f"Error during Google async client teardown: {exc}")
+            log.debug("A Google async client could not be closed", fields=error_fields(exc=exc))
 
     #########################################################
     # Reasoning helpers
@@ -263,14 +261,25 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 model_handle=self.inference_model.name,
             ) from sdk_exc
 
-        # Extract text from response (skips thinking parts)
-        text_content = GoogleFactory.extract_text_from_response(response=response, model_desc=self.inference_model.desc)
-
         # Track token usage if available
         if llm_job.job_report.llm_tokens_usage and response.usage_metadata:
             llm_job.job_report.llm_tokens_usage.nb_tokens_by_category = GoogleFactory.extract_token_usage(response.usage_metadata)
 
-        return text_content
+        # Read before the text, so a candidate cut or filtered with no text left is reported for what stopped it
+        if response.candidates:
+            if finish_reason := response.candidates[0].finish_reason:
+                self._check_completion_stop(llm_job=llm_job, stop_reason=finish_reason.value, max_tokens=job_params.max_tokens)
+        elif response.prompt_feedback and (block_reason := response.prompt_feedback.block_reason):
+            # A blocked prompt gets no candidate at all, its block reason in the prompt feedback: a refusal, named for its reason
+            self._raise_for_completion_stop(
+                llm_job=llm_job,
+                outcome=classify_prompt_block_reason(block_reason=block_reason.value, model_handle=self.inference_model.name),
+                stop_reason=block_reason.value,
+                max_tokens=job_params.max_tokens,
+            )
+
+        # Extract text from response (skips thinking parts)
+        return GoogleFactory.extract_text_from_response(response=response, model_desc=self.inference_model.desc)
 
     def _validates_structured_output_strictly(self) -> bool:
         """Whether ``instructor`` validates a structured response in pydantic's strict mode.

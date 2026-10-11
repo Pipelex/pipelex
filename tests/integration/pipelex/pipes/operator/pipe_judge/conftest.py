@@ -3,8 +3,8 @@ from collections.abc import Iterator
 import pytest
 
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.runtime_hub import get_model_deck
-from tests.integration.pipelex.pipes.operator.pipe_judge.test_data import PipeJudgeLoadTestData
+from pipelex.runtime_hub import get_class_registry, get_model_deck
+from tests.integration.pipelex.pipes.operator.pipe_judge.test_data import ClassBackedOpenTriage, ClassBackedTriage, PipeJudgeLoadTestData
 
 
 @pytest.fixture
@@ -40,3 +40,16 @@ def unserved_judgment_waterfall() -> Iterator[str]:
         yield "~unserved_judges"
     finally:
         del model_deck.judgment_waterfalls["unserved_judges"]
+
+
+@pytest.fixture
+def class_backed_triages() -> Iterator[None]:
+    """The hand-written triage structure classes, registered for one test so a concept may name them as its structure."""
+    class_registry = get_class_registry()
+    class_registry.register_class(ClassBackedTriage)
+    class_registry.register_class(ClassBackedOpenTriage)
+    try:
+        yield
+    finally:
+        class_registry.unregister_class(ClassBackedTriage)
+        class_registry.unregister_class(ClassBackedOpenTriage)

@@ -192,12 +192,18 @@ class SchemaToModelFactory:
             # and an LLM filling that schema returns the Python repr
             # `"Recommendation.Poor_Match"` instead of the value `"Poor Match"`,
             # which then fails Pydantic validation against the original choice set.
+            # `strict_nullable=True` keeps a property nullable only where its schema says so. Without it, a
+            # property that is not required and carries a default (a defaulted structure field, which pydantic
+            # emits as a plain `{"type": "string", "default": …}`) round-trips as `X | None`, so a model's
+            # `null` there passes the rebuilt class and fails only when the result is revalidated into the
+            # caller's class, past the point where the model could be asked again.
             generate(
                 input_=schema_str,
                 input_file_type=InputFileType.JsonSchema,
                 output=output_path,
                 output_model_type=DataModelType.PydanticV2BaseModel,
                 enum_field_as_literal=LiteralType.All,
+                strict_nullable=True,
                 formatters=[],
             )
             return output_path.read_text(encoding="utf-8")

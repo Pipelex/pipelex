@@ -7,12 +7,18 @@ from pydantic import ValidationError
 from pytest_mock import MockerFixture
 
 from pipelex.config import get_config
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import PRIVATE_BINDING_NAME_PREFIX, WorkingMemory
-from pipelex.core.pipes.exceptions import PipeValidationError
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.exceptions import PipeRunError, PipeValidationError
+from pipelex.core.pipes.inputs.exceptions import PipeRunInputsError
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
+from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
+from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graphspec import EdgeKind, GraphSpec, NodeKind, NodeSpec
-from pipelex.interpreter_hub import get_library_manager
+from pipelex.interpreter_hub import get_library_manager, get_native_concept
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
@@ -23,9 +29,11 @@ from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import BatchParams
+from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.runtime_hub import scoped_event_log
+from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 from pipelex.validation_error_types import PipeValidationErrorType
@@ -178,6 +186,20 @@ def _load_sequence(*, mthds_content: str, library_id: str, pipe_code: str) -> Pi
     return sequences[0]
 
 
+def _make_pipe_batch(*, input_names: list[str], batch_params: BatchParams) -> PipeBatch:
+    """A batch built as `SubPipe.run_pipe` builds one, its inputs these names, each of a text."""
+    text_concept = get_native_concept(NativeConceptCode.TEXT)
+    return PipeBatch(
+        domain_code="catalog_index",
+        code="write_index_line_batch",
+        description="Batch processing for write_index_line",
+        inputs=InputStuffSpecs(root={input_name: StuffSpec(concept=text_concept) for input_name in input_names}),
+        output=StuffSpec(concept=text_concept),
+        branch_pipe_code="catalog_index.write_index_line",
+        batch_params=batch_params,
+    )
+
+
 async def _index_lines(*, mthds_content: str, inputs: "PipelineInputs") -> PipelexRunResultExecute:
     return await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.LIVE).execute(mthds_contents=[mthds_content], inputs=inputs)
 
@@ -262,7 +284,101 @@ class TestDottedBatchOver:
         assert pipe_step.batch_params is not None
         assert pipe_step.batch_params.input_list_stuff_name == binding_step.output_name
         assert pipe_step.batch_params.input_item_stuff_name == "page"
+        assert pipe_step.batch_params.batch_over_path == "catalog.pages"
+        assert pipe_step.batch_params.input_list_label == "catalog.pages"
         assert sequence.build_typed_flow().binding_specs[0].multiplicity is True
+
+    async def test_a_batch_over_a_name_the_author_bound_carries_no_path(self, load_empty_library: Callable[[], str]) -> None:
+        sequence = _load_sequence(mthds_content=_PRODUCED_ROOT_EXPLICIT_BUNDLE, library_id=load_empty_library(), pipe_code="index_pages")
+
+        pipe_step = sequence.sequential_sub_pipes[-1]
+        assert isinstance(pipe_step, SubPipe)
+        assert pipe_step.batch_params is not None
+        assert pipe_step.batch_params.batch_over_path is None
+        assert pipe_step.batch_params.input_list_label == "catalog_pages"
+
+    @pytest.mark.parametrize("holds_a_single_value", [False, True], ids=["missing", "not-a-list"])
+    async def test_a_step_refusing_its_bound_list_names_the_path_its_author_wrote(
+        self, load_empty_library: Callable[[], str], job_metadata: JobMetadata, holds_a_single_value: bool
+    ) -> None:
+        """The list is stored under a private name, which the author never wrote: the refusal names the dotted `batch_over` instead."""
+        sequence = _load_sequence(mthds_content=_SINGLE_ROOT_BUNDLE, library_id=load_empty_library(), pipe_code="index_pages")
+        binding_step, pipe_step = sequence.sequential_sub_pipes
+        assert isinstance(binding_step, BindingStep)
+        assert isinstance(pipe_step, SubPipe)
+        working_memory = WorkingMemoryFactory.make_empty()
+        if holds_a_single_value:
+            working_memory.add_new_stuff(
+                name=binding_step.output_name, stuff=StuffFactory.make_from_str(str_value="Garden chairs", name=binding_step.output_name)
+            )
+
+        with pytest.raises(PipeRunInputsError) as exc_info:
+            await pipe_step.run_pipe(
+                calling_pipe_code="index_pages",
+                working_memory=working_memory,
+                job_metadata=job_metadata,
+                sub_pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+            )
+
+        message = str(exc_info.value)
+        assert "'catalog.pages'" in message
+        assert PRIVATE_BINDING_NAME_PREFIX not in message
+        assert exc_info.value.variable_name == "catalog.pages"
+        if holds_a_single_value:
+            assert "is not a list" in message
+
+    @pytest.mark.parametrize(
+        ("input_names", "holds_a_single_value", "message_fragment"),
+        [
+            pytest.param(["season"], False, "is not among its inputs", id="not-among-the-inputs"),
+            pytest.param([f"{PRIVATE_BINDING_NAME_PREFIX}catalog_pages"], False, "is not in working memory", id="missing"),
+            pytest.param([f"{PRIVATE_BINDING_NAME_PREFIX}catalog_pages"], True, "is not a list", id="not-a-list"),
+        ],
+    )
+    async def test_a_batch_refusing_its_bound_list_names_the_path_its_author_wrote(
+        self,
+        load_empty_library: Callable[[], str],
+        job_metadata: JobMetadata,
+        input_names: list[str],
+        holds_a_single_value: bool,
+        message_fragment: str,
+    ) -> None:
+        load_empty_library()
+        private_name = f"{PRIVATE_BINDING_NAME_PREFIX}catalog_pages"
+        pipe_batch = _make_pipe_batch(
+            input_names=input_names,
+            batch_params=BatchParams.make_batch_params(input_list_name=private_name, input_item_name="page", batch_over_path="catalog.pages"),
+        )
+        working_memory = WorkingMemoryFactory.make_empty()
+        if holds_a_single_value:
+            working_memory.add_new_stuff(name=private_name, stuff=StuffFactory.make_from_str(str_value="Garden chairs", name=private_name))
+
+        with pytest.raises(PipeRunError) as exc_info:
+            await pipe_batch._validate_before_run(  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+                job_metadata=job_metadata,
+                working_memory=working_memory,
+                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+            )
+
+        message = str(exc_info.value)
+        assert message_fragment in message
+        assert "'catalog.pages'" in message
+        assert PRIVATE_BINDING_NAME_PREFIX not in message
+
+    async def test_a_declared_batch_names_its_own_list(self, load_empty_library: Callable[[], str], job_metadata: JobMetadata) -> None:
+        load_empty_library()
+        pipe_batch = _make_pipe_batch(
+            input_names=["pages"], batch_params=BatchParams.make_batch_params(input_list_name="pages", input_item_name="page")
+        )
+
+        with pytest.raises(PipeRunError) as exc_info:
+            await pipe_batch._validate_before_run(  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+                job_metadata=job_metadata,
+                working_memory=WorkingMemoryFactory.make_empty(),
+                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+            )
+
+        assert "The list 'pages' that PipeBatch 'write_index_line_batch' batches over is not in working memory" in str(exc_info.value)
 
     async def test_a_step_never_batches_over_a_dotted_path_itself(self) -> None:
         """Only the sequence's rewrite reads a dotted path, as a binding: a step built to batch over one is refused."""

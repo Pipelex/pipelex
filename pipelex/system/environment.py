@@ -110,7 +110,7 @@ def get_positive_int_env(*, env_var: str, default: int) -> int:
         parsed = 0
     if parsed <= 0:
         log.warning(
-            "An environment variable holds no positive integer, so its default applies",
+            "An environment variable holding no positive integer was ignored for its default",
             fields={"env_var": env_var, "default_value": default},
         )
         return default

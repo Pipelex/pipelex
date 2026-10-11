@@ -31,9 +31,7 @@ class FuncRegistryUtils:
         functions_registered = 0
 
         if not hasattr(package, "__path__"):
-            log.warning(
-                "A PipeFunc package is a plain module with no submodules to walk, so nothing was registered", fields={"module_name": package_name}
-            )
+            log.warning("Nothing was registered from a PipeFunc package that is a plain module", fields={"module_name": package_name})
             return 0
 
         log.verbose(f"Walking package {package_name} at {package.__path__}")
@@ -70,7 +68,7 @@ class FuncRegistryUtils:
                         source_file=modname,
                     )
                     log.warning(
-                        "A function decorated with @pipe_func is not eligible, and was not registered",
+                        "An ineligible PipeFunc function was not registered",
                         fields={"function_name": func_name, "module_name": modname, "eligibility_error": eligibility_error},
                     )
 
@@ -203,7 +201,7 @@ class FuncRegistryUtils:
                         source_file=str(file_path),
                     )
                     log.warning(
-                        "A function decorated with @pipe_func is not eligible, and was not registered",
+                        "An ineligible PipeFunc function was not registered",
                         fields={"function_name": func_name, OTelLogAttr.FILE_PATH: str(file_path), "eligibility_error": eligibility_error},
                     )
         except ModuleFileError:
@@ -216,13 +214,13 @@ class FuncRegistryUtils:
             # registry" raised much later by the PipeFunc validator, with the real ImportError (the
             # actual cause) otherwise swallowed here and invisible.
             log.warning(
-                "A Python file could not be imported while registering PipeFuncs, so its functions are unavailable",
+                "A Python file could not be imported while registering PipeFuncs",
                 fields={OTelLogAttr.FILE_PATH: str(file_path), **error_fields(exc=exc)},
             )
         except SyntaxError as exc:
             # Potentially problematic: invalid Python syntax may indicate broken code
             log.warning(
-                "A Python file has a syntax error, so its PipeFuncs are unavailable",
+                "A Python file with a syntax error was skipped while registering PipeFuncs",
                 fields={OTelLogAttr.FILE_PATH: str(file_path), **error_fields(exc=exc)},
             )
 

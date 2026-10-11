@@ -61,7 +61,7 @@ class TestGraphRenderFailure:
         # The log line is a fixed message and carries the path and the diagnosis as written, with no escape:
         # only the console print reads markup, and no sink reads a log message as markup.
         log_spy.error.assert_called_once()
-        assert log_spy.error.call_args.args == ("The graph spec was refused, so no graph was rendered",)
+        assert log_spy.error.call_args.args == ("The graph spec was refused and no graph was rendered",)
         fields = log_spy.error.call_args.kwargs["fields"]
         assert fields["file.path"] == str(spec_file)
         assert fields["error.type"] == "GraphSpecValidationError"

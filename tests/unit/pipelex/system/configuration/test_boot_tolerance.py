@@ -48,6 +48,7 @@ from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 from pipelex.system.telemetry.telemetry_config import PostHogMode, TelemetryConfig
 from pipelex.system.telemetry.telemetry_loader import load_telemetry_config
 from pipelex.tools.log.log_dispatch import LogDispatch
+from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pipelex.tools.log.log_levels import LogLevel
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
@@ -320,13 +321,14 @@ class TestWhatTheWarningSays:
 
         assert warning_spy.call_count == 2
         inside_call, outside_call = warning_spy.call_args_list
-        assert "run `pipelex migrate` to update it" in inside_call.args[0]
-        assert "`pipelex migrate` does not reach it, so update it where it lives" in outside_call.args[0]
+        assert inside_call.args[0] == outside_call.args[0] == "A configuration file is out of date and was migrated in memory only"
         assert inside_call.kwargs["fields"] == {
             "file.path": str(inside_file),
             "migration_steps": ["Nest the flat telemetry settings under [custom_posthog]"],
             "has_blocked_steps": False,
+            USER_ACTION_FIELD: "Run pipelex migrate to update it",
         }
+        assert outside_call.kwargs["fields"][USER_ACTION_FIELD] == "Update it where it lives, since pipelex migrate does not reach it"
         assert outside_call.kwargs["fields"]["file.path"] == str(outside_file)
         for call in (inside_call, outside_call):
             assert str(tmp_path) not in call.args[0]
@@ -334,22 +336,22 @@ class TestWhatTheWarningSays:
     @pytest.mark.parametrize(
         ("topic", "is_reached_by_migrate", "has_blocked_steps", "expected_remedy"),
         [
-            ("in reach", True, False, "run `pipelex migrate` to update it"),
-            ("in reach, blocked", True, True, "run `pipelex migrate` to update it, and make by hand the changes it reports it cannot apply"),
-            ("out of reach", False, False, "`pipelex migrate` does not reach it, so update it where it lives"),
+            ("in reach", True, False, "Run pipelex migrate to update it"),
+            ("in reach, blocked", True, True, "Run pipelex migrate to update it, and make by hand the changes it reports it cannot apply"),
+            ("out of reach", False, False, "Update it where it lives, since pipelex migrate does not reach it"),
             (
                 "out of reach, blocked",
                 False,
                 True,
-                "`pipelex migrate` does not reach it, so update it where it lives, including changes no migration can apply for you",
+                "Update it where it lives, with the changes no migration can apply, since pipelex migrate does not reach it",
             ),
         ],
     )
-    def test_each_message_says_nothing_was_written_and_a_blocked_file_says_so(
+    def test_every_file_is_one_event_and_its_advice_says_its_remedy(
         self, tmp_path: Path, mocker: MockerFixture, topic: str, is_reached_by_migrate: bool, has_blocked_steps: bool, expected_remedy: str
     ) -> None:
-        """The warning used to be one text that said nothing was written, and that some of what a file needs cannot be applied for
-        the user, with `pipelex migrate` reporting it; a fixed message per file must keep saying both.
+        """Whatever its remedy, a stale file is one event, so a log store counts it under one message: the message says the file
+        was migrated in memory only, and the remedy, `pipelex migrate` or an edit where the file lives, is its advice.
         """
         stale_file = StaleConfigurationFile(
             file_path=tmp_path / "pipelex.toml",
@@ -362,10 +364,8 @@ class TestWhatTheWarningSays:
         StaleConfigurationWarning(files=[stale_file]).emit()
 
         warning_spy.assert_called_once()
-        message = warning_spy.call_args.args[0]
-        assert message == (
-            f"A configuration file is out of date and was read as if it had been migrated, and nothing was written; {expected_remedy}"
-        ), topic
+        assert warning_spy.call_args.args[0] == "A configuration file is out of date and was migrated in memory only", topic
+        assert warning_spy.call_args.kwargs["fields"][USER_ACTION_FIELD] == expected_remedy, topic
         assert warning_spy.call_args.kwargs["fields"]["has_blocked_steps"] is has_blocked_steps
 
     def test_it_says_what_the_ledger_carried_and_nothing_read_from_the_file(self, tmp_path: Path) -> None:
@@ -526,7 +526,7 @@ class TestTheTelemetryLoader:
 
         assert config.custom_posthog is not None
         assert stale.read_bytes() == before, "a tolerated boot writes nothing"
-        assert "pipelex migrate" in warning.call_args.args[0]
+        assert "pipelex migrate" in warning.call_args.kwargs["fields"][USER_ACTION_FIELD]
         assert warning.call_args.kwargs["fields"]["file.path"] == str(stale)
 
     def test_a_file_the_ledger_cannot_explain_still_raises(

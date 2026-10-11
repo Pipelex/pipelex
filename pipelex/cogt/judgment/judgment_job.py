@@ -3,10 +3,8 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 from typing_extensions import override
 
-from pipelex.cogt.document.prompt_document import PromptDocument
-from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
-from pipelex.cogt.judgment.judgment_models import JudgmentQuestion, JudgmentState
+from pipelex.cogt.judgment.judgment_models import JudgmentPrompt, JudgmentQuestion
 from pipelex.cogt.judgment.judgment_report import JudgmentTokensUsage
 from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -21,25 +19,22 @@ class JudgmentJobReport(BaseModel):
 
 
 class JudgmentJob(InferenceJobAbstract):
-    """One state, a map of questions over it, and the answers they get.
+    """One prompt, a map of questions over it, and the outcomes they get.
 
-    The shape is batch-first because batching is the backend's whole economy: the spike measured
-    three questions over one state at 506 input tokens against 1138 for the same three sent
+    The shape is batch-first because batching is the backends' whole economy: the spike measured
+    three questions over one evidence at 506 input tokens against 1138 for the same three sent
     separately. A caller with one question sends a batch of one; a contract that could not express
     the batch would have to be broken to gain it later.
 
-    The question keys are the caller's own — the model never sees them — and they are what the
-    answers come back under.
+    The question keys are the caller's own, and they are what the outcomes come back under. A backend
+    may show them to its model or not: the one that sends a question's name echoes it on its answer.
 
-    The files travel beside the state, keyed by the name of the input they came from, because a file
-    is not a JSON value: an image or a document reaches a judgment exactly as it reaches an LLM, as a
-    prompt image or a prompt document. Whether the model reads them is its own capability, which the
-    worker checks before the backend is called.
+    The evidence is the rendered prompt with the images and documents it presents, ordered as its
+    tokens number them, exactly as an image or a document reaches an LLM. Whether the model reads them
+    is its own capability, which the worker checks before the backend is called.
     """
 
-    state: JudgmentState
-    images: dict[str, list[PromptImage]] = Field(default_factory=dict)
-    documents: dict[str, list[PromptDocument]] = Field(default_factory=dict)
+    prompt: JudgmentPrompt
     questions: dict[str, JudgmentQuestion] = Field(min_length=1)
     job_params: JudgmentJobParams
     job_report: JudgmentJobReport = JudgmentJobReport()

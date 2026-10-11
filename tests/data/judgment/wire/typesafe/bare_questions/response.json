@@ -1,0 +1,36 @@
+{
+  "status": 200,
+  "body": {
+    "answers": {
+      "refund": {
+        "kind": "yes_no",
+        "probability": 0.99
+      },
+      "tone": {
+        "kind": "choice",
+        "choice": "calm",
+        "confidence": 0.98,
+        "probabilities": {
+          "calm": 0.99,
+          "angry": 0.01,
+          "anxious": 0.0
+        }
+      },
+      "priority": {
+        "kind": "rating",
+        "level": 2,
+        "position": 1.71,
+        "confidence": 0.58,
+        "probabilities": {
+          "0": 0.0,
+          "1": 0.28,
+          "2": 0.72
+        }
+      }
+    },
+    "usage": {
+      "input_tokens": 388,
+      "output_tokens": 73
+    }
+  }
+}

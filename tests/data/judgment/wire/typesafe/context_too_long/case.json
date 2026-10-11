@@ -1,0 +1,4 @@
+{
+  "summary": "Evidence over the model's context limit: TypeSafe's max_tokens_exceeded envelope, a 400 with no message.",
+  "source": "The envelope the phase 1 spike recorded on 2026-09-19 (04b_state_200k_chars_error) for a 200,000-character state. It does not depend on the request, so it is paired with a short one rather than carrying the evidence that provoked it."
+}

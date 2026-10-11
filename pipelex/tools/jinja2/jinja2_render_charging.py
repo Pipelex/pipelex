@@ -9,10 +9,11 @@ the render runs, for the work a template sets off where no hook reaches (`active
 - **Filters and tests.** Every filter and test registered on the environment is wrapped by
   `charged_filter` and `charged_test` before a template compiles (`charge_registered_functions`),
   which refuses a function the cost tables do not classify.
-- **Printing.** `{{ value }}` goes through the environment's `finalize`, built by `make_charged_finalize`.
-- **What no hook reaches.** Loops, `~`, comparisons, slices and static text compile to plain Python,
-  so the environment rewrites the parsed template (`jinja2_render_rewrite.py`) to route each through
-  one of the internal filters defined here.
+- **Printing.** `{{ value }}` goes through the environment's `finalize`, built by `make_charged_finalize`,
+  and a `{% filter %}` block's result through `printed_block`, which prints it the same way.
+- **What no hook reaches.** Loops, `~`, comparisons, slices, static text and a filter block's result
+  compile to plain Python, so the environment rewrites the parsed template (`jinja2_render_rewrite.py`)
+  to route each through one of the internal filters defined here.
 
 The rule each hook applies is in `jinja2_render_budget.py`, and the estimates in `jinja2_render_costs.py`.
 """
@@ -504,7 +505,8 @@ def make_charged_finalize(*, inner: Callable[..., Any] | None) -> Callable[..., 
     """The environment's `finalize`: convert a printed value to text, charged, after the caller's own `finalize`.
 
     Jinja converts what `finalize` returns once more (`str()`, or `escape()` under autoescape), which
-    leaves text this has already converted unchanged.
+    leaves text this has already converted unchanged. A `{% filter %}` block's result that is not text
+    reaches it too, through `printed_block`.
     """
     inner_pass_arg = _pass_arg_of(function=inner) if inner is not None else None
 
@@ -537,6 +539,7 @@ COMPARE_FILTER: Final = "_pipelex_charged_comparison"
 COMPARED_FILTER: Final = "_pipelex_charged_operand"
 SLICED_FILTER: Final = "_pipelex_charged_slice"
 LITERAL_FILTER: Final = "_pipelex_charged_literal"
+PRINTED_BLOCK_FILTER: Final = "_pipelex_printed_block"
 
 _COMPARISONS: Final[dict[str, Callable[[Any, Any], Any]]] = {
     "eq": operator.eq,
@@ -617,6 +620,26 @@ def tuple_keys_weight(*, literal: object, limit: int) -> int:
     return sum(compare_weight(key, limit=limit) for key in cast("dict[object, object]", literal) if isinstance(key, tuple))
 
 
+@pass_context
+def printed_block(context: Context, value: Any) -> Any:
+    """What a `{% filter %}` block prints: its filters' result, printed as a `{{ }}` tag prints a value.
+
+    Jinja writes a filter block's result out as it is, with neither the environment's `finalize` nor a conversion
+    to text, so a filter returning anything but text, such as `length` or the document templates' `markdown`, would
+    fail the render. A text result is returned as it is, left unescaped under autoescape as Jinja leaves it, since
+    Jinja's filters keep the markup of a block's body. Any other result goes through the environment's `finalize`,
+    which charges it, then is converted as a printed value is. A text result is charged here as `finalize` charges
+    a printed one, so that everything a template prints is charged as printing.
+    """
+    if isinstance(value, str):
+        render_budget_of(context).charge(units=STEP_UNITS + size_of(value), operation=_PRINTING)
+        return value
+    finalize = context.environment.finalize
+    if finalize is not None:
+        value = finalize(*_first_argument(pass_arg=_pass_arg_of(function=finalize), context=context), value)
+    return escape(value) if context.eval_ctx.autoescape else str(value)
+
+
 INTERNAL_FILTERS: Final[dict[str, Callable[..., Any]]] = {
     ITERATE_FILTER: charged_iteration,
     CONCAT_FILTER: charged_concat,
@@ -624,4 +647,5 @@ INTERNAL_FILTERS: Final[dict[str, Callable[..., Any]]] = {
     COMPARED_FILTER: charged_operand,
     SLICED_FILTER: charged_slice,
     LITERAL_FILTER: charged_literal,
+    PRINTED_BLOCK_FILTER: printed_block,
 }

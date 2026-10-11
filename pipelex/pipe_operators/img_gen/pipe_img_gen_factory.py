@@ -10,7 +10,7 @@ from pipelex.pipe_machinery.pipe_factory import PipeFactoryProtocol
 from pipelex.pipe_operators.img_gen.img_gen_prompt_blueprint import ImgGenPromptBlueprint
 from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
-from pipelex.pipe_operators.shared.template_image_analyzer import TemplateImageAnalyzer
+from pipelex.pipe_operators.shared.template_file_references import analyze_template_file_references
 from pipelex.tools.jinja2.template_category import TemplateCategory
 
 if TYPE_CHECKING:
@@ -51,37 +51,24 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
             else None
         )
 
-        # Analyze both prompts for image references
-        # Images may be referenced in positive prompt, negative prompt, or both
+        # Images may be referenced in the positive prompt, the negative prompt or both. A generation prompt
+        # presents images only, so the analysis's documents are not read here.
         image_references: list[ImageReference] | None = None
         if blueprint.inputs:
             # Template analyzers read the slot grammar only, so they get the concept-spec projection.
             blueprint_input_specs = blueprint.inputs_concept_specs or {}
             all_image_refs: list[ImageReference] = []
             seen_paths: set[str] = set()
-
-            # Analyze positive prompt
-            if blueprint.prompt:
-                prompt_refs = TemplateImageAnalyzer.analyze_template_for_images(
-                    template_source=blueprint.prompt,
+            for template_source in (blueprint.prompt, blueprint.negative_prompt):
+                if not template_source:
+                    continue
+                prompt_files = analyze_template_file_references(
+                    template_source=template_source,
                     input_specs=blueprint_input_specs,
                     domain_code=domain_code,
                     template_category=TemplateCategory.IMG_GEN_PROMPT,
                 )
-                for ref in prompt_refs:
-                    if ref.variable_path not in seen_paths:
-                        all_image_refs.append(ref)
-                        seen_paths.add(ref.variable_path)
-
-            # Analyze negative prompt
-            if blueprint.negative_prompt:
-                negative_refs = TemplateImageAnalyzer.analyze_template_for_images(
-                    template_source=blueprint.negative_prompt,
-                    input_specs=blueprint_input_specs,
-                    domain_code=domain_code,
-                    template_category=TemplateCategory.IMG_GEN_PROMPT,
-                )
-                for ref in negative_refs:
+                for ref in prompt_files.image_references:
                     if ref.variable_path not in seen_paths:
                         all_image_refs.append(ref)
                         seen_paths.add(ref.variable_path)

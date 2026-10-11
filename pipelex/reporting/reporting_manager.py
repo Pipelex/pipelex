@@ -128,7 +128,7 @@ class ReportingManager(ReportingProtocol):
         llm_tokens_usage = llm_job.job_report.llm_tokens_usage
 
         if not llm_tokens_usage:
-            log.warning("LLM job has no llm_tokens_usage")
+            self._warn_of_missing_usage(inference_job=llm_job)
             return
 
         self._emit_usage_event(llm_job, tokens_usage=llm_tokens_usage)
@@ -137,7 +137,7 @@ class ReportingManager(ReportingProtocol):
         img_gen_tokens_usage = img_gen_job.job_report.img_gen_tokens_usage
 
         if not img_gen_tokens_usage:
-            log.warning("ImgGen job has no img_gen_tokens_usage")
+            self._warn_of_missing_usage(inference_job=img_gen_job)
             return
 
         self._emit_usage_event(img_gen_job, tokens_usage=img_gen_tokens_usage)
@@ -146,7 +146,7 @@ class ReportingManager(ReportingProtocol):
         extract_tokens_usage = extract_job.job_report.extract_tokens_usage
 
         if not extract_tokens_usage:
-            log.warning("Extract job has no extract_tokens_usage")
+            self._warn_of_missing_usage(inference_job=extract_job)
             return
 
         self._emit_usage_event(extract_job, tokens_usage=extract_tokens_usage)
@@ -155,7 +155,7 @@ class ReportingManager(ReportingProtocol):
         search_tokens_usage = search_job.job_report.search_tokens_usage
 
         if not search_tokens_usage:
-            log.warning("Search job has no search_tokens_usage")
+            self._warn_of_missing_usage(inference_job=search_job)
             return
 
         self._emit_usage_event(search_job, tokens_usage=search_tokens_usage)
@@ -164,10 +164,15 @@ class ReportingManager(ReportingProtocol):
         judgment_tokens_usage = judgment_job.job_report.judgment_tokens_usage
 
         if not judgment_tokens_usage:
-            log.warning("Judgment job has no judgment_tokens_usage")
+            self._warn_of_missing_usage(inference_job=judgment_job)
             return
 
         self._emit_usage_event(judgment_job, tokens_usage=judgment_tokens_usage)
+
+    @classmethod
+    def _warn_of_missing_usage(cls, *, inference_job: InferenceJobAbstract) -> None:
+        """Warn that an inference job reported no usage: one event whichever family the job is of, its class a field."""
+        log.warning("An inference job reported no usage", fields={"inference_job_type": type(inference_job).__name__})
 
     def _emit_usage_event(self, inference_job: InferenceJobAbstract, *, tokens_usage: AnyTokensUsage) -> None:
         """Emit a UsageReportEvent for this job.
@@ -294,7 +299,7 @@ class ReportingManager(ReportingProtocol):
         try:
             process_event_log = ActivityEventLogCache.get_or_create(tracing_config)
         except (OSError, MissingDependencyError, PipelexConfigError) as exc:
-            log.warning("The runner-side activity event log could not be built, so a usage event was dropped", fields=error_fields(exc=exc))
+            log.warning("The activity event log could not be built and a usage event was dropped", fields=error_fields(exc=exc))
             return
 
         if process_event_log is None:
@@ -332,6 +337,6 @@ class ReportingManager(ReportingProtocol):
             self._report_judgment_job(judgment_job=inference_job)
         else:
             log.error(
-                "The reporting manager cannot report this type of inference job, so its usage is lost",
+                "The usage of an inference job of an unknown type was lost",
                 fields={"inference_job_type": type(inference_job).__name__},
             )

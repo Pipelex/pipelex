@@ -1,0 +1,4 @@
+{
+  "summary": "One level past TypeSafe's cap is refused by the gateway before any call; there is no vendor request.",
+  "source": "No vendor exchange. TypeSafe itself answers 400 'Too many score levels. Must have at most 10 levels.' (phase 1 spike, 04_score_eleven_levels_error)."
+}

@@ -2,9 +2,9 @@
 
 A deck variant is a complete set of the numbered model deck files (`1_llm_deck.toml`, `2_img_gen_deck.toml`, `3_extract_deck.toml`, `4_search_deck.toml`, `5_doc_gen_deck.toml`, `6_judgment_deck.toml`) kept as an alternative edition of the deck that the kit ships in `pipelex/kit/configs/inference/deck/`. Nothing loads a variant: `pipelex init` does not copy it, `pipelex update` and `pipelex doctor` do not diff against it, and the deck manifest does not know it exists. It is source code that is kept correct, not configuration that is applied.
 
-`multi_provider/` is the deck Pipelex shipped before the default moved to the models the Pipelex Gateway serves from Azure. It resolves the default aliases and presets to Anthropic, Google and OpenAI models, and it still defines the three provider-named aliases (`best-claude`, `best-gemini`, `best-mistral`) that the shipped deck no longer carries.
+`multi_provider/` is the deck Pipelex shipped before the default deck moved to OpenAI's GPT models alone. It resolves the default aliases and presets to Anthropic, Google and OpenAI models, and it still defines the three provider-named aliases (`best-claude`, `best-gemini`, `best-mistral`) that the shipped deck no longer carries.
 
-The files keep their header comment about being managed by `pipelex update`, because they are byte-identical copies of what was shipped. That sentence is true of an installed deck, not of this parked copy.
+The files keep their header comment about being managed by `pipelex update`, because they are copies of what was shipped. That sentence is true of an installed deck, not of this parked copy.
 
 ## What keeps a variant from rotting
 
@@ -12,7 +12,7 @@ The files keep their header comment about being managed by `pipelex update`, bec
 
 The first is the vocabulary: the variant must define exactly the same alias, preset and waterfall names, per model family, as the shipped deck. The only differences it tolerates are the names the shipped deck deliberately dropped, which the test lists explicitly, so a stale entry in that list fails too. Adding a preset to the shipped deck and not to a variant turns the test red.
 
-The second is the handles: every model handle a variant names and the shipped deck does not must still be declared by one of the kit's backend files. This is how a parked deck actually goes stale — pipelex v0.61.0 retired the GPT-4.1, o-series and GPT-5 to 5.2 generations, and a variant naming one of those would otherwise pass the vocabulary check forever. The check is scoped to the handles only the variant names, because a handle the shipped deck names too is already exercised at boot, and some of those are gateway-served with no backend section of their own.
+The second is the handles: every model handle a variant names and the shipped deck does not must still be declared by one of the kit's backend files. This is how a parked deck actually goes stale — pipelex v0.61.0 retired the GPT-4.1, o-series and GPT-5 to 5.2 generations, and a variant naming one of those would otherwise pass the vocabulary check forever. The check is scoped to the handles only the variant names, because a handle the shipped deck names too is already exercised at boot.
 
 ## Re-enabling a variant
 

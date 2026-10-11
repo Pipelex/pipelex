@@ -583,9 +583,7 @@ class TestDeliveryExecutor:
         assert result is None
         assert warn_spy.call_count == 0
         unknown_concept_calls = [
-            call
-            for call in debug_spy.call_args_list
-            if call.args[0] == "The delivered result's concept is not known here; the delivery renders it raw"
+            call for call in debug_spy.call_args_list if call.args[0] == "A delivered result's concept is not known here and was rendered raw"
         ]
         assert len(unknown_concept_calls) == 1
         assert unknown_concept_calls[0].kwargs["fields"] == {"concept_ref": "dynamic_test.Greeting"}
@@ -603,7 +601,7 @@ class TestDeliveryExecutor:
 
         assert result is None
         (warning_call,) = warn_spy.call_args_list
-        assert warning_call.args[0] == "The delivered result could not be hydrated; the delivery renders it raw"
+        assert warning_call.args[0] == "A delivered result could not be hydrated and was rendered raw"
         assert warning_call.kwargs["fields"]["error.type"] == "ValidationError"
         assert warning_call.kwargs["fields"]["error.message"].startswith("text: ")
         assert "secret-result-value" not in str(warning_call)

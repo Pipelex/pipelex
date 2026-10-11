@@ -67,6 +67,7 @@ from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.storage_scope import DRY_RUN_STORAGE_SCOPE, DRY_RUN_USER_ID
 from pipelex.system.telemetry.events import EventName, EventProperty
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 if TYPE_CHECKING:
@@ -358,7 +359,10 @@ class BundleValidator:
                 pipe.validate_with_libraries()
             except PipeNotFoundError as not_found_error:
                 error_message = f"Skipped dry run for pipe '{pipe.pipe_ref}': unresolved dependency: {not_found_error}"
-                log.verbose(error_message)
+                log.verbose(
+                    "A pipe's dry run was skipped for an unresolved dependency",
+                    fields={"pipe_ref": pipe.pipe_ref, **error_fields(exc=not_found_error)},
+                )
                 results[pipe.pipe_ref] = DryRunOutput(
                     pipe_code=pipe.code, pipe_ref=pipe.pipe_ref, status=DryRunStatus.SKIPPED, error_message=error_message
                 )
@@ -497,7 +501,7 @@ class BundleValidator:
             # cause/context chain — testing exc itself first — to reclassify it as SKIPPED.
             if self._root_cause_is(exc=exc, exc_type=PipeNotFoundError):
                 error_message = f"Skipped dry run for pipe '{pipe.pipe_ref}': unresolved dependency: {exc}"
-                log.verbose(error_message)
+                log.verbose("A pipe's dry run was skipped for an unresolved dependency", fields={"pipe_ref": pipe.pipe_ref, **error_fields(exc=exc)})
                 return DryRunOutput(pipe_code=pipe.code, pipe_ref=pipe.pipe_ref, status=DryRunStatus.SKIPPED, error_message=error_message)
             formatted_error = format_pydantic_validation_error(exc) if isinstance(exc, ValidationError) else str(exc)
             error_message = f"Dry run failed for pipe '{pipe.pipe_ref}': {formatted_error}"

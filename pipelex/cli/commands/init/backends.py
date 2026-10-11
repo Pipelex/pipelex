@@ -22,6 +22,7 @@ from pipelex.cli.commands.init.ui.backends_ui import (
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.runtime_hub import get_console
 from pipelex.system.configuration.config_loader import config_manager
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_with_tomlkit, save_toml_to_path
 
 
@@ -118,7 +119,7 @@ def customize_backends_config(*, is_first_time_setup: bool = False, target_confi
             suggest_extension_install_if_needed(console=console)
         except EOFError as exc:
             # No stdin available for the install prompt — skip the optional IDE extension suggestion.
-            log.debug(f"IDE extension suggestion skipped: {exc}")
+            log.debug("The IDE extension suggestion was skipped, since no input could answer it", fields=error_fields(exc=exc))
 
         # Business logic: Update and save backends.toml first (local operation)
         update_backends_in_toml(toml_doc, selected_indices=selected_indices, backend_options=backend_options)

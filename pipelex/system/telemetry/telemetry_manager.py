@@ -69,11 +69,11 @@ class TelemetryManager(TelemetryManagerAbstract):
                 otlp_exporters=telemetry_config.otlp,
                 langfuse_config=telemetry_config.langfuse,
             )
-            log.verbose("AI tracing enabled: OpenTelemetry tracer created")
+            log.verbose("AI tracing is enabled, and an OpenTelemetry tracer was made")
         else:
             self._otel_tracer = None
             self._tracer_provider = None
-            log.verbose("AI tracing disabled: No OpenTelemetry tracer created")
+            log.verbose("AI tracing is disabled, and no OpenTelemetry tracer was made")
 
         # Wrap capture_exception to sanitize before sending
         if self.custom_posthog_client:
@@ -160,7 +160,7 @@ class TelemetryManager(TelemetryManagerAbstract):
                     return None
                 sanitized = self._sanitized_exception_arg(exception=resolved)
             except Exception as sanitize_exc:  # ruff: ignore[blind-except]
-                log.debug(f"Dropped an exception capture the privacy redaction could not complete: {sanitize_exc!r}")
+                log.debug("An exception capture the privacy redaction could not complete was dropped", fields=error_fields(exc=sanitize_exc))
                 return None
             result = original_capture_exception(sanitized, **kwargs)
             ExceptionCapture.carry_capture_marks(source=sanitized, target=resolved)
@@ -331,17 +331,17 @@ class TelemetryManager(TelemetryManagerAbstract):
                 self._exception_capture.close()
             except Exception as exc:  # ruff: ignore[blind-except]
                 # Telemetry teardown must never break the app: a close failure is logged at debug and swallowed.
-                log.debug(f"Error closing exception capture: {exc}")
+                log.debug("The exception capture could not be closed", fields=error_fields(exc=exc))
 
         # Then, shutdown the TracerProvider to flush all pending spans
         # This MUST happen before PostHog shutdown, otherwise spans won't be exported
         if self._tracer_provider:
             try:
-                log.verbose("Shutting down OTel TracerProvider (flushing pending spans)...")
+                log.verbose("The OpenTelemetry tracer provider is shutting down and flushing its pending spans")
                 self._tracer_provider.shutdown()
             except Exception as exc:  # ruff: ignore[blind-except]
                 # Suppress any shutdown errors to avoid cascading failures
-                log.debug(f"Error during TracerProvider shutdown: {exc}")
+                log.debug("The OpenTelemetry tracer provider could not be shut down", fields=error_fields(exc=exc))
 
         # Then shutdown the PostHog client
         if self.custom_posthog_client:
@@ -349,7 +349,7 @@ class TelemetryManager(TelemetryManagerAbstract):
                 self.custom_posthog_client.shutdown()
             except Exception as exc:  # ruff: ignore[blind-except]
                 # Suppress any shutdown errors to avoid cascading failures
-                log.debug(f"Error during custom PostHog shutdown: {exc}")
+                log.debug("The custom PostHog client could not be shut down", fields=error_fields(exc=exc))
 
         # Clear singleton instance
         TelemetryManagerAbstract.clear_instance()
@@ -382,7 +382,7 @@ class TelemetryManager(TelemetryManagerAbstract):
             case PostHogMode.IDENTIFIED:
                 if not self.telemetry_config.custom_posthog.user_id:
                     log.warning(
-                        "An event could not be tracked as identified because no user_id is set, and was tracked as anonymous",
+                        "An event with no user id to identify it was tracked as anonymous",
                         fields={"event_name": event_name},
                     )
                     self._capture_custom_event(event_name, properties=tracked_properties, identity=TelemetryIdentity.make_anonymous())
@@ -423,7 +423,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         dict must not carry that mark away with it.
         """
         if not self.custom_posthog_client:
-            log.error("Could not track event to custom telemetry because custom_posthog_client is not set")
+            log.error("An event could not be tracked to custom telemetry, which has no PostHog client")
             return
         capture_properties = dict(properties)
         if identity.distinct_id:
@@ -448,7 +448,7 @@ class TelemetryManager(TelemetryManagerAbstract):
     def is_custom_portkey_logging_enabled(self, *, is_debug_configured: bool) -> bool:
         is_debug: bool = is_debug_configured
         if not is_debug and self.telemetry_config.custom_portkey.force_debug_enabled:
-            log.verbose("Force-enabling Portkey logging (debug mode) because custom_portkey.force_debug_enabled is set in telemetry configuration")
+            log.verbose("Portkey logging (debug mode) is forced on by custom_portkey.force_debug_enabled in the telemetry configuration")
             is_debug = True
         if is_debug and is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY):
             # DEBUG rather than WARNING: honouring DO_NOT_TRACK over every other setting is the documented rule, not a
@@ -464,7 +464,7 @@ class TelemetryManager(TelemetryManagerAbstract):
     def is_custom_portkey_tracing_enabled(self) -> bool:
         if self.telemetry_config.custom_portkey.force_tracing_enabled and not is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY):
             # DEBUG, not INFO: this is asked on every Portkey inference call, and a setting the user chose is no milestone.
-            log.debug("Force-enabling Portkey tracing because custom_portkey.force_tracing_enabled is set in telemetry configuration")
+            log.debug("Portkey tracing is forced on by custom_portkey.force_tracing_enabled in the telemetry configuration")
             return True
         else:
             return False

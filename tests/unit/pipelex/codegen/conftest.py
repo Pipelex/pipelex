@@ -309,21 +309,21 @@ def every_type_kind_crate() -> LibraryCrate:
                         choices=["a) strongly agree with the proposal", "b) agree. with some reservations", "c unsure"],
                         required=True,
                     ),
-                    # The same unbounded choice list carrying a default — the widest presence spelling
-                    # ts-zod emits (`.nullable().default(…)` on top of a broken `z.enum([…])`), so the
-                    # print-width and prettier guards actually exercise the multi-member chain break.
+                    # The same unbounded choice list carrying a default — a presence call on top of a broken
+                    # `z.enum([…])`, so the print-width and prettier guards actually exercise the
+                    # multi-member chain break.
                     "fallback_state": ConceptStructureBlueprint(
                         description="Fallback workflow state",
                         choices=["awaiting_triage", "in_progress_with_owner", "blocked_on_dependency", "ready_for_review"],
                         default_value="awaiting_triage",
                     ),
-                    # A short choice list that only overflows once `.nullable().default(…)` is attached.
+                    # A short choice list that only overflows once `.default(…)` is attached.
                     # Prettier re-measures each call after breaking the chain, so the enum goes back onto
                     # one line at indent 4 — exploding its members regardless is a shape prettier folds
                     # straight back, which is exactly the stamp break the breaking exists to prevent.
                     "escalation_severity": ConceptStructureBlueprint(
                         description="How severe the escalation is",
-                        choices=["low", "medium", "high"],
+                        choices=["low", "medium", "high", "critical"],
                         default_value="medium",
                     ),
                     # The overflow that has nothing to do with the *expression*: `z.string()` is as short as
@@ -333,7 +333,7 @@ def every_type_kind_crate() -> LibraryCrate:
                     "default_summary_style": ConceptStructureBlueprint(
                         description="How the summary should be written",
                         type=ConceptStructureBlueprintFieldType.TEXT,
-                        default_value="a concise executive summary",
+                        default_value="a concise executive summary for the board",
                     ),
                     # The same overflow reached through a nested type rather than a long default.
                     "per_reviewer_summary_style_overrides": ConceptStructureBlueprint(

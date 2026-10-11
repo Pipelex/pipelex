@@ -38,7 +38,7 @@ class AwsConfig(ConfigModel):
     def get_aws_access_keys_with_method(self, *, api_key_method: AwsKeyMethod) -> tuple[str, str, str]:
         match api_key_method:
             case AwsKeyMethod.ENV:
-                log.debug("Getting AWS access keys from environment (key id and secret access key).")
+                log.debug("AWS access keys are read from the environment")
                 try:
                     aws_access_key_id = get_required_env(AWS_ACCESS_KEY_ID_VAR_NAME)
                     aws_secret_access_key = get_required_env(AWS_SECRET_ACCESS_KEY_VAR_NAME)
@@ -48,7 +48,7 @@ class AwsConfig(ConfigModel):
                     raise AwsCredentialsError(msg) from exc
 
             case AwsKeyMethod.SECRET_PROVIDER:
-                log.debug("Getting AWS secret access key from secrets provider (key id and secret access key).")
+                log.debug("AWS access keys are read from the secrets provider")
                 try:
                     aws_access_key_id = get_secret(AWS_ACCESS_KEY_ID_VAR_NAME)
                     aws_secret_access_key = get_secret(AWS_SECRET_ACCESS_KEY_VAR_NAME)

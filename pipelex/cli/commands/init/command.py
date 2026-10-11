@@ -61,6 +61,7 @@ from pipelex.migration.former_release import (
 from pipelex.runtime_hub import get_console
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
+from pipelex.tools.log.error_fields import error_fields
 
 #: The focuses whose run asks where runs execute when it sets up inference: the full setup, and a first setup reached
 #: through `config`. `inference` configures this machine's backends on purpose and leaves the setting as it is.
@@ -481,7 +482,7 @@ def _suggest_extension(*, console: Console) -> None:
         suggest_extension_install_if_needed(console=console)
     except EOFError as exc:
         # No stdin available for the install prompt — skip the optional IDE extension suggestion.
-        log.debug(f"IDE extension suggestion skipped: {exc}")
+        log.debug("The IDE extension suggestion was skipped, since no input could answer it", fields=error_fields(exc=exc))
 
 
 def execute_initialization(*, console: Console, inspection: InitInspection, choices: InitChoices) -> None:

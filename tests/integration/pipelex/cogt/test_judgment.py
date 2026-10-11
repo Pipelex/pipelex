@@ -6,9 +6,10 @@ from pipelex.cogt.judgment.judgment_job import JudgmentJob
 from pipelex.cogt.judgment.judgment_job_factory import JudgmentJobFactory
 from pipelex.cogt.judgment.judgment_models import (
     ChoiceAnswer,
-    JudgmentAnswer,
     JudgmentKind,
+    JudgmentOutcome,
     JudgmentQuestion,
+    JudgmentRefusal,
     RatingAnswer,
     YesNoAnswer,
 )
@@ -29,14 +30,14 @@ def _inference_model(judgment_combo: ModelCombo) -> InferenceModelSpec:
 
 def _job(*, judgment_combo: ModelCombo, job_metadata: JobMetadata, questions: dict[str, JudgmentQuestion]) -> JudgmentJob:
     return JudgmentJobFactory.make_judgment_job(
-        state=JudgmentTestCases.STATE,
+        prompt=JudgmentTestCases.PROMPT,
         questions=questions,
         judgment_setting=JudgmentSetting(model=judgment_combo.handle),
         job_metadata=job_metadata,
     )
 
 
-def _assert_expected_verdict(*, answer: JudgmentAnswer) -> None:
+def _assert_expected_verdict(*, answer: JudgmentOutcome) -> None:
     """The verdict exactly, the probability within the margin the spike's stability measure sets."""
     match answer:
         case YesNoAnswer():
@@ -51,6 +52,8 @@ def _assert_expected_verdict(*, answer: JudgmentAnswer) -> None:
             assert answer.level == JudgmentTestCases.EXPECTED_SEVERITY_LEVEL
             assert answer.probabilities is not None
             assert set(answer.probabilities) == set(range(len(JudgmentTestCases.SEVERITY.levels)))
+        case JudgmentRefusal():
+            pytest.fail("The unambiguous case is answered, never declined")
 
 
 @pytest.mark.judgment

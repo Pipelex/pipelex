@@ -5,7 +5,7 @@ import pytest
 from pipelex.core.domains.domain import Domain
 from pipelex.libraries.domain.domain_library import DomainLibrary
 
-DOMAIN_FIELD_CONFLICT_MESSAGE = "Two declarations of one domain give one of its fields different values, so the first is kept"
+DOMAIN_FIELD_CONFLICT_MESSAGE = "Two declarations of a domain disagree on a field, and the first value is kept"
 
 
 class TestDomainLibrary:

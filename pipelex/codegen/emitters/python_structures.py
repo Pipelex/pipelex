@@ -104,7 +104,8 @@ def _structured_content(*, imports: set[str]) -> str:
 
 def _render_field(concept_field: ResolvedField, *, by_ref: dict[str, ResolvedConcept], imports: set[str]) -> str:
     annotation = _annotation(concept_field.resolved_type, by_ref=by_ref, imports=imports)
-    if not concept_field.required:
+    # Only a field that may hold nothing is nullable: a defaulted field is never `None`, as in the runtime class.
+    if concept_field.may_hold_nothing:
         annotation = f"{annotation} | None"
     return field_line(concept_field, annotation=annotation, imports=imports)
 

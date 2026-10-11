@@ -46,6 +46,14 @@ class ImageReference(BaseModel):
         description="For NESTED kind: relative paths to images within the structure, e.g., ['text_and_images.images', 'page_view']",
     )
 
+    is_optional: bool = Field(
+        default=False,
+        description=(
+            "Whether the input the path starts from is declared optional (`Image?`, `Album?`). An optional input that is absent is "
+            "skipped when the prompt is assembled, so the template's guard renders it out; a required one that is absent is refused."
+        ),
+    )
+
     @override
     def __str__(self) -> str:
         match self.kind:
@@ -79,6 +87,14 @@ class DocumentReference(BaseModel):
     variable_path: str = Field(description="The variable path referenced in the template, e.g., 'report', 'submission.pdf', 'documents'")
 
     kind: DocumentReferenceKind = Field(description="The kind of document reference")
+
+    is_optional: bool = Field(
+        default=False,
+        description=(
+            "Whether the input the path starts from is declared optional (`Image?`, `Album?`). An optional input that is absent is "
+            "skipped when the prompt is assembled, so the template's guard renders it out; a required one that is absent is refused."
+        ),
+    )
 
     @override
     def __str__(self) -> str:

@@ -1,0 +1,8 @@
+{
+  "status": 400,
+  "body": {
+    "detail": {
+      "error_type": "max_tokens_exceeded"
+    }
+  }
+}

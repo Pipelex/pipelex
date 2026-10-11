@@ -364,8 +364,8 @@ class Library(BaseModel):
                         )
                         raise LibraryError(msg)
                     log.verbose(
-                        f"Concept '{concept.concept_ref}' refines cross-package concept '{concept.refines}' "
-                        f"from unloaded dependency '{alias}', skipping validation"
+                        f"The validation of concept '{concept.concept_ref}' was skipped: it refines cross-package concept "
+                        f"'{concept.refines}' from unloaded dependency '{alias}'"
                     )
 
     def validate_domain_library_with_libraries(self) -> None:

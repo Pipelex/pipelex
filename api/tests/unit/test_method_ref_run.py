@@ -132,7 +132,7 @@ class TestMethodRefRun:
             response = client.post("/v1/execute", json={"method_ref": method_ref, "inputs": {"text": "hi"}})
 
         assert response.status_code == 200, response.text
-        (resolution_record,) = [record for record in caplog.records if record.getMessage() == "A method_ref was resolved to a package"]
+        (resolution_record,) = [record for record in caplog.records if record.getMessage() == "A method reference was resolved to a package"]
         record_fields = vars(resolution_record)
         assert record_fields["method_ref"] == method_ref
         assert record_fields["package_address"] == STUB_METHOD_ADDRESS

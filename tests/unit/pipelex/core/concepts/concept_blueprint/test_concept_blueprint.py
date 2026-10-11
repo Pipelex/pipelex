@@ -173,6 +173,21 @@ class TestConceptStructureBlueprintValidation:
         with pytest.raises(ValidationError, match="valid Python identifiers"):
             ConceptBlueprint(description="Invalid field name", structure={field_name: "A value"})
 
+    @pytest.mark.parametrize(
+        ("field_name", "message_fragment"),
+        [
+            pytest.param("model_config", "Cannot use reserved fields in concept structure. Problematic fields: ''model_config''", id="reserved"),
+            pytest.param("_dynamic_output_concept", "Cannot use reserved fields in concept structure", id="reserved_before_underscore"),
+            pytest.param("_internal", "Cannot use 'field' starting with underscore in concept structure", id="underscore"),
+            pytest.param("_not-valid", "valid Python identifiers", id="identifier_before_underscore"),
+        ],
+    )
+    def test_concept_rejects_reserved_and_private_field_names(self, field_name: str, message_fragment: str):
+        """Each rule keeps its own message, checked in order: identifier, then reserved, then underscore."""
+        with pytest.raises(ValidationError) as exc_info:
+            ConceptBlueprint(description="Invalid field name", structure={field_name: "A value"})
+        assert message_fragment in str(exc_info.value)
+
     def test_edge_cases(self):
         """Test edge cases for validation."""
         # Valid field without default_value

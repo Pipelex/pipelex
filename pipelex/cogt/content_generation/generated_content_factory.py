@@ -224,7 +224,7 @@ class GeneratedContentFactory:
                 # so there is nothing to refuse and the URL is kept as it came.
                 actual_bytes, fetched_mime_type = await self._fetch_remote_content(url=url)
             except RemoteFileFetchError as exc:
-                log.warning("A generated image could not be fetched from its remote URL, so the URL is kept as it came", fields=error_fields(exc=exc))
+                log.warning("A generated image could not be fetched, and its remote URL was kept", fields=error_fields(exc=exc))
                 public_url = url
             else:
                 if not declared_mime_type and fetched_mime_type:

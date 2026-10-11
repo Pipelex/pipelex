@@ -73,7 +73,7 @@ async def best_effort_graph_spec(*, pipe_ref: str | None, library_id: str | None
         if foreign_fault is not None and not isinstance(foreign_fault, (FactoryException, ValueError)):
             raise
         log.warning(
-            "The graph dry run produced no graph; the validation result carries none",
+            "The graph dry run produced no graph",
             fields={"caller": log_context, **_graph_target_fields(pipe=pipe, target=pipe_ref), **error_fields(exc=graph_error)},
         )
         return None

@@ -530,5 +530,5 @@ def categorize_blueprint_validation_error(
         return syntax_error
 
     # No categorizer knows it: keep it as an item of its own, never dropped because another item exists.
-    log.verbose(f"Pipelex bundle blueprint validation error that is not categorized: {error_scope} - {source} - {domain}")
+    log.verbose(f"A bundle blueprint validation error is not categorized: {error_scope} - {source} - {domain}")
     return _make_uncategorized_blueprint_error(error=error, domain=domain, source=source, pipe_code=pipe_code)

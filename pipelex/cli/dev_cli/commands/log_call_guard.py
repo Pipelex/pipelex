@@ -18,25 +18,41 @@ and in the ``api/`` member's ``api/pipelex_api/``:
    (``[red]``, ``[bold green]``, ``[link=https://…]``) or as one of its theme's style names. The text is read the way
    it reaches the console: a ``+`` of literals, named ones included, is folded into one text before it is scanned. A
    bracketed word that is no style, ``list[int]``, is text and passes. A tag escaped with a backslash passes.
+3. **The wording rules.** At every level, a message starts with no lowercase letter (``lowercase-start``), ends with
+   no period and no ellipsis (``trailing-period``) and holds no backtick (``backtick``); at INFO and above it also
+   names no identifier, a word holding an underscore or a call written ``name()`` (``identifier``), and holds at most
+   ``MAX_MESSAGE_LENGTH`` characters (``length``). They read the texts the markup rule reads, each text a message can
+   reach the console as, and one text that breaks a rule is enough: a conditional between a good and a bad literal
+   breaks it. A text that starts or ends with a value the guard cannot read passes the rule about that end, and the
+   length counts a text's literal parts alone, the least it can hold once its values are spliced in.
+4. **The exception rule, at every level** (``spliced-exception``). No value a message splices into its text reaches
+   a handled exception: an f-string's placeholder, a value a ``%`` or a ``.format()`` formats, or any part of the
+   message that is no literal text, the message itself included. A value reaches one when it calls a
+   ``.exception()`` method, or reads a name bound by ``except ... as``, directly or through the bindings of the names
+   it reads (``detail = str(exc)``), a captured name included.
 
-The title and the inline title join the message (the dispatch renders them into it), so both rules read them too,
-and a title or an inline title that is statically ``None`` is no text at all. A ``**`` expansion of a dict literal
-with string keys passes its entries as keywords; any other ``**`` expansion could carry the message, so it is refused
-as ``non-literal`` at every level. DEBUG and VERBOSE may keep an f-string; the markup rule holds there as everywhere.
+The title and the inline title join the message (the dispatch renders them into it), so every rule reads them too,
+each as a text of its own, and a title or an inline title that is statically ``None`` is no text at all. A ``**``
+expansion of a dict literal with string keys passes its entries as keywords; any other ``**`` expansion could carry
+the message, so it is refused as ``non-literal`` at every level. DEBUG and VERBOSE may keep an f-string, a long
+message and an identifier; every other rule holds there as everywhere.
 
 **Names** are read by Python's own scoping: the scope the call is made in (a comprehension reading as part of the
 scope it is written in), then the enclosing functions, class bodies never among them, then the module. Of a name's
 bindings there, only those that can reach the read count, by the scope's control flow: the nearest along
 straight-line code, the nearest on each path through an ``if``, a ``try`` or a ``match``, those a loop's later passes
 carry back, and none past a ``return``, a ``raise``, a ``break`` or a ``continue``. A name bound in an enclosing
-function is not followed. The facade itself is found the same way: a call's receiver is the facade where an import
-of the facade reaches it. One index of every scope's bindings and flow is built per module, in one walk.
+function is not followed, save by the exception rule, which reads it through every binding that function makes. The
+facade itself is found the same way: a call's receiver is the facade where an import of the facade reaches it, a
+captured receiver read through every binding of its function too. One index of every scope's bindings and flow is
+built per module, in one walk.
 
 **The baseline.** The calls that broke the rules when the guard arrived are listed in the committed
 ``log_call_baseline.toml`` at the repo root, under the key ``<relative_path>::<qualified_name>`` of the function that
 makes them, ``<module>`` for a module-level call, each by its signature: the method, the message's source text, the
-rules the call breaks and every binding that reaches the names the guard read to judge it
-(``warning: msg [f-string] where msg = f"Loaded {alias}"``), rendered the same on every supported Python. Line
+rules the call breaks and every binding that reaches the names the guard read to judge it, the bindings a spliced
+exception is reached through included (``warning: msg [f-string] where msg = f"Loaded {alias}"``), rendered the same
+on every supported Python. Line
 numbers never enter it. The comparison with the tree is exact both ways: a call the baseline does not list fails,
 and so does a listed signature no call matches any more, whether the call now complies, moved to another function,
 or had its message, a binding of it or the rules it breaks change, until its entry is removed. Changing a listed
@@ -58,6 +74,7 @@ import ast
 import copy
 import itertools
 import json
+import re
 import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import tomllib
 from collections import Counter
@@ -103,11 +120,15 @@ FACADE_PATHS = frozenset({"pipelex.log", "pipelex.tools.log.log.log"})
 FACADE_STAR_MODULES = frozenset({"pipelex", "pipelex.tools.log.log"})
 FACADE_NAME = "log"
 
-#: The facade's methods at INFO and above, where a message is a literal.
-INTERPOLATION_BOUND_METHODS = frozenset({"info", "warning", "error", "critical"})
+#: The facade's methods at INFO and above, where a message is a literal, names no identifier and is short.
+INFO_AND_ABOVE_METHODS = frozenset({"info", "warning", "error", "critical"})
 
-#: Every method of the facade that emits a line, where a literal message holds no markup.
-MARKUP_BOUND_METHODS = frozenset({"verbose", "debug", *INTERPOLATION_BOUND_METHODS})
+#: Every method of the facade that emits a line, where a message holds no markup, keeps the wording rules that hold at
+#: every level and splices no exception.
+EMITTING_METHODS = frozenset({"verbose", "debug", *INFO_AND_ABOVE_METHODS})
+
+#: The longest a message may be at INFO and above, in characters.
+MAX_MESSAGE_LENGTH = 80
 
 #: The keyword a call may pass its message under instead of positionally.
 CONTENT_KEYWORD = "content"
@@ -139,6 +160,12 @@ class LogCallRule(StrEnum):
     FORMAT_CALL = "format-call"
     NON_LITERAL = "non-literal"
     MARKUP = "markup"
+    LOWERCASE_START = "lowercase-start"
+    TRAILING_PERIOD = "trailing-period"
+    BACKTICK = "backtick"
+    IDENTIFIER = "identifier"
+    LENGTH = "length"
+    SPLICED_EXCEPTION = "spliced-exception"
 
     @property
     def remedy(self) -> str:
@@ -149,6 +176,24 @@ class LogCallRule(StrEnum):
                 return "write the message as a literal at the call and pass what varies in `fields=`"
             case LogCallRule.MARKUP:
                 return "drop the tag: the console colours a value by its field's name, or draws a named layout"
+            case LogCallRule.LOWERCASE_START:
+                return "start the message with a capital letter, its subject first"
+            case LogCallRule.TRAILING_PERIOD:
+                return "end the message with no period and no ellipsis"
+            case LogCallRule.BACKTICK:
+                return "write the message as plain prose: what a backtick would quote rides in a field"
+            case LogCallRule.IDENTIFIER:
+                return "say it in words and carry the identifier as a field's value, an environment variable's name in `env_var` for instance"
+            case LogCallRule.LENGTH:
+                return (
+                    f"say what happened in one sentence of at most {MAX_MESSAGE_LENGTH} characters, "
+                    "the values in `fields=` and the advice in `user_action`"
+                )
+            case LogCallRule.SPLICED_EXCEPTION:
+                return (
+                    "write a fixed message and pass the exception in `fields=` as `**error_fields(exc=...)`, "
+                    "or with `include_exception=True` at ERROR and above"
+                )
 
 
 class RuleBreach(NamedTuple):
@@ -799,6 +844,8 @@ class _ScopeIndex:
     def __init__(self, *, module: ast.Module, package: str) -> None:
         self.module_scope = _Scope(kind=_ScopeKind.MODULE, parent=None)
         self.call_scopes: dict[ast.Call, _Scope] = {}
+        # The scope each name is read in, so a name met anywhere in an expression, a lambda's body included, resolves.
+        self.read_scopes: dict[ast.Name, _Scope] = {}
         self._package = package
         self._scopes: list[_Scope] = [self.module_scope]
         self._serials = itertools.count()
@@ -1014,6 +1061,7 @@ class _ScopeIndex:
                     scope=scope, event=_Branch(paths=(self._collected(nodes=[body], scope=scope), self._collected(nodes=[orelse], scope=scope)))
                 )
             case ast.Name(id=name, ctx=ast.Load()):
+                self.read_scopes[node] = scope
                 self._emit(scope=scope, event=_Read(node=node, name=name))
             case ast.Name(id=name, ctx=ast.Store()):
                 self._bind_opaque(name=name, kind=_OpaqueBinding.ASSIGNMENT_TARGET, scope=scope, lineno=node.lineno)
@@ -1205,8 +1253,12 @@ class _ScopeIndex:
         found.update(binding for binding in location.moved_bindings.get(name, []) if binding.scope.statement_scope is not flow)
         return sorted(found, key=lambda binding: (binding.lineno, binding.serial))
 
-    def receiver_bindings(self, *, node: ast.Name, scope: _Scope) -> list[_Binding]:
-        """The bindings a call's receiver may hold where the call is made, a captured name's every binding included."""
+    def possible_bindings(self, *, node: ast.Name, scope: _Scope) -> list[_Binding]:
+        """The bindings a name may hold where it is read, a captured name's every binding included.
+
+        How a call's receiver is read, and a name the exception rule follows: a name captured from an enclosing
+        function may hold whatever that function binds it to.
+        """
         reach = self.reaching(node=node, scope=scope)
         if not isinstance(reach, str):
             return reach
@@ -1242,10 +1294,30 @@ _MAX_FOLDED_SHAPES = 256
 _Seen: TypeAlias = frozenset[_Binding]
 
 
+#: The bindings a name reaches a handled exception through, as a signature writes them, the last binding the exception's.
+_Route: TypeAlias = tuple[str, ...]
+
+
+class _Splice(NamedTuple):
+    """A value a message splices into its text that reaches a handled exception.
+
+    Attributes:
+        source: The spliced value's source text, as the report names it.
+        route: The bindings it reaches the exception through, which join the call's signature.
+    """
+
+    source: str
+    route: _Route
+
+
 def _folded(*, left: set[_Shape], right: set[_Shape]) -> set[_Shape]:
-    """The shapes of a concatenation: each left text's last run joined to each right text's first run."""
+    """The shapes of a concatenation: each left text's last run joined to each right text's first run.
+
+    Past the bound, the sides are kept apart as if a value the guard cannot read stood between them: each left text
+    keeps its start and each right text its end, and no run joins across.
+    """
     if len(left) * len(right) > _MAX_FOLDED_SHAPES:
-        return left | right
+        return {(*left_shape, "") for left_shape in left} | {("", *right_shape) for right_shape in right}
     return {(*left_shape[:-1], left_shape[-1] + right_shape[0], *right_shape[1:]) for left_shape, right_shape in itertools.product(left, right)}
 
 
@@ -1423,6 +1495,104 @@ class _MessageReader:
             return {_UNKNOWN_SHAPE}
         return self._name_shapes(node=binding.prior, scope=binding.scope, seen=seen)
 
+    # ---- the spliced exceptions, for the exception rule -------------------------------
+
+    def spliced_exceptions(self, *, expr: ast.expr, scope: _Scope, seen: _Seen) -> list[_Splice]:
+        """The values a message expression splices into its text that reach a handled exception, in source order.
+
+        The message is read the way ``shapes`` reads it, down to the values it splices: an f-string's placeholders,
+        the values a ``%`` formats, the arguments of a ``.format()`` call, and any expression that is no literal
+        text, the message itself included. A name is read through its bindings, a captured name through every binding
+        of the function it is captured from, and a name bound by ``except ... as`` is the exception itself.
+        """
+        match expr:
+            case ast.Constant():
+                return []
+            case ast.JoinedStr(values=values):
+                placeholders = [value.value for value in values if isinstance(value, ast.FormattedValue)]
+                return [splice for placeholder in placeholders for splice in self._splice(value=placeholder, seen=seen)]
+            case ast.BinOp(op=ast.Add(), left=left, right=right):
+                return [*self.spliced_exceptions(expr=left, scope=scope, seen=seen), *self.spliced_exceptions(expr=right, scope=scope, seen=seen)]
+            case ast.BinOp(op=ast.Mod(), left=left, right=right):
+                return [*self.spliced_exceptions(expr=left, scope=scope, seen=seen), *self._splice(value=right, seen=seen)]
+            case ast.Call(func=ast.Attribute(attr="format", value=receiver), args=args, keywords=keywords):
+                arguments = [*args, *(keyword.value for keyword in keywords)]
+                spliced = [splice for argument in arguments for splice in self._splice(value=argument, seen=seen)]
+                return [*self.spliced_exceptions(expr=receiver, scope=scope, seen=seen), *spliced]
+            case ast.IfExp(body=body, orelse=orelse):
+                return [*self.spliced_exceptions(expr=body, scope=scope, seen=seen), *self.spliced_exceptions(expr=orelse, scope=scope, seen=seen)]
+            case ast.Name():
+                return self._name_spliced_exceptions(node=expr, scope=scope, seen=seen)
+            case _:
+                return self._splice(value=expr, seen=seen)
+
+    def _name_spliced_exceptions(self, *, node: ast.Name, scope: _Scope, seen: _Seen) -> list[_Splice]:
+        """What a name splices through each binding it may hold, the binding leading every route it is on."""
+        splices: list[_Splice] = []
+        for binding in self._index.possible_bindings(node=node, scope=scope):
+            if binding in seen:
+                continue
+            rendered = binding.render(name=node.id)
+            if binding.opaque == _OpaqueBinding.EXCEPT_TARGET:
+                splices.append(_Splice(source=node.id, route=(rendered,)))
+                continue
+            if binding.opaque is not None or binding.value is None:
+                continue
+            inner_seen = seen | {binding}
+            found: list[_Splice] = []
+            if binding.prior is not None:
+                found.extend(self._name_spliced_exceptions(node=binding.prior, scope=binding.scope, seen=inner_seen))
+            if binding.operator is None or isinstance(binding.operator, ast.Add):
+                found.extend(self.spliced_exceptions(expr=binding.value, scope=binding.scope, seen=inner_seen))
+            else:
+                found.extend(self._splice(value=binding.value, seen=inner_seen))
+            splices.extend(_Splice(source=splice.source, route=(rendered, *splice.route)) for splice in found)
+        return splices
+
+    def _splice(self, *, value: ast.expr, seen: _Seen) -> list[_Splice]:
+        """A value spliced into a message, when it reaches a handled exception."""
+        route = self._exception_route(expr=value, visited=set(seen))
+        if route is None:
+            return []
+        return [_Splice(source=_short_source(expr=value), route=route)]
+
+    def _exception_route(self, *, expr: ast.expr, visited: set[_Binding]) -> _Route | None:
+        """The bindings through which an expression reaches a handled exception, or ``None`` when it reaches none.
+
+        It reaches one when it calls a ``.exception()`` method, a finished task's or a retry outcome's, or reads a
+        name one of whose bindings is an ``except ... as`` target or binds a value that reaches one in turn. Whether
+        a binding reaches one does not depend on the way to it, so each binding is followed once.
+        """
+        for node in ast.walk(expr):
+            match node:
+                case ast.Call(func=ast.Attribute(attr="exception")):
+                    return ()
+                case ast.Name(ctx=ast.Load()):
+                    scope = self._index.read_scopes.get(node)
+                    route = None if scope is None else self._name_exception_route(node=node, scope=scope, visited=visited)
+                    if route is not None:
+                        return route
+                case _:
+                    pass
+        return None
+
+    def _name_exception_route(self, *, node: ast.Name, scope: _Scope, visited: set[_Binding]) -> _Route | None:
+        for binding in self._index.possible_bindings(node=node, scope=scope):
+            if binding in visited:
+                continue
+            visited.add(binding)
+            rendered = binding.render(name=node.id)
+            if binding.opaque == _OpaqueBinding.EXCEPT_TARGET:
+                return (rendered,)
+            if binding.opaque is not None or binding.value is None:
+                continue
+            route = self._exception_route(expr=binding.value, visited=visited)
+            if route is None and binding.prior is not None:
+                route = self._name_exception_route(node=binding.prior, scope=binding.scope, visited=visited)
+            if route is not None:
+                return (rendered, *route)
+        return None
+
 
 def markup_tags_of(*, shapes: Iterable[_Shape]) -> list[str]:
     """The distinct markup tags the runs of these shapes hold, in a stable order."""
@@ -1433,6 +1603,79 @@ def markup_tags_of(*, shapes: Iterable[_Shape]) -> list[str]:
                 if tag not in tags:
                     tags.append(tag)
     return tags
+
+
+# --------------------------------------------------------------------------------------
+# Wording: what the text of a message says, read off its shapes
+#
+# A rule about how a text starts or ends reads the first or the last run of each shape, so a text that starts or ends
+# with a value the guard cannot read passes it. A rule about what a text holds reads every run, never across a value.
+# The length counts a shape's runs alone, the least its text can be once its values are spliced in.
+# --------------------------------------------------------------------------------------
+
+#: The periods that end a text, an ellipsis written as three periods or as one character included.
+_TRAILING_PERIOD_PATTERN = re.compile(r"[.…]+$")
+
+#: A call written with empty parentheses, ``load()`` or ``Loader.load()``, else a word.
+_IDENTIFIER_CANDIDATE_PATTERN = re.compile(r"(?:\w+\.)*\w+\(\)|\w+")
+
+
+def _lowercase_start_of(*, text: str) -> str | None:
+    """The first word of a text that starts with a lowercase letter, or ``None``; leading whitespace is skipped."""
+    stripped = text.lstrip()
+    if not stripped or not stripped[0].islower():
+        return None
+    return stripped.split(maxsplit=1)[0]
+
+
+def _trailing_period_of(*, text: str) -> str | None:
+    """The periods, or the ellipsis, a text ends with, or ``None``; trailing whitespace is skipped."""
+    match = _TRAILING_PERIOD_PATTERN.search(text.rstrip())
+    return match.group() if match else None
+
+
+def _identifiers_in(*, text: str) -> list[str]:
+    """The identifiers a text holds, in order: each call written ``name()``, and each word holding an underscore."""
+    identifiers: list[str] = []
+    for match in _IDENTIFIER_CANDIDATE_PATTERN.finditer(text):
+        token = match.group()
+        if token.endswith("()") or ("_" in token and token.strip("_")):
+            identifiers.append(token)
+    return identifiers
+
+
+def _shape_length(*, shape: _Shape) -> int:
+    return sum(len(run) for run in shape)
+
+
+def wording_breaches(*, shapes: Iterable[_Shape], part_name: str, is_info_and_above: bool) -> list[RuleBreach]:
+    """The wording rules a part of a message breaks, read off every text it can reach the console as.
+
+    At every level a text starts with no lowercase letter, ends with no period and no ellipsis, and holds no backtick;
+    at INFO and above it also holds no identifier and is at most ``MAX_MESSAGE_LENGTH`` characters long. A shape
+    that breaks a rule is enough: a conditional between a good and a bad literal breaks it.
+    """
+    ordered_shapes = sorted(shapes)
+    breaches: list[RuleBreach] = []
+    first_words = dict.fromkeys(word for shape in ordered_shapes if (word := _lowercase_start_of(text=shape[0])) is not None)
+    breaches.extend(RuleBreach(rule=LogCallRule.LOWERCASE_START, detail=f"{part_name} starts with the lowercase `{word}`") for word in first_words)
+    endings = dict.fromkeys(ending for shape in ordered_shapes if (ending := _trailing_period_of(text=shape[-1])) is not None)
+    breaches.extend(RuleBreach(rule=LogCallRule.TRAILING_PERIOD, detail=f"{part_name} ends with `{ending}`") for ending in endings)
+    if any("`" in run for shape in ordered_shapes for run in shape):
+        breaches.append(RuleBreach(rule=LogCallRule.BACKTICK, detail=f"{part_name} holds a backtick"))
+    if not is_info_and_above:
+        return breaches
+    identifiers = dict.fromkeys(identifier for shape in ordered_shapes for run in shape for identifier in _identifiers_in(text=run))
+    for identifier in identifiers:
+        kind = "call" if identifier.endswith("()") else "identifier"
+        breaches.append(RuleBreach(rule=LogCallRule.IDENTIFIER, detail=f"{part_name} holds the {kind} `{identifier}`"))
+    longest = max(ordered_shapes, key=lambda shape: _shape_length(shape=shape), default=None)
+    if longest is not None and _shape_length(shape=longest) > MAX_MESSAGE_LENGTH:
+        # A shape of several runs splices values the guard cannot read, so its literal runs are the least it holds.
+        bound = "" if len(longest) == 1 else "at least "
+        detail = f"{part_name} is {bound}{_shape_length(shape=longest)} characters long, more than {MAX_MESSAGE_LENGTH}"
+        breaches.append(RuleBreach(rule=LogCallRule.LENGTH, detail=detail))
+    return breaches
 
 
 # --------------------------------------------------------------------------------------
@@ -1573,13 +1816,13 @@ class _LogCallCollector(ast.NodeVisitor):
         The receiver's name is the facade when a binding that can reach the call imports the facade, under whatever
         name or module path: a parameter or a local of that name, or an import made in another function, is not.
         """
-        if not isinstance(node.func, ast.Attribute) or node.func.attr not in MARKUP_BOUND_METHODS:
+        if not isinstance(node.func, ast.Attribute) or node.func.attr not in EMITTING_METHODS:
             return None
         receiver = _receiver_root(expr=node.func.value)
         if receiver is None:
             return None
         root, attributes = receiver
-        for binding in self._index.receiver_bindings(node=root, scope=self._index.call_scopes[node]):
+        for binding in self._index.possible_bindings(node=root, scope=self._index.call_scopes[node]):
             if binding.import_path is not None and ".".join([binding.import_path, *attributes]) in FACADE_PATHS:
                 return node.func.attr
         return None
@@ -1587,22 +1830,35 @@ class _LogCallCollector(ast.NodeVisitor):
     def _check_call(self, *, node: ast.Call, method: str) -> None:
         scope = self._index.call_scopes[node]
         parts, unread_expansions = message_parts_of(call=node)
+        is_info_and_above = method in INFO_AND_ABOVE_METHODS
 
         trace: set[str] = set()
         reader = _MessageReader(index=self._index, trace=trace)
-        # A `**` expansion the guard cannot read may carry the message or a title, so neither rule can be checked.
+        # A `**` expansion the guard cannot read may carry the message or a title, so no rule can be checked through it.
         breaches = [
             RuleBreach(rule=LogCallRule.NON_LITERAL, detail=f"`**{_short_source(expr=expansion)}` is an expansion whose keywords cannot be read")
             for expansion in unread_expansions
         ]
-        if method in INTERPOLATION_BOUND_METHODS:
+        if is_info_and_above:
             for label, expr in parts:
                 form = reader.form(expr=expr, scope=scope, seen=frozenset(), allows_none=label is not None)
                 if form is not None:
                     breaches.append(RuleBreach(rule=form.rule, detail=f"{_part_name(label=label)} is {form.detail}"))
         for label, expr in parts:
-            for tag in markup_tags_of(shapes=reader.shapes(expr=expr, scope=scope, seen=frozenset())):
-                breaches.append(RuleBreach(rule=LogCallRule.MARKUP, detail=f"{_part_name(label=label)} holds the markup tag `{tag}`"))
+            part_name = _part_name(label=label)
+            shapes = reader.shapes(expr=expr, scope=scope, seen=frozenset())
+            for tag in markup_tags_of(shapes=shapes):
+                breaches.append(RuleBreach(rule=LogCallRule.MARKUP, detail=f"{part_name} holds the markup tag `{tag}`"))
+            breaches.extend(wording_breaches(shapes=shapes, part_name=part_name, is_info_and_above=is_info_and_above))
+            # Only the bindings a spliced exception is reached through join the trace: they are what that rule read.
+            spliced_sources: list[str] = []
+            for splice in reader.spliced_exceptions(expr=expr, scope=scope, seen=frozenset()):
+                trace.update(splice.route)
+                if splice.source not in spliced_sources:
+                    spliced_sources.append(splice.source)
+            breaches.extend(
+                RuleBreach(rule=LogCallRule.SPLICED_EXCEPTION, detail=f"{part_name} splices the exception `{source}`") for source in spliced_sources
+            )
 
         if not breaches:
             return

@@ -290,7 +290,7 @@ def derive_binding(*, path: str, root: BindingRoot, resolver: ConceptWalkResolve
         if current_leaf_field is not None:
             msg = (
                 f"Cannot bind '{path}': '{reached_path}' is {current_leaf_field.value_kind.leaf_description}, a leaf holding a plain value "
-                f"with no fields, so the segment '{segment_name}' cannot follow it. It has no fields."
+                f"with no fields, so the segment '{segment_name}' cannot follow it."
             )
             raise BindingPathUnresolvedError(msg, path=path, failed_segment=segment_name, available_fields=[])
         if current_concept is None:
@@ -300,13 +300,13 @@ def derive_binding(*, path: str, root: BindingRoot, resolver: ConceptWalkResolve
             case ConceptShape.VALUE:
                 msg = (
                     f"Cannot bind '{path}': '{reached_path}' holds a '{current_concept.concept_ref}', which {current_concept.shape_reason}, "
-                    f"so it is a leaf and the segment '{segment_name}' cannot follow it. It has no fields to walk."
+                    f"so it is a leaf and the segment '{segment_name}' cannot follow it."
                 )
                 raise BindingPathUnresolvedError(msg, path=path, failed_segment=segment_name, available_fields=[])
             case ConceptShape.NO_STRUCTURE:
                 msg = (
                     f"Cannot bind '{path}': '{reached_path}' holds a '{current_concept.concept_ref}', which {current_concept.shape_reason}, "
-                    f"so the segment '{segment_name}' has no structure to walk. It has no fields."
+                    f"so the segment '{segment_name}' has no structure to walk."
                 )
                 raise BindingPathUnresolvedError(msg, path=path, failed_segment=segment_name, available_fields=[])
             case ConceptShape.STRUCTURE:

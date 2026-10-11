@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Callable
 
 from pipelex.kernel.prompt_references import DocumentReferenceKind
-from pipelex.pipe_operators.llm.template_document_analyzer import TemplateDocumentAnalyzer
+from pipelex.pipe_operators.shared.template_document_analyzer import TemplateDocumentAnalyzer
 
 
 class TestTemplateDocumentAnalyzer:

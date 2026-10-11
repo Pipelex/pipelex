@@ -3,6 +3,7 @@ from pipelex.plugins.pipe_func_executor_registry import DIRECT_PIPE_FUNC_EXECUTI
 from pipelex.runtime_hub import get_optional_config, get_required_config
 from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.environment import get_optional_env
+from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 
 METHODS_FETCH_ON_MISS_ENV_VAR = "PIPELEX_METHODS_FETCH_ON_MISS"
 
@@ -51,8 +52,8 @@ def is_method_fetch_on_miss_enabled() -> bool:
         if normalized in _ENV_FALSY:
             return False
         log.warning(
-            "An environment variable holds no recognized boolean (1/0, true/false, yes/no, on/off), so it is ignored and the config decides",
-            fields={"env_var": METHODS_FETCH_ON_MISS_ENV_VAR},
+            "An environment variable holding no recognized boolean was ignored",
+            fields={"env_var": METHODS_FETCH_ON_MISS_ENV_VAR, USER_ACTION_FIELD: "Set it to 1 or 0, true or false, yes or no, or on or off"},
         )
     optional_config = get_optional_config()
     if not isinstance(optional_config, PipelexConfig):

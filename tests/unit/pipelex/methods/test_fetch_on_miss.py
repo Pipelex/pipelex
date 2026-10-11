@@ -19,6 +19,7 @@ from pipelex.methods.exceptions import (
 from pipelex.methods.fetch_on_miss import resolve_address_based_method
 from pipelex.methods.fetching import FetchedMethodPackage, MethodProvenance
 from pipelex.methods.method_ref import parse_method_ref
+from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -224,10 +225,17 @@ class TestResolveAddressBasedMethod:
         resolved = resolve_address_based_method(full_address=FULL_ADDRESS)
 
         assert (resolved.path / "structures.py").is_file()
-        structures_warnings = [call for call in warning_spy.call_args_list if "hosted execution refuses them" in call.args[0]]
+        structures_warnings = [
+            call
+            for call in warning_spy.call_args_list
+            if call.args[0] == "A fetched method declares Python structure classes, which hosted runs refuse"
+        ]
         assert len(structures_warnings) == 1
-        assert "declare these types as MTHDS concepts" in structures_warnings[0].args[0]
-        assert structures_warnings[0].kwargs["fields"] == {"package_address": FULL_ADDRESS, "structure_classes": "structures.py defines Invoice"}
+        assert structures_warnings[0].kwargs["fields"] == {
+            "package_address": FULL_ADDRESS,
+            "structure_classes": "structures.py defines Invoice",
+            USER_ACTION_FIELD: "Declare these types as MTHDS concepts with inline structures",
+        }
 
     @pytest.mark.usefixtures("isolated_methods_dirs")
     def test_fetched_provenance_records_the_bare_address_fetch(self, tmp_path: Path, mocker: MockerFixture) -> None:

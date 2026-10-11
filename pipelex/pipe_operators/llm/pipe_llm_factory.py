@@ -15,8 +15,7 @@ from pipelex.pipe_operators.llm.exceptions import PipeLLMFactoryError
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
-from pipelex.pipe_operators.llm.template_document_analyzer import TemplateDocumentAnalyzer
-from pipelex.pipe_operators.shared.template_image_analyzer import TemplateImageAnalyzer
+from pipelex.pipe_operators.shared.template_file_references import analyze_template_file_references
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
 
@@ -90,61 +89,26 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         # Template analyzers read the slot grammar only, so they get the concept-spec projection.
         blueprint_input_specs = blueprint.inputs_concept_specs or {}
 
-        # Analyze template for image references
-        user_image_references = None
-        if blueprint.prompt and blueprint.inputs:
-            user_image_references = (
-                TemplateImageAnalyzer.analyze_template_for_images(
-                    template_source=blueprint.prompt,
-                    input_specs=blueprint_input_specs,
-                    domain_code=domain_code,
-                )
-                or None
-            )
-
-        # Analyze template for document references
-        user_document_references = None
-        if blueprint.prompt and blueprint.inputs:
-            user_document_references = (
-                TemplateDocumentAnalyzer.analyze_template_for_documents(
-                    template_source=blueprint.prompt,
-                    input_specs=blueprint_input_specs,
-                    domain_code=domain_code,
-                )
-                or None
-            )
-
-        # Analyze system prompt for image references
-        system_image_references = None
-        if blueprint.system_prompt and blueprint.inputs:
-            system_image_references = (
-                TemplateImageAnalyzer.analyze_template_for_images(
-                    template_source=blueprint.system_prompt,
-                    input_specs=blueprint_input_specs,
-                    domain_code=domain_code,
-                )
-                or None
-            )
-
-        # Analyze system prompt for document references
-        system_document_references = None
-        if blueprint.system_prompt and blueprint.inputs:
-            system_document_references = (
-                TemplateDocumentAnalyzer.analyze_template_for_documents(
-                    template_source=blueprint.system_prompt,
-                    input_specs=blueprint_input_specs,
-                    domain_code=domain_code,
-                )
-                or None
-            )
+        # The user and system prompts are analyzed apart, each keeping its own references; the assembly
+        # registers the system prompt's first and numbers both prompts' files in one sequence.
+        user_files = (
+            analyze_template_file_references(template_source=blueprint.prompt, input_specs=blueprint_input_specs, domain_code=domain_code)
+            if blueprint.prompt and blueprint.inputs
+            else None
+        )
+        system_files = (
+            analyze_template_file_references(template_source=blueprint.system_prompt, input_specs=blueprint_input_specs, domain_code=domain_code)
+            if blueprint.system_prompt and blueprint.inputs
+            else None
+        )
 
         llm_prompt_spec = LLMPromptBlueprint(
             system_prompt_blueprint=system_prompt_jinja2_blueprint,
             prompt_blueprint=user_text_jinja2_blueprint,
-            user_image_references=user_image_references,
-            user_document_references=user_document_references,
-            system_image_references=system_image_references,
-            system_document_references=system_document_references,
+            user_image_references=(user_files.image_references or None) if user_files else None,
+            user_document_references=(user_files.document_references or None) if user_files else None,
+            system_image_references=(system_files.image_references or None) if system_files else None,
+            system_document_references=(system_files.document_references or None) if system_files else None,
         )
 
         llm_choices = LLMSettingChoices(

@@ -12,6 +12,7 @@ from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.models.model_reference import ModelReferenceKind
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.system.runtime import ProblemReaction
+from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 
 
 def _make_deck() -> ModelDeck:
@@ -65,10 +66,12 @@ class TestModelDeckAmbiguousBareHandle:
 
         assert setting.model == "twin"
         warning.assert_called_once()
+        assert warning.call_args.args == ("An ambiguous bare model name was read as a direct model handle",)
         assert warning.call_args.kwargs["fields"] == {
             "model_handle": "twin",
             "model_type": ModelType.LLM,
             "matching_reference_kinds": [ModelReferenceKind.PRESET, ModelReferenceKind.ALIAS],
+            USER_ACTION_FIELD: "Prefix the name with $ or preset: for a preset, @ or alias: for an alias, ~ or waterfall: for a waterfall",
         }
 
     def test_a_bare_name_that_names_nothing_else_is_not_warned_about(self, mocker: MockerFixture) -> None:

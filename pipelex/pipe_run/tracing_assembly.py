@@ -169,7 +169,7 @@ def _assemble_tracing_events(
                 event_log.close()
     except (OSError, json.JSONDecodeError, ValidationError, PipelexConfigError, MissingDependencyError, EventLogError) as read_error:
         message = f"Tracing assembly failed to read events for pipeline_run_id={pipeline_run_id}: {read_error}"
-        log.warning("Tracing assembly could not read the run's trace events", fields=error_fields(exc=read_error))
+        log.warning("The trace events of a run could not be read for its tracing assembly", fields=error_fields(exc=read_error))
         if assemble_graph:
             result.graph_assembly_error = message
         if assemble_usage:

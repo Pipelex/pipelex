@@ -743,7 +743,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 self.class_registry.teardown()
             func_registry.teardown()
 
-            log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done (except config & logs)")
+            log.verbose(f"The {PACKAGE_NAME} {PACKAGE_VERSION} runtime was torn down, except its config and logs")
         finally:
             # The runtime hub releases its process-global config and boot-scoped flags. ``class_registry_scoping``
             # is reset here

@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 from pydantic import ValidationError
 
@@ -28,7 +30,10 @@ class TestSubPipeBlueprint:
                 nb_output=3,
                 multiple_output=True,
             )
-        assert "PipeStepBlueprint should have no more than '1' of nb_output or multiple_output" in str(exc_info.value)
+        assert "The step running pipe 'process' carries both `nb_output` and `multiple_output`: a step sets at most one of them." in str(
+            exc_info.value
+        )
+        assert "PipeStepBlueprint" not in str(exc_info.value)
 
     def test_validate_batch_params_correct(self):
         blueprint = SubPipeBlueprint(pipe="process")
@@ -49,24 +54,60 @@ class TestSubPipeBlueprint:
                 pipe="process",
                 batch_over="items",
             )
-        assert "When 'batch_over' is specified, 'batch_as' must also be provided" in str(exc_info.value)
+        assert "The step running pipe 'process' carries `batch_over` without `batch_as`:" in str(exc_info.value)
 
         with pytest.raises(ValidationError) as exc_info:
             SubPipeBlueprint(
                 pipe="process",
                 batch_as="item",
             )
-        assert "When 'batch_as' is specified, 'batch_over' must also be provided" in str(exc_info.value)
+        assert "The step running pipe 'process' carries `batch_as` without `batch_over`:" in str(exc_info.value)
 
     def test_rejects_batch_over_same_as_batch_as(self):
         """SubPipeBlueprint rejects batch_as == batch_over."""
-        with pytest.raises(ValidationError, match="batch_as"):
+        with pytest.raises(ValidationError) as exc_info:
             SubPipeBlueprint(
                 pipe="process_item",
                 result="processed",
                 batch_over="items",
                 batch_as="items",
             )
+
+        refusal = exc_info.value.errors()[0].get("ctx", {}).get("error")
+        assert isinstance(refusal, PipeValidationError)
+        assert refusal.error_type == PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+        assert "The `batch_as` of the step running pipe 'process_item' is 'items', the same name as its `batch_over`:" in str(refusal)
+
+    @pytest.mark.parametrize(
+        "blueprint_fields",
+        [
+            pytest.param({"nb_output": 3, "multiple_output": True}, id="both-counts"),
+            pytest.param({"batch_over": "items"}, id="batch-over-alone"),
+            pytest.param({"batch_as": "item"}, id="batch-as-alone"),
+            pytest.param({"batch_over": "items", "batch_as": "items"}, id="batch-as-is-batch-over"),
+            pytest.param({"batch_over": "catalog..pages", "batch_as": "page"}, id="a-dotted-batch-over-that-is-not-a-path"),
+        ],
+    )
+    def test_a_refusal_names_the_step_never_its_pipe_as_the_faulty_one(self, blueprint_fields: dict[str, Any]) -> None:
+        """The faulty fields belong to the step, held by the sequence or parallel the error locates, not to the pipe the step runs."""
+        with pytest.raises(ValidationError) as exc_info:
+            SubPipeBlueprint.model_validate({"pipe": "write_index_line", **blueprint_fields})
+
+        message = str(exc_info.value)
+        assert "the step running pipe 'write_index_line'" in message.lower()
+        assert "In pipe" not in message
+
+    def test_a_dotted_batch_over_that_is_not_a_path_is_named_on_its_step(self) -> None:
+        with pytest.raises(ValidationError) as exc_info:
+            SubPipeBlueprint(pipe="write_index_line", batch_over="catalog..pages", batch_as="page")
+
+        refusal = exc_info.value.errors()[0].get("ctx", {}).get("error")
+        assert isinstance(refusal, PipeValidationError)
+        assert refusal.error_type == PipeValidationErrorType.BINDING_STEP_INVALID
+        assert refusal.variable_names == ["catalog..pages"]
+        assert str(refusal).startswith(
+            "The dotted `batch_over` 'catalog..pages' of the step running pipe 'write_index_line' is not a path. A dotted `batch_over` binds"
+        )
 
     @pytest.mark.parametrize(
         "stored_name",

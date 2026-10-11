@@ -174,3 +174,17 @@ def taint_after_write(*, prior_taint: SlotTaint | None, memory_write: MemoryWrit
     if memory_write.is_always_written:
         return None
     return prior_taint
+
+
+def write_after_lift(*, memory_write: MemoryWrite, lift_taint: SlotTaint) -> MemoryWrite:
+    """What a pipe that may be lifted stores under one name, joining the lift with a run, since the pipe may also run.
+
+    The lift resolves a name the pipe always stores to an absence, which `lift_taint` describes, or to an empty list for a
+    list (`PipeAbstract.lifted_companion_slots`), so such a single name may hold an absence, and a list never does. The lift
+    leaves a name only some runs store as it was, as a run that does not store it does, so that write stands as runs make it.
+    """
+    if not memory_write.is_always_written:
+        return memory_write
+    if memory_write.stuff_spec is not None and memory_write.stuff_spec.is_multiple():
+        return memory_write
+    return memory_write.model_copy(update={"absence": lift_taint})

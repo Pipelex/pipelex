@@ -1,0 +1,20 @@
+domain      = "roof_inspection"
+description = "Rating the condition of a roof from an inspector's site note"
+main_pipe   = "rate_roof_condition"
+
+[pipe.rate_roof_condition]
+type = "PipeJudge"
+description = "Rates the condition of a roof on a labelled scale"
+inputs = { site_note = "Text" }
+output = "Rating"
+model = "@default-judgment"
+prompt = """
+An inspector's note from a roof survey:
+@site_note
+"""
+question = "What condition is this roof in?"
+levels = [
+  { label = "Sound", description = "No repair is needed before the next survey" },
+  { label = "Worn", description = "Some tiles or flashing need repair within the year" },
+  { label = "Failing", description = "Water is getting in, or will at the next storm" },
+]

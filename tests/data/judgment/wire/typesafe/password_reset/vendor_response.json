@@ -1,0 +1,42 @@
+{
+  "status": 200,
+  "body": {
+    "model": "jev-1.13.0",
+    "answers": {
+      "urgent": {
+        "type": "noul",
+        "noul": 0.21
+      },
+      "team": {
+        "type": "choice",
+        "choice": "accounts",
+        "confidence": 1.0,
+        "probabilities": {
+          "payments": 0.0,
+          "shipping": 0.0,
+          "accounts": 1.0,
+          "other": 0.0
+        }
+      },
+      "severity": {
+        "type": "score",
+        "score": 1.42,
+        "confidence": 0.36,
+        "legend": {
+          "0": "Cosmetic: Appearance only; no lost functionality",
+          "1": "Workaround available: A task fails, but another way works",
+          "2": "Fully blocked: A task fails with no workaround"
+        },
+        "probabilities": {
+          "0": 0.0,
+          "1": 0.58,
+          "2": 0.42
+        }
+      }
+    },
+    "usage": {
+      "input_tokens": 503,
+      "output_tokens": 75
+    }
+  }
+}

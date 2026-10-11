@@ -1214,6 +1214,12 @@
       "default": true,
       "open_node": false
     },
+    "runtime.log.rich_log.is_show_path": {
+      "value_type": "bool",
+      "required": true,
+      "default": false,
+      "open_node": false
+    },
     "runtime.log.rich_log.is_show_time": {
       "value_type": "bool",
       "required": true,

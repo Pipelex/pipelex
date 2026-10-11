@@ -46,7 +46,7 @@ from pipelex.cogt.image.prompt_image import PromptImageUri
 from pipelex.cogt.img_gen.img_gen_job_factory import ImgGenJobFactory
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.inference_call_summary import INFERENCE_CALL_ENDS_MESSAGE, InferenceOperation
-from pipelex.cogt.judgment.judgment_models import JudgmentAnswer, YesNoAnswer, YesNoQuestion
+from pipelex.cogt.judgment.judgment_models import JudgmentOutcome, YesNoAnswer, YesNoQuestion
 from pipelex.cogt.judgment.judgment_worker_abstract import JudgmentWorkerAbstract
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobParams
@@ -216,7 +216,7 @@ class _StandInJudgmentWorker(JudgmentWorkerAbstract):
         JudgmentWorkerAbstract.__init__(self, inference_model=_model(model_type=ModelType.JUDGMENT, name="judge-test", model_id="judge-test-2026"))
 
     @override
-    async def _judge(self, judgment_job: JudgmentJob) -> dict[str, JudgmentAnswer]:
+    async def _judge(self, judgment_job: JudgmentJob) -> dict[str, JudgmentOutcome]:
         _record_usage(tokens_usage=judgment_job.job_report.judgment_tokens_usage, usage=OTHER_USAGE)
         return {"is_urgent": YesNoAnswer(yes_no=True)}
 
@@ -685,8 +685,8 @@ class TestInferenceCallSummary:
                 await _StandInLLMWorker(error=LLMCompletionError(message="provider refused")).gen_text(llm_job=_llm_job())
 
         succeeded, failed = _summaries(caplog)
-        assert rendered_text(record=succeeded).plain == "🧠: gpt-test chat · 1,200 → 300 tokens · $0.0018 · done in 1.25 s"
-        assert rendered_text(record=failed).plain == "🧠: gpt-test chat · failed after 1.25 s error.type=LLMCompletionError"
+        assert rendered_text(record=succeeded).plain == "gpt-test chat · 1,200 → 300 tokens · $0.0018 · done in 1.25 s"
+        assert rendered_text(record=failed).plain == "gpt-test chat · failed after 1.25 s error.type=LLMCompletionError"
 
     @pytest.mark.parametrize(("refuse_call", "refusal_type", "operation"), REFUSAL_CASES, ids=REFUSAL_IDS)
     @pytest.mark.asyncio
@@ -738,7 +738,7 @@ class TestInferenceCallSummary:
         fields = _fields(record)
         assert (fields["outcome"], fields["duration_ms"]) == ("cancelled", DURATION_MS)
         assert "error.type" not in fields
-        assert rendered_text(record=record).plain == "🧠: gpt-test chat · cancelled after 1.25 s"
+        assert rendered_text(record=record).plain == "gpt-test chat · cancelled after 1.25 s"
 
     @pytest.mark.parametrize("provider_error", [None, LLMCompletionError(message="provider refused")], ids=["the call succeeds", "the call fails"])
     @pytest.mark.asyncio

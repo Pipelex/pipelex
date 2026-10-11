@@ -12,9 +12,9 @@ Plural slots are never tainted (D4): a skipped plural output normalizes to an em
 batched step compacts absent branch results, so a list slot is always guaranteed (possibly empty).
 
 The walk logic itself lives on the controllers (`PipeSequence.analyze_taint`,
-`PipeParallel.analyze_branch_taint`); this module holds the shared value objects and the
-presence-resolution helper so the pipeline layer (liftable-pipe inventory) can consume the
-same shapes without importing controller internals. `SlotTaint` itself lives in
+`PipeParallel.analyze_branch_taint`, `PipeCondition.analyze_outcome_taint`); this module holds
+the shared value objects and the presence-resolution helpers so the pipeline layer
+(liftable-pipe inventory) can consume the same shapes without importing controller internals. `SlotTaint` itself lives in
 `pipelex.pipe_machinery.memory_writes`, beside the model of what a nested controller stores in
 its caller's memory, which carries it.
 """
@@ -77,6 +77,14 @@ class ParallelTaintAnalysis:
     force_consumptions: tuple[ForceConsumptionInfo, ...] = ()
 
 
+@dataclass(frozen=True)
+class ConditionTaintAnalysis:
+    """Result of the taint walk over a PipeCondition's outcomes: which outcome its own `?` inputs may lift."""
+
+    liftable_steps: tuple[LiftableStepInfo, ...]
+    force_consumptions: tuple[ForceConsumptionInfo, ...] = ()
+
+
 class TaintTriggerScan(NamedTuple):
     """How a pipe consumes the currently tainted slots: the plain-consumed (lift-trigger)
     variable names, the first trigger's taint (for provenance chaining), and the `!`
@@ -88,6 +96,19 @@ class TaintTriggerScan(NamedTuple):
     trigger_taint: SlotTaint | None
     asserting_force_names: tuple[str, ...] = ()
     redundant_force_names: tuple[str, ...] = ()
+
+
+def optional_input_taints(*, pipe: PipeAbstract) -> dict[str, SlotTaint]:
+    """The slots a controller's own frame may find absent: each single input it declares optional (`?`).
+
+    An input it declares plain or `!` is present inside it, since an absence there lifts the controller or fails it at its
+    boundary, and a list input is never absent (D4).
+    """
+    return {
+        input_name: SlotTaint(source=f"optional input '{input_name}' of pipe '{pipe.code}'", origin_slot_name=input_name)
+        for input_name, stuff_spec in pipe.inputs.root.items()
+        if stuff_spec.presence.is_optional and not stuff_spec.is_multiple()
+    }
 
 
 def scan_taint_triggers(pipe: PipeAbstract, *, slot_taints: dict[str, SlotTaint], visited_pipes: set[str] | None = None) -> TaintTriggerScan:

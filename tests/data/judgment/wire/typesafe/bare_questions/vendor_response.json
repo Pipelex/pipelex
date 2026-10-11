@@ -1,0 +1,41 @@
+{
+  "status": 200,
+  "body": {
+    "model": "jev-1.13.0",
+    "answers": {
+      "refund": {
+        "type": "noul",
+        "noul": 0.99
+      },
+      "tone": {
+        "type": "choice",
+        "choice": "calm",
+        "confidence": 0.98,
+        "probabilities": {
+          "calm": 0.99,
+          "angry": 0.01,
+          "anxious": 0.0
+        }
+      },
+      "priority": {
+        "type": "score",
+        "score": 1.71,
+        "confidence": 0.58,
+        "legend": {
+          "0": "Low",
+          "1": "Normal",
+          "2": "High"
+        },
+        "probabilities": {
+          "0": 0.0,
+          "1": 0.28,
+          "2": 0.72
+        }
+      }
+    },
+    "usage": {
+      "input_tokens": 388,
+      "output_tokens": 73
+    }
+  }
+}

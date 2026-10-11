@@ -557,7 +557,7 @@ class TestMigrationRunner:
         assert stale_backup.exists()
         # The warning names the file and the backup just taken, and carries the system's reason alone, the paths being fields.
         warning_mock.assert_called_once_with(
-            "A change to a configuration file was backed up, but an older backup of the file could not be pruned",
+            "An older backup of a configuration file could not be pruned",
             fields={
                 "file.path": str(target),
                 "backup_path": str(plan.backup_path),

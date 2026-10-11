@@ -182,7 +182,7 @@ async def _validate_bundles_in_scope(
                 # As fields and no traceback: the validation error is chained onto this one, so its traceback would
                 # print the validation error's text, which can quote the bundle, and which its own catcher reports.
                 log.error(
-                    "The teardown of the validation library also failed after the validation failed; the original error is raised",
+                    "The validation library could not be torn down after the validation failed",
                     fields={"caller": log_context, "library_id": validation_library_id, **error_fields(exc=teardown_error)},
                 )
     return build_validation_report(

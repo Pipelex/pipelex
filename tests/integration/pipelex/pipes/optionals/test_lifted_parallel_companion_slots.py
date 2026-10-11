@@ -7,6 +7,7 @@ static taint pass blessed meets a neither-value-nor-record hard miss at its gate
 from typing import Callable, cast
 
 import pytest
+from pytest_mock import MockerFixture
 
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -14,12 +15,14 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.interpreter_hub import get_pipe_library
+from pipelex.interpreter_hub import get_optional_pipe, get_pipe_library
+from pipelex.pipe_controllers.parallel import pipe_parallel as parallel_module
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
+from pipelex.pipe_machinery.pipe_abstract import CompanionSlot, PipeAbstract
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
@@ -123,7 +126,6 @@ def _build_sequence_with_liftable_parallel() -> PipeSequence:
     return sequence
 
 
-@pytest.mark.asyncio(loop_scope="class")
 class TestLiftedParallelCompanionSlots:
     @classmethod
     def setup_class(cls):
@@ -136,6 +138,7 @@ class TestLiftedParallelCompanionSlots:
             if func_registry.has_function(func.__name__):
                 func_registry.unregister_function_by_name(func.__name__)
 
+    @pytest.mark.asyncio(loop_scope="class")
     async def test_lifted_parallel_resolves_branch_slots(self, job_metadata: JobMetadata, load_empty_library: Callable[[], str]):
         """Static validation blesses the flow AND the runtime resolves every branch slot on lift:
         singular → SKIPPED record with provenance; plural → empty list. The absorbing sink runs.
@@ -175,3 +178,34 @@ class TestLiftedParallelCompanionSlots:
         many_out_content = many_out_stuff.content
         assert isinstance(many_out_content, ListContent)
         assert cast("ListContent[TextContent]", many_out_content).items == []
+
+    def test_companion_slots_are_what_the_parallel_always_stores(self, load_empty_library: Callable[[], str], mocker: MockerFixture):
+        """Regression: the slots a lifted parallel resolves are the names its `memory_writes` always stores, which the caller's
+        analyses read, a branch whose pipe does not resolve included: its slot is resolved absent, being of no known spec.
+        """
+        load_empty_library()
+        sequence = _build_sequence_with_liftable_parallel()
+        sequence.validate_with_libraries()
+        parallel = get_pipe_library().get_required_pipe(pipe_code="test_optionals_companion.comp_parallel")
+        assert isinstance(parallel, PipeParallel)
+
+        def get_optional_pipe_but_comp_find(*, pipe_code: str) -> PipeAbstract | None:
+            if pipe_code.endswith("comp_find"):
+                return None
+            return get_optional_pipe(pipe_code=pipe_code)
+
+        mocker.patch.object(parallel_module, "get_optional_pipe", side_effect=get_optional_pipe_but_comp_find)
+
+        companion_slots = parallel.lifted_companion_slots()
+
+        always_written_names = {name for name, memory_write in parallel.memory_writes().items() if memory_write.is_always_written}
+        assert {companion_slot.slot_name for companion_slot in companion_slots} == always_written_names == {"a_out", "many_out"}
+        assert sorted(companion_slots) == [
+            CompanionSlot(slot_name="a_out", concept=None, is_plural=False, producing_pipe_code="test_optionals_companion.comp_find"),
+            CompanionSlot(
+                slot_name="many_out",
+                concept=get_pipe_library().get_required_pipe(pipe_code="test_optionals_companion.comp_find_many").output.concept,
+                is_plural=True,
+                producing_pipe_code="comp_find_many",
+            ),
+        ]

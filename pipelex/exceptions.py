@@ -47,7 +47,6 @@ from pipelex.pipeline.exceptions import (
     PipeStackOverflowError,
 )
 from pipelex.system.exceptions import (
-    ConfigModelError,
     ConfigValidationError,
     CredentialsError,
     FatalError,
@@ -119,5 +118,4 @@ __all__ = [
     "FatalError",
     "MissingDependencyError",
     "ConfigValidationError",
-    "ConfigModelError",
 ]

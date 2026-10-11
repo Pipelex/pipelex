@@ -94,7 +94,7 @@ To run methods on it from the `pipelex` CLI, give its origin, without `/v1`, to 
 
 ## Authentication
 
-The API supports three authentication modes via the `AUTH_MODE` environment variable:
+The `AUTH_MODE` environment variable selects how the API authenticates its callers, with one of the modes below. An unset or empty `AUTH_MODE` means `none`. Any other value must spell a mode exactly as written here, lowercase included, or the server refuses to start with an error naming the valid modes: a mistyped mode never serves the API without the authentication it asked for.
 
 ### No Authentication (Default)
 

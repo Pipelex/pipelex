@@ -1,7 +1,7 @@
 """Single-pass controller taint collection shared by the validate-report projections.
 
-The absence-taint walk (`PipeSequence.analyze_taint`, `PipeParallel.analyze_branch_taint`)
-hub-resolves every sub-pipe and recurses through nested controllers, so it must run exactly
+The absence-taint walk (`PipeSequence.analyze_taint`, `PipeParallel.analyze_branch_taint`,
+`PipeCondition.analyze_outcome_taint`) hub-resolves every sub-pipe and recurses through nested controllers, so it must run exactly
 once per validate pass. Both report projections — the `liftable_pipes` inventory and the
 `warnings` optionality lints — consume the same analyses; callers collect them here and feed
 the list to both builders instead of each builder re-walking the pipes.
@@ -13,12 +13,13 @@ the hub.
 from collections.abc import Sequence
 from typing import TypeAlias
 
-from pipelex.pipe_controllers.absence_taint import ParallelTaintAnalysis, SequenceTaintAnalysis
+from pipelex.pipe_controllers.absence_taint import ConditionTaintAnalysis, ParallelTaintAnalysis, SequenceTaintAnalysis
+from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 
-ControllerTaintAnalysis: TypeAlias = SequenceTaintAnalysis | ParallelTaintAnalysis
+ControllerTaintAnalysis: TypeAlias = SequenceTaintAnalysis | ParallelTaintAnalysis | ConditionTaintAnalysis
 
 
 def collect_controller_taint_analyses(pipes: Sequence[PipeAbstract]) -> list[ControllerTaintAnalysis]:
@@ -36,4 +37,6 @@ def collect_controller_taint_analyses(pipes: Sequence[PipeAbstract]) -> list[Con
             analyses.append(pipe.analyze_taint())
         elif isinstance(pipe, PipeParallel):
             analyses.append(pipe.analyze_branch_taint())
+        elif isinstance(pipe, PipeCondition):
+            analyses.append(pipe.analyze_outcome_taint())
     return analyses

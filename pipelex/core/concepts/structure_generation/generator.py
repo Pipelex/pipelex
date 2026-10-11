@@ -12,6 +12,8 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.resolved_fields import ResolvedField, ResolvedType, ResolvedTypeKind, resolve_structure_fields
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError, ConceptStructureValidationError, SyntaxErrorData
 from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.core.stuffs import non_null_any
+from pipelex.core.stuffs.non_null_any import NonNullAny
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.system.registries.class_registry_access import get_class_registry
 
@@ -19,6 +21,10 @@ from pipelex.system.registries.class_registry_access import get_class_registry
 # Each emitted line stays under this so ruff E501 doesn't trigger on long descriptions.
 _MAX_LINE_LENGTH = 150
 _WRAP_WIDTH = 120  # conservative: leaves headroom for indentation and syntax overhead
+
+# The annotation of an open field that never holds nothing, imported by name in the generated code.
+_NON_NULL_ANY_MODULE = non_null_any.__name__
+_NON_NULL_ANY_NAME = "NonNullAny"
 
 
 class StructureGenerator:
@@ -291,16 +297,25 @@ class StructureGenerator:
         """Render one Python field definition from a neutral resolved field."""
         python_type = self._python_type_from_resolved(resolved_field.resolved_type)
 
-        # Make optional if not required. A concept ref renders as a *quoted* forward reference (this
-        # module, unlike the codegen emitters, has no `from __future__ import annotations`), and
-        # `"Foo" | None` is a TypeError at runtime — str doesn't implement `|`. Fold the union inside
-        # the quotes so the whole annotation stays one deferred expression for model_rebuild to eval.
-        # Only a *bare* quoted ref needs this: `list["Foo"] | None` is a real GenericAlias and works.
-        if not resolved_field.required:
+        # Only a field that may hold nothing admits `None`: by the standard's rule, one that is neither
+        # required nor defaulted. A binding step reading a field derives its absence from that rule alone,
+        # so a required or defaulted field holding `None` would be an absence its readers ruled out — a
+        # defaulted field is therefore `X = Field(default=…)`, and an explicit `null` for it is refused
+        # rather than kept. A concept ref renders as a *quoted* forward reference (this module, unlike
+        # the codegen emitters, has no `from __future__ import annotations`), and `"Foo" | None` is a
+        # TypeError at runtime — str doesn't implement `|`. Fold the union inside the quotes so the whole
+        # annotation stays one deferred expression for model_rebuild to eval. Only a *bare* quoted ref
+        # needs this: `list["Foo"] | None` is a real GenericAlias and works.
+        if resolved_field.may_hold_nothing:
             if python_type.startswith('"') and python_type.endswith('"'):
                 python_type = f'"{python_type[1:-1]} | None"'
             else:
                 python_type = f"{python_type} | None"
+        elif python_type == "Any":
+            # `Any` admits `None` by itself, so an open field that never holds nothing (one naming
+            # `native.Anything`, or of an unspecified type) takes the annotation that refuses it.
+            self.imports.add(f"from {_NON_NULL_ANY_MODULE} import {_NON_NULL_ANY_NAME}")
+            python_type = _NON_NULL_ANY_NAME
 
         # Generate Field parameters (default/... first, then description)
         field_params = [self._format_field_description(resolved_field.description)]
@@ -414,6 +429,7 @@ class StructureGenerator:
             "Any": Any,
             "Literal": Literal,
             "Field": Field,
+            _NON_NULL_ANY_NAME: NonNullAny,
         }
 
         # Add all native content classes to exec_globals so they're available during validation

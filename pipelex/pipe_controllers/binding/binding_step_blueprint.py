@@ -24,6 +24,38 @@ PATH_GRAMMAR_DESCRIPTION = (
 _RESULT_GRAMMAR = f"a plain input name, a snake_case identifier matching `{SNAKE_CASE_IDENTIFIER_REGEX}`"
 
 
+# The pipe-step fields a binding step may carry by mistake, by the remedy their refusal proposes.
+_BATCH_FIELDS = frozenset({"batch_over", "batch_as"})
+_COUNT_FIELDS = frozenset({"nb_output", "multiple_output"})
+
+
+def _joined_with_or(*, field_names: list[str]) -> str:
+    """The field names quoted and joined in prose: "`a`", "`a` or `b`", "`a`, `b` or `c`"."""
+    quoted_names = [f"`{field_name}`" for field_name in field_names]
+    if len(quoted_names) == 1:
+        return quoted_names[0]
+    return f"{', '.join(quoted_names[:-1])} or {quoted_names[-1]}"
+
+
+def _batch_remedy(*, from_path: Any, result: Any) -> str:
+    """How to batch over what a binding step carrying batch fields binds: a dotted `batch_over` binds a path, a plain one reads a name.
+
+    Either way, the step can stay a binding step, the next pipe step batching over what it binds, under its own `result` when it
+    carries one.
+    """
+    bound_name = result if isinstance(result, str) else "<name>"
+    keep_binding = f'Or keep this step as `{{ from = "{from_path}", result = "{bound_name}" }}` and batch over `{bound_name}` in the next pipe step.'
+    if isinstance(from_path, str) and "." in from_path:
+        return (
+            f'To batch over the list at `{from_path}`, write `batch_over = "{from_path}"` on the pipe step to run once per item: a dotted '
+            f"`batch_over` binds the list at that path and batches over it. {keep_binding}"
+        )
+    return (
+        f'To batch over `{from_path}`, write `batch_over = "{from_path}"` on the pipe step to run once per item: a plain `batch_over` '
+        f"batches over that name and needs no binding. {keep_binding}"
+    )
+
+
 def is_binding_step_dict(*, raw_step: Mapping[str, Any]) -> bool:
     """Whether a step, as written, is a binding step: it carries `from`."""
     return BINDING_FROM_KEY in raw_step
@@ -50,12 +82,17 @@ def check_binding_step_shape(*, raw_step: Mapping[str, Any], step_label: str) ->
         raise PipeValidationError(message=msg, error_type=PipeValidationErrorType.BINDING_STEP_INVALID)
     pipe_step_fields = [field_name for field_name in PIPE_STEP_ONLY_FIELDS if field_name in raw_step]
     if pipe_step_fields:
-        quoted_fields = ", ".join(f"`{field_name}`" for field_name in pipe_step_fields)
         msg = (
-            f"{step_label} is a binding step (it carries `from`), which carries only `from` and `result`, so it cannot carry {quoted_fields}. "
-            f'To batch over the list at `{from_path}`, write it as a pipe step\'s `batch_over = "{from_path}"`, which binds it and batches over '
-            "the bound list, or bind it first, then batch over the bound name in the next pipe step."
+            f"{step_label} is a binding step (it carries `from`), which carries only `from` and `result`, so it cannot carry "
+            f"{_joined_with_or(field_names=pipe_step_fields)}."
         )
+        if any(field_name in _BATCH_FIELDS for field_name in pipe_step_fields):
+            msg += f" {_batch_remedy(from_path=from_path, result=raw_step.get('result'))}"
+        if any(field_name in _COUNT_FIELDS for field_name in pipe_step_fields):
+            msg += (
+                " `nb_output` and `multiple_output` set how many outputs a pipe produces, so they go on the pipe step running that pipe: "
+                "a binding step binds the value as it is."
+            )
         raise PipeValidationError(message=msg, error_type=PipeValidationErrorType.BINDING_STEP_INVALID)
     if "result" not in raw_step:
         msg = f"{step_label} is a binding step without `result`: a binding step names the value it binds, so `result` is required."

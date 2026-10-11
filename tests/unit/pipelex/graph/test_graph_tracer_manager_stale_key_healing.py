@@ -24,8 +24,8 @@ _DATA_INCLUSION_OFF = DataInclusionConfig(
 
 _TRACER_KEY = "run_under_test"
 
-_STALE_TRACER_MESSAGE = "Replacing a graph tracer left over by an interrupted execution whose cleanup never ran"
-_STALE_TEARDOWN_MESSAGE = "The teardown of a stale graph tracer raised; replacing it anyway"
+_STALE_TRACER_MESSAGE = "A graph tracer left over by an interrupted execution was replaced"
+_STALE_TEARDOWN_MESSAGE = "The teardown of a stale graph tracer failed, and the tracer was replaced"
 
 
 def _records_with_message(*, caplog: pytest.LogCaptureFixture, message: str) -> list[logging.LogRecord]:

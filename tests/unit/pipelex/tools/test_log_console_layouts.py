@@ -56,7 +56,7 @@ class TestConsoleLayouts:
     def test_the_pipe_run_layout_draws_the_tree_in_the_style_map_colours(self, overrides: dict[str, Any], expected: str) -> None:
         text = rendered_text(record=record_with_fields(message="Pipe run starts", extra={**PIPE_RUN_FIELDS, **overrides}, layout=LogLayout.PIPE_RUN))
 
-        assert text.plain == f"🧠: {expected}"
+        assert text.plain == expected
         assert styles_of(text=text, fragment="compose_company") == [FIELD_STYLES["pipe_code"]]
         assert styles_of(text=text, fragment="Company") == [FIELD_STYLES["output_concept"]]
 
@@ -102,7 +102,7 @@ class TestConsoleLayouts:
 
         text = rendered_text(record=record_with_fields(message="Inference call ends", extra=fields, layout=LogLayout.INFERENCE_CALL_END))
 
-        assert text.plain == f"🧠: {expected}"
+        assert text.plain == expected
 
     @pytest.mark.parametrize(
         ("overrides", "expected"),
@@ -119,7 +119,7 @@ class TestConsoleLayouts:
 
         text = rendered_text(record=record_with_fields(message="Pipe run ends", extra=fields, layout=LogLayout.PIPE_RUN_END))
 
-        assert text.plain == f"🧠: {expected}"
+        assert text.plain == expected
         assert styles_of(text=text, fragment="compose_company") == [FIELD_STYLES["pipe_code"]]
 
     @pytest.mark.parametrize(
@@ -138,7 +138,7 @@ class TestConsoleLayouts:
     ) -> None:
         text = rendered_text(record=record_with_fields(message="Work ends", extra={**fields, **overrides}, layout=layout))
 
-        assert text.plain.startswith("🧠: Work ends ")
+        assert text.plain.startswith("Work ends ")
         assert expected_values in text.plain
 
     def test_a_value_carrying_markup_or_an_emoji_code_prints_as_written_inside_a_layout(self) -> None:
@@ -150,7 +150,7 @@ class TestConsoleLayouts:
 
         text = rendered_text(record=record)
 
-        assert text.plain == "🧠: PipeCompose: [red]x[/red] → :fire:"
+        assert text.plain == "PipeCompose: [red]x[/red] → :fire:"
         assert styles_of(text=text, fragment="[red]x[/red]") == [FIELD_STYLES["pipe_code"]]
 
     def test_the_console_renders_a_layout_end_to_end_and_the_other_fields_follow_it(self, caplog: pytest.LogCaptureFixture) -> None:
@@ -189,12 +189,12 @@ class TestConsoleLayouts:
 
         text = rendered_text(record=record)
 
-        assert text.plain == f"🧠: Pipe run starts pipe_type=PipeCompose pipe_code=compose_company output_concept=Company {expected_values}"
+        assert text.plain == f"Pipe run starts pipe_type=PipeCompose pipe_code=compose_company output_concept=Company {expected_values}"
 
     def test_a_layout_that_cannot_be_filled_falls_back_to_the_message_and_every_field(self) -> None:
         text = rendered_text(record=record_with_fields(message="Pipe run starts", extra={"pipe_code": "compose_company"}, layout=LogLayout.PIPE_RUN))
 
-        assert text.plain == "🧠: Pipe run starts pipe_code=compose_company"
+        assert text.plain == "Pipe run starts pipe_code=compose_company"
 
     def test_a_layout_that_raises_anything_at_all_costs_only_itself(self, mocker: MockerFixture) -> None:
         """What a layout's derivation can raise is open-ended, and an error outside the ones the fallback named used to lose the line."""
@@ -202,7 +202,7 @@ class TestConsoleLayouts:
 
         text = rendered_text(record=record_with_fields(message="Pipe run starts", extra={"pipe_code": "compose_company"}, layout=LogLayout.PIPE_RUN))
 
-        assert text.plain == "🧠: Pipe run starts pipe_code=compose_company"
+        assert text.plain == "Pipe run starts pipe_code=compose_company"
 
     def test_a_record_carrying_structured_content_keeps_its_message_and_every_field_follows_it(self, caplog: pytest.LogCaptureFixture) -> None:
         """The console never repeats ``data`` in the suffix because the message renders it, so a layout must not replace that message."""
@@ -278,7 +278,7 @@ class TestConsoleLayouts:
     def test_a_layout_name_nobody_registered_renders_the_message(self) -> None:
         text = rendered_text(record=record_with_fields(message="Plain", extra={"files": 7}, layout="no_such_layout"))
 
-        assert text.plain == "🧠: Plain files=7"
+        assert text.plain == "Plain files=7"
 
     def test_every_layout_a_call_can_name_is_registered(self) -> None:
         assert set(CONSOLE_LAYOUTS) == set(LogLayout)

@@ -18,6 +18,7 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.telemetry.otel_constants import OTelLogAttr
+from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pipelex.tools.misc.async_utils import gather_bounded
 from pipelex.urls import URLs
 
@@ -35,22 +36,16 @@ LARGE_BATCH_ADVISORY_THRESHOLD = 100
 def warn_of_large_batch(*, pipe_code: str, item_count: int, max_concurrency: int | None) -> None:
     """Advise a durable execution backend for a batch past ``LARGE_BATCH_ADVISORY_THRESHOLD`` items.
 
-    Each case has its own message, which says what the fan-out is: bounded, it is backpressure, and unbounded it is not
-    even that. ``max_concurrency`` is always an integer, so a log query reads one type: it is absent from the line when
-    the configuration's ``"unbounded"`` resolved to no bound at all.
+    Bounded or not, the fan-out is one event: a bound is backpressure, and neither is durable, rate-limited execution.
+    ``max_concurrency`` is always an integer, so a log query reads one type: it is absent from the line when the
+    configuration's ``"unbounded"`` resolved to no bound at all.
     """
-    if max_concurrency is None:
-        log.warning(
-            "A PipeBatch fans out over a large list with unbounded fan-out, which is neither backpressure nor durable execution; "
-            "for a workload this size, consider a durable execution backend for rate-limited, resumable runs",
-            fields={"pipe_code": pipe_code, "item_count": item_count, OTelLogAttr.URL_FULL: URLs.durable_execution},
-        )
-        return
-    log.warning(
-        "A PipeBatch fans out over a large list with bounded fan-out, which is backpressure and not durable execution; "
-        "for a workload this size, consider a durable execution backend for rate-limited, resumable runs",
-        fields={"pipe_code": pipe_code, "item_count": item_count, "max_concurrency": max_concurrency, OTelLogAttr.URL_FULL: URLs.durable_execution},
-    )
+    fields: dict[str, str | int] = {"pipe_code": pipe_code, "item_count": item_count}
+    if max_concurrency is not None:
+        fields["max_concurrency"] = max_concurrency
+    fields[OTelLogAttr.URL_FULL] = URLs.durable_execution
+    fields[USER_ACTION_FIELD] = "Consider a durable execution backend for rate-limited, resumable runs"
+    log.warning("A PipeBatch fans out over a large list without durable execution", fields=fields)
 
 
 class PipeBatch(PipeController):
@@ -107,19 +102,22 @@ class PipeBatch(PipeController):
     ) -> None:
         batch_params = pipe_run_params.batch_params or self.batch_params or BatchParams.make_default()
         input_list_stuff_name = batch_params.input_list_stuff_name
+        # The list is named as its author wrote it, never by the private name a sequence binds a dotted `batch_over` under.
+        list_label = batch_params.input_list_label
         if not self.inputs.is_variable_existing(variable_name=input_list_stuff_name):
-            msg = f"Batch input list named '{input_list_stuff_name}' is not in PipeBatch '{self.code}' input requirements: {self.inputs}"
+            input_names = ", ".join(f"'{input_name}'" for input_name in self.inputs.variables) or "none"
+            msg = f"The list '{list_label}' that PipeBatch '{self.code}' batches over is not among its inputs: {input_names}."
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
         if not working_memory.is_stuff_exists(input_list_stuff_name):
-            msg = f"Input list stuff '{input_list_stuff_name}' required by this PipeBatch '{self.code}' not found in working memory"
+            msg = f"The list '{list_label}' that PipeBatch '{self.code}' batches over is not in working memory."
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
         input_stuff = working_memory.get_stuff(input_list_stuff_name)
         if not isinstance(input_stuff.content, ListContent):
             msg = (
-                f"Input list stuff '{input_list_stuff_name}' of PipeBatch '{self.code}' must be ListContent, "
-                f"got {input_stuff.stuff_name or 'unnamed'} = {type(input_stuff.content)}. stuff: {input_stuff}"
+                f"The value '{list_label}' that PipeBatch '{self.code}' batches over is not a list: it holds a "
+                f"'{input_stuff.concept.concept_ref}', and a batch runs its pipe once per item of a list."
             )
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 

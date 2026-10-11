@@ -103,9 +103,8 @@ def check_inputs_match_variables(
     """Refuse a variable the templates read that no input declares, then a declared input no template reads.
 
     The rule shared by every operator that reads its inputs through templates: PipeLLM, PipeCompose,
-    PipeSearch and PipeImgGen. It is the composition of `check_variables_are_declared` and
-    `check_inputs_are_read`, in that order. PipeJudge calls the first half alone, since every input it
-    declares is material to judge whether its question names it or not.
+    PipeSearch, PipeImgGen and PipeJudge, whose prompt and questions are read together. It is the
+    composition of `check_variables_are_declared` and `check_inputs_are_read`, in that order.
 
     Raises:
         PipeValidationError: ``MISSING_INPUT_VARIABLE`` with the undeclared root names, or

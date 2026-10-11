@@ -7,7 +7,7 @@ description: "Reference for the `PipeJudgeInputCapabilityError` Pipelex error cl
 
 # Pipe judge input capability
 
-A `PipeJudge` declares an image or a document input, and the judging model it resolves to does not read one.
+A `PipeJudge`'s prompt presents an image or a document, and the judging model it resolves to does not read one.
 
 | Field | Value |
 |---|---|

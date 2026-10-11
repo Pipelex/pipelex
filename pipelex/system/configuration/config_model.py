@@ -1,84 +1,16 @@
 from enum import StrEnum
-from typing import Any, TypeVar
+from typing import Annotated, TypeAlias, TypeVar
 
-from pydantic import BaseModel, ConfigDict
-
-from pipelex.system.exceptions import ConfigModelError
+from pydantic import BaseModel, ConfigDict, Strict
 
 StrEnumType = TypeVar("StrEnumType", bound=StrEnum)
+
+# A `StrEnum` read leniently, so a TOML string converts to its member, inside a container that stays strict.
+# `Field(strict=False)` on a field does not reach a container's items: `list[MyEnum] = Field(strict=False)`
+# still refuses `["a_member"]`. Write `list[LaxEnum[MyEnum]]` or `dict[LaxEnum[MyEnum], ...]` instead, and
+# never convert the items by hand in a `mode="before"` validator, which would see the raw value of any type.
+LaxEnum: TypeAlias = Annotated[StrEnumType, Strict(False)]
 
 
 class ConfigModel(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
-
-    @staticmethod
-    def transform_dict_str_to_enum(
-        input_dict: dict[str, str],
-        *,
-        key_enum_cls: type[StrEnumType] | None = None,
-        value_enum_cls: type[StrEnumType] | None = None,
-    ) -> dict[str, StrEnumType] | dict[StrEnumType, str] | dict[StrEnumType, StrEnumType]:
-        """Transforms a dictionary with str values into a dictionary with enum values.
-
-        Args:
-            input_dict: Dictionary with string values to be transformed.
-            key_enum_cls: The StrEnum class to convert the keys to (if needed)
-            value_enum_cls: The StrEnum class to convert the values to (if needed).
-
-        Returns:
-            A dictionary where the values are converted to the given StrEnum type.
-
-        """
-        # return {key: value_enum_cls(value) for key, value in input_dict.items()}
-        if key_enum_cls and value_enum_cls:
-            return {key_enum_cls(key): value_enum_cls(value) for key, value in input_dict.items()}
-        if key_enum_cls:
-            return {key_enum_cls(key): value for key, value in input_dict.items()}
-        if value_enum_cls:
-            return {key: value_enum_cls(value) for key, value in input_dict.items()}
-        msg = "Either key_enum_cls or value_enum_cls must be provided."
-        raise ConfigModelError(msg)
-
-    @staticmethod
-    def transform_dict_of_floats_str_to_enum(
-        input_dict: dict[str, float],
-        *,
-        key_enum_cls: type[StrEnumType],
-    ) -> dict[StrEnumType, float]:
-        """Transforms a dictionary with str keys and float values into a dictionary with enum keys and float values.
-
-        Args:
-            input_dict: Dictionary with string values to be transformed.
-            key_enum_cls: The StrEnum class to convert the keys to
-
-        Returns:
-            A dictionary where the keys are converted to the given StrEnum type.
-
-        """
-        return {key_enum_cls(key): value for key, value in input_dict.items()}
-
-    @staticmethod
-    def transform_dict_keys_str_to_enum(
-        input_dict: dict[str, Any],
-        *,
-        key_enum_cls: type[StrEnumType],
-    ) -> dict[StrEnumType, Any]:
-        """Transforms a dictionary with str keys and Any values into a dictionary with enum keys and Any values.
-
-        Args:
-            input_dict: Dictionary with string keys to be transformed.
-            key_enum_cls: The StrEnum class to convert the keys to
-
-        Returns:
-            A dictionary where the keys are converted to the given StrEnum type.
-
-        """
-        return {key_enum_cls(key): value for key, value in input_dict.items()}
-
-    @staticmethod
-    def transform_list_of_str_to_enum(
-        input_list: list[str],
-        *,
-        enum_cls: type[StrEnumType],
-    ) -> list[StrEnumType]:
-        return [enum_cls(item) for item in input_list]

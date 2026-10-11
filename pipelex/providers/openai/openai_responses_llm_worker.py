@@ -24,6 +24,7 @@ from pipelex.cogt.inference.error_classification import (
 )
 from pipelex.cogt.inference.error_classify import classify_inference_error
 from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.llm.completion_stop import classify_responses_stop
 from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
@@ -172,6 +173,19 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
                 model_handle=self.inference_model.name,
             ) from sdk_exc
 
+        if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and response.usage:
+            llm_tokens_usage.nb_tokens_by_category = self.openai_responses_factory.make_nb_tokens_by_category(usage=response.usage)
+
+        # An answer cut at its output limit or stopped by a filter has the `incomplete` status, its reason in its details
+        incomplete_reason = response.incomplete_details.reason if response.incomplete_details else None
+        stop_outcome = classify_responses_stop(status=response.status, incomplete_reason=incomplete_reason, model_handle=self.inference_model.name)
+        self._raise_for_completion_stop(
+            llm_job=llm_job,
+            outcome=stop_outcome,
+            stop_reason=incomplete_reason or response.status or "",
+            max_tokens=job_params.max_tokens,
+        )
+
         if not response.output_text:
             msg = f"OpenAI Responses message content is empty: {response}\nmodel: {self.inference_model.desc}"
             raise LLMCompletionError(
@@ -184,8 +198,6 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
                 ),
             )
 
-        if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and response.usage:
-            llm_tokens_usage.nb_tokens_by_category = self.openai_responses_factory.make_nb_tokens_by_category(usage=response.usage)
         return response.output_text
 
     @override
