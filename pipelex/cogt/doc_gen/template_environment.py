@@ -36,8 +36,10 @@ def make_plain_data_template_environment(*, finalize: Callable[..., Any] | None 
 
     `finalize`, when given, is applied to every value a tag prints before the environment converts it to text, so an
     engine turns a printed `FormattedMarkdown` into its own form there and hands every other value back as it is.
-    Without one, a `FormattedMarkdown` prints its plain text. It is handed to the environment at construction, which a
-    Pipelex environment requires, since the environment wraps it to charge what is printed.
+    A filter block's result that is not text is printed the same way, so `{% filter markdown %}…{% endfilter %}`
+    prints what `{{ … | markdown }}` prints. Without one, a `FormattedMarkdown` prints its plain text. It is handed to
+    the environment at construction, which a Pipelex environment requires, since the environment wraps it to charge
+    what is printed.
 
     It loads no template by name, so a template is built from its source with `from_string`.
     """
