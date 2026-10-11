@@ -11,8 +11,10 @@ from typing import Annotated
 
 import typer
 
-from pipelex.cli.commands.codegen.types_cmd import codegen_types_cmd
+from pipelex.cli.commands.codegen.types_cmd import generate_types
 from pipelex.codegen.emitters.target import CodegenTarget
+from pipelex.pipeline.usage_stats_reporting import CodeGenerationReport
+from pipelex.system.usage_stats.usage_stats_contract import UsageStatsCodegenArtifact
 
 SUB_COMMAND_STRUCTURES = "structures"
 
@@ -52,9 +54,10 @@ def build_structures_command(
         raise typer.Exit(2)
     closure_dir = target_path.parent if target_path.is_file() else target_path
 
-    codegen_types_cmd(
+    generate_types(
         target=CodegenTarget.PYTHON_STRUCTURES,
         paths=[closure_dir],
         output_dir=output_dir or str(closure_dir / "structures"),
         library_dir=[Path(lib_dir) for lib_dir in library_dir] if library_dir else None,
+        generation_report=CodeGenerationReport(artifact=UsageStatsCodegenArtifact.STRUCTURES),
     )

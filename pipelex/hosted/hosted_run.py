@@ -28,6 +28,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 
 from pipelex.hosted.exceptions import HostedRunOutcomeUnknownError, HostedRunPollingError
 from pipelex.hosted.hosted_inputs import prepare_hosted_inputs
+from pipelex.system.usage_stats.usage_stats_client import note_command_hosted
 
 #: The `implementation` a bare runner names in its `GET /v1/version` handshake: an open-source pipelex-api, which
 #: keeps no runs to poll. The same value pipelex-sdk's `start_and_wait` tests to choose the blocking route.
@@ -209,6 +210,8 @@ async def run_hosted(*, client: PipelexAPIClient, request: HostedRunRequest, on_
         ApiUnreachableError: If the hosted API cannot be reached before the run request is sent.
         InputPreparationError: If a local file cannot be read or uploaded.
     """
+    # A command running this sends its work to the hosted API; its `command_completed` says so and no more.
+    note_command_hosted()
     prepared = await prepare_hosted_inputs(
         client=client,
         mthds_files=request.mthds_files,

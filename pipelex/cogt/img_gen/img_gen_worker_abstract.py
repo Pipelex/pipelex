@@ -63,7 +63,7 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
         img_gen_job: ImgGenJob,
     ) -> GeneratedImageRawDetails:
         # The call ends with its summary event whichever way it ends, a refusal by the checks below included
-        with self._call_summary(img_gen_job=img_gen_job):
+        with self._call_summary(img_gen_job=img_gen_job) as call_summary:
             # Verify that the job is valid
             img_gen_job.validate_before_execution()
 
@@ -82,6 +82,7 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
             except CogtError as exc:
                 exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
                 raise
+            call_summary.count_images_generated(count=1)
 
             # Report job
             img_gen_job.img_gen_job_after_complete()
@@ -104,7 +105,7 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
         nb_images: int,
     ) -> list[GeneratedImageRawDetails]:
         # The call ends with its summary event whichever way it ends, a refusal by the checks below included
-        with self._call_summary(img_gen_job=img_gen_job):
+        with self._call_summary(img_gen_job=img_gen_job) as call_summary:
             # Verify that the job is valid
             img_gen_job.validate_before_execution()
 
@@ -123,6 +124,7 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
             except CogtError as exc:
                 exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
                 raise
+            call_summary.count_images_generated(count=len(result))
 
             # Report job
             img_gen_job.img_gen_job_after_complete()

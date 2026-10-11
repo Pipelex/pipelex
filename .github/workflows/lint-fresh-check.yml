@@ -21,6 +21,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# No pipelex process a job starts reports anonymous usage statistics (docs/setup/usage-statistics.md).
+env:
+  DO_NOT_TRACK: "1"
+
 jobs:
   lint-fresh:
     name: Lint fresh (py${{ matrix.python-version }})

@@ -218,6 +218,10 @@ For the structured commands, exactly one such object is written to stderr per fa
 
 `fmt` and `lint` are raw passthroughs to the `plxt` binary and bypass the JSON output contract, producing native `plxt` output instead.
 
+## Usage Statistics
+
+`pipelex-agent` sends Pipelex's [anonymous usage statistics](../../setup/usage-statistics.md) as `pipelex` does: one `command_completed` per command, plus the events of the runs, validations and code generations it performs, all off under `DO_NOT_TRACK=1`, `PIPELEX_USAGE_STATS=0` or `pipelex usage-stats disable`. When the invocation's errors are JSON, with `--error-format json` or with `--format json` and no `--error-format`, stderr is a machine contract, so the one-time notice is neither printed nor recorded there; the next command whose stderr a person reads prints it. The `plxt` that `fmt` and `lint` start reports nothing of its own. There is no `usage-stats` group on this CLI: [`pipelex usage-stats`](usage-stats.md) shows and changes the statistics for both.
+
 ## Graph Visualization
 
 Graph visualization is available through the `validate bundle` subcommand with the `--graph` flag, and through `run` subcommands where it is enabled by default. Use `--no-graph` on `run` to disable it.

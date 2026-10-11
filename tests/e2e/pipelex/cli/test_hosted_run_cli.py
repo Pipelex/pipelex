@@ -29,6 +29,7 @@ from pathlib import Path
 import pytest
 
 from pipelex.hosted.client_factory import HOSTED_API_DEFAULT_BASE_URL, PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
+from pipelex.test_extras.usage_stats_isolation import usage_stats_off_environment
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 PIPELEX_BIN = REPO_ROOT / ".venv" / "bin" / "pipelex"
@@ -73,6 +74,8 @@ def _hosted_env(*, home: Path, base_url: str | None) -> dict[str, str]:
         # Wide enough that Rich never wraps the lines the tests read.
         "COLUMNS": "250",
         PIPELEX_API_KEY_ENV_KEY: os.environ[PIPELEX_API_KEY_ENV_KEY],
+        # No subprocess a test starts reports anonymous usage statistics, and none could reach a host that is not loopback.
+        **usage_stats_off_environment(),
     }
     if base_url is not None:
         env[PIPELEX_BASE_URL_ENV_KEY] = base_url

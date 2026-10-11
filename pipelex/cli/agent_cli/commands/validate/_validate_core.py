@@ -8,6 +8,7 @@ from pipelex.interpreter_hub import (
     clear_current_library,
     get_current_library_id_or_none,
     get_library_manager,
+    get_own_pipes,
     get_pipe_library,
     get_required_entry_pipe,
     resolve_library_dirs,
@@ -17,6 +18,7 @@ from pipelex.pipeline.advisory_warnings import collect_advisory_warnings, collec
 from pipelex.pipeline.blueprint_selection import collect_entry_pipe_refs
 from pipelex.pipeline.bundle_validator import BundleValidator
 from pipelex.pipeline.execution_seams import acquire_library
+from pipelex.pipeline.usage_stats_reporting import MethodValidationReport
 from pipelex.pipeline.validate_bundle import build_pending_signatures, build_validated_pipes, validate_bundle
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 
@@ -42,54 +44,57 @@ async def validate_all_core(*, library_dirs: list[Path] | None = None, allow_sig
     # teardown) inline rather than calling it, because `validate all` is strict-by-default on
     # signatures and must read the LIBRARY-WIDE pending set BEFORE teardown — acquire_and_validate
     # returns only the per-pipe status map and tears the library down before we could compute it.
-    prev_library_id = get_current_library_id_or_none()
-    # A refusal of the libraries while loading them is the invalid verdict, through the shared
-    # bundle-loading cascade, as on `validate bundle`. The directories are the caller's own, so
-    # acquire_library translates their load itself, while the library is still current: the translation
-    # reads the library's pipe sources to locate an item, and a translation around the call would run
-    # only after acquire_library had torn the failed library down, leaving the item without its file.
-    # The sweep below stays untranslated on purpose: a failing dry run is answered as the DryRunError it
-    # is, as on `validate pipe`.
-    acquired_id, _ = acquire_library(
-        library_id="",
-        library_dirs=[str(library_dir) for library_dir in library_dirs] if library_dirs else None,
-        library_dirs_are_callers=True,
-    )
-    try:
-        # acquire_library left the freshly-acquired library current, so the inner sweep targets it
-        # (it filters signatures in strict mode itself). The returned map is keyed by namespaced pipe_ref.
-        # A pipe whose dry run fails is the invalid verdict, one located dry_run item per failing pipe,
-        # through the same cascade and item builder as `validate bundle`.
-        with translate_to_validate_bundle_error():
-            dry_run_results = await BundleValidator().validate_current_library(allow_signatures=allow_signatures)
+    with MethodValidationReport() as validation_report:
+        prev_library_id = get_current_library_id_or_none()
+        # A refusal of the libraries while loading them is the invalid verdict, through the shared
+        # bundle-loading cascade, as on `validate bundle`. The directories are the caller's own, so
+        # acquire_library translates their load itself, while the library is still current: the translation
+        # reads the library's pipe sources to locate an item, and a translation around the call would run
+        # only after acquire_library had torn the failed library down, leaving the item without its file.
+        # The sweep below stays untranslated on purpose: a failing dry run is answered as the DryRunError it
+        # is, as on `validate pipe`.
+        acquired_id, _ = acquire_library(
+            library_id="",
+            library_dirs=[str(library_dir) for library_dir in library_dirs] if library_dirs else None,
+            library_dirs_are_callers=True,
+        )
+        try:
+            validation_report.describe(pipes=get_own_pipes())
+            # acquire_library left the freshly-acquired library current, so the inner sweep targets it
+            # (it filters signatures in strict mode itself). The returned map is keyed by namespaced pipe_ref.
+            # A pipe whose dry run fails is the invalid verdict, one located dry_run item per failing pipe,
+            # through the same cascade and item builder as `validate bundle`.
+            with translate_to_validate_bundle_error():
+                dry_run_results = await BundleValidator().validate_current_library(allow_signatures=allow_signatures)
 
-        # pending_signatures is the library-wide set of still-unimplemented forward declarations;
-        # is_runnable = not pending. `validate all` now makes a strict runnability claim (the consumer
-        # gates the exit code on it unless --allow-signatures), so both keys ride the envelope.
-        pending_signatures = build_pending_signatures(get_pipe_library().get_pipes_dict())
-        # warnings: same advisory lint channel as the bundle surfaces — `validate all` has the
-        # whole library loaded, which is all the flow context the cross-flow aggregation needs.
-        # Its entry pipes come off the blueprints the library manager accumulated on the way in;
-        # there is no `ValidateBundleResult` on this path to read a `main_pipe` from.
-        library_pipes = list(get_pipe_library().get_pipes_dict().values())
-        warnings = collect_advisory_warnings(pipes=library_pipes, entry_pipe_refs=collect_current_library_entry_pipe_refs())
-        return {
-            "success": True,
-            "is_valid": True,
-            "validated_pipes": build_validated_pipes(dry_run_results),
-            "total_pipes": len(dry_run_results),
-            "pending_signatures": pending_signatures,
-            "is_runnable": not pending_signatures,
-            "warnings": [warning.model_dump(exclude_none=True) for warning in warnings],
-        }
-    finally:
-        # Restore the caller's outer current-library FIRST (so the guarantee survives a teardown
-        # raise), then tear the acquired library down — mirroring acquire_and_validate / validate_pipe_core.
-        if prev_library_id is not None:
-            set_current_library(library_id=prev_library_id)
-        else:
-            clear_current_library()
-        get_library_manager().teardown(library_id=acquired_id)
+            # pending_signatures is the library-wide set of still-unimplemented forward declarations;
+            # is_runnable = not pending. `validate all` now makes a strict runnability claim (the consumer
+            # gates the exit code on it unless --allow-signatures), so both keys ride the envelope.
+            pending_signatures = build_pending_signatures(get_pipe_library().get_pipes_dict())
+            # warnings: same advisory lint channel as the bundle surfaces — `validate all` has the
+            # whole library loaded, which is all the flow context the cross-flow aggregation needs.
+            # Its entry pipes come off the blueprints the library manager accumulated on the way in;
+            # there is no `ValidateBundleResult` on this path to read a `main_pipe` from.
+            library_pipes = list(get_pipe_library().get_pipes_dict().values())
+            warnings = collect_advisory_warnings(pipes=library_pipes, entry_pipe_refs=collect_current_library_entry_pipe_refs())
+            validation_report.count_warnings(count=len(warnings))
+            return {
+                "success": True,
+                "is_valid": True,
+                "validated_pipes": build_validated_pipes(dry_run_results),
+                "total_pipes": len(dry_run_results),
+                "pending_signatures": pending_signatures,
+                "is_runnable": not pending_signatures,
+                "warnings": [warning.model_dump(exclude_none=True) for warning in warnings],
+            }
+        finally:
+            # Restore the caller's outer current-library FIRST (so the guarantee survives a teardown
+            # raise), then tear the acquired library down — mirroring acquire_and_validate / validate_pipe_core.
+            if prev_library_id is not None:
+                set_current_library(library_id=prev_library_id)
+            else:
+                clear_current_library()
+            get_library_manager().teardown(library_id=acquired_id)
 
 
 async def validate_bundle_core(
@@ -112,11 +117,15 @@ async def validate_bundle_core(
     Raises:
         ValidateBundleError: If validation fails.
     """
-    result = await validate_bundle(
-        mthds_file_path=bundle_path,
-        library_dirs=library_dirs,
-        allow_signatures=allow_signatures,
-    )
+    with MethodValidationReport() as validation_report:
+        result = await validate_bundle(
+            mthds_file_path=bundle_path,
+            library_dirs=library_dirs,
+            allow_signatures=allow_signatures,
+        )
+        warnings = collect_advisory_warnings(pipes=result.pipes, entry_pipe_refs=collect_entry_pipe_refs(result.blueprints))
+        validation_report.describe(pipes=result.pipes)
+        validation_report.count_warnings(count=len(warnings))
 
     # Consume the real per-pipe status from the sweep — a fixed all-"SUCCESS" list would hide allowed
     # failures and SKIPPED cross-package pipes the dry-run actually recorded (C-8). pending_signatures
@@ -131,10 +140,7 @@ async def validate_bundle_core(
         "total_pipes": len(result.dry_run_result),
         "pending_signatures": result.pending_signatures,
         "is_runnable": not result.pending_signatures,
-        "warnings": [
-            warning.model_dump(exclude_none=True)
-            for warning in collect_advisory_warnings(pipes=result.pipes, entry_pipe_refs=collect_entry_pipe_refs(result.blueprints))
-        ],
+        "warnings": [warning.model_dump(exclude_none=True) for warning in warnings],
     }
 
 
@@ -158,44 +164,46 @@ async def validate_pipe_core(
     Raises:
         ValidateBundleError: If validation fails.
     """
-    library_manager = get_library_manager()
-    # Capture the caller's outer current-library so it can be restored after this temporary validation
-    # library is torn down.
-    prev_library_id = get_current_library_id_or_none()
-    library_id, _ = library_manager.open_library()
-    try:
-        set_current_library(library_id=library_id)
-        effective_dirs, _ = resolve_library_dirs(library_dirs)
+    with MethodValidationReport() as validation_report:
+        library_manager = get_library_manager()
+        # Capture the caller's outer current-library so it can be restored after this temporary validation
+        # library is torn down.
+        prev_library_id = get_current_library_id_or_none()
+        library_id, _ = library_manager.open_library()
+        try:
+            set_current_library(library_id=library_id)
+            effective_dirs, _ = resolve_library_dirs(library_dirs)
 
-        if effective_dirs:
-            # A refusal of the libraries while loading them is the invalid verdict, through the shared
-            # bundle-loading cascade, as on `validate bundle`.
+            if effective_dirs:
+                # A refusal of the libraries while loading them is the invalid verdict, through the shared
+                # bundle-loading cascade, as on `validate bundle`.
+                with translate_to_validate_bundle_error():
+                    library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
+
+            # The entry-pipe lookup stays outside the cascade: a code naming no pipe is no verdict. A pipe whose
+            # dry run fails is the invalid verdict, one located dry_run item per failing pipe, as on `validate bundle`.
+            the_pipe = get_required_entry_pipe(pipe_code=pipe_code)
+            validation_report.describe(pipes=get_own_pipes())
             with translate_to_validate_bundle_error():
-                library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
+                dry_run_results = await BundleValidator().validate_pipes(pipes=[the_pipe], library_id=library_id, allow_signatures=allow_signatures)
 
-        # The entry-pipe lookup stays outside the cascade: a code naming no pipe is no verdict. A pipe whose
-        # dry run fails is the invalid verdict, one located dry_run item per failing pipe, as on `validate bundle`.
-        the_pipe = get_required_entry_pipe(pipe_code=pipe_code)
-        with translate_to_validate_bundle_error():
-            dry_run_results = await BundleValidator().validate_pipes(pipes=[the_pipe], library_id=library_id, allow_signatures=allow_signatures)
-
-        return {
-            "success": True,
-            "is_valid": True,
-            "validated_pipes": build_validated_pipes(dry_run_results),
-            "total_pipes": len(dry_run_results),
-        }
-    finally:
-        # validate_pipes is the D6 inner sweep and never tears the library down, and validate_pipe_core
-        # does not need the library after returning its results dict — so this caller owns the full
-        # lifecycle on BOTH paths. Restore the outer current-library FIRST (so the guarantee survives a
-        # teardown raise), then tear the temporary library down. set_current_library cannot take None,
-        # so route the "no outer was set" case through clear_current_library.
-        if prev_library_id is not None:
-            set_current_library(library_id=prev_library_id)
-        else:
-            clear_current_library()
-        library_manager.teardown(library_id=library_id)
+            return {
+                "success": True,
+                "is_valid": True,
+                "validated_pipes": build_validated_pipes(dry_run_results),
+                "total_pipes": len(dry_run_results),
+            }
+        finally:
+            # validate_pipes is the D6 inner sweep and never tears the library down, and validate_pipe_core
+            # does not need the library after returning its results dict — so this caller owns the full
+            # lifecycle on BOTH paths. Restore the outer current-library FIRST (so the guarantee survives a
+            # teardown raise), then tear the temporary library down. set_current_library cannot take None,
+            # so route the "no outer was set" case through clear_current_library.
+            if prev_library_id is not None:
+                set_current_library(library_id=prev_library_id)
+            else:
+                clear_current_library()
+            library_manager.teardown(library_id=library_id)
 
 
 async def validate_pipe_in_bundle_core(
@@ -232,12 +240,16 @@ async def validate_pipe_in_bundle_core(
             selector makes it INPUT-domained; it is a `PipeNotFoundError` subclass, so an existing
             `except PipeNotFoundError` still catches it.
     """
-    result = await validate_bundle(
-        mthds_file_path=bundle_path,
-        library_dirs=library_dirs,
-        allow_signatures=allow_signatures,
-        dry_run_pipe_codes=[pipe_code],
-    )
+    with MethodValidationReport() as validation_report:
+        result = await validate_bundle(
+            mthds_file_path=bundle_path,
+            library_dirs=library_dirs,
+            allow_signatures=allow_signatures,
+            dry_run_pipe_codes=[pipe_code],
+        )
+        warnings = collect_advisory_warnings(pipes=result.pipes, entry_pipe_refs=collect_entry_pipe_refs(result.blueprints))
+        validation_report.describe(pipes=result.pipes)
+        validation_report.count_warnings(count=len(warnings))
 
     # Consume the real per-pipe status from the sliced sweep — a fixed "SUCCESS" would hide an allowed
     # failure or a cross-package SKIPPED the dry-run actually recorded (C-8). pending_signatures is the
@@ -251,8 +263,5 @@ async def validate_pipe_in_bundle_core(
         "total_pipes": len(result.dry_run_result),
         "pending_signatures": result.pending_signatures,
         "is_runnable": not result.pending_signatures,
-        "warnings": [
-            warning.model_dump(exclude_none=True)
-            for warning in collect_advisory_warnings(pipes=result.pipes, entry_pipe_refs=collect_entry_pipe_refs(result.blueprints))
-        ],
+        "warnings": [warning.model_dump(exclude_none=True) for warning in warnings],
     }

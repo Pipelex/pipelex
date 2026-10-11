@@ -1510,6 +1510,17 @@
       "required": true,
       "default": ".pipelex/traces",
       "open_node": false
+    },
+    "usage_stats": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "usage_stats.enabled": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
     }
   }
 }

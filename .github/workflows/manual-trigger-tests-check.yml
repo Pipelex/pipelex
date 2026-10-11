@@ -9,6 +9,10 @@ on:
       # - "release/v[0-9]+.[0-9]+.[0-9]+"
   # workflow_dispatch:
 
+# No pipelex process a job starts reports anonymous usage statistics (docs/setup/usage-statistics.md).
+env:
+  DO_NOT_TRACK: "1"
+
 jobs:
   manual-trigger-tests:
     runs-on: ubuntu-latest

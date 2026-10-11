@@ -1,11 +1,13 @@
 """Passthrough helper for delegating to the plxt CLI binary."""
 
+import os
 import shutil
 import subprocess  # ruff: ignore[suspicious-subprocess-import]
 
 import typer
 
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
+from pipelex.system.usage_stats.usage_stats_contract import UsageStatsEnvVar
 
 
 def run_plxt(subcommand: str, *, file_path: str) -> None:
@@ -25,8 +27,10 @@ def run_plxt(subcommand: str, *, file_path: str) -> None:
             error_type="BinaryNotFoundError",
         )
 
+    # The command's usage statistics are pipelex-agent's own, so the plxt it delegates to reports none of its own.
     result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
         [plxt_path, subcommand, file_path],
         check=False,
+        env={**os.environ, UsageStatsEnvVar.TOOL_SWITCH: "0"},
     )
     raise typer.Exit(result.returncode)

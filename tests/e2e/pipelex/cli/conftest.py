@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from pipelex.test_extras.usage_stats_isolation import usage_stats_off_environment
 from tests.e2e.agent_cli.conftest import (  # ruff: ignore[unused-import] - fixtures re-exported for this directory
     hermetic_home,
     offline_subprocess_env,
@@ -44,4 +45,6 @@ def fresh_home_env(tmp_path: Path) -> dict[str, str]:
         "PIPELEX_API_KEY": TEST_KEY,
         "PIPELEX_BASE_URL": "http://127.0.0.1:9",
         "PIPELEX_APP_URL": "http://127.0.0.1:9",
+        # No subprocess a test starts reports anonymous usage statistics, and none could reach a host that is not loopback.
+        **usage_stats_off_environment(),
     }

@@ -21,6 +21,7 @@ Two things make this test catch the bug where the existing CLI tests did not:
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess  # ruff: ignore[suspicious-subprocess-import] -- invokes the real pipelex binary on purpose
 import sys
@@ -62,7 +63,7 @@ class TestCliEntrypointStarts:
             ["login", "--help"],
         ],
     )
-    def test_subcommand_starts_and_exits_zero(self, args: list[str]) -> None:
+    def test_subcommand_starts_and_exits_zero(self, args: list[str], tmp_path: Path) -> None:
         bin_path = PIPELEX_BIN
         if bin_path is None:
             pytest.fail("`pipelex` console script not found next to the interpreter or on PATH; install the package before running this test.")
@@ -72,6 +73,8 @@ class TestCliEntrypointStarts:
             text=True,
             timeout=120,
             check=False,
+            # A home of its own: every CLI command reads the usage statistics' shared state there, which stays this test's.
+            env={**os.environ, "HOME": str(tmp_path)},
         )
         combined = f"{result.stdout}\n{result.stderr}"
         assert result.returncode == 0, (

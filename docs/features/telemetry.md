@@ -9,7 +9,7 @@ Production-ready monitoring for your AI methods.
 
 ## Overview
 
-Pipelex provides comprehensive telemetry and observability capabilities to monitor your AI methods in production. Track costs, latency, errors, and execution patterns across multiple destinations. Every destination is yours, opt-in and configurable per integration mode (CLI, pytest, API), and nothing reports to Pipelex.
+Pipelex provides comprehensive telemetry and observability capabilities to monitor your AI methods in production. Track costs, latency, errors, and execution patterns across multiple destinations. Every destination is yours, opt-in and configurable per integration mode (CLI, pytest, API), and none of it reports to Pipelex. The anonymous [usage statistics](../setup/usage-statistics.md) Pipelex collects are separate, with switches of their own.
 
 ## Langfuse Integration
 

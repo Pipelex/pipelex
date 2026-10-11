@@ -12,6 +12,10 @@ permissions:
   contents: read
   pull-requests: write
 
+# No pipelex process a job starts reports anonymous usage statistics (docs/setup/usage-statistics.md).
+env:
+  DO_NOT_TRACK: "1"
+
 jobs:
   dependency-review:
     name: Review new dependencies

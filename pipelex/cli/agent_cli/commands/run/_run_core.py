@@ -17,6 +17,8 @@ from pipelex.core.memory.absence_render import build_absence_html, build_absence
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.system.usage_stats.usage_stats_contract import UsageStatsMethodSource
+from pipelex.system.usage_stats.usage_stats_runs import method_source_scope
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.json_utils import clean_json_dumps
 
@@ -102,11 +104,13 @@ async def run_pipeline_core(
         # The directories a CLI loads are the caller's own: a refusal there is their invalid bundle.
         library_dirs_are_callers=True,
     )
-    response = await runner.execute(
-        pipe_code=pipe_code,
-        mthds_contents=mthds_contents,
-        inputs=inputs,
-    )
+    # The CLI reads every bundle it runs from the caller's files; a method it resolved declared its own source first.
+    with method_source_scope(source=UsageStatsMethodSource.LOCAL_BUNDLE):
+        response = await runner.execute(
+            pipe_code=pipe_code,
+            mthds_contents=mthds_contents,
+            inputs=inputs,
+        )
     pipe_output = response.pipe_output
 
     # A completed run always resolves its declared output: a value or a recorded absence. An

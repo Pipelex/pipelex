@@ -1,10 +1,13 @@
 ---
-description: "Understand Pipelex telemetry — nothing reports to Pipelex, and the streams you configure yourself are off until you turn them on."
+description: "Understand Pipelex telemetry — telemetry.toml never reports to Pipelex, and the streams you configure yourself are off until you turn them on."
 ---
 
 # Telemetry
 
-**Pipelex sends no telemetry to Pipelex.** The only telemetry the runtime produces is yours: you configure it in `telemetry.toml`, it is off until you turn it on, and it goes to analytics and monitoring systems you operate.
+**The telemetry you configure in `telemetry.toml` never reports to Pipelex.** It is yours: it is off until you turn it on, and it goes to analytics and monitoring systems you operate.
+
+!!! note "Usage statistics are separate"
+    Pipelex does collect anonymous usage statistics, counts of commands, runs, pipe types, models and tokens, through a client of their own that `telemetry.toml` neither configures nor reaches. They never carry your methods, prompts, inputs, outputs, file names or pipe names, and you turn them off with `pipelex usage-stats disable` or `DO_NOT_TRACK=1`. See [Usage Statistics](usage-statistics.md).
 
 ## Your Telemetry Streams
 
@@ -120,7 +123,7 @@ These are labels for grouping, not content: they land in the reserved identity f
 
 We take your privacy seriously:
 
-- Nothing reports to Pipelex: every stream is one you configure, sent to a system you operate
+- Nothing in `telemetry.toml` reports to Pipelex: every stream is one you configure, sent to a system you operate; the anonymous [usage statistics](usage-statistics.md) are separate and have switches of their own
 - Your `telemetry.toml` gives you full control over what data is captured
 - PostHog tracing includes privacy controls to redact sensitive content
 - All telemetry can be completely disabled

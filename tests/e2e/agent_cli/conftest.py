@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 
 from pipelex.kit.paths import get_kit_configs_dir
+from pipelex.test_extras.usage_stats_isolation import usage_stats_off_environment
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PIPELEX_AGENT_BIN = REPO_ROOT / ".venv" / "bin" / "pipelex-agent"
@@ -90,6 +91,8 @@ def offline_subprocess_env(hermetic_home: Path) -> dict[str, str]:
     env: dict[str, str] = {
         "HOME": str(hermetic_home),
         "PATH": "/usr/bin:/bin:/usr/local/bin",
+        # No subprocess a test starts reports anonymous usage statistics, and none could reach a host that is not loopback.
+        **usage_stats_off_environment(),
         # Force CI test mode, so a boot that resolves credentials (the doctor's) skips vertexai,
         # whose token it would otherwise mint over the network.
         "RUN_MODE": "ci_test",

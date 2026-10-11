@@ -22,6 +22,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
+# No pipelex process a job starts reports anonymous usage statistics (docs/setup/usage-statistics.md).
+env:
+  DO_NOT_TRACK: "1"
+
 jobs:
   natives-vs-standard:
     name: "Pinned natives vs the standard's page (a red with no pinned-set change in this PR means the standard moved)"

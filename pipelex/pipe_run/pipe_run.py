@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING
 
 from typing_extensions import override
@@ -7,17 +8,22 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.base_exceptions import ErrorReport, PipelexError, PipelexUnexpectedError
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
-from pipelex.interpreter_hub import get_own_pipes
+from pipelex.interpreter_hub import get_concept_library, get_own_pipes
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus
 from pipelex.pipe_run.delivery_executor import DeliveryExecutor
 from pipelex.pipe_run.exceptions import DeliveryError
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
-from pipelex.pipe_run.tracing_assembly import assemble_tracing_on_output
+from pipelex.pipe_run.tracing_assembly import RunTraceEvents, assemble_tracing_on_output, read_run_trace_events
 from pipelex.pipeline.build_pipe_io_artifacts import build_pipe_io_artifacts
+from pipelex.pipeline.usage_stats_reporting import RunUsageFacts, input_kinds_of, report_run_usage
+from pipelex.system.usage_stats.usage_stats_client import usage_stats_are_enabled
+from pipelex.system.usage_stats.usage_stats_contract import UsageStatsOutcome
+from pipelex.system.usage_stats.usage_stats_runs import RunInferenceTally, tallying_inference_calls
 from pipelex.tools.log.error_fields import error_fields
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_output import PipeOutput
+    from pipelex.graph.graphspec import GraphSpec
     from pipelex.pipe_run.pipe_job import PipeJob
     from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 
@@ -25,9 +31,18 @@ if TYPE_CHECKING:
 class PipeRun(PipeRunProtocol):
     """Direct-mode PipeRun: executes the pipe inline, then delivers results."""
 
-    def __init__(self, pipe_router: PipeRouterProtocol) -> None:
+    def __init__(self, pipe_router: PipeRouterProtocol, *, reports_usage_stats: bool = True) -> None:
+        """Execute pipes through `pipe_router`.
+
+        Args:
+            pipe_router: The router the run's pipes are dispatched through.
+            reports_usage_stats: Whether a run reports its anonymous usage statistics, its `run_completed` and
+                `model_used` events, when statistics are on. Off for the runs a validation makes, which its own
+                `method_validated` describes.
+        """
         self._pipe_router = pipe_router
         self._delivery_executor = DeliveryExecutor()
+        self._reports_usage_stats = reports_usage_stats
 
     @override
     async def run(
@@ -52,9 +67,15 @@ class PipeRun(PipeRunProtocol):
         pipe_output: PipeOutput | None = None
         execution_error: Exception | None = None
         error_report: ErrorReport | None = None
+        closed_graph: GraphSpec | None = None
+        # The run's statistics: its inputs are read before the run adds its own outputs to its working memory.
+        usage_tally = RunInferenceTally() if self._reports_usage_stats and usage_stats_are_enabled() else None
+        input_kinds = input_kinds_of(working_memory=pipe_job.working_memory) if usage_tally is not None else (False, False)
+        started_at = time.monotonic()
 
         try:
-            pipe_output = await self._pipe_router.run(pipe_job)
+            with tallying_inference_calls(tally=usage_tally):
+                pipe_output = await self._pipe_router.run(pipe_job)
             # Stamp the job onto the run's OWN output, here and nowhere else.
             # Only the top-level output crosses a transport boundary; a sub-pipe's
             # output stays in-process, so stamping at every `PipeOutput(...)` site
@@ -83,7 +104,7 @@ class PipeRun(PipeRunProtocol):
             tracer_manager = GraphTracerManager.get_instance()
             if tracer_manager is not None:
                 try:
-                    tracer_manager.close_tracer(pipeline_run_id)
+                    closed_graph = tracer_manager.close_tracer(pipeline_run_id)
                 except OSError as close_error:
                     if execution_error is None:
                         raise
@@ -98,8 +119,16 @@ class PipeRun(PipeRunProtocol):
             # concerns are gated independently: graph events feed the GraphSpec (so a costs-only run does
             # not set an empty GraphSpec, preserving the --no-graph contract), usage events feed the
             # tokens_usages the submitter renders the cost report from.
+            # The run's statistics read the same events, its usage events, whether the run completed or not.
             trace_context = pipe_job.job_metadata.trace_context
-            if pipe_output is not None and trace_context is not None and (trace_context.emit_graph_events or trace_context.emit_usage_events):
+            assembles_output = (
+                pipe_output is not None and trace_context is not None and (trace_context.emit_graph_events or trace_context.emit_usage_events)
+            )
+            counts_usage = usage_tally is not None and trace_context is not None and trace_context.emit_usage_events
+            trace_events: RunTraceEvents | None = None
+            if assembles_output or counts_usage:
+                trace_events = read_run_trace_events(pipeline_run_id=pipeline_run_id)
+            if pipe_output is not None and trace_context is not None and assembles_output:
                 assemble_tracing_on_output(
                     pipe_output=pipe_output,
                     pipeline_run_id=pipeline_run_id,
@@ -108,9 +137,30 @@ class PipeRun(PipeRunProtocol):
                     domain_code=pipe_job.pipe.domain_code,
                     main_pipe_code=pipe_job.pipe.code,
                     run_mode=pipe_job.pipe_run_params.run_mode,
+                    trace_events=trace_events,
                 )
                 if trace_context.describe_pipe_io and pipe_output.graph_spec is not None:
                     self._build_pipe_io_artifacts_on_output(pipe_output=pipe_output, pipeline_run_id=pipeline_run_id)
+
+            if usage_tally is not None:
+                outcome: UsageStatsOutcome
+                if execution_error is not None:
+                    outcome = UsageStatsOutcome.FAILED
+                elif pipe_output is None:
+                    # Neither a result nor an exception: the run was cancelled or interrupted, which no `except Exception` catches.
+                    outcome = UsageStatsOutcome.CANCELLED
+                else:
+                    outcome = UsageStatsOutcome.SUCCEEDED
+                self._report_usage_stats(
+                    pipe_job=pipe_job,
+                    outcome=outcome,
+                    execution_error=execution_error,
+                    duration_seconds=time.monotonic() - started_at,
+                    input_kinds=input_kinds,
+                    trace_events=trace_events if counts_usage else None,
+                    closed_graph=closed_graph,
+                    usage_tally=usage_tally,
+                )
 
             if delivery_assignment is not None:
                 log.debug("Executing the delivery", fields={"delivery_status": status})
@@ -138,6 +188,47 @@ class PipeRun(PipeRunProtocol):
 
         assert pipe_output is not None
         return pipe_output
+
+    @classmethod
+    def _report_usage_stats(
+        cls,
+        *,
+        pipe_job: PipeJob,
+        outcome: UsageStatsOutcome,
+        execution_error: Exception | None,
+        duration_seconds: float,
+        input_kinds: tuple[bool, bool],
+        trace_events: RunTraceEvents | None,
+        closed_graph: GraphSpec | None,
+        usage_tally: RunInferenceTally,
+    ) -> None:
+        """Record the run's `run_completed`, and a `model_used` per model when its usage events were read.
+
+        Runs inside the run's library window, which the bundle's description reads. It runs in the `finally` ahead of
+        the delivery, and an anonymous statistic must never replace a run's outcome or skip its delivery, so a failure
+        to build it is logged at debug level and the event is not sent.
+        """
+        has_image_input, has_document_input = input_kinds
+        try:
+            report_run_usage(
+                facts=RunUsageFacts(
+                    outcome=outcome,
+                    error=execution_error,
+                    is_dry_run=pipe_job.pipe_run_params.run_mode.is_dry,
+                    duration_seconds=duration_seconds,
+                    main_pipe=pipe_job.pipe,
+                    own_pipes=get_own_pipes(),
+                    own_concepts=get_concept_library().list_own_concepts(),
+                    has_image_input=has_image_input,
+                    has_document_input=has_document_input,
+                    events=trace_events.events if trace_events is not None else None,
+                    closed_graph=closed_graph,
+                    tally=usage_tally,
+                )
+            )
+        except (PipelexError, ValueError, OSError) as report_error:
+            # A library that cannot describe the bundle, an event that will not validate, a state that cannot be read.
+            log.debug("The usage statistics of a run could not be built", fields=error_fields(exc=report_error))
 
     @classmethod
     def _build_pipe_io_artifacts_on_output(cls, *, pipe_output: PipeOutput, pipeline_run_id: str) -> None:

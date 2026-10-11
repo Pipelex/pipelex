@@ -90,6 +90,15 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         return list(self.root.values())
 
     @override
+    def list_own_concepts(self) -> list[Concept]:
+        # A dependency's concept is keyed `alias->domain.Code` (see `add_dependency_concept`); the natives are the library's own seed.
+        return [
+            concept
+            for key, concept in self.root.items()
+            if not QualifiedRef.has_cross_package_prefix(key) and not SpecialDomain.is_native(domain_code=concept.domain_code)
+        ]
+
+    @override
     def list_concepts_by_domain(self, domain_code: str) -> list[Concept]:
         return [concept for key, concept in self.root.items() if key.startswith(f"{domain_code}.")]
 
