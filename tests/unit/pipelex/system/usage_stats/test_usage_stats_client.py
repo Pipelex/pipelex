@@ -27,7 +27,14 @@ from pipelex.system.usage_stats.usage_stats_contract import (
     UsageStatsOutcome,
     UsageStatsSurface,
 )
-from pipelex.system.usage_stats.usage_stats_core import SpoolContent, UsageStatsState, pending_files, read_spool_file, write_spool_file
+from pipelex.system.usage_stats.usage_stats_core import (
+    PostVerdict,
+    SpoolContent,
+    UsageStatsState,
+    pending_files,
+    read_spool_file,
+    write_spool_file,
+)
 from pipelex.system.usage_stats.usage_stats_events import CommandCompletedProperties, UsageStatsEvent
 from pipelex.test_extras.usage_stats_isolation import USAGE_STATS_DEAD_LOOPBACK_ORIGIN
 from tests.helpers.usage_stats_capture import capture_server
@@ -184,6 +191,34 @@ class TestUsageStatsClient:
                 assert received[-1] == queued_uuid
                 assert len(received) == 2 * (index_case + 1)
                 assert pending_files(spool_dir=settings.state.spool_dir(tool=TOOL_NAME)) == []
+
+    @pytest.mark.parametrize("delivery", [UsageStatsDelivery.LONG_RUNNING, UsageStatsDelivery.CLI_COMMAND])
+    @pytest.mark.parametrize(
+        ("verdict", "is_drained"),
+        [(None, False), (PostVerdict.RETRY, False), (PostVerdict.REFUSED, False), (PostVerdict.ACCEPTED, True)],
+    )
+    def test_the_spool_goes_only_after_an_accepted_post(
+        self, tmp_path: Path, mocker: MockerFixture, delivery: UsageStatsDelivery, verdict: PostVerdict | None, is_drained: bool
+    ) -> None:
+        """What earlier processes queued is sent once PostHog accepted a post, never after a post of nothing, as when every
+        event was screened out, from a program's thread as from a command posting in-process.
+        """
+
+        def answered(**kwargs: Any) -> tuple[PostVerdict | None, list[dict[str, Any]]]:
+            return verdict, (list(kwargs["events"]) if verdict is not None else [])
+
+        mocker.patch.object(usage_stats_client, "post_in_process", side_effect=answered)
+        with capture_server() as server:
+            settings = _settings(tmp_path=tmp_path, origin=server.origin, delivery=delivery, is_ci=delivery == UsageStatsDelivery.CLI_COMMAND)
+            queued_uuid = _seed_spool(settings=settings)
+            client = UsageStatsClient(settings=settings)
+            client.record(event=_COMMAND_EVENT)
+            if delivery == UsageStatsDelivery.CLI_COMMAND:
+                client.finish_command()
+            else:
+                client.flush()
+            received = [event["uuid"] for event in server.events]
+        assert (queued_uuid in received) is is_drained
 
     def test_process_local_identifier_is_never_persisted(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """A malformed `id`: the command posts in-process under an identifier of its own and spools nothing on failure."""

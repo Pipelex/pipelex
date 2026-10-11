@@ -180,11 +180,14 @@ class _BackgroundSender:
         match verdict:
             case PostVerdict.RETRY:
                 self._spool(events=posted)
-            case PostVerdict.ACCEPTED | PostVerdict.REFUSED | None:
+            case PostVerdict.ACCEPTED:
                 if state.read_installation_id() == self._own_id:
-                    # PostHog answers, and this process sends under the machine's identifier: what earlier processes
-                    # queued under it goes too, within what is left of the batch's budget.
+                    # PostHog accepted the batch, and this process sends under the machine's identifier: what earlier
+                    # processes queued under it goes too, within what is left of the batch's budget.
                     drain_spool_until(state=state, tool=TOOL_NAME, origin=origin, deadline=deadline)
+            case PostVerdict.REFUSED | None:
+                # Refused for good, or nothing posted at all: nothing says PostHog would take what is queued.
+                return
 
     def _spool(self, *, events: list[dict[str, Any]]) -> None:
         origin = self._settings.origin
@@ -355,7 +358,7 @@ class UsageStatsClient:
         drain_spool_until(state=state, tool=TOOL_NAME, origin=origin, deadline=time.monotonic() + BUDGET_CLI_IN_PROCESS_MS / 1000, first=spool_file)
 
     def _post_in_process(self, *, events: list[dict[str, Any]], origin: str, own_id: str, may_spool: bool) -> None:
-        """Post the command's events within its budget and, when PostHog answered, what earlier commands queued.
+        """Post the command's events within its budget and, once PostHog accepted them, what earlier commands queued.
 
         Args:
             events: The command's events.
@@ -375,8 +378,11 @@ class UsageStatsClient:
                     write_spool_file(spool_dir=state.spool_dir(tool=TOOL_NAME), content=SpoolContent(endpoint=origin, events=posted))
                 except OSError:
                     return
-            case PostVerdict.ACCEPTED | PostVerdict.REFUSED | None:
+            case PostVerdict.ACCEPTED:
                 drain_spool_until(state=state, tool=TOOL_NAME, origin=origin, deadline=deadline)
+            case PostVerdict.REFUSED | None:
+                # Refused for good, or nothing posted at all: nothing says PostHog would take what is queued.
+                return
 
 
 # -------------------------------------------------------------------------------------------------
