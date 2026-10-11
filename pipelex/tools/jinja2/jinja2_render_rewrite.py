@@ -1,19 +1,23 @@
 """Rewrite a parsed template so that what no sandbox hook reaches is charged to the render's budget.
 
-Six constructs compile to plain Python, with no hook the sandbox could use to charge them:
+These constructs compile to plain Python, with no hook the sandbox could use to charge them:
 
 - iterating a `{% for %}` loop, which an empty loop body makes free;
 - joining with `~`;
 - comparing (`==`, `<`, `in` and the rest);
 - slicing (`value[a:b]`), which bypasses the sandbox's `getitem`;
 - writing out a list, a tuple or a dict (`[a, b]`, `(a, b)`, `{k: v}`), which a loop rebuilds;
-- emitting the template's own static text, which a loop repeats.
+- emitting the template's own static text, which a loop repeats;
+- printing a `{% filter %}` block's result, which Jinja writes out without the environment's `finalize`.
 
 `PipelexTemplateEnvironment._generate`, the hook Jinja documents for this, runs the parsed template
-through `rewrite_for_render_budget` before compiling it, so that each goes through one of the charging
+through `rewrite_for_render_budget` before compiling it, so that each goes through one of the internal
 filters of `jinja2_render_charging.py`. Static text becomes a constant marked safe, which the
-environment's `finalize` charges without escaping it. The rewrite changes what is charged, never what
-a template renders.
+environment's `finalize` charges without escaping it. A filter block's result goes through
+`printed_block`, which prints it as a `{{ }}` tag prints a value, so a filter returning anything but
+text, which Jinja would fail to join into the output, prints through `finalize` too. The rewrite
+changes what is charged, and makes such a filter block print, but never changes what a template that
+renders without it renders.
 """
 
 from __future__ import annotations
@@ -30,6 +34,7 @@ from pipelex.tools.jinja2.jinja2_render_charging import (
     CONCAT_FILTER,
     ITERATE_FILTER,
     LITERAL_FILTER,
+    PRINTED_BLOCK_FILTER,
     SLICED_FILTER,
 )
 
@@ -46,7 +51,7 @@ def _is_charging_filter(*, node: nodes.Node, name: str) -> bool:
 
 
 class _RenderBudgetRewriter(NodeTransformer):
-    """Route loops, `~`, comparisons, slices, literals and static text through the budget's charging filters."""
+    """Route loops, `~`, comparisons, slices, literals, static text and filter blocks through the budget's internal filters."""
 
     @override
     def get_visitor(self, node: nodes.Node) -> Callable[..., Any] | None:
@@ -63,6 +68,8 @@ class _RenderBudgetRewriter(NodeTransformer):
                 return self._rewrite_filter
             case nodes.Output():
                 return self._rewrite_output
+            case nodes.FilterBlock():
+                return self._rewrite_filter_block
             case nodes.List() | nodes.Dict():
                 return self._rewrite_literal
             case nodes.Tuple():
@@ -114,6 +121,13 @@ class _RenderBudgetRewriter(NodeTransformer):
             node.args = [self.visit(argument) for argument in node.args]
             return node
         self.generic_visit(node)
+        return node
+
+    def _rewrite_filter_block(self, node: nodes.FilterBlock) -> nodes.Node:
+        self.generic_visit(node)
+        if not _is_charging_filter(node=node.filter, name=PRINTED_BLOCK_FILTER):
+            # The block's filters apply to its body; the outermost one's result is what the block prints.
+            node.filter = _charging_filter(node=node.filter, name=PRINTED_BLOCK_FILTER)
         return node
 
     def _rewrite_output(self, node: nodes.Output) -> nodes.Node:

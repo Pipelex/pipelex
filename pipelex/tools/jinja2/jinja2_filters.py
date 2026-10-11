@@ -231,9 +231,9 @@ def markdown_to_formatted(value: Any) -> FormattedMarkdown:
 
     The result is a `FormattedMarkdown` (`markdown_formatting.py`, which the document engine contract names in
     `pipelex/cogt/doc_gen/formatted_markdown.py`), which the engine's `finalize` turns into its own form when it
-    prints, which prints as its plain text where nothing does, and which is false when it holds nothing, as for None
-    or a blank text. The conversion is charged to the render's budget, or, called outside any render, to a budget of
-    its own, as large as one render's.
+    prints, in a `{{ … | markdown }}` tag or a `{% filter markdown %}` block alike, which prints as its plain text
+    where nothing does, and which is false when it holds nothing, as for None or a blank text. The conversion is
+    charged to the render's budget, or, called outside any render, to a budget of its own, as large as one render's.
     """
     if value is None:
         return FormattedMarkdown(blocks=[])

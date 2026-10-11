@@ -69,6 +69,69 @@ class TestPlainDataTemplateEnvironment:
         )
         assert rendered == "<paragraph,list_item,list_item>|3|Invoice"
 
+    def test_a_markdown_filter_block_prints_through_the_engine_s_finalize(self) -> None:
+        environment = make_plain_data_template_environment(finalize=_kinds_of_formatted)
+        over_a_value = environment.from_string("{% filter markdown %}{{ notes }}{% endfilter %}|{{ count }}").render(
+            notes=MarkdownFormattingTestData.NOTES, count=3
+        )
+        assert over_a_value == "<paragraph,list_item,list_item>|3"
+        assert environment.from_string("{% filter markdown %}Due in **30** days.{% endfilter %}").render() == "<paragraph>"
+
+    def test_a_markdown_filter_block_prints_its_plain_text_without_a_finalize(self) -> None:
+        template = make_plain_data_template_environment().from_string("{% filter markdown %}{{ notes }}{% endfilter %}")
+        assert template.render(notes=MarkdownFormattingTestData.NOTES) == MarkdownFormattingTestData.NOTES_PLAIN_TEXT
+
+    @pytest.mark.parametrize(
+        ("block_source", "printed_source"),
+        [
+            pytest.param(
+                "{% set out %}{% filter markdown %}{{ notes }}{% endfilter %}{% endset %}[{{ out }}]",
+                "{% set out %}{{ notes | markdown }}{% endset %}[{{ out }}]",
+                id="in_a_set_block",
+            ),
+            pytest.param(
+                "{% macro m(n) %}[{% filter markdown %}{{ n }}{% endfilter %}]{% endmacro %}{{ m(notes) }}",
+                "{% macro m(n) %}[{{ n | markdown }}]{% endmacro %}{{ m(notes) }}",
+                id="in_a_macro",
+            ),
+            pytest.param(
+                "{% for n in [notes, notes] %}{% filter markdown %}{{ n }}{% endfilter %};{% endfor %}",
+                "{% for n in [notes, notes] %}{{ n | markdown }};{% endfor %}",
+                id="in_a_loop",
+            ),
+            pytest.param(
+                "{% filter upper %}{% filter markdown %}{{ notes }}{% endfilter %}{% endfilter %}",
+                "{% filter upper %}{{ notes | markdown }}{% endfilter %}",
+                id="in_another_filter_block",
+            ),
+        ],
+    )
+    @pytest.mark.parametrize("with_finalize", [True, False])
+    def test_a_markdown_filter_block_prints_as_the_printed_form_does(self, block_source: str, printed_source: str, with_finalize: bool) -> None:
+        environment = make_plain_data_template_environment(finalize=_kinds_of_formatted if with_finalize else None)
+        notes = MarkdownFormattingTestData.NOTES
+        assert environment.from_string(block_source).render(notes=notes) == environment.from_string(printed_source).render(notes=notes)
+
+    def test_a_markdown_filter_block_reads_none_printed_in_its_body_as_text(self) -> None:
+        # The block's body is printed before the filter reads it, so None arrives as the text "None"; the tag form
+        # is the one that turns None into nothing, as the docs say.
+        environment = make_plain_data_template_environment()
+        assert environment.from_string("[{% filter markdown %}{{ notes }}{% endfilter %}]").render(notes=None) == "[None]"
+        assert environment.from_string("[{{ notes | markdown }}]").render(notes=None) == "[]"
+
+    def test_a_filter_after_markdown_in_a_block_prints_what_it_returns(self) -> None:
+        environment = make_plain_data_template_environment(finalize=_kinds_of_formatted)
+        template = environment.from_string("{% filter markdown | upper %}{{ notes }}{% endfilter %}")
+        assert template.render(notes=MarkdownFormattingTestData.NOTES) == MarkdownFormattingTestData.NOTES_PLAIN_TEXT.upper()
+
+    def test_a_markdown_filter_block_under_autoescape_prints_as_the_printed_form_does(self) -> None:
+        environment = make_plain_data_template_environment(finalize=_marker_for_formatted)
+        environment.autoescape = True
+        assert environment.from_string("{% filter markdown %}a < b{% endfilter %}").render() == "<?marker?>"
+        plain_environment = make_plain_data_template_environment()
+        plain_environment.autoescape = True
+        assert plain_environment.from_string("{% filter markdown %}a < **b** & c{% endfilter %}").render() == "a &lt; b &amp; c"
+
     def test_markdown_prints_its_plain_text_without_a_finalize(self) -> None:
         rendered = (
             make_plain_data_template_environment()
