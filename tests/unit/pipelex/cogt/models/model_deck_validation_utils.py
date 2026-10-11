@@ -7,6 +7,14 @@ and are used by multiple test modules.
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind
 
+# Deck aliases that knowingly name a model no backend file of the kit declares as their family's type,
+# because the backend that would serve it on the user's own keys does not exist yet, each with the reason.
+# The deck's own comment beside the alias says the same to the person reading the deck. The shipped deck's
+# default guard holds each entry to staying unserved, so it ends with the gap it explains.
+ALIASES_AWAITING_A_KIT_BACKEND: dict[tuple[ModelType, str], str] = {
+    (ModelType.JUDGMENT, "default-judgment-vision"): "gpt-6-luna judges through OpenAI's Decisions API, which the openai plugin does not call yet",
+}
+
 
 def find_invalid_alias_targets(
     aliases: dict[str, str],
