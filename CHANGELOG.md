@@ -9,7 +9,7 @@
 ### Changed
 
 - **The Bedrock client's `chat` returns a `BedrockChatResult` (Breaking)**: `BedrockClientProtocol.chat` returns a named result holding the text, the token usage and Converse's `stopReason`, in place of a `(text, usage)` tuple, so a custom Bedrock client returns `read_converse_response(response=…)` or builds the result itself.
-- **A lowered Anthropic structured-output limit is said**: when a structured generation on an Anthropic model lowers `max_tokens` to fit its structured-output timeout, the call logs it, at warning level when the pipe set the limit and at debug level when it is the model's default, and an error the call raises ends with a sentence saying the limit was lowered and to what.
+- **A lowered Anthropic structured-output limit is said**: when a structured generation on an Anthropic model lowers `max_tokens` to fit its structured-output timeout, the call logs it, at warning level when the pipe set the limit and at debug level when it is the model's default, and an error the lowered limit can explain, a structured output that failed validation or came back incomplete, or a timeout, ends with a sentence saying the limit was lowered and to what, never a rate limit, an authentication failure, an overload, a server error or a lost connection.
 
 ### Fixed
 

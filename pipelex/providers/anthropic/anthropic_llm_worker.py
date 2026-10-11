@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from anthropic import (
     APIConnectionError,
     APIStatusError,
+    APITimeoutError,
     AsyncAnthropic,
     omit,
 )
@@ -156,7 +157,8 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         A max_tokens the pipe's setting asked for and the call lowers is said at warning level, since the call then
         sends less than the method wrote. The model's own default lowered is said at debug level: a model whose
         default exceeds what the timeout allows has it lowered on every structured call, by design. Either way, an
-        error the call raises says the limit was lowered and to what.
+        error the call raises for a failure the lowered limit can explain, an output that failed validation or came
+        back incomplete, or a timeout, says the limit was lowered and to what (see `_with_note`).
 
         Args:
             is_caller_setting: Whether the requested max_tokens is the pipe's setting rather than the model's default.
@@ -165,7 +167,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
             timeout_seconds: The structured call's timeout, which the effective max_tokens fits.
 
         Returns:
-            The sentence an error of the call ends with, None when the call sends the max_tokens it was given.
+            The sentence such an error of the call ends with, None when the call sends the max_tokens it was given.
         """
         if effective_max_tokens >= requested_max_tokens:
             return None
@@ -185,13 +187,33 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         )
 
     @classmethod
-    def _with_note(cls, *, error: CogtError, note: str | None) -> CogtError:
-        """The error a structured call raises, its message ending with the note when there is one.
+    def _lowered_max_tokens_can_explain(cls, *, failure: BaseException | None) -> bool:
+        """Whether a lowered max_tokens can explain the failure that ended a structured call.
+
+        A lower limit can cut the structured output short, which instructor reports, once its re-asks are spent, as
+        an output that failed validation or came back incomplete; and the limit is lowered to fit the call's
+        timeout, so a timeout concerns it too. A failure the API or the network answered for its own reason, a rate
+        limit, an authentication failure, an overload, a server error or a lost connection, has nothing to do with it.
+
+        Args:
+            failure: The exception that ended the call, None when instructor's wrapper carries none.
+
+        Returns:
+            True when the failure is a timeout or no API or connection error.
+        """
+        if isinstance(failure, APITimeoutError):
+            return True
+        return not isinstance(failure, (APIStatusError, APIConnectionError))
+
+    @classmethod
+    def _with_note(cls, *, error: CogtError, note: str | None, failure: BaseException | None) -> CogtError:
+        """The error a structured call raises, its message ending with the note when the lowered limit can explain the failure.
 
         The note adds a fact to the error the call built and changes nothing else: its class, its category and
-        whether it is retried stay what they were.
+        whether it is retried stay what they were. It is left off an error the lowered limit cannot explain, a rate
+        limit or an outage, so that error does not point at max_tokens.
         """
-        if note is None:
+        if note is None or not cls._lowered_max_tokens_can_explain(failure=failure):
             return error
         error.message = f"{error.message} {note}"
         error.args = (error.message,)
@@ -502,7 +524,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                     model_desc=self.inference_model.desc,
                     model_handle=self.inference_model.name,
                 )
-                raise self._with_note(error=rendered_error, note=lowered_max_tokens_note) from instructor_exc
+                raise self._with_note(error=rendered_error, note=lowered_max_tokens_note, failure=underlying_exc) from instructor_exc
             msg = (
                 f"Anthropic structured generation via 'instructor' failed with model: {self.inference_model.desc} "
                 f"trying to generate schema: {schema} with error: {instructor_exc}"
@@ -515,7 +537,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                     detail="Structured generation failed for an unrecognized reason — retry, and report this if it persists",
                 ),
             )
-            raise self._with_note(error=fallback_error, note=lowered_max_tokens_note) from instructor_exc
+            raise self._with_note(error=fallback_error, note=lowered_max_tokens_note, failure=None) from instructor_exc
         except (APIStatusError, APIConnectionError) as sdk_exc:
             metadata = extract_anthropic_metadata(sdk_exc)
             classification = classify_inference_error(metadata)
@@ -526,7 +548,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                 model_desc=self.inference_model.desc,
                 model_handle=self.inference_model.name,
             )
-            raise self._with_note(error=rendered_error, note=lowered_max_tokens_note) from sdk_exc
+            raise self._with_note(error=rendered_error, note=lowered_max_tokens_note, failure=sdk_exc) from sdk_exc
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
             llm_tokens_usage.nb_tokens_by_category = AnthropicFactory.make_nb_tokens_by_category(usage=usage)
 

@@ -5,11 +5,12 @@ from typing import TYPE_CHECKING
 import anthropic
 import httpx
 import pytest
+from anthropic.types import ToolUseBlock
 
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.providers.anthropic import anthropic_llm_worker
-from tests.helpers.anthropic_structured_request import make_structured_worker, sent_request
+from tests.helpers.anthropic_structured_request import make_message, make_structured_worker, sent_request
 from tests.helpers.instructor_test_utils import DummySchema, make_llm_job, wrap_in_instructor_retry
 
 if TYPE_CHECKING:
@@ -22,15 +23,28 @@ TIMEOUT_SAFE_MAX_TOKENS = 42666
 LOWERED_NOTE = f"The structured output's max_tokens was lowered from 64000 to {TIMEOUT_SAFE_MAX_TOKENS} to fit its 1200-second timeout."
 
 
-def _rate_limit_error() -> anthropic.RateLimitError:
-    request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
-    return anthropic.RateLimitError("Rate limit exceeded", response=httpx.Response(429, request=request), body=None)
+MESSAGES_REQUEST = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
 
 
-def _fail_the_structured_call(mocker: MockerFixture, *, worker: AnthropicLLMWorker) -> None:
-    """Make the structured call fail as instructor fails it on a rate-limited request: wrapped, after one attempt."""
+def _status_error(error_class: type[anthropic.APIStatusError], *, status_code: int, message: str) -> anthropic.APIStatusError:
+    return error_class(message, response=httpx.Response(status_code, request=MESSAGES_REQUEST), body=None)
+
+
+# Failures the API or the network answered for its own reason, which no lowered max_tokens explains
+UNRELATED_FAILURES: list[tuple[str, Exception]] = [
+    ("rate limit", _status_error(anthropic.RateLimitError, status_code=429, message="Rate limit exceeded")),
+    ("authentication", _status_error(anthropic.AuthenticationError, status_code=401, message="Invalid API key")),
+    ("overloaded", _status_error(anthropic.InternalServerError, status_code=529, message="Overloaded")),
+    ("server error", _status_error(anthropic.InternalServerError, status_code=500, message="Internal server error")),
+    ("lost connection", anthropic.APIConnectionError(request=MESSAGES_REQUEST)),
+]
+
+
+def _fail_the_structured_call(mocker: MockerFixture, *, worker: AnthropicLLMWorker, failure: Exception, is_wrapped: bool) -> None:
+    """Make the structured call fail with the failure given, wrapped as instructor wraps one after an attempt, or raised as is."""
     instructor_client = mocker.MagicMock()
-    instructor_client.chat.completions.create_with_completion = mocker.AsyncMock(side_effect=wrap_in_instructor_retry(_rate_limit_error()))
+    side_effect = wrap_in_instructor_retry(failure) if is_wrapped else failure
+    instructor_client.chat.completions.create_with_completion = mocker.AsyncMock(side_effect=side_effect)
     worker.instructor_for_objects = instructor_client
 
 
@@ -73,10 +87,25 @@ class TestAnthropicStructuredClamp:
         ]
         assert len(lowered_calls) == 1
 
-    async def test_an_error_of_the_lowered_call_says_the_limit_was_lowered(self, mocker: MockerFixture) -> None:
+    @pytest.mark.parametrize("is_wrapped", [True, False])
+    @pytest.mark.parametrize(("_topic", "failure"), UNRELATED_FAILURES)
+    async def test_an_error_the_lowered_limit_cannot_explain_carries_no_note(
+        self, mocker: MockerFixture, _topic: str, failure: Exception, is_wrapped: bool
+    ) -> None:
+        """A rate limit, an authentication failure, an overload, a server error or a lost connection never points at max_tokens."""
+        worker, _ = make_structured_worker(mocker, structure_method=StructureMethod.INSTRUCTOR_ANTHROPIC_TOOLS, default_max_tokens=64000)
+        _fail_the_structured_call(mocker, worker=worker, failure=failure, is_wrapped=is_wrapped)
+
+        with pytest.raises(LLMCompletionError) as exc_info:
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
+        assert "was lowered" not in exc_info.value.message
+
+    @pytest.mark.parametrize("is_wrapped", [True, False])
+    async def test_a_timeout_of_the_lowered_call_says_the_limit_was_lowered(self, mocker: MockerFixture, is_wrapped: bool) -> None:
         """The note is added to the error the call raises, whose class and retryable category stay as they were."""
         worker, _ = make_structured_worker(mocker, structure_method=StructureMethod.INSTRUCTOR_ANTHROPIC_TOOLS, default_max_tokens=64000)
-        _fail_the_structured_call(mocker, worker=worker)
+        _fail_the_structured_call(mocker, worker=worker, failure=anthropic.APITimeoutError(request=MESSAGES_REQUEST), is_wrapped=is_wrapped)
 
         with pytest.raises(LLMCompletionError) as exc_info:
             await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
@@ -87,9 +116,22 @@ class TestAnthropicStructuredClamp:
         assert error.error_category == InferenceErrorCategory.TRANSIENT
         assert error.to_error_report().retryable is True
 
+    async def test_an_invalid_output_of_the_lowered_call_says_the_limit_was_lowered(self, mocker: MockerFixture) -> None:
+        """An output that still fails validation once instructor's re-asks are spent may have been cut by the lowered limit."""
+        invalid_output = make_message(ToolUseBlock(type="tool_use", id="toolu_test", name="DummySchema", input={"unexpected": "field"}))
+        worker, create = make_structured_worker(
+            mocker, structure_method=StructureMethod.INSTRUCTOR_ANTHROPIC_TOOLS, default_max_tokens=64000, responses=[invalid_output]
+        )
+
+        with pytest.raises(LLMCompletionError) as exc_info:
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
+        assert sent_request(create)["max_tokens"] == TIMEOUT_SAFE_MAX_TOKENS
+        assert exc_info.value.message.endswith(LOWERED_NOTE)
+
     async def test_an_error_of_a_call_sent_as_given_carries_no_note(self, mocker: MockerFixture) -> None:
         worker, _ = make_structured_worker(mocker, structure_method=StructureMethod.INSTRUCTOR_ANTHROPIC_TOOLS)
-        _fail_the_structured_call(mocker, worker=worker)
+        _fail_the_structured_call(mocker, worker=worker, failure=anthropic.APITimeoutError(request=MESSAGES_REQUEST), is_wrapped=True)
 
         with pytest.raises(LLMCompletionError) as exc_info:
             await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
