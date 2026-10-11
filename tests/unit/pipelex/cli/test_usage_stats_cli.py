@@ -6,6 +6,7 @@ from typing import Any
 import click
 import pytest
 import typer
+from pytest_mock import MockerFixture
 
 from pipelex.cli._cli import app as pipelex_app
 from pipelex.cli.agent_cli._agent_cli import app as agent_app
@@ -71,6 +72,21 @@ def _local_init() -> None:
 
 def _hosted_init() -> None:
     note_init_execution(execution=RunExecution.HOSTED)
+
+
+def _ask() -> None:
+    typer.prompt("Name")
+
+
+def _confirm() -> None:
+    typer.confirm("Proceed?", abort=True)
+
+
+def _prompting_app() -> click.Command:
+    prompting = typer.Typer()
+    prompting.command(name="ask")(_ask)
+    prompting.command(name="confirm")(_confirm)
+    return typer.main.get_command(prompting)
 
 
 class TestUsageStatsCli:
@@ -181,6 +197,35 @@ class TestUsageStatsCli:
             assert properties[name] == value
         assert ("error_domain" in properties) is ("error_domain" in expected)
         assert ("hosted" in properties) is ("hosted" in expected)
+
+    @pytest.mark.parametrize(
+        ("command", "prompt_answer", "outcome"),
+        [
+            ("ask", KeyboardInterrupt(), "cancelled"),
+            ("confirm", "n", "cancelled"),
+            ("ask", EOFError(), "failed"),
+        ],
+    )
+    def test_a_command_stopped_at_a_prompt_is_cancelled(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        mocker: MockerFixture,
+        command: str,
+        prompt_answer: BaseException | str,
+        outcome: str,
+    ) -> None:
+        """Ctrl-C at a prompt, or a confirmation declined, reaches Typer as Click's `Abort` and exits 1, yet the person stopped it."""
+        mocker.patch("click.termui.visible_prompt_func", side_effect=[prompt_answer])
+        prompting = _prompting_app()
+        with usage_stats_switched_on(monkeypatch=monkeypatch, home=tmp_path / "home", cwd=make_project_dir(parent=tmp_path), is_debug=True):
+            with pytest.raises(SystemExit) as exit_info:
+                _run(surface=UsageStatsSurface.PIPELEX, args=["run", "bundle", "x.mthds"], invoke=lambda: prompting.main(args=[command]))
+            events = _debug_events(capsys.readouterr().err)
+        assert exit_info.value.code == 1
+        assert len(events) == 1
+        assert events[0]["properties"]["outcome"] == outcome
 
     @pytest.mark.parametrize(
         ("surface", "args", "invoke", "expected"),

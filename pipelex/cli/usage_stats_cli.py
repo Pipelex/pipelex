@@ -196,6 +196,29 @@ def outcome_for_exit_code(*, code: object) -> UsageStatsOutcome:
     return UsageStatsOutcome.FAILED
 
 
+def is_stopped_by_the_person(*, abort: click.exceptions.Abort) -> bool:
+    """Whether Click's `Abort` means the person stopped the command: Ctrl-C at a prompt, or a confirmation declined.
+
+    Click raises it from a prompt interrupted by Ctrl-C and from a `confirm(abort=True)` answered no; it also raises it
+    when a prompt finds its input ended, which is a failure, not a choice.
+    """
+    reason = abort.__cause__ or abort.__context__
+    return not isinstance(reason, EOFError)
+
+
+def outcome_for_exit(*, exit_signal: SystemExit) -> UsageStatsOutcome:
+    """A command's outcome by how it exited.
+
+    Typer turns Click's `Abort` into exit code 1, the code of a failure, from within its handler of the `Abort`, so the
+    exit's context still names it: a command the person stopped that way is `cancelled`, as one stopped by Ctrl-C
+    anywhere else, exiting 130, is.
+    """
+    reason = exit_signal.__context__
+    if isinstance(reason, click.exceptions.Abort) and is_stopped_by_the_person(abort=reason):
+        return UsageStatsOutcome.CANCELLED
+    return outcome_for_exit_code(code=exit_signal.code)
+
+
 def run_with_usage_stats(
     *,
     root: click.Group,
@@ -226,10 +249,15 @@ def run_with_usage_stats(
         outcome = UsageStatsOutcome.SUCCEEDED
         return result
     except SystemExit as exit_signal:
-        outcome = outcome_for_exit_code(code=exit_signal.code)
+        outcome = outcome_for_exit(exit_signal=exit_signal)
         raise
     except KeyboardInterrupt:
         outcome = UsageStatsOutcome.CANCELLED
+        raise
+    except click.exceptions.Abort as abort:
+        # Outside standalone mode Click's `Abort` reaches the caller as it is.
+        if is_stopped_by_the_person(abort=abort):
+            outcome = UsageStatsOutcome.CANCELLED
         raise
     except PipelexError as pipelex_error:
         failure = pipelex_error
