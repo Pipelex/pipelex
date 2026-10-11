@@ -13,6 +13,7 @@ from pipelex.system.environment import PIPELEX_HOME_ENV_KEY
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
+from pipelex.test_extras.usage_stats_isolation import turn_usage_stats_off_for_the_session, usage_stats_guarded
 from pipelex.tools.log.error_fields import error_fields
 
 if TYPE_CHECKING:
@@ -23,6 +24,11 @@ pytest_plugins = [
 ]
 
 TEST_OUTPUTS_DIR = "temp/test_outputs"
+
+# Anonymous usage statistics: no test reports to Pipelex, and none touches this machine's shared state in `~/.mthds/`.
+# Turned off in the environment when this conftest loads, before any test runs and before xdist starts its workers, so
+# every process a test starts inherits it; `isolate_usage_stats` below guards this process and its workers.
+USAGE_STATS_TEST_HOME = turn_usage_stats_off_for_the_session()
 
 
 def _fast_telemetry_teardown(self: "TelemetryManager") -> None:
@@ -56,6 +62,13 @@ def cache_configs_for_session(session_mocker: MockerFixture):
     from pipelex.system.telemetry.telemetry_manager import TelemetryManager  # ruff: ignore[import-outside-top-level]
 
     session_mocker.patch.object(TelemetryManager, "teardown", _fast_telemetry_teardown)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def isolate_usage_stats() -> Generator[None, None, None]:
+    """Keep the shared statistics state in a temporary home, and fail any attempt to send to a host that is not loopback."""
+    with usage_stats_guarded(home=USAGE_STATS_TEST_HOME):
+        yield
 
 
 def _get_test_integration_mode() -> IntegrationMode:

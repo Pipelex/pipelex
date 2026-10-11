@@ -15,6 +15,8 @@ pipelex init --local [FOCUS]
 
 By default, `pipelex init` writes to the home configuration directory (`~/.pipelex/`, or `PIPELEX_HOME`; see [Configuration](../../configuration/index.md#the-home-configuration-directory-pipelex_home)). Use `--local` to create a project-level `.pipelex/` directory at the detected project root. Credentials always remain in the home configuration directory regardless of `--local`.
 
+Whenever [usage statistics](../../setup/usage-statistics.md) are on, `pipelex init` shows their notice on stderr ahead of its own output, once per run; with them off, it shows nothing about them.
+
 !!! note "Config updates not yet supported"
     The `pipelex init` command always performs a full reset of the configuration. Incremental config updates will be supported in a future release.
 

@@ -1,0 +1,1634 @@
+{
+  "description": "The usage-statistics contract in machine-readable form: the source of truth for specs/usage-statistics.md's generated tables, the PostHog gate generated from it, and every emitter's typed events. Emitters vendor it byte-identical; conformance/scripts/check-usage-statistics-schema.py gates the copies.",
+  "spec": "conformance/specs/usage-statistics.md",
+  "schema_version": 1,
+  "destination": {
+    "project": "Open-source usage",
+    "region": "eu",
+    "capture_host": "https://eu.i.posthog.com",
+    "batch_path": "/batch/",
+    "project_token": "phc_uQjSVbzNPJxA8bHxfevn7NMzB6PbC6aJQRB6ka6MxT7a"
+  },
+  "notice": {
+    "version": 1,
+    "details_url": "https://docs.pipelex.com/latest/setup/usage-statistics/",
+    "text": "Pipelex collects anonymous usage statistics: counts of commands, runs, pipe types, models and tokens, and the country your IP address maps to; the address itself is never stored. It never collects your methods, prompts, inputs, outputs, file names or pipe names. To turn it off, run `{disable_command}` or set DO_NOT_TRACK=1. Details: {details_url}",
+    "disable_commands": {
+      "pipelex": "pipelex usage-stats disable",
+      "plxt": "plxt usage-stats disable",
+      "vscode-pipelex": "Pipelex: Disable Usage Statistics",
+      "mthds": "mthds telemetry disable"
+    }
+  },
+  "patterns": {
+    "release_version": {
+      "regex": "^[0-9]{1,4}\\.[0-9]{1,4}\\.[0-9]{1,4}([.-]?(a|b|rc|alpha|beta|dev|post|insider)[.]?[0-9]{0,4})?$",
+      "max_length": 32,
+      "description": "A released version: three numeric components and at most one pre-release, development or post-release tag from a closed set."
+    },
+    "language_runtime": {
+      "regex": "^(python-[0-9]{1,2}\\.[0-9]{1,3}|node-[0-9]{1,3})$",
+      "max_length": 16,
+      "description": "A language runtime and its version: major and minor for Python, such as `python-3.13`, major only for Node, such as `node-22`."
+    },
+    "model_handle": {
+      "regex": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}$",
+      "max_length": 96,
+      "description": "A model's name as a shipped backend table names it, or `other`."
+    },
+    "installation_id": {
+      "regex": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "max_length": 36,
+      "description": "A random UUID version 4 in its canonical lowercase form."
+    },
+    "ip_address": {
+      "regex": "^[0-9A-Fa-f.:]{2,45}$",
+      "max_length": 45,
+      "description": "An IPv4 or IPv6 address as PostHog's capture writes it."
+    },
+    "country_code": {
+      "regex": "^[A-Z]{2}$",
+      "max_length": 2,
+      "description": "An ISO 3166-1 alpha-2 country code."
+    },
+    "country_name": {
+      "regex": "^[^\\x00-\\x1f]{1,64}$",
+      "max_length": 64,
+      "description": "A country's English name as PostHog's GeoIP database gives it."
+    },
+    "event_uuid": {
+      "regex": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$",
+      "max_length": 36,
+      "description": "An event's UUID: the version 4 the sender drew, or the one PostHog assigns to an event that came without one."
+    },
+    "event_timestamp": {
+      "regex": "^[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,9})?(Z|[+-][0-9]{2}:?[0-9]{2})?$",
+      "max_length": 40,
+      "description": "An RFC 3339 date and time, such as `2026-10-11T09:30:00.123Z`, as the sender wrote it or PostHog normalised it."
+    }
+  },
+  "envelope": {
+    "fields": {
+      "distinct_id": {
+        "pattern": "installation_id",
+        "description": "The installation identifier."
+      },
+      "uuid": {
+        "pattern": "event_uuid",
+        "description": "Drawn when the event is created and kept by every resend."
+      },
+      "timestamp": {
+        "pattern": "event_timestamp",
+        "description": "When the event was created, in UTC with milliseconds."
+      }
+    },
+    "empty_fields": {
+      "elements_chain": "PostHog derives it from `$elements_chain`, which no event declares; no sender sets it.",
+      "url": "PostHog derives it from `$current_url`, which no event declares; no sender sets it."
+    }
+  },
+  "common_properties": {
+    "schema": {
+      "type": "integer",
+      "required": true,
+      "min": 1,
+      "max": 1,
+      "description": "The version of this event schema the event follows."
+    },
+    "tool": {
+      "type": "enum",
+      "required": true,
+      "values": [
+        "pipelex",
+        "plxt",
+        "vscode-pipelex",
+        "mthds"
+      ],
+      "description": "The reporting tool."
+    },
+    "tool_version": {
+      "type": "pattern",
+      "required": true,
+      "pattern": "release_version",
+      "description": "The reporting tool's released version."
+    },
+    "surface": {
+      "type": "enum",
+      "required": true,
+      "values_by": {
+        "property": "tool",
+        "values": {
+          "pipelex": [
+            "pipelex",
+            "pipelex-agent",
+            "api",
+            "python"
+          ],
+          "plxt": [
+            "plxt"
+          ],
+          "vscode-pipelex": [
+            "extension"
+          ],
+          "mthds": [
+            "mthds",
+            "mthds-agent"
+          ]
+        }
+      },
+      "description": "Which entry point of the tool sent the event; the values depend on `tool`."
+    },
+    "integration": {
+      "type": "enum",
+      "required": true,
+      "values": [
+        "cli",
+        "python",
+        "fastapi",
+        "docker",
+        "mcp",
+        "n8n",
+        "ci"
+      ],
+      "description": "The pipelex runtime's integration mode. Sent by pipelex only.",
+      "when": {
+        "property": "tool",
+        "equals": "pipelex"
+      }
+    },
+    "host": {
+      "type": "enum",
+      "required": false,
+      "values": [
+        "cocode",
+        "mthds-agent",
+        "other"
+      ],
+      "description": "The program of ours that embeds or spawns the tool, when one declares itself; absent otherwise."
+    },
+    "id_new": {
+      "type": "boolean",
+      "required": true,
+      "description": "Whether this process created the installation identifier."
+    },
+    "os": {
+      "type": "enum",
+      "required": true,
+      "values": [
+        "linux",
+        "darwin",
+        "windows",
+        "other"
+      ],
+      "description": "The operating system family."
+    },
+    "arch": {
+      "type": "enum",
+      "required": true,
+      "values": [
+        "x86_64",
+        "arm64",
+        "other"
+      ],
+      "description": "The processor architecture."
+    },
+    "language_runtime": {
+      "type": "pattern",
+      "required": false,
+      "pattern": "language_runtime",
+      "description": "The language runtime the tool runs on, for the tools that run on one."
+    },
+    "ci": {
+      "type": "boolean",
+      "required": true,
+      "description": "Whether the process runs in continuous integration, by the rule of the CI section."
+    },
+    "container": {
+      "type": "boolean",
+      "required": true,
+      "description": "Whether the process runs in a container, by the rule of the container section."
+    },
+    "internal": {
+      "type": "boolean",
+      "required": true,
+      "description": "Whether the shared state marks the machine as one of the team's."
+    },
+    "notice_version": {
+      "type": "integer",
+      "required": true,
+      "min": 0,
+      "max": 1,
+      "description": "The highest notice version recorded as shown on this machine, 0 when none."
+    }
+  },
+  "events": {
+    "run_completed": {
+      "description": "One per run, whatever started it and however it ended.",
+      "tools": [
+        "pipelex"
+      ],
+      "common": true,
+      "person_profile": "never",
+      "properties": {
+        "outcome": {
+          "type": "enum",
+          "required": true,
+          "values": [
+            "succeeded",
+            "failed",
+            "cancelled"
+          ],
+          "description": "How the run ended."
+        },
+        "error_domain": {
+          "type": "enum",
+          "required": true,
+          "values": [
+            "input",
+            "config",
+            "runtime",
+            "other"
+          ],
+          "description": "For a failed run, who can fix the error, `other` when the runtime cannot say.",
+          "when": {
+            "property": "outcome",
+            "equals": "failed"
+          }
+        },
+        "dry_run": {
+          "type": "boolean",
+          "required": true,
+          "description": "Whether the run was a dry run."
+        },
+        "method_source": {
+          "type": "enum",
+          "required": true,
+          "values": [
+            "local_bundle",
+            "inline_source",
+            "installed_method",
+            "published_address",
+            "catalog_id",
+            "other"
+          ],
+          "description": "Where the method came from, by kind only."
+        },
+        "duration_ms": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 2592000000,
+          "description": "The run's wall-clock duration in milliseconds."
+        },
+        "bundle_pipes": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 100000,
+          "description": "The number of pipes the run's bundle declares."
+        },
+        "bundle_concepts": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 100000,
+          "description": "The number of concepts the run's bundle declares."
+        },
+        "bundle_depth": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000,
+          "description": "The deepest nesting of controllers under the run's main pipe."
+        },
+        "feature_batch": {
+          "type": "boolean",
+          "required": true,
+          "description": "Whether the bundle uses batching."
+        },
+        "feature_parallel": {
+          "type": "boolean",
+          "required": true,
+          "description": "Whether the bundle uses parallel branches."
+        },
+        "feature_condition": {
+          "type": "boolean",
+          "required": true,
+          "description": "Whether the bundle uses a condition."
+        },
+        "feature_structured_output": {
+          "type": "boolean",
+          "required": true,
+          "description": "Whether a pipe of the bundle produces a structured concept."
+        },
+        "feature_image_input": {
+          "type": "boolean",
+          "required": true,
+          "description": "Whether the run received an image input."
+        },
+        "feature_document_input": {
+          "type": "boolean",
+          "required": true,
+          "description": "Whether the run received a document input."
+        },
+        "usage_known": {
+          "type": "boolean",
+          "required": true,
+          "description": "Whether the run's events were read for its counts; false when tracing or usage events are off."
+        },
+        "pipes_llm": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000000,
+          "description": "The number of PipeLLM pipes the run executed.",
+          "when": {
+            "property": "usage_known",
+            "equals": true
+          }
+        },
+        "pipes_extract": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000000,
+          "description": "The number of PipeExtract pipes the run executed.",
+          "when": {
+            "property": "usage_known",
+            "equals": true
+          }
+        },
+        "pipes_img_gen": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000000,
+          "description": "The number of PipeImgGen pipes the run executed.",
+          "when": {
+            "property": "usage_known",
+            "equals": true
+          }
+        },
+        "pipes_search": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000000,
+          "description": "The number of PipeSearch pipes the run executed.",
+          "when": {
+            "property": "usage_known",
+            "equals": true
+          }
+        },
+        "pipes_compose": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000000,
+          "description": "The number of PipeCompose pipes the run executed.",
+          "when": {
+            "property": "usage_known",
+            "equals": true
+          }
+        },
+        "pipes_structure": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000000,
+          "description": "The number of PipeStructure pipes the run executed.",
+          "when": {
+            "property": "usage_known",
+            "equals": true
+          }
+        },
+        "pipes_doc_gen": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000000,
+          "description": "The number of PipeDocGen pipes the run executed.",
+          "when": {
+            "property": "usage_known",
+            "equals": true
+          }
+        },
+        "pipes_judge": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000000,
+          "description": "The number of PipeJudge pipes the run executed.",
+          "when": {
+            "property": "usage_known",
+            "equals": true
+          }
+        },
+        "pipes_func": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000000,
+          "description": "The number of PipeFunc pipes the run executed.",
+          "when": {
+            "property": "usage_known",
+            "equals": true
+          }
+        },
+        "pipes_sequence": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000000,
+          "description": "The number of PipeSequence pipes the run executed.",
+          "when": {
+            "property": "usage_known",
+            "equals": true
+          }
+        },
+        "pipes_parallel": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000000,
+          "description": "The number of PipeParallel pipes the run executed.",
+          "when": {
+            "property": "usage_known",
+            "equals": true
+          }
+        },
+        "pipes_condition": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000000,
+          "description": "The number of PipeCondition pipes the run executed.",
+          "when": {
+            "property": "usage_known",
+            "equals": true
+          }
+        },
+        "pipes_batch": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000000,
+          "description": "The number of PipeBatch pipes the run executed.",
+          "when": {
+            "property": "usage_known",
+            "equals": true
+          }
+        },
+        "pipes_other": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000000,
+          "description": "The number of pipes of a type pipelex does not ship that the run executed.",
+          "when": {
+            "property": "usage_known",
+            "equals": true
+          }
+        },
+        "models_used": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 10000,
+          "description": "The number of distinct models the run called, one `model_used` each.",
+          "when": {
+            "property": "usage_known",
+            "equals": true
+          }
+        },
+        "inference_calls": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 10000000,
+          "description": "The run's inference calls.",
+          "when": {
+            "property": "usage_known",
+            "equals": true
+          }
+        },
+        "inference_failures": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 10000000,
+          "description": "The run's failed inference calls.",
+          "when": {
+            "property": "usage_known",
+            "equals": true
+          }
+        },
+        "input_tokens": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000000000000,
+          "description": "The run's input tokens.",
+          "when": {
+            "property": "usage_known",
+            "equals": true
+          }
+        },
+        "output_tokens": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000000000000,
+          "description": "The run's output tokens.",
+          "when": {
+            "property": "usage_known",
+            "equals": true
+          }
+        },
+        "cached_tokens": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000000000000,
+          "description": "The run's cached input tokens.",
+          "when": {
+            "property": "usage_known",
+            "equals": true
+          }
+        },
+        "images_generated": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000000,
+          "description": "The images the run generated.",
+          "when": {
+            "property": "usage_known",
+            "equals": true
+          }
+        },
+        "pages_extracted": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 10000000,
+          "description": "The document pages the run extracted.",
+          "when": {
+            "property": "usage_known",
+            "equals": true
+          }
+        },
+        "cost_usd": {
+          "type": "number",
+          "required": false,
+          "min": 0,
+          "max": 1000000,
+          "description": "The run's inference cost in US dollars from the release's own rate tables, absent when they do not know every model used.",
+          "when": {
+            "property": "usage_known",
+            "equals": true
+          }
+        }
+      }
+    },
+    "model_used": {
+      "description": "One per distinct provider and model a run called, sent with the run's `run_completed` when `usage_known` is true.",
+      "tools": [
+        "pipelex"
+      ],
+      "common": true,
+      "person_profile": "never",
+      "properties": {
+        "provider": {
+          "type": "enum",
+          "required": true,
+          "values": [
+            "anthropic",
+            "azure_openai",
+            "bedrock",
+            "blackboxai",
+            "fal",
+            "google",
+            "groq",
+            "huggingface",
+            "internal",
+            "linkup",
+            "minimax",
+            "mistral",
+            "ollama",
+            "openai",
+            "openrouter",
+            "portkey",
+            "scaleway",
+            "typesafe",
+            "vertexai",
+            "xai",
+            "pipelex_manifold",
+            "custom"
+          ],
+          "description": "The backend the model was called through: a backend pipelex ships or one our plugins add, `custom` for any other."
+        },
+        "model": {
+          "type": "pattern",
+          "required": true,
+          "pattern": "model_handle",
+          "description": "The model's name in the shipped backend's table, `other` for a custom backend or a model the release does not ship.",
+          "fixed_when": {
+            "property": "provider",
+            "equals": "custom",
+            "value": "other"
+          }
+        },
+        "calls": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 10000000,
+          "description": "The run's calls to this model."
+        },
+        "failures": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 10000000,
+          "description": "The run's failed calls to this model."
+        },
+        "failures_transient": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 10000000,
+          "description": "The failed calls the runtime classified as `transient`."
+        },
+        "failures_configuration": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 10000000,
+          "description": "The failed calls the runtime classified as `configuration`."
+        },
+        "failures_content": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 10000000,
+          "description": "The failed calls the runtime classified as `content`."
+        },
+        "failures_capacity": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 10000000,
+          "description": "The failed calls the runtime classified as `capacity`."
+        },
+        "failures_ambiguous": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 10000000,
+          "description": "The failed calls the runtime classified as `ambiguous`."
+        },
+        "failures_unknown": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 10000000,
+          "description": "The failed calls the runtime classified as `unknown`."
+        },
+        "input_tokens": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000000000000,
+          "description": "Input tokens sent to this model."
+        },
+        "output_tokens": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000000000000,
+          "description": "Output tokens this model produced."
+        },
+        "cached_tokens": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000000000000,
+          "description": "Cached input tokens for this model."
+        },
+        "images_generated": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000000,
+          "description": "Images this model generated."
+        },
+        "pages_extracted": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 10000000,
+          "description": "Pages this model extracted."
+        },
+        "cost_usd": {
+          "type": "number",
+          "required": false,
+          "min": 0,
+          "max": 1000000,
+          "description": "The cost of these calls in US dollars, absent when the release has no rate for the model."
+        }
+      }
+    },
+    "command_completed": {
+      "description": "One per CLI command, whatever its outcome, except `--help`, `--version`, the statistics command group, `plxt lsp` and `plxt completions`.",
+      "tools": [
+        "pipelex",
+        "plxt",
+        "mthds"
+      ],
+      "common": true,
+      "person_profile": "never",
+      "properties": {
+        "command": {
+          "type": "enum",
+          "required": true,
+          "values_by": {
+            "property": "surface",
+            "values": {
+              "pipelex": [
+                "init",
+                "login",
+                "doctor",
+                "update",
+                "migrate",
+                "build inputs bundle",
+                "build inputs method",
+                "build inputs pipe",
+                "build output bundle",
+                "build output method",
+                "build output pipe",
+                "build structures",
+                "validate",
+                "validate bundle",
+                "validate method",
+                "validate pipe",
+                "fix bundle",
+                "resolve",
+                "codegen types",
+                "codegen inputs",
+                "codegen check",
+                "run bundle",
+                "run method",
+                "run pipe",
+                "graph render",
+                "show config",
+                "show pipe",
+                "show models",
+                "show backends",
+                "which",
+                "plugins list",
+                "other"
+              ],
+              "pipelex-agent": [
+                "init",
+                "run bundle",
+                "run method",
+                "run pipe",
+                "validate",
+                "validate bundle",
+                "validate method",
+                "validate pipe",
+                "fix bundle",
+                "fmt",
+                "lint",
+                "inputs bundle",
+                "inputs method",
+                "inputs pipe",
+                "codegen types",
+                "codegen inputs",
+                "codegen check",
+                "models",
+                "check-model",
+                "migrate",
+                "doctor",
+                "other"
+              ],
+              "plxt": [
+                "format",
+                "lint",
+                "get",
+                "config",
+                "other"
+              ],
+              "mthds": [
+                "login",
+                "run bundle",
+                "run method",
+                "run pipe",
+                "build inputs method",
+                "build inputs pipe",
+                "validate bundle",
+                "validate method",
+                "validate pipe",
+                "install",
+                "publish",
+                "share",
+                "config get",
+                "config list",
+                "config set",
+                "runner setup",
+                "runner set-default",
+                "runner status",
+                "package init",
+                "package list",
+                "package validate",
+                "other"
+              ],
+              "mthds-agent": [
+                "bootstrap",
+                "install",
+                "publish",
+                "share",
+                "config get",
+                "config list",
+                "config set",
+                "package init",
+                "package list",
+                "package validate",
+                "runner setup api",
+                "runner setup pipelex",
+                "plxt fmt",
+                "plxt lint",
+                "doctor",
+                "init",
+                "validate bundle",
+                "validate method",
+                "validate pipe",
+                "run bundle",
+                "run method",
+                "run pipe",
+                "models",
+                "check-model",
+                "inputs bundle",
+                "inputs method",
+                "inputs pipe",
+                "codegen check",
+                "codegen types",
+                "update-check",
+                "upgrade",
+                "codex apply-config",
+                "codex hook",
+                "other"
+              ]
+            }
+          },
+          "description": "The command's path in the CLI's own command tree, aliases resolved to the canonical name, never its arguments; `other` for a command this schema does not list yet."
+        },
+        "outcome": {
+          "type": "enum",
+          "required": true,
+          "values": [
+            "succeeded",
+            "failed",
+            "cancelled"
+          ],
+          "description": "How the command ended; `cancelled` for an interrupt."
+        },
+        "error_domain": {
+          "type": "enum",
+          "required": false,
+          "values": [
+            "input",
+            "config",
+            "runtime",
+            "other"
+          ],
+          "description": "For a failed command, who can fix the error, when the tool can say.",
+          "when": {
+            "property": "outcome",
+            "equals": "failed"
+          }
+        },
+        "duration_ms": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 2592000000,
+          "description": "The command's wall-clock duration in milliseconds."
+        },
+        "hosted": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether the command was sent to the hosted Pipelex API (`--hosted` or the configured execution)."
+        },
+        "init_execution": {
+          "type": "enum",
+          "required": false,
+          "values": [
+            "local",
+            "hosted"
+          ],
+          "description": "Where `init` set runs to execute.",
+          "when": {
+            "property": "command",
+            "equals": "init"
+          }
+        },
+        "init_backend_anthropic": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether `init` enabled the `anthropic` backend.",
+          "when": {
+            "property": "command",
+            "equals": "init"
+          }
+        },
+        "init_backend_azure_openai": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether `init` enabled the `azure_openai` backend.",
+          "when": {
+            "property": "command",
+            "equals": "init"
+          }
+        },
+        "init_backend_bedrock": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether `init` enabled the `bedrock` backend.",
+          "when": {
+            "property": "command",
+            "equals": "init"
+          }
+        },
+        "init_backend_blackboxai": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether `init` enabled the `blackboxai` backend.",
+          "when": {
+            "property": "command",
+            "equals": "init"
+          }
+        },
+        "init_backend_fal": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether `init` enabled the `fal` backend.",
+          "when": {
+            "property": "command",
+            "equals": "init"
+          }
+        },
+        "init_backend_google": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether `init` enabled the `google` backend.",
+          "when": {
+            "property": "command",
+            "equals": "init"
+          }
+        },
+        "init_backend_groq": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether `init` enabled the `groq` backend.",
+          "when": {
+            "property": "command",
+            "equals": "init"
+          }
+        },
+        "init_backend_huggingface": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether `init` enabled the `huggingface` backend.",
+          "when": {
+            "property": "command",
+            "equals": "init"
+          }
+        },
+        "init_backend_internal": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether `init` enabled the `internal` backend.",
+          "when": {
+            "property": "command",
+            "equals": "init"
+          }
+        },
+        "init_backend_linkup": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether `init` enabled the `linkup` backend.",
+          "when": {
+            "property": "command",
+            "equals": "init"
+          }
+        },
+        "init_backend_minimax": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether `init` enabled the `minimax` backend.",
+          "when": {
+            "property": "command",
+            "equals": "init"
+          }
+        },
+        "init_backend_mistral": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether `init` enabled the `mistral` backend.",
+          "when": {
+            "property": "command",
+            "equals": "init"
+          }
+        },
+        "init_backend_ollama": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether `init` enabled the `ollama` backend.",
+          "when": {
+            "property": "command",
+            "equals": "init"
+          }
+        },
+        "init_backend_openai": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether `init` enabled the `openai` backend.",
+          "when": {
+            "property": "command",
+            "equals": "init"
+          }
+        },
+        "init_backend_openrouter": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether `init` enabled the `openrouter` backend.",
+          "when": {
+            "property": "command",
+            "equals": "init"
+          }
+        },
+        "init_backend_portkey": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether `init` enabled the `portkey` backend.",
+          "when": {
+            "property": "command",
+            "equals": "init"
+          }
+        },
+        "init_backend_scaleway": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether `init` enabled the `scaleway` backend.",
+          "when": {
+            "property": "command",
+            "equals": "init"
+          }
+        },
+        "init_backend_typesafe": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether `init` enabled the `typesafe` backend.",
+          "when": {
+            "property": "command",
+            "equals": "init"
+          }
+        },
+        "init_backend_vertexai": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether `init` enabled the `vertexai` backend.",
+          "when": {
+            "property": "command",
+            "equals": "init"
+          }
+        },
+        "init_backend_xai": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether `init` enabled the `xai` backend.",
+          "when": {
+            "property": "command",
+            "equals": "init"
+          }
+        },
+        "init_backend_pipelex_manifold": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether `init` enabled the `pipelex_manifold` backend.",
+          "when": {
+            "property": "command",
+            "equals": "init"
+          }
+        },
+        "init_backend_custom": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether `init` enabled a backend pipelex does not ship.",
+          "when": {
+            "property": "command",
+            "equals": "init"
+          }
+        },
+        "files_bucket": {
+          "type": "enum",
+          "required": true,
+          "values": [
+            "0",
+            "1",
+            "2-10",
+            "11-100",
+            "101-1000",
+            "1001+"
+          ],
+          "description": "How many files `plxt` processed, in buckets.",
+          "when": {
+            "property": "tool",
+            "equals": "plxt"
+          }
+        },
+        "invocation": {
+          "type": "enum",
+          "required": true,
+          "values": [
+            "terminal",
+            "pre_commit",
+            "ci",
+            "other"
+          ],
+          "description": "What started `plxt`.",
+          "when": {
+            "property": "tool",
+            "equals": "plxt"
+          }
+        },
+        "diagnostics_syntax": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000000,
+          "description": "The `syntax` diagnostics `plxt` reported.",
+          "when": {
+            "property": "tool",
+            "equals": "plxt"
+          }
+        },
+        "diagnostics_semantic": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000000,
+          "description": "The `semantic` diagnostics `plxt` reported.",
+          "when": {
+            "property": "tool",
+            "equals": "plxt"
+          }
+        },
+        "diagnostics_schema": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000000,
+          "description": "The `schema` diagnostics `plxt` reported.",
+          "when": {
+            "property": "tool",
+            "equals": "plxt"
+          }
+        }
+      }
+    },
+    "method_validated": {
+      "description": "One per validation of a method, whatever started it.",
+      "tools": [
+        "pipelex"
+      ],
+      "common": true,
+      "person_profile": "never",
+      "properties": {
+        "outcome": {
+          "type": "enum",
+          "required": true,
+          "values": [
+            "valid",
+            "invalid",
+            "failed"
+          ],
+          "description": "The verdict: `valid`, `invalid`, or `failed` when no verdict could be reached."
+        },
+        "duration_ms": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 2592000000,
+          "description": "The validation's duration in milliseconds."
+        },
+        "errors": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 100000,
+          "description": "The number of error items the verdict carries."
+        },
+        "warnings": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 100000,
+          "description": "The number of warning items the verdict carries."
+        },
+        "bundle_pipes": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 100000,
+          "description": "The number of pipes the bundle declares."
+        },
+        "bundle_concepts": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 100000,
+          "description": "The number of concepts the bundle declares."
+        },
+        "bundle_depth": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 1000,
+          "description": "The deepest nesting of controllers in the bundle."
+        }
+      }
+    },
+    "code_generated": {
+      "description": "One per code generation, whatever started it.",
+      "tools": [
+        "pipelex"
+      ],
+      "common": true,
+      "person_profile": "never",
+      "properties": {
+        "outcome": {
+          "type": "enum",
+          "required": true,
+          "values": [
+            "succeeded",
+            "failed"
+          ],
+          "description": "How the generation ended."
+        },
+        "artifact": {
+          "type": "enum",
+          "required": true,
+          "values": [
+            "types",
+            "inputs",
+            "structures",
+            "other"
+          ],
+          "description": "What was generated."
+        },
+        "target": {
+          "type": "enum",
+          "required": true,
+          "values": [
+            "python-structures",
+            "python-pydantic",
+            "ts-zod",
+            "other"
+          ],
+          "description": "The target flavour of a `types` generation.",
+          "when": {
+            "property": "artifact",
+            "equals": "types"
+          }
+        },
+        "duration_ms": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 2592000000,
+          "description": "The generation's duration in milliseconds."
+        },
+        "bundle_pipes": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 100000,
+          "description": "The number of pipes the bundle declares."
+        },
+        "bundle_concepts": {
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 100000,
+          "description": "The number of concepts the bundle declares."
+        }
+      }
+    },
+    "extension_activated": {
+      "description": "At most one per installation and UTC day, when the VS Code extension activates with statistics on.",
+      "tools": [
+        "vscode-pipelex"
+      ],
+      "common": true,
+      "person_profile": "never",
+      "properties": {
+        "editor_version": {
+          "type": "pattern",
+          "required": true,
+          "pattern": "release_version",
+          "description": "The editor's version, as `vscode.version` reports it."
+        },
+        "editor": {
+          "type": "enum",
+          "required": true,
+          "values": [
+            "vscode",
+            "vscode-insiders",
+            "cursor",
+            "windsurf",
+            "vscodium",
+            "other"
+          ],
+          "description": "Which editor hosts the extension, from `vscode.env.appName`."
+        }
+      }
+    },
+    "feature_used": {
+      "description": "The VS Code extension's uses of one feature, counted in memory and sent in small batches.",
+      "tools": [
+        "vscode-pipelex"
+      ],
+      "common": true,
+      "person_profile": "never",
+      "properties": {
+        "feature": {
+          "type": "enum",
+          "required": true,
+          "values": [
+            "graph_preview",
+            "validation",
+            "run",
+            "format",
+            "other"
+          ],
+          "description": "The feature used."
+        },
+        "count": {
+          "type": "integer",
+          "required": true,
+          "min": 1,
+          "max": 100000,
+          "description": "How many times it was used since the previous `feature_used` for that feature."
+        },
+        "editor_version": {
+          "type": "pattern",
+          "required": true,
+          "pattern": "release_version",
+          "description": "The editor's version, as `vscode.version` reports it."
+        },
+        "editor": {
+          "type": "enum",
+          "required": true,
+          "values": [
+            "vscode",
+            "vscode-insiders",
+            "cursor",
+            "windsurf",
+            "vscodium",
+            "other"
+          ],
+          "description": "Which editor hosts the extension, from `vscode.env.appName`."
+        }
+      }
+    },
+    "deletion_requested": {
+      "description": "Sent only by the deletion procedure, never by a tool. The gate passes it only with the secret deletion key, which it strips.",
+      "tools": [],
+      "common": false,
+      "person_profile": "deletion",
+      "properties": {
+        "schema": {
+          "type": "integer",
+          "required": true,
+          "min": 1,
+          "max": 1,
+          "description": "The version of this event schema the event follows."
+        },
+        "deletion_key": {
+          "type": "secret",
+          "required": true,
+          "description": "The secret the gate compares with its `deletion_key` input; stripped before the event is stored."
+        }
+      }
+    }
+  },
+  "posthog_added_properties": {
+    "$ip": {
+      "type": "pattern",
+      "required": false,
+      "pattern": "ip_address",
+      "description": "The client address, which PostHog's capture adds and drops after the transformations, since the project discards client IP data."
+    },
+    "$geoip_country_code": {
+      "type": "pattern",
+      "required": false,
+      "pattern": "country_code",
+      "description": "Added by PostHog's GeoIP transformation."
+    },
+    "$geoip_country_name": {
+      "type": "pattern",
+      "required": false,
+      "pattern": "country_name",
+      "description": "Added by PostHog's GeoIP transformation."
+    }
+  },
+  "person_profile_property": "$process_person_profile",
+  "switch_values": {
+    "falsy": [
+      "",
+      "0",
+      "false"
+    ],
+    "tool_switch_off": [
+      "0",
+      "false",
+      "no",
+      "off"
+    ],
+    "tool_switch_no_effect": [
+      "",
+      "1",
+      "true",
+      "yes",
+      "on"
+    ],
+    "mthds_disable_on": [
+      "1",
+      "true",
+      "yes",
+      "on"
+    ]
+  },
+  "switches": [
+    {
+      "token": "do_not_track",
+      "source": "`DO_NOT_TRACK` set to anything but empty, `0` or `false`",
+      "tools": [
+        "pipelex",
+        "plxt",
+        "vscode-pipelex",
+        "mthds"
+      ]
+    },
+    {
+      "token": "tool_variable",
+      "source": "`PIPELEX_USAGE_STATS` saying off; for the `mthds` CLI also its own `DISABLE_TELEMETRY` environment variable",
+      "tools": [
+        "pipelex",
+        "plxt",
+        "vscode-pipelex",
+        "mthds"
+      ]
+    },
+    {
+      "token": "machine_choice",
+      "source": "the shared state's `disabled` file",
+      "tools": [
+        "pipelex",
+        "plxt",
+        "vscode-pipelex",
+        "mthds"
+      ]
+    },
+    {
+      "token": "legacy_mthds_choice",
+      "source": "`DISABLE_TELEMETRY` on in `~/.mthds/config`, newer than the `legacy-migrated` marker",
+      "tools": [
+        "pipelex",
+        "plxt",
+        "vscode-pipelex",
+        "mthds"
+      ]
+    },
+    {
+      "token": "project_setting",
+      "source": "`[usage_stats] enabled = false` in the project's `.pipelex/pipelex.toml`, or that file unreadable",
+      "tools": [
+        "pipelex",
+        "plxt",
+        "vscode-pipelex",
+        "mthds"
+      ]
+    },
+    {
+      "token": "packaged_default",
+      "source": "`[usage_stats] enabled = false` in pipelex's packaged configuration",
+      "tools": [
+        "pipelex"
+      ]
+    },
+    {
+      "token": "editor_setting",
+      "source": "VS Code's telemetry setting, its enterprise policy included",
+      "tools": [
+        "vscode-pipelex"
+      ]
+    },
+    {
+      "token": "integration_mode",
+      "source": "pipelex's `pytest` integration mode",
+      "tools": [
+        "pipelex"
+      ]
+    },
+    {
+      "token": "invalid_endpoint_override",
+      "source": "`PIPELEX_USAGE_STATS_ENDPOINT` set to anything but a loopback `http` origin",
+      "tools": [
+        "pipelex",
+        "plxt",
+        "vscode-pipelex",
+        "mthds"
+      ]
+    }
+  ],
+  "environment": {
+    "do_not_track": "DO_NOT_TRACK",
+    "tool_switch": "PIPELEX_USAGE_STATS",
+    "debug": "PIPELEX_USAGE_STATS_DEBUG",
+    "endpoint_override": "PIPELEX_USAGE_STATS_ENDPOINT",
+    "host": "PIPELEX_USAGE_STATS_HOST",
+    "mthds_tool_switch": "DISABLE_TELEMETRY"
+  },
+  "state": {
+    "directory": "~/.mthds/usage-stats",
+    "id": "id",
+    "disabled": "disabled",
+    "legacy_migrated": "legacy-migrated",
+    "notice_prefix": "notice-v",
+    "internal": "internal",
+    "spool": "spool",
+    "legacy_config": "~/.mthds/config",
+    "legacy_key": "DISABLE_TELEMETRY"
+  },
+  "spool": {
+    "max_files_per_tool": 100,
+    "max_age_days": 30,
+    "stale_claim_minutes": 10,
+    "stale_temp_minutes": 60
+  },
+  "budgets_ms": {
+    "cli_in_process": 1000,
+    "python_exit_flush": 250,
+    "shutdown_flush": 2000,
+    "detached_sender": 10000,
+    "background_post_delay": 10000
+  },
+  "ci_variables": [
+    "CI",
+    "CONTINUOUS_INTEGRATION",
+    "BUILD_NUMBER",
+    "GITHUB_ACTIONS",
+    "GITLAB_CI",
+    "CIRCLECI",
+    "TRAVIS",
+    "BUILDKITE",
+    "TF_BUILD",
+    "JENKINS_URL",
+    "TEAMCITY_VERSION",
+    "BITBUCKET_BUILD_NUMBER",
+    "CODEBUILD_BUILD_ID",
+    "DRONE",
+    "APPVEYOR",
+    "SEMAPHORE",
+    "WOODPECKER"
+  ],
+  "container_markers": {
+    "files": [
+      "/.dockerenv",
+      "/run/.containerenv"
+    ],
+    "environment": [
+      "container",
+      "KUBERNETES_SERVICE_HOST"
+    ],
+    "cgroup_words": [
+      "docker",
+      "kubepods",
+      "containerd",
+      "lxc"
+    ]
+  },
+  "project_markers": [
+    ".pipelex",
+    ".git",
+    "pyproject.toml",
+    "setup.py",
+    "setup.cfg",
+    "package.json",
+    ".hg"
+  ]
+}

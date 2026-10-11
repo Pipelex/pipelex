@@ -24,6 +24,8 @@ from pipelex.methods.structures_check import (
     describe_structured_content_violations,
     scan_structured_content_classes,
 )
+from pipelex.system.usage_stats.usage_stats_contract import UsageStatsMethodSource
+from pipelex.system.usage_stats.usage_stats_runs import declare_method_source
 
 
 def _get_all_exported_pipes(method: InstalledMethod) -> set[str]:
@@ -198,6 +200,7 @@ def resolve_method_target(
     """
     method: InstalledMethod
     if looks_like_method_ref(method_name):
+        declare_method_source(source=UsageStatsMethodSource.PUBLISHED_ADDRESS)
         if raise_ref_errors:
             method = resolve_method_from_ref(method_name)
         else:
@@ -207,8 +210,10 @@ def resolve_method_target(
                 typer.secho(str(exc), fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from exc
     elif is_local_path(method_name):
+        declare_method_source(source=UsageStatsMethodSource.LOCAL_BUNDLE)
         method = resolve_method_from_path(method_name)
     else:
+        declare_method_source(source=UsageStatsMethodSource.INSTALLED_METHOD)
         try:
             method = find_method_by_name(method_name, library_dirs=library_dirs)
         except MethodNotFoundError as exc:

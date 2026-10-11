@@ -12,6 +12,7 @@ import typer
 from pipelex.cli.agent_cli.commands.fmt_cmd import fmt_cmd
 from pipelex.cli.agent_cli.commands.lint_cmd import lint_cmd
 from pipelex.cli.agent_cli.commands.plxt_passthrough import run_plxt
+from pipelex.system.usage_stats.usage_stats_contract import UsageStatsEnvVar
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -79,7 +80,10 @@ class TestPlxtPassthrough:
         self,
         mocker: MockerFixture,
     ) -> None:
-        """run_plxt passes [plxt_path, subcommand, file_path] to subprocess.run."""
+        """run_plxt passes [plxt_path, subcommand, file_path] to subprocess.run, with plxt's own usage statistics off.
+
+        The child's environment is compared by the one variable it adds, never printed whole: it holds the caller's.
+        """
         mocker.patch("shutil.which", return_value="/usr/bin/plxt")
         mock_run = mocker.patch(
             "subprocess.run",
@@ -89,10 +93,12 @@ class TestPlxtPassthrough:
         with pytest.raises(typer.Exit):
             run_plxt("fmt", file_path="/path/to/file.mthds")
 
-        mock_run.assert_called_once_with(
-            ["/usr/bin/plxt", "fmt", "/path/to/file.mthds"],
-            check=False,
-        )
+        assert mock_run.call_count == 1
+        call_args, call_kwargs = mock_run.call_args
+        assert call_args == (["/usr/bin/plxt", "fmt", "/path/to/file.mthds"],)
+        assert sorted(call_kwargs) == ["check", "env"]
+        assert call_kwargs["check"] is False
+        assert call_kwargs["env"].get(UsageStatsEnvVar.TOOL_SWITCH) == "0"
 
     def test_fmt_cmd_delegates_to_plxt_with_fmt_subcommand(
         self,

@@ -35,6 +35,8 @@ from pipelex.system.caller_identity import CallerIdentity
 from pipelex.system.job_metadata import validate_request_id
 from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE, LOCAL_USER_ID
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
+from pipelex.system.usage_stats.usage_stats_contract import UsageStatsMethodSource
+from pipelex.system.usage_stats.usage_stats_runs import method_source_scope
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 if TYPE_CHECKING:
@@ -226,6 +228,17 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         """
         return CallerIdentity.make_from_host(user_id=self.user_id, extras=self.extras)
 
+    def _method_source(self, *, mthds_contents: list[str] | None) -> UsageStatsMethodSource:
+        """Where the method this runner runs came from, as far as the runner can tell, for the run's usage statistics.
+
+        A caller that knows better, a CLI resolving an installed method or an address, declares it first and wins.
+        """
+        if mthds_contents:
+            return UsageStatsMethodSource.INLINE_SOURCE
+        if self.bundle_uris or self.library_dirs:
+            return UsageStatsMethodSource.LOCAL_BUNDLE
+        return UsageStatsMethodSource.OTHER
+
     @override
     async def execute(
         self,
@@ -340,7 +353,8 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 request_id=request_id,
             )
             effective_pipe_run = self._pipe_run or get_pipe_run()
-            pipe_output = await effective_pipe_run.run(pipe_job, delivery_assignment=delivery_assignment)
+            with method_source_scope(source=self._method_source(mthds_contents=mthds_contents)):
+                pipe_output = await effective_pipe_run.run(pipe_job, delivery_assignment=delivery_assignment)
         except PipelexError as exc:
             # If pipe_job is None, the error occurred during pipeline_run_setup, before the job existed:
             # it is not a run failure, and it propagates untouched.

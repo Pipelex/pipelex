@@ -144,7 +144,7 @@ async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str, caller
     # try/finally that guarantees its close — an entry in the process-wide GraphTracerManager
     # must never outlive this call.
     pipe_router = PipeRouter(observer=ObserverNoOp())
-    pipe_run = PipeRun(pipe_router=pipe_router)
+    pipe_run = PipeRun(pipe_router=pipe_router, reports_usage_stats=False)
     content_generator = ContentGenerator.make_inline()
 
     graph_tracer_manager = GraphTracerManager.get_or_create_instance()

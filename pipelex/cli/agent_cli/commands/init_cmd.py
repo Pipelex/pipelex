@@ -16,6 +16,7 @@ from pipelex.cli.agent_cli.commands.agent_output import (
 )
 from pipelex.cli.commands.init.backends import get_selected_backend_keys, update_backends_in_toml
 from pipelex.cli.commands.init.config_files import init_config
+from pipelex.cli.commands.init.init_usage_stats import note_init_backends, note_init_execution
 from pipelex.cli.commands.init.setup_path import describe_project_execution_shadow, find_project_execution_shadow, write_run_execution
 from pipelex.cli.commands.init.ui.backends_ui import get_backend_options_from_toml
 from pipelex.cli.commands.login.api_key_store import find_pipelex_api_key
@@ -434,6 +435,7 @@ def agent_init_cmd(
 
         # Step 1.7: Write where runs execute
         write_run_execution(pipelex_toml_path=target_dir / "pipelex.toml", execution=execution)
+        note_init_execution(execution=execution)
 
         result_payload: dict[str, Any] = {
             "success": True,
@@ -453,6 +455,7 @@ def agent_init_cmd(
                 backends_enabled = _configure_backends(
                     config=parsed_config, backends_toml_path=backends_toml_path, template_backends_path=template_backends_path
                 )
+                note_init_backends(backend_keys=backends_enabled)
 
                 # Step 3: Configure routing
                 routing_profile = _configure_routing(backends_enabled, config=parsed_config, target_dir=target_dir)

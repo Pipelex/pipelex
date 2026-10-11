@@ -8,6 +8,8 @@ from pipelex.codegen.emitters.target import CodegenKind, CodegenTarget
 from pipelex.codegen.emitters.types_emitter import emit_types
 from pipelex.codegen.lock import CODEGEN_LOCK_FILENAME
 from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.usage_stats_reporting import CodeGenerationReport, usage_stats_codegen_target
+from pipelex.system.usage_stats.usage_stats_contract import UsageStatsCodegenArtifact
 from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pydantic import BaseModel, Field, model_validator
@@ -136,12 +138,22 @@ async def codegen_mthds(request_data: CodegenRequest) -> JSONResponse:
       `method_ref` is a 501 until server-side method registry resolution exists; auth is 401/403;
       server fault is 5xx.
     """
+    with CodeGenerationReport(
+        artifact=UsageStatsCodegenArtifact.TYPES, target=usage_stats_codegen_target(target=request_data.target)
+    ) as generation_report:
+        return _generate_codegen_response(request_data=request_data, generation_report=generation_report)
+
+
+def _generate_codegen_response(*, request_data: CodegenRequest, generation_report: CodeGenerationReport) -> JSONResponse:
+    """The body of `codegen_mthds`, timed by `generation_report`, which an invalid verdict declares failed."""
     try:
         # `types` is concept-set-wide: no pipe is selected, so the manifest's `main_pipe` beside the crate is unused.
         # A future per-pipe kind takes it from the `ResolvedClosure` and hands it to `resolve_requested_pipe`.
         crate = resolve_requested_crate(request_data).crate
     except ValidateBundleError as validate_error:
+        generation_report.declare_failed()
         return invalid_crate_report_response(validate_error.to_error_report())
+    generation_report.describe(crate=crate)
     try:
         emitted = emit_types(crate, target=request_data.target)
         projection = build_stamped_projection(

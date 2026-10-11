@@ -21,9 +21,11 @@ from pipelex.codegen.emission import write_stamped_projection
 from pipelex.codegen.emitters.target import CodegenKind, CodegenTarget
 from pipelex.codegen.emitters.types_emitter import emit_types
 from pipelex.pipelex import Pipelex
+from pipelex.pipeline.usage_stats_reporting import CodeGenerationReport, usage_stats_codegen_target
 from pipelex.runtime_hub import get_telemetry_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
+from pipelex.system.usage_stats.usage_stats_contract import UsageStatsCodegenArtifact
 from pipelex.tools.misc.package_utils import get_package_version
 
 COMMAND = "codegen"
@@ -49,17 +51,39 @@ def codegen_types_cmd(
     ] = None,
 ) -> None:
     """Project the crate's concept set into typed artifacts for the chosen target."""
+    generate_types(
+        target=target,
+        paths=paths,
+        output_dir=output_dir,
+        library_dir=library_dir,
+        generation_report=CodeGenerationReport(artifact=UsageStatsCodegenArtifact.TYPES, target=usage_stats_codegen_target(target=target)),
+    )
+
+
+def generate_types(
+    *,
+    target: CodegenTarget,
+    paths: list[Path] | None,
+    output_dir: str,
+    library_dir: list[Path] | None,
+    generation_report: CodeGenerationReport,
+) -> None:
+    """Load the closure, project its concept set for `target` and write the stamped files, timed by `generation_report`.
+
+    The body of `codegen types` and of its alias `build structures`, which report the generation as different artifacts.
+    """
     make_pipelex_for_cli(context=ErrorContext.VALIDATION, needs_inference=False)
     output_root = Path(output_dir).expanduser()
 
     try:
-        with get_telemetry_manager().telemetry_context():
+        with get_telemetry_manager().telemetry_context(), generation_report:
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
             tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
             tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND}")
 
             combined_dirs: list[Path] = [*(paths or []), *(library_dir or [])]
             crate = load_normalized_crate_or_exit(library_dirs=combined_dirs or None)
+            generation_report.describe(crate=crate)
 
             emitted = emit_types(crate, target=target)
             report = write_stamped_projection(

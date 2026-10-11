@@ -499,3 +499,15 @@ execution = "local"
 # - "cursor" installs .cursor/rules/*.mdc files (cannot be combined with others)
 # - "agents" / "claude" install AGENTS.md / CLAUDE.md respectively — both can be listed together
 preferred_agent_targets = ["claude", "agents"]
+
+####################################################################################################
+# Usage statistics — the anonymous counts pipelex sends to the Pipelex project
+####################################################################################################
+
+[usage_stats]
+# Whether pipelex may send anonymous usage statistics: counts of commands, runs, pipe types, models and tokens,
+# never a method, a prompt, an input, an output, a file name or a pipe name (https://docs.pipelex.com/latest/setup/usage-statistics/).
+# Only `false` has an effect, and only in two places: this packaged file, for a packager shipping pipelex with statistics
+# off, and a project's own .pipelex/pipelex.toml, for a team turning them off for everyone working in the project.
+# For yourself, run `pipelex usage-stats disable` or set DO_NOT_TRACK=1.
+enabled = true

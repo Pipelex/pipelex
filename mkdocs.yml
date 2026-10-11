@@ -300,6 +300,7 @@ plugins:
         - tools/cli/run.md: "CLI Run"
         - tools/cli/run-by-address.md: "CLI Run by Address"
         - tools/cli/show.md: "CLI Show"
+        - tools/cli/usage-stats.md: "CLI Usage Stats"
         - tools/cli/pkg.md: "CLI Pkg"
         - tools/cli/build/index.md: "CLI Build Overview"
         - tools/cli/build/structures.md: "CLI Build Structures"
@@ -323,6 +324,7 @@ plugins:
         - tools/logging.md: "Logging"
         - analytics/data-extraction.md: "Observer Data Extraction"
         - setup/telemetry.md: "Telemetry"
+        - setup/usage-statistics.md: "Usage Statistics"
         Advanced:
         - advanced/index.md: "Advanced Customizations Overview"
         - advanced/secrets-provider-injection.md: "Secrets Provider"
@@ -544,6 +546,7 @@ nav:
       - Run: tools/cli/run.md
       - Run by Address: tools/cli/run-by-address.md
       - Show: tools/cli/show.md
+      - Usage Stats: tools/cli/usage-stats.md
       - Pkg: tools/cli/pkg.md
       - Build:
         - Overview: tools/cli/build/index.md
@@ -558,6 +561,7 @@ nav:
     - Analytics:
       - Observer Data Extraction: analytics/data-extraction.md
       - Telemetry: setup/telemetry.md
+      - Usage Statistics: setup/usage-statistics.md
     - Error Reference:
       - Overview: errors/index.md
       - Authoring & language: errors/authoring-and-language.md

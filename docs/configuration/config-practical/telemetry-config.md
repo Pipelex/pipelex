@@ -9,7 +9,7 @@ description: "Set up custom telemetry destinations for observability data — se
 Telemetry configuration is stored in `.pipelex/telemetry.toml`. This file controls **your custom telemetry** destinations—where you want to send observability data for your own analytics and monitoring.
 
 !!! info "One Telemetry Stream, Yours"
-    The runtime has a single telemetry stream, and it is the one you configure in this file and send to your own backends. Nothing reports to Pipelex.
+    The runtime has a single telemetry stream, and it is the one you configure in this file and send to your own backends. Nothing in this file reports to Pipelex. The anonymous usage statistics Pipelex collects are separate: this file neither configures nor reaches them, and [Usage Statistics](../../setup/usage-statistics.md) says how to turn them off.
 
     For an overview, see [Telemetry Setup](../../setup/telemetry.md).
 

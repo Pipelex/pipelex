@@ -10,6 +10,10 @@ permissions:
   contents: write
   pages: write
 
+# No pipelex process a job starts reports anonymous usage statistics (docs/setup/usage-statistics.md).
+env:
+  DO_NOT_TRACK: "1"
+
 jobs:
   deploy:
     runs-on: ubuntu-latest

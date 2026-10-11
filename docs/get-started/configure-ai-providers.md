@@ -6,7 +6,7 @@ description: "Set up API keys for OpenAI, Anthropic, Mistral, OpenRouter and oth
 
 ## Configure API Access
 
-To run pipelines on your own machine, Pipelex needs access to AI models. **You have two options**: your own provider keys, or models running locally. Nothing reports to Pipelex either way. This is the setup `pipelex init` runs when you answer **On this machine, with your own provider keys** to its question "Where should your runs execute?". If you would rather hold no provider keys at all, take its default answer, the hosted Pipelex API, which signs you in for a Pipelex API key instead (see [Run It Yourself](./run-it-yourself.md) and [`pipelex login`](../tools/cli/login.md)).
+To run pipelines on your own machine, Pipelex needs access to AI models. **You have two options**: your own provider keys, or models running locally. Your methods, prompts, inputs and outputs never reach Pipelex either way; only anonymous [usage statistics](../setup/usage-statistics.md) do, which you can turn off. This is the setup `pipelex init` runs when you answer **On this machine, with your own provider keys** to its question "Where should your runs execute?". If you would rather hold no provider keys at all, take its default answer, the hosted Pipelex API, which signs you in for a Pipelex API key instead (see [Run It Yourself](./run-it-yourself.md) and [`pipelex login`](../tools/cli/login.md)).
 
 ### Option 1: Bring Your Own API Keys
 

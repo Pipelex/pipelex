@@ -46,6 +46,8 @@ from pipelex.runtime_hub import get_console, get_telemetry_manager
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
+from pipelex.system.usage_stats.usage_stats_contract import UsageStatsMethodSource
+from pipelex.system.usage_stats.usage_stats_runs import method_source_scope
 from pipelex.tools.misc.exceptions import JsonTypeError, TomlError
 from pipelex.tools.misc.file_utils import get_incremental_directory_path
 from pipelex.tools.misc.json_utils import save_as_json_to_path
@@ -266,12 +268,14 @@ async def _execute_run(
             # The directories a CLI loads are the caller's own: a refusal there is their invalid bundle.
             library_dirs_are_callers=True,
         )
-        response = await runner.execute(
-            pipe_code=pipe_code,
-            mthds_contents=[mthds_content] if mthds_content else None,
-            inputs=pipeline_inputs,
-            dynamic_output_concept_ref=dynamic_output_concept_ref,
-        )
+        # The CLI reads every bundle it runs from the caller's files; a method it resolved declared its own source first.
+        with method_source_scope(source=UsageStatsMethodSource.LOCAL_BUNDLE):
+            response = await runner.execute(
+                pipe_code=pipe_code,
+                mthds_contents=[mthds_content] if mthds_content else None,
+                inputs=pipeline_inputs,
+                dynamic_output_concept_ref=dynamic_output_concept_ref,
+            )
         pipe_output = response.pipe_output
     except ValidateBundleError as exc:
         # The run refused the bundle while loading it, before any pipe ran.

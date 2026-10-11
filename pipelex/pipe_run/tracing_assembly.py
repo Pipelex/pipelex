@@ -11,6 +11,7 @@ that crosses the Temporal activity boundary (returned by ``act_assemble_tracing`
 """
 
 import json
+from typing import NamedTuple
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr, ValidationError
 
@@ -28,6 +29,7 @@ from pipelex.tools.log.error_fields import error_fields
 from pipelex.tracing.event_log_factory import make_event_log
 from pipelex.tracing.exceptions import EventLogError
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
+from pipelex.tracing.trace_events import TraceEvent
 from pipelex.tracing.usage_aggregator import UsageAggregator
 
 
@@ -74,6 +76,60 @@ class TracingAssembly(BaseModel):
         self._run_metadata = run_metadata
 
 
+class RunTraceEvents(NamedTuple):
+    """The one read of a run's trace events: what it returned, or why it returned nothing.
+
+    ``events`` is ``None`` when the events were not read (tracing is off) or could not be; ``read_error`` says
+    which, carrying the note the assembly records when the read failed.
+    """
+
+    events: list[TraceEvent] | None
+    read_error: str | None
+
+    @property
+    def was_read(self) -> bool:
+        return self.events is not None
+
+
+def read_run_trace_events(*, pipeline_run_id: str) -> RunTraceEvents:
+    """Read the trace events of ``pipeline_run_id`` once, from the run's scoped event log or the configured backend.
+
+    Best-effort, for the reasons :func:`assemble_tracing` gives: a backend failure, malformed event data or broken
+    tracing infrastructure returns no events and the failure's note, never raises. With tracing off and no scoped
+    event log, nothing is read.
+    """
+    tracing_config = get_config().runtime.tracing
+    # A scoped override (see hub.scoped_event_log) is the run's transport and implies
+    # tracing-enabled (D1) — it must not be skipped by the is_enabled early-return.
+    event_log_override = get_event_log_override()
+    if event_log_override is None and not tracing_config.is_enabled:
+        return RunTraceEvents(events=None, read_error=None)
+
+    # Best-effort: a backend failure degrades to an *_assembly_error note rather than failing the run.
+    # The DynamoDB backend converts its botocore failures (ClientError / BotoCoreError) into our
+    # EventLogError family — EventLogSetupError on client construction (make_event_log), EventLogReadError
+    # inside ``DynamoDBEventLog.read_events`` — so the assembly layer catches the EventLogError base and
+    # never imports boto3 itself; NDJSON read failures surface as OSError. Both backends refuse a log holding an
+    # event the current models do not accept with EventLogSchemaMismatchError, which drops the graph and the usage.
+    try:
+        if event_log_override is not None:
+            # The scope owner keeps the instance's lifecycle: read without close().
+            events = event_log_override.read_events(pipeline_run_id)
+        else:
+            event_log = make_event_log(tracing_config)
+            try:
+                events = event_log.read_events(pipeline_run_id)
+            finally:
+                event_log.close()
+    except (OSError, json.JSONDecodeError, ValidationError, PipelexConfigError, MissingDependencyError, EventLogError) as read_error:
+        log.warning("The trace events of a run could not be read for its tracing assembly", fields=error_fields(exc=read_error))
+        return RunTraceEvents(
+            events=None,
+            read_error=f"Tracing assembly failed to read events for pipeline_run_id={pipeline_run_id}: {read_error}",
+        )
+    return RunTraceEvents(events=events, read_error=None)
+
+
 def assemble_tracing(
     pipeline_run_id: str,
     *,
@@ -83,6 +139,7 @@ def assemble_tracing(
     main_pipe_code: str | None = None,
     run_mode: PipeRunMode = PipeRunMode.LIVE,
     run_metadata: RunMetadata | None = None,
+    trace_events: RunTraceEvents | None = None,
 ) -> TracingAssembly:
     """Read the trace events for ``pipeline_run_id`` once and assemble the requested artifacts.
 
@@ -110,6 +167,8 @@ def assemble_tracing(
         run_metadata: The run this assembly belongs to, stamped onto the result so a
             transport that offloads it keys it inside the run's namespace. None for a
             run with no host-supplied scope.
+        trace_events: The run's events, already read by the caller for another reader of the same events (the run's
+            usage statistics), so the run's events are still read once; None to read them here.
 
     Returns:
         A TracingAssembly carrying whichever artifacts were requested and succeeded.
@@ -128,6 +187,7 @@ def assemble_tracing(
             domain_code=domain_code,
             main_pipe_code=main_pipe_code,
             run_mode=run_mode,
+            trace_events=trace_events,
         )
 
 
@@ -140,42 +200,21 @@ def _assemble_tracing_events(
     domain_code: str | None,
     main_pipe_code: str | None,
     run_mode: PipeRunMode,
+    trace_events: RunTraceEvents | None,
 ) -> TracingAssembly:
     """The body of ``assemble_tracing``, run inside the log context it binds: read the events once, assemble onto ``result``."""
-    tracing_config = get_config().runtime.tracing
-    # A scoped override (see hub.scoped_event_log) is the run's transport and implies
-    # tracing-enabled (D1) — it must not be skipped by the is_enabled early-return.
-    event_log_override = get_event_log_override()
-    if event_log_override is None and not tracing_config.is_enabled:
-        return result
     if not (assemble_graph or assemble_usage):
         return result
 
-    # Best-effort: a backend failure degrades to an *_assembly_error note rather than failing the run.
-    # The DynamoDB backend converts its botocore failures (ClientError / BotoCoreError) into our
-    # EventLogError family — EventLogSetupError on client construction (make_event_log), EventLogReadError
-    # inside ``DynamoDBEventLog.read_events`` — so the assembly layer catches the EventLogError base and
-    # never imports boto3 itself; NDJSON read failures surface as OSError. Both backends refuse a log holding an
-    # event the current models do not accept with EventLogSchemaMismatchError, which drops the graph and the usage.
-    try:
-        if event_log_override is not None:
-            # The scope owner keeps the instance's lifecycle: read without close().
-            events = event_log_override.read_events(pipeline_run_id)
-        else:
-            event_log = make_event_log(tracing_config)
-            try:
-                events = event_log.read_events(pipeline_run_id)
-            finally:
-                event_log.close()
-    except (OSError, json.JSONDecodeError, ValidationError, PipelexConfigError, MissingDependencyError, EventLogError) as read_error:
-        message = f"Tracing assembly failed to read events for pipeline_run_id={pipeline_run_id}: {read_error}"
-        log.warning("The trace events of a run could not be read for its tracing assembly", fields=error_fields(exc=read_error))
+    if trace_events is None:
+        trace_events = read_run_trace_events(pipeline_run_id=pipeline_run_id)
+    if trace_events.read_error is not None:
         if assemble_graph:
-            result.graph_assembly_error = message
+            result.graph_assembly_error = trace_events.read_error
         if assemble_usage:
-            result.usage_assembly_error = message
+            result.usage_assembly_error = trace_events.read_error
         return result
-
+    events = trace_events.events
     if not events:
         return result
 
@@ -210,6 +249,7 @@ def assemble_tracing_on_output(
     domain_code: str | None = None,
     main_pipe_code: str | None = None,
     run_mode: PipeRunMode = PipeRunMode.LIVE,
+    trace_events: RunTraceEvents | None = None,
 ) -> None:
     """Assemble graph and/or usage from trace events and set them on pipe_output (DIRECT mode).
 
@@ -225,6 +265,7 @@ def assemble_tracing_on_output(
         domain_code: Domain code for the graph's pipeline ref.
         main_pipe_code: Main pipe code for the graph's pipeline ref.
         run_mode: Final pipe run mode used to stamp GraphSpec provenance.
+        trace_events: The run's events when the caller already read them; None to read them here.
     """
     result = assemble_tracing(
         pipeline_run_id=pipeline_run_id,
@@ -235,6 +276,7 @@ def assemble_tracing_on_output(
         run_mode=run_mode,
         # Inherited from the output this assembly decorates, so both key together.
         run_metadata=pipe_output.job_metadata.run_metadata if pipe_output.job_metadata else None,
+        trace_events=trace_events,
     )
     if result.graph_spec is not None:
         pipe_output.graph_spec = result.graph_spec

@@ -53,6 +53,7 @@ from pipelex.system.telemetry.telemetry_config import (
 from pipelex.system.telemetry.telemetry_manager_abstract import (
     TelemetryManagerAbstract,
 )
+from pipelex.system.usage_stats.usage_stats_client import configure_usage_stats_for_runtime, flush_usage_stats
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
@@ -215,6 +216,9 @@ class Pipelex(RuntimeBoot):
         # process re-bootable, so skipping it would wedge the process for good — see its docstring. The
         # order is preserved by keeping both statements in the ``try``. No ``except``: the failure still
         # propagates.
+        # The usage statistics this process holds leave first, within their budget: a long-running process shutting
+        # pipelex down sends what it recorded rather than leaving it to the exit flush. It never raises.
+        flush_usage_stats()
         try:
             self._teardown_plugin_callbacks()
             self.pipeline_manager.teardown()
@@ -309,6 +313,10 @@ class Pipelex(RuntimeBoot):
         # class never re-runs ``__init__`` (see the guard's docstring). Asked of ``RuntimeBoot``, so a
         # bare runtime boot blocks this one too.
         cls.raise_if_a_boot_already_holds_the_process_globals()
+
+        # Before any work: a process that boots pipelex reads every usage-statistics switch now, unless a CLI command
+        # already did, and the `pytest` integration mode turns them off for good.
+        configure_usage_stats_for_runtime(integration_mode=integration_mode)
 
         pipelex_instance = cls(config_dir=config_dir, config_overrides=config_overrides)
         try:
