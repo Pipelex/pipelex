@@ -230,6 +230,8 @@ class UsageStatsClient:
         self.is_command_hosted = False
         #: What an `init` command set, for its `command_completed`.
         self.command_init_choices: InitChoices | None = None
+        #: Whether this command printed the notice, which it then never prints a second time.
+        self.is_notice_printed = False
 
     @property
     def is_enabled(self) -> bool:
@@ -510,8 +512,23 @@ def configure_usage_stats_for_cli(*, surface: UsageStatsSurface, is_machine_read
         return None
     if client.is_enabled and not is_machine_read and not state.notice_was_recorded(version=NOTICE_VERSION):
         write_stderr_line(line=render_notice())
+        client.is_notice_printed = True
         state.record_notice(version=NOTICE_VERSION)
     return client
+
+
+def show_usage_stats_notice() -> None:
+    """Show the notice's text as part of a command's own output, as `pipelex init` does whenever statistics are on.
+
+    The text goes to stderr, as the first-run notice does, and only when this command has not printed it already: a first
+    run's notice stands for it. With statistics off, or switches that could not be read, nothing is shown. Showing the
+    text records no `notice-v<N>` marker, and a marker already there does not stop it.
+    """
+    client = _PROCESS.client
+    if client is None or not client.is_enabled or client.is_notice_printed:
+        return
+    write_stderr_line(line=render_notice())
+    client.is_notice_printed = True
 
 
 def configure_usage_stats_for_runtime(*, integration_mode: IntegrationMode) -> None:

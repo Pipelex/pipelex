@@ -1,12 +1,12 @@
 contract = "cli-docs"
-digest = "sha256:b9587397a7e3d8c4093ee2f44b8f979c1bd4666c641ce8212d9ccd2827e63c96"
+digest = "sha256:0d0482f20caaffbade6fb43ccf4f5c8aa3684c40f99b961699cea94bc3a8f30c"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-11T18:59:14Z"
-rationale = "clean-pass: run_with_usage_stats now runs a command without statistics when they cannot be configured at all, and its end can no longer raise over the command's own exit; no option, output or exit code changed, so docs/tools/cli/ and the agent CLI guide stand, and docs/setup/usage-statistics.md says what an unreadable state does."
+reviewed_at = "2026-10-11T19:29:59Z"
+rationale = "clean-pass: pipelex init now shows the usage statistics notice on stderr whenever they are on, and docs/tools/cli/init.md says so in this same change; pipelex-agent is untouched, so the agent CLI guide stands."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
-"pipelex/cli/_cli.py" = "blob:75efdb3e4d3dae29e63e01d6e5bc74f8de78bf77"
+"pipelex/cli/_cli.py" = "blob:9eca8e06a004933e5cfa2ba871e4fb1ff6c6bf0c"
 "pipelex/cli/agent_cli/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/_agent_cli.py" = "blob:5ab17e334cdfd4b5f8e4afdc932f3fca3747ed59"
 "pipelex/cli/agent_cli/commands/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"

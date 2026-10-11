@@ -12,6 +12,8 @@ The first time a Pipelex tool runs with statistics on, it prints this notice on 
 
 > Pipelex collects anonymous usage statistics: counts of commands, runs, pipe types, models and tokens, and the country your IP address maps to; the address itself is never stored. It never collects your methods, prompts, inputs, outputs, file names or pipe names. To turn it off, run `pipelex usage-stats disable` or set DO_NOT_TRACK=1. Details: https://docs.pipelex.com/latest/setup/usage-statistics/
 
+`pipelex init` carries the same text: whenever statistics are on, it shows this notice on stderr ahead of its own output, even after the first run printed it. A first run that is itself `pipelex init` shows it once, not twice. Showing it there records nothing, and with statistics off it shows nothing.
+
 !!! note "Not your telemetry"
     The usage statistics are separate from the telemetry you configure in `telemetry.toml`, which goes only to analytics and monitoring systems you operate and never to Pipelex. See [Telemetry](telemetry.md).
 

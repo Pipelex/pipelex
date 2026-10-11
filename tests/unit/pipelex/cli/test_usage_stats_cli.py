@@ -16,11 +16,14 @@ from pipelex.hosted.run_config import RunExecution
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.usage_stats.usage_stats_client import (
     UsageStatsClient,
+    configure_usage_stats_for_cli,
     configure_usage_stats_for_runtime,
     note_command_error_domain,
     note_command_hosted,
+    show_usage_stats_notice,
 )
 from pipelex.system.usage_stats.usage_stats_contract import (
+    NOTICE_VERSION,
     UsageStatsEnvVar,
     UsageStatsErrorDomain,
     UsageStatsProvider,
@@ -94,6 +97,18 @@ def _prompting_app() -> click.Command:
     prompting.command(name="ask")(_ask)
     prompting.command(name="confirm")(_confirm)
     return typer.main.get_command(prompting)
+
+
+def _off_by_do_not_track(*, state: UsageStatsState, monkeypatch: pytest.MonkeyPatch) -> None:  # ruff: ignore[unused-function-argument]
+    monkeypatch.setenv(UsageStatsEnvVar.DO_NOT_TRACK, "1")
+
+
+def _off_by_tool_switch(*, state: UsageStatsState, monkeypatch: pytest.MonkeyPatch) -> None:  # ruff: ignore[unused-function-argument]
+    monkeypatch.setenv(UsageStatsEnvVar.TOOL_SWITCH, "off")
+
+
+def _off_by_disable(*, state: UsageStatsState, monkeypatch: pytest.MonkeyPatch) -> None:  # ruff: ignore[unused-function-argument]
+    state.disable()
 
 
 def _replaces_its_client_then_is_cancelled() -> None:
@@ -274,6 +289,52 @@ class TestUsageStatsCli:
             assert {name for name, value in backends.items() if value} == {name for name, value in expected_backends.items() if value}
         else:
             assert backends == {}
+
+    @pytest.mark.parametrize(
+        ("args", "is_notice_recorded_before", "switch_off"),
+        [
+            (["--no-logo", "init"], False, None),
+            (["--no-logo", "init"], True, None),
+            (["--no-logo", "init", "routing"], True, None),
+            (["--no-logo", "init"], False, _off_by_do_not_track),
+            (["--no-logo", "init"], True, _off_by_tool_switch),
+            (["--no-logo", "init"], True, _off_by_disable),
+        ],
+    )
+    def test_init_carries_the_notice_once(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        mocker: MockerFixture,
+        args: list[str],
+        is_notice_recorded_before: bool,
+        switch_off: Callable[..., None] | None,
+    ) -> None:
+        """`pipelex init` shows the notice's text on stderr whenever statistics are on, once, the first run's notice standing for it."""
+        init_cmd = mocker.patch("pipelex.cli._cli.init_cmd")
+        with usage_stats_switched_on(monkeypatch=monkeypatch, home=tmp_path / "home", cwd=make_project_dir(parent=tmp_path), is_debug=True) as state:
+            if is_notice_recorded_before:
+                state.record_notice(version=NOTICE_VERSION)
+            if switch_off is not None:
+                switch_off(state=state, monkeypatch=monkeypatch)
+            _root_of(UsageStatsSurface.PIPELEX).main(args=args, standalone_mode=False)
+            captured = capsys.readouterr()
+        init_cmd.assert_called_once()
+        assert render_notice() not in captured.out
+        assert captured.err.count(render_notice()) == (0 if switch_off else 1)
+        assert state.notice_marker(version=NOTICE_VERSION).exists() is (is_notice_recorded_before or switch_off is None)
+
+    def test_the_notice_init_shows_records_nothing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+        """Showing the text writes no marker, and a command asked twice shows it once."""
+        with usage_stats_switched_on(monkeypatch=monkeypatch, home=tmp_path / "home", cwd=make_project_dir(parent=tmp_path)) as state:
+            assert configure_usage_stats_for_cli(surface=UsageStatsSurface.PIPELEX_AGENT, is_machine_read=True) is not None
+            show_usage_stats_notice()
+            show_usage_stats_notice()
+            captured = capsys.readouterr()
+        assert captured.out == ""
+        assert captured.err.count(render_notice()) == 1
+        assert not state.notice_marker(version=NOTICE_VERSION).exists()
 
     @pytest.mark.parametrize("args", [["--help"], ["usage-stats", "status"], ["show"]])
     def test_uncounted_invocations_touch_nothing(

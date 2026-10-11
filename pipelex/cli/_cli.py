@@ -30,6 +30,7 @@ from pipelex.cli.readiness import check_readiness
 from pipelex.cli.usage_stats_cli import STATISTICS_GROUP_NAME, run_with_usage_stats
 from pipelex.cli.version_report import version_report_lines
 from pipelex.runtime_hub import get_console
+from pipelex.system.usage_stats.usage_stats_client import show_usage_stats_notice
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsSurface
 from pipelex.tools.misc.package_utils import get_package_version
 
@@ -248,6 +249,8 @@ def init_command(
 
       telemetry    Reset telemetry preferences
     """
+    # `pipelex init` carries the usage statistics notice's text whenever they are on, ahead of its own output.
+    show_usage_stats_notice()
     init_cmd(focus=focus, local=local)
 
 
