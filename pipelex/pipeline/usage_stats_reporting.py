@@ -479,6 +479,7 @@ class MethodValidationReport:
         self._concepts: Sequence[Concept] = ()
         self._warnings = 0
         self._is_declared_valid = False
+        self._could_not_describe = False
 
     def __enter__(self) -> Self:
         self._started_at = time.monotonic()
@@ -494,11 +495,15 @@ class MethodValidationReport:
             return
         try:
             self._record(exc_value=exc_value)
-        except (ValueError, OSError) as report_error:
-            # A statistic that cannot be built is lost; it never replaces the outcome of the work it describes.
+        except Exception as report_error:  # ruff: ignore[blind-except]
+            # (2) Building the event walks the bundle's pipes, plugin-provided pipe types included, whose surface cannot
+            # be enumerated. A statistic that cannot be built is lost; it never replaces the verdict it describes.
             log.debug("A usage statistics event could not be built", fields=error_fields(exc=report_error))
 
     def _record(self, *, exc_value: BaseException | None) -> None:
+        if self._could_not_describe:
+            # A bundle the report could not describe would be counted wrong: the event is lost instead.
+            return
         outcome: UsageStatsValidationOutcome
         errors = 0
         invalid_verdict = _find_validate_bundle_error(error=exc_value)
@@ -529,8 +534,14 @@ class MethodValidationReport:
         """Describe the validated bundle by its pipes and by the concepts of the library it loaded, which must be current."""
         if not usage_stats_are_enabled():
             return
-        self._pipes = list(pipes)
-        self._concepts = get_concept_library().list_own_concepts()
+        try:
+            self._pipes = list(pipes)
+            self._concepts = get_concept_library().list_own_concepts()
+        except Exception as describe_error:  # ruff: ignore[blind-except]
+            # (2) The concept library is whatever the validation loaded, plugin-provided concepts included, and its
+            # surface cannot be enumerated; describing it for a statistic must never break the validation itself.
+            self._could_not_describe = True
+            log.debug("A validated bundle could not be described for usage statistics", fields=error_fields(exc=describe_error))
 
     def count_warnings(self, *, count: int) -> None:
         self._warnings += count

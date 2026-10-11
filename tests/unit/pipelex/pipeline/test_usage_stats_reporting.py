@@ -247,6 +247,20 @@ class TestUsageStatsReporting:
         assert outcomes == [("valid", 0), ("invalid", 1), ("failed", 0), ("valid", 0)]
         assert _properties(usage_event=recorded[0])["warnings"] == 2
 
+    def test_a_validation_statistic_never_changes_the_validation(self, mocker: MockerFixture) -> None:
+        """A library that cannot be described, or a bundle whose event cannot be built, loses the event and nothing else."""
+        recorded = _recorded_events(mocker)
+        mocker.patch("pipelex.pipeline.usage_stats_reporting.get_concept_library", side_effect=RuntimeError("no library loaded"))
+        steps: list[str] = []
+        with MethodValidationReport() as report:
+            report.describe(pipes=[])
+            steps.append("validated")
+        assert steps == ["validated"]
+        mocker.patch("pipelex.pipeline.usage_stats_reporting.bundle_shape_of", side_effect=AttributeError("a pipe of an unknown kind"))
+        with pytest.raises(ValidateBundleError):
+            _validate_raising(error=ValidateBundleError(message=_SECRET_MESSAGE))
+        assert recorded == []
+
     def test_invalid_verdict_handled_on_the_way_out_is_read(self, mocker: MockerFixture) -> None:
         """A CLI renders the invalid verdict and exits: the verdict is found on the exception it handled."""
         recorded = _recorded_events(mocker)
