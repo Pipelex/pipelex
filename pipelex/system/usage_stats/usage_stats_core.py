@@ -15,12 +15,12 @@ The rest of the package imports what it needs from here, so the in-process paths
   notice N was shown; `internal` marks a team machine; and `spool/<tool>/` queues each tool's unsent events. A
   filesystem failure is never raised from a reader: statistics are a measurement, never part of what the person asked
   for, so an unreadable state reads as absent, except `disabled`, which it may hold: statistics are then off.
-- **The spool**: a file is named `<created-ms>-<random>.json` and holds `{"spool_version": 1, "events": [...]}`, to
-  which pipelex adds `"endpoint"`, the origin the events were queued for: a sender posts a file only to that origin,
-  and a file naming none, as the contract's shape names none, to any. It is written under a name starting with a dot
-  and renamed into place, so a reader never sees it partial, and readers ignore names starting with a dot. A sender
-  claims a file by renaming it to `<name>.sending-<random>`, so two senders never post one file, and after its attempt
-  deletes it or renames it back.
+- **The spool**: a file is named `<created-ms>-<random>.json` and holds
+  `{"spool_version": 1, "endpoint": <origin>, "events": [...]}`, `endpoint` being the contract's member for the origin
+  the events were queued for: a sender posts a file naming the origin it posts to, and a file naming none, as earlier
+  builds wrote them, wherever it posts. It is written under a name starting with a dot and renamed into place, so a
+  reader never sees it partial, and readers ignore names starting with a dot. A sender claims a file by renaming it
+  to `<name>.sending-<random>`, so two senders never post one file, and after its attempt deletes it or renames it back.
 - **The post**: `POST <origin>/batch/` with `{"api_key": <project token>, "batch": [...]}` and nothing else, so no SDK
   library property, no `sent_at`. Redirects are never followed, so a batch can never be carried anywhere but the
   origin it was addressed to, and a loopback origin is reached without a proxy. A post returns within the time left in
@@ -426,7 +426,7 @@ class UsageStatsState:
 # -------------------------------------------------------------------------------------------------
 
 SPOOL_FILE_SUFFIX = ".json"
-#: The key under which pipelex records the endpoint a file's events were queued for, beside the contract's two.
+#: The spool file's member naming the endpoint its events were queued for, as the contract's shape has it.
 SPOOL_ENDPOINT_KEY = "endpoint"
 CLAIM_MARKER = ".sending-"
 _TEMP_PREFIX = ".tmp-"
