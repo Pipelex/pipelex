@@ -39,9 +39,18 @@
 #
 # `jev-1.13.0` is TypeSafe's. Its next version is found on the provider's models page and not through
 # its API, whose model listing names only the moving aliases — moving this pin is a documentation read.
+#
+# Jev reads text alone, so a `PipeJudge` whose prompt presents an image names `@default-judgment-vision`,
+# a judgment model that reads images, as a `PipeExtract` over a web page names `@default-extract-web-page`.
+# It is OpenAI's `gpt-6-luna`, judging through OpenAI's Decisions API, and the one alias here that is not
+# versioned, because nothing versioned exists to pin: the Decisions API serves it under that name alone.
+# Pin the first dated snapshot OpenAI publishes. No backend file of the kit declares it as a judgment model
+# yet, since the openai plugin does not call the Decisions API, so on your own keys this alias resolves to
+# no model until it does.
 
 [judgment.aliases]
 default-judgment = "jev-1.13.0"
+default-judgment-vision = "gpt-6-luna"
 
 ####################################################################################################
 # Judgment Presets

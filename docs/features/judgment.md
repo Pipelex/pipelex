@@ -26,7 +26,7 @@ Many steps of a method come down to a closed question: is this message urgent, w
 
 Put a PipeJudge where a method needs a decision, then route on the verdict: a `PipeCondition` whose expression is `routing.choice` sends each item to the branch its judgment chose, and one comparing `approved.probability` with a bound gates a step on the model's certainty. To judge every item of a list, map the PipeJudge over it with a `PipeBatch`.
 
-No judgment model is served out of the box: a judgment names its model, such as the deck's `@default-judgment` alias for TypeSafe's model, which needs a `TYPESAFE_API_KEY`.
+No judgment model is served out of the box: a judgment names its model, such as the deck's `@default-judgment` alias for TypeSafe's model, which needs a `TYPESAFE_API_KEY`. TypeSafe's model reads text alone, and a judgment whose prompt presents an image names the deck's `@default-judgment-vision` alias instead, for OpenAI's `gpt-6-luna`, which no inference backend of Pipelex serves on your own keys yet.
 
 ## Related Documentation
 

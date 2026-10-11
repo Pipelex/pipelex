@@ -26,6 +26,7 @@ from pipelex.system.configuration.config_loader import config_manager
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.misc.toml_utils import load_toml_from_path_if_exists
 from tests.unit.pipelex.cogt.models.model_deck_validation_utils import (
+    ALIASES_AWAITING_A_KIT_BACKEND,
     find_circular_aliases,
     find_invalid_alias_targets,
     find_invalid_waterfall_entries,
@@ -164,11 +165,19 @@ class TestModelDeckReferences:
         model_type: ModelType,
         deck_name: str,
     ):
-        """Verify aliases point to valid targets (other aliases, waterfalls, or direct handles)."""
+        """Verify aliases point to valid targets (other aliases, waterfalls, or direct handles).
+
+        An alias knowingly awaiting a kit backend is left out: `test_shipped_deck_defaults.py` holds it to staying unserved.
+        """
         deck = self._get_deck_for_model_type(model_deck_blueprint, model_type)
+        checked_aliases = {
+            alias_name: target_value
+            for alias_name, target_value in deck.aliases.items()
+            if (model_type, alias_name) not in ALIASES_AWAITING_A_KIT_BACKEND
+        }
 
         invalid_refs = find_invalid_alias_targets(
-            aliases=deck.aliases,
+            aliases=checked_aliases,
             all_aliases=deck.aliases,
             all_waterfalls=deck.waterfalls,
             known_model_handles=all_known_model_handles,

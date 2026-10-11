@@ -6,6 +6,11 @@ that relies on it, for everyone running on their own keys. A waterfall passes wh
 is declared, which is how a default can put a managed model first and still resolve without it. A handle
 names one model per model type, so a default reaches a model only through a handle declared as the type
 its family asks for: a judgment default naming a handle the kit declares only as an LLM serves nothing.
+
+A default that knowingly reaches no declared model, because the backend that would serve it on the user's
+own keys does not exist yet, is listed with the reason in `ALIASES_AWAITING_A_KIT_BACKEND`, and must stay
+unserved: its entry fails the day a backend file declares what it names, so the exception ends with the gap
+it explains.
 """
 
 import pytest
@@ -14,6 +19,7 @@ from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.deck_manifest import KitManagedArea, kit_deck_dir, list_managed_kit_files
 from pipelex.cogt.models.model_deck import JudgmentDeckBlueprint
 from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind
+from tests.unit.pipelex.cogt.models.model_deck_validation_utils import ALIASES_AWAITING_A_KIT_BACKEND
 from tests.unit.pipelex.kit.test_deck_variants import (
     FAMILY_MODEL_TYPES,
     DeckFamilyBlueprint,
@@ -83,7 +89,22 @@ class TestShippedDeckDefaults:
         unserved = _unserved_default(
             family=family, alias=alias, family_blueprint=_shipped_family_blueprints()[family], declared_models=list_declared_backend_models()
         )
-        assert unserved is None, unserved
+        awaited_backend = ALIASES_AWAITING_A_KIT_BACKEND.get((FAMILY_MODEL_TYPES[family], alias))
+        if awaited_backend is None:
+            assert unserved is None, unserved
+        else:
+            assert unserved is not None, (
+                f"{family} alias '{alias}' is listed as awaiting a kit backend ({awaited_backend}), but a backend file of the kit now "
+                "declares what it names: remove its entry from ALIASES_AWAITING_A_KIT_BACKEND, and the deck comment that explains the gap"
+            )
+
+    @pytest.mark.parametrize(("model_type", "alias"), sorted(ALIASES_AWAITING_A_KIT_BACKEND))
+    def test_an_alias_awaiting_a_kit_backend_is_a_shipped_default(self, model_type: ModelType, alias: str) -> None:
+        """An entry for an alias the shipped deck no longer defines is stale, and would excuse the next alias given its name."""
+        shipped_defaults = {(FAMILY_MODEL_TYPES[family], default_alias) for family, default_alias in _default_aliases()}
+        assert (model_type, alias) in shipped_defaults, (
+            f"{model_type} alias '{alias}' is listed as awaiting a kit backend, but the shipped deck defines no such default"
+        )
 
     def test_a_judgment_default_naming_a_handle_the_kit_declares_only_as_an_llm_is_refused(self) -> None:
         """The guard must not count a handle's LLM spec for the judgment family, which asks for a judgment model."""
