@@ -18,7 +18,7 @@ from pipelex.interpreter_hub import (
     set_current_library,
 )
 from pipelex.pipe_run.dry_run_in_process import dry_run_pipe_in_process
-from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.pipeline.validate_bundle import validate_bundle, validate_bundles_from_directory
 from pipelex.pipeline.validate_bundle_translation import HOST_LIBRARY_FILE_PLACEHOLDER
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
 from pipelex.pipeline.validation_render import format_validate_markdown
@@ -144,6 +144,26 @@ class TestPipeDocGenTemplateWarnings:
             )
         ]
         assert all(str(template_path.parent) not in warning.model_dump_json() for warning in report.warnings)
+
+    @pytest.mark.parametrize("sweep", ["validate_bundle", "validate_bundles_from_directory"])
+    async def test_a_sweep_whose_caller_reports_no_warnings_logs_them(
+        self, tmp_path: Path, stub_engines: StubEngines, mocker: MockerFixture, sweep: str
+    ) -> None:
+        """A caller that reports no verdict of its own, such as `pipelex fix` or `pipelex build inputs`, leaves the warning to the log.
+
+        Only a caller that asks for the warnings has them collected, so no warning is ever dropped unseen.
+        """
+        bundle_path = _write_templated_bundle(directory=tmp_path, stub_engines=stub_engines)
+        warning_spy = mocker.spy(log, "warning")
+
+        match sweep:
+            case "validate_bundle":
+                result = await validate_bundle(mthds_file_path=bundle_path)
+            case _:
+                result = await validate_bundles_from_directory(tmp_path)
+
+        assert result.dry_run_result["doc_gen_tests.print_invoice"].warnings == []
+        assert _template_check_log_calls(warning_spy) == [_NOTES_LOG_FIELDS]
 
     async def test_the_agent_cli_bundle_envelope_carries_the_warning(self, tmp_path: Path, stub_engines: StubEngines) -> None:
         bundle_path = _write_templated_bundle(directory=tmp_path, stub_engines=stub_engines)

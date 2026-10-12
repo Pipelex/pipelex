@@ -66,7 +66,7 @@ async def validate_all_core(*, library_dirs: list[Path] | None = None, allow_sig
             # A pipe whose dry run fails is the invalid verdict, one located dry_run item per failing pipe,
             # through the same cascade and item builder as `validate bundle`.
             with translate_to_validate_bundle_error():
-                dry_run_results = await BundleValidator().validate_current_library(allow_signatures=allow_signatures)
+                dry_run_results = await BundleValidator().validate_current_library(allow_signatures=allow_signatures, collect_dry_run_warnings=True)
 
             # pending_signatures is the library-wide set of still-unimplemented forward declarations;
             # is_runnable = not pending. `validate all` now makes a strict runnability claim (the consumer
@@ -127,6 +127,7 @@ async def validate_bundle_core(
             mthds_file_path=bundle_path,
             library_dirs=library_dirs,
             allow_signatures=allow_signatures,
+            collect_dry_run_warnings=True,
         )
         warnings = collect_advisory_warnings(
             pipes=result.pipes,
@@ -194,7 +195,9 @@ async def validate_pipe_core(
             the_pipe = get_required_entry_pipe(pipe_code=pipe_code)
             validation_report.describe(pipes=get_own_pipes())
             with translate_to_validate_bundle_error():
-                dry_run_results = await BundleValidator().validate_pipes(pipes=[the_pipe], library_id=library_id, allow_signatures=allow_signatures)
+                dry_run_results = await BundleValidator().validate_pipes(
+                    pipes=[the_pipe], library_id=library_id, allow_signatures=allow_signatures, collect_dry_run_warnings=True
+                )
 
             # warnings: what the pipe's dry run found without failing, such as a template check's warnings. None
             # of the bundle-wide lints ride here: one pipe makes no bundle-wide claim, so there is no flow to lint.
@@ -260,6 +263,7 @@ async def validate_pipe_in_bundle_core(
             library_dirs=library_dirs,
             allow_signatures=allow_signatures,
             dry_run_pipe_codes=[pipe_code],
+            collect_dry_run_warnings=True,
         )
         warnings = collect_advisory_warnings(
             pipes=result.pipes,

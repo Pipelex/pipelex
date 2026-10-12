@@ -67,7 +67,8 @@ def build_advisory_warnings(
         input_form: The batch's input-form descriptors (`build_input_form`).
         entry_pipe_refs: The qualified refs of the batch's entry pipes (`collect_entry_pipe_refs`).
         qualified_crate: The current library's qualified crate (`qualify_current_library_crate`).
-        dry_run_result: The sweep's per-pipe status map, carrying what each dry run found without failing.
+        dry_run_result: The sweep's per-pipe status map, carrying what each dry run found without failing,
+            from a sweep run with `collect_dry_run_warnings`.
 
     Returns:
         The advisory items: optionality, then presence vacuity, then hints, then the dry-run findings.
@@ -93,7 +94,7 @@ def collect_advisory_warnings(
             the current library on the library-wide path).
         entry_pipe_refs: The qualified refs of the batch's entry pipes (`collect_entry_pipe_refs`).
         dry_run_result: The sweep's per-pipe status map (`ValidateBundleResult.dry_run_result`, or what the
-            library-wide sweep returned).
+            library-wide sweep returned), from a sweep run with `collect_dry_run_warnings`.
 
     Returns:
         The advisory items, in the order :func:`build_advisory_warnings` fixes.

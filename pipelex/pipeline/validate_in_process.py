@@ -140,6 +140,7 @@ async def _validate_bundles_in_scope(
             library_dirs=library_dirs,
             allow_signatures=allow_signatures,
             library_dirs_are_callers=library_dirs_are_callers,
+            collect_dry_run_warnings=True,
         )
         # Capture the validation library id ONCE, right after validate_bundle leaves it
         # current — the graph arm and the finally must target the SAME library even if

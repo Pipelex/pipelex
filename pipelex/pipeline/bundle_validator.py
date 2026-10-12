@@ -27,6 +27,7 @@ activity later (D5).
 """
 
 import time
+from contextlib import AbstractContextManager, nullcontext
 from contextvars import ContextVar
 from enum import StrEnum
 from typing import TYPE_CHECKING
@@ -54,7 +55,7 @@ from pipelex.interpreter_hub import (
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.observer.observer_protocol import ObserverNoOp
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
-from pipelex.pipe_run.dry_run_warning_collector import collecting_dry_run_warnings
+from pipelex.pipe_run.dry_run_warning_collector import DryRunWarningCollector, collecting_dry_run_warnings
 from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipe_run.located_failure import find_foreign_fault, find_root_fault
 from pipelex.pipe_run.pipe_job import PipeJob
@@ -113,7 +114,8 @@ class DryRunOutput(BaseModel):
     failure: DryRunFailureErrorData | None = None
     # What the pipe's dry run found without failing, each item located at the pipe that found it, which is this
     # pipe or one it runs: today, the warnings of a PipeDocGen step's template check. The composition point of the
-    # verdict's advisory `warnings` reads them from here (see `pipelex.pipeline.dry_run_warnings`).
+    # verdict's advisory `warnings` reads them from here (see `pipelex.pipeline.dry_run_warnings`). Empty unless
+    # the sweep's caller asked for them (`collect_dry_run_warnings`): otherwise the dry run logged them.
     warnings: list[ValidationErrorItem] = Field(default_factory=empty_list_factory_of(ValidationErrorItem))
 
 
@@ -292,7 +294,7 @@ class BundleValidator:
             get_library_manager().teardown(library_id=acquired_id)
 
     async def validate_current_library(
-        self, *, allow_signatures: bool = False, caller_identity: CallerIdentity | None = None
+        self, *, allow_signatures: bool = False, caller_identity: CallerIdentity | None = None, collect_dry_run_warnings: bool = False
     ) -> dict[str, DryRunOutput]:
         """Sweep every pipe in the already-open **current** library, **without** tearing it down.
 
@@ -303,12 +305,14 @@ class BundleValidator:
         by minting a mock). This is the loaded-library twin of :meth:`acquire_and_validate` (which
         acquires + tears down) and the shared core both the ``validate --all`` CLI and downstream
         consumers (e.g. cocode) build on instead of re-deriving ``get_pipes`` + ``validate_pipes`` by hand.
+        ``collect_dry_run_warnings`` is :meth:`validate_pipes`'.
         """
         return await self.validate_pipes(
             get_pipe_library().get_pipes(),
             library_id=get_current_library(),
             allow_signatures=allow_signatures,
             caller_identity=caller_identity,
+            collect_dry_run_warnings=collect_dry_run_warnings,
         )
 
     async def validate_pipes(
@@ -319,6 +323,7 @@ class BundleValidator:
         allow_signatures: bool = False,
         caller_identity: CallerIdentity | None = None,
         source_pipe_refs: frozenset[str] | None = None,
+        collect_dry_run_warnings: bool = False,
     ) -> dict[str, DryRunOutput]:
         """Classify each pipe ``SUCCESS / FAILURE / SKIPPED`` against an already-open library.
 
@@ -355,6 +360,13 @@ class BundleValidator:
         does, and as submitted content validated beside directories that are the caller's own
         (``library_dirs_are_callers``) does.
 
+        ``collect_dry_run_warnings`` is for a caller that reports what the dry runs find without failing,
+        such as a template check's warnings, in a verdict of its own (the validate surfaces): each pipe's
+        output then carries them in ``warnings``, and the dry runs log none of them. Any other caller leaves
+        it ``False``, and the dry runs log what they find, as a dry run outside any sweep does, so no warning
+        is dropped unseen. A sweep that raises keeps none: an invalid verdict carries its errors alone, as it
+        carries none of the static lints.
+
         Returns the per-pipe status map (carrying allowed failures + skips). Raises ``DryRunError``
         on ≥1 unexpected failure.
         """
@@ -365,6 +377,7 @@ class BundleValidator:
                 allow_signatures=allow_signatures,
                 caller_identity=effective_caller_identity,
                 source_pipe_refs=source_pipe_refs,
+                collect_dry_run_warnings=collect_dry_run_warnings,
             )
 
     async def _validate_pipes_for_caller(
@@ -375,6 +388,7 @@ class BundleValidator:
         allow_signatures: bool,
         caller_identity: CallerIdentity | None,
         source_pipe_refs: frozenset[str] | None,
+        collect_dry_run_warnings: bool,
     ) -> dict[str, DryRunOutput]:
         """The body of :meth:`validate_pipes`, run inside the caller's scope."""
         start_time = time.time()
@@ -449,6 +463,7 @@ class BundleValidator:
                     dry_run_pipeline_id=dry_run_pipeline_id,
                     caller_identity=caller_identity,
                     source_pipe_refs=source_pipe_refs,
+                    collect_dry_run_warnings=collect_dry_run_warnings,
                 )
 
         # 4. Aggregate + report.
@@ -463,6 +478,7 @@ class BundleValidator:
         dry_run_pipeline_id: str,
         caller_identity: CallerIdentity | None,
         source_pipe_refs: frozenset[str] | None,
+        collect_dry_run_warnings: bool,
     ) -> DryRunOutput:
         """Build the mock job and run the pipe DRY through the direct primitive; classify the outcome.
 
@@ -482,13 +498,17 @@ class BundleValidator:
         it runs failed reports that pipe, and ``_aggregate`` keeps the failure once. A failure met at a pipe
         allowed to fail is reported at the pipe around it that is not, the one whose failure is unexpected.
 
-        Whatever the outcome, the output carries the ``warnings`` the dry run found without failing, which the
-        dry run's pipes report to a collector scoped to this pipe (see ``pipelex.pipe_run.dry_run_warning_collector``).
+        With ``collect_dry_run_warnings``, whatever the outcome, the output carries the ``warnings`` the dry run
+        found without failing, which the dry run's pipes report to a collector scoped to this pipe (see
+        ``pipelex.pipe_run.dry_run_warning_collector``); without it no collector is installed, and they log them.
         """
         recorder = _FailingPipeRecorder(tolerated_pipe_refs=frozenset(get_config().inference.dry_run.allowed_to_fail_pipes))
         recorder_token = _failing_pipe_recorder.set(recorder)
+        warning_collection: AbstractContextManager[DryRunWarningCollector | None] = (
+            collecting_dry_run_warnings() if collect_dry_run_warnings else nullcontext()
+        )
         try:
-            with collecting_dry_run_warnings() as warning_collector:
+            with warning_collection as warning_collector:
                 dry_run_output = await self._run_and_classify(
                     pipe=pipe,
                     library_id=library_id,
@@ -498,6 +518,8 @@ class BundleValidator:
                     recorder=recorder,
                     source_pipe_refs=source_pipe_refs,
                 )
+            if warning_collector is None:
+                return dry_run_output
             warnings = _disclosed_warnings(warnings=warning_collector.warnings, source_pipe_refs=source_pipe_refs)
             return dry_run_output.model_copy(update={"warnings": warnings})
         finally:

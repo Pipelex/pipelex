@@ -2,9 +2,10 @@
 
 A dry run can find something worth surfacing on a VALID bundle without failing: the first occupant is a
 `PipeDocGen` step's template check, whose warning findings (`template_check_warning`) name a field of an
-office template that matches no input, a Markdown field that would print its markup, and the like. The
-sweep keeps each pipe's findings on its `DryRunOutput` (`pipelex.pipe_run.dry_run_warning_collector`
-explains how they get there), and this family projects them into the report.
+office template that matches no input, a Markdown field that would print its markup, and the like. A
+sweep asked to collect them (`collect_dry_run_warnings`) keeps each pipe's findings on its `DryRunOutput`
+(`pipelex.pipe_run.dry_run_warning_collector` explains how they get there), and this family projects them
+into the report, so the map it reads must come from such a sweep.
 
 Unlike the static lints, this family needs no bundle-wide view: a finding is about the step whose dry run
 made it, so a surface that dry-runs a single pipe carries it too.

@@ -83,7 +83,8 @@ class TestPipeDocGenTemplateFiles:
     async def test_warnings_alone_pass_and_print_nothing(self, tmp_path: Path, stub_engines: StubEngines) -> None:
         """A warning is not raised and the dry run prints nothing: the step's dry run output carries it for the verdict.
 
-        `test_pipe_doc_gen_template_warnings.py` follows it from there to every validate surface.
+        `test_pipe_doc_gen_template_warnings.py` follows it from there to every validate surface, and to the log when the
+        sweep's caller asks for no warnings.
         """
         (tmp_path / "invoice.docx").write_bytes(b"docx bytes")
         bundle_path = write_bundle(directory=tmp_path, step_fields=_DOCX_TEMPLATE_STEP)
@@ -91,7 +92,7 @@ class TestPipeDocGenTemplateFiles:
             TemplateFinding(severity=TemplateFindingSeverity.WARNING, message="The notes are never printed", location="the field notes on page 2")
         ]
 
-        result = await validate_bundle(mthds_file_path=bundle_path)
+        result = await validate_bundle(mthds_file_path=bundle_path, collect_dry_run_warnings=True)
 
         assert len(stub_engines.check_requests) == 1
         assert stub_engines.engine.jobs == []

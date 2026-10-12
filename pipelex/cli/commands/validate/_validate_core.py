@@ -111,7 +111,9 @@ def do_validate_all_libraries_and_dry_run(*, library_dirs: list[Path] | None = N
                 # event — sweeping the library we just loaded, without teardown. A pipe whose dry run fails
                 # raises DryRunError, which the cascade turns into the same invalid verdict.
                 with translate_to_validate_bundle_error():
-                    dry_run_results = asyncio.run(BundleValidator().validate_current_library(allow_signatures=allow_signatures))
+                    dry_run_results = asyncio.run(
+                        BundleValidator().validate_current_library(allow_signatures=allow_signatures, collect_dry_run_warnings=True)
+                    )
 
                 # Advisory lints over the whole loaded library (the optionality lint's cross-flow
                 # aggregation needs every flow) — printed even when the signature gate below exits
@@ -164,6 +166,7 @@ async def _validate_pipe_or_bundle(
                     mthds_file_path=bundle_path,
                     library_dirs=library_dirs,
                     allow_signatures=allow_signatures,
+                    collect_dry_run_warnings=True,
                 )
                 # Advisory lints, printed BEFORE the signature gate below exits non-zero — same ordering
                 # as `validate --all`. A method with an unimplemented placeholder is the state an author
@@ -234,6 +237,7 @@ async def _validate_pipe_or_bundle(
                         pipes=[pipe],
                         library_id=library_id,
                         allow_signatures=allow_signatures,
+                        collect_dry_run_warnings=True,
                     )
                 # No bundle-wide lint here, since one pipe makes no bundle-wide claim, but what its dry run found
                 # without failing is about this pipe, such as a template check's warnings, so it is echoed.
