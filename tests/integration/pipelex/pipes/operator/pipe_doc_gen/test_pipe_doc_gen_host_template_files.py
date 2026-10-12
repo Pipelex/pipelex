@@ -76,7 +76,7 @@ class TestPipeDocGenHostTemplateFiles:
 
         verdict = await _caller_verdict(mthds_content=PipeDocGenTestData.CALLER_BUNDLE_MTHDS, host_dir=tmp_path)
 
-        assert "a path relative to the bundle's file, not an absolute path" in verdict
+        assert "a path relative to the bundle's file, inside its bundle, and this one cannot be: it is absolute" in verdict
         assert str(tmp_path.resolve()) not in verdict
         assert str(tmp_path) not in verdict
 

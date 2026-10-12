@@ -1,4 +1,3 @@
-from pathlib import PurePosixPath, PureWindowsPath
 from typing import Literal, Self
 
 from pydantic import Field, model_validator
@@ -8,7 +7,7 @@ from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice
 from pipelex.cogt.templating.exceptions import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
-from pipelex.core.bundle_resources.bundle_resource import BundleResourceReadStage
+from pipelex.core.bundle_resources.bundle_resource import BundleResourceReadStage, resource_path_refusal
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateSyntaxError
@@ -16,15 +15,6 @@ from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
-
-
-def is_anchored_path(*, path: str) -> bool:
-    """Whether a path is anchored on some platform a method may load on, rather than relative to the bundle's file.
-
-    A POSIX root (`/templates/x.docx`), a Windows root (a leading backslash), a drive (`C:x.docx`, `C:/templates/x.docx`)
-    and a UNC share all anchor a path, so none of them is relative wherever the method loads.
-    """
-    return PurePosixPath(path).is_absolute() or PureWindowsPath(path).anchor != ""
 
 
 def template_required_roots(*, template_source: str, template_category: TemplateCategory, declared_inputs: set[str], label: str) -> set[str]:
@@ -56,7 +46,8 @@ class PipeDocGenBlueprint(PipeBlueprint):
 
     It calls no AI model: it lays out or fills what its inputs already hold. With no template, the pipe lays its inputs
     out by itself (the auto-layout), for every format but `pptx`. `template` is an inline HTML and Jinja2 template, for
-    `pdf` only; `template_file` is a path relative to the bundle's file: an `.html` for `pdf`, an `.xlsx` for `xlsx`, a
+    `pdf` only; `template_file` is a path relative to the bundle's file, inside its bundle and written with forward
+    slashes: an `.html` for `pdf`, an `.xlsx` for `xlsx`, a
     `.docx` for `docx` and a `.pptx` for `pptx`, which `pptx` requires. `filename` is a Jinja expression over the
     inputs; the suffix is added. The output must be a single `Document`, or a concept refining it. `model` names the
     document engine that prints it, a model of the `doc_gen` family such as `reportlab-pdf` or, with the Pipelex
@@ -76,10 +67,13 @@ class PipeDocGenBlueprint(PipeBlueprint):
 
     @model_validator(mode="after")
     def validate_template_sources(self) -> Self:
-        # The message never repeats the path: a host library's step would put the host's own path in front of a caller.
-        if self.template_file is not None and is_anchored_path(path=self.template_file):
-            msg = "PipeDocGen's 'template_file' is a path relative to the bundle's file, not an absolute path or one naming a drive."
-            raise ValueError(msg)
+        # The rule the files submitted with a bundle are keyed by, so a template file can be submitted whatever loads the
+        # bundle. The message never repeats the path: a host library's step would put the host's own path in front of a caller.
+        if self.template_file is not None:
+            refusal = resource_path_refusal(path=self.template_file)
+            if refusal is not None:
+                msg = f"PipeDocGen's 'template_file' is a path relative to the bundle's file, inside its bundle, and this one cannot be: {refusal}."
+                raise ValueError(msg)
         if self.template is not None and self.template_file is not None:
             msg = "PipeDocGen cannot have both 'template' and 'template_file': use one or the other."
             raise ValueError(msg)

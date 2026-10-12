@@ -31,8 +31,8 @@ def bundle_resource_reads(*, pipe_blueprints: Iterable[PipeBlueprintUnion]) -> d
     """The bundle files these pipes read, keyed by canonical path, and when each is first read.
 
     A path no file inside a bundle can have, such as one with a `..` segment, is left out: no submitted file can
-    answer it, and the step that names it is refused when it is built. A file read at load by one step and at run
-    by another counts as read at load, which is the stricter way to carry it.
+    answer it, and a step's blueprint refuses to name one. A file read at load by one step and at run by another
+    counts as read at load, which is the stricter way to carry it.
     """
     reads: dict[str, BundleResourceReadStage] = {}
     for pipe_blueprint in pipe_blueprints:
@@ -40,7 +40,8 @@ def bundle_resource_reads(*, pipe_blueprints: Iterable[PipeBlueprintUnion]) -> d
             canonical_path = canonical_resource_path_or_none(path=named_path)
             if canonical_path is None:
                 continue
-            if reads.get(canonical_path) != BundleResourceReadStage.LOAD:
+            known_stage = reads.get(canonical_path)
+            if known_stage is None or not known_stage.is_read_at_load:
                 reads[canonical_path] = stage
     return reads
 
@@ -67,7 +68,7 @@ def check_bundle_resources(*, blueprints: Iterable[PipelexBundleBlueprint], bund
             "each keyed by the path the step names, such as a PipeDocGen step's 'template_file', relative to the bundle."
         )
         raise BundleResourceNotNamedError(msg)
-    load_stage_paths = sorted(path for path, stage in reads.items() if stage == BundleResourceReadStage.LOAD and path in bundle_resources)
+    load_stage_paths = sorted(path for path, stage in reads.items() if stage.is_read_at_load and path in bundle_resources)
     load_stage_bytes = sum(bundle_resources[path].size for path in load_stage_paths)
     if load_stage_bytes > MAX_LOAD_STAGE_RESOURCES_BYTES:
         listed = ", ".join(f"'{path}'" for path in load_stage_paths)
@@ -91,9 +92,7 @@ async def relocate_run_resources(*, crate: LibraryCrate, storage_provider: Stora
     """
     if not crate.bundle_resources:
         return crate
-    run_stage_paths = {
-        path for path, stage in bundle_resource_reads(pipe_blueprints=crate.pipes.values()).items() if stage == BundleResourceReadStage.RUN
-    }
+    run_stage_paths = {path for path, stage in bundle_resource_reads(pipe_blueprints=crate.pipes.values()).items() if not stage.is_read_at_load}
     relocated: dict[str, BundleResource] = {}
     for path, resource in crate.bundle_resources.items():
         if path not in run_stage_paths or not resource.is_inline:

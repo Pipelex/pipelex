@@ -19,15 +19,20 @@ class TestPipeDocGenTemplateFiles:
         ("template_file", "expected"),
         [
             ("invoice.docx", "does not exist"),
-            ("../outside.docx", "outside its bundle's directory"),
+            ("../outside.docx", "it leaves the bundle through a '..' segment"),
+            ("linked.docx", "outside its bundle's directory"),
         ],
-        ids=["missing_file", "outside_the_bundle"],
+        ids=["missing_file", "outside_the_bundle", "linked_outside_the_bundle"],
     )
     async def test_a_template_file_is_found_inside_the_bundle_s_directory(self, tmp_path: Path, template_file: str, expected: str) -> None:
-        """A template file must exist beside the bundle, and a path out of the bundle's directory is refused even when the file exists."""
+        """A template file must exist beside the bundle, and a path out of the bundle's directory is refused even when the file exists.
+
+        The blueprint refuses a path written out of the bundle, and the load one that leads out of it through a link.
+        """
         bundle_dir = tmp_path / "bundle"
         bundle_dir.mkdir()
         (tmp_path / "outside.docx").write_bytes(b"docx")
+        (bundle_dir / "linked.docx").symlink_to(tmp_path / "outside.docx")
         bundle_path = write_bundle(directory=bundle_dir, step_fields=f'format = "docx"\ntemplate_file = "{template_file}"')
 
         with pytest.raises(ValidateBundleError) as exc_info:
@@ -46,7 +51,7 @@ class TestPipeDocGenTemplateFiles:
             await validate_bundle(mthds_file_path=bundle_path)
 
         report = str(exc_info.value.to_error_report().model_dump())
-        assert "a path relative to the bundle's file, not an absolute path" in report
+        assert "a path relative to the bundle's file, inside its bundle, and this one cannot be: it is absolute" in report
         assert str(absolute_template) not in report
 
     @pytest.mark.usefixtures("stub_engines")

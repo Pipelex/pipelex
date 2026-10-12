@@ -45,9 +45,23 @@ class BundleResourceReadStage(StrEnum):
     RUN = "run"
     """Read only when the step runs, such as an office template its engine fills: it may travel by reference."""
 
+    @property
+    def is_read_at_load(self) -> bool:
+        """Whether the file is read while the method loads, so it travels inline with the method wherever it runs."""
+        match self:
+            case BundleResourceReadStage.LOAD:
+                return True
+            case BundleResourceReadStage.RUN:
+                return False
 
-def _path_refusal(*, path: str) -> str | None:
-    """Why `path` cannot name a file inside a bundle, or None when it can."""
+
+def resource_path_refusal(*, path: str) -> str | None:
+    """Why `path` cannot name a file inside a bundle, or None when it can.
+
+    The one rule for a bundle-relative path, held by the key of a file submitted with a bundle and by the path a step
+    names, such as a `PipeDocGen` step's `template_file`, so any file a step names can be submitted with its bundle.
+    The reason never repeats the path, which a host library's step would otherwise put in front of a caller.
+    """
     if not path.strip():
         return "it is empty"
     if "\\" in path:
@@ -71,7 +85,7 @@ def canonical_resource_path_or_none(*, path: str) -> str | None:
 
     `.` segments and repeated slashes collapse, so `./invoice.xlsx` and `invoice.xlsx` name one file.
     """
-    if _path_refusal(path=path) is not None:
+    if resource_path_refusal(path=path) is not None:
         return None
     return PurePosixPath(path).as_posix()
 
@@ -86,7 +100,7 @@ def canonical_resource_path(*, path: str) -> str:
     Raises:
         BundleResourcePathError: the path cannot name a file inside the bundle.
     """
-    refusal = _path_refusal(path=path)
+    refusal = resource_path_refusal(path=path)
     if refusal is not None:
         msg = f"The file '{path}' submitted with the bundle cannot be one of its files: {refusal}."
         raise BundleResourcePathError(msg)

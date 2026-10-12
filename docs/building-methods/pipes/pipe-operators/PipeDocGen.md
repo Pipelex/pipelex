@@ -81,7 +81,7 @@ To print the same invoice on the plugin's `pipelex-pdf`, the step names it: `mod
 | `format` | string | `pdf`, `xlsx`, `docx` or `pptx`. It sets the file's type and suffix. | Yes |
 | `model` | string | The document engine that prints the file, a `doc_gen` model, alias or preset, such as `reportlab-pdf` or, with the plugin, `pipelex-pdf`. It defaults to the model deck's engine for the format and source. | No |
 | `template` | string | An inline HTML and Jinja2 template, for `pdf` only. A `pdf` with a template is printed by the plugin. | No |
-| `template_file` | string | A template file relative to the bundle's file: `.html` for `pdf`, `.xlsx`, `.docx` or `.pptx`. An absolute path, or one naming a drive, is refused. Read beside the bundle when it is loaded from a directory, and from the files sent with it when it is loaded from a string. It excludes `template`. `pptx` requires one. | No |
+| `template_file` | string | A template file relative to the bundle's file, inside its bundle and written with forward slashes: `.html` for `pdf`, `.xlsx`, `.docx` or `.pptx`. An empty or absolute path, a `..` segment, a backslash and a colon are refused, the rule the files sent with a bundle are keyed by, so any template file can be sent with its bundle. Read beside the bundle when it is loaded from a directory, and from the files sent with it when it is loaded from a string. It excludes `template`. `pptx` requires one. | No |
 | `filename` | string | A Jinja expression over the inputs for the file's name, without its suffix, such as `invoice-{{ invoice.number }}`. It defaults to the pipe's code. | No |
 
 ### An LLM report as a PDF
@@ -134,7 +134,7 @@ When a bundle is sent as content rather than read from a directory, as it is thr
 }
 ```
 
-- **The key is the path the step names**, relative to the bundle and written with forward slashes: a step with `template_file = "templates/invoice.docx"` reads the file sent as `templates/invoice.docx`, and `./templates/invoice.docx` names the same file. Every bundle of the request is read as sitting in one directory. An absolute path, a `..` segment, a backslash and a colon are refused.
+- **The key is the path the step names**, relative to the bundle and written with forward slashes: a step with `template_file = "templates/invoice.docx"` reads the file sent as `templates/invoice.docx`, and `./templates/invoice.docx` names the same file. Every bundle of the request is read as sitting in one directory. An absolute path, a `..` segment, a backslash and a colon are refused, as they are in a `template_file`.
 - **The value is the file's bytes** in standard base64.
 - **Every file sent must be one a step names.** A file no step reads is refused, so a misspelled key fails loudly rather than leaving its step without a template.
 - **The files are checked like files on disk.** An `.html` template file is checked against the inputs when the method loads, and the engine's template check runs on an office template file at validation and in the dry run.
