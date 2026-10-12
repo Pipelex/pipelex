@@ -50,17 +50,6 @@ from pipelex.tools.uri.uri_read_scope import UriReference
 from pipelex.validation_error_types import TemplateCheckErrorType
 
 
-def safe_filename(*, rendered: str, fallback: str, suffix: str) -> str:
-    """The name the document is stored under, ending in the format's suffix, from whatever the filename template rendered.
-
-    It is one every `pipelex-storage://` reader accepts, the hosted platform's included, which serves a stored file only
-    when its stem is ASCII letters, digits, hyphens and underscores: `Zoë Ångström — Q3.2026` is stored as
-    `Zoe-Angstrom-Q3-2026.docx`, and a name that leaves nothing, one written wholly in Han for one, as the step's code.
-    See `path_safe_file_name` for the rule.
-    """
-    return path_safe_file_name(name=rendered, fallback=fallback, extension=suffix)
-
-
 class PipeDocGenOutput(PipeOutput):
     pass
 
@@ -231,7 +220,8 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
                 label="filename",
                 templating_style=resolve_templating_style(authored=None),
             )
-        filename = safe_filename(rendered=rendered_filename, fallback=self.code, suffix=self.doc_gen_format.suffix)
+        # Stored under a name every `pipelex-storage://` reader serves, the hosted platform's included.
+        filename = path_safe_file_name(name=rendered_filename, fallback=self.code, extension=self.doc_gen_format.suffix)
         named_contents = self._named_contents(working_memory)
         title = self._title(named_contents)
         source = self.source

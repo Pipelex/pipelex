@@ -20,6 +20,9 @@ STORAGE_FILE_EXTENSION_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[A-Za-z0-
 
 # Long enough for any name a person reads, short enough that a key stays far below a store's own limit.
 MAX_STORAGE_FILE_STEM_LENGTH: Final[int] = 120
+# How much of a name is read at all, cut before any pass over it: well above the stem's cap, so no name a person writes
+# loses anything to it, and a bound on the work a name rendered from a caller's text can ask of a worker.
+_MAX_READ_NAME_LENGTH: Final[int] = 8 * MAX_STORAGE_FILE_STEM_LENGTH
 
 # The stem when neither the name nor its fallback leaves anything, and the extension when the given one is not plain.
 _LAST_RESORT_STEM: Final[str] = "file"
@@ -58,9 +61,8 @@ _TRANSLITERATION_TABLE: Final[dict[int, str]] = str.maketrans(_LETTERS_NFKD_KEEP
 # Dots are kept until a name already ending in its extension has had it removed, then go with everything else.
 _NOT_STEM_OR_DOT_CHARACTERS: Final[re.Pattern[str]] = re.compile(r"[^A-Za-z0-9_.-]+")
 _NOT_STEM_CHARACTERS: Final[re.Pattern[str]] = re.compile(r"[^A-Za-z0-9_-]+")
-# A run of separators holding a hyphen becomes one hyphen; a run of underscores alone becomes one underscore.
-_HYPHENATED_SEPARATOR_RUNS: Final[re.Pattern[str]] = re.compile(r"[-_]*-[-_]*")
-_UNDERSCORE_RUNS: Final[re.Pattern[str]] = re.compile(r"_{2,}")
+# A run of separators, read once: it becomes one hyphen when it holds a hyphen, one underscore when it is underscores alone.
+_SEPARATOR_RUNS: Final[re.Pattern[str]] = re.compile(r"[-_]+")
 _EDGE_CHARACTERS: Final[str] = ".-_"
 
 
@@ -79,12 +81,11 @@ def fold_to_ascii(*, text: str) -> str:
 
 def _path_safe_stem(*, name: str, extension: str) -> str:
     """The stem `name` gives once folded to ASCII and held to the grammar, or the empty string when nothing is left."""
-    stem = _NOT_STEM_OR_DOT_CHARACTERS.sub("-", fold_to_ascii(text=name)).strip(_EDGE_CHARACTERS)
+    stem = _NOT_STEM_OR_DOT_CHARACTERS.sub("-", fold_to_ascii(text=name[:_MAX_READ_NAME_LENGTH])).strip(_EDGE_CHARACTERS)
     if stem.lower().endswith(f".{extension}"):
         stem = stem[: -(len(extension) + 1)]
     stem = _NOT_STEM_CHARACTERS.sub("-", stem)
-    stem = _HYPHENATED_SEPARATOR_RUNS.sub("-", stem)
-    stem = _UNDERSCORE_RUNS.sub("_", stem)
+    stem = _SEPARATOR_RUNS.sub(lambda separator_run: "-" if "-" in separator_run.group() else "_", stem)
     return stem[:MAX_STORAGE_FILE_STEM_LENGTH].strip(_EDGE_CHARACTERS)
 
 
@@ -114,7 +115,9 @@ def path_safe_file_name(*, name: str, fallback: str, extension: str) -> str:
     stem included, becomes a hyphen, a run of separators collapsing into one. A name already ending in the extension
     is not given it twice, the stem is cut at `MAX_STORAGE_FILE_STEM_LENGTH` characters, and a separator left at either
     end is dropped. When nothing is left, a name written wholly in Greek or Han for one, the stem is `fallback` held to
-    the same rule, then `file`.
+    the same rule, then `file`. So a `PipeDocGen` step's `Zoë Ångström — Q3.2026` is stored as
+    `Zoe-Angstrom-Q3-2026.docx`. Only the name's first characters are read, eight times the stem's cap, so a name
+    rendered from a caller's text costs a bounded amount of work whatever its length.
 
     Args:
         name: The name to store the file under, as rendered or as sent: any text.

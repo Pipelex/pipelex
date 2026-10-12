@@ -2,7 +2,7 @@ import base64
 import binascii
 import mimetypes
 from collections.abc import Collection
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Final
 
 import filetype
@@ -132,9 +132,6 @@ def mime_type_of_file_name(*, file_name: str) -> str | None:
         The MIME type, such as `application/vnd.openxmlformats-officedocument.wordprocessingml.document` for a `.docx`
         file, or None when the extension is absent or unknown.
     """
-    office_mime_type = OFFICE_MIME_TYPES_BY_EXTENSION.get(PurePosixPath(file_name).suffix.lower())
-    if office_mime_type is not None:
-        return office_mime_type
     return _MIME_DB.guess_type(file_name, strict=False)[0]
 
 
