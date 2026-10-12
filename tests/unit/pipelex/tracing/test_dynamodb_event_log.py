@@ -69,6 +69,12 @@ class TestDynamoDBEventLog:
         with pytest.raises(ValidationError):
             DynamoDBTracingConfig.model_validate({"table_name": "trace-events-test", "region": "us-east-1", "retention_days": retention_days})
 
+    @pytest.mark.parametrize("retention_days", [0, -1])
+    def test_init_refuses_a_retention_under_one_day(self, retention_days: int) -> None:
+        """A direct construction bypasses the config's check, so the writer refuses such a retention itself."""
+        with pytest.raises(EventLogSetupError, match="at least one day"):
+            DynamoDBEventLog(table_name="trace-events-test", region="us-east-1", retention_days=retention_days)
+
     @pytest.mark.parametrize(
         "backend_error",
         [

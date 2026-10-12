@@ -61,6 +61,11 @@ class DynamoDBEventLog(EventLogProtocol):
             lib_extra_name = "dynamodb"
             msg = "boto3 is required for the DynamoDB event log backend."
             raise MissingDependencyError(lib_name, lib_extra_name, msg)
+        # The config refuses a retention under one day too, but a direct construction bypasses it,
+        # and such a retention would expire every event as it is written.
+        if retention_days < 1:
+            msg = f"The DynamoDB event log needs a retention of at least one day, got retention_days={retention_days}."
+            raise EventLogSetupError(msg)
 
         self._table_name = table_name
         self._region = region
