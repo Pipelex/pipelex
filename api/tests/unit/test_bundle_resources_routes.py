@@ -2,8 +2,9 @@
 
 Pins the wire across the routes that load inline contents: the files reach the step that reads them, a file no step
 names is refused as the request's fault, a path that cannot name a file inside the bundle is refused, and the count,
-per-file and total limits are enforced before anything loads. A live run handed to an orchestrator other than
-`direct` carries its office templates by reference to the run's storage, never as bytes in the job.
+per-file and total limits are enforced before anything loads, and the files read when the method loads within a bound of
+their own once it is parsed. A run handed to an orchestrator other than `direct` carries its office templates by
+reference to the run's storage, never as bytes in the job.
 
 The hermetic API environment has no document engine, so the step's engine is stubbed and its template check records
 the bytes it reads, which is the read the engine's checker would be handed.
@@ -24,6 +25,7 @@ from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
 from pipelex.runtime_bridge.payloads import PipelexPipeDispatchAck, PipelexPipeRunOutput
+from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 from pytest_mock import MockerFixture
 
@@ -33,7 +35,9 @@ from pipelex_api.routes import router as api_router
 from tests.unit._constants import STUB_METHOD_ADDRESS
 
 _PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
+_REMOTE_DISPATCH_NS = "pipelex.pipe_run.remote_dispatch"
 _RESOURCES_NS = "pipelex_api.bundle_resources"
+_LIBRARY_RESOURCES_NS = "pipelex.libraries.bundle_resources"
 
 _TEMPLATE_PATH = "templates/invoice.docx"
 _TEMPLATE_BYTES = b"PK\x03\x04 a docx template"
@@ -83,7 +87,7 @@ def _stub_the_document_engine(mocker: MockerFixture) -> list[bytes]:
     """
     read_templates: list[bytes] = []
 
-    async def _record_template_check(pipe: PipeDocGen, *, working_memory: WorkingMemory) -> None:  # noqa: ARG001
+    async def _record_template_check(pipe: PipeDocGen, *, job_metadata: JobMetadata, working_memory: WorkingMemory) -> None:  # noqa: ARG001
         assert pipe.template_file is not None
         resource = bundle_resource_of_template_file(template_file=pipe.template_file)
         assert resource is not None, f"the library holds no file for the template file '{pipe.template_file}'"
@@ -111,17 +115,17 @@ class _RecordingTemporalStub:
         return PipelexPipeDispatchAck(pipeline_run_id=pipe_job.job_metadata.run_metadata.pipeline_run_id, workflow_id="wf-1")
 
 
-def _contents_body(*, route: str, resources: dict[str, str]) -> dict[str, Any]:
-    """The route's body carrying the invoice bundle inline with the given resources: the crate routes take `files[]`."""
+def _contents_body(*, route: str, resources: dict[str, str], mthds: str = _INVOICE_MTHDS) -> dict[str, Any]:
+    """The route's body carrying the bundle inline with the given resources: the crate routes take `files[]`."""
     match route:
         case "/v1/validate":
-            return {"mthds_contents": [_INVOICE_MTHDS], "resources": resources}
+            return {"mthds_contents": [mthds], "resources": resources}
         case "/v1/execute":
-            return {"mthds_contents": [_INVOICE_MTHDS], "inputs": _INVOICE_INPUTS, "resources": resources}
+            return {"mthds_contents": [mthds], "inputs": _INVOICE_INPUTS, "resources": resources}
         case "/v1/codegen":
-            return {"files": [{"content": _INVOICE_MTHDS, "source": "invoicing.mthds"}], "kind": "types", "target": "ts-zod", "resources": resources}
+            return {"files": [{"content": mthds, "source": "invoicing.mthds"}], "kind": "types", "target": "ts-zod", "resources": resources}
         case _:
-            return {"files": [{"content": _INVOICE_MTHDS, "source": "invoicing.mthds"}], "resources": resources}
+            return {"files": [{"content": mthds, "source": "invoicing.mthds"}], "resources": resources}
 
 
 def _assert_problem(response: Any, *, status: int, error_type: str) -> str:
@@ -168,6 +172,19 @@ class TestBundleResourcesRoutes:
         detail = _assert_problem(_build_client().post(route, json=body), status=422, error_type="BundleResourceNotNamedError")
 
         assert "'templates/logo.png'" in detail
+
+    @pytest.mark.parametrize("route", ["/v1/validate", "/v1/execute", "/v1/pipe-io", "/v1/resolve", "/v1/codegen"])
+    def test_html_templates_over_the_load_stage_bound_are_refused_with_a_413_naming_the_limit(self, mocker: MockerFixture, route: str) -> None:
+        """An HTML template travels inline with the method wherever it runs, so the files read at load are bounded in total."""
+        _stub_the_document_engine(mocker)
+        mocker.patch(f"{_LIBRARY_RESOURCES_NS}.MAX_LOAD_STAGE_RESOURCES_BYTES", 1024)
+        html_mthds = _INVOICE_MTHDS.replace('format        = "docx"', 'format        = "pdf"').replace(_TEMPLATE_PATH, "invoice.html")
+        body = _contents_body(route=route, resources={"invoice.html": _b64(b"x" * 1025)}, mthds=html_mthds)
+
+        detail = _assert_problem(_build_client().post(route, json=body), status=413, error_type="BundleResourcesTooLargeError")
+
+        assert "('invoice.html')" in detail
+        assert "1 KiB limit" in detail
 
     @pytest.mark.parametrize(
         ("path", "reason"),
@@ -258,7 +275,7 @@ class TestBundleResourcesRoutes:
         """`/start` on a Temporal-like orchestrator: the job's crate names the stored file, and the run's storage holds its bytes."""
         _stub_the_document_engine(mocker)
         storage_provider = InMemoryStorageProvider()
-        mocker.patch(f"{_PIPELINE_NS}.get_storage_provider", return_value=storage_provider)
+        mocker.patch(f"{_REMOTE_DISPATCH_NS}.get_storage_provider", return_value=storage_provider)
         mocker.patch(
             f"{_PIPELINE_NS}.get_api_config", return_value=ApiConfig(orchestration_mode="temporal", allow_request_orchestration_mode_override=False)
         )

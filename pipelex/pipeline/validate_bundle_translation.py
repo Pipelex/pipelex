@@ -19,7 +19,7 @@ from pydantic import ValidationError
 
 from pipelex.base_exceptions import PipelexError, SecurityError, error_domain_is_input
 from pipelex.config import get_config
-from pipelex.core.bundle_resources.exceptions import BundleResourceNotNamedError
+from pipelex.core.bundle_resources.exceptions import BundleResourceNotNamedError, BundleResourcesTooLargeError
 from pipelex.core.exceptions import DryRunFailureErrorData, PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
 from pipelex.core.pipes.exceptions import (
     PipeFactoryError,
@@ -97,8 +97,8 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
     ``runtime`` fault, an unclassified one, anything that is not a ``PipelexError`` — propagates as
     no verdict, along with the refusals that must keep their own class: ``PipeNotFoundError`` (its
     dedicated not-found handler), a ``SecurityError`` (never absorbed by a domain handler), a
-    ``ValidateBundleError`` already produced (never re-wrapped), and a ``BundleResourceNotNamedError``,
-    which refuses the files submitted with the bundle rather than the bundle.
+    ``ValidateBundleError`` already produced (never re-wrapped), and a ``BundleResourceNotNamedError`` or a
+    ``BundleResourcesTooLargeError``, which refuse the files submitted with the bundle rather than the bundle.
     """
     try:
         yield
@@ -196,12 +196,13 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
             message=model_choice_error.message,
             pipe_validation_errors=[categorize_pipe_operator_model_choice_error(model_choice_error=model_choice_error)],
         ) from model_choice_error
-    except (ValidateBundleError, SecurityError, BundleResourceNotNamedError):
+    except (ValidateBundleError, SecurityError, BundleResourceNotNamedError, BundleResourcesTooLargeError):
         # All are PipelexErrors the general arm below would otherwise catch. A verdict already produced
         # (e.g. by a nested load) passes through as it is: re-wrapping it would flatten its items into one.
         # A security refusal is never absorbed into a domain answer, verdict included. A file submitted with
-        # the bundle that none of its steps names is a refusal of the request, not of the bundle, so it keeps
-        # its own class rather than becoming a verdict about a bundle that may well be valid.
+        # the bundle that none of its steps names, or files read at load too large to travel with it, are a
+        # refusal of the request, not of the bundle, so they keep their own class rather than becoming a
+        # verdict about a bundle that may well be valid.
         raise
     except PipelexError as refusal:
         verdict = _make_refusal_verdict(refusal=refusal)

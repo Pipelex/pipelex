@@ -9,6 +9,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
+from pipelex.cogt.content_generation.read_authorization import authorize_assignment_reads
 from pipelex.cogt.doc_gen.doc_gen_engine import require_doc_gen_engine_declared, resolve_doc_gen_setting
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice, DocGenSetting
@@ -45,6 +46,7 @@ from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_require
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.tools.templating.templating_style import TemplatingStyle
+from pipelex.tools.uri.uri_read_scope import UriReference
 from pipelex.validation_error_types import TemplateCheckErrorType
 
 _UNSAFE_FILENAME_CHARACTERS = re.compile(r"[^\w.\-]+")
@@ -281,14 +283,26 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
             raise PipeDocGenRunError(msg)
         return resource
 
-    async def _read_template_file(self) -> bytes:
-        """The office template's bytes, from beside the bundle on disk or from the files submitted with it."""
+    async def _read_template_file(self, *, job_metadata: JobMetadata) -> bytes:
+        """The office template's bytes, from beside the bundle on disk or from the files submitted with it.
+
+        A submitted file the run stored before it left the process is read back under the run's read scope, as the
+        print stage reads it.
+
+        Raises:
+            UriReadRefusedError: the stored file lies outside the run's read scope.
+        """
         if self.template_path is not None:
             return Path(self.template_path).read_bytes()
         resource = self._template_resource()
         if resource is None:
             msg = f"PipeDocGen '{self.code}' has no template file to read."
             raise PipeDocGenRunError(msg)
+        if resource.uri is not None:
+            authorize_assignment_reads(
+                job_metadata=job_metadata,
+                uri_references=[UriReference(uri=resource.uri, position=f"the template file '{self.template_file}'")],
+            )
         return await resource.read_bytes(storage_provider=get_storage_provider())
 
     ####################################################################################################################
@@ -304,7 +318,7 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
             shapes[input_name] = shape_of_input(content_class=content_class, is_list=stuff_spec.is_multiple())
         return shapes
 
-    async def check_template_file(self, *, working_memory: WorkingMemory) -> None:
+    async def check_template_file(self, *, job_metadata: JobMetadata, working_memory: WorkingMemory) -> None:
         """Run the engine's template checker on the step's template file, when its engine has one.
 
         The inputs in memory are the dry run's mocks, so the checker can fill the template in memory with them.
@@ -313,6 +327,7 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
 
         Raises:
             PipeDocGenTemplateCheckError: the checker reported errors.
+            UriReadRefusedError: the template file was stored outside the run's read scope.
         """
         # Only an office template file is the engine's to check; an HTML one was checked against the inputs at load.
         if self.template is not None or self.template_file is None:
@@ -322,7 +337,7 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         worker = DocGenWorkerFactory.make_doc_gen_worker(inference_model=inference_model, reporting_delegate=get_report_delegate())
         request = TemplateCheckRequest(
             format=self.doc_gen_format,
-            template=await self._read_template_file(),
+            template=await self._read_template_file(job_metadata=job_metadata),
             template_name=self.template_file,
             inputs=self._input_shapes(),
             data={name: plain_data(content) for name, content in self._named_contents(working_memory)},
@@ -423,7 +438,7 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         # The live path with the dry mode riding into the leaf: the compose stage runs for real against the mock
         # inputs, which checks the templates, and the leaf prints and stores nothing. The template file's checker
         # runs first, since only a dry run has inputs to fill it with and nothing to spend.
-        await self.check_template_file(working_memory=working_memory)
+        await self.check_template_file(job_metadata=job_metadata, working_memory=working_memory)
         return await self._live_run_operator_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,

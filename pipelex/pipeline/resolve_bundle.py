@@ -20,7 +20,7 @@ from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.bundle_resources.bundle_resource import BundleResources
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
-from pipelex.libraries.bundle_resources import check_bundle_resources_are_named
+from pipelex.libraries.bundle_resources import check_bundle_resources
 from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
@@ -84,7 +84,7 @@ def resolve_crate_from_contents(
             ]
             _reject_address_based_dependencies(blueprints=blueprints)
             if bundle_resources:
-                check_bundle_resources_are_named(blueprints=blueprints, bundle_resources=bundle_resources)
+                check_bundle_resources(blueprints=blueprints, bundle_resources=bundle_resources)
                 library_manager.add_bundle_resources(library_id=library_id, bundle_resources=bundle_resources)
             # load_from_blueprints ends in load_from_crate, whose last step is
             # library.validate_library() — so a crate read after it satisfies the D6

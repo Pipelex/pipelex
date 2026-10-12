@@ -41,7 +41,7 @@ from pipelex.interpreter_hub import (
     set_current_library,
 )
 from pipelex.kernel.memory_ops import shape_inputs
-from pipelex.libraries.bundle_resources import check_bundle_resources_are_named
+from pipelex.libraries.bundle_resources import check_bundle_resources
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.pipe_job import PipeJob
@@ -109,7 +109,8 @@ def acquire_library(
     ``bundle_resources`` are the files submitted with the ``mthds_contents`` that their steps read, such as a
     ``PipeDocGen`` step's ``template_file``, keyed by canonical bundle-relative path. The library holds them before the
     contents load, and its crate carries them with the run. A file none of the contents' steps names is refused with a
-    ``BundleResourceNotNamedError``.
+    ``BundleResourceNotNamedError``, and files read at load too large to travel with the method with a
+    ``BundleResourcesTooLargeError``.
 
     Returns the ``library_id`` and the bundle's qualified ``main_pipe`` ref
     (``domain.pipe_code``) when an ``mthds_contents`` bundle declares one, else
@@ -151,7 +152,7 @@ def acquire_library(
             with host_library_withholding, translate_to_validate_bundle_error():
                 all_blueprints = [MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
                 if bundle_resources:
-                    check_bundle_resources_are_named(blueprints=all_blueprints, bundle_resources=bundle_resources)
+                    check_bundle_resources(blueprints=all_blueprints, bundle_resources=bundle_resources)
                     library_manager.add_bundle_resources(library_id=library_id, bundle_resources=bundle_resources)
 
                 # Filter out blueprints whose URIs are already loaded (e.g. via PIPELEXPATH).

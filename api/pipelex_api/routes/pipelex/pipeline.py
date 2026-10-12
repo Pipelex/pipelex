@@ -11,10 +11,10 @@ from fastapi.responses import JSONResponse
 from mthds.protocol.exceptions import PipelineRequestError
 from pipelex.config import get_config, is_pipe_func_sandbox_hosted
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.libraries.bundle_resources import relocate_run_resources
 from pipelex.methods.structures_check import ensure_no_structured_content_python
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, StorageTarget, WebhookTarget
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
+from pipelex.pipe_run.remote_dispatch import prepare_job_for_remote_dispatch
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
@@ -22,7 +22,7 @@ from pipelex.reporting.usage_records import apply_tokens_usage_wire_shape
 from pipelex.runtime_bridge.exceptions import MissingBundleValidatorError, MissingOrchestratorError
 from pipelex.runtime_bridge.orchestration_mode import DIRECT_ORCHESTRATION_MODE
 from pipelex.runtime_bridge.primitives.hydration import hydrate_working_memory
-from pipelex.runtime_hub import get_bundle_validator_registry, get_orchestrator_registry, get_storage_provider
+from pipelex.runtime_hub import get_bundle_validator_registry, get_orchestrator_registry
 from pipelex.system.environment import get_required_env
 from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE, SINGLE_TENANT_USER_ID, validate_storage_scope_within_read_scope
 from pydantic import ValidationError
@@ -230,27 +230,16 @@ def _pipe_output_from_run_output(run_output: PipelexPipeRunOutput) -> PipeOutput
     )
 
 
-async def _relocate_bundle_resources_for_dispatch(*, pipe_job: PipeJob, orchestration_mode: str) -> PipeJob:
-    """The job as an orchestrator receives it: a live run leaving this process carries its office templates by reference.
+async def _prepare_job_for_dispatch(*, pipe_job: PipeJob, orchestration_mode: str) -> PipeJob:
+    """The job as the mode's orchestrator receives it: prepared to leave this process for every mode but `direct`.
 
-    The files submitted with a bundle travel in the job's crate. A step reads an office template only when it
-    prints, so before a live run is handed to an orchestrator other than the in-process `direct` one, such as
-    Temporal, those files are stored under the run's storage scope and the crate carries their references:
-    the bytes never ride in the workflow's history, and the print stage reads them back under the run's read
-    scope. A file read when the method loads, such as an HTML template, stays inline, since the worker reads it
-    while it loads the crate. A `direct` run and a dry run keep them inline and store nothing.
+    The files submitted with a bundle travel in the job's crate. An orchestrator other than the in-process `direct`
+    one, such as Temporal, runs the job outside this process, so the files its steps read only when they run move to
+    the run's storage first, dry runs included (`prepare_job_for_remote_dispatch`). A `direct` run keeps them inline.
     """
-    crate = pipe_job.library_crate
-    if orchestration_mode == DIRECT_ORCHESTRATION_MODE or crate is None or not crate.bundle_resources:
+    if orchestration_mode == DIRECT_ORCHESTRATION_MODE:
         return pipe_job
-    if pipe_job.pipe_run_params.run_mode.is_dry:
-        return pipe_job
-    relocated_crate = await relocate_run_resources(
-        crate=crate,
-        storage_provider=get_storage_provider(),
-        storage_scope=pipe_job.job_metadata.run_metadata.storage_scope,
-    )
-    return pipe_job.model_copy(update={"library_crate": relocated_crate})
+    return await prepare_job_for_remote_dispatch(pipe_job=pipe_job)
 
 
 class _OrchestratorPipeRun(PipeRunProtocol):
@@ -273,7 +262,7 @@ class _OrchestratorPipeRun(PipeRunProtocol):
 
     @override
     async def run(self, pipe_job: PipeJob, *, delivery_assignment: DeliveryAssignment | None = None) -> PipeOutput:
-        dispatched_job = await _relocate_bundle_resources_for_dispatch(pipe_job=pipe_job, orchestration_mode=self._orchestration_mode)
+        dispatched_job = await _prepare_job_for_dispatch(pipe_job=pipe_job, orchestration_mode=self._orchestration_mode)
         run_output = await self._orchestrator.execute(pipe_job=dispatched_job, delivery_assignment=delivery_assignment)
         return _pipe_output_from_run_output(run_output)
 
@@ -485,7 +474,7 @@ class ApiRunner(PipelexMTHDSProtocol):
         # `PipelexPipeRunInput` (which carries no request_id / output_multiplicity /
         # dynamic_output_concept_ref and skips run registration + telemetry). `start` genuinely
         # enqueues the job and returns a `PipelexPipeDispatchAck` (ids only) immediately.
-        dispatched_job = await _relocate_bundle_resources_for_dispatch(pipe_job=pipe_job, orchestration_mode=orchestration_mode)
+        dispatched_job = await _prepare_job_for_dispatch(pipe_job=pipe_job, orchestration_mode=orchestration_mode)
         dispatch_ack = await orchestrator.start(pipe_job=dispatched_job, delivery_assignment=delivery_assignment)
 
         return PipelexRunResultStart(

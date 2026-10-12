@@ -1,32 +1,23 @@
 """A bundle loaded from content strings brings the template files its PipeDocGen steps read, as the runner's routes receive it."""
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import pytest
-from typing_extensions import override
 
+from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenSource
 from pipelex.cogt.doc_gen.template_check import TemplateFinding, TemplateFindingSeverity
 from pipelex.core.bundle_resources.bundle_resource import BundleResources, make_bundle_resources
 from pipelex.core.bundle_resources.exceptions import BundleResourceNotNamedError
-from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.document_content import DocumentContent
-from pipelex.interpreter_hub import get_current_library, get_library_manager, get_pipe_run, set_current_library
-from pipelex.libraries.bundle_resources import relocate_run_resources
-from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
-from pipelex.pipe_run.pipe_job import PipeJob
-from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
-from pipelex.runtime_hub import get_storage_provider
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import StubEngines, write_bundle
+from pipelex.system.storage_scope import DRY_RUN_STORAGE_SCOPE, LOCAL_STORAGE_SCOPE
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import StubEngines, WorkerLikePipeRun, write_bundle
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
-
-if TYPE_CHECKING:
-    from pipelex.libraries.library_crate import LibraryCrate
 
 _DOCX_TEMPLATE_STEP = 'format = "docx"\ntemplate_file = "templates/invoice.docx"'
 _DOCX_BYTES = b"PK docx template bytes"
@@ -34,43 +25,6 @@ _DOCX_BYTES = b"PK docx template bytes"
 
 def _docx_resources() -> BundleResources:
     return make_bundle_resources(files={"./templates/invoice.docx": _DOCX_BYTES})
-
-
-class _WorkerLikePipeRun(PipeRunProtocol):
-    """Runs a job the way a remote worker does: its crate's office templates relocated to storage, loaded into a library of its own.
-
-    The worker rebuilds the pipe from the crate and runs its own copy, which finds only a reference to its template in
-    the library it runs in, so its print stage reads the bytes back from the run's storage, as a Temporal activity does.
-    """
-
-    def __init__(self) -> None:
-        self.relocated_crate: LibraryCrate | None = None
-
-    @override
-    async def run(self, pipe_job: PipeJob, *, delivery_assignment: DeliveryAssignment | None = None) -> PipeOutput:
-        assert pipe_job.library_crate is not None
-        relocated_crate = await relocate_run_resources(
-            crate=pipe_job.library_crate,
-            storage_provider=get_storage_provider(),
-            storage_scope=pipe_job.job_metadata.run_metadata.storage_scope,
-        )
-        self.relocated_crate = relocated_crate
-        library_manager = get_library_manager()
-        submitter_library_id = get_current_library()
-        worker_library_id = f"worker-{pipe_job.job_metadata.run_metadata.pipeline_run_id}"
-        worker_library = library_manager.open_fresh_library(library_id=worker_library_id)
-        submitter_class_registry = library_manager.get_library(library_id=submitter_library_id).get_class_registry()
-        if submitter_class_registry is not None:
-            worker_library.set_class_registry(submitter_class_registry)
-        set_current_library(library_id=worker_library_id)
-        try:
-            library_manager.load_from_crate(library_id=worker_library_id, crate=relocated_crate, is_crate_prevalidated=True)
-            worker_pipe = library_manager.get_library(library_id=worker_library_id).pipe_library.get_required_pipe(pipe_code=pipe_job.pipe.pipe_ref)
-            worker_job = pipe_job.model_copy(update={"pipe": worker_pipe, "library_crate": relocated_crate})
-            return await get_pipe_run().run(worker_job, delivery_assignment=delivery_assignment)
-        finally:
-            set_current_library(library_id=submitter_library_id)
-            library_manager.teardown(library_id=worker_library_id)
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -164,21 +118,52 @@ class TestPipeDocGenBundleResources:
         assert request.template == _DOCX_BYTES
         assert stub_engines.engine.jobs == []
 
-    async def test_a_run_handed_to_a_remote_worker_prints_from_the_run_s_storage(self, stub_engines: StubEngines) -> None:
-        """The relocated crate carries a reference, the worker's library holds only that, and the print stage reads the stored bytes."""
-        worker_like_pipe_run = _WorkerLikePipeRun()
+    @pytest.mark.parametrize(
+        ("pipe_run_mode", "storage_scope", "is_stored"),
+        [
+            pytest.param(PipeRunMode.LIVE, LOCAL_STORAGE_SCOPE, True, id="live"),
+            pytest.param(PipeRunMode.DRY, LOCAL_STORAGE_SCOPE, True, id="dry"),
+            pytest.param(PipeRunMode.DRY, DRY_RUN_STORAGE_SCOPE, False, id="dry_run_placeholder_scope"),
+        ],
+    )
+    async def test_a_run_handed_to_a_remote_worker_reads_its_template_from_the_run_s_storage(
+        self,
+        stub_engines: StubEngines,
+        remote_worker: WorkerLikePipeRun,
+        pipe_run_mode: PipeRunMode,
+        storage_scope: str,
+        is_stored: bool,
+    ) -> None:
+        """The job leaves the process carrying a reference, and the worker's step reads the stored bytes, to print or to check.
 
-        await PipelexMTHDSProtocol(bundle_resources=_docx_resources(), pipe_run=worker_like_pipe_run).execute(
+        A run whose storage scope is the dry-run placeholder stores nothing, so its template travels inline.
+        """
+        await PipelexMTHDSProtocol(pipe_run_mode=pipe_run_mode, storage_scope=storage_scope, bundle_resources=_docx_resources()).execute(
             mthds_contents=[PipeDocGenTestData.bundle(step_fields=_DOCX_TEMPLATE_STEP)],
             inputs=PipeDocGenTestData.INVOICE_INPUTS,
         )
 
-        assert worker_like_pipe_run.relocated_crate is not None
-        stored = worker_like_pipe_run.relocated_crate.bundle_resources["templates/invoice.docx"]
-        assert stored.uri is not None
-        assert stored.content_b64 is None
-        (job,) = stub_engines.engine.jobs
-        assert job.template == _DOCX_BYTES
+        (received_crate,) = remote_worker.received_crates
+        received = received_crate.bundle_resources["templates/invoice.docx"]
+        assert (received.uri is not None) == is_stored
+        assert received.is_inline != is_stored
+        templates_read = [request.template for request in stub_engines.check_requests] + [job.template for job in stub_engines.engine.jobs]
+        assert templates_read == [_DOCX_BYTES]
+
+    async def test_a_worker_reads_no_stored_template_outside_the_run_s_read_scope_even_to_check_it(
+        self, stub_engines: StubEngines, remote_worker: WorkerLikePipeRun
+    ) -> None:
+        """The dry run's template check reads a stored template under the run's read scope, as the print stage does."""
+        remote_worker.worker_read_scope = "another-tenant"
+
+        with pytest.raises(PipelexError) as exc_info:
+            await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, bundle_resources=_docx_resources()).execute(
+                mthds_contents=[PipeDocGenTestData.bundle(step_fields=_DOCX_TEMPLATE_STEP)],
+                inputs=PipeDocGenTestData.INVOICE_INPUTS,
+            )
+
+        assert "Refused to read the template file 'templates/invoice.docx'" in str(exc_info.value.to_error_report().model_dump())
+        assert stub_engines.check_requests == []
 
     @pytest.mark.parametrize(
         ("step_fields", "template_name", "template_bytes"),
@@ -220,7 +205,10 @@ class TestPipeDocGenBundleResources:
         assert stub_engines.check_requests == []
         assert stub_engines.engine.jobs == []
 
-    async def test_a_step_read_from_a_file_here_reads_beside_it_and_never_a_submitted_file(self, stub_engines: StubEngines, tmp_path: Path) -> None:
+    @pytest.mark.parametrize("is_remote", [pytest.param(False, id="in_process"), pytest.param(True, id="remote_worker")])
+    async def test_a_step_read_from_a_file_here_reads_beside_it_and_never_a_submitted_file(
+        self, request: pytest.FixtureRequest, stub_engines: StubEngines, tmp_path: Path, is_remote: bool
+    ) -> None:
         """A host library's step and a submitted step naming the same template path each read their own file, here and on a worker.
 
         A worker's library holds the crate's submitted files before it builds any pipe, the host library's included,
@@ -240,12 +228,14 @@ class TestPipeDocGenBundleResources:
             ("doc_gen_tests.print_invoice", PipeDocGenTestData.INVOICE_INPUTS),
         ]
 
-        for pipe_run in (None, _WorkerLikePipeRun()):
-            for pipe_code, inputs in runs:
-                await PipelexMTHDSProtocol(library_dirs=[str(host_dir)], bundle_resources=submitted, pipe_run=pipe_run).execute(
-                    pipe_code=pipe_code,
-                    mthds_contents=[PipeDocGenTestData.bundle(step_fields=step_fields)],
-                    inputs=inputs,
-                )
+        if is_remote:
+            request.getfixturevalue("remote_worker")
 
-        assert [job.template for job in stub_engines.engine.jobs] == [b"host template", b"submitted template"] * 2
+        for pipe_code, inputs in runs:
+            await PipelexMTHDSProtocol(library_dirs=[str(host_dir)], bundle_resources=submitted).execute(
+                pipe_code=pipe_code,
+                mthds_contents=[PipeDocGenTestData.bundle(step_fields=step_fields)],
+                inputs=inputs,
+            )
+
+        assert [job.template for job in stub_engines.engine.jobs] == [b"host template", b"submitted template"]

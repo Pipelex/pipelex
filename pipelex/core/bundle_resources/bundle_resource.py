@@ -7,9 +7,10 @@ them for its pipes to read, and its crate carries them wherever the library is l
 
 A resource carries its bytes inline, base64-encoded so that it serializes to JSON like the rest of a crate, or by
 reference to the run's storage. A file a step reads when the method loads, such as an HTML template, which is checked
-against the step's inputs, always travels inline, like the bundle's own text. A file a step reads only when it runs,
-such as an office template, which only its engine opens, moves to the run's storage before a live run is handed to
-its orchestrator, so a run that crosses to another process carries a reference rather than the bytes.
+against the step's inputs, always travels inline, like the bundle's own text, so the files read at load are bounded in
+total (`MAX_LOAD_STAGE_RESOURCES_BYTES`). A file a step reads only when it runs, such as an office template, which only
+its engine opens, moves to the run's storage before a run is handed to an orchestrator outside this process, so a run
+that crosses to another process carries a reference rather than the bytes.
 """
 
 import base64
@@ -24,6 +25,15 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from pipelex.core.bundle_resources.exceptions import BundleResourceError, BundleResourcePathError
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME, StorageProviderAbstract
+
+MAX_LOAD_STAGE_RESOURCES_BYTES = 512 * 1024
+"""The most the files a bundle's steps read when the method loads, such as its HTML templates, may total, in bytes.
+
+They travel inline in the method's crate wherever it runs, a remote orchestrator's payloads included, where the remote
+side reads them while it loads the crate and may do no IO, so they cannot move to the run's storage as an office
+template does. Sized well under Temporal's 2 MB payload limit, with room for the third that base64 adds and for the
+method's own text. A fixed bound, not a setting: raising it would let a run that passed every check fail at dispatch.
+"""
 
 
 class BundleResourceReadStage(StrEnum):

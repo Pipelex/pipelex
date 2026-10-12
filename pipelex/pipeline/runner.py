@@ -20,12 +20,14 @@ from pipelex.config import get_config
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import (
     clear_current_library,
+    does_pipe_run_leave_process,
     get_current_library_id_or_none,
     get_library_manager,
     get_pipe_run,
     get_pipeline_manager,
     set_current_library,
 )
+from pipelex.pipe_run.remote_dispatch import prepare_job_for_remote_dispatch
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
@@ -189,6 +191,8 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         # a label here would put every such run into one shared entity.
         extras: dict[str, str] | None = None,
         execution_config: PipelineExecutionConfig | None = None,
+        # The pipe run to hand each job to instead of the hub's. One that hands the job to an orchestrator outside this
+        # process prepares it with `prepare_job_for_remote_dispatch` first, as the hub's path does here.
         pipe_run: PipeRunProtocol | None = None,
         inputs_base_dir: Path | None = None,
         # Whose `library_dirs` are: the caller's own on a local CLI run, so a refusal while loading
@@ -360,6 +364,10 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 request_id=request_id,
             )
             effective_pipe_run = self._pipe_run or get_pipe_run()
+            if self._pipe_run is None and does_pipe_run_leave_process():
+                # The hub's pipe run hands the job to the boot orchestrator, outside this process, so the files its
+                # steps read when they run travel by reference. An injected pipe run dispatches the job itself.
+                pipe_job = await prepare_job_for_remote_dispatch(pipe_job=pipe_job)
             with method_source_scope(source=self._method_source(mthds_contents=mthds_contents)):
                 pipe_output = await effective_pipe_run.run(pipe_job, delivery_assignment=delivery_assignment)
         except PipelexError as exc:

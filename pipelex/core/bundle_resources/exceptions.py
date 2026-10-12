@@ -26,3 +26,15 @@ class BundleResourceNotNamedError(PipelexError):
 
     error_domain = ErrorDomain.INPUT
     _authors_caller_facing_message = True
+
+
+class BundleResourcesTooLargeError(PipelexError):
+    """Raised when the files a bundle's steps read when the method loads, such as HTML templates, are too large in total.
+
+    They travel inline with the method wherever it runs, so their total is bounded (`MAX_LOAD_STAGE_RESOURCES_BYTES`),
+    whereas a file read only when its step runs, such as an office template, travels by reference to the run's storage.
+    The message names the caller's paths and the limit.
+    """
+
+    error_domain = ErrorDomain.INPUT
+    _authors_caller_facing_message = True

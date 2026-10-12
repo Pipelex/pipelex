@@ -139,7 +139,7 @@ When a bundle is sent as content rather than read from a directory, as it is thr
 - **Every file sent must be one a step names.** A file no step reads is refused, so a misspelled key fails loudly rather than leaving its step without a template.
 - **The files are checked like files on disk.** An `.html` template file is checked against the inputs when the method loads, and the engine's template check runs on an office template file at validation and in the dry run.
 
-A run that a remote orchestrator such as Temporal executes stores each office template file in the run's storage before the run leaves the server, so the run carries a reference rather than the bytes, and the print stage reads the file back under the run's read scope. An HTML template file travels with the method, since it is read while the method loads.
+A run that a remote orchestrator such as Temporal executes, a dry run included, stores each office template file in the run's storage before the run leaves the process, so the run carries a reference rather than the bytes, and the step reads the file back under the run's read scope, to print it or to check it. An HTML template file travels with the method, since it is read while the method loads, so the HTML template files sent with a bundle may total 512 KiB at most: keep images and fonts out of them, at URLs they reference.
 
 From Python, the same files are passed as `bundle_resources`, built with `make_bundle_resources`:
 

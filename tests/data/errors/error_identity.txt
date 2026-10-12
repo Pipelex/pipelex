@@ -27,6 +27,7 @@ BundleElaboratorError | Bundle elaborator | https://docs.pipelex.com/latest/erro
 BundleResourceError | Bundle resource | https://docs.pipelex.com/latest/errors/bundle-resource-error/
 BundleResourceNotNamedError | Bundle resource not named | https://docs.pipelex.com/latest/errors/bundle-resource-not-named-error/
 BundleResourcePathError | Bundle resource path | https://docs.pipelex.com/latest/errors/bundle-resource-path-error/
+BundleResourcesTooLargeError | Bundle resources too large | https://docs.pipelex.com/latest/errors/bundle-resources-too-large-error/
 CodegenError | Codegen error | https://docs.pipelex.com/latest/errors/codegen-error/
 CodegenLockError | Codegen lock error | https://docs.pipelex.com/latest/errors/codegen-lock-error/
 CodegenStampError | Codegen stamp error | https://docs.pipelex.com/latest/errors/codegen-stamp-error/

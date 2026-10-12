@@ -191,7 +191,9 @@ paths:
                     is read as sitting in one directory. A path must be relative and written with forward slashes, with no
                     `..` segment, backslash or colon. Every file must be named by a step, or the request is refused with a
                     422 `BundleResourceNotNamedError`. By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded;
-                    a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.'
+                    a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.
+                    The `.html` template files, which travel inline with the method wherever it runs, may total 512 KiB at
+                    most, a fixed bound, or the request is refused with a 413 `BundleResourcesTooLargeError`.'
                 orchestration_mode:
                   anyOf:
                   - type: string
@@ -461,7 +463,9 @@ paths:
                     is read as sitting in one directory. A path must be relative and written with forward slashes, with no
                     `..` segment, backslash or colon. Every file must be named by a step, or the request is refused with a
                     422 `BundleResourceNotNamedError`. By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded;
-                    a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.'
+                    a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.
+                    The `.html` template files, which travel inline with the method wherever it runs, may total 512 KiB at
+                    most, a fixed bound, or the request is refused with a 413 `BundleResourcesTooLargeError`.'
                 pipeline_run_id:
                   anyOf:
                   - type: string
@@ -1570,7 +1574,8 @@ components:
             in one directory. A path must be relative and written with forward slashes, with no `..` segment, backslash or
             colon. Every file must be named by a step, or the request is refused with a 422 `BundleResourceNotNamedError`.
             By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
-            `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.'
+            `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The `.html` template files, which travel inline with the
+            method wherever it runs, may total 512 KiB at most, a fixed bound, or the request is refused with a 413 `BundleResourcesTooLargeError`.'
         kind:
           $ref: '#/components/schemas/CodegenRouteKind'
           description: What to project. `types` projects the crate's concept set into typed models.
@@ -3952,7 +3957,8 @@ components:
             in one directory. A path must be relative and written with forward slashes, with no `..` segment, backslash or
             colon. Every file must be named by a step, or the request is refused with a 422 `BundleResourceNotNamedError`.
             By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
-            `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.'
+            `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The `.html` template files, which travel inline with the
+            method wherever it runs, may total 512 KiB at most, a fixed bound, or the request is refused with a 413 `BundleResourcesTooLargeError`.'
       type: object
       title: MthdsFilesRequest
       description: 'Shared closure selector for the resolve/codegen routes: inline `files[]` XOR a `method_ref`.
@@ -5019,7 +5025,8 @@ components:
             in one directory. A path must be relative and written with forward slashes, with no `..` segment, backslash or
             colon. Every file must be named by a step, or the request is refused with a 422 `BundleResourceNotNamedError`.
             By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
-            `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.'
+            `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The `.html` template files, which travel inline with the
+            method wherever it runs, may total 512 KiB at most, a fixed bound, or the request is refused with a 413 `BundleResourcesTooLargeError`.'
         pipe_ref:
           anyOf:
           - type: string
@@ -7699,7 +7706,8 @@ components:
             in one directory. A path must be relative and written with forward slashes, with no `..` segment, backslash or
             colon. Every file must be named by a step, or the request is refused with a 422 `BundleResourceNotNamedError`.
             By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
-            `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.'
+            `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The `.html` template files, which travel inline with the
+            method wherever it runs, may total 512 KiB at most, a fixed bound, or the request is refused with a 413 `BundleResourcesTooLargeError`.'
         render:
           items:
             type: string

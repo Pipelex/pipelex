@@ -20,7 +20,7 @@ from pipelex.interpreter_hub import (
     resolve_library_dirs,
     set_current_library,
 )
-from pipelex.libraries.bundle_resources import check_bundle_resources_are_named
+from pipelex.libraries.bundle_resources import check_bundle_resources
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.libraries.pipe.exceptions import EntryPipeNotFoundError
 from pipelex.mthds_parsing.parser import MthdsParser
@@ -133,7 +133,8 @@ async def validate_bundle(
     ``bundle_resources`` are the files submitted with ``mthds_contents`` that their steps read, such as a
     ``PipeDocGen`` step's ``template_file``, keyed by canonical bundle-relative path (see
     ``make_bundle_resources``). A file none of the submitted steps names is refused with a
-    ``BundleResourceNotNamedError``, which is not a verdict. A bundle file reads beside itself on disk and takes none.
+    ``BundleResourceNotNamedError``, and files read at load that total more than ``MAX_LOAD_STAGE_RESOURCES_BYTES`` with
+    a ``BundleResourcesTooLargeError``, neither a verdict. A bundle file reads beside itself on disk and takes none.
 
     ``caller_identity`` is who asked for the validation, when the host knows it; the dry-run
     sweep is attributed to that caller (see ``BundleValidator.validate_pipes``). ``None``
@@ -227,7 +228,7 @@ async def validate_bundle(
                     for content, source in zip(mthds_contents, content_sources, strict=True)
                 ]
                 if bundle_resources:
-                    check_bundle_resources_are_named(blueprints=loaded_blueprints, bundle_resources=bundle_resources)
+                    check_bundle_resources(blueprints=loaded_blueprints, bundle_resources=bundle_resources)
                     library_manager.add_bundle_resources(library_id=library_id, bundle_resources=bundle_resources)
                 loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
                 dry_run_results = await BundleValidator().validate_pipes(
