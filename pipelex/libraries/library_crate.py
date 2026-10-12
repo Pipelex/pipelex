@@ -3,6 +3,7 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from pipelex.core.bundle_resources.bundle_resource import BundleResources
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import ElaborationMetadata, PipeBlueprintUnion
@@ -48,6 +49,27 @@ class LibraryCrate(BaseModel):
     mode; empty for local/direct loads. Deliberately EXCLUDED from the fingerprint (see
     compute_fingerprint_from_content): the fingerprint represents library structure for dedupe, and
     folding source into it would break the structural-idempotency contract in load_from_crate.
+    """
+
+    bundle_resources: BundleResources = Field(default_factory=dict)
+    """canonical bundle-relative path -> a file submitted with a bundle loaded from content strings.
+
+    Carries the files a content-string bundle's steps read, such as a PipeDocGen `template_file`, wherever the
+    crate is loaded again, a Temporal workflow included: a file read when the method loads travels inline, and one
+    read only when its step runs may travel by reference to the run's storage (see `relocate_run_resources`).
+    Empty for a library loaded from directories, whose steps read beside their files on disk. Like
+    `python_sources`, it is transport-only: EXCLUDED from the fingerprint and from the normalized crate.
+    """
+
+    host_bundle_files: dict[str, str] = Field(default_factory=dict)
+    """pipe_ref -> the bundle file the pipe was read from, on the host that assembled the crate, for a pipe whose bundle
+    that host read from a file (a library directory, a bundle file).
+
+    A pipe reads a file beside its bundle, such as a PipeDocGen `template_file`, only through this map, never through
+    `source_map`: a source is a label, which a caller sends with content strings and a bundle's own text can write, so
+    a pipe loaded from content strings has no entry and reads only the files submitted with it (`bundle_resources`).
+    Transport-only, like `python_sources`: EXCLUDED from the fingerprint and from the normalized crate, so a host path
+    never reaches a caller through `/resolve`.
     """
 
     fingerprint: str = ""

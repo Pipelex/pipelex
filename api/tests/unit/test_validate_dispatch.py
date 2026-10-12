@@ -18,6 +18,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pipelex.base_exceptions import ErrorDomain, ErrorReport, PipelexConfigError, ValidationErrorCategory, ValidationErrorItem
+from pipelex.core.bundle_resources.bundle_resource import BundleResources
 from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
 from pipelex.runtime_bridge.exceptions import MissingBundleValidatorError
 from pipelex.system.caller_identity import CallerIdentity
@@ -49,6 +50,7 @@ class _StubBundleValidator:
         library_dirs: Sequence[Path] | None,
         caller_identity: CallerIdentity | None,
         graph_pipe_code: str | None,
+        bundle_resources: BundleResources | None,
     ) -> ErrorReport:
         self.calls.append(
             {
@@ -58,6 +60,7 @@ class _StubBundleValidator:
                 "library_dirs": library_dirs,
                 "caller_identity": caller_identity,
                 "graph_pipe_code": graph_pipe_code,
+                "bundle_resources": bundle_resources,
             }
         )
         if self._error is not None:

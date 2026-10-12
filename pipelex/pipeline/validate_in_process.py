@@ -25,8 +25,10 @@ from typing import TYPE_CHECKING
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError, ValidationErrorItem
+from pipelex.core.bundle_resources.bundle_resource import BundleResources
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.pipe_run.dry_run_in_process import best_effort_graph_spec
+from pipelex.pipe_run.dry_run_warning_collector import collecting_dry_run_warnings
 from pipelex.pipeline.advisory_warnings import build_advisory_warnings
 from pipelex.pipeline.blueprint_selection import collect_entry_pipe_refs, select_primary_blueprint
 from pipelex.pipeline.build_pipe_io_artifacts import build_pipe_io_artifacts
@@ -53,6 +55,7 @@ async def validate_bundles_in_process(
     log_context: str = "validate",
     caller_identity: CallerIdentity | None = None,
     library_dirs_are_callers: bool = False,
+    bundle_resources: BundleResources | None = None,
 ) -> PipelexValidationReport:
     """Parse, validate, and dry-run MTHDS bundles in-process; assemble the canonical report.
 
@@ -84,6 +87,9 @@ async def validate_bundles_in_process(
         library_dirs_are_callers: Whether ``library_dirs`` are the caller's own, whose files the
             verdict may name; by default they are a host's, whose files it withholds (see
             ``validate_bundle``).
+        bundle_resources: The files submitted with ``mthds_contents`` that their steps read, such as a
+            ``PipeDocGen`` template file, keyed by canonical bundle-relative path. The dry run reads them, so the
+            template check runs on them.
 
     Returns:
         PipelexValidationReport with the structural artifacts of a valid bundle.
@@ -100,6 +106,7 @@ async def validate_bundles_in_process(
             graph_pipe_code=graph_pipe_code,
             log_context=log_context,
             library_dirs_are_callers=library_dirs_are_callers,
+            bundle_resources=bundle_resources,
             validation_report=validation_report,
         )
 
@@ -113,6 +120,7 @@ async def _validate_bundles_in_scope(
     graph_pipe_code: str | None,
     log_context: str,
     library_dirs_are_callers: bool,
+    bundle_resources: BundleResources | None,
     validation_report: MethodValidationReport,
 ) -> PipelexValidationReport:
     """The body of :func:`validate_bundles_in_process`, run inside the caller's scope and timed by `validation_report`."""
@@ -139,6 +147,8 @@ async def _validate_bundles_in_scope(
             library_dirs=library_dirs,
             allow_signatures=allow_signatures,
             library_dirs_are_callers=library_dirs_are_callers,
+            collect_dry_run_warnings=True,
+            bundle_resources=bundle_resources,
         )
         # Capture the validation library id ONCE, right after validate_bundle leaves it
         # current — the graph arm and the finally must target the SAME library even if
@@ -158,14 +168,18 @@ async def _validate_bundles_in_scope(
             input_form=artifacts.input_form,
             entry_pipe_refs=collect_entry_pipe_refs(result.blueprints),
             qualified_crate=qualified_crate,
+            dry_run_result=result.dry_run_result,
         )
         validation_report.count_warnings(count=len(warnings))
         graph_target_ref = graph_pipe_code if graph_pipe_code is not None else select_primary_blueprint(result.blueprints).main_pipe_ref
-        graph_spec: GraphSpec | None = await best_effort_graph_spec(
-            pipe_ref=graph_target_ref,
-            library_id=validation_library_id,
-            log_context=log_context,
-        )
+        # The graph arm dry-runs its target once more, and finds again what the sweep found, which `warnings`
+        # already carries: it is collected and dropped here rather than logged as if nothing reported it.
+        with collecting_dry_run_warnings():
+            graph_spec: GraphSpec | None = await best_effort_graph_spec(
+                pipe_ref=graph_target_ref,
+                library_id=validation_library_id,
+                log_context=log_context,
+            )
         body_succeeded = True
     finally:
         if validation_library_id is not None and validation_library_id != prev_library_id:

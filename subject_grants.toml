@@ -3816,7 +3816,7 @@ rationale = "Verb-object: loads the ref-to-entry mapping in topological order; s
 param = "mthds_version_constraint"
 rationale = "Predicate-style check on the version constraint; single operand."
 
-["pipelex/libraries/library_manager.py::_find_methods_dirs_from_blueprints"]
+["pipelex/libraries/library_manager.py::find_methods_dirs_from_blueprints"]
 param = "blueprints"
 rationale = "Derivation: finds dirs from the blueprints; single operand."
 
@@ -4431,6 +4431,10 @@ rationale = "Single-operand analysis over the pipes collection."
 ["pipelex/pipeline/dry_run_pipeline.py::dry_run_pipeline"]
 param = "mthds_contents"
 rationale = "Verb-object: dry-runs the given .mthds contents; options stay keyword."
+
+["pipelex/pipeline/dry_run_warnings.py::build_dry_run_warnings"]
+param = "dry_run_result"
+rationale = "Projects the sweep's per-pipe status map into warning items; reads as 'build dry-run warnings from the dry-run result', the one operand, as its sibling family builders take theirs."
 
 ["pipelex/pipeline/execution_seams.py::acquire_library"]
 param = "library_id"

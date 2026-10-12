@@ -18,6 +18,7 @@ from pipelex import log
 from pipelex.base_exceptions import PipelexError, SecurityError, error_domain_is_input, iter_cause_chain
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.config import is_pipe_func_sandbox_hosted
+from pipelex.core.bundle_resources.bundle_resource import BundleResources
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.helpers import make_qualified_structure_class_name
@@ -80,7 +81,7 @@ if TYPE_CHECKING:
 MTHDS_METHODS_DIRNAME = ".mthds/methods"
 
 
-def _find_methods_dirs_from_blueprints(blueprints: list[PipelexBundleBlueprint]) -> list[Path]:
+def find_methods_dirs_from_blueprints(blueprints: list[PipelexBundleBlueprint]) -> list[Path]:
     """Find .mthds/methods/ directories by walking up from blueprint source paths.
 
     When a bundle file is located outside the CWD (e.g. validating a
@@ -90,8 +91,8 @@ def _find_methods_dirs_from_blueprints(blueprints: list[PipelexBundleBlueprint])
     additional .mthds/methods/ directories.
 
     Args:
-        blueprints: The parsed bundle blueprints (their ``source`` field
-            holds the original file path)
+        blueprints: The parsed bundle blueprints; only those read from a file on this host
+            (``host_bundle_file``) are walked up from
 
     Returns:
         Deduplicated list of existing .mthds/methods/ directories found
@@ -99,9 +100,11 @@ def _find_methods_dirs_from_blueprints(blueprints: list[PipelexBundleBlueprint])
     result: list[Path] = []
     seen: set[Path] = set()
     for blueprint in blueprints:
-        if not blueprint.source:
+        # Only from a file this host read the bundle from: a bundle parsed from a string carries a label at most, which
+        # a caller chose, so walking up from it would search this host's directories wherever the caller pointed.
+        if blueprint.host_bundle_file is None:
             continue
-        current = Path(blueprint.source).resolve().parent
+        current = blueprint.host_bundle_file.resolve().parent
         while True:
             candidate = current / MTHDS_METHODS_DIRNAME
             resolved_candidate = candidate.resolve()
@@ -540,12 +543,22 @@ class LibraryManager(LibraryManagerAbstract):
         accumulated = self._blueprints.get(library_id)
         if not accumulated:
             return None
+        library = self._libraries.get(library_id)
         crate = LibraryCrateFactory.make_from_blueprints(
             blueprints=accumulated,
             python_sources=self._library_sources.get(library_id),
+            bundle_resources=library.bundle_resources if library is not None else None,
         )
         self._crate_cache[library_id] = crate
         return crate
+
+    @override
+    def add_bundle_resources(self, *, library_id: str, bundle_resources: BundleResources) -> None:
+        if not bundle_resources:
+            return
+        self.get_library(library_id=library_id).add_bundle_resources(bundle_resources=bundle_resources)
+        # The cached crate was built without them.
+        self._crate_cache.pop(library_id, None)
 
     ############################################################
     # Private methods
@@ -723,6 +736,11 @@ class LibraryManager(LibraryManagerAbstract):
             if library_id not in self._blueprints:
                 self._crate_cache[library_id] = crate
 
+            # The files a transported crate carries for its content-string bundles, held before the pipes are built,
+            # since a pipe reading one, such as a PipeDocGen step with an HTML template file, reads it as it is built.
+            if crate.bundle_resources:
+                self.get_library(library_id=library_id).add_bundle_resources(bundle_resources=crate.bundle_resources)
+
             # Fingerprint idempotency: skip if this crate was already loaded into this library
             fingerprint = crate.fingerprint
             loaded_set = self._loaded_fingerprints.setdefault(library_id, set())
@@ -790,10 +808,11 @@ class LibraryManager(LibraryManagerAbstract):
                 concept_codes_for_domain = domain_concept_codes.get(domain_code, [])
 
                 source = crate.source_map.get(pipe_ref)
-                # A pipe that reads a file beside its bundle (a PipeDocGen `template_file`) resolves it
-                # against the bundle's own file, which the crate knows and the pipe's blueprint does not.
-                if source is not None and pipe_blueprint.source is None:
-                    pipe_blueprint = pipe_blueprint.model_copy(update={"source": source})
+                # A pipe that reads a file beside its bundle (a PipeDocGen `template_file`) resolves it against the
+                # bundle file the host that assembled the crate read it from, and against nothing else: the pipe's
+                # `source` is overwritten with that file, or cleared, so neither a caller's label (`source_map`) nor a
+                # `source` the bundle's text wrote on the pipe can point the read at a directory on this host.
+                pipe_blueprint = pipe_blueprint.model_copy(update={"source": crate.host_bundle_files.get(pipe_ref)})
                 with _locating_pipe_build_refusals(
                     pipe_code=pipe_code, domain_code=domain_code, source=source, elaboration=crate.elaboration_metadata.get(pipe_ref)
                 ):
@@ -1418,8 +1437,8 @@ class LibraryManager(LibraryManagerAbstract):
                 # bundle's file on this host, which its blueprint carries into the factory and no further. The
                 # package's address stays the source every refusal names, since the host's path is not the caller's.
                 bundle_file = bundle_files_by_source.get(dependency_source) if dependency_source is not None else None
-                if bundle_file is not None and pipe_blueprint.source is None:
-                    pipe_blueprint = pipe_blueprint.model_copy(update={"source": str(bundle_file)})
+                # Overwritten either way, so a `source` the package's own text wrote on the pipe never names a directory.
+                pipe_blueprint = pipe_blueprint.model_copy(update={"source": str(bundle_file) if bundle_file is not None else None})
                 try:
                     # The same location the main load path attaches, so a dependency pipe's refusal
                     # names the dependency's own file.
@@ -1514,7 +1533,7 @@ class LibraryManager(LibraryManagerAbstract):
             return
 
         # Derive extra search dirs from bundle source paths
-        extra_search_dirs = _find_methods_dirs_from_blueprints(blueprints)
+        extra_search_dirs = find_methods_dirs_from_blueprints(blueprints)
 
         unresolved_items: list[PipesAndConceptValidationErrorData] = []
         for full_address, (reference, blueprint) in first_references.items():

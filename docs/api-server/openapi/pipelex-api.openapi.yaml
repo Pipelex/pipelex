@@ -12,7 +12,7 @@ info:
   license:
     name: Elastic License 2.0
     identifier: Elastic-2.0
-  version: 0.84.0
+  version: 0.85.0
 paths:
   /health:
     get:
@@ -178,6 +178,23 @@ paths:
                     `pipe_code` may accompany it to override the manifest''s `main_pipe`. A package shipping custom Python
                     is only honored on a sandbox-hosted deployment, and a package declaring Python structure classes is always
                     refused — hosted execution accepts MTHDS concepts and sandboxed PipeFuncs, not in-process Python.'
+                resources:
+                  anyOf:
+                  - additionalProperties:
+                      type: string
+                    type: object
+                  - type: 'null'
+                  title: Resources
+                  description: 'The files submitted with the bundle that its steps read, such as a PipeDocGen step''s `template_file`
+                    (an `.xlsx`, `.docx`, `.pptx` or `.html` template): a JSON object mapping each file''s bundle-relative
+                    path, exactly as the step names it, to the file''s bytes in standard base64. Every bundle of the request
+                    is read as sitting in one directory. A path must be relative and written with forward slashes, with no
+                    `..` segment, backslash or colon. Every file must be named by a step, or the request is refused with a
+                    422 `BundleResourceNotNamedError`. By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded,
+                    counting the files a method bundle ships for its steps; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
+                    `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. A file both sent here and shipped in a method bundle
+                    must be the same. The `.html` template files, which travel inline with the method wherever it runs, may
+                    total 512 KiB at most, a fixed bound, or the request is refused with a 413 `BundleResourcesTooLargeError`.'
                 orchestration_mode:
                   anyOf:
                   - type: string
@@ -434,6 +451,23 @@ paths:
                     `pipe_code` may accompany it to override the manifest''s `main_pipe`. A package shipping custom Python
                     is only honored on a sandbox-hosted deployment, and a package declaring Python structure classes is always
                     refused — hosted execution accepts MTHDS concepts and sandboxed PipeFuncs, not in-process Python.'
+                resources:
+                  anyOf:
+                  - additionalProperties:
+                      type: string
+                    type: object
+                  - type: 'null'
+                  title: Resources
+                  description: 'The files submitted with the bundle that its steps read, such as a PipeDocGen step''s `template_file`
+                    (an `.xlsx`, `.docx`, `.pptx` or `.html` template): a JSON object mapping each file''s bundle-relative
+                    path, exactly as the step names it, to the file''s bytes in standard base64. Every bundle of the request
+                    is read as sitting in one directory. A path must be relative and written with forward slashes, with no
+                    `..` segment, backslash or colon. Every file must be named by a step, or the request is refused with a
+                    422 `BundleResourceNotNamedError`. By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded,
+                    counting the files a method bundle ships for its steps; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
+                    `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. A file both sent here and shipped in a method bundle
+                    must be the same. The `.html` template files, which travel inline with the method wherever it runs, may
+                    total 512 KiB at most, a fixed bound, or the request is refused with a 413 `BundleResourcesTooLargeError`.'
                 pipeline_run_id:
                   anyOf:
                   - type: string
@@ -1529,6 +1563,23 @@ components:
           title: Method Ref
           description: Reference to a published method, resolving to its package's `.mthds` files. Address form (`github.com/<owner>/<repo>[/<selector>][@<tag>]`)
             is fetched and resolved server-side; the registry form stays reserved (501 until a method registry exists).
+        resources:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          title: Resources
+          description: 'The files submitted with the bundle that its steps read, such as a PipeDocGen step''s `template_file`
+            (an `.xlsx`, `.docx`, `.pptx` or `.html` template): a JSON object mapping each file''s bundle-relative path, exactly
+            as the step names it, to the file''s bytes in standard base64. Every bundle of the request is read as sitting
+            in one directory. A path must be relative and written with forward slashes, with no `..` segment, backslash or
+            colon. Every file must be named by a step, or the request is refused with a 422 `BundleResourceNotNamedError`.
+            By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded, counting the files a method bundle ships
+            for its steps; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.
+            A file both sent here and shipped in a method bundle must be the same. The `.html` template files, which travel
+            inline with the method wherever it runs, may total 512 KiB at most, a fixed bound, or the request is refused with
+            a 413 `BundleResourcesTooLargeError`.'
         kind:
           $ref: '#/components/schemas/CodegenRouteKind'
           description: What to project. `types` projects the crate's concept set into typed models.
@@ -3897,6 +3948,23 @@ components:
           title: Method Ref
           description: Reference to a published method, resolving to its package's `.mthds` files. Address form (`github.com/<owner>/<repo>[/<selector>][@<tag>]`)
             is fetched and resolved server-side; the registry form stays reserved (501 until a method registry exists).
+        resources:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          title: Resources
+          description: 'The files submitted with the bundle that its steps read, such as a PipeDocGen step''s `template_file`
+            (an `.xlsx`, `.docx`, `.pptx` or `.html` template): a JSON object mapping each file''s bundle-relative path, exactly
+            as the step names it, to the file''s bytes in standard base64. Every bundle of the request is read as sitting
+            in one directory. A path must be relative and written with forward slashes, with no `..` segment, backslash or
+            colon. Every file must be named by a step, or the request is refused with a 422 `BundleResourceNotNamedError`.
+            By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded, counting the files a method bundle ships
+            for its steps; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.
+            A file both sent here and shipped in a method bundle must be the same. The `.html` template files, which travel
+            inline with the method wherever it runs, may total 512 KiB at most, a fixed bound, or the request is refused with
+            a 413 `BundleResourcesTooLargeError`.'
       type: object
       title: MthdsFilesRequest
       description: 'Shared closure selector for the resolve/codegen routes: inline `files[]` XOR a `method_ref`.
@@ -4734,8 +4802,9 @@ components:
 
         out by itself (the auto-layout), for every format but `pptx`. `template` is an inline HTML and Jinja2 template, for
 
-        `pdf` only; `template_file` is a path relative to the bundle''s file: an `.html` for `pdf`, an `.xlsx` for `xlsx`,
-        a
+        `pdf` only; `template_file` is a path relative to the bundle''s file, inside its bundle and written with forward
+
+        slashes: an `.html` for `pdf`, an `.xlsx` for `xlsx`, a
 
         `.docx` for `docx` and a `.pptx` for `pptx`, which `pptx` requires. `filename` is a Jinja expression over the
 
@@ -4950,6 +5019,23 @@ components:
           title: Method Ref
           description: Reference to a published method, resolving to its package's `.mthds` files. Address form (`github.com/<owner>/<repo>[/<selector>][@<tag>]`)
             is fetched and resolved server-side; the registry form stays reserved (501 until a method registry exists).
+        resources:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          title: Resources
+          description: 'The files submitted with the bundle that its steps read, such as a PipeDocGen step''s `template_file`
+            (an `.xlsx`, `.docx`, `.pptx` or `.html` template): a JSON object mapping each file''s bundle-relative path, exactly
+            as the step names it, to the file''s bytes in standard base64. Every bundle of the request is read as sitting
+            in one directory. A path must be relative and written with forward slashes, with no `..` segment, backslash or
+            colon. Every file must be named by a step, or the request is refused with a 422 `BundleResourceNotNamedError`.
+            By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded, counting the files a method bundle ships
+            for its steps; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.
+            A file both sent here and shipped in a method bundle must be the same. The `.html` template files, which travel
+            inline with the method wherever it runs, may total 512 KiB at most, a fixed bound, or the request is refused with
+            a 413 `BundleResourcesTooLargeError`.'
         pipe_ref:
           anyOf:
           - type: string
@@ -6975,6 +7061,25 @@ components:
       - llm_prompt
       - img_gen_prompt
       title: TemplateCategory
+    TemplateCheckErrorType:
+      type: string
+      enum:
+      - template_check_warning
+      title: TemplateCheckErrorType
+      description: 'Advisory findings of a ``PipeDocGen`` step''s template check (the engine''s ``check_template``).
+
+
+        Every member is advisory-only: it rides the validation report''s ``warnings`` array and never makes a
+
+        verdict invalid. An error finding of the same check fails the step''s dry run instead, and is reported as
+
+        the ``DryRunError`` item every failed dry run is. A separate enum rather than a new
+
+        ``PipeValidationErrorType`` member because the finding is not the pipe''s validation: the dry run hands the
+
+        step''s template file to its engine, which reads it in a way only the engine can, and reports in its own
+
+        words. Its locators are the template file and the place in it the engine names.'
     TemplatingStyle:
       properties:
         tag_style:
@@ -7597,6 +7702,23 @@ components:
           description: Optional per-file sources, parallel to `mthds_contents`. When provided, each entry is threaded onto
             the corresponding bundle's `source` so server-side validation errors carry a `source` pointing at the owning file.
             Must match `mthds_contents` in length when present.
+        resources:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          title: Resources
+          description: 'The files submitted with the bundle that its steps read, such as a PipeDocGen step''s `template_file`
+            (an `.xlsx`, `.docx`, `.pptx` or `.html` template): a JSON object mapping each file''s bundle-relative path, exactly
+            as the step names it, to the file''s bytes in standard base64. Every bundle of the request is read as sitting
+            in one directory. A path must be relative and written with forward slashes, with no `..` segment, backslash or
+            colon. Every file must be named by a step, or the request is refused with a 422 `BundleResourceNotNamedError`.
+            By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded, counting the files a method bundle ships
+            for its steps; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.
+            A file both sent here and shipped in a method bundle must be the same. The `.html` template files, which travel
+            inline with the method wherever it runs, may total 512 KiB at most, a fixed bound, or the request is refused with
+            a 413 `BundleResourcesTooLargeError`.'
         render:
           items:
             type: string
@@ -7678,7 +7800,11 @@ components:
 
         or a type mismatch), and ``dry_run`` — one item per pipe whose dry run failed,
 
-        located at the innermost failing pipe.'
+        located at the innermost failing pipe. On the report''s advisory ``warnings``,
+
+        ``dry_run`` marks a finding a dry run made without failing, such as a warning of
+
+        a ``PipeDocGen`` step''s template check.'
     ValidationErrorItem:
       properties:
         category:
@@ -7692,6 +7818,7 @@ components:
           - $ref: '#/components/schemas/PipeFactoryErrorType'
           - $ref: '#/components/schemas/ValidationResidualErrorType'
           - $ref: '#/components/schemas/HintLintErrorType'
+          - $ref: '#/components/schemas/TemplateCheckErrorType'
           - type: 'null'
           title: Error Type
         pipe_code:
@@ -7775,6 +7902,16 @@ components:
             type: array
           - type: 'null'
           title: Suggestions
+        template_file:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Template File
+        template_location:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Template Location
         suggested_fix:
           anyOf:
           - $ref: '#/components/schemas/SuggestedFix'

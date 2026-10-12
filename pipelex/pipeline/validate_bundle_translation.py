@@ -9,14 +9,17 @@ below the validation service in the import graph (``validate_bundle`` → ``bund
 ``execution_seams``), and both must reach the same translation.
 """
 
-from collections.abc import Collection, Generator, Sequence
+import tomllib
+from collections.abc import Collection, Generator, Iterable, Sequence
 from contextlib import contextmanager
 from pathlib import Path
+from typing import NamedTuple, cast
 
 from pydantic import ValidationError
 
 from pipelex.base_exceptions import PipelexError, SecurityError, error_domain_is_input
 from pipelex.config import get_config
+from pipelex.core.bundle_resources.exceptions import BundleResourceNotNamedError, BundleResourcesTooLargeError
 from pipelex.core.exceptions import DryRunFailureErrorData, PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
 from pipelex.core.pipes.exceptions import (
     PipeFactoryError,
@@ -93,8 +96,9 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
     as a crash or a no-verdict fault. Only a failure of the tool or its environment — a ``config`` or
     ``runtime`` fault, an unclassified one, anything that is not a ``PipelexError`` — propagates as
     no verdict, along with the refusals that must keep their own class: ``PipeNotFoundError`` (its
-    dedicated not-found handler), a ``SecurityError`` (never absorbed by a domain handler), and a
-    ``ValidateBundleError`` already produced (never re-wrapped).
+    dedicated not-found handler), a ``SecurityError`` (never absorbed by a domain handler), a
+    ``ValidateBundleError`` already produced (never re-wrapped), and a ``BundleResourceNotNamedError`` or a
+    ``BundleResourcesTooLargeError``, which refuse the files submitted with the bundle rather than the bundle.
     """
     try:
         yield
@@ -192,10 +196,13 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
             message=model_choice_error.message,
             pipe_validation_errors=[categorize_pipe_operator_model_choice_error(model_choice_error=model_choice_error)],
         ) from model_choice_error
-    except (ValidateBundleError, SecurityError):
-        # Both are PipelexErrors the general arm below would otherwise catch. A verdict already produced
+    except (ValidateBundleError, SecurityError, BundleResourceNotNamedError, BundleResourcesTooLargeError):
+        # All are PipelexErrors the general arm below would otherwise catch. A verdict already produced
         # (e.g. by a nested load) passes through as it is: re-wrapping it would flatten its items into one.
-        # A security refusal is never absorbed into a domain answer, verdict included.
+        # A security refusal is never absorbed into a domain answer, verdict included. A file submitted with
+        # the bundle that none of its steps names, or files read at load too large to travel with it, are a
+        # refusal of the request, not of the bundle, so they keep their own class rather than becoming a
+        # verdict about a bundle that may well be valid.
         raise
     except PipelexError as refusal:
         verdict = _make_refusal_verdict(refusal=refusal)
@@ -241,7 +248,9 @@ def _make_refusal_verdict(*, refusal: PipelexError) -> ValidateBundleError | Non
 
 
 @contextmanager
-def withholding_host_library_files(*, library_dirs: Sequence[Path], caller_sources: Collection[str] = ()) -> Generator[None, None, None]:
+def withholding_host_library_files(
+    *, library_dirs: Sequence[Path], caller_sources: Collection[str] = (), caller_contents: Collection[str] = ()
+) -> Generator[None, None, None]:
     """Keep the files of a host's own library directories out of the verdict the block raises.
 
     A verdict is caller-facing as a whole, and STRICT disclosure hands its message and its items to the caller
@@ -254,7 +263,10 @@ def withholding_host_library_files(*, library_dirs: Sequence[Path], caller_sourc
     domain, and a message reads ``HOST_LIBRARY_FILE_PLACEHOLDER`` where it named one. The names are the ones the
     load gives: each bundle file in the spelling it gives a bundle's ``source`` and resolved, and each Python file's
     module name. A name the caller submitted as a content's source (``caller_sources``) is the caller's own and is
-    never withheld, even where a host file is spelled the same.
+    never withheld, even where a host file is spelled the same. The template files the host's ``PipeDocGen`` steps
+    name are withheld too, in the spelling the steps give them, since their refusals, at load or in the dry run of a
+    caller's pipe that runs one, name them; a template file the caller's own content names (``caller_contents``)
+    stays, so the caller's own steps keep naming theirs.
 
     A bundle validated from a file on the caller's own disk, or validated or run with library directories that
     are the caller's, keeps every path: there the directories are the caller's to read. A package the content
@@ -263,7 +275,9 @@ def withholding_host_library_files(*, library_dirs: Sequence[Path], caller_sourc
     try:
         yield
     except ValidateBundleError as verdict:
-        host_library_names = _host_library_names(library_dirs=library_dirs) - set(caller_sources)
+        host_files = _host_library_files(library_dirs=library_dirs)
+        host_library_names = host_files.names - set(caller_sources)
+        host_library_names |= host_files.template_files - _template_files_named_in(mthds_texts=caller_contents)
         if not host_library_names:
             raise
         withheld_verdict = verdict.withholding_files(withheld_files=host_library_names, placeholder=HOST_LIBRARY_FILE_PLACEHOLDER)
@@ -272,15 +286,62 @@ def withholding_host_library_files(*, library_dirs: Sequence[Path], caller_sourc
         raise withheld_verdict from verdict.__cause__
 
 
-def _host_library_names(*, library_dirs: Sequence[Path]) -> set[str]:
-    """Every name the library load gives a file of ``library_dirs``.
+def _template_files_named_in(*, mthds_texts: Iterable[str]) -> set[str]:
+    """The ``template_file`` every pipe of the given bundle texts names, read from the TOML alone.
+
+    The bundles are read as TOML rather than parsed into blueprints, because the bundle whose refusal is being
+    withheld may be the one that does not parse, and its steps' template files are still the ones its messages name.
+    """
+    template_files: set[str] = set()
+    for mthds_text in mthds_texts:
+        try:
+            document = tomllib.loads(mthds_text)
+        except tomllib.TOMLDecodeError:
+            continue
+        pipe_tables: object = document.get("pipe")
+        if not isinstance(pipe_tables, dict):
+            continue
+        for pipe_table in cast("dict[str, object]", pipe_tables).values():
+            if not isinstance(pipe_table, dict):
+                continue
+            template_file = cast("dict[str, object]", pipe_table).get("template_file")
+            if isinstance(template_file, str):
+                template_files.add(template_file)
+    return template_files
+
+
+def _bundle_text_or_none(*, library_file: Path) -> str | None:
+    """A host bundle file's text, or None for a file the load could not read either, whose refusal names no template file."""
+    try:
+        return library_file.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+class _HostLibraryFiles(NamedTuple):
+    """What a verdict must not name of the host's library directories."""
+
+    names: set[str]
+    """Every name the library load gives a file of the directories."""
+
+    template_files: set[str]
+    """The template files the steps of their bundles name, as the steps spell them."""
+
+
+def _host_library_files(*, library_dirs: Sequence[Path]) -> _HostLibraryFiles:
+    """Every name the library load gives a file of ``library_dirs``, and the template files their steps name, in one walk.
 
     A bundle file is named as listed, which is the ``source`` the load gives it, and resolved; a Python file by
-    the module name the function registry imports it under, which is spelled from its resolved path.
+    the module name the function registry imports it under, which is spelled from its resolved path. Each bundle file
+    is read once, for the template files its steps name.
     """
     names: set[str] = set()
+    host_texts: list[str] = []
     for library_file in get_pipelex_mthds_files_from_dirs(set(library_dirs)):
         names.add(str(library_file))
+        host_text = _bundle_text_or_none(library_file=library_file)
+        if host_text is not None:
+            host_texts.append(host_text)
         try:
             names.add(str(library_file.resolve()))
         except (OSError, RuntimeError):
@@ -294,4 +355,4 @@ def _host_library_names(*, library_dirs: Sequence[Path]) -> set[str]:
                 names.add(convert_file_path_to_module_path(python_file))
             except (OSError, RuntimeError):
                 continue
-    return names
+    return _HostLibraryFiles(names=names, template_files=_template_files_named_in(mthds_texts=host_texts))

@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from typing_extensions import override
@@ -13,6 +13,11 @@ from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.config import get_config
+from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.interpreter_hub import get_current_library, get_library_manager, set_current_library
+from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
+from pipelex.pipe_run.pipe_job import PipeJob
+from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.plugins.contract import PLUGIN_API_VERSION
@@ -24,6 +29,9 @@ from pipelex.plugins.sdk_client_registry import SdkClientRegistry
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.runtime_hub import get_secrets_provider
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
+
+if TYPE_CHECKING:
+    from pipelex.libraries.library_crate import LibraryCrate
 
 # The engines the stubs stand in for: the built-in pdf from the layout, and two of the document generation plugin's,
 # a pdf from HTML and a docx, which the stub plugin declares as the real plugin would.
@@ -157,3 +165,44 @@ def write_bundle(*, directory: Path, step_fields: str) -> Path:
     bundle_path = directory / "invoice.mthds"
     bundle_path.write_text(PipeDocGenTestData.bundle(step_fields=step_fields), encoding="utf-8")
     return bundle_path
+
+
+class WorkerLikePipeRun(PipeRunProtocol):
+    """Runs a job the way a remote worker does: loads the crate it was handed into a library of its own and runs its own pipe.
+
+    Installed as the hub's pipe run, as a boot orchestrator's plugin installs its own (the `remote_worker` fixture), it
+    receives the job only after the submitter prepared it to leave the process. Its pipe, rebuilt from the crate, finds
+    only a reference to its office template in the library it runs in, and reads the bytes back from the run's storage,
+    as a Temporal activity does. `worker_read_scope`, when given, replaces the run's read scope on the worker.
+    """
+
+    def __init__(self, *, in_process_pipe_run: PipeRunProtocol, worker_read_scope: str | None = None) -> None:
+        self._in_process_pipe_run = in_process_pipe_run
+        self.worker_read_scope = worker_read_scope
+        self.received_crates: list[LibraryCrate] = []
+
+    @override
+    async def run(self, pipe_job: PipeJob, *, delivery_assignment: DeliveryAssignment | None = None) -> PipeOutput:
+        crate = pipe_job.library_crate
+        assert crate is not None
+        self.received_crates.append(crate)
+        library_manager = get_library_manager()
+        submitter_library_id = get_current_library()
+        worker_library_id = f"worker-{pipe_job.job_metadata.run_metadata.pipeline_run_id}"
+        worker_library = library_manager.open_fresh_library(library_id=worker_library_id)
+        submitter_class_registry = library_manager.get_library(library_id=submitter_library_id).get_class_registry()
+        if submitter_class_registry is not None:
+            worker_library.set_class_registry(submitter_class_registry)
+        set_current_library(library_id=worker_library_id)
+        try:
+            library_manager.load_from_crate(library_id=worker_library_id, crate=crate, is_crate_prevalidated=True)
+            worker_pipe = library_manager.get_library(library_id=worker_library_id).pipe_library.get_required_pipe(pipe_code=pipe_job.pipe.pipe_ref)
+            job_metadata = pipe_job.job_metadata
+            if self.worker_read_scope is not None:
+                run_metadata = job_metadata.run_metadata.model_copy(update={"read_scope": self.worker_read_scope})
+                job_metadata = job_metadata.model_copy(update={"run_metadata": run_metadata})
+            worker_job = pipe_job.model_copy(update={"pipe": worker_pipe, "job_metadata": job_metadata})
+            return await self._in_process_pipe_run.run(worker_job, delivery_assignment=delivery_assignment)
+        finally:
+            set_current_library(library_id=submitter_library_id)
+            library_manager.teardown(library_id=worker_library_id)

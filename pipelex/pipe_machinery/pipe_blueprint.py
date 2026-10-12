@@ -6,6 +6,7 @@ from typing import Any, Self, cast, final
 
 from pydantic import BaseModel, ConfigDict, Field, SerializerFunctionWrapHandler, field_validator, model_serializer, model_validator
 
+from pipelex.core.bundle_resources.bundle_resource import BundleResourceReadStage
 from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.core.pipes.exceptions import PipeValidationError
@@ -228,6 +229,9 @@ class PipeBlueprint(ABC, BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     source: str | None = None
+    """Not an authoring field. The library manager overwrites it, just before the pipe is built, with the bundle file this
+    host read the pipe's bundle from, or None, so whatever a bundle's text writes here is never read (see
+    `LibraryCrate.host_bundle_files`)."""
     pipe_category: Any = Field(exclude=True)  # Technical field for Union discrimination, not user-facing
     type: Any  # TODO: Find a better way to handle this.
     description: str
@@ -285,6 +289,16 @@ class PipeBlueprint(ABC, BaseModel):
             Set of pipe codes this pipe depends on
         """
         return set()
+
+    @property
+    def bundle_resource_reads(self) -> dict[str, BundleResourceReadStage]:
+        """The files of its bundle this pipe reads, keyed by the bundle-relative path it names, and when it reads each.
+
+        Overridden by a pipe that reads a file beside its bundle, such as a `PipeDocGen` step's `template_file`.
+        A bundle submitted as content strings brings exactly these files with it, and the one read only when the
+        step runs may travel with the run by reference.
+        """
+        return {}
 
     @property
     def ordered_pipe_dependencies(self) -> list[str] | None:

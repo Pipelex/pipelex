@@ -6,6 +6,8 @@ from pydantic import ValidationError
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
 from pipelex.cogt.doc_gen.document_composition import DocumentComposition
 from pipelex.cogt.doc_gen.layout_tree import ImageBlock, LayoutDocument, SectionBlock
+from pipelex.core.bundle_resources.bundle_resource import BundleResource
+from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 
 
 class TestDocumentComposition:
@@ -46,7 +48,8 @@ class TestDocumentComposition:
         )
         assert composition.referenced_uris() == []
 
-    def test_the_render_job_carries_the_template_file_s_bytes(self, tmp_path: Path) -> None:
+    @pytest.mark.asyncio
+    async def test_the_render_job_carries_the_template_file_s_bytes(self, tmp_path: Path) -> None:
         template_file = tmp_path / "invoice.docx"
         template_file.write_bytes(b"docx bytes")
         composition = DocumentComposition(
@@ -59,11 +62,54 @@ class TestDocumentComposition:
             data={"invoice": {"number": "INV-1"}},
         )
 
-        job = composition.make_render_job()
+        job = await composition.make_render_job(storage_provider=InMemoryStorageProvider())
 
         assert job.template == b"docx bytes"
         assert job.template_name == "invoice.docx"
         assert job.data == {"invoice": {"number": "INV-1"}}
+
+    @pytest.mark.asyncio
+    async def test_a_template_file_submitted_with_its_bundle_is_read_from_its_resource(self) -> None:
+        """Inline, the bytes are the composition's own; stored, they are read back through the run's storage, under its read scope."""
+        storage_provider = InMemoryStorageProvider()
+        inline = BundleResource.make_inline(content=b"docx bytes")
+        uri = await storage_provider.store(b"docx bytes", key="org/run/assets/bundle/digest/invoice.docx")
+        stored = inline.stored_at(uri=uri)
+
+        for resource in (inline, stored):
+            composition = DocumentComposition(
+                format=DocGenFormat.DOCX,
+                source=DocGenSource.TEMPLATE_FILE,
+                filename="invoice.docx",
+                title="Invoice",
+                template_resource=resource,
+                template_name="invoice.docx",
+            )
+            job = await composition.make_render_job(storage_provider=storage_provider)
+            assert job.template == b"docx bytes"
+
+        stored_composition = DocumentComposition(
+            format=DocGenFormat.DOCX,
+            source=DocGenSource.TEMPLATE_FILE,
+            filename="invoice.docx",
+            title="Invoice",
+            template_resource=stored,
+            template_name="invoice.docx",
+        )
+        (uri_reference,) = stored_composition.referenced_uris()
+        assert uri_reference.uri == uri
+        assert uri_reference.position == "the template file 'invoice.docx'"
+
+    def test_a_template_file_read_from_disk_and_from_its_resource_is_refused(self) -> None:
+        with pytest.raises(ValidationError, match="not both"):
+            DocumentComposition(
+                format=DocGenFormat.DOCX,
+                source=DocGenSource.TEMPLATE_FILE,
+                filename="invoice.docx",
+                title="Invoice",
+                template_path="/nowhere/invoice.docx",
+                template_resource=BundleResource.make_inline(content=b"docx bytes"),
+            )
 
     def test_a_composition_without_its_payload_is_refused(self) -> None:
         with pytest.raises(ValidationError, match="carries its payload"):

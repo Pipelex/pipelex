@@ -17,6 +17,10 @@ own page. Classes are grouped by subsystem.
 
 ## Core language
 
+- [`BundleResourceError`](bundle-resource-error.md) — Bundle resource
+- [`BundleResourceNotNamedError`](bundle-resource-not-named-error.md) — Bundle resource not named
+- [`BundleResourcePathError`](bundle-resource-path-error.md) — Bundle resource path
+- [`BundleResourcesTooLargeError`](bundle-resources-too-large-error.md) — Bundle resources too large
 - [`ConceptCodeError`](concept-code-error.md) — Concept code
 - [`ConceptError`](concept-error.md) — Concept error
 - [`ConceptFactoryError`](concept-factory-error.md) — Concept factory

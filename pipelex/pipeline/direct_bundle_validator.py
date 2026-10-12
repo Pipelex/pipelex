@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from pipelex.base_exceptions import ErrorReport
+    from pipelex.core.bundle_resources.bundle_resource import BundleResources
     from pipelex.pipeline.validation_report import PipelexValidationReport
     from pipelex.system.caller_identity import CallerIdentity
 
@@ -44,6 +45,7 @@ class DirectBundleValidator:
         library_dirs: Sequence[Path] | None,
         caller_identity: CallerIdentity | None,
         graph_pipe_code: str | None,
+        bundle_resources: BundleResources | None,
     ) -> PipelexValidationReport | ErrorReport:
         try:
             return await validate_bundles_in_process(
@@ -54,6 +56,7 @@ class DirectBundleValidator:
                 graph_pipe_code=graph_pipe_code,
                 log_context="API validate",
                 caller_identity=caller_identity,
+                bundle_resources=bundle_resources,
             )
         except ValidateBundleError as exc:
             # An invalid bundle is a produced verdict, not a fault: surface its structured

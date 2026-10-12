@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 
 import pytest
 
+from pipelex.core.bundle_resources.bundle_resource import make_bundle_resources
 from pipelex.core.pipes.pipe_io_artifacts import PipeIOArtifacts
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.caller_identity import CallerIdentity, get_current_caller_identity
@@ -79,9 +80,13 @@ class TestRunnerValidatePlumbing:
         )
 
     async def test_library_dirs_converted_to_paths_and_allow_signatures_passthrough(self, mocker: MockerFixture) -> None:
-        """Constructor library_dirs strings reach validate_bundle as Path objects; allow_signatures and their ownership forwarded verbatim."""
+        """Constructor library_dirs strings reach validate_bundle as Paths; allow_signatures, their ownership and the files forwarded verbatim.
+
+        The protocol validation returns a verdict, so it asks the sweep to collect the dry runs' warnings for it.
+        """
         env = self._patch_env(mocker, library_ids=[None, "val-lib"])
-        runner = PipelexMTHDSProtocol(library_dirs=["dir_alpha", "nested/dir_beta"], library_dirs_are_callers=True)
+        bundle_resources = make_bundle_resources(files={"templates/invoice.docx": b"template"})
+        runner = PipelexMTHDSProtocol(library_dirs=["dir_alpha", "nested/dir_beta"], library_dirs_are_callers=True, bundle_resources=bundle_resources)
 
         await runner.validate(mthds_contents=["bundle-content"], allow_signatures=True)
 
@@ -91,6 +96,8 @@ class TestRunnerValidatePlumbing:
             library_dirs=[Path("dir_alpha"), Path("nested/dir_beta")],
             allow_signatures=True,
             library_dirs_are_callers=True,
+            collect_dry_run_warnings=True,
+            bundle_resources=bundle_resources,
         )
 
     async def test_no_library_dirs_passes_none_and_strict_default(self, mocker: MockerFixture) -> None:
@@ -106,6 +113,8 @@ class TestRunnerValidatePlumbing:
             library_dirs=None,
             allow_signatures=False,
             library_dirs_are_callers=False,
+            collect_dry_run_warnings=True,
+            bundle_resources=None,
         )
 
     async def test_validation_runs_with_the_protocols_caller_in_scope(self, mocker: MockerFixture) -> None:

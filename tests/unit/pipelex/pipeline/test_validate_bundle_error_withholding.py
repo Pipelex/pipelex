@@ -2,6 +2,7 @@ import inspect
 from pathlib import Path
 
 import pytest
+from pytest_mock import MockerFixture
 
 from pipelex.core.exceptions import (
     DryRunFailureErrorData,
@@ -9,6 +10,7 @@ from pipelex.core.exceptions import (
     PipelexBundleBlueprintValidationErrorData,
     PipesAndConceptValidationErrorData,
 )
+from pipelex.pipeline import validate_bundle_translation
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle_translation import HOST_LIBRARY_FILE_PLACEHOLDER, withholding_host_library_files
 from pipelex.validation_error_types import PipeFactoryErrorType
@@ -106,3 +108,19 @@ class TestValidateBundleErrorWithholding:
 
         (item,) = raised.value.to_error_report().validation_errors or []
         assert item.source == callers_source
+
+    def test_the_host_s_files_and_the_template_files_its_steps_name_are_found_in_one_walk(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """The host's directories are listed once, and each bundle file read once, for both its name and its steps' template files."""
+        host_library_file = tmp_path / "harbour_board.mthds"
+        host_library_file.write_text(
+            'domain = "harbour_board"\n\n[pipe.print_notice]\ntype = "PipeDocGen"\nformat = "docx"\ntemplate_file = "notice-template.docx"\n',
+            encoding="utf-8",
+        )
+        message = f"Pipe 'print_notice' in '{host_library_file}' could not read 'notice-template.docx'"
+        walk_spy = mocker.spy(validate_bundle_translation, "get_pipelex_mthds_files_from_dirs")
+
+        with pytest.raises(ValidateBundleError) as raised, withholding_host_library_files(library_dirs=[tmp_path]):
+            raise ValidateBundleError(message=message)
+
+        assert raised.value.message == f"Pipe 'print_notice' in '{HOST_LIBRARY_FILE_PLACEHOLDER}' could not read '{HOST_LIBRARY_FILE_PLACEHOLDER}'"
+        assert walk_spy.call_count == 1

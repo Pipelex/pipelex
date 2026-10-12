@@ -669,6 +669,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 return cast("_HubSlotImplT", factory())
         return default()
 
+    def _is_hub_slot_claimed(self, *, slot: HubSlot) -> bool:
+        """Whether a plugin claimed the slot, so that `_resolve_hub_slot` resolves it to the plugin's implementation."""
+        return self._plugin_registrar is not None and slot in self._plugin_registrar.slot_claims
+
     def _teardown_plugin_callbacks(self) -> None:
         """Run the plugin-contributed teardown callbacks, LIFO.
 
