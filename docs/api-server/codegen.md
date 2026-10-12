@@ -15,6 +15,8 @@ Both endpoints accept the same closure selector — exactly one of:
 
 Providing neither or both is a request-shape `422`.
 
+Beside inline `files`, both endpoints accept `resources`: the files the closure's steps read, such as a `PipeDocGen` step's `template_file`, keyed by the path the step names, each in standard base64, with the rules and refusals of [`/v1/validate`](pipe-validate.md#sending-the-files-the-steps-read-resources). A step that names a template file the request did not send cannot be built, so the closure is invalid. `resources` beside a `method_ref` is a request-shape `422`: a published method's files are its package's own.
+
 ## Resolve
 
 **Endpoint:** `POST /v1/resolve`

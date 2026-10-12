@@ -41,6 +41,13 @@ PIPELEX_ENV=dev
 # A JSON body may also nest its arrays and objects at most 128 levels deep. That bound is
 # fixed, not configurable (see error-responses.md).
 
+# The files a request sends beside its bundle in `resources`, such as a PipeDocGen step's
+# template file (see pipe-validate.md → "Sending the files the steps read"). Over any of
+# them is a 413. Read at startup.
+# MAX_RESOURCES_PER_REQUEST=32   # files in one request
+# MAX_RESOURCE_FILE_KIB=5120     # decoded bytes per file (default 5 MiB)
+# MAX_RESOURCES_TOTAL_KIB=10240  # decoded bytes across the request (default 10 MiB)
+
 # ── Running a method by address (`method_ref`) ────────────────────────────
 # See pipe-run.md → "Running a method by address". All read at startup.
 #

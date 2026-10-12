@@ -1,5 +1,22 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`resources` on the API server's routes**: `POST /v1/validate`, `/v1/execute`, `/v1/start`, `/v1/pipe-io`, `/v1/resolve` and `/v1/codegen` take the files a bundle sent as content reads, such as a `PipeDocGen` step's `template_file`, as a map from the path the step names to the file's bytes in standard base64, so a caller with no local pipelex can validate, dry-run and run a method that prints with an `.xlsx`, `.docx`, `.pptx` or `.html` template file. A key that cannot name a file inside the bundle answers `422 InvalidResourcePath`, a file no step names `422 BundleResourceNotNamedError`, a value that is not base64 `400 InvalidBase64`, and a request over `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` or `MAX_RESOURCES_TOTAL_KIB` (32 files, 5 MiB each and 10 MiB in all by default) `413 PayloadTooLarge`; `resources` beside a `method_ref` is a `422`. On an orchestrator other than `direct`, such as Temporal, a live run stores each office template file under its `storage_scope` at `assets/bundle/` before it is dispatched, so the job carries a `pipelex-storage://` reference rather than the bytes.
+- **Template files sent with a bundle loaded from content strings**: `PipelexMTHDSProtocol`, `validate_bundle`, `validate_bundles_in_process`, `acquire_library`, `pipeline_run_setup` and `resolve_crate_from_contents` take `bundle_resources`, built with `make_bundle_resources` from the bytes of each file keyed by the path its step names. The library holds them and its `LibraryCrate` carries them, outside its fingerprint, so a `PipeDocGen` step finds its template file wherever the bundle is loaded: an `.html` one is checked against the inputs at load, the engine's template check runs on an office one at validation and in the dry run, and the print stage reads it, from the run's storage when the crate carries a reference. A step of a bundle the runtime read from its own disk, such as the host's library, still reads only beside it, so a file sent under the same path never stands in for its template. A file no step names raises `BundleResourceNotNamedError`, a path outside the bundle `BundleResourcePathError`.
+
+### Changed
+
+- **`BundleValidatorProtocol.validate_bundles` takes `bundle_resources` (Breaking)**: a bundle validator registered for an orchestration mode receives the files sent with the contents, or `None`, and hands them to the validation it runs, so a remote validator implements the parameter and carries the files to its worker.
+- **`DocumentComposition.make_render_job` is asynchronous (Breaking)**: it takes the run's `storage_provider`, since a composition's template file may be a `BundleResource` read back from storage, and a `TEMPLATE_FILE` composition carries either `template_path` or `template_resource`. A stored template file's URI is among the composition's `referenced_uris()`, so the run's read scope authorizes it before the print stage reads it.
+- **A string-loaded `PipeDocGen` step without its template file says it was not supplied**: the load refusal now names the path the file is expected under and says to send it with the bundle, where it used to say the bundle was not loaded from a file on disk.
+
+### Security
+
+- **A bundle loaded from content strings never reads the runtime's disk**: a `PipeDocGen` step of such a bundle read its `template_file` beside whatever its source named, so a caller's `mthds_sources` on `/v1/validate`, a `files[].source` on `/v1/resolve`, `/v1/codegen` or `/v1/pipe-io`, or a `source` key written on the step in the bundle's text could make the runner read a file from its own disk, and an address-based reference searched `.mthds/methods/` directories above that label too. Both now start only from a bundle file the runtime read itself, which the parser records as `PipelexBundleBlueprint.host_bundle_file` and the crate carries as `LibraryCrate.host_bundle_files`, outside its fingerprint and its normalized form; a content-string bundle reads only the files sent with it, and a step's `source` is overwritten whenever the pipe is built.
+
 ## [v0.84.0] - 2026-10-12
 
 ### Highlights

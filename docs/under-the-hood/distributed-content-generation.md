@@ -172,6 +172,8 @@ What gets stored vs. what crosses the boundary, by content type:
 | Search structured | Nothing (JSON is small) | Raw `dict`, re-validated against the output class on the submitter |
 | Judgment answers | Nothing (verdicts are small) | `dict[str, JudgmentAnswer]` keyed as the questions were |
 
+The traffic also runs the other way. A template file sent with a bundle loaded from content strings, such as a `PipeDocGen` step's `.docx` template, travels in the run's `LibraryCrate` as a `BundleResource`, keyed by the path the step names. Before a live run is handed to an orchestrator that runs it remotely, the submitter stores each file a step reads only when it prints under `{storage_scope}/assets/bundle/<sha256>/<name>` and replaces its bytes in the crate with the `pipelex-storage://` URI (`relocate_run_resources` in `pipelex/libraries/bundle_resources.py`). The worker's library holds the reference, the step's composition carries it, and the print stage reads the bytes back through the storage provider, checking them against their digest, after the read scope has authorized the URI like any other the composition declares. An `.html` template file stays inline, since it is read while the crate loads, where the workflow may do no IO; an in-process run and a dry run keep every file inline and store nothing.
+
 Each host-runtime plugin dispatches these through its own activities and queue routing; for the Temporal realization (the `act_*` activity set, per-activity task queues), see our Temporal plugin's own docs.
 
 ### What a leaf may read: the read scope
