@@ -155,7 +155,7 @@ async def _print_document(*, render_assignment: RenderDocumentAssignment, storag
         )
         engine_name = inference_model.name
         worker = DocGenWorkerFactory.make_doc_gen_worker(inference_model=inference_model, reporting_delegate=get_report_delegate())
-        render_job = composition.make_render_job()
+        render_job = await composition.make_render_job(storage_provider=storage_provider)
         resources = RunRenderResources(
             storage_provider=storage_provider,
             read_scope=render_assignment.job_metadata.run_metadata.read_scope,

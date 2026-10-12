@@ -1,7 +1,8 @@
 from enum import StrEnum
+from pathlib import Path
 from typing import Annotated, Any, NamedTuple, cast
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, ValidationInfo, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
@@ -122,6 +123,22 @@ class PipelexBundleBlueprint(BaseModel):
     # consumers — graph viewer, Temporal payload, library cache — is the deliberate
     # next step recorded in `docs/under-the-hood/build-time-elaboration.md`.
     elaboration_metadata: SkipJsonSchema[dict[str, ElaborationMetadata] | None] = Field(default=None, exclude=True)
+
+    # The file on this host the bundle was read from, set by the parser when it reads one and by a loader that reads a
+    # bundle's file itself. Never serialized, and never taken from `source`: `source` is a label, which a caller sends
+    # with content strings (`mthds_sources`) and the bundle's own text can write, so it names no directory to read.
+    # This is what lets a step read a file beside its bundle, such as a PipeDocGen `template_file`, and lets an
+    # address-based reference find a `.mthds/methods/` directory above it; a bundle parsed from a string has none.
+    _host_bundle_file: Path | None = PrivateAttr(default=None)
+
+    @property
+    def host_bundle_file(self) -> Path | None:
+        """The file on this host the bundle was read from, or None for a bundle parsed from a string."""
+        return self._host_bundle_file
+
+    def mark_read_from_host_file(self, *, bundle_file: Path) -> None:
+        """Record that this host read the bundle from `bundle_file`, which its steps may read beside."""
+        self._host_bundle_file = bundle_file
 
     @field_validator("domain", mode="before")
     @classmethod

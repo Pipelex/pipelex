@@ -61,6 +61,7 @@ class InterpreterHub:
         # run
         self._pipe_router: PipeRouterProtocol | None = None
         self._pipe_run: PipeRunProtocol | None = None
+        self._pipe_run_leaves_process = False
         self._pipe_func_executor: PipeFuncExecutorProtocol | None = None
         self._pipe_func_executor_registry: PipeFuncExecutorRegistry | None = None
         # pipeline
@@ -107,8 +108,14 @@ class InterpreterHub:
     def set_pipe_router(self, pipe_router: "PipeRouterProtocol"):
         self._pipe_router = pipe_router
 
-    def set_pipe_run(self, pipe_run: "PipeRunProtocol") -> None:
+    def set_pipe_run(self, pipe_run: "PipeRunProtocol", *, leaves_process: bool) -> None:
+        """Set the pipe run a run uses when its caller injects none, and say whether it runs the job in this process.
+
+        `leaves_process` is true for the pipe run a boot orchestrator's plugin claimed, which hands each job to that
+        orchestrator, such as Temporal, outside this process, and false for core's own, which runs it here.
+        """
         self._pipe_run = pipe_run
+        self._pipe_run_leaves_process = leaves_process
 
     def set_pipe_func_executor(self, pipe_func_executor: PipeFuncExecutorProtocol):
         self._pipe_func_executor = pipe_func_executor
@@ -173,6 +180,10 @@ class InterpreterHub:
             msg = "PipeRun is not initialized"
             raise RuntimeError(msg)
         return self._pipe_run
+
+    def does_pipe_run_leave_process(self) -> bool:
+        """Whether the pipe run `get_required_pipe_run` returns hands each job to an orchestrator outside this process."""
+        return self._pipe_run_leaves_process
 
     def get_required_pipe_func_executor(self) -> PipeFuncExecutorProtocol:
         if self._pipe_func_executor is None:
@@ -489,6 +500,10 @@ def get_pipe_func_executor_registry() -> "PipeFuncExecutorRegistry":
 
 def get_pipe_run() -> "PipeRunProtocol":
     return get_interpreter_hub().get_required_pipe_run()
+
+
+def does_pipe_run_leave_process() -> bool:
+    return get_interpreter_hub().does_pipe_run_leave_process()
 
 
 def get_pipeline_manager() -> PipelineManagerAbstract:

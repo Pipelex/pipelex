@@ -24,6 +24,7 @@ from pipelex.pipeline.validate_in_process import validate_bundles_in_process
 from pipelex.pipeline.validation_render import format_validate_markdown
 from pipelex.validation_error_types import TemplateCheckErrorType
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import StubEngines, write_bundle
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 if TYPE_CHECKING:
     from pytest_mock import MockType
@@ -50,20 +51,7 @@ _NOTES_LOG_FIELDS = {
     "finding_location": "the field notes on page 2",
 }
 
-# A bundle of another domain whose sequence runs the templated step, which a library directory holds: the step is
-# dry-run only inside the sequence, so its warning reaches the verdict from a pipe the sweep did not sweep itself.
-_CALLER_MTHDS = """
-domain = "doc_gen_caller"
-description = "Billing a customer with a printed invoice"
-main_pipe = "bill_customer"
-
-[pipe.bill_customer]
-type        = "PipeSequence"
-description = "Print the customer's invoice"
-inputs      = { invoice = "doc_gen_tests.Invoice" }
-output      = "doc_gen_tests.InvoicePdf"
-steps       = [{ pipe = "doc_gen_tests.print_invoice", result = "invoice_pdf" }]
-"""
+_CALLER_MTHDS = PipeDocGenTestData.CALLER_BUNDLE_MTHDS
 
 
 @pytest.fixture(autouse=True)
@@ -116,19 +104,31 @@ class TestPipeDocGenTemplateWarnings:
         assert len(stub_engines.check_requests) == 2
         assert _template_check_log_calls(warning_spy) == []
 
-    @pytest.mark.parametrize("spelling", ["relative", "absolute"])
-    async def test_the_protocol_report_withholds_a_host_template_file(self, tmp_path: Path, stub_engines: StubEngines, spelling: str) -> None:
+    async def test_a_finding_with_an_empty_location_is_reported_with_no_location(self, tmp_path: Path, stub_engines: StubEngines) -> None:
+        """An engine that answers an empty location says nowhere in particular, so the item's `template_location` is unset."""
+        _write_templated_bundle(directory=tmp_path, stub_engines=stub_engines)
+        stub_engines.findings = [_NOTES_FINDING.model_copy(update={"location": ""})]
+
+        report = await validate_bundles_in_process(mthds_contents=[_CALLER_MTHDS], library_dirs=[tmp_path], library_dirs_are_callers=True)
+
+        template_warnings = [warning for warning in report.warnings if warning.error_type == TemplateCheckErrorType.TEMPLATE_CHECK_WARNING]
+        assert template_warnings == [
+            _NOTES_WARNING.model_copy(
+                update={"template_location": None, "message": "PipeDocGen 'print_invoice', template file 'invoice.docx': The notes are never printed"}
+            )
+        ]
+
+    async def test_the_protocol_report_withholds_a_host_template_file(self, tmp_path: Path, stub_engines: StubEngines) -> None:
         """A step of the host's library directories is found by its code and domain, and its template file is not named.
 
         Submitted content beside library directories that are the host's names none of their files, so the warning carries
-        no `template_file` and its message reads the placeholder where it named one, however the step spells it, its
-        absolute path on the host included. The engine's own words about the template stay.
+        no `template_file` and its message reads the placeholder where it named one. The engine's own words about the
+        template stay. A step cannot name its template file by an absolute path, which its blueprint refuses.
         """
         template_path = (tmp_path / "invoice.docx").resolve()
         template_path.write_bytes(b"docx bytes")
         stub_engines.findings = [_NOTES_FINDING]
-        template_file = str(template_path) if spelling == "absolute" else "invoice.docx"
-        write_bundle(directory=tmp_path, step_fields=f'format = "docx"\ntemplate_file = "{template_file}"')
+        write_bundle(directory=tmp_path, step_fields=_DOCX_TEMPLATE_STEP)
 
         report = await validate_bundles_in_process(mthds_contents=[_CALLER_MTHDS], library_dirs=[tmp_path])
 

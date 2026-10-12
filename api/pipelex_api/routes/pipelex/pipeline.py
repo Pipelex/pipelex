@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 from contextlib import ExitStack, contextmanager
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, cast
 
 from fastapi import APIRouter, Depends, Request
@@ -14,11 +14,13 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.methods.structures_check import ensure_no_structured_content_python
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, StorageTarget, WebhookTarget
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
+from pipelex.pipe_run.remote_dispatch import prepare_job_for_remote_dispatch
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.reporting.usage_records import apply_tokens_usage_wire_shape
 from pipelex.runtime_bridge.exceptions import MissingBundleValidatorError, MissingOrchestratorError
+from pipelex.runtime_bridge.orchestration_mode import DIRECT_ORCHESTRATION_MODE
 from pipelex.runtime_bridge.primitives.hydration import hydrate_working_memory
 from pipelex.runtime_hub import get_bundle_validator_registry, get_orchestrator_registry
 from pipelex.system.environment import get_required_env
@@ -35,6 +37,7 @@ from pipelex_api.bundle import (
     parse_bundle,
     partition_bundle_entries,
 )
+from pipelex_api.bundle_resources import decode_bundle_resources, files_its_steps_read
 from pipelex_api.error_types import ErrorType
 from pipelex_api.errors import raise_bad_request, raise_forbidden, raise_validation_error
 from pipelex_api.json_body import decode_json_body
@@ -227,6 +230,18 @@ def _pipe_output_from_run_output(run_output: PipelexPipeRunOutput) -> PipeOutput
     )
 
 
+async def _prepare_job_for_dispatch(*, pipe_job: PipeJob, orchestration_mode: str) -> PipeJob:
+    """The job as the mode's orchestrator receives it: prepared to leave this process for every mode but `direct`.
+
+    The files submitted with a bundle travel in the job's crate. An orchestrator other than the in-process `direct`
+    one, such as Temporal, runs the job outside this process, so the files its steps read only when they run move to
+    the run's storage first, dry runs included (`prepare_job_for_remote_dispatch`). A `direct` run keeps them inline.
+    """
+    if orchestration_mode == DIRECT_ORCHESTRATION_MODE:
+        return pipe_job
+    return await prepare_job_for_remote_dispatch(pipe_job=pipe_job)
+
+
 class _OrchestratorPipeRun(PipeRunProtocol):
     """Adapts a mode-selected orchestrator to the `PipeRunProtocol` the base `execute` drives.
 
@@ -241,12 +256,14 @@ class _OrchestratorPipeRun(PipeRunProtocol):
     synchronous and always drives this arm, so there is no delivery axis to thread here.
     """
 
-    def __init__(self, *, orchestrator: OrchestratorProtocol) -> None:
+    def __init__(self, *, orchestrator: OrchestratorProtocol, orchestration_mode: str) -> None:
         self._orchestrator = orchestrator
+        self._orchestration_mode = orchestration_mode
 
     @override
     async def run(self, pipe_job: PipeJob, *, delivery_assignment: DeliveryAssignment | None = None) -> PipeOutput:
-        run_output = await self._orchestrator.execute(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
+        dispatched_job = await _prepare_job_for_dispatch(pipe_job=pipe_job, orchestration_mode=self._orchestration_mode)
+        run_output = await self._orchestrator.execute(pipe_job=dispatched_job, delivery_assignment=delivery_assignment)
         return _pipe_output_from_run_output(run_output)
 
 
@@ -313,7 +330,7 @@ class ApiRunner(PipelexMTHDSProtocol):
         # PipeRun, then delegate to the base execute, which owns the full run lifecycle. The
         # ApiRunner is constructed per request, so mutating _pipe_run here is request-scoped.
         # `/execute` is synchronous, so it drives the orchestrator's BLOCKING `execute` arm.
-        self._pipe_run = _OrchestratorPipeRun(orchestrator=orchestrator)
+        self._pipe_run = _OrchestratorPipeRun(orchestrator=orchestrator, orchestration_mode=orchestration_mode)
         return await super().execute(
             pipe_code=pipe_code,
             mthds_contents=mthds_contents,
@@ -417,6 +434,8 @@ class ApiRunner(PipelexMTHDSProtocol):
             extras=self.extras,
             # The packages the request ships, which the base `execute` threads too.
             methods_dirs=self.methods_dirs,
+            # The files submitted with the contents, such as a template file, which the base `execute` threads too.
+            bundle_resources=self.bundle_resources,
             pipeline_run_id=pipeline_run_id,
             request_id=request_id,
         )
@@ -455,7 +474,8 @@ class ApiRunner(PipelexMTHDSProtocol):
         # `PipelexPipeRunInput` (which carries no request_id / output_multiplicity /
         # dynamic_output_concept_ref and skips run registration + telemetry). `start` genuinely
         # enqueues the job and returns a `PipelexPipeDispatchAck` (ids only) immediately.
-        dispatch_ack = await orchestrator.start(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
+        dispatched_job = await _prepare_job_for_dispatch(pipe_job=pipe_job, orchestration_mode=orchestration_mode)
+        dispatch_ack = await orchestrator.start(pipe_job=dispatched_job, delivery_assignment=delivery_assignment)
 
         return PipelexRunResultStart(
             pipeline_run_id=resolved_pipeline_run_id,
@@ -517,6 +537,8 @@ class ApiRunner(PipelexMTHDSProtocol):
             # done for the caller this runner was built for — the user and groups a run would state.
             caller_identity=self.caller_identity,
             graph_pipe_code=graph_pipe_code,
+            # The files submitted with the contents, which the validation's dry run reads, the template check included.
+            bundle_resources=self.bundle_resources,
         )
         # The core seam types its valid arm at the protocol-level ValidationReport (a leaf type)
         # to stay import-acyclic in core; every registered validator in fact produces the canonical
@@ -701,6 +723,8 @@ class _BundleRunSource(NamedTuple):
     mthds_contents: list[str] | None
     library_dirs: list[str] | None
     methods_dirs: list[Path] | None
+    bundle_files: dict[str, bytes]
+    """The files a method bundle ships beside its `.mthds` files that their steps read, keyed by the path a step names."""
 
 
 def _ensure_vendored_packages_hold_no_structures(*, methods_dir: Path, packages: tuple[VendoredMethodPackage, ...]) -> None:
@@ -746,7 +770,7 @@ def _bundle_run_source(run_request: RunRequest) -> Generator[_BundleRunSource, N
     rather than executing untrusted code.
     """
     if run_request.bundle_b64 is None and run_request.files is None:
-        yield _BundleRunSource(mthds_contents=run_request.mthds_contents, library_dirs=None, methods_dirs=None)
+        yield _BundleRunSource(mthds_contents=run_request.mthds_contents, library_dirs=None, methods_dirs=None, bundle_files={})
         return
     # Parse + guard in memory FIRST, then apply the sandbox-hosted gate BEFORE any disk write —
     # a bundle destined for a 403 on a non-hosted deployment never touches the filesystem.
@@ -758,12 +782,13 @@ def _bundle_run_source(run_request: RunRequest) -> Generator[_BundleRunSource, N
     # (`.py`, `requirements.txt`) → a temp `library_dirs` entry the load path source-captures; the packages it
     # ships → a temp methods directory.
     partition = partition_bundle_entries(parsed.entries)
-    mthds_contents: list[str] = []
+    mthds_entries: list[tuple[PurePosixPath, str]] = []
     for relpath, content in partition.mthds_entries:
         try:
-            mthds_contents.append(content.decode("utf-8"))
+            mthds_entries.append((relpath, content.decode("utf-8")))
         except UnicodeDecodeError:
             raise_validation_error(message=f"Bundle .mthds file '{relpath}' is not valid UTF-8.", error_type=ErrorType.INVALID_BUNDLE)
+    mthds_contents = [content for _, content in mthds_entries]
     if not mthds_contents:
         msg = "Method bundle contains no .mthds file."
         if partition.vendored_packages:
@@ -772,6 +797,8 @@ def _bundle_run_source(run_request: RunRequest) -> Generator[_BundleRunSource, N
                 "packages it ships, and the bundle's own .mthds files go outside '.mthds/'."
             )
         raise_validation_error(message=msg, error_type=ErrorType.INVALID_BUNDLE)
+    # The `.mthds` files load as content strings, so a template file shipped beside one travels with it as a resource.
+    bundle_files = files_its_steps_read(mthds_entries=mthds_entries, other_entries=partition.library_entries)
     with ExitStack() as stack:
         library_dirs: list[str] | None = None
         if partition.library_entries:
@@ -783,7 +810,7 @@ def _bundle_run_source(run_request: RunRequest) -> Generator[_BundleRunSource, N
             if is_pipe_func_sandbox_hosted():
                 _ensure_vendored_packages_hold_no_structures(methods_dir=methods_dir, packages=partition.vendored_packages)
             methods_dirs = [methods_dir]
-        yield _BundleRunSource(mthds_contents=mthds_contents, library_dirs=library_dirs, methods_dirs=methods_dirs)
+        yield _BundleRunSource(mthds_contents=mthds_contents, library_dirs=library_dirs, methods_dirs=methods_dirs, bundle_files=bundle_files)
 
 
 class _ResolvedRunSource(NamedTuple):
@@ -794,6 +821,8 @@ class _ResolvedRunSource(NamedTuple):
     methods_dirs: list[Path] | None
     pipe_code: str | None
     method_provenance: MethodProvenance | None
+    bundle_files: dict[str, bytes]
+    """The files a method bundle ships that its steps read, which join the request's `resources`."""
 
 
 @contextmanager
@@ -817,6 +846,7 @@ def _run_source(run_request: RunRequest) -> Generator[_ResolvedRunSource, None, 
                 methods_dirs=fetched.methods_dirs,
                 pipe_code=run_request.pipe_code or fetched.main_pipe,
                 method_provenance=fetched.provenance,
+                bundle_files={},
             )
         return
     with _bundle_run_source(run_request) as bundle_source:
@@ -826,6 +856,7 @@ def _run_source(run_request: RunRequest) -> Generator[_ResolvedRunSource, None, 
             methods_dirs=bundle_source.methods_dirs,
             pipe_code=run_request.pipe_code,
             method_provenance=None,
+            bundle_files=bundle_source.bundle_files,
         )
 
 
@@ -878,6 +909,7 @@ async def execute(request: Request) -> JSONResponse:
             extras=extras.analytics_groups,
             library_dirs=source.library_dirs,
             methods_dirs=source.methods_dirs,
+            bundle_resources=decode_bundle_resources(resources=run_request.resources, bundle_files=source.bundle_files),
         )
         response = await runner.execute(
             pipe_code=source.pipe_code,
@@ -970,6 +1002,7 @@ async def start(
             extras=extras.analytics_groups,
             library_dirs=source.library_dirs,
             methods_dirs=source.methods_dirs,
+            bundle_resources=decode_bundle_resources(resources=run_request.resources, bundle_files=source.bundle_files),
         )
         start_result = await runner.start(
             pipe_code=source.pipe_code,

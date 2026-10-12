@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat
+from pipelex.core.bundle_resources.bundle_resource import BundleResourceReadStage, canonical_resource_path_or_none
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen_blueprint import PipeDocGenBlueprint
 
 
@@ -32,6 +33,17 @@ class TestPipeDocGenBlueprint:
             ("filename_reads_an_undeclared_input", {"filename": "invoice-{{ order.number }}"}, "Variable 'order'"),
             ("list_output", {"output": "Document[]"}, "produces one file"),
             ("broken_template", {"template": "{% for %}"}, "Could not parse"),
+            ("posix_absolute_template_file", {"format": "docx", "template_file": "/srv/methods/invoice.docx"}, "it is absolute"),
+            ("windows_rooted_template_file", {"format": "docx", "template_file": "\\methods\\invoice.docx"}, "it holds a backslash"),
+            ("drive_absolute_template_file", {"format": "docx", "template_file": "C:/methods/invoice.docx"}, "it holds a colon"),
+            ("drive_relative_template_file", {"format": "docx", "template_file": "C:invoice.docx"}, "it holds a colon"),
+            ("unc_template_file", {"format": "docx", "template_file": "\\\\server\\share\\invoice.docx"}, "it holds a backslash"),
+            ("posix_unc_template_file", {"format": "docx", "template_file": "//server/share/invoice.docx"}, "it is absolute"),
+            ("colon_in_the_name", {"format": "docx", "template_file": "invoice:v2.docx"}, "it holds a colon"),
+            ("backslash_in_the_name", {"format": "docx", "template_file": "templates\\invoice.docx"}, "it holds a backslash"),
+            ("leaves_the_bundle", {"format": "docx", "template_file": "../invoice.docx"}, "'..' segment"),
+            ("dot_dot_inside_the_bundle", {"format": "docx", "template_file": "templates/../invoice.docx"}, "'..' segment"),
+            ("empty_template_file", {"format": "docx", "template_file": " "}, "it is empty"),
         ],
     )
     def test_refused_blueprints(
@@ -43,6 +55,20 @@ class TestPipeDocGenBlueprint:
         with pytest.raises(ValidationError, match=expected_message):
             _blueprint(**overrides)
 
+    @pytest.mark.parametrize("template_file", ["invoice.docx", "./invoice.docx", "templates/invoice.docx", "templates//invoice.docx"])
+    def test_a_path_inside_the_bundle_is_accepted_and_could_be_submitted(self, template_file: str) -> None:
+        """A step's template file obeys the rule the files submitted with a bundle are keyed by, so it can always be submitted."""
+        blueprint = _blueprint(format="docx", template_file=template_file)
+        assert blueprint.template_file == template_file
+        assert canonical_resource_path_or_none(path=template_file) is not None
+
+    @pytest.mark.parametrize("template_file", ["/srv/methods/invoice.docx", "C:/srv/methods/invoice.docx", "../srv/methods/invoice.docx"])
+    def test_the_refusal_of_a_template_file_outside_its_bundle_never_repeats_it(self, template_file: str) -> None:
+        """A host library's step would otherwise put the host's own path in front of a caller."""
+        with pytest.raises(ValidationError) as exc_info:
+            _blueprint(format="docx", template_file=template_file)
+        assert all("srv/methods" not in error["msg"] for error in exc_info.value.errors())
+
     def test_a_name_every_branch_sets_is_the_template_s_own(self) -> None:
         template = (
             "{% if invoice.paid %}{% set status = 'Paid' %}{% else %}{% set status = 'Due' %}{% endif %}<h1>{{ invoice.number }}: {{ status }}</h1>"
@@ -53,3 +79,17 @@ class TestPipeDocGenBlueprint:
     def test_a_sigil_in_the_template_reads_its_input(self) -> None:
         blueprint = _blueprint(template="<h1>$invoice.number</h1>")
         assert blueprint.template == "<h1>$invoice.number</h1>"
+
+    @pytest.mark.parametrize(
+        ("overrides", "expected_reads"),
+        [
+            ({"template_file": "templates/invoice.html"}, {"templates/invoice.html": BundleResourceReadStage.LOAD}),
+            ({"format": "docx", "template_file": "invoice.docx"}, {"invoice.docx": BundleResourceReadStage.RUN}),
+            ({"format": "xlsx", "template_file": "./invoice.xlsx"}, {"./invoice.xlsx": BundleResourceReadStage.RUN}),
+            ({"template": "<p>{{ invoice.number }}</p>"}, {}),
+            ({}, {}),
+        ],
+    )
+    def test_the_file_it_reads_from_its_bundle_and_when(self, overrides: dict[str, Any], expected_reads: dict[str, BundleResourceReadStage]) -> None:
+        """An HTML template file is read while the method loads, to check it against the inputs; an office one only when the step prints."""
+        assert _blueprint(**overrides).bundle_resource_reads == expected_reads

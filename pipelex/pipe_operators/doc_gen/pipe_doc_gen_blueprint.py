@@ -7,6 +7,7 @@ from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice
 from pipelex.cogt.templating.exceptions import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
+from pipelex.core.bundle_resources.bundle_resource import BundleResourceReadStage, resource_path_refusal
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateSyntaxError
@@ -45,7 +46,8 @@ class PipeDocGenBlueprint(PipeBlueprint):
 
     It calls no AI model: it lays out or fills what its inputs already hold. With no template, the pipe lays its inputs
     out by itself (the auto-layout), for every format but `pptx`. `template` is an inline HTML and Jinja2 template, for
-    `pdf` only; `template_file` is a path relative to the bundle's file: an `.html` for `pdf`, an `.xlsx` for `xlsx`, a
+    `pdf` only; `template_file` is a path relative to the bundle's file, inside its bundle and written with forward
+    slashes: an `.html` for `pdf`, an `.xlsx` for `xlsx`, a
     `.docx` for `docx` and a `.pptx` for `pptx`, which `pptx` requires. `filename` is a Jinja expression over the
     inputs; the suffix is added. The output must be a single `Document`, or a concept refining it. `model` names the
     document engine that prints it, a model of the `doc_gen` family such as `reportlab-pdf` or, with the Pipelex
@@ -65,6 +67,13 @@ class PipeDocGenBlueprint(PipeBlueprint):
 
     @model_validator(mode="after")
     def validate_template_sources(self) -> Self:
+        # The rule the files submitted with a bundle are keyed by, so a template file can be submitted whatever loads the
+        # bundle. The message never repeats the path: a host library's step would put the host's own path in front of a caller.
+        if self.template_file is not None:
+            refusal = resource_path_refusal(path=self.template_file)
+            if refusal is not None:
+                msg = f"PipeDocGen's 'template_file' is a path relative to the bundle's file, inside its bundle, and this one cannot be: {refusal}."
+                raise ValueError(msg)
         if self.template is not None and self.template_file is not None:
             msg = "PipeDocGen cannot have both 'template' and 'template_file': use one or the other."
             raise ValueError(msg)
@@ -88,6 +97,16 @@ class PipeDocGenBlueprint(PipeBlueprint):
             )
             raise ValueError(msg)
         return self
+
+    @property
+    @override
+    def bundle_resource_reads(self) -> dict[str, BundleResourceReadStage]:
+        # An HTML template is read and checked against the inputs when the method loads; an office template is read
+        # only when the step prints, or when a dry run hands it to the engine's checker.
+        if self.template_file is None:
+            return {}
+        stage = BundleResourceReadStage.LOAD if self.format.is_template_html else BundleResourceReadStage.RUN
+        return {self.template_file: stage}
 
     @override
     def validate_inputs(self):

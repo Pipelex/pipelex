@@ -196,10 +196,13 @@ class Pipelex(RuntimeBoot):
             )
 
         # --- Pipe Run --------------------------------------------------------------------------
-        # No explicit param for pipe_run: plugin slot-claim thunk > core default.
+        # No explicit param for pipe_run: plugin slot-claim thunk > core default. A boot orchestrator's pipe run hands
+        # each job to that orchestrator, outside this process, which is what decides how the job's files travel
+        # (`prepare_job_for_remote_dispatch`); core's runs it here.
 
         self.interpreter_hub.set_pipe_run(
-            self._resolve_hub_slot(slot=HubSlot.PIPE_RUN, default=lambda: PipeRun(pipe_router=self.interpreter_hub.get_required_pipe_router()))
+            self._resolve_hub_slot(slot=HubSlot.PIPE_RUN, default=lambda: PipeRun(pipe_router=self.interpreter_hub.get_required_pipe_router())),
+            leaves_process=self._is_hub_slot_claimed(slot=HubSlot.PIPE_RUN),
         )
 
     @override

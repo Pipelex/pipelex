@@ -61,6 +61,10 @@ class ErrorType(StrEnum):
     # A run request carried a malformed method bundle (`bundle_b64` / `files`): a corrupt zip, an
     # unsafe entry name (absolute path or `..` traversal), or both transport forms supplied at once.
     INVALID_BUNDLE = "InvalidBundle"
+    # A request's `resources` map keys a submitted file by a path that cannot name a file inside the
+    # bundle: absolute, with a `..` segment, a backslash or a colon, empty, or a second spelling of a
+    # path already submitted. A 422: the key is the path a step names, relative to the bundle.
+    INVALID_RESOURCE_PATH = "InvalidResourcePath"
     # A method carrying custom Python (`.py` in a bundle, or in a fetched `method_ref` package)
     # reached a deployment that is NOT sandbox-hosted. Running customer code in-process is
     # refused (403): custom code is a sandbox-hosted capability only. Use a sandbox-hosted

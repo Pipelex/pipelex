@@ -17,8 +17,10 @@ from typing import Sequence
 from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
 
 from pipelex.base_exceptions import PipelexUnexpectedError
+from pipelex.core.bundle_resources.bundle_resource import BundleResources
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
+from pipelex.libraries.bundle_resources import check_bundle_resources
 from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
@@ -27,7 +29,12 @@ from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprin
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 
 
-def resolve_crate_from_contents(*, mthds_contents: list[str], mthds_sources: Sequence[str | None] | None = None) -> LibraryCrate:
+def resolve_crate_from_contents(
+    *,
+    mthds_contents: list[str],
+    mthds_sources: Sequence[str | None] | None = None,
+    bundle_resources: BundleResources | None = None,
+) -> LibraryCrate:
     """Assemble, validate, and normalize a library crate from in-memory MTHDS contents.
 
     Mirrors ``validate_bundle``'s in-memory arm and its **loaded-on-success contract**: on
@@ -42,6 +49,9 @@ def resolve_crate_from_contents(*, mthds_contents: list[str], mthds_sources: Seq
             onto each blueprint so diagnostics carry a real ``source``; a ``None`` entry leaves
             that content source-less. Must match ``mthds_contents`` in length when provided — a
             mismatch is a host-wiring bug.
+        bundle_resources: The files submitted with the contents that their steps read, such as a ``PipeDocGen``
+            step's ``template_file``, keyed by canonical bundle-relative path. The load reads them; the normalized
+            crate, a standard artifact, does not carry them.
 
     Returns:
         The normalized library crate (fully qualified, natives materialized, fingerprint set).
@@ -73,6 +83,9 @@ def resolve_crate_from_contents(*, mthds_contents: list[str], mthds_sources: Seq
                 for content, source in zip(mthds_contents, content_sources, strict=True)
             ]
             _reject_address_based_dependencies(blueprints=blueprints)
+            if bundle_resources:
+                check_bundle_resources(blueprints=blueprints, bundle_resources=bundle_resources)
+                library_manager.add_bundle_resources(library_id=library_id, bundle_resources=bundle_resources)
             # load_from_blueprints ends in load_from_crate, whose last step is
             # library.validate_library() — so a crate read after it satisfies the D6
             # "built only from a valid library" contract.

@@ -18,6 +18,7 @@ The body is the [crate routes' closure selector](codegen.md#selecting-the-closur
 - `pipe_ref` (string, optional): the qualified ref `domain.pipe_code` of the pipe to describe. Omitted, the selection chain below decides.
 - `all_pipes` (boolean, default `false`): describe every pipe the closure loads instead of the selected one.
 - `include_files` (boolean, default `false`): echo the resolved closure's `.mthds` files on the valid arm.
+- `resources` (object, optional): the files the closure's steps read, such as a `PipeDocGen` step's `template_file`, keyed by the path the step names, each in standard base64, as on [`/v1/validate`](pipe-validate.md#sending-the-files-the-steps-read-resources). It accompanies `files` only. A string-loaded step whose template file was not sent makes the closure invalid.
 
 There is no `views` field, because the valid arm always carries all three artifacts. The hosted API also accepts a catalog `method_id`, which the platform resolves into `files[]` before forwarding, so this server never declares it.
 

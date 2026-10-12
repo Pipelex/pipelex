@@ -62,7 +62,7 @@ There is deliberately **no** `pipelex.hub`. It was deleted rather than kept as a
 | current-library contextvar | `set_current_library`, `get_current_library`, `get_current_library_id_or_none`, `clear_current_library`, `scoped_current_library` |
 | library dirs | `resolve_library_dirs`, `get_default_library_dirs` |
 | pipe router | `get_pipe_router`, `set_pipe_router`, `teardown_current_pipe_router`, `scoped_pipe_router` |
-| run | `get_pipe_run`, `get_pipeline_manager`, `get_pipeline` |
+| run | `get_pipe_run`, `does_pipe_run_leave_process`, `get_pipeline_manager`, `get_pipeline` |
 | pipe func | `get_pipe_func_executor`, `scoped_pipe_func_executor`, `get_pipe_func_executor_registry` |
 
 Setters follow their getters onto the matching container.
