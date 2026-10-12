@@ -199,6 +199,15 @@ class _FileWithholding(NamedTuple):
         return withheld
 
 
+def withhold_names_in_text(*, text: str, names: Collection[str], placeholder: str) -> str:
+    """``text`` reading ``placeholder`` where it named one of ``names`` standing on its own, never inside a longer name.
+
+    The rule a verdict's messages are withheld by (:meth:`ValidateBundleError.withholding_files`), for a channel that
+    is not a verdict's error data, such as an advisory warning.
+    """
+    return _FileWithholding.make_from_names(names=names, placeholder=placeholder).withheld_text(text=text)
+
+
 class ValidateBundleError(PipelexError):
     """Raised when a bundle is refused while it is loaded or validated: the invalid verdict, carrying one
     structured item per refusal in ``validation_errors``. Every refusal of the bundle itself becomes one —

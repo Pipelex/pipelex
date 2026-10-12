@@ -10,7 +10,8 @@ whatever diagnostics it happens to have seen.
 The registry is a **union of the enums the runtime already raises**, never a second list beside
 them. ``PipeValidationErrorType`` and ``PipeFactoryErrorType`` are the two vocabularies the
 validation stages produce, :class:`ValidationResidualErrorType` names the one residual channel
-that has no stage enum of its own, and :class:`HintLintErrorType` carries the intent-hint lints.
+that has no stage enum of its own, :class:`HintLintErrorType` carries the intent-hint lints, and
+:class:`TemplateCheckErrorType` the warnings a template check finds during a dry run.
 Deriving the registry from them is what stops it from drifting: a member added to any of them is
 in the registry the moment it is declared, with nothing here to remember to update.
 
@@ -466,7 +467,26 @@ class HintLintErrorType(StrEnum):
     HINT_INAPPLICABLE_INTENT = "hint_inapplicable_intent"
 
 
-ValidationErrorType: TypeAlias = PipeValidationErrorType | PipeFactoryErrorType | ValidationResidualErrorType | HintLintErrorType
+class TemplateCheckErrorType(StrEnum):
+    """Advisory findings of a ``PipeDocGen`` step's template check (the engine's ``check_template``).
+
+    Every member is advisory-only: it rides the validation report's ``warnings`` array and never makes a
+    verdict invalid. An error finding of the same check fails the step's dry run instead, and is reported as
+    the ``DryRunError`` item every failed dry run is. A separate enum rather than a new
+    ``PipeValidationErrorType`` member because the finding is not the pipe's validation: the dry run hands the
+    step's template file to its engine, which reads it in a way only the engine can, and reports in its own
+    words. Its locators are the template file and the place in it the engine names.
+    """
+
+    # A warning finding of the template check: an Excel defined name or a PowerPoint shape name that matches no
+    # input field, a Markdown field that would print its markup, a cell or a shape marked Markdown that is filled
+    # from a value that is not text, or whatever else the engine reports as a warning.
+    TEMPLATE_CHECK_WARNING = "template_check_warning"
+
+
+ValidationErrorType: TypeAlias = (
+    PipeValidationErrorType | PipeFactoryErrorType | ValidationResidualErrorType | HintLintErrorType | TemplateCheckErrorType
+)
 """The type of a bundle-validation diagnostic's ``error_type``.
 
 ``ValidationErrorItem.error_type`` is typed against this alias, which is what makes the registry
@@ -480,6 +500,7 @@ VALIDATION_ERROR_TYPES: tuple[ValidationErrorType, ...] = (
     *PipeFactoryErrorType,
     *ValidationResidualErrorType,
     *HintLintErrorType,
+    *TemplateCheckErrorType,
 )
 """Every ``error_type`` a bundle-validation diagnostic can carry, in a deterministic order.
 
@@ -493,7 +514,7 @@ alias above would resolve it to whichever enum pydantic tried first. It is gated
 ``tests/unit/pipelex/errors/test_validation_error_types.py``.
 
 Membership says a value is *reachable on the wire*, never that it is a useful coverage target.
-The advisory-only member rides the validation report's ``warnings`` array and never an invalid
+The advisory-only members ride the validation report's ``warnings`` array and never an invalid
 verdict; the two ``unknown_*`` fallbacks fire on states no author can ask for. A consumer that
 needs to exercise each fault — the corpus's ``error.*`` axis — excludes those in its own
 generator, with a stated reason per exclusion, rather than pruning them from the runtime truth here.

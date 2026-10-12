@@ -29,6 +29,7 @@ from pipelex.pipelex import Pipelex
 from pipelex.pipeline.advisory_warnings import collect_advisory_warnings, collect_current_library_entry_pipe_refs
 from pipelex.pipeline.blueprint_selection import collect_entry_pipe_refs
 from pipelex.pipeline.bundle_validator import BundleValidator
+from pipelex.pipeline.dry_run_warnings import build_dry_run_warnings
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.execution_seams import load_libraries_and_activate
 from pipelex.pipeline.usage_stats_reporting import MethodValidationReport
@@ -41,24 +42,31 @@ from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.misc.string_utils import count_with_noun
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from pathlib import Path
 
+    from pipelex.base_exceptions import ValidationErrorItem
     from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
+    from pipelex.pipeline.bundle_validator import DryRunOutput
 
 COMMAND = "validate"
 
 
-def _echo_advisory_warnings(*, pipes: list[PipeAbstract], entry_pipe_refs: list[str]) -> int:
-    """Render every advisory lint family in yellow, in the composition point's fixed order, and return how many there were.
+def _echo_warnings(*, warnings: list[ValidationErrorItem]) -> int:
+    """Render advisory warnings in yellow, in the order given, and return how many there were."""
+    for warning in warnings:
+        typer.secho(f"Warning: {warning.message}", fg=typer.colors.YELLOW)
+    return len(warnings)
+
+
+def _echo_advisory_warnings(*, pipes: list[PipeAbstract], entry_pipe_refs: list[str], dry_run_result: Mapping[str, DryRunOutput]) -> int:
+    """Render every advisory family in yellow, in the composition point's fixed order, and return how many there were.
 
     Advisory only — a warning never changes the validation verdict or the exit code. Requires the
     validation library to still be loaded: the taint walk resolves child pipes via the hub, and the
     descriptors and the hint lint read the library's accumulated crate.
     """
-    warnings = collect_advisory_warnings(pipes=pipes, entry_pipe_refs=entry_pipe_refs)
-    for warning in warnings:
-        typer.secho(f"Warning: {warning.message}", fg=typer.colors.YELLOW)
-    return len(warnings)
+    return _echo_warnings(warnings=collect_advisory_warnings(pipes=pipes, entry_pipe_refs=entry_pipe_refs, dry_run_result=dry_run_result))
 
 
 def _format_signatures_summary_suffix(*, signature_count: int) -> str:
@@ -103,13 +111,19 @@ def do_validate_all_libraries_and_dry_run(*, library_dirs: list[Path] | None = N
                 # event — sweeping the library we just loaded, without teardown. A pipe whose dry run fails
                 # raises DryRunError, which the cascade turns into the same invalid verdict.
                 with translate_to_validate_bundle_error():
-                    asyncio.run(BundleValidator().validate_current_library(allow_signatures=allow_signatures))
+                    dry_run_results = asyncio.run(
+                        BundleValidator().validate_current_library(allow_signatures=allow_signatures, collect_dry_run_warnings=True)
+                    )
 
                 # Advisory lints over the whole loaded library (the optionality lint's cross-flow
                 # aggregation needs every flow) — printed even when the signature gate below exits
                 # non-zero. The entry pipes come off the blueprints the library manager accumulated.
                 validation_report.count_warnings(
-                    count=_echo_advisory_warnings(pipes=all_pipes, entry_pipe_refs=collect_current_library_entry_pipe_refs())
+                    count=_echo_advisory_warnings(
+                        pipes=all_pipes,
+                        entry_pipe_refs=collect_current_library_entry_pipe_refs(),
+                        dry_run_result=dry_run_results,
+                    )
                 )
 
                 # Gate-from-report (D-B consumer-decides): signatures are never a validation error, but a
@@ -152,6 +166,7 @@ async def _validate_pipe_or_bundle(
                     mthds_file_path=bundle_path,
                     library_dirs=library_dirs,
                     allow_signatures=allow_signatures,
+                    collect_dry_run_warnings=True,
                 )
                 # Advisory lints, printed BEFORE the signature gate below exits non-zero — same ordering
                 # as `validate --all`. A method with an unimplemented placeholder is the state an author
@@ -160,7 +175,11 @@ async def _validate_pipe_or_bundle(
                 # the lints can still resolve the bundle's pipes.
                 validation_report.describe(pipes=bundle_result.pipes)
                 validation_report.count_warnings(
-                    count=_echo_advisory_warnings(pipes=bundle_result.pipes, entry_pipe_refs=collect_entry_pipe_refs(bundle_result.blueprints))
+                    count=_echo_advisory_warnings(
+                        pipes=bundle_result.pipes,
+                        entry_pipe_refs=collect_entry_pipe_refs(bundle_result.blueprints),
+                        dry_run_result=bundle_result.dry_run_result,
+                    )
                 )
                 # Valid whatever the gate below decides: a bundle left unrunnable by its placeholders is still valid.
                 validation_report.declare_valid()
@@ -214,11 +233,15 @@ async def _validate_pipe_or_bundle(
                 # dry-runs trivially (the placeholder mints a mock). validate pipe makes no library-wide
                 # runnability claim — pending_signatures is a bundle-surface fact — so there is no gate here.
                 with translate_to_validate_bundle_error():
-                    await BundleValidator().validate_pipes(
+                    dry_run_results = await BundleValidator().validate_pipes(
                         pipes=[pipe],
                         library_id=library_id,
                         allow_signatures=allow_signatures,
+                        collect_dry_run_warnings=True,
                     )
+                # No bundle-wide lint here, since one pipe makes no bundle-wide claim, but what its dry run found
+                # without failing is about this pipe, such as a template check's warnings, so it is echoed.
+                validation_report.count_warnings(count=_echo_warnings(warnings=build_dry_run_warnings(dry_run_results)))
             except ValidateBundleError as bundle_error:
                 handle_validate_bundle_error(bundle_error, library_dirs=library_dirs, allow_signatures=allow_signatures)
             signature_count = len(collect_signature_refs(pipe=pipe))

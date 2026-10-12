@@ -135,6 +135,8 @@ Running the `PipeDocGen` step alone on inputs saved from an earlier run is the l
 
 A dry run composes for real against mock inputs, which checks the templates and the file's name, prints nothing, and outputs a mock `Document`.
 
+When the plugin's engine checks an office template file, validation reports what it finds in two ways. An error, such as a Word tag that names no field, fails the step's dry run, and so the validation. A warning, such as an Excel defined name or a PowerPoint shape name that matches no field, leaves the bundle valid and rides the verdict's advisory `warnings` as a `template_check_warning` item naming the step (`pipe_code`, `domain_code`), the file (`template_file`) and the place in it (`template_location`). Read it all the same: a misspelled name fills nothing, so the document keeps the template's sample value there. The warning reaches every surface that returns the verdict: `pipelex validate`, `pipelex-agent validate` and the API server's `POST /v1/validate`. A dry run that returns no verdict, such as `pipelex run --dry-run`, `pipelex fix bundle` or `pipelex build inputs`, logs it instead.
+
 ## Related documentation
 
 - [PipeCompose](./PipeCompose.md), which renders a template into a `Text` or `Html` output
