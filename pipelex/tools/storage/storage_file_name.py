@@ -21,7 +21,7 @@ STORAGE_FILE_EXTENSION_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[A-Za-z0-
 # Long enough for any name a person reads, short enough that a key stays far below a store's own limit.
 MAX_STORAGE_FILE_STEM_LENGTH: Final[int] = 120
 
-# The stem when neither the name nor its fallback leaves anything, and the extension when the given one leaves nothing.
+# The stem when neither the name nor its fallback leaves anything, and the extension when the given one is not plain.
 _LAST_RESORT_STEM: Final[str] = "file"
 _LAST_RESORT_EXTENSION: Final[str] = "bin"
 
@@ -58,7 +58,6 @@ _TRANSLITERATION_TABLE: Final[dict[int, str]] = str.maketrans(_LETTERS_NFKD_KEEP
 # Dots are kept until a name already ending in its extension has had it removed, then go with everything else.
 _NOT_STEM_OR_DOT_CHARACTERS: Final[re.Pattern[str]] = re.compile(r"[^A-Za-z0-9_.-]+")
 _NOT_STEM_CHARACTERS: Final[re.Pattern[str]] = re.compile(r"[^A-Za-z0-9_-]+")
-_NOT_EXTENSION_CHARACTERS: Final[re.Pattern[str]] = re.compile(r"[^A-Za-z0-9]+")
 # A run of separators holding a hyphen becomes one hyphen; a run of underscores alone becomes one underscore.
 _HYPHENATED_SEPARATOR_RUNS: Final[re.Pattern[str]] = re.compile(r"[-_]*-[-_]*")
 _UNDERSCORE_RUNS: Final[re.Pattern[str]] = re.compile(r"_{2,}")
@@ -89,6 +88,25 @@ def _path_safe_stem(*, name: str, extension: str) -> str:
     return stem[:MAX_STORAGE_FILE_STEM_LENGTH].strip(_EDGE_CHARACTERS)
 
 
+def path_safe_extension(*, extension: str) -> str:
+    """`extension` as every `pipelex-storage://` reader accepts it: spelled in ASCII and lowercased, or `bin`.
+
+    The hosted platform keys its own uploads by the same rule: an extension that is not then plainly letters and digits,
+    such as `v1_draft` or `tar-gz`, names no type worth keeping, so the file is stored as `bin` rather than under a key
+    a reader refuses. The extension is a convenience for the content type, never the file's identity.
+
+    Args:
+        extension: The extension, with or without its leading dot.
+
+    Returns:
+        An extension matching `STORAGE_FILE_EXTENSION_PATTERN`.
+    """
+    folded = fold_to_ascii(text=extension.removeprefix(".")).lower()
+    if STORAGE_FILE_EXTENSION_PATTERN.fullmatch(folded):
+        return folded
+    return _LAST_RESORT_EXTENSION
+
+
 def path_safe_file_name(*, name: str, fallback: str, extension: str) -> str:
     """One file name every `pipelex-storage://` reader accepts, ending in `.{extension}`, from whatever `name` holds.
 
@@ -101,12 +119,11 @@ def path_safe_file_name(*, name: str, fallback: str, extension: str) -> str:
     Args:
         name: The name to store the file under, as rendered or as sent: any text.
         fallback: The stem to use when `name` leaves none, such as the pipe's code.
-        extension: The file's extension, without its dot, lowercased and kept to its ASCII letters and digits, `bin`
-            when it has none.
+        extension: The file's extension, held to `path_safe_extension`: `bin` unless it is plainly letters and digits.
 
     Returns:
         A name whose stem matches `STORAGE_FILE_STEM_PATTERN` and whose extension matches `STORAGE_FILE_EXTENSION_PATTERN`.
     """
-    safe_extension = _NOT_EXTENSION_CHARACTERS.sub("", fold_to_ascii(text=extension)).lower() or _LAST_RESORT_EXTENSION
+    safe_extension = path_safe_extension(extension=extension)
     stem = _path_safe_stem(name=name, extension=safe_extension) or _path_safe_stem(name=fallback, extension=safe_extension) or _LAST_RESORT_STEM
     return f"{stem}.{safe_extension}"

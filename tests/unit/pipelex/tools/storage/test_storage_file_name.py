@@ -39,9 +39,11 @@ class TestStorageFileName:
             # A template file's own name, with its own extension.
             ("modèle.v2.docx", "file", "docx", "modele-v2.docx"),
             ("Invoice Template.DOCX", "file", "DOCX", "Invoice-Template.docx"),
-            # An extension is lowercased and kept to its ASCII letters and digits, `bin` when none is left.
+            # An extension is spelled in ASCII and lowercased, `bin` when it is not then plainly letters and digits.
             ("template", "file", "", "template.bin"),
-            ("template", "file", ".x-l_s.x", "template.xlsx"),
+            ("template", "file", ".PDF", "template.pdf"),
+            ("photo", "file", "jpég", "photo.jpeg"),
+            ("notes", "file", "v1_draft", "notes.bin"),
             ("template", "file", "東京", "template.bin"),
             # A fallback is held to the same rule, and `file` stands in when it leaves nothing either.
             ("東京都", "Pipe Code.v2", "pdf", "Pipe-Code-v2.pdf"),
