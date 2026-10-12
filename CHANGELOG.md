@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [v0.85.0] - 2026-10-12
+
+### Highlights
+
+**A method that prints with a template file now runs wherever it is sent.** A `PipeDocGen` step's `.xlsx`, `.docx`, `.pptx` or `.html` template file travels with its bundle, as `resources` on the API server's routes, inside a `bundle_b64` or `files` bundle, or as `bundle_resources` in Python, so a caller with no local pipelex can validate, dry-run and run it, and a bundle loaded from content strings never reads the runtime's own disk.
 
 ### Added
 
