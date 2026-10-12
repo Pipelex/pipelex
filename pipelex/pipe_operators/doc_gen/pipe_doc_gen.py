@@ -353,22 +353,26 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
             raise PipeDocGenTemplateCheckError(msg)
 
     def _report_template_warning(self, *, finding: TemplateFinding, template_file: str) -> None:
-        """Report a warning of the template check as an advisory item, located at this step, its file and the place in it."""
-        location_suffix = f" ({finding.location})" if finding.location else ""
+        """Report a warning of the template check as an advisory item, located at this step, its file and the place in it.
+
+        An engine that answers an empty location names no place, so the item's `template_location` is left unset.
+        """
+        location = finding.location or None
+        location_suffix = f" ({location})" if location is not None else ""
         warning = ValidationErrorItem(
             category=ValidationErrorCategory.DRY_RUN,
             error_type=TemplateCheckErrorType.TEMPLATE_CHECK_WARNING,
             pipe_code=self.code,
             domain_code=self.domain_code,
             template_file=template_file,
-            template_location=finding.location,
+            template_location=location,
             message=f"PipeDocGen '{self.code}', template file '{template_file}': {finding.message}{location_suffix}",
         )
         if report_dry_run_warning(warning=warning):
             return
         finding_fields: dict[str, str] = {"pipe_code": self.code, "template_file": template_file, "finding_message": finding.message}
-        if finding.location:
-            finding_fields["finding_location"] = finding.location
+        if location is not None:
+            finding_fields["finding_location"] = location
         log.warning("The template check of a PipeDocGen found a warning in its template file", fields=finding_fields)
 
     ####################################################################################################################

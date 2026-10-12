@@ -104,6 +104,20 @@ class TestPipeDocGenTemplateWarnings:
         assert len(stub_engines.check_requests) == 2
         assert _template_check_log_calls(warning_spy) == []
 
+    async def test_a_finding_with_an_empty_location_is_reported_with_no_location(self, tmp_path: Path, stub_engines: StubEngines) -> None:
+        """An engine that answers an empty location says nowhere in particular, so the item's `template_location` is unset."""
+        _write_templated_bundle(directory=tmp_path, stub_engines=stub_engines)
+        stub_engines.findings = [_NOTES_FINDING.model_copy(update={"location": ""})]
+
+        report = await validate_bundles_in_process(mthds_contents=[_CALLER_MTHDS], library_dirs=[tmp_path], library_dirs_are_callers=True)
+
+        template_warnings = [warning for warning in report.warnings if warning.error_type == TemplateCheckErrorType.TEMPLATE_CHECK_WARNING]
+        assert template_warnings == [
+            _NOTES_WARNING.model_copy(
+                update={"template_location": None, "message": "PipeDocGen 'print_invoice', template file 'invoice.docx': The notes are never printed"}
+            )
+        ]
+
     async def test_the_protocol_report_withholds_a_host_template_file(self, tmp_path: Path, stub_engines: StubEngines) -> None:
         """A step of the host's library directories is found by its code and domain, and its template file is not named.
 
