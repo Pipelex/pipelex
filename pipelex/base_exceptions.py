@@ -269,7 +269,9 @@ class ValidationErrorCategory(StrEnum):
     blueprint validation (from the interpreter), pipe-factory failures (e.g. a
     missing concept), pipe/concept validation (e.g. a missing input variable
     or a type mismatch), and ``dry_run`` — one item per pipe whose dry run failed,
-    located at the innermost failing pipe.
+    located at the innermost failing pipe. On the report's advisory ``warnings``,
+    ``dry_run`` marks a finding a dry run made without failing, such as a warning of
+    a ``PipeDocGen`` step's template check.
     """
 
     BLUEPRINT_VALIDATION = "blueprint_validation"
@@ -345,6 +347,11 @@ class ValidationErrorItem(BaseModel):
     model_reference: str | None = None
     model_type: str | None = None
     suggestions: list[str] | None = None
+    # The template-check locators, carried by a ``template_check_warning`` item: the template file as the
+    # ``PipeDocGen`` step names it, and the place in it the engine's finding names, in the engine's own words
+    # (a defined name, a Table, a cell, a shape, a tag). Optional and additive, like ``declared_concepts``.
+    template_file: str | None = None
+    template_location: str | None = None
     # Structured, deterministic fix for this error, when the fix planner derived one from the
     # enriched error data. Optional and additive: non-fixable items serialize unchanged under
     # ``exclude_none``.

@@ -27,6 +27,7 @@ from pipelex.validation_error_types import (
     HintLintErrorType,
     PipeFactoryErrorType,
     PipeValidationErrorType,
+    TemplateCheckErrorType,
     ValidationErrorType,
 )
 
@@ -186,6 +187,13 @@ _ERROR_TYPE_EXCLUSIONS: dict[ValidationErrorType, str] = {
     HintLintErrorType.HINT_UNKNOWN_KEY: _ADVISORY_HINT_LINT_EXCLUSION,
     HintLintErrorType.HINT_UNKNOWN_INTENT: _ADVISORY_HINT_LINT_EXCLUSION,
     HintLintErrorType.HINT_INAPPLICABLE_INTENT: _ADVISORY_HINT_LINT_EXCLUSION,
+    TemplateCheckErrorType.TEMPLATE_CHECK_WARNING: (
+        "Advisory-only, for the same reason as `optional_force_redundant`: a warning of a PipeDocGen step's template check rides "
+        "the validation report's `warnings` array and never makes a verdict invalid. It also needs what a focused "
+        "entry cannot carry: a template file beside the bundle, an office format, and an engine that reads that "
+        "format, which no consumer but a runtime holding the document generation plugin has. Revisit if the manifest "
+        "ever grows a warnings axis and an entry can carry its template files."
+    ),
     PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR: (
         "The generic fallback for a validation failure that matched no specific code. Reaching it on purpose "
         "would mean authoring a bundle that breaks in a way the categorizer does not recognize — which is a "
