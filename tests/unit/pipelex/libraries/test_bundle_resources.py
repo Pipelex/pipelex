@@ -1,4 +1,8 @@
+import mimetypes
+import re
+
 import pytest
+from pytest_mock import MockerFixture
 
 from pipelex.core.bundle_resources.bundle_resource import MAX_LOAD_STAGE_RESOURCES_BYTES, BundleResourceReadStage, make_bundle_resources
 from pipelex.core.bundle_resources.exceptions import BundleResourceNotNamedError, BundleResourcesTooLargeError
@@ -41,6 +45,31 @@ output        = "ReportFile"
 format        = "pdf"
 template_file = "summary.html"
 """
+
+
+# A template file whose own name the hosted plane would refuse to serve: a letter outside ASCII and inner dots.
+_UNSAFE_NAME_BUNDLE = """
+domain = "bundle_resources_tests"
+main_pipe = "print_review"
+
+[concept.Review]
+description = "A review"
+
+[pipe.print_review]
+type          = "PipeDocGen"
+description   = "Print the review in Word"
+inputs        = { review = "Review" }
+output        = "Document"
+format        = "docx"
+template_file = "templates/Modèle trimestriel.v2.docx"
+"""
+
+# The hosted platform's grammar for the last segment of a `pipelex-storage://` URI, copied from `_SEGMENT_PATTERN` and
+# `_EXTENSION_PATTERN` in pipelex-server's `shared/src/pipelex_shared/domain/storage/storage_uri.py` (`parse_storage_uri`).
+_HOSTED_STEM_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
+_HOSTED_EXTENSION_PATTERN = re.compile(r"^[A-Za-z0-9]+$")
+
+_DOCX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 
 def _blueprint() -> PipelexBundleBlueprint:
@@ -103,6 +132,39 @@ class TestBundleResources:
         # The crate the run was built from is left as it was.
         assert crate.bundle_resources["templates/report.docx"].is_inline
         assert relocated.fingerprint == crate.fingerprint
+
+    @pytest.mark.asyncio
+    async def test_a_stored_office_template_carries_its_office_content_type(self, mocker: MockerFixture) -> None:
+        """Named in code, so a host whose `mimetypes` table knows no `.docx` does not leave it `binary/octet-stream`."""
+        mocker.patch.object(mimetypes, "guess_type", return_value=(None, None))
+        store_spy = mocker.spy(InMemoryStorageProvider, "store")
+        resources = make_bundle_resources(files={"templates/report.docx": b"docx bytes", "summary.html": b"<h1></h1>"})
+        crate = LibraryCrateFactory.make_from_blueprints([_blueprint()], bundle_resources=resources)
+
+        await relocate_run_resources(crate=crate, storage_provider=InMemoryStorageProvider(), storage_scope="org/method/run")
+
+        assert store_spy.call_count == 1
+        assert store_spy.call_args.kwargs["content_type"] == _DOCX_MIME_TYPE
+
+    @pytest.mark.asyncio
+    async def test_a_template_whose_name_is_not_path_safe_is_stored_under_one_that_is(self) -> None:
+        """The key's last segment is one the hosted plane serves; the step still finds the file by the path it names."""
+        storage_provider = InMemoryStorageProvider()
+        template_path = "templates/Modèle trimestriel.v2.docx"
+        blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=_UNSAFE_NAME_BUNDLE)
+        resources = make_bundle_resources(files={template_path: b"docx bytes"})
+        crate = LibraryCrateFactory.make_from_blueprints([blueprint], bundle_resources=resources)
+
+        relocated = await relocate_run_resources(crate=crate, storage_provider=storage_provider, storage_scope="org/method/run")
+
+        stored = relocated.bundle_resources[template_path]
+        stored_uri = stored.uri
+        assert stored_uri is not None
+        assert stored_uri == f"pipelex-storage://org/method/run/{BUNDLE_RESOURCES_STORAGE_PREFIX}/{stored.sha256}/Modele-trimestriel-v2.docx"
+        stem, extension = stored_uri.rsplit("/", 1)[1].rsplit(".", 1)
+        assert _HOSTED_STEM_PATTERN.match(stem)
+        assert _HOSTED_EXTENSION_PATTERN.match(extension)
+        assert await stored.read_bytes(storage_provider=storage_provider) == b"docx bytes"
 
     @pytest.mark.asyncio
     async def test_a_crate_without_resources_is_returned_as_it_is(self) -> None:

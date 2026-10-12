@@ -57,6 +57,7 @@ from pipelex.tools.misc.filetype_utils import (
 )
 from pipelex.tools.misc.http_utils import validate_http_url_syntax
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidUriError
+from pipelex.tools.storage.storage_file_name import path_safe_extension
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.tools.uri.resolved_uri import ResolvedBase64DataUrl, ResolvedHttpUrl, ResolvedLocalPath, ResolvedPipelexStorage, UriKind
 from pipelex.tools.uri.uri_read_scope import authorize_uri_read
@@ -582,7 +583,8 @@ def _storage_key_extension(*, raw_bytes: bytes, mime_type: str | None, fallback_
     """The extension a relocated file's storage key ends with.
 
     The sniffed extension when the bytes were identified, else the extension of the declared type,
-    else the local file's own suffix, else `bin`.
+    else the local file's own suffix when it is plainly letters and digits (`path_safe_extension`), so
+    every reader of the key accepts it, the hosted platform's included, else `bin`.
     """
     sniffed = guess_file_type_from_bytes(raw_bytes=raw_bytes)
     if sniffed is not None and sniffed.mime == mime_type:
@@ -591,4 +593,4 @@ def _storage_key_extension(*, raw_bytes: bytes, mime_type: str | None, fallback_
         extension = mime_type_to_extension(mime_type)
         if extension != UNKNOWN_FILE_TYPE:
             return extension
-    return fallback_suffix or "bin"
+    return path_safe_extension(extension=fallback_suffix or "")

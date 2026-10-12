@@ -6,8 +6,6 @@ read only when a step runs to the run's storage before the run leaves the proces
 receives carries references rather than the bytes.
 """
 
-import mimetypes
-import re
 from collections.abc import Iterable, Mapping
 from pathlib import PurePosixPath
 
@@ -20,11 +18,14 @@ from pipelex.core.bundle_resources.bundle_resource import (
 from pipelex.core.bundle_resources.exceptions import BundleResourceNotNamedError, BundleResourcesTooLargeError
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipeBlueprintUnion, PipelexBundleBlueprint
+from pipelex.tools.misc.filetype_utils import mime_type_of_file_name
+from pipelex.tools.storage.storage_file_name import path_safe_file_name
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
 # The run's storage leaf for the files its caller supplied, under which the bundle's files are stored by digest.
 BUNDLE_RESOURCES_STORAGE_PREFIX = "assets/bundle"
-_UNSAFE_KEY_CHARACTERS = re.compile(r"[^A-Za-z0-9._-]+")
+# The stem a stored file takes when its own name leaves none, such as a name written wholly in Han.
+_FALLBACK_STORED_STEM = "file"
 
 
 def bundle_resource_reads(*, pipe_blueprints: Iterable[PipeBlueprintUnion]) -> dict[str, BundleResourceReadStage]:
@@ -89,6 +90,11 @@ async def relocate_run_resources(*, crate: LibraryCrate, storage_provider: Stora
     file read when the method loads stays inline, since the remote side reads it while it loads the crate, where it may
     do no IO. The files are stored by digest, so a run that submits the same file twice stores it once, and a file
     already stored is kept as it is.
+
+    Each is stored under a name every `pipelex-storage://` reader accepts (`path_safe_file_name`), so `modèle.v2.docx`
+    is stored as `modele-v2.docx`, and with the content type its extension names, the Office Open XML types named in
+    code rather than read from the host's `mimetypes` table, which may not know them and would leave the object typed
+    `binary/octet-stream`.
     """
     if not crate.bundle_resources:
         return crate
@@ -98,11 +104,12 @@ async def relocate_run_resources(*, crate: LibraryCrate, storage_provider: Stora
         if path not in run_stage_paths or not resource.is_inline:
             relocated[path] = resource
             continue
-        file_name = _UNSAFE_KEY_CHARACTERS.sub("-", PurePosixPath(path).name).strip(".-") or "file"
+        submitted_name = PurePosixPath(path)
+        file_name = path_safe_file_name(name=submitted_name.name, fallback=_FALLBACK_STORED_STEM, extension=submitted_name.suffix.removeprefix("."))
         uri = await storage_provider.store(
             resource.inline_bytes(),
             key=f"{storage_scope}/{BUNDLE_RESOURCES_STORAGE_PREFIX}/{resource.sha256}/{file_name}",
-            content_type=mimetypes.guess_type(file_name)[0],
+            content_type=mime_type_of_file_name(file_name=file_name),
         )
         relocated[path] = resource.stored_at(uri=uri)
     return crate.model_copy(update={"bundle_resources": relocated})

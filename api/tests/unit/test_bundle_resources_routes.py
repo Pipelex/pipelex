@@ -193,9 +193,12 @@ class TestBundleResourcesRoutes:
         _stub_the_document_engine(mocker)
         body = _contents_body(route=route, resources={_TEMPLATE_PATH: _b64(_TEMPLATE_BYTES), "templates/logo.png": _b64(b"png")})
 
-        detail = _assert_problem(_build_client().post(route, json=body), status=422, error_type="BundleResourceNotNamedError")
+        response = _build_client().post(route, json=body)
+        detail = _assert_problem(response, status=422, error_type="BundleResourceNotNamedError")
 
         assert "'templates/logo.png'" in detail
+        # A deterministic refusal of what the caller sent, as InvalidResourcePath is: the same request fails again.
+        assert response.json()["retryable"] is False
 
     @pytest.mark.parametrize("route", ["/v1/validate", "/v1/execute", "/v1/pipe-io", "/v1/resolve", "/v1/codegen"])
     def test_html_templates_over_the_load_stage_bound_are_refused_with_a_413_naming_the_limit(self, mocker: MockerFixture, route: str) -> None:
@@ -205,10 +208,12 @@ class TestBundleResourcesRoutes:
         html_mthds = _INVOICE_MTHDS.replace('format        = "docx"', 'format        = "pdf"').replace(_TEMPLATE_PATH, "invoice.html")
         body = _contents_body(route=route, resources={"invoice.html": _b64(b"x" * 1025)}, mthds=html_mthds)
 
-        detail = _assert_problem(_build_client().post(route, json=body), status=413, error_type="BundleResourcesTooLargeError")
+        response = _build_client().post(route, json=body)
+        detail = _assert_problem(response, status=413, error_type="BundleResourcesTooLargeError")
 
         assert "('invoice.html')" in detail
         assert "1 KiB limit" in detail
+        assert response.json()["retryable"] is False
 
     @pytest.mark.parametrize(
         ("path", "reason"),

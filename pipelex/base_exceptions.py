@@ -611,6 +611,11 @@ def _humanize_class_name(class_name: str) -> str:
 class PipelexError(Exception):
     error_domain: ErrorDomain | None = None
     user_action: UserAction | None = None
+    # Whether running the same request again could succeed, declared by a class whose every instance answers the
+    # same: ``False`` on a deterministic refusal of what the caller sent. ``None`` says nothing, and the report then
+    # takes the answer from the ``__cause__`` chain, or carries none. The ``CogtError`` family derives it from its
+    # ``error_category`` instead.
+    retryable: bool | None = None
 
     # When declared *directly in a subclass body*, ``title()`` returns this
     # verbatim instead of auto-deriving from the class name. Use to fix awkward
@@ -735,6 +740,7 @@ class PipelexError(Exception):
             title=type(self).title(),
             type_uri=type(self).type_uri(),
             error_domain=self.error_domain,
+            retryable=self.retryable,
             user_action=self.user_action,
             caller_facing_message=self._authors_caller_facing_message or self._raised_as_caller_fault,
         )

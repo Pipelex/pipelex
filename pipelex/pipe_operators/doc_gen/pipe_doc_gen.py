@@ -1,5 +1,4 @@
 import asyncio
-import re
 from pathlib import Path
 from typing import Any, Literal
 
@@ -45,21 +44,10 @@ from pipelex.tools.jinja2.exceptions import Jinja2TemplateRenderError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
+from pipelex.tools.storage.storage_file_name import path_safe_file_name
 from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.tools.uri.uri_read_scope import UriReference
 from pipelex.validation_error_types import TemplateCheckErrorType
-
-_UNSAFE_FILENAME_CHARACTERS = re.compile(r"[^\w.\-]+")
-_MAX_FILENAME_STEM_LENGTH = 120
-
-
-def safe_filename(*, rendered: str, fallback: str, suffix: str) -> str:
-    """One storage-safe path segment ending in the format's suffix, from whatever the filename template rendered."""
-    stem = _UNSAFE_FILENAME_CHARACTERS.sub("-", rendered.strip()).strip(".-_")
-    if stem.lower().endswith(f".{suffix}"):
-        stem = stem[: -(len(suffix) + 1)]
-    stem = stem[:_MAX_FILENAME_STEM_LENGTH].strip(".-_") or fallback
-    return f"{stem}.{suffix}"
 
 
 class PipeDocGenOutput(PipeOutput):
@@ -232,7 +220,8 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
                 label="filename",
                 templating_style=resolve_templating_style(authored=None),
             )
-        filename = safe_filename(rendered=rendered_filename, fallback=self.code, suffix=self.doc_gen_format.suffix)
+        # Stored under a name every `pipelex-storage://` reader serves, the hosted platform's included.
+        filename = path_safe_file_name(name=rendered_filename, fallback=self.code, extension=self.doc_gen_format.suffix)
         named_contents = self._named_contents(working_memory)
         title = self._title(named_contents)
         source = self.source
