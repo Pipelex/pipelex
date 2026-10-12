@@ -108,7 +108,8 @@ async def pipeline_run_setup(
         List of URIs identifying the bundles. Used to detect if bundles were already
         loaded from library directories (e.g., via PIPELEXPATH) to avoid duplicate
         domain registration. If all resolved absolute paths are already in the loaded
-        MTHDS paths, the ``mthds_contents`` loading will be skipped.
+        MTHDS paths, the ``mthds_contents`` loading will be skipped. A content whose URI names a file on this host
+        loads as read from that file, so its steps read beside it, such as a ``PipeDocGen`` step's ``template_file``.
     inputs:
         Inputs passed to the pipeline. Can be either a ``PipelineInputs`` dictionary
         or a ``WorkingMemory`` instance.

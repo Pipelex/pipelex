@@ -186,6 +186,30 @@ class TestPipeDocGenBundleResources:
         assert "which was not supplied with its bundle" in str(exc_info.value.to_error_report().model_dump())
         assert stub_engines.check_requests == []
 
+    @pytest.mark.parametrize("pipe_run_mode", [pytest.param(PipeRunMode.LIVE, id="live"), pytest.param(PipeRunMode.DRY, id="dry")])
+    async def test_a_bundle_its_caller_read_from_a_file_here_reads_its_template_beside_that_file(
+        self, stub_engines: StubEngines, tmp_path: Path, pipe_run_mode: PipeRunMode
+    ) -> None:
+        """A caller that read the bundle's file itself, and names it in `bundle_uris`, runs it as a bundle loaded from that file.
+
+        Nothing loads the bundle's directory, so the contents are what loads, and their step reads the template beside the file.
+        """
+        bundle_path = write_bundle(directory=tmp_path, step_fields=_DOCX_TEMPLATE_STEP)
+        (tmp_path / "templates").mkdir()
+        (tmp_path / "templates" / "invoice.docx").write_bytes(_DOCX_BYTES)
+
+        await PipelexMTHDSProtocol(bundle_uris=[str(bundle_path)], pipe_run_mode=pipe_run_mode).execute(
+            mthds_contents=[bundle_path.read_text(encoding="utf-8")],
+            inputs=PipeDocGenTestData.INVOICE_INPUTS,
+        )
+
+        match pipe_run_mode:
+            case PipeRunMode.LIVE:
+                assert [job.template for job in stub_engines.engine.jobs] == [_DOCX_BYTES]
+            case PipeRunMode.DRY:
+                assert [check_request.template for check_request in stub_engines.check_requests] == [_DOCX_BYTES]
+                assert stub_engines.engine.jobs == []
+
     async def test_a_source_the_bundle_s_text_writes_on_its_step_never_reads_beside_it_on_this_host(
         self, stub_engines: StubEngines, tmp_path: Path
     ) -> None:

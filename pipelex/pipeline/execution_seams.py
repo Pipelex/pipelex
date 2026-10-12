@@ -106,6 +106,12 @@ def acquire_library(
     reference of the contents is looked up there first, before the installed stores and fetch-on-miss, and a package
     found there is never installed; the bundles of a package are named by its address, never by these directories.
 
+    ``bundle_uris``, parallel to ``mthds_contents``, name the files on this host the caller read them from, such as the
+    bundle file a CLI runs. A bundle already loaded from the library directories under that path is skipped, and one
+    whose file exists is loaded as read from it: its steps read beside it, such as a ``PipeDocGen`` step's
+    ``template_file``, and an address-based reference is searched for in a ``.mthds/methods/`` directory above it, as
+    when its directory loads. They are the host's own paths, never a label a remote caller sends: a server passes none.
+
     ``bundle_resources`` are the files submitted with the ``mthds_contents`` that their steps read, such as a
     ``PipeDocGen`` step's ``template_file``, keyed by canonical bundle-relative path. The library holds them before the
     contents load, and its crate carries them with the run. A file none of the contents' steps names is refused with a
@@ -155,7 +161,8 @@ def acquire_library(
                     check_bundle_resources(blueprints=all_blueprints, bundle_resources=bundle_resources)
                     library_manager.add_bundle_resources(library_id=library_id, bundle_resources=bundle_resources)
 
-                # Filter out blueprints whose URIs are already loaded (e.g. via PIPELEXPATH).
+                # Filter out blueprints whose URIs are already loaded (e.g. via PIPELEXPATH), and record the file on this
+                # host each of the others was read from, so its steps read beside it as when its directory loads.
                 blueprints_to_load: list[PipelexBundleBlueprint] = list(all_blueprints)
                 if bundle_uris:
                     current_library = library_manager.get_library(library_id=library_id)
@@ -168,6 +175,8 @@ def acquire_library(
                         if resolved_uri in current_library.loaded_mthds_paths:
                             log.verbose(f"Bundle '{uri}' was skipped, already loaded from library directories")
                         else:
+                            if resolved_uri.is_file():
+                                blueprint.mark_read_from_host_file(bundle_file=resolved_uri)
                             blueprints_to_load.append(blueprint)
 
                 if blueprints_to_load:
