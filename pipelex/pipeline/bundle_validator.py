@@ -32,11 +32,11 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from polyfactory.exceptions import FactoryException
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.base_exceptions import PipelexError
+from pipelex.base_exceptions import PipelexError, ValidationErrorItem
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.config import get_config
 from pipelex.core.exceptions import DryRunFailureErrorData
@@ -54,6 +54,7 @@ from pipelex.interpreter_hub import (
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.observer.observer_protocol import ObserverNoOp
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
+from pipelex.pipe_run.dry_run_warning_collector import collecting_dry_run_warnings
 from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipe_run.located_failure import find_foreign_fault, find_root_fault
 from pipelex.pipe_run.pipe_job import PipeJob
@@ -68,7 +69,7 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.storage_scope import DRY_RUN_STORAGE_SCOPE, DRY_RUN_USER_ID
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.tools.log.error_fields import error_fields
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+from pipelex.tools.typing.pydantic_utils import empty_list_factory_of, format_pydantic_validation_error
 
 if TYPE_CHECKING:
     from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
@@ -108,6 +109,10 @@ class DryRunOutput(BaseModel):
     # which is this pipe or one
     # it runs, with a message the disclosure rule allows onto a verdict item.
     failure: DryRunFailureErrorData | None = None
+    # What the pipe's dry run found without failing, each item located at the pipe that found it, which is this
+    # pipe or one it runs: today, the warnings of a PipeDocGen step's template check. The composition point of the
+    # verdict's advisory `warnings` reads them from here (see `pipelex.pipeline.dry_run_warnings`).
+    warnings: list[ValidationErrorItem] = Field(default_factory=empty_list_factory_of(ValidationErrorItem))
 
 
 # The foreign shapes a dry run can fail with (pydantic and polyfactory, while mock data is built) carry no
@@ -440,19 +445,24 @@ class BundleValidator:
         fail: the sweep's router notes where each failure happened, so a controller failing because a pipe
         it runs failed reports that pipe, and ``_aggregate`` keeps the failure once. A failure met at a pipe
         allowed to fail is reported at the pipe around it that is not, the one whose failure is unexpected.
+
+        Whatever the outcome, the output carries the ``warnings`` the dry run found without failing, which the
+        dry run's pipes report to a collector scoped to this pipe (see ``pipelex.pipe_run.dry_run_warning_collector``).
         """
         recorder = _FailingPipeRecorder(tolerated_pipe_refs=frozenset(get_config().inference.dry_run.allowed_to_fail_pipes))
         recorder_token = _failing_pipe_recorder.set(recorder)
         try:
-            return await self._run_and_classify(
-                pipe=pipe,
-                library_id=library_id,
-                execution_config=execution_config,
-                dry_run_pipeline_id=dry_run_pipeline_id,
-                caller_identity=caller_identity,
-                recorder=recorder,
-                source_pipe_refs=source_pipe_refs,
-            )
+            with collecting_dry_run_warnings() as warning_collector:
+                dry_run_output = await self._run_and_classify(
+                    pipe=pipe,
+                    library_id=library_id,
+                    execution_config=execution_config,
+                    dry_run_pipeline_id=dry_run_pipeline_id,
+                    caller_identity=caller_identity,
+                    recorder=recorder,
+                    source_pipe_refs=source_pipe_refs,
+                )
+            return dry_run_output.model_copy(update={"warnings": warning_collector.warnings})
         finally:
             _failing_pipe_recorder.reset(recorder_token)
 

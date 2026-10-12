@@ -77,9 +77,9 @@ class PipelexValidationReport(ValidationReport):
     """Per-pipe sweep outcomes (`{pipe_ref, status}`) — the same entries as the agent-CLI envelope."""
 
     warnings: list[ValidationErrorItem] = Field(default_factory=empty_list_factory_of(ValidationErrorItem))
-    """Advisory findings (lints) on a VALID bundle — same item shape as `validation_errors`,
-    but they never flip `is_valid`. First occupant: the useless-`!` lint
-    (`optional_force_redundant`)."""
+    """Advisory findings on a VALID bundle — same item shape as `validation_errors`, but they never
+    flip `is_valid`. Composed by `pipelex.pipeline.advisory_warnings`: the static lints, then what the
+    sweep's dry runs found without failing, such as a `PipeDocGen` template check's warnings."""
 
     pending_signatures: list[str] = Field(default_factory=list)
     """Qualified refs of pipes still declared as `PipeSignature` in the assembled library."""

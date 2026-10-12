@@ -17,6 +17,7 @@ from pipelex.interpreter_hub import (
 from pipelex.pipeline.advisory_warnings import collect_advisory_warnings, collect_current_library_entry_pipe_refs
 from pipelex.pipeline.blueprint_selection import collect_entry_pipe_refs
 from pipelex.pipeline.bundle_validator import BundleValidator
+from pipelex.pipeline.dry_run_warnings import build_dry_run_warnings
 from pipelex.pipeline.execution_seams import acquire_library
 from pipelex.pipeline.usage_stats_reporting import MethodValidationReport
 from pipelex.pipeline.validate_bundle import build_pending_signatures, build_validated_pipes, validate_bundle
@@ -76,7 +77,11 @@ async def validate_all_core(*, library_dirs: list[Path] | None = None, allow_sig
             # Its entry pipes come off the blueprints the library manager accumulated on the way in;
             # there is no `ValidateBundleResult` on this path to read a `main_pipe` from.
             library_pipes = list(get_pipe_library().get_pipes_dict().values())
-            warnings = collect_advisory_warnings(pipes=library_pipes, entry_pipe_refs=collect_current_library_entry_pipe_refs())
+            warnings = collect_advisory_warnings(
+                pipes=library_pipes,
+                entry_pipe_refs=collect_current_library_entry_pipe_refs(),
+                dry_run_result=dry_run_results,
+            )
             validation_report.count_warnings(count=len(warnings))
             return {
                 "success": True,
@@ -123,7 +128,11 @@ async def validate_bundle_core(
             library_dirs=library_dirs,
             allow_signatures=allow_signatures,
         )
-        warnings = collect_advisory_warnings(pipes=result.pipes, entry_pipe_refs=collect_entry_pipe_refs(result.blueprints))
+        warnings = collect_advisory_warnings(
+            pipes=result.pipes,
+            entry_pipe_refs=collect_entry_pipe_refs(result.blueprints),
+            dry_run_result=result.dry_run_result,
+        )
         validation_report.describe(pipes=result.pipes)
         validation_report.count_warnings(count=len(warnings))
 
@@ -187,11 +196,16 @@ async def validate_pipe_core(
             with translate_to_validate_bundle_error():
                 dry_run_results = await BundleValidator().validate_pipes(pipes=[the_pipe], library_id=library_id, allow_signatures=allow_signatures)
 
+            # warnings: what the pipe's dry run found without failing, such as a template check's warnings. None
+            # of the bundle-wide lints ride here: one pipe makes no bundle-wide claim, so there is no flow to lint.
+            warnings = build_dry_run_warnings(dry_run_results)
+            validation_report.count_warnings(count=len(warnings))
             return {
                 "success": True,
                 "is_valid": True,
                 "validated_pipes": build_validated_pipes(dry_run_results),
                 "total_pipes": len(dry_run_results),
+                "warnings": [warning.model_dump(exclude_none=True) for warning in warnings],
             }
         finally:
             # validate_pipes is the D6 inner sweep and never tears the library down, and validate_pipe_core
@@ -247,7 +261,11 @@ async def validate_pipe_in_bundle_core(
             allow_signatures=allow_signatures,
             dry_run_pipe_codes=[pipe_code],
         )
-        warnings = collect_advisory_warnings(pipes=result.pipes, entry_pipe_refs=collect_entry_pipe_refs(result.blueprints))
+        warnings = collect_advisory_warnings(
+            pipes=result.pipes,
+            entry_pipe_refs=collect_entry_pipe_refs(result.blueprints),
+            dry_run_result=result.dry_run_result,
+        )
         validation_report.describe(pipes=result.pipes)
         validation_report.count_warnings(count=len(warnings))
 
