@@ -3816,7 +3816,7 @@ rationale = "Verb-object: loads the ref-to-entry mapping in topological order; s
 param = "mthds_version_constraint"
 rationale = "Predicate-style check on the version constraint; single operand."
 
-["pipelex/libraries/library_manager.py::_find_methods_dirs_from_blueprints"]
+["pipelex/libraries/library_manager.py::find_methods_dirs_from_blueprints"]
 param = "blueprints"
 rationale = "Derivation: finds dirs from the blueprints; single operand."
 

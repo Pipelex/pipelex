@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, NamedTuple
 
+from pipelex.core.bundle_resources.bundle_resource import BundleResources
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.libraries.collision_messages import duplicate_ref_msg
@@ -35,6 +36,7 @@ class LibraryCrateFactory:
         blueprints: list[PipelexBundleBlueprint],
         *,
         python_sources: dict[str, str] | None = None,
+        bundle_resources: BundleResources | None = None,
     ) -> LibraryCrate:
         """Build a LibraryCrate from parsed bundle blueprints.
 
@@ -52,6 +54,8 @@ class LibraryCrateFactory:
             python_sources: Optional relpath -> Python source text captured (without importing) in
                 sandbox-hosted load mode. Attached verbatim to the crate; intentionally NOT folded
                 into the fingerprint (the fingerprint represents library structure for dedupe).
+            bundle_resources: Optional canonical path -> file submitted with a bundle loaded from content strings.
+                Attached verbatim to the crate and, like ``python_sources``, NOT folded into the fingerprint.
 
         Returns:
             A LibraryCrate with all content merged and fingerprinted
@@ -60,11 +64,13 @@ class LibraryCrateFactory:
         pipes: dict[str, PipeBlueprintUnion] = {}
         domains: dict[str, DomainBlueprint] = {}
         source_map: dict[str, str] = {}
+        host_bundle_files: dict[str, str] = {}
         elaboration_metadata: dict[str, ElaborationMetadata] = {}
 
         for blueprint in blueprints:
             domain_code = blueprint.domain
             source = blueprint.source
+            host_bundle_file = str(blueprint.host_bundle_file) if blueprint.host_bundle_file is not None else None
 
             # Domain metadata: order-independent, omission-quiet merge (see merge_domain_metadata_field).
             if domain_code not in domains:
@@ -143,6 +149,11 @@ class LibraryCrateFactory:
                         else:
                             source_map.pop(pipe_ref, None)
                         if winner.blueprint is pipe_blueprint:
+                            # The bundle file a step reads beside follows the winner too.
+                            if host_bundle_file is not None:
+                                host_bundle_files[pipe_ref] = host_bundle_file
+                            else:
+                                host_bundle_files.pop(pipe_ref, None)
                             cls._track_elaboration(
                                 elaboration_metadata=elaboration_metadata, pipe_ref=pipe_ref, elaboration=blueprint.get_elaboration_for(pipe_code)
                             )
@@ -150,6 +161,8 @@ class LibraryCrateFactory:
                     pipes[pipe_ref] = pipe_blueprint
                     if source:
                         source_map[pipe_ref] = source
+                    if host_bundle_file is not None:
+                        host_bundle_files[pipe_ref] = host_bundle_file
                     cls._track_elaboration(
                         elaboration_metadata=elaboration_metadata, pipe_ref=pipe_ref, elaboration=blueprint.get_elaboration_for(pipe_code)
                     )
@@ -164,8 +177,10 @@ class LibraryCrateFactory:
             pipes=pipes,
             domains=domains,
             source_map=source_map,
+            host_bundle_files=host_bundle_files,
             elaboration_metadata=elaboration_metadata,
             python_sources=python_sources or {},
+            bundle_resources=dict(bundle_resources) if bundle_resources else {},
             fingerprint=fingerprint,
         )
 

@@ -94,6 +94,10 @@ class MthdsParser(BaseModel):
             ) from exc
 
         try:
-            return BundleElaborator.elaborate(bundle=pipelex_bundle_blueprint)
+            elaborated_blueprint = BundleElaborator.elaborate(bundle=pipelex_bundle_blueprint)
         except BundleElaboratorError as exc:
             raise MthdsParserError(message=str(exc)) from exc
+        # Only a bundle read from a file here may read beside it: a content string's `mthds_source` is a label.
+        if bundle_path is not None:
+            elaborated_blueprint.mark_read_from_host_file(bundle_file=Path(bundle_path))
+        return elaborated_blueprint

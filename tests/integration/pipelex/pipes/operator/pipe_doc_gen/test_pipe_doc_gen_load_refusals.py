@@ -64,10 +64,10 @@ class TestPipeDocGenLoadRefusals:
         assert "built into Pipelex and disabled" in report
 
     @pytest.mark.usefixtures("stub_engines")
-    async def test_a_template_file_in_a_bundle_loaded_from_a_string_is_refused(self) -> None:
-        """A bundle loaded from a string has no directory to find a template file in."""
+    async def test_a_template_file_not_supplied_with_a_bundle_loaded_from_a_string_is_refused(self) -> None:
+        """A bundle loaded from a string has no directory to find a template file in, so the file must come with it."""
         report = await refusal_report(step_fields='format = "docx"\ntemplate_file = "invoice.docx"')
-        assert "not loaded from a file on disk" in report
+        assert "which was not supplied with its bundle" in report
 
     @pytest.mark.usefixtures("stub_engines")
     @pytest.mark.parametrize(

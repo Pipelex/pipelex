@@ -44,6 +44,7 @@ from pipelex.cogt.judgment.judgment_models import JudgmentPrompt, YesNoQuestion
 from pipelex.cogt.judgment.judgment_setting import JudgmentSetting
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.core.bundle_resources.bundle_resource import BundleResource
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.uri.uri_read_scope import UriReference
@@ -62,7 +63,8 @@ URL_FIELD_INVENTORY: dict[type[BaseModel], set[str]] = {
     ExtractAssignment: {"extract_input.image_uri", "extract_input.document_uri"},
     RenderPageViewsAssignment: {"document_uri"},
     # A section's blocks hold blocks again: the walk names the images inside one section and stops where a section would enclose itself.
-    RenderDocumentAssignment: {"composition.layout.blocks.url", "composition.layout.blocks.blocks.url"},
+    # A template file submitted with the bundle and stored with the run is read back by the print stage too.
+    RenderDocumentAssignment: {"composition.layout.blocks.url", "composition.layout.blocks.blocks.url", "composition.template_resource.uri"},
     SearchAssignment: set(),
     SearchObjectAssignment: set(),
     JudgmentAssignment: {"prompt.images.uri", "prompt.documents.uri"},
@@ -235,6 +237,27 @@ class TestAssignmentReadCoverage:
         for assignment_class, (sample, expected_uris) in URL_BEARING_SAMPLES.items():
             referenced_uris = sample.referenced_uris()
             assert {uri_reference.uri for uri_reference in referenced_uris} == expected_uris, assignment_class.__name__
+
+    def test_a_document_printed_from_a_stored_template_file_declares_it(self) -> None:
+        """A composition holds a layout or a template file, never both, so the template file's field gets a sample of its own."""
+        stored_template = BundleResource.make_inline(content=b"template").stored_at(uri="pipelex-storage://s/assets/bundle/invoice.docx")
+        assignment = RenderDocumentAssignment(
+            job_metadata=_job_metadata(),
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
+            composition=DocumentComposition(
+                format=DocGenFormat.DOCX,
+                source=DocGenSource.TEMPLATE_FILE,
+                filename="invoice.docx",
+                title="Invoice",
+                template_resource=stored_template,
+                template_name="templates/invoice.docx",
+            ),
+            doc_gen_setting=DocGenSetting(model="pipelex-docx"),
+        )
+
+        referenced_uris = assignment.referenced_uris()
+
+        assert [uri_reference.uri for uri_reference in referenced_uris] == ["pipelex-storage://s/assets/bundle/invoice.docx"]
 
     def test_the_extract_input_declares_an_image_too(self) -> None:
         referenced_uris = ExtractInput(image_uri="pipelex-storage://s/scan.png").referenced_uris()

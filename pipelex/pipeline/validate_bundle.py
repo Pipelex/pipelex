@@ -11,6 +11,7 @@ from typing_extensions import TypedDict
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexUnexpectedError
+from pipelex.core.bundle_resources.bundle_resource import BundleResources
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.interpreter_hub import (
     clear_current_library,
@@ -19,6 +20,7 @@ from pipelex.interpreter_hub import (
     resolve_library_dirs,
     set_current_library,
 )
+from pipelex.libraries.bundle_resources import check_bundle_resources_are_named
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.libraries.pipe.exceptions import EntryPipeNotFoundError
 from pipelex.mthds_parsing.parser import MthdsParser
@@ -123,8 +125,14 @@ async def validate_bundle(
     dry_run_pipe_codes: list[str] | None = None,
     caller_identity: CallerIdentity | None = None,
     library_dirs_are_callers: bool = False,
+    bundle_resources: BundleResources | None = None,
 ) -> ValidateBundleResult:
     """Load one bundle into a fresh library and dry-run its pipes.
+
+    ``bundle_resources`` are the files submitted with ``mthds_contents`` that their steps read, such as a
+    ``PipeDocGen`` step's ``template_file``, keyed by canonical bundle-relative path (see
+    ``make_bundle_resources``). A file none of the submitted steps names is refused with a
+    ``BundleResourceNotNamedError``, which is not a verdict. A bundle file reads beside itself on disk and takes none.
 
     ``caller_identity`` is who asked for the validation, when the host knows it; the dry-run
     sweep is attributed to that caller (see ``BundleValidator.validate_pipes``). ``None``
@@ -170,6 +178,10 @@ async def validate_bundle(
         msg = "mthds_sources, when provided, must be a per-item source list matching mthds_contents in length"
         raise PipelexUnexpectedError(msg)
 
+    if bundle_resources and mthds_contents is None:
+        msg = "bundle_resources accompany mthds_contents: a bundle file reads the files beside it on disk"
+        raise PipelexUnexpectedError(msg)
+
     library_manager = get_library_manager()
     library_id, library = library_manager.open_library()
     success = False
@@ -207,6 +219,9 @@ async def validate_bundle(
                     MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content, mthds_source=source)
                     for content, source in zip(mthds_contents, content_sources, strict=True)
                 ]
+                if bundle_resources:
+                    check_bundle_resources_are_named(blueprints=loaded_blueprints, bundle_resources=bundle_resources)
+                    library_manager.add_bundle_resources(library_id=library_id, bundle_resources=bundle_resources)
                 loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
                 dry_run_results = await BundleValidator().validate_pipes(
                     pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes=dry_run_pipe_codes),

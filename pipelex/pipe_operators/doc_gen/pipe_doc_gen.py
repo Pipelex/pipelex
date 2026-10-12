@@ -21,6 +21,7 @@ from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck_check import check_doc_gen_choice_with_deck
 from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
 from pipelex.cogt.templating.template_rendering import render_template
+from pipelex.core.bundle_resources.bundle_resource import BundleResource
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -32,9 +33,10 @@ from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_operators.doc_gen.exceptions import PipeDocGenRunError, PipeDocGenTemplateCheckError, PipeDocGenUndefinedValueError
 from pipelex.pipe_operators.doc_gen.template_field_check import check_template_field_paths
+from pipelex.pipe_operators.doc_gen.template_file_resource import bundle_resource_of_template_file
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.runtime_hub import get_class_registry, get_content_generator, get_model_deck, get_report_delegate
+from pipelex.runtime_hub import get_class_registry, get_content_generator, get_model_deck, get_report_delegate, get_storage_provider
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateRenderError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
@@ -82,7 +84,7 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
 
     @property
     def source(self) -> DocGenSource:
-        return DocGenSource.for_step(doc_gen_format=self.doc_gen_format, has_template=self.template is not None or self.template_path is not None)
+        return DocGenSource.for_step(doc_gen_format=self.doc_gen_format, has_template=self.template is not None or self.template_file is not None)
 
     @override
     def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
@@ -257,9 +259,34 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
                     filename=filename,
                     title=title,
                     template_path=self.template_path,
+                    template_resource=self._template_resource(),
                     template_name=self.template_file,
                     data={name: plain_data(content) for name, content in named_contents},
                 )
+
+    def _template_resource(self) -> BundleResource | None:
+        """The office template submitted with the bundle, or None when the step reads it beside its bundle on disk.
+
+        Looked up when the step composes, in the library the step runs in: the submitter's own, or the one a remote
+        worker loaded from the run's crate, whose copy may be a reference to the run's storage.
+        """
+        if self.template_path is not None or self.template_file is None:
+            return None
+        resource = bundle_resource_of_template_file(template_file=self.template_file)
+        if resource is None:
+            msg = f"PipeDocGen '{self.code}' names the template file '{self.template_file}', which the library it runs in does not hold."
+            raise PipeDocGenRunError(msg)
+        return resource
+
+    async def _read_template_file(self) -> bytes:
+        """The office template's bytes, from beside the bundle on disk or from the files submitted with it."""
+        if self.template_path is not None:
+            return Path(self.template_path).read_bytes()
+        resource = self._template_resource()
+        if resource is None:
+            msg = f"PipeDocGen '{self.code}' has no template file to read."
+            raise PipeDocGenRunError(msg)
+        return await resource.read_bytes(storage_provider=get_storage_provider())
 
     ####################################################################################################################
     # Template file check, at the dry run
@@ -282,14 +309,15 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         Raises:
             PipeDocGenTemplateCheckError: the checker reported errors.
         """
-        if self.template_path is None or self.template_file is None:
+        # Only an office template file is the engine's to check; an HTML one was checked against the inputs at load.
+        if self.template is not None or self.template_file is None:
             return
         doc_gen_setting = self.resolve_engine()
         inference_model = get_model_deck().get_required_inference_model(model_handle=doc_gen_setting.model, model_type=ModelType.DOC_GEN)
         worker = DocGenWorkerFactory.make_doc_gen_worker(inference_model=inference_model, reporting_delegate=get_report_delegate())
         request = TemplateCheckRequest(
             format=self.doc_gen_format,
-            template=Path(self.template_path).read_bytes(),
+            template=await self._read_template_file(),
             template_name=self.template_file,
             inputs=self._input_shapes(),
             data={name: plain_data(content) for name, content in self._named_contents(working_memory)},

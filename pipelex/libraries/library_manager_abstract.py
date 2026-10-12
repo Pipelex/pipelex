@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from kajson.class_registry import ClassRegistry
 
+from pipelex.core.bundle_resources.bundle_resource import BundleResources
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
@@ -95,6 +96,18 @@ class LibraryManagerAbstract(ABC):
 
         Returns:
             A LibraryCrate built from all accumulated blueprints, or None
+        """
+
+    @abstractmethod
+    def add_bundle_resources(self, *, library_id: str, bundle_resources: BundleResources) -> None:
+        """Hold the files submitted with bundles loaded from content strings, for their pipes to read.
+
+        Called before the bundles load, since a pipe that reads one, such as a `PipeDocGen` step with an HTML
+        `template_file`, reads it while it is built. The library's crate carries them from then on.
+
+        Args:
+            library_id: The library the bundles load into
+            bundle_resources: The files, keyed by canonical bundle-relative path
         """
 
     @abstractmethod

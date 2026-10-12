@@ -7,6 +7,7 @@ from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice
 from pipelex.cogt.templating.exceptions import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
+from pipelex.core.bundle_resources.bundle_resource import BundleResourceReadStage
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateSyntaxError
@@ -88,6 +89,16 @@ class PipeDocGenBlueprint(PipeBlueprint):
             )
             raise ValueError(msg)
         return self
+
+    @property
+    @override
+    def bundle_resource_reads(self) -> dict[str, BundleResourceReadStage]:
+        # An HTML template is read and checked against the inputs when the method loads; an office template is read
+        # only when the step prints, or when a dry run hands it to the engine's checker.
+        if self.template_file is None:
+            return {}
+        stage = BundleResourceReadStage.LOAD if self.format.is_template_html else BundleResourceReadStage.RUN
+        return {self.template_file: stage}
 
     @override
     def validate_inputs(self):

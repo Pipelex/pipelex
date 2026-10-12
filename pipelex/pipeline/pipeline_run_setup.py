@@ -5,6 +5,7 @@ from mthds.protocol.pipeline_inputs import PipelineInputs
 
 from pipelex import log
 from pipelex.config import get_config
+from pipelex.core.bundle_resources.bundle_resource import BundleResources
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
@@ -71,6 +72,7 @@ async def pipeline_run_setup(
     inputs_base_dir: Path | None = None,
     library_dirs_are_callers: bool = False,
     methods_dirs: list[Path] | None = None,
+    bundle_resources: BundleResources | None = None,
 ) -> tuple[PipeJob, str, str]:
     """Set up a pipeline for execution.
 
@@ -175,6 +177,12 @@ async def pipeline_run_setup(
         Directories laid out like ``.mthds/methods/`` holding the method packages the caller ships with
         ``mthds_contents``, for this run alone. An address-based reference is looked up there before the
         installed stores and fetch-on-miss, and a package found there is never installed. See
+        :func:`acquire_library`.
+    bundle_resources:
+        The files submitted with ``mthds_contents`` that their steps read, such as a ``PipeDocGen``
+        step's ``template_file``, keyed by canonical bundle-relative path. The run library holds them, and
+        the job's crate carries them inline; a host that hands the job to a remote orchestrator moves the
+        ones read only when a step runs to the run's storage first (``relocate_run_resources``). See
         :func:`acquire_library`.
 
     Returns:
@@ -306,6 +314,7 @@ async def pipeline_run_setup(
             bundle_uris=bundle_uris,
             library_dirs_are_callers=library_dirs_are_callers,
             methods_dirs=methods_dirs,
+            bundle_resources=bundle_resources,
         )
         library_acquired = True
 

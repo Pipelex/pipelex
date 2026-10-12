@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     from mthds.protocol.pipeline_inputs import PipelineInputs
     from mthds.protocol.working_memory import WorkingMemoryAbstract
 
+    from pipelex.core.bundle_resources.bundle_resource import BundleResources
     from pipelex.core.memory.working_memory import WorkingMemory
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
@@ -198,11 +199,16 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         # runs, searched first for an address-based reference and never written. A run reads them; `validate` does
         # not, and resolves such a reference through the installed stores and fetch-on-miss only.
         methods_dirs: list[Path] | None = None,
+        # The files a caller submits with the contents it runs or validates that their steps read, such as a
+        # PipeDocGen step's `template_file`, keyed by canonical bundle-relative path (`make_bundle_resources`).
+        # A bundle loaded from a directory reads beside itself on disk instead.
+        bundle_resources: BundleResources | None = None,
     ):
         self.library_id = library_id
         self.library_dirs = library_dirs
         self.library_dirs_are_callers = library_dirs_are_callers
         self.methods_dirs = methods_dirs
+        self.bundle_resources = bundle_resources
         self.bundle_uris = bundle_uris
         self.pipe_run_mode = pipe_run_mode
         self.is_mock_usage = is_mock_usage
@@ -350,6 +356,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 inputs_base_dir=self.inputs_base_dir,
                 library_dirs_are_callers=self.library_dirs_are_callers,
                 methods_dirs=self.methods_dirs,
+                bundle_resources=self.bundle_resources,
                 request_id=request_id,
             )
             effective_pipe_run = self._pipe_run or get_pipe_run()
@@ -540,6 +547,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             caller_identity=self.caller_identity,
             # The same ownership a run of this runtime reads: the caller's own directories keep their paths.
             library_dirs_are_callers=self.library_dirs_are_callers,
+            bundle_resources=self.bundle_resources,
         )
 
     @override

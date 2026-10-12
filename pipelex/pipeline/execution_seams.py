@@ -27,6 +27,8 @@ from typing import TYPE_CHECKING
 from mthds.protocol.pipeline_inputs import PipelineInputs
 
 from pipelex import log
+from pipelex.base_exceptions import PipelexUnexpectedError
+from pipelex.core.bundle_resources.bundle_resource import BundleResources
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
@@ -39,6 +41,7 @@ from pipelex.interpreter_hub import (
     set_current_library,
 )
 from pipelex.kernel.memory_ops import shape_inputs
+from pipelex.libraries.bundle_resources import check_bundle_resources_are_named
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.pipe_job import PipeJob
@@ -69,6 +72,7 @@ def acquire_library(
     bundle_uris: list[str] | None = None,
     library_dirs_are_callers: bool = False,
     methods_dirs: list[Path] | None = None,
+    bundle_resources: BundleResources | None = None,
 ) -> tuple[str, str | None]:
     """Set the current library, open it, and load dirs + blueprints into it.
 
@@ -102,10 +106,18 @@ def acquire_library(
     reference of the contents is looked up there first, before the installed stores and fetch-on-miss, and a package
     found there is never installed; the bundles of a package are named by its address, never by these directories.
 
+    ``bundle_resources`` are the files submitted with the ``mthds_contents`` that their steps read, such as a
+    ``PipeDocGen`` step's ``template_file``, keyed by canonical bundle-relative path. The library holds them before the
+    contents load, and its crate carries them with the run. A file none of the contents' steps names is refused with a
+    ``BundleResourceNotNamedError``.
+
     Returns the ``library_id`` and the bundle's qualified ``main_pipe`` ref
     (``domain.pipe_code``) when an ``mthds_contents`` bundle declares one, else
     ``None``. Pipe resolution is the caller's responsibility.
     """
+    if bundle_resources and not mthds_contents:
+        msg = "bundle_resources accompany mthds_contents: a bundle loaded from a directory reads the files beside it on disk"
+        raise PipelexUnexpectedError(msg)
     library_manager = get_library_manager()
     prev_library_id = get_current_library_id_or_none()
     # Adopt the canonical id open_library keyed the Library under: when given a falsy library_id it
@@ -136,6 +148,9 @@ def acquire_library(
             )
             with host_library_withholding, translate_to_validate_bundle_error():
                 all_blueprints = [MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
+                if bundle_resources:
+                    check_bundle_resources_are_named(blueprints=all_blueprints, bundle_resources=bundle_resources)
+                    library_manager.add_bundle_resources(library_id=library_id, bundle_resources=bundle_resources)
 
                 # Filter out blueprints whose URIs are already loaded (e.g. via PIPELEXPATH).
                 blueprints_to_load: list[PipelexBundleBlueprint] = list(all_blueprints)
