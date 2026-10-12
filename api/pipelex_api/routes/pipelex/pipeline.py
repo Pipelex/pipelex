@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 from contextlib import ExitStack, contextmanager
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, cast
 
 from fastapi import APIRouter, Depends, Request
@@ -37,7 +37,7 @@ from pipelex_api.bundle import (
     parse_bundle,
     partition_bundle_entries,
 )
-from pipelex_api.bundle_resources import decode_bundle_resources
+from pipelex_api.bundle_resources import decode_bundle_resources, files_its_steps_read
 from pipelex_api.error_types import ErrorType
 from pipelex_api.errors import raise_bad_request, raise_forbidden, raise_validation_error
 from pipelex_api.json_body import decode_json_body
@@ -723,6 +723,8 @@ class _BundleRunSource(NamedTuple):
     mthds_contents: list[str] | None
     library_dirs: list[str] | None
     methods_dirs: list[Path] | None
+    bundle_files: dict[str, bytes]
+    """The files a method bundle ships beside its `.mthds` files that their steps read, keyed by the path a step names."""
 
 
 def _ensure_vendored_packages_hold_no_structures(*, methods_dir: Path, packages: tuple[VendoredMethodPackage, ...]) -> None:
@@ -768,7 +770,7 @@ def _bundle_run_source(run_request: RunRequest) -> Generator[_BundleRunSource, N
     rather than executing untrusted code.
     """
     if run_request.bundle_b64 is None and run_request.files is None:
-        yield _BundleRunSource(mthds_contents=run_request.mthds_contents, library_dirs=None, methods_dirs=None)
+        yield _BundleRunSource(mthds_contents=run_request.mthds_contents, library_dirs=None, methods_dirs=None, bundle_files={})
         return
     # Parse + guard in memory FIRST, then apply the sandbox-hosted gate BEFORE any disk write —
     # a bundle destined for a 403 on a non-hosted deployment never touches the filesystem.
@@ -780,12 +782,13 @@ def _bundle_run_source(run_request: RunRequest) -> Generator[_BundleRunSource, N
     # (`.py`, `requirements.txt`) → a temp `library_dirs` entry the load path source-captures; the packages it
     # ships → a temp methods directory.
     partition = partition_bundle_entries(parsed.entries)
-    mthds_contents: list[str] = []
+    mthds_entries: list[tuple[PurePosixPath, str]] = []
     for relpath, content in partition.mthds_entries:
         try:
-            mthds_contents.append(content.decode("utf-8"))
+            mthds_entries.append((relpath, content.decode("utf-8")))
         except UnicodeDecodeError:
             raise_validation_error(message=f"Bundle .mthds file '{relpath}' is not valid UTF-8.", error_type=ErrorType.INVALID_BUNDLE)
+    mthds_contents = [content for _, content in mthds_entries]
     if not mthds_contents:
         msg = "Method bundle contains no .mthds file."
         if partition.vendored_packages:
@@ -794,6 +797,8 @@ def _bundle_run_source(run_request: RunRequest) -> Generator[_BundleRunSource, N
                 "packages it ships, and the bundle's own .mthds files go outside '.mthds/'."
             )
         raise_validation_error(message=msg, error_type=ErrorType.INVALID_BUNDLE)
+    # The `.mthds` files load as content strings, so a template file shipped beside one travels with it as a resource.
+    bundle_files = files_its_steps_read(mthds_entries=mthds_entries, other_entries=partition.library_entries)
     with ExitStack() as stack:
         library_dirs: list[str] | None = None
         if partition.library_entries:
@@ -805,7 +810,7 @@ def _bundle_run_source(run_request: RunRequest) -> Generator[_BundleRunSource, N
             if is_pipe_func_sandbox_hosted():
                 _ensure_vendored_packages_hold_no_structures(methods_dir=methods_dir, packages=partition.vendored_packages)
             methods_dirs = [methods_dir]
-        yield _BundleRunSource(mthds_contents=mthds_contents, library_dirs=library_dirs, methods_dirs=methods_dirs)
+        yield _BundleRunSource(mthds_contents=mthds_contents, library_dirs=library_dirs, methods_dirs=methods_dirs, bundle_files=bundle_files)
 
 
 class _ResolvedRunSource(NamedTuple):
@@ -816,6 +821,8 @@ class _ResolvedRunSource(NamedTuple):
     methods_dirs: list[Path] | None
     pipe_code: str | None
     method_provenance: MethodProvenance | None
+    bundle_files: dict[str, bytes]
+    """The files a method bundle ships that its steps read, which join the request's `resources`."""
 
 
 @contextmanager
@@ -839,6 +846,7 @@ def _run_source(run_request: RunRequest) -> Generator[_ResolvedRunSource, None, 
                 methods_dirs=fetched.methods_dirs,
                 pipe_code=run_request.pipe_code or fetched.main_pipe,
                 method_provenance=fetched.provenance,
+                bundle_files={},
             )
         return
     with _bundle_run_source(run_request) as bundle_source:
@@ -848,6 +856,7 @@ def _run_source(run_request: RunRequest) -> Generator[_ResolvedRunSource, None, 
             methods_dirs=bundle_source.methods_dirs,
             pipe_code=run_request.pipe_code,
             method_provenance=None,
+            bundle_files=bundle_source.bundle_files,
         )
 
 
@@ -900,7 +909,7 @@ async def execute(request: Request) -> JSONResponse:
             extras=extras.analytics_groups,
             library_dirs=source.library_dirs,
             methods_dirs=source.methods_dirs,
-            bundle_resources=decode_bundle_resources(resources=run_request.resources),
+            bundle_resources=decode_bundle_resources(resources=run_request.resources, bundle_files=source.bundle_files),
         )
         response = await runner.execute(
             pipe_code=source.pipe_code,
@@ -993,7 +1002,7 @@ async def start(
             extras=extras.analytics_groups,
             library_dirs=source.library_dirs,
             methods_dirs=source.methods_dirs,
-            bundle_resources=decode_bundle_resources(resources=run_request.resources),
+            bundle_resources=decode_bundle_resources(resources=run_request.resources, bundle_files=source.bundle_files),
         )
         start_result = await runner.start(
             pipe_code=source.pipe_code,

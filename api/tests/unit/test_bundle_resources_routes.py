@@ -11,6 +11,9 @@ the bytes it reads, which is the read the engine's checker would be handed.
 """
 
 import base64
+import io
+import zipfile
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -115,6 +118,27 @@ class _RecordingTemporalStub:
         return PipelexPipeDispatchAck(pipeline_run_id=pipe_job.job_metadata.run_metadata.pipeline_run_id, workflow_id="wf-1")
 
 
+def _record_dispatches_to_a_temporal_like_orchestrator(mocker: MockerFixture) -> tuple[_RecordingTemporalStub, InMemoryStorageProvider]:
+    """Make Temporal the deployment's orchestrator, recording each job it is handed, over an in-memory run storage."""
+    storage_provider = InMemoryStorageProvider()
+    mocker.patch(f"{_REMOTE_DISPATCH_NS}.get_storage_provider", return_value=storage_provider)
+    mocker.patch(
+        f"{_PIPELINE_NS}.get_api_config", return_value=ApiConfig(orchestration_mode="temporal", allow_request_orchestration_mode_override=False)
+    )
+    orchestrator = _RecordingTemporalStub()
+    mocker.patch(f"{_PIPELINE_NS}.get_orchestrator_registry", return_value=OrchestratorRegistry({"temporal": orchestrator}))
+    return orchestrator, storage_provider
+
+
+def _zip_b64(files: Mapping[str, str | bytes]) -> str:
+    """A `bundle_b64` of the files, which, unlike a `files` map, can carry bytes that are not text."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, content in files.items():
+            archive.writestr(name, content)
+    return base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
 def _contents_body(*, route: str, resources: dict[str, str], mthds: str = _INVOICE_MTHDS) -> dict[str, Any]:
     """The route's body carrying the bundle inline with the given resources: the crate routes take `files[]`."""
     match route:
@@ -200,10 +224,11 @@ class TestBundleResourcesRoutes:
 
         assert reason in _assert_problem(response, status=422, error_type="InvalidResourcePath")
 
-    def test_two_spellings_of_one_file_are_refused(self) -> None:
+    @pytest.mark.parametrize("second_value", [pytest.param(_b64(b"b"), id="both_base64"), pytest.param("not base64!", id="second_not_base64")])
+    def test_two_spellings_of_one_file_are_refused_before_either_is_decoded(self, second_value: str) -> None:
         response = _build_client().post(
             "/v1/validate",
-            json={"mthds_contents": [_INVOICE_MTHDS], "resources": {_TEMPLATE_PATH: _b64(b"a"), f"./{_TEMPLATE_PATH}": _b64(b"b")}},
+            json={"mthds_contents": [_INVOICE_MTHDS], "resources": {_TEMPLATE_PATH: _b64(b"a"), f"./{_TEMPLATE_PATH}": second_value}},
         )
 
         assert "name the same file" in _assert_problem(response, status=422, error_type="InvalidResourcePath")
@@ -274,13 +299,7 @@ class TestBundleResourcesRoutes:
     def test_a_run_handed_to_a_remote_orchestrator_carries_its_template_by_reference(self, mocker: MockerFixture) -> None:
         """`/start` on a Temporal-like orchestrator: the job's crate names the stored file, and the run's storage holds its bytes."""
         _stub_the_document_engine(mocker)
-        storage_provider = InMemoryStorageProvider()
-        mocker.patch(f"{_REMOTE_DISPATCH_NS}.get_storage_provider", return_value=storage_provider)
-        mocker.patch(
-            f"{_PIPELINE_NS}.get_api_config", return_value=ApiConfig(orchestration_mode="temporal", allow_request_orchestration_mode_override=False)
-        )
-        orchestrator = _RecordingTemporalStub()
-        mocker.patch(f"{_PIPELINE_NS}.get_orchestrator_registry", return_value=OrchestratorRegistry({"temporal": orchestrator}))
+        orchestrator, storage_provider = _record_dispatches_to_a_temporal_like_orchestrator(mocker)
 
         response = _build_client().post(
             "/v1/start",
@@ -296,3 +315,94 @@ class TestBundleResourcesRoutes:
         assert stored.uri.startswith(f"pipelex-storage://{pipe_job.job_metadata.run_metadata.storage_scope}/assets/bundle/")
         assert storage_provider.root[stored.uri.removeprefix("pipelex-storage://")] == _TEMPLATE_BYTES
         assert _b64(_TEMPLATE_BYTES) not in pipe_job.model_dump_json()
+
+    @pytest.mark.parametrize(
+        ("bundle_files", "resources"),
+        [
+            pytest.param({"invoicing.mthds": _INVOICE_MTHDS, _TEMPLATE_PATH: _TEMPLATE_BYTES}, None, id="beside_the_bundle"),
+            pytest.param({"methods/invoicing.mthds": _INVOICE_MTHDS, f"methods/{_TEMPLATE_PATH}": _TEMPLATE_BYTES}, None, id="in_a_directory"),
+            pytest.param(
+                {"invoicing.mthds": _INVOICE_MTHDS, _TEMPLATE_PATH: _TEMPLATE_BYTES}, {_TEMPLATE_PATH: _b64(_TEMPLATE_BYTES)}, id="also_in_resources"
+            ),
+        ],
+    )
+    def test_a_method_bundle_carries_the_office_template_it_ships_to_its_step(
+        self, mocker: MockerFixture, bundle_files: dict[str, str | bytes], resources: dict[str, str] | None
+    ) -> None:
+        """A template file shipped beside the bundle's `.mthds` file reaches its step as one sent in `resources` does, by reference."""
+        _stub_the_document_engine(mocker)
+        orchestrator, storage_provider = _record_dispatches_to_a_temporal_like_orchestrator(mocker)
+        body: dict[str, Any] = {"bundle_b64": _zip_b64(bundle_files), "inputs": _INVOICE_INPUTS}
+        if resources is not None:
+            body["resources"] = resources
+
+        response = _build_client().post("/v1/start", json=body)
+
+        assert response.status_code == 202, response.text
+        (pipe_job,) = orchestrator.pipe_jobs
+        assert pipe_job.library_crate is not None
+        assert set(pipe_job.library_crate.bundle_resources) == {_TEMPLATE_PATH}
+        stored = pipe_job.library_crate.bundle_resources[_TEMPLATE_PATH]
+        assert stored.uri is not None
+        assert storage_provider.root[stored.uri.removeprefix("pipelex-storage://")] == _TEMPLATE_BYTES
+
+    def test_a_method_bundle_s_files_map_carries_the_html_template_it_ships_inline(self, mocker: MockerFixture) -> None:
+        """An HTML template is read while the method loads, so it travels inline in the job, from a `files` map as from a zip."""
+        _stub_the_document_engine(mocker)
+        orchestrator, _ = _record_dispatches_to_a_temporal_like_orchestrator(mocker)
+        html_mthds = _INVOICE_MTHDS.replace('format        = "docx"', 'format        = "pdf"').replace(_TEMPLATE_PATH, "templates/invoice.html")
+        html_template = "<h1>{{ invoice.number }}</h1>"
+
+        response = _build_client().post(
+            "/v1/start",
+            json={"files": {"invoicing.mthds": html_mthds, "templates/invoice.html": html_template}, "inputs": _INVOICE_INPUTS},
+        )
+
+        assert response.status_code == 202, response.text
+        (pipe_job,) = orchestrator.pipe_jobs
+        assert pipe_job.library_crate is not None
+        assert pipe_job.library_crate.bundle_resources["templates/invoice.html"].inline_bytes() == html_template.encode("utf-8")
+
+    @pytest.mark.parametrize(
+        ("bundle_files", "resources"),
+        [
+            pytest.param(
+                {"invoicing.mthds": _INVOICE_MTHDS, _TEMPLATE_PATH: _TEMPLATE_BYTES}, {_TEMPLATE_PATH: _b64(b"another template")}, id="and_resources"
+            ),
+            pytest.param(
+                {
+                    "a/invoicing.mthds": _INVOICE_MTHDS,
+                    f"a/{_TEMPLATE_PATH}": _TEMPLATE_BYTES,
+                    "b/invoicing.mthds": _INVOICE_MTHDS.replace('domain = "invoicing"', 'domain = "invoicing_b"').replace(
+                        "invoicing.Invoice", "invoicing_b.Invoice"
+                    ),
+                    f"b/{_TEMPLATE_PATH}": b"another template",
+                },
+                None,
+                id="two_of_its_bundles",
+            ),
+        ],
+    )
+    def test_two_different_files_a_step_reads_under_one_path_are_refused(
+        self, mocker: MockerFixture, bundle_files: dict[str, str | bytes], resources: dict[str, str] | None
+    ) -> None:
+        """Every bundle of a request reads its files as if it sat in one directory, so one path holds one file."""
+        _stub_the_document_engine(mocker)
+        body: dict[str, Any] = {"bundle_b64": _zip_b64(bundle_files), "inputs": _INVOICE_INPUTS}
+        if resources is not None:
+            body["resources"] = resources
+
+        detail = _assert_problem(_build_client().post("/v1/execute", json=body), status=422, error_type="InvalidResourcePath")
+
+        assert f"'{_TEMPLATE_PATH}'" in detail
+
+    def test_a_template_a_method_bundle_ships_is_held_to_the_per_file_limit(self, mocker: MockerFixture) -> None:
+        _stub_the_document_engine(mocker)
+        mocker.patch(f"{_RESOURCES_NS}.MAX_RESOURCE_FILE_BYTES", len(_TEMPLATE_BYTES) - 1)
+
+        response = _build_client().post(
+            "/v1/execute",
+            json={"bundle_b64": _zip_b64({"invoicing.mthds": _INVOICE_MTHDS, _TEMPLATE_PATH: _TEMPLATE_BYTES}), "inputs": _INVOICE_INPUTS},
+        )
+
+        assert "per-file" in _assert_problem(response, status=413, error_type="PayloadTooLarge")

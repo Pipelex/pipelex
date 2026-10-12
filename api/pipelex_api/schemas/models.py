@@ -52,8 +52,9 @@ RESOURCES_FIELD_DESCRIPTION = (
     "one directory. A path must be relative and written with forward slashes, with no `..` segment, backslash or "
     "colon. Every file must be named by a step, or the request is refused with a 422 `BundleResourceNotNamedError`. "
     f"By default at most {DEFAULT_MAX_RESOURCES_PER_REQUEST} files, {DEFAULT_MAX_RESOURCE_FILE_KIB} KiB each and "
-    f"{DEFAULT_MAX_RESOURCES_TOTAL_KIB} KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`, "
-    "`MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The `.html` template files, which travel inline with the "
+    f"{DEFAULT_MAX_RESOURCES_TOTAL_KIB} KiB in all, decoded, counting the files a method bundle ships for its steps; a "
+    "deployment sets its own with `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. A file "
+    "both sent here and shipped in a method bundle must be the same. The `.html` template files, which travel inline with the "
     f"method wherever it runs, may total {MAX_LOAD_STAGE_RESOURCES_BYTES // 1024} KiB at most, a fixed bound, or the request "
     "is refused with a 413 `BundleResourcesTooLargeError`."
 )

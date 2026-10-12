@@ -230,6 +230,8 @@ The server materializes the bundle into a temporary library directory for the ru
 }
 ```
 
+**Template files shipped in the bundle.** A file a step reads beside its bundle, such as a `PipeDocGen` step's `template_file`, can ship in the bundle, relative to the `.mthds` file whose step names it, as it sits beside a bundle on disk. The bundle's `.mthds` files load as content, so the server sends each such file with them as if it had come in [`resources`](pipe-validate.md#sending-the-files-the-steps-read-resources): it is counted against the same limits as `resources`, together with them, an office template file is stored with the run when the run goes to a remote orchestrator, and an `.html` one is bounded with the files read when the method loads. Every `.mthds` file of the bundle is read as sitting in one directory, so two different files a step reads under one path, shipped beside two `.mthds` files or shipped and also sent in `resources`, are a `422 InvalidResourcePath`; the same file in both is accepted.
+
 **Ingest guards.** Bundles are bounded at ingest and rejected with a clear error (never a silent truncation):
 
 - A hard **file-count** ceiling (`MAX_BUNDLE_FILES`) and a **total decompressed-size** ceiling (`MAX_BUNDLE_TOTAL_KIB`) → `413 PayloadTooLarge`. The zip path bounds actual decompression, so a zip bomb cannot expand past the ceiling, and an oversized `bundle_b64` is refused on its encoded length *before* it is decoded into memory.
