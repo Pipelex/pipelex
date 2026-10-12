@@ -4,6 +4,7 @@ Stores trace events in a DynamoDB table with the schema:
     PK: PIPELINE_RUN#{pipeline_run_id}
     SK: EVENT#{workflow_id}#{writer_id}#{sequence:010d}
     payload: dict (full event via model_dump)
+    ttl: epoch seconds at which DynamoDB may delete the item, the write time plus the configured retention
 
 Legacy emissions write writer_id="primary" so existing rows remain valid.
 
@@ -12,6 +13,7 @@ Requires: pip install "pipelex[dynamodb]"
 """
 
 import threading
+import time
 from typing import Any
 
 from pydantic import TypeAdapter, ValidationError
@@ -34,6 +36,8 @@ except ImportError:
 
 _any_trace_event_adapter: TypeAdapter[TraceEvent] = TypeAdapter(AnyTraceEvent)
 
+_SECONDS_PER_DAY = 86_400
+
 
 class DynamoDBEventLog(EventLogProtocol):
     """Event log backed by AWS DynamoDB.
@@ -42,13 +46,16 @@ class DynamoDBEventLog(EventLogProtocol):
     provides natural deduplication for Temporal replay re-emissions.
     Read path: Query on PK, returns events sorted by SK which encodes
     (workflow_id, sequence) — matching the NDJSON ordering contract.
+    Retention: every item carries a `ttl` in epoch seconds, `retention_days`
+    past its write, which is the attribute the events table expires items on,
+    so a run's events are deleted by DynamoDB instead of being kept forever.
 
     WARNING: Do not call emit() from inside a Temporal workflow body — the
     synchronous boto3 HTTP call will block the workflow thread and trigger
     the deadlock detector. Use BufferingEventLog + act_flush_trace_events instead.
     """
 
-    def __init__(self, table_name: str, region: str, writer_id: str = "primary") -> None:
+    def __init__(self, *, table_name: str, region: str, retention_days: int, writer_id: str = "primary") -> None:
         if boto3 is None:
             lib_name = "boto3"
             lib_extra_name = "dynamodb"
@@ -58,6 +65,7 @@ class DynamoDBEventLog(EventLogProtocol):
         self._table_name = table_name
         self._region = region
         self._writer_id = writer_id
+        self._retention_seconds = retention_days * _SECONDS_PER_DAY
         self._sequence: int = 0
         self._sequence_lock = threading.Lock()
         # Translate construction-time botocore failures (e.g. a misconfigured region) into our
@@ -107,6 +115,9 @@ class DynamoDBEventLog(EventLogProtocol):
     @override
     def emit(self, event: TraceEvent) -> None:
         """Write a single event to DynamoDB. Synchronous and idempotent."""
+        # The retention counts from the write rather than from the event's own timestamp, which is for display only.
+        # A replay's re-emission overwrites the item under the same key and only pushes its expiry a little later.
+        ttl = int(time.time()) + self._retention_seconds
         item: dict[str, Any] = {
             "PK": self._make_pk(event.pipeline_run_id),
             "SK": self._make_sk(event.workflow_id, writer_id=event.writer_id, sequence=event.sequence),
@@ -115,6 +126,7 @@ class DynamoDBEventLog(EventLogProtocol):
             "writer_id": event.writer_id,
             "sequence": event.sequence,
             "payload": event.model_dump_json(),
+            "ttl": ttl,
         }
         self._table.put_item(Item=item)
 
@@ -199,7 +211,7 @@ class DynamoDBEventLog(EventLogProtocol):
 
     @override
     def cleanup(self, pipeline_run_id: str) -> None:
-        """Delete all events for a pipeline run. In practice TTL handles this."""
+        """Delete all events for a pipeline run, ahead of the expiry their `ttl` sets."""
         response = self._table.query(
             KeyConditionExpression=self._key_condition(pipeline_run_id),
             ProjectionExpression="PK, SK",

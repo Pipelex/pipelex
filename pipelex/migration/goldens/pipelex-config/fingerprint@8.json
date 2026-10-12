@@ -1488,6 +1488,15 @@
       "default": "",
       "open_node": false
     },
+    "runtime.tracing.dynamodb.retention_days": {
+      "value_type": "int",
+      "required": true,
+      "default": 30,
+      "open_node": false,
+      "constraints": {
+        "ge": 1
+      }
+    },
     "runtime.tracing.dynamodb.table_name": {
       "value_type": "str",
       "required": true,

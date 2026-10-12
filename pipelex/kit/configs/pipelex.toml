@@ -162,6 +162,9 @@ traces_dir = ".pipelex/traces"
 [runtime.tracing.dynamodb]
 table_name = ""
 region = ""
+# Days a trace event is kept: every item is written with a `ttl` (epoch seconds) this many days past its write,
+# which the table must use as its TTL attribute for DynamoDB to delete expired events.
+retention_days = 30
 
 ####################################################################################################
 # Plugins

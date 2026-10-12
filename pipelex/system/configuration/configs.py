@@ -81,6 +81,9 @@ class NdjsonTracingConfig(ConfigModel):
 class DynamoDBTracingConfig(ConfigModel):
     table_name: str
     region: str
+    # How long a trace event is kept: each item is written with a `ttl` this many days past its write, the attribute
+    # the events table expires items on.
+    retention_days: Annotated[int, Field(ge=1)]
 
 
 class TracingConfig(ConfigModel):
