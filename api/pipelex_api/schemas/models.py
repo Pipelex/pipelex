@@ -25,6 +25,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from pydantic.functional_validators import SkipValidation
 
 from pipelex_api.limits import (
+    DEFAULT_MAX_RESOURCE_FILE_KIB,
+    DEFAULT_MAX_RESOURCES_PER_REQUEST,
+    DEFAULT_MAX_RESOURCES_TOTAL_KIB,
     MAX_CALLBACK_URL_LEN,
     MAX_CALLBACK_URLS,
     MAX_METHOD_REF_LEN,
@@ -39,6 +42,18 @@ def _ensure_mthds_file_within_bytes_limit(content: str) -> None:
     if len(content.encode("utf-8")) > MAX_MTHDS_FILE_BYTES:
         msg = f"MTHDS file exceeds {MAX_MTHDS_FILE_BYTES // 1024} KiB limit"
         raise ValueError(msg)
+
+
+RESOURCES_FIELD_DESCRIPTION = (
+    "The files submitted with the bundle that its steps read, such as a PipeDocGen step's `template_file` (an "
+    "`.xlsx`, `.docx`, `.pptx` or `.html` template): a JSON object mapping each file's bundle-relative path, exactly "
+    "as the step names it, to the file's bytes in standard base64. Every bundle of the request is read as sitting in "
+    "one directory. A path must be relative and written with forward slashes, with no `..` segment, backslash or "
+    "colon. Every file must be named by a step, or the request is refused with a 422 `BundleResourceNotNamedError`. "
+    f"By default at most {DEFAULT_MAX_RESOURCES_PER_REQUEST} files, {DEFAULT_MAX_RESOURCE_FILE_KIB} KiB each and "
+    f"{DEFAULT_MAX_RESOURCES_TOTAL_KIB} KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`, "
+    "`MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`."
+)
 
 
 class RunRequest(BaseModel):
@@ -83,6 +98,9 @@ class RunRequest(BaseModel):
             by manifest identity); mutually exclusive with `mthds_contents` and with a
             method bundle. `pipe_code` may accompany it to override the manifest's
             `main_pipe`.
+        resources: The files the submitted bundle's steps read, such as a PipeDocGen
+            step's `template_file`, as `{bundle_relative_path: base64}`. Accompanies inline
+            `mthds_contents` or a method bundle, never a `method_ref`.
     """
 
     model_config = ConfigDict(extra="allow")
@@ -127,6 +145,7 @@ class RunRequest(BaseModel):
             "MTHDS concepts and sandboxed PipeFuncs, not in-process Python."
         ),
     )
+    resources: dict[str, str] | None = Field(default=None, description=RESOURCES_FIELD_DESCRIPTION)
 
     @model_validator(mode="before")
     @classmethod
@@ -155,6 +174,15 @@ class RunRequest(BaseModel):
         if has_method_ref and has_bundle:
             msg = "method_ref and a method bundle (bundle_b64 / files) are mutually exclusive; send one or the other."
             raise PipelineRequestError(msg)
+        # `resources` are the files the submitted bundle's steps read, so they accompany a bundle the request
+        # carries: inline contents or a method bundle. A fetched package's files are its own.
+        if values.get("resources"):
+            if has_method_ref:
+                msg = "resources accompany inline mthds_contents or a method bundle; a method_ref's files are the package's own."
+                raise PipelineRequestError(msg)
+            if not values.get("mthds_contents") and not values.get("mthds_content") and not has_bundle:
+                msg = "resources accompany the bundle whose steps read them: send them with mthds_contents or a method bundle."
+                raise PipelineRequestError(msg)
         if values.get("pipe_code") is None and not values.get("mthds_contents") and not has_bundle and not has_method_ref:
             msg = (
                 "pipe_code and mthds_contents cannot both be empty. Either: both are provided, or if there are no mthds_contents, "
@@ -231,6 +259,7 @@ class RunRequest(BaseModel):
             bundle_b64=request_body.get("bundle_b64"),
             files=request_body.get("files"),
             method_ref=request_body.get("method_ref"),
+            resources=request_body.get("resources"),
         )
 
 
@@ -565,10 +594,15 @@ class MthdsFilesRequest(BaseModel):
         ),
     )
 
+    resources: dict[str, str] | None = Field(default=None, description=RESOURCES_FIELD_DESCRIPTION)
+
     @model_validator(mode="after")
     def _exactly_one_selector(self) -> Self:
         if (self.files is None) == (self.method_ref is None):
             msg = "provide exactly one of `files` or `method_ref`"
+            raise ValueError(msg)
+        if self.resources and self.method_ref is not None:
+            msg = "resources accompany inline `files`; a method_ref's files are the package's own"
             raise ValueError(msg)
         return self
 

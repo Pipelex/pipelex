@@ -12,13 +12,14 @@ from pipelex.pipeline.validation_report import PipelexValidationReport
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pydantic import BaseModel, Field, model_validator
 
+from pipelex_api.bundle_resources import decode_bundle_resources
 from pipelex_api.errors import raise_validation_error
 from pipelex_api.exception_handlers import problem_response_from_error_report
 from pipelex_api.json_body import JsonBodyRoute
 from pipelex_api.method_source import fetched_method_source
 from pipelex_api.openapi_responses import PROBLEM_403_RUN_POLICY, PROBLEM_404_METHOD_PACKAGE
 from pipelex_api.routes.pipelex.pipeline import ApiRunner, get_request_user_id
-from pipelex_api.schemas.models import CallerAnalyticsGroupsMixin, MthdsContentsRequest
+from pipelex_api.schemas.models import RESOURCES_FIELD_DESCRIPTION, CallerAnalyticsGroupsMixin, MthdsContentsRequest
 
 router = APIRouter(tags=["validate"], route_class=JsonBodyRoute)
 
@@ -87,6 +88,7 @@ class ValidateRequest(MthdsContentsRequest, CallerAnalyticsGroupsMixin):
             "at the owning file. Must match `mthds_contents` in length when present."
         ),
     )
+    resources: dict[str, str] | None = Field(default=None, description=RESOURCES_FIELD_DESCRIPTION)
     render: list[str] = Field(
         default_factory=list,
         description=(
@@ -123,6 +125,10 @@ class ValidateRequest(MthdsContentsRequest, CallerAnalyticsGroupsMixin):
         # file names, so pairing the two is a request-shape bug → 422.
         if self.mthds_sources is not None and self.method_ref is not None:
             msg = "mthds_sources accompanies inline mthds_contents; a method_ref's sources are the package's own file names"
+            raise ValueError(msg)
+        # `resources` are the files the inline contents' steps read; a `method_ref`'s files are the package's own.
+        if self.resources and self.method_ref is not None:
+            msg = "resources accompany inline mthds_contents; a method_ref's files are the package's own"
             raise ValueError(msg)
         # A caller-supplied length mismatch is a request-shape bug → caught here as a 422.
         # Without this guard it reaches the runtime's `validate_bundle`, which treats the
@@ -396,7 +402,11 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
         validated_contents = request_data.mthds_contents
         # Inline contents carry no manifest, so the closure's own declaration is the whole chain.
         manifest_main_pipe = None
-        verdict = await ApiRunner(user_id=user_id, extras=request_data.analytics_groups).validate_verdict(
+        verdict = await ApiRunner(
+            user_id=user_id,
+            extras=request_data.analytics_groups,
+            bundle_resources=decode_bundle_resources(resources=request_data.resources),
+        ).validate_verdict(
             mthds_contents=request_data.mthds_contents,
             mthds_sources=request_data.mthds_sources,
             allow_signatures=request_data.allow_signatures,

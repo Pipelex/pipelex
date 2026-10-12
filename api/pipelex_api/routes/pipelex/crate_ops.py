@@ -27,6 +27,7 @@ from pipelex.pipeline.resolve_bundle import resolve_crate_from_contents
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pydantic import BaseModel, Field
 
+from pipelex_api.bundle_resources import decode_bundle_resources
 from pipelex_api.error_types import ErrorType
 from pipelex_api.errors import raise_not_implemented
 from pipelex_api.method_source import fetch_method_mthds_files
@@ -151,6 +152,8 @@ def resolve_requested_crate(request_data: MthdsFilesRequest) -> ResolvedClosure:
     crate = resolve_crate_from_contents(
         mthds_contents=[item.content for item in selection.files],
         mthds_sources=[item.source for item in selection.files],
+        # The files the closure's steps read, such as a PipeDocGen template file, which the load reads.
+        bundle_resources=decode_bundle_resources(resources=request_data.resources),
     )
     return ResolvedClosure(crate=crate, files=selection.files, manifest_main_pipe=selection.manifest_main_pipe)
 

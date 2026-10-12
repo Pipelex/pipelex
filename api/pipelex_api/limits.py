@@ -25,6 +25,9 @@ DEFAULT_MAX_CALLBACK_URLS = 5
 DEFAULT_MAX_CALLBACK_URL_LEN = 2048
 DEFAULT_MAX_BUNDLE_FILES = 128  # entries in a materialized method bundle (.mthds + .py + requirements.txt)
 DEFAULT_MAX_BUNDLE_TOTAL_KIB = 8 * 1024  # 8 MiB decompressed across the whole bundle (zip-bomb guard)
+DEFAULT_MAX_RESOURCES_PER_REQUEST = 32  # files submitted with a bundle that its steps read (`resources`)
+DEFAULT_MAX_RESOURCE_FILE_KIB = 5 * 1024  # 5 MiB decoded per submitted file, such as an office template
+DEFAULT_MAX_RESOURCES_TOTAL_KIB = 10 * 1024  # 10 MiB decoded across a request's submitted files
 DEFAULT_MAX_METHOD_CACHE_CLONES = 64  # cached method-package clones (one per resolved commit SHA)
 DEFAULT_MAX_METHOD_CACHE_TOTAL_KIB = 512 * 1024  # 512 MiB across all cached clones
 DEFAULT_MAX_METHOD_CACHE_AGE_HOURS = 24  # a cached clone unused for this long is evicted
@@ -42,6 +45,10 @@ MAX_CALLBACK_URL_LEN = get_positive_int_env(env_var="MAX_CALLBACK_URL_LEN", defa
 
 MAX_BUNDLE_FILES = get_positive_int_env(env_var="MAX_BUNDLE_FILES", default=DEFAULT_MAX_BUNDLE_FILES)
 MAX_BUNDLE_TOTAL_BYTES = get_positive_int_env(env_var="MAX_BUNDLE_TOTAL_KIB", default=DEFAULT_MAX_BUNDLE_TOTAL_KIB) * 1024
+
+MAX_RESOURCES_PER_REQUEST = get_positive_int_env(env_var="MAX_RESOURCES_PER_REQUEST", default=DEFAULT_MAX_RESOURCES_PER_REQUEST)
+MAX_RESOURCE_FILE_BYTES = get_positive_int_env(env_var="MAX_RESOURCE_FILE_KIB", default=DEFAULT_MAX_RESOURCE_FILE_KIB) * 1024
+MAX_RESOURCES_TOTAL_BYTES = get_positive_int_env(env_var="MAX_RESOURCES_TOTAL_KIB", default=DEFAULT_MAX_RESOURCES_TOTAL_KIB) * 1024
 
 MAX_METHOD_CACHE_CLONES = get_positive_int_env(env_var="MAX_METHOD_CACHE_CLONES", default=DEFAULT_MAX_METHOD_CACHE_CLONES)
 MAX_METHOD_CACHE_TOTAL_BYTES = get_positive_int_env(env_var="MAX_METHOD_CACHE_TOTAL_KIB", default=DEFAULT_MAX_METHOD_CACHE_TOTAL_KIB) * 1024
