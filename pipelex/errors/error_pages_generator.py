@@ -203,7 +203,8 @@ def render_error_page(cls: type[PipelexError]) -> str:
     Includes the class identity (title, type URI, defining module), the
     declared error domain (or ``(inherited from parent)`` for subclasses that
     don't override it), a link to the parent class's page when the parent is
-    itself a ``PipelexError``, and a back-link to the Error Reference index.
+    itself a ``PipelexError``, the ``retryable`` and ``user_action`` the class
+    declares in its own body, if any, and a back-link to the Error Reference index.
     """
     title = cls.title()
     type_uri = cls.type_uri()
@@ -219,6 +220,9 @@ def render_error_page(cls: type[PipelexError]) -> str:
         ("Defined in", f"`{cls.__module__}`"),
         ("Parent class", parent_link),
     ]
+    declared_retryable = cls.__dict__.get("retryable")
+    if isinstance(declared_retryable, bool):
+        rows.append(("`retryable`", f"`{str(declared_retryable).lower()}`"))
     declared_action = _resolve_class_level_user_action(cls)
     if declared_action is not None:
         rows.append(("`user_action`", declared_action))

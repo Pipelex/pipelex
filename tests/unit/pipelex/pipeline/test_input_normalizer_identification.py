@@ -213,6 +213,20 @@ class TestFileInputIdentification:
         assert stored.public_url is None
         assert _stored_keys(tmp_path=tmp_path) == {"org/uploads/c.docx"}
 
+    async def test_a_local_file_whose_suffix_is_not_plain_is_stored_as_bin(self, storage: LocalStorageProvider, tmp_path: Path):  # ruff: ignore[unused-method-argument]
+        """The suffix `v1_draft` names no type, and a key ending in it is one the hosted platform refuses to serve."""
+        local_notes = tmp_path / "notes.v1_draft"
+        local_notes.write_bytes(b"Plain notes that no sniffer recognises.")
+        memory = _memory(notes=DocumentContent(url=str(local_notes)))
+
+        await prepare_file_inputs(memory, storage_scope=STORAGE_SCOPE, read_scope=None, is_relocation_enabled=True)
+
+        content = memory.get_stuff("notes").content
+        assert isinstance(content, DocumentContent)
+        assert content.url.startswith("pipelex-storage://test/scope/assets/")
+        assert content.url.endswith(".bin")
+        assert _stored_bytes(tmp_path=tmp_path, uri=content.url) == b"Plain notes that no sniffer recognises."
+
     async def test_a_missing_stored_object_is_an_input_error(self, storage: LocalStorageProvider):  # ruff: ignore[unused-method-argument]
         memory = _memory(transcript=DocumentContent(url="pipelex-storage://org/uploads/never-uploaded.docx"))
 
