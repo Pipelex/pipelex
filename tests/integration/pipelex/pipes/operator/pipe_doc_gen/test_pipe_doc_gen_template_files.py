@@ -4,12 +4,28 @@ import pytest
 
 from pipelex.cogt.doc_gen.input_shape import InputShapeKind
 from pipelex.cogt.doc_gen.template_check import TemplateFinding, TemplateFindingSeverity
+from pipelex.core.bundle_resources.bundle_resource import make_bundle_resources
+from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.pipeline.validate_bundle import ValidateBundleResult, validate_bundle
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import StubEngines, write_bundle
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 _DOCX_TEMPLATE_STEP = 'format = "docx"\ntemplate_file = "invoice.docx"'
+
+
+async def _validate_with_html_template_file(*, directory: Path, load: str, template_bytes: bytes) -> ValidateBundleResult:
+    """Validate the test bundle with a pdf step naming `invoice.html`, loaded from its directory or sent as content with the file."""
+    step_fields = 'format = "pdf"\ntemplate_file = "invoice.html"'
+    match load:
+        case "from_its_directory":
+            (directory / "invoice.html").write_bytes(template_bytes)
+            return await validate_bundle(mthds_file_path=write_bundle(directory=directory, step_fields=step_fields))
+        case _:
+            return await validate_bundle(
+                mthds_contents=[PipeDocGenTestData.bundle(step_fields=step_fields)],
+                bundle_resources=make_bundle_resources(files={"invoice.html": template_bytes}),
+            )
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -55,15 +71,25 @@ class TestPipeDocGenTemplateFiles:
         assert str(absolute_template) not in report
 
     @pytest.mark.usefixtures("stub_engines")
-    async def test_an_html_template_file_that_is_not_utf8_is_refused_naming_it(self, tmp_path: Path) -> None:
-        """A template saved in another encoding is refused at load, naming the file, rather than crashing the load."""
-        (tmp_path / "invoice.html").write_bytes("<p>Facture émise</p>".encode("latin-1"))
-        bundle_path = write_bundle(directory=tmp_path, step_fields='format = "pdf"\ntemplate_file = "invoice.html"')
-
+    @pytest.mark.parametrize("load", ["from_its_directory", "from_content"])
+    async def test_an_html_template_file_that_is_not_utf8_is_refused_naming_it(self, tmp_path: Path, load: str) -> None:
+        """A template saved in another encoding is refused at load, naming the file, rather than crashing the load, however it came."""
         with pytest.raises(ValidateBundleError) as exc_info:
-            await validate_bundle(mthds_file_path=bundle_path)
+            await _validate_with_html_template_file(directory=tmp_path, load=load, template_bytes="<p>Facture émise</p>".encode("latin-1"))
 
         assert "could not read the template file 'invoice.html' as UTF-8 text" in str(exc_info.value.to_error_report().model_dump())
+
+    @pytest.mark.usefixtures("stub_engines")
+    @pytest.mark.parametrize("load", ["from_its_directory", "from_content"])
+    async def test_an_html_template_file_reads_the_same_whichever_way_its_bundle_loads(self, tmp_path: Path, load: str) -> None:
+        """The step holds the file's text as written, its line endings included, read from disk as from the submitted bytes."""
+        template_bytes = b"<h1>{{ invoice.number }}</h1>\r\n<p>Due on receipt</p>\r\n"
+
+        result = await _validate_with_html_template_file(directory=tmp_path, load=load, template_bytes=template_bytes)
+
+        (pipe,) = result.pipes
+        assert isinstance(pipe, PipeDocGen)
+        assert pipe.template == template_bytes.decode("utf-8")
 
     async def test_the_engine_s_checker_findings_fail_the_dry_run(self, tmp_path: Path, stub_engines: StubEngines) -> None:
         """The dry run hands the checker the file's bytes, the inputs' shapes and the mock data, and an error finding fails it."""

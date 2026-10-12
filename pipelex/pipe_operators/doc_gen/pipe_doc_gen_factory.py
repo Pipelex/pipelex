@@ -1,8 +1,10 @@
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from typing_extensions import override
 
+from pipelex.core.bundle_resources.bundle_resource import BundleResource
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
@@ -58,38 +60,22 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
         template_path: str | None = None
         if blueprint.template_file is not None:
             bundle_dir = bundle_dir_of_source(blueprint.source)
+            read_template_bytes: Callable[[], bytes]
             if bundle_dir is None:
                 # A bundle loaded from content strings reads only the files submitted with it, never this host's disk. An
                 # office template is read from them when the step prints, so the pipe keeps only its name, and the run
                 # carries the file in its crate.
-                resource = bundle_resource_of_template_file(template_file=blueprint.template_file)
-                if resource is None:
-                    msg = (
-                        f"PipeDocGen '{pipe_code}' names the template file '{blueprint.template_file}', which was not supplied with its "
-                        "bundle. A bundle loaded from content strings has no directory to find the file in, so the file must be "
-                        f"submitted with it, keyed by the same path, '{blueprint.template_file}'. A bundle loaded from a directory "
-                        "finds it beside its file."
-                    )
-                    raise PipeDocGenFactoryError(msg)
-                if blueprint.format.is_template_html:
-                    try:
-                        template = resource.inline_bytes().decode("utf-8")
-                    except UnicodeError as exc:
-                        msg = f"PipeDocGen '{pipe_code}' could not read the template file '{blueprint.template_file}' as UTF-8 text."
-                        raise PipeDocGenFactoryError(msg) from exc
-                    cls._check_html_template_file(pipe_code=pipe_code, template=template, inputs=inputs, template_file=blueprint.template_file)
+                read_template_bytes = cls._submitted_template_file(pipe_code=pipe_code, template_file=blueprint.template_file).inline_bytes
             else:
                 # A bundle this host read from a file finds its template file beside it, and never among submitted files.
                 resolved_path = cls._resolve_template_file(pipe_code=pipe_code, template_file=blueprint.template_file, bundle_dir=bundle_dir)
-                if blueprint.format.is_template_html:
-                    try:
-                        template = resolved_path.read_text(encoding="utf-8")
-                    except (OSError, UnicodeError) as exc:
-                        msg = f"PipeDocGen '{pipe_code}' could not read the template file '{blueprint.template_file}' as UTF-8 text."
-                        raise PipeDocGenFactoryError(msg) from exc
-                    cls._check_html_template_file(pipe_code=pipe_code, template=template, inputs=inputs, template_file=blueprint.template_file)
-                else:
+                read_template_bytes = resolved_path.read_bytes
+                if not blueprint.format.is_template_html:
                     template_path = str(resolved_path)
+            if blueprint.format.is_template_html:
+                # An HTML template is read and checked now, from disk as from the submitted bytes, as written.
+                template = cls._html_template_file_text(pipe_code=pipe_code, template_file=blueprint.template_file, read_bytes=read_template_bytes)
+                cls._check_html_template_file(pipe_code=pipe_code, template=template, inputs=inputs, template_file=blueprint.template_file)
 
         return PipeDocGen(
             domain_code=domain_code,
@@ -120,6 +106,29 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
             msg = f"PipeDocGen '{pipe_code}' names the template file '{template_file}', which does not exist beside its bundle."
             raise PipeDocGenFactoryError(msg)
         return resolved_path
+
+    @classmethod
+    def _submitted_template_file(cls, *, pipe_code: str, template_file: str) -> BundleResource:
+        """The template file submitted with a bundle loaded from content strings, which the current library holds."""
+        resource = bundle_resource_of_template_file(template_file=template_file)
+        if resource is None:
+            msg = (
+                f"PipeDocGen '{pipe_code}' names the template file '{template_file}', which was not supplied with its "
+                "bundle. A bundle loaded from content strings has no directory to find the file in, so the file must be "
+                f"submitted with it, keyed by the same path, '{template_file}'. A bundle loaded from a directory "
+                "finds it beside its file."
+            )
+            raise PipeDocGenFactoryError(msg)
+        return resource
+
+    @classmethod
+    def _html_template_file_text(cls, *, pipe_code: str, template_file: str, read_bytes: Callable[[], bytes]) -> str:
+        """An HTML template file's text, decoded from its bytes as written, line endings included."""
+        try:
+            return read_bytes().decode("utf-8")
+        except (OSError, UnicodeError) as exc:
+            msg = f"PipeDocGen '{pipe_code}' could not read the template file '{template_file}' as UTF-8 text."
+            raise PipeDocGenFactoryError(msg) from exc
 
     @classmethod
     def _check_html_template_file(cls, *, pipe_code: str, template: str, inputs: InputStuffSpecs, template_file: str) -> None:

@@ -13,7 +13,7 @@ import tomllib
 from collections.abc import Collection, Generator, Iterable, Sequence
 from contextlib import contextmanager
 from pathlib import Path
-from typing import cast
+from typing import NamedTuple, cast
 
 from pydantic import ValidationError
 
@@ -275,26 +275,15 @@ def withholding_host_library_files(
     try:
         yield
     except ValidateBundleError as verdict:
-        host_library_names = _host_library_names(library_dirs=library_dirs) - set(caller_sources)
-        host_library_names |= _host_template_files(library_dirs=library_dirs) - _template_files_named_in(mthds_texts=caller_contents)
+        host_files = _host_library_files(library_dirs=library_dirs)
+        host_library_names = host_files.names - set(caller_sources)
+        host_library_names |= host_files.template_files - _template_files_named_in(mthds_texts=caller_contents)
         if not host_library_names:
             raise
         withheld_verdict = verdict.withholding_files(withheld_files=host_library_names, placeholder=HOST_LIBRARY_FILE_PLACEHOLDER)
         # The withheld verdict takes this one's place over the same cause, so its report inherits the same
         # classification and the unwithheld verdict is not left on the chain beside it.
         raise withheld_verdict from verdict.__cause__
-
-
-def _host_template_files(*, library_dirs: Sequence[Path]) -> set[str]:
-    """The template files the steps of the bundles in ``library_dirs`` name, as the steps spell them."""
-    host_texts: list[str] = []
-    for library_file in get_pipelex_mthds_files_from_dirs(set(library_dirs)):
-        try:
-            host_texts.append(library_file.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError):
-            # A file the load could not read either: its refusal names no template file of its steps.
-            continue
-    return _template_files_named_in(mthds_texts=host_texts)
 
 
 def _template_files_named_in(*, mthds_texts: Iterable[str]) -> set[str]:
@@ -321,15 +310,38 @@ def _template_files_named_in(*, mthds_texts: Iterable[str]) -> set[str]:
     return template_files
 
 
-def _host_library_names(*, library_dirs: Sequence[Path]) -> set[str]:
-    """Every name the library load gives a file of ``library_dirs``.
+def _bundle_text_or_none(*, library_file: Path) -> str | None:
+    """A host bundle file's text, or None for a file the load could not read either, whose refusal names no template file."""
+    try:
+        return library_file.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+class _HostLibraryFiles(NamedTuple):
+    """What a verdict must not name of the host's library directories."""
+
+    names: set[str]
+    """Every name the library load gives a file of the directories."""
+
+    template_files: set[str]
+    """The template files the steps of their bundles name, as the steps spell them."""
+
+
+def _host_library_files(*, library_dirs: Sequence[Path]) -> _HostLibraryFiles:
+    """Every name the library load gives a file of ``library_dirs``, and the template files their steps name, in one walk.
 
     A bundle file is named as listed, which is the ``source`` the load gives it, and resolved; a Python file by
-    the module name the function registry imports it under, which is spelled from its resolved path.
+    the module name the function registry imports it under, which is spelled from its resolved path. Each bundle file
+    is read once, for the template files its steps name.
     """
     names: set[str] = set()
+    host_texts: list[str] = []
     for library_file in get_pipelex_mthds_files_from_dirs(set(library_dirs)):
         names.add(str(library_file))
+        host_text = _bundle_text_or_none(library_file=library_file)
+        if host_text is not None:
+            host_texts.append(host_text)
         try:
             names.add(str(library_file.resolve()))
         except (OSError, RuntimeError):
@@ -343,4 +355,4 @@ def _host_library_names(*, library_dirs: Sequence[Path]) -> set[str]:
                 names.add(convert_file_path_to_module_path(python_file))
             except (OSError, RuntimeError):
                 continue
-    return names
+    return _HostLibraryFiles(names=names, template_files=_template_files_named_in(mthds_texts=host_texts))
