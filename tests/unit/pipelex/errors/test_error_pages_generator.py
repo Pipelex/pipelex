@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipelex.base_exceptions import PipelexError
+from pipelex.core.bundle_resources.exceptions import BundleResourceError, BundleResourceNotNamedError
 from pipelex.errors.error_pages_generator import (
     _MACRO_SECTIONS,  # pyright: ignore[reportPrivateUsage]
     AUTHORED_MARKER,
@@ -19,6 +20,7 @@ from pipelex.errors.error_pages_generator import (
     has_authored_marker,
     iter_pipelex_error_subclasses,
     page_slug,
+    render_error_page,
 )
 from pipelex.tools.misc.string_utils import pascal_case_to_kebab
 
@@ -122,6 +124,10 @@ class TestErrorPagesGenerator:
 
         body_with_standalone_marker = f"some content\n{AUTHORED_MARKER}\nmore content\n"
         assert has_authored_marker(body_with_standalone_marker) is True
+
+    def test_a_class_declaring_retryable_shows_it_and_one_declaring_nothing_does_not(self) -> None:
+        assert "| `retryable` | `false` |" in render_error_page(BundleResourceNotNamedError)
+        assert "`retryable`" not in render_error_page(BundleResourceError)
 
     def test_report_total_sums_four_populations(self) -> None:
         """``total`` should equal the sum of ``written`` + ``unchanged`` + ``preserved`` + ``removed``."""

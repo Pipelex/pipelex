@@ -17,5 +17,6 @@ Raised when the files a bundle's steps read when the method loads, such as HTML 
 | `error_domain` | `input` |
 | Defined in | `pipelex.core.bundle_resources.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
+| `retryable` | `false` |
 
 [Back to Error Reference](index.md)

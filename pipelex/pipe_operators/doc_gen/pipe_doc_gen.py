@@ -1,5 +1,4 @@
 import asyncio
-import re
 from pathlib import Path
 from typing import Any, Literal
 
@@ -45,21 +44,21 @@ from pipelex.tools.jinja2.exceptions import Jinja2TemplateRenderError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
+from pipelex.tools.storage.storage_file_name import path_safe_file_name
 from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.tools.uri.uri_read_scope import UriReference
 from pipelex.validation_error_types import TemplateCheckErrorType
 
-_UNSAFE_FILENAME_CHARACTERS = re.compile(r"[^\w.\-]+")
-_MAX_FILENAME_STEM_LENGTH = 120
-
 
 def safe_filename(*, rendered: str, fallback: str, suffix: str) -> str:
-    """One storage-safe path segment ending in the format's suffix, from whatever the filename template rendered."""
-    stem = _UNSAFE_FILENAME_CHARACTERS.sub("-", rendered.strip()).strip(".-_")
-    if stem.lower().endswith(f".{suffix}"):
-        stem = stem[: -(len(suffix) + 1)]
-    stem = stem[:_MAX_FILENAME_STEM_LENGTH].strip(".-_") or fallback
-    return f"{stem}.{suffix}"
+    """The name the document is stored under, ending in the format's suffix, from whatever the filename template rendered.
+
+    It is one every `pipelex-storage://` reader accepts, the hosted platform's included, which serves a stored file only
+    when its stem is ASCII letters, digits, hyphens and underscores: `Zoë Ångström — Q3.2026` is stored as
+    `Zoe-Angstrom-Q3-2026.docx`, and a name that leaves nothing, one written wholly in Han for one, as the step's code.
+    See `path_safe_file_name` for the rule.
+    """
+    return path_safe_file_name(name=rendered, fallback=fallback, extension=suffix)
 
 
 class PipeDocGenOutput(PipeOutput):

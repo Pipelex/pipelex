@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **A `PipeDocGen` document's name is one the hosted API serves**: a rendered `filename` holding a letter outside ASCII or a dot, such as `Zoë Ångström — Q3.2026`, was stored under a `pipelex-storage://` URI the hosted API refuses to serve, so the completed document could never be downloaded. The name is now spelled in ASCII where it can be, accents dropped and letters such as `ø`, `æ`, `ł`, `ß`, `đ`, `þ`, `œ` and `ı` transliterated, every other character, an inner dot included, becomes a hyphen, repeated separators collapse, and a name that leaves nothing, one written wholly in Greek, Cyrillic, Han or Arabic for one, falls back to the pipe's code, so that name is `Zoe-Angstrom-Q3-2026.pdf`, on a local run as on a hosted one.
+- **An office template file stored for a remote run is named and typed for its readers**: the copy of a `.docx`, `.xlsx` or `.pptx` template file a run stores under `assets/bundle/` before it is dispatched now carries its Office Open XML content type, named in code, where a host whose `mimetypes` table did not know the extension stored it as `binary/octet-stream`, and its name follows the rule a document's name follows, so `Modèle trimestriel.v2.docx` is stored as `Modele-trimestriel-v2.docx`.
+- **The refusals of the files sent with a bundle say a retry cannot succeed**: `BundleResourceNotNamedError`, `BundleResourcesTooLargeError` and `BundleResourcePathError` now carry `retryable: false` in their error report, and so in the API server's problem document, as `InvalidResourcePath` already did. A `PipelexError` subclass declares it with the new class attribute `retryable`, which its report carries and the generated error reference shows; a wrapper raised from such an error inherits it, as it does `error_domain`.
+
 ## [v0.85.0] - 2026-10-12
 
 ### Highlights

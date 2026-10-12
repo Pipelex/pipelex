@@ -17,5 +17,6 @@ Raised when a file submitted with a bundle is keyed by a path that cannot name a
 | `error_domain` | `input` |
 | Defined in | `pipelex.core.bundle_resources.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
+| `retryable` | `false` |
 
 [Back to Error Reference](index.md)

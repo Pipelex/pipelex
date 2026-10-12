@@ -55,7 +55,7 @@ Classification happens once, at **Layer 1**. Layers 2–5 are wrappers: they att
 | `type_uri` | `str` | Per-class documentation URI — the RFC 7807 `type` |
 | `error_category` | `str \| None` | `InferenceErrorCategory` value (inference errors only) |
 | `error_domain` | `str \| None` | `ErrorDomain` value — `input` / `config` / `runtime`. Declared per class, except on the `CogtError` family where it is [derived from `error_category`](#the-cogterror-family-derives-its-domain-from-its-category) |
-| `retryable` | `bool \| None` | Whether a retry could succeed |
+| `retryable` | `bool \| None` | Whether a retry could succeed. Declared per class, `retryable = False` on a deterministic refusal of what the caller sent (`BundleResourceNotNamedError`, `BundleResourcesTooLargeError`), except on the `CogtError` family where it is derived from `error_category`; left `None`, it is taken from the cause chain, or absent |
 | `user_action` | `UserAction \| None` | Typed advice — `kind` + free-form `detail` |
 | `model` | `str \| None` | Model handle, when the failure is attributable to one |
 | `provider` | `str \| None` | Backend name, when attributable |

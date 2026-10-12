@@ -82,7 +82,18 @@ To print the same invoice on the plugin's `pipelex-pdf`, the step names it: `mod
 | `model` | string | The document engine that prints the file, a `doc_gen` model, alias or preset, such as `reportlab-pdf` or, with the plugin, `pipelex-pdf`. It defaults to the model deck's engine for the format and source. | No |
 | `template` | string | An inline HTML and Jinja2 template, for `pdf` only. A `pdf` with a template is printed by the plugin. | No |
 | `template_file` | string | A template file relative to the bundle's file, inside its bundle and written with forward slashes: `.html` for `pdf`, `.xlsx`, `.docx` or `.pptx`. An empty or absolute path, a `..` segment, a backslash and a colon are refused, the rule the files sent with a bundle are keyed by, so any template file can be sent with its bundle. Read beside the bundle when it is loaded from a directory, and from the files sent with it when it is loaded from a string. It excludes `template`. `pptx` requires one. | No |
-| `filename` | string | A Jinja expression over the inputs for the file's name, without its suffix, such as `invoice-{{ invoice.number }}`. It defaults to the pipe's code. | No |
+| `filename` | string | A Jinja expression over the inputs for the file's name, without its suffix, such as `invoice-{{ invoice.number }}`. It defaults to the pipe's code. The rendered name is made into one every storage reader serves, the hosted API's included, spelled in ASCII with hyphens for the rest: see [The file's name](#the-files-name). | No |
+
+### The file's name
+
+The document is stored, and downloaded, under its `filename` plus the format's suffix. A storage URI names it, and the hosted API serves a stored file only when its name is ASCII letters, digits, hyphens and underscores, one dot and the suffix, so the step makes every rendered name into one of those before it stores the file:
+
+- **Letters are spelled in ASCII where they can be.** Accents are dropped (`Bäckerei Müller` gives `Backerei-Muller`, `İstanbul` gives `Istanbul`), and the letters that carry no accent to drop are spelled as a reader would type them: `ø` as `o`, `æ` as `ae`, `œ` as `oe`, `ł` as `l`, `đ` and `ð` as `d`, `þ` as `th`, `ß` as `ss`, `ı` as `i`.
+- **Every other character becomes a hyphen**: a space, punctuation, a dot inside the name, and a letter of a script with no ASCII spelling here, such as Greek, Cyrillic, Han, Hangul, Arabic or Hebrew. A run of hyphens and underscores collapses into one, and none is kept at either end.
+- **A name already ending in the suffix keeps it once**: `report.pdf` stays `report.pdf`.
+- **The name is cut at 120 characters**, and a name that leaves nothing falls back to the pipe's code.
+
+So `Halden Brook Review Q3 2026 — Zoë Ångström · Ærøskøbing · Москва · 東京都` is stored as `Halden-Brook-Review-Q3-2026-Zoe-Angstrom-AEroskobing.docx`. Keep a name you want to read whole to Latin letters and digits.
 
 ### An LLM report as a PDF
 
@@ -139,7 +150,7 @@ When a bundle is sent as content rather than read from a directory, as it is thr
 - **Every file sent must be one a step names.** A file no step reads is refused, so a misspelled key fails loudly rather than leaving its step without a template.
 - **The files are checked like files on disk.** An `.html` template file is checked against the inputs when the method loads, and the engine's template check runs on an office template file at validation and in the dry run.
 
-A run that a remote orchestrator such as Temporal executes, a dry run included, stores each office template file in the run's storage before the run leaves the process, so the run carries a reference rather than the bytes, and the step reads the file back under the run's read scope, to print it or to check it. An HTML template file travels with the method, since it is read while the method loads, so the HTML template files sent with a bundle may total 512 KiB at most: keep images and fonts out of them, at URLs they reference.
+A run that a remote orchestrator such as Temporal executes, a dry run included, stores each office template file in the run's storage before the run leaves the process, so the run carries a reference rather than the bytes, and the step reads the file back under the run's read scope, to print it or to check it. The stored copy is named by the rule a document's name follows (see [The file's name](#the-files-name)), so `Modèle trimestriel.v2.docx` is stored as `Modele-trimestriel-v2.docx`, and it carries its Office content type, whatever the host's own table of types knows; the step still names the file by its own path. An HTML template file travels with the method, since it is read while the method loads, so the HTML template files sent with a bundle may total 512 KiB at most: keep images and fonts out of them, at URLs they reference.
 
 From Python, the same files are passed as `bundle_resources`, built with `make_bundle_resources`:
 

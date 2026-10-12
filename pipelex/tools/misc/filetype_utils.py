@@ -2,7 +2,7 @@ import base64
 import binascii
 import mimetypes
 from collections.abc import Collection
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Final
 
 import filetype
@@ -23,13 +23,20 @@ _MIME_OVERRIDES: Final[dict[str, str]] = {
     "application/json": "json",
 }
 
-# Initialize MIME database with additional types
+# The Office Open XML types, named here because neither Python's built-in table nor a slim server image's `mime.types`
+# is sure to know them, and an object stored with no content type is served as `binary/octet-stream`.
+OFFICE_MIME_TYPES_BY_EXTENSION: Final[dict[str, str]] = {
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+}
+
+# A table of our own: a `MimeTypes` instance starts from Python's built-in table, never from the host's `mime.types`
+# files or registry, which only the module-level functions of `mimetypes` read, and it gets the types added here.
 _MIME_DB: Final[mimetypes.MimeTypes] = mimetypes.MimeTypes()
 _MIME_DB.add_type("application/json", ".json", strict=True)
-# Office Open XML formats (not always in default mimetypes DB)
-_MIME_DB.add_type("application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".docx", strict=True)
-_MIME_DB.add_type("application/vnd.openxmlformats-officedocument.presentationml.presentation", ".pptx", strict=True)
-_MIME_DB.add_type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx", strict=True)
+for office_extension, office_mime_type in OFFICE_MIME_TYPES_BY_EXTENSION.items():
+    _MIME_DB.add_type(office_mime_type, office_extension, strict=True)
 
 
 class FileType(BaseModel):
@@ -110,6 +117,25 @@ def detect_file_type_from_base64(base64_data: str | bytes) -> FileType:
         raise FileTypeError(msg) from exc
 
     return detect_file_type_from_bytes(raw_bytes=raw)
+
+
+def mime_type_of_file_name(*, file_name: str) -> str | None:
+    """The MIME type a file's name implies by its extension, or None when the extension is not known.
+
+    Read from this module's own table, which names the Office Open XML types, so an `.xlsx`, `.docx` or `.pptx` file is
+    stored under its type whatever the host's `mimetypes` table holds, and never from the host's own files.
+
+    Args:
+        file_name: The file's name, or a path or storage key ending in it.
+
+    Returns:
+        The MIME type, such as `application/vnd.openxmlformats-officedocument.wordprocessingml.document` for a `.docx`
+        file, or None when the extension is absent or unknown.
+    """
+    office_mime_type = OFFICE_MIME_TYPES_BY_EXTENSION.get(PurePosixPath(file_name).suffix.lower())
+    if office_mime_type is not None:
+        return office_mime_type
+    return _MIME_DB.guess_type(file_name, strict=False)[0]
 
 
 def mime_type_to_extension(mime_type: str) -> str:

@@ -127,7 +127,8 @@ class GeneratedContentFactory:
         The key is `{storage_scope}/generated/{hash}/{filename}`: the hash keeps two different files with the
         same name apart, and ending in the human filename means every backend's URL, and so every download, is
         called `invoice-INV-2026-0142.pdf` rather than a hash. The caller owns the filename's safety: it must be
-        one path segment.
+        one name every `pipelex-storage://` reader accepts, as `path_safe_file_name` makes it, or a host that
+        checks the key, such as the hosted platform, refuses to serve the file.
         """
         hash_digest = hashlib.sha256(data).hexdigest()[:16]
         storage_key = f"{storage_scope}/{GENERATED_CONTENT_LEAF}/{hash_digest}/{filename}"
