@@ -38,6 +38,20 @@ class TestPipeDocGenTemplateFiles:
         assert expected in str(exc_info.value.to_error_report().model_dump())
 
     @pytest.mark.usefixtures("stub_engines")
+    async def test_a_template_file_named_by_an_absolute_path_is_refused_without_repeating_it(self, tmp_path: Path) -> None:
+        """Even an absolute path to a file inside the bundle's directory is refused, and the refusal never carries the host's path."""
+        (tmp_path / "invoice.docx").write_bytes(b"docx")
+        absolute_template = tmp_path / "invoice.docx"
+        bundle_path = write_bundle(directory=tmp_path, step_fields=f'format = "docx"\ntemplate_file = "{absolute_template}"')
+
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_file_path=bundle_path)
+
+        report = str(exc_info.value.to_error_report().model_dump())
+        assert "a path relative to the bundle's file, not an absolute path" in report
+        assert str(absolute_template) not in report
+
+    @pytest.mark.usefixtures("stub_engines")
     async def test_an_html_template_file_that_is_not_utf8_is_refused_naming_it(self, tmp_path: Path) -> None:
         """A template saved in another encoding is refused at load, naming the file, rather than crashing the load."""
         (tmp_path / "invoice.html").write_bytes("<p>Facture émise</p>".encode("latin-1"))

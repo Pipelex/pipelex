@@ -11,6 +11,7 @@
 
 - **`BundleValidatorProtocol.validate_bundles` takes `bundle_resources` (Breaking)**: a bundle validator registered for an orchestration mode receives the files sent with the contents, or `None`, and hands them to the validation it runs, so a remote validator implements the parameter and carries the files to its worker.
 - **`DocumentComposition.make_render_job` is asynchronous (Breaking)**: it takes the run's `storage_provider`, since a composition's template file may be a `BundleResource` read back from storage, and a `TEMPLATE_FILE` composition carries either `template_path` or `template_resource`. A stored template file's URI is among the composition's `referenced_uris()`, so the run's read scope authorizes it before the print stage reads it.
+- **A `PipeDocGen` step's `template_file` must be relative (Breaking)**: an absolute path, a Windows root, a drive or a UNC share is refused when the blueprint validates, even one naming a file inside the bundle's directory, which used to load. The refusal does not repeat the path, so a host library's step can no longer put the host's own path into a caller's verdict through its template file.
 - **A string-loaded `PipeDocGen` step without its template file says it was not supplied**: the load refusal now names the path the file is expected under and says to send it with the bundle, where it used to say the bundle was not loaded from a file on disk.
 
 ### Security

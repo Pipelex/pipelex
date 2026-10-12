@@ -1,3 +1,4 @@
+from pathlib import PurePosixPath, PureWindowsPath
 from typing import Literal, Self
 
 from pydantic import Field, model_validator
@@ -15,6 +16,15 @@ from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
+
+
+def is_anchored_path(*, path: str) -> bool:
+    """Whether a path is anchored on some platform a method may load on, rather than relative to the bundle's file.
+
+    A POSIX root (`/templates/x.docx`), a Windows root (a leading backslash), a drive (`C:x.docx`, `C:/templates/x.docx`)
+    and a UNC share all anchor a path, so none of them is relative wherever the method loads.
+    """
+    return PurePosixPath(path).is_absolute() or PureWindowsPath(path).anchor != ""
 
 
 def template_required_roots(*, template_source: str, template_category: TemplateCategory, declared_inputs: set[str], label: str) -> set[str]:
@@ -66,6 +76,10 @@ class PipeDocGenBlueprint(PipeBlueprint):
 
     @model_validator(mode="after")
     def validate_template_sources(self) -> Self:
+        # The message never repeats the path: a host library's step would put the host's own path in front of a caller.
+        if self.template_file is not None and is_anchored_path(path=self.template_file):
+            msg = "PipeDocGen's 'template_file' is a path relative to the bundle's file, not an absolute path or one naming a drive."
+            raise ValueError(msg)
         if self.template is not None and self.template_file is not None:
             msg = "PipeDocGen cannot have both 'template' and 'template_file': use one or the other."
             raise ValueError(msg)
