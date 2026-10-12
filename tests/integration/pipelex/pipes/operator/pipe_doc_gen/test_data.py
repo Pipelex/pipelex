@@ -64,6 +64,21 @@ output      = "InvoicePdf"
 
     PDF_LAYOUT_STEP: ClassVar[str] = 'format = "pdf"\nfilename = "invoice-{{ invoice.number }}"'
 
+    # A bundle of another domain whose sequence runs the test bundle's step, which a library directory holds: the step
+    # is dry-run only inside the sequence, so what it finds reaches the verdict from a pipe the sweep did not sweep itself.
+    CALLER_BUNDLE_MTHDS: ClassVar[str] = """
+domain = "doc_gen_caller"
+description = "Billing a customer with a printed invoice"
+main_pipe = "bill_customer"
+
+[pipe.bill_customer]
+type        = "PipeSequence"
+description = "Print the customer's invoice"
+inputs      = { invoice = "doc_gen_tests.Invoice" }
+output      = "doc_gen_tests.InvoicePdf"
+steps       = [{ pipe = "doc_gen_tests.print_invoice", result = "invoice_pdf" }]
+"""
+
     @classmethod
     def bundle(cls, *, step_fields: str) -> str:
         return cls.BUNDLE_MTHDS.replace(cls.STEP_SLOT, step_fields)

@@ -204,7 +204,9 @@ async def validate_bundle(
         host_library_withholding: AbstractContextManager[None]
         if mthds_contents is not None and not library_dirs_are_callers:
             host_library_withholding = withholding_host_library_files(
-                library_dirs=effective_dirs, caller_sources=[source for source in mthds_sources or [] if source is not None]
+                library_dirs=effective_dirs,
+                caller_sources=[source for source in mthds_sources or [] if source is not None],
+                caller_contents=mthds_contents,
             )
         else:
             host_library_withholding = nullcontext()

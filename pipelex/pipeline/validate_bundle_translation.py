@@ -9,9 +9,11 @@ below the validation service in the import graph (``validate_bundle`` → ``bund
 ``execution_seams``), and both must reach the same translation.
 """
 
-from collections.abc import Collection, Generator, Sequence
+import tomllib
+from collections.abc import Collection, Generator, Iterable, Sequence
 from contextlib import contextmanager
 from pathlib import Path
+from typing import cast
 
 from pydantic import ValidationError
 
@@ -245,7 +247,9 @@ def _make_refusal_verdict(*, refusal: PipelexError) -> ValidateBundleError | Non
 
 
 @contextmanager
-def withholding_host_library_files(*, library_dirs: Sequence[Path], caller_sources: Collection[str] = ()) -> Generator[None, None, None]:
+def withholding_host_library_files(
+    *, library_dirs: Sequence[Path], caller_sources: Collection[str] = (), caller_contents: Collection[str] = ()
+) -> Generator[None, None, None]:
     """Keep the files of a host's own library directories out of the verdict the block raises.
 
     A verdict is caller-facing as a whole, and STRICT disclosure hands its message and its items to the caller
@@ -258,7 +262,10 @@ def withholding_host_library_files(*, library_dirs: Sequence[Path], caller_sourc
     domain, and a message reads ``HOST_LIBRARY_FILE_PLACEHOLDER`` where it named one. The names are the ones the
     load gives: each bundle file in the spelling it gives a bundle's ``source`` and resolved, and each Python file's
     module name. A name the caller submitted as a content's source (``caller_sources``) is the caller's own and is
-    never withheld, even where a host file is spelled the same.
+    never withheld, even where a host file is spelled the same. The template files the host's ``PipeDocGen`` steps
+    name are withheld too, in the spelling the steps give them, since their refusals, at load or in the dry run of a
+    caller's pipe that runs one, name them; a template file the caller's own content names (``caller_contents``)
+    stays, so the caller's own steps keep naming theirs.
 
     A bundle validated from a file on the caller's own disk, or validated or run with library directories that
     are the caller's, keeps every path: there the directories are the caller's to read. A package the content
@@ -268,12 +275,49 @@ def withholding_host_library_files(*, library_dirs: Sequence[Path], caller_sourc
         yield
     except ValidateBundleError as verdict:
         host_library_names = _host_library_names(library_dirs=library_dirs) - set(caller_sources)
+        host_library_names |= _host_template_files(library_dirs=library_dirs) - _template_files_named_in(mthds_texts=caller_contents)
         if not host_library_names:
             raise
         withheld_verdict = verdict.withholding_files(withheld_files=host_library_names, placeholder=HOST_LIBRARY_FILE_PLACEHOLDER)
         # The withheld verdict takes this one's place over the same cause, so its report inherits the same
         # classification and the unwithheld verdict is not left on the chain beside it.
         raise withheld_verdict from verdict.__cause__
+
+
+def _host_template_files(*, library_dirs: Sequence[Path]) -> set[str]:
+    """The template files the steps of the bundles in ``library_dirs`` name, as the steps spell them."""
+    host_texts: list[str] = []
+    for library_file in get_pipelex_mthds_files_from_dirs(set(library_dirs)):
+        try:
+            host_texts.append(library_file.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError):
+            # A file the load could not read either: its refusal names no template file of its steps.
+            continue
+    return _template_files_named_in(mthds_texts=host_texts)
+
+
+def _template_files_named_in(*, mthds_texts: Iterable[str]) -> set[str]:
+    """The ``template_file`` every pipe of the given bundle texts names, read from the TOML alone.
+
+    The bundles are read as TOML rather than parsed into blueprints, because the bundle whose refusal is being
+    withheld may be the one that does not parse, and its steps' template files are still the ones its messages name.
+    """
+    template_files: set[str] = set()
+    for mthds_text in mthds_texts:
+        try:
+            document = tomllib.loads(mthds_text)
+        except tomllib.TOMLDecodeError:
+            continue
+        pipe_tables: object = document.get("pipe")
+        if not isinstance(pipe_tables, dict):
+            continue
+        for pipe_table in cast("dict[str, object]", pipe_tables).values():
+            if not isinstance(pipe_table, dict):
+                continue
+            template_file = cast("dict[str, object]", pipe_table).get("template_file")
+            if isinstance(template_file, str):
+                template_files.add(template_file)
+    return template_files
 
 
 def _host_library_names(*, library_dirs: Sequence[Path]) -> set[str]:

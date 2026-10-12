@@ -24,6 +24,7 @@ from pipelex.pipeline.validate_in_process import validate_bundles_in_process
 from pipelex.pipeline.validation_render import format_validate_markdown
 from pipelex.validation_error_types import TemplateCheckErrorType
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import StubEngines, write_bundle
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 if TYPE_CHECKING:
     from pytest_mock import MockType
@@ -50,20 +51,7 @@ _NOTES_LOG_FIELDS = {
     "finding_location": "the field notes on page 2",
 }
 
-# A bundle of another domain whose sequence runs the templated step, which a library directory holds: the step is
-# dry-run only inside the sequence, so its warning reaches the verdict from a pipe the sweep did not sweep itself.
-_CALLER_MTHDS = """
-domain = "doc_gen_caller"
-description = "Billing a customer with a printed invoice"
-main_pipe = "bill_customer"
-
-[pipe.bill_customer]
-type        = "PipeSequence"
-description = "Print the customer's invoice"
-inputs      = { invoice = "doc_gen_tests.Invoice" }
-output      = "doc_gen_tests.InvoicePdf"
-steps       = [{ pipe = "doc_gen_tests.print_invoice", result = "invoice_pdf" }]
-"""
+_CALLER_MTHDS = PipeDocGenTestData.CALLER_BUNDLE_MTHDS
 
 
 @pytest.fixture(autouse=True)

@@ -144,7 +144,9 @@ def acquire_library(
         if mthds_contents:
             # Beside a host's library directories, the verdict names none of their files, which are paths on the host.
             host_library_withholding: AbstractContextManager[None] = (
-                nullcontext() if library_dirs_are_callers else withholding_host_library_files(library_dirs=effective_dirs)
+                nullcontext()
+                if library_dirs_are_callers
+                else withholding_host_library_files(library_dirs=effective_dirs, caller_contents=mthds_contents)
             )
             with host_library_withholding, translate_to_validate_bundle_error():
                 all_blueprints = [MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
