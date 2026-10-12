@@ -60,8 +60,10 @@ from pipelex.pipe_run.located_failure import find_foreign_fault, find_root_fault
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_run import PipeRun
+from pipelex.pipeline.exceptions import withhold_names_in_text
 from pipelex.pipeline.execution_seams import acquire_library, prepare_pipe_job
 from pipelex.pipeline.pipeline_factory import PipelineFactory
+from pipelex.pipeline.validate_bundle_translation import HOST_LIBRARY_FILE_PLACEHOLDER
 from pipelex.runtime_hub import get_telemetry_manager, scoped_content_generator
 from pipelex.system.caller_identity import CallerIdentity, scoped_caller_identity
 from pipelex.system.configuration.configs import PipelineExecutionConfig
@@ -200,6 +202,40 @@ def _dry_run_failure_text(*, error: Exception) -> str:
     return caller_facing_refusal_text(refusal=root_fault)
 
 
+def _disclosed_warnings(*, warnings: list[ValidationErrorItem], source_pipe_refs: frozenset[str] | None) -> list[ValidationErrorItem]:
+    """The warnings as the caller may read them: one found at a pipe outside ``source_pipe_refs`` names no file of it.
+
+    A validator of submitted content beside a host's library directories passes that content's pipes, and a warning
+    found at a pipe of the host's directories would otherwise name a file there: a ``PipeDocGen`` step's template
+    file, which the step may even name by its absolute path on the host. Such a warning is still located at its pipe
+    and domain, keeps the finding's own words, and carries no ``template_file`` nor ``source``, every text of it reading
+    ``HOST_LIBRARY_FILE_PLACEHOLDER`` where it named one, as a verdict's failure located there carries no ``source``.
+    ``None`` keeps every warning whole, as a sweep of one's own library does.
+    """
+    if source_pipe_refs is None:
+        return warnings
+    disclosed: list[ValidationErrorItem] = []
+    for warning in warnings:
+        named_files = [name for name in (warning.template_file, warning.source) if name is not None]
+        if not named_files or f"{warning.domain_code}.{warning.pipe_code}" in source_pipe_refs:
+            disclosed.append(warning)
+            continue
+        template_location = warning.template_location
+        if template_location is not None:
+            template_location = withhold_names_in_text(text=template_location, names=named_files, placeholder=HOST_LIBRARY_FILE_PLACEHOLDER)
+        disclosed.append(
+            warning.model_copy(
+                update={
+                    "template_file": None,
+                    "source": None,
+                    "template_location": template_location,
+                    "message": withhold_names_in_text(text=warning.message, names=named_files, placeholder=HOST_LIBRARY_FILE_PLACEHOLDER),
+                }
+            )
+        )
+    return disclosed
+
+
 class BundleValidator:
     """Owns the validation sweep; composes the shared seams + a direct in-process ``PipeRun``."""
 
@@ -312,10 +348,10 @@ class BundleValidator:
         caller is already in scope, and with none — a local CLI sweep — the dry runs state
         ``DRY_RUN_USER_ID`` and the event goes out under the fallback, as before.
 
-        ``source_pipe_refs`` names the pipes whose file a located failure may carry as its ``source``:
-        a validator of submitted content beside a host's library directories passes that content's
-        pipes, so a failure located at a pipe loaded from those directories never names a file on the
-        host. ``None`` lets every failure carry its pipe's file, as a local sweep of one's own library
+        ``source_pipe_refs`` names the pipes whose file a located failure may carry as its ``source``,
+        and whose files a warning may name: a validator of submitted content beside a host's library
+        directories passes that content's pipes, so a failure or a warning located at a pipe loaded from
+        those directories never names a file on the host. ``None`` lets every failure carry its pipe's file, as a local sweep of one's own library
         does, and as submitted content validated beside directories that are the caller's own
         (``library_dirs_are_callers``) does.
 
@@ -462,7 +498,8 @@ class BundleValidator:
                     recorder=recorder,
                     source_pipe_refs=source_pipe_refs,
                 )
-            return dry_run_output.model_copy(update={"warnings": warning_collector.warnings})
+            warnings = _disclosed_warnings(warnings=warning_collector.warnings, source_pipe_refs=source_pipe_refs)
+            return dry_run_output.model_copy(update={"warnings": warnings})
         finally:
             _failing_pipe_recorder.reset(recorder_token)
 

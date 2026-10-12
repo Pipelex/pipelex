@@ -19,6 +19,7 @@ from pipelex.interpreter_hub import (
 )
 from pipelex.pipe_run.dry_run_in_process import dry_run_pipe_in_process
 from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.pipeline.validate_bundle_translation import HOST_LIBRARY_FILE_PLACEHOLDER
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
 from pipelex.pipeline.validation_render import format_validate_markdown
 from pipelex.validation_error_types import TemplateCheckErrorType
@@ -42,6 +43,12 @@ _NOTES_WARNING = ValidationErrorItem(
     template_location="the field notes on page 2",
     message="PipeDocGen 'print_invoice', template file 'invoice.docx': The notes are never printed (the field notes on page 2)",
 )
+_NOTES_LOG_FIELDS = {
+    "pipe_code": "print_invoice",
+    "template_file": "invoice.docx",
+    "finding_message": "The notes are never printed",
+    "finding_location": "the field notes on page 2",
+}
 
 # A bundle of another domain whose sequence runs the templated step, which a library directory holds: the step is
 # dry-run only inside the sequence, so its warning reaches the verdict from a pipe the sweep did not sweep itself.
@@ -94,12 +101,13 @@ class TestPipeDocGenTemplateWarnings:
     ) -> None:
         """The report every backend returns, the runner's `/v1/validate` included, carries the warning once and stays valid.
 
-        The graph arm dry-runs the sequence again and finds the warning again, and drops it rather than logging it.
+        The graph arm dry-runs the sequence again and finds the warning again, and drops it rather than logging it. The
+        library directory is the caller's own, so the step's template file is named as the step names it.
         """
         warning_spy = mocker.spy(log, "warning")
         _write_templated_bundle(directory=tmp_path, stub_engines=stub_engines)
 
-        report = await validate_bundles_in_process(mthds_contents=[_CALLER_MTHDS], library_dirs=[tmp_path])
+        report = await validate_bundles_in_process(mthds_contents=[_CALLER_MTHDS], library_dirs=[tmp_path], library_dirs_are_callers=True)
 
         assert report.is_valid is True
         assert report.is_runnable is True
@@ -107,6 +115,35 @@ class TestPipeDocGenTemplateWarnings:
         # Once in the sweep's dry run of the sequence, once more in the graph arm's.
         assert len(stub_engines.check_requests) == 2
         assert _template_check_log_calls(warning_spy) == []
+
+    @pytest.mark.parametrize("spelling", ["relative", "absolute"])
+    async def test_the_protocol_report_withholds_a_host_template_file(self, tmp_path: Path, stub_engines: StubEngines, spelling: str) -> None:
+        """A step of the host's library directories is found by its code and domain, and its template file is not named.
+
+        Submitted content beside library directories that are the host's names none of their files, so the warning carries
+        no `template_file` and its message reads the placeholder where it named one, however the step spells it, its
+        absolute path on the host included. The engine's own words about the template stay.
+        """
+        template_path = (tmp_path / "invoice.docx").resolve()
+        template_path.write_bytes(b"docx bytes")
+        stub_engines.findings = [_NOTES_FINDING]
+        template_file = str(template_path) if spelling == "absolute" else "invoice.docx"
+        write_bundle(directory=tmp_path, step_fields=f'format = "docx"\ntemplate_file = "{template_file}"')
+
+        report = await validate_bundles_in_process(mthds_contents=[_CALLER_MTHDS], library_dirs=[tmp_path])
+
+        assert report.is_valid is True
+        template_warnings = [warning for warning in report.warnings if warning.error_type == TemplateCheckErrorType.TEMPLATE_CHECK_WARNING]
+        assert template_warnings == [
+            _NOTES_WARNING.model_copy(
+                update={
+                    "template_file": None,
+                    "message": f"PipeDocGen 'print_invoice', template file '{HOST_LIBRARY_FILE_PLACEHOLDER}': "
+                    "The notes are never printed (the field notes on page 2)",
+                }
+            )
+        ]
+        assert all(str(template_path.parent) not in warning.model_dump_json() for warning in report.warnings)
 
     async def test_the_agent_cli_bundle_envelope_carries_the_warning(self, tmp_path: Path, stub_engines: StubEngines) -> None:
         bundle_path = _write_templated_bundle(directory=tmp_path, stub_engines=stub_engines)
@@ -156,11 +193,4 @@ class TestPipeDocGenTemplateWarnings:
 
         await dry_run_pipe_in_process(pipe, library_id=get_current_library())
 
-        assert _template_check_log_calls(warning_spy) == [
-            {
-                "pipe_code": "print_invoice",
-                "template_file": "invoice.docx",
-                "finding_message": "The notes are never printed",
-                "finding_location": "the field notes on page 2",
-            }
-        ]
+        assert _template_check_log_calls(warning_spy) == [_NOTES_LOG_FIELDS]
