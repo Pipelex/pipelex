@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- **Trace events written to DynamoDB expire (Breaking)**: the DynamoDB event log now writes every event with a `ttl` in epoch seconds, its write time plus the new `runtime.tracing.dynamodb.retention_days` (30 by default, at least 1), so a table that expires items on `ttl` deletes a run's events, full output data included, where it used to keep them forever. `DynamoDBEventLog` takes `retention_days` and now takes all its arguments by keyword; `make_event_log` reads the setting from the configuration.
+- **Trace events written to DynamoDB expire (Breaking)**: the DynamoDB event log now writes every event with a `ttl` in epoch seconds, its write time plus the new `runtime.tracing.dynamodb.retention_days` (30 by default, at least 1), so a table that expires items on `ttl` deletes a run's events, full output data included, where it used to keep them forever. Only events written from this version on carry a `ttl`, so the rows an earlier version wrote stay until they are deleted or given a `ttl` by hand. `DynamoDBEventLog` takes `retention_days` and now takes all its arguments by keyword; `make_event_log` reads the setting from the configuration.
 
 ## [v0.85.1] - 2026-10-12
 
