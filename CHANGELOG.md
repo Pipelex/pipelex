@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Template-check warnings in the validation verdict**: a warning the engine's template check finds in a `PipeDocGen` step's office template file, such as an Excel defined name or a PowerPoint shape name that matches no input field, now rides the verdict's advisory `warnings` on `pipelex validate`, `pipelex-agent validate` and the API server's `POST /v1/validate`, where it was only logged. It is a `dry_run` item with the new `error_type` `template_check_warning`, the step's `pipe_code` and `domain_code`, and two new optional locators of `ValidationErrorItem`, `template_file` and `template_location`, which the server's OpenAPI schema publishes; an error finding still fails the validation, `validate pipe <code>` on both CLIs carries these warnings alone, and a dry run that returns no verdict, such as `pipelex run --dry-run`, still logs them.
+
+### Changed
+
+- **`build_advisory_warnings` and `collect_advisory_warnings` take the sweep's `dry_run_result` (Breaking)**: the composition point of the advisory warnings reads what the dry runs found from the per-pipe status map, so a caller passes the map its validation sweep returned, and `DryRunOutput` carries those findings in its new `warnings`.
+
 ## [v0.84.0] - 2026-10-12
 
 ### Highlights
