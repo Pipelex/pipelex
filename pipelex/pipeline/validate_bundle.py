@@ -125,6 +125,7 @@ async def validate_bundle(
     dry_run_pipe_codes: list[str] | None = None,
     caller_identity: CallerIdentity | None = None,
     library_dirs_are_callers: bool = False,
+    collect_dry_run_warnings: bool = False,
     bundle_resources: BundleResources | None = None,
 ) -> ValidateBundleResult:
     """Load one bundle into a fresh library and dry-run its pipes.
@@ -144,6 +145,10 @@ async def validate_bundle(
     caller validating content against its own directories passes True and keeps every path. A
     bundle file is validated on the caller's own disk, among the caller's own directories, and
     keeps every path whatever this says.
+
+    ``collect_dry_run_warnings`` is for a caller that puts what the dry runs find without failing in a
+    verdict of its own, as the validate surfaces do (see ``BundleValidator.validate_pipes``); any other
+    caller, a fix loop or a builder, leaves it ``False`` and the dry runs log what they find.
     """
     provided_params = sum(
         [
@@ -232,6 +237,7 @@ async def validate_bundle(
                     # never a pipe of the host's directories, which would put a path on the host into the
                     # caller's verdict. Beside the caller's own directories, every failure names its file.
                     source_pipe_refs=None if library_dirs_are_callers else frozenset(pipe.pipe_ref for pipe in loaded_pipes),
+                    collect_dry_run_warnings=collect_dry_run_warnings,
                 )
                 result = ValidateBundleResult(
                     blueprints=loaded_blueprints,
@@ -263,6 +269,7 @@ async def validate_bundle(
                     # A file on the caller's own disk: every failure names its file, a sibling file of the
                     # same method included, since the library directories are the caller's own too.
                     source_pipe_refs=None,
+                    collect_dry_run_warnings=collect_dry_run_warnings,
                 )
                 result = ValidateBundleResult(
                     blueprints=loaded_blueprints,

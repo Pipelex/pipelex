@@ -80,7 +80,10 @@ class TestRunnerValidatePlumbing:
         )
 
     async def test_library_dirs_converted_to_paths_and_allow_signatures_passthrough(self, mocker: MockerFixture) -> None:
-        """Constructor library_dirs strings reach validate_bundle as Paths; allow_signatures, their ownership and the files forwarded verbatim."""
+        """Constructor library_dirs strings reach validate_bundle as Paths; allow_signatures, their ownership and the files forwarded verbatim.
+
+        The protocol validation returns a verdict, so it asks the sweep to collect the dry runs' warnings for it.
+        """
         env = self._patch_env(mocker, library_ids=[None, "val-lib"])
         bundle_resources = make_bundle_resources(files={"templates/invoice.docx": b"template"})
         runner = PipelexMTHDSProtocol(library_dirs=["dir_alpha", "nested/dir_beta"], library_dirs_are_callers=True, bundle_resources=bundle_resources)
@@ -93,6 +96,7 @@ class TestRunnerValidatePlumbing:
             library_dirs=[Path("dir_alpha"), Path("nested/dir_beta")],
             allow_signatures=True,
             library_dirs_are_callers=True,
+            collect_dry_run_warnings=True,
             bundle_resources=bundle_resources,
         )
 
@@ -109,6 +113,7 @@ class TestRunnerValidatePlumbing:
             library_dirs=None,
             allow_signatures=False,
             library_dirs_are_callers=False,
+            collect_dry_run_warnings=True,
             bundle_resources=None,
         )
 

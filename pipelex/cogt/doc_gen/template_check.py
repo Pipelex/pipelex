@@ -4,8 +4,10 @@ An office template names the fields it is filled with in its own way: an Excel w
 names and Tables, a Word document through its tags, a PowerPoint deck through its shape names. Pipelex cannot
 read those, so an engine that fills a template file overrides its worker's `check_template`
 (`DocGenWorkerAbstract`). The dry run, and so `pipelex validate`, calls it for every `PipeDocGen` step with a
-`template_file`, before anything is spent: an error finding fails the step, and a warning is logged. The
-built-in PDF engine takes no template, and Pipelex checks HTML templates itself, so neither needs one.
+`template_file`, before anything is spent: an error finding fails the step, and a warning joins the validation
+verdict's advisory `warnings` as a `template_check_warning` item, or is logged by a dry run that returns no verdict.
+Either way a finding's words reach whoever validates the method, so they are written for the template's author.
+The built-in PDF engine takes no template, and Pipelex checks HTML templates itself, so neither needs one.
 """
 
 from enum import StrEnum
@@ -23,7 +25,7 @@ class TemplateFindingSeverity(StrEnum):
 
     @property
     def is_error(self) -> bool:
-        """Whether a finding of this severity fails the step, rather than being logged."""
+        """Whether a finding of this severity fails the step, rather than being reported as an advisory warning."""
         match self:
             case TemplateFindingSeverity.ERROR:
                 return True

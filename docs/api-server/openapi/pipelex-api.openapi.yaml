@@ -7045,6 +7045,25 @@ components:
       - llm_prompt
       - img_gen_prompt
       title: TemplateCategory
+    TemplateCheckErrorType:
+      type: string
+      enum:
+      - template_check_warning
+      title: TemplateCheckErrorType
+      description: 'Advisory findings of a ``PipeDocGen`` step''s template check (the engine''s ``check_template``).
+
+
+        Every member is advisory-only: it rides the validation report''s ``warnings`` array and never makes a
+
+        verdict invalid. An error finding of the same check fails the step''s dry run instead, and is reported as
+
+        the ``DryRunError`` item every failed dry run is. A separate enum rather than a new
+
+        ``PipeValidationErrorType`` member because the finding is not the pipe''s validation: the dry run hands the
+
+        step''s template file to its engine, which reads it in a way only the engine can, and reports in its own
+
+        words. Its locators are the template file and the place in it the engine names.'
     TemplatingStyle:
       properties:
         tag_style:
@@ -7762,7 +7781,11 @@ components:
 
         or a type mismatch), and ``dry_run`` — one item per pipe whose dry run failed,
 
-        located at the innermost failing pipe.'
+        located at the innermost failing pipe. On the report''s advisory ``warnings``,
+
+        ``dry_run`` marks a finding a dry run made without failing, such as a warning of
+
+        a ``PipeDocGen`` step''s template check.'
     ValidationErrorItem:
       properties:
         category:
@@ -7776,6 +7799,7 @@ components:
           - $ref: '#/components/schemas/PipeFactoryErrorType'
           - $ref: '#/components/schemas/ValidationResidualErrorType'
           - $ref: '#/components/schemas/HintLintErrorType'
+          - $ref: '#/components/schemas/TemplateCheckErrorType'
           - type: 'null'
           title: Error Type
         pipe_code:
@@ -7859,6 +7883,16 @@ components:
             type: array
           - type: 'null'
           title: Suggestions
+        template_file:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Template File
+        template_location:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Template Location
         suggested_fix:
           anyOf:
           - $ref: '#/components/schemas/SuggestedFix'

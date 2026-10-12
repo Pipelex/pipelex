@@ -8,6 +8,7 @@ from pydantic import Field
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.cogt.doc_gen.doc_gen_engine import require_doc_gen_engine_declared, resolve_doc_gen_setting
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice, DocGenSetting
@@ -16,7 +17,7 @@ from pipelex.cogt.doc_gen.document_composition import DocumentComposition
 from pipelex.cogt.doc_gen.input_shape import InputShape, shape_of_input
 from pipelex.cogt.doc_gen.layout_builder import build_layout_document, humanize
 from pipelex.cogt.doc_gen.plain_data import plain_data
-from pipelex.cogt.doc_gen.template_check import TemplateCheckRequest
+from pipelex.cogt.doc_gen.template_check import TemplateCheckRequest, TemplateFinding
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck_check import check_doc_gen_choice_with_deck
 from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
@@ -35,6 +36,7 @@ from pipelex.pipe_operators.doc_gen.exceptions import PipeDocGenRunError, PipeDo
 from pipelex.pipe_operators.doc_gen.template_field_check import check_template_field_paths
 from pipelex.pipe_operators.doc_gen.template_file_resource import bundle_resource_of_template_file
 from pipelex.pipe_operators.pipe_operator import PipeOperator
+from pipelex.pipe_run.dry_run_warning_collector import report_dry_run_warning
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.runtime_hub import get_class_registry, get_content_generator, get_model_deck, get_report_delegate, get_storage_provider
 from pipelex.system.job_metadata import JobMetadata
@@ -43,6 +45,7 @@ from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_require
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.tools.templating.templating_style import TemplatingStyle
+from pipelex.validation_error_types import TemplateCheckErrorType
 
 _UNSAFE_FILENAME_CHARACTERS = re.compile(r"[^\w.\-]+")
 _MAX_FILENAME_STEM_LENGTH = 120
@@ -305,6 +308,8 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         """Run the engine's template checker on the step's template file, when its engine has one.
 
         The inputs in memory are the dry run's mocks, so the checker can fill the template in memory with them.
+        A warning finding is reported to the validation sweep, which puts it in the verdict's `warnings`, or logged
+        when no sweep collects this dry run's warnings.
 
         Raises:
             PipeDocGenTemplateCheckError: the checker reported errors.
@@ -326,14 +331,30 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         errors = [finding for finding in findings if finding.severity.is_error]
         for finding in findings:
             if not finding.severity.is_error:
-                finding_fields: dict[str, str] = {"pipe_code": self.code, "template_file": self.template_file, "finding_message": finding.message}
-                if finding.location:
-                    finding_fields["finding_location"] = finding.location
-                log.warning("The template check of a PipeDocGen found a warning in its template file", fields=finding_fields)
+                self._report_template_warning(finding=finding, template_file=self.template_file)
         if errors:
             listed = "\n".join(f"- {finding.message}" + (f" ({finding.location})" if finding.location else "") for finding in errors)
             msg = f"PipeDocGen '{self.code}': the template file '{self.template_file}' does not fit the step's inputs:\n{listed}"
             raise PipeDocGenTemplateCheckError(msg)
+
+    def _report_template_warning(self, *, finding: TemplateFinding, template_file: str) -> None:
+        """Report a warning of the template check as an advisory item, located at this step, its file and the place in it."""
+        location_suffix = f" ({finding.location})" if finding.location else ""
+        warning = ValidationErrorItem(
+            category=ValidationErrorCategory.DRY_RUN,
+            error_type=TemplateCheckErrorType.TEMPLATE_CHECK_WARNING,
+            pipe_code=self.code,
+            domain_code=self.domain_code,
+            template_file=template_file,
+            template_location=finding.location,
+            message=f"PipeDocGen '{self.code}', template file '{template_file}': {finding.message}{location_suffix}",
+        )
+        if report_dry_run_warning(warning=warning):
+            return
+        finding_fields: dict[str, str] = {"pipe_code": self.code, "template_file": template_file, "finding_message": finding.message}
+        if finding.location:
+            finding_fields["finding_location"] = finding.location
+        log.warning("The template check of a PipeDocGen found a warning in its template file", fields=finding_fields)
 
     ####################################################################################################################
     # Runs

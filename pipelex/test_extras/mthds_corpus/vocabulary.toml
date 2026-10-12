@@ -248,6 +248,10 @@ excluded = "Advisory-only: the intent-hints lint rides the validation report's `
 code = "hint_inapplicable_intent"
 excluded = "Advisory-only: the intent-hints lint rides the validation report's `warnings` array and never makes a verdict invalid (hints are non-normative; well-formed unknown content is preserved). Same shape problem as `optional_force_redundant`: an entry contract keyed on `expected_error` has nowhere to put a warning on a valid entry. Revisit if the manifest ever grows a warnings axis."
 
+[error.template_check_warning]
+code = "template_check_warning"
+excluded = "Advisory-only, for the same reason as `optional_force_redundant`: a warning of a PipeDocGen step's template check rides the validation report's `warnings` array and never makes a verdict invalid. It also needs what a focused entry cannot carry: a template file beside the bundle, an office format, and an engine that reads that format, which no consumer but a runtime holding the document generation plugin has. Revisit if the manifest ever grows a warnings axis and an entry can carry its template files."
+
 [feature.binding_step]
 description = "A PipeSequence step `{ from = \"invoice.total\", result = \"total_amount\" }` that binds the value at a path in working memory to a new name: its concept is derived from the declared structures the path walks, its value is a deep copy taken when the step runs, a path crossing a list binds a flat list, and a path reaching nothing records an absence."
 

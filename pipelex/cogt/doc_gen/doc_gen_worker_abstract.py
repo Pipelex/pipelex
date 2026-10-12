@@ -46,8 +46,9 @@ class DocGenWorkerAbstract(InferenceWorkerAbstract):
 
         An office template names its fields in its own way, which only its engine can read, so an engine that fills
         template files overrides this. The default finds nothing: the built-in PDF engine takes no template, and
-        Pipelex checks HTML templates itself. An error finding fails the step, and a warning is logged. It raises
-        only for a fault of its own: a template it cannot read at all is an error finding.
+        Pipelex checks HTML templates itself. An error finding fails the step, and a warning joins the validation
+        verdict's advisory `warnings`, or is logged by a dry run that returns no verdict. It raises only for a fault
+        of its own: a template it cannot read at all is an error finding.
         """
         _ = request
         return []

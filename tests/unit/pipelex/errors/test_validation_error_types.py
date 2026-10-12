@@ -17,6 +17,7 @@ from pipelex.validation_error_types import (
     HintLintErrorType,
     PipeFactoryErrorType,
     PipeValidationErrorType,
+    TemplateCheckErrorType,
     ValidationErrorType,
     ValidationResidualErrorType,
 )
@@ -29,7 +30,13 @@ class TestValidationErrorTypeRegistry:
         Written as a set comparison rather than a length check: a member dropped from the registry
         and a member added to a source enum are both failures, and both should name the member.
         """
-        contributed = set(PipeValidationErrorType) | set(PipeFactoryErrorType) | set(ValidationResidualErrorType) | set(HintLintErrorType)
+        contributed = (
+            set(PipeValidationErrorType)
+            | set(PipeFactoryErrorType)
+            | set(ValidationResidualErrorType)
+            | set(HintLintErrorType)
+            | set(TemplateCheckErrorType)
+        )
         assert set(VALIDATION_ERROR_TYPES) == contributed
 
     def test_registry_has_no_duplicate_wire_values(self) -> None:
@@ -46,7 +53,13 @@ class TestValidationErrorTypeRegistry:
     def test_registry_order_is_deterministic(self) -> None:
         """Two reads give the same order, so an artifact generated from the registry is stable."""
         assert tuple(VALIDATION_ERROR_TYPES) == VALIDATION_ERROR_TYPES
-        assert list(VALIDATION_ERROR_TYPES) == [*PipeValidationErrorType, *PipeFactoryErrorType, *ValidationResidualErrorType, *HintLintErrorType]
+        assert list(VALIDATION_ERROR_TYPES) == [
+            *PipeValidationErrorType,
+            *PipeFactoryErrorType,
+            *ValidationResidualErrorType,
+            *HintLintErrorType,
+            *TemplateCheckErrorType,
+        ]
 
     # The three tests below hold that the registry is enforced when an item is parsed, not merely
     # documented. They go through ``model_validate`` rather than the constructor on purpose: the

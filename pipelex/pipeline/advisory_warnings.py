@@ -1,11 +1,13 @@
 """The one composition point for the validation report's advisory `warnings`.
 
 A warning is a finding worth surfacing on a VALID bundle that must never flip `is_valid`. There are
-three families of them today, each derived from a different substrate:
+four families of them today, each derived from a different substrate:
 
 - **`optionality`** — the useless-`!` lint, from the controllers' taint analyses.
 - **`presence vacuity`** — the entry-pipe lint, from the input-form descriptors.
 - **`hints`** — the intent-hints lints, from the qualified crate.
+- **`dry-run findings`** — what the sweep's dry runs found without failing, such as the warnings of a
+  `PipeDocGen` step's template check, from the sweep's per-pipe status map.
 
 They used to be assembled site by site, and the sites disagreed: the protocol path carried the
 optionality and hint lints, while the agent CLI, the builder ops and the bare CLI each carried the
@@ -23,16 +25,23 @@ Two entry points, because the channels hold different things in hand:
 
 Both must run **inside the open validation window**: the descriptors' class-backed reflection reads
 the class registry, and the crate is read off the current library.
+
+The single-pipe surfaces (`validate pipe`) are the one place a channel carries less, and on purpose: they
+dry-run one pipe and make no bundle-wide claim, so they carry the dry-run findings alone
+(`pipelex.pipeline.dry_run_warnings.build_dry_run_warnings`), which are about the pipes they ran, and none
+of the three lints, which have nothing to say about one pipe in isolation.
 """
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 
 from pipelex.base_exceptions import ValidationErrorItem
 from pipelex.interpreter_hub import get_current_library, get_library_manager
 from pipelex.libraries.crate_qualification import QualifiedCrateContent
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipeline.blueprint_selection import collect_entry_pipe_refs
+from pipelex.pipeline.bundle_validator import DryRunOutput
 from pipelex.pipeline.controller_taint import ControllerTaintAnalysis, collect_controller_taint_analyses
+from pipelex.pipeline.dry_run_warnings import build_dry_run_warnings
 from pipelex.pipeline.hint_warnings import build_hint_warnings
 from pipelex.pipeline.input_form import InputForm, build_input_form, qualify_current_library_crate
 from pipelex.pipeline.optionality_warnings import build_optionality_warnings
@@ -45,6 +54,7 @@ def build_advisory_warnings(
     input_form: InputForm,
     entry_pipe_refs: Iterable[str],
     qualified_crate: QualifiedCrateContent,
+    dry_run_result: Mapping[str, DryRunOutput],
 ) -> list[ValidationErrorItem]:
     """Every advisory family, concatenated in one fixed order.
 
@@ -57,18 +67,23 @@ def build_advisory_warnings(
         input_form: The batch's input-form descriptors (`build_input_form`).
         entry_pipe_refs: The qualified refs of the batch's entry pipes (`collect_entry_pipe_refs`).
         qualified_crate: The current library's qualified crate (`qualify_current_library_crate`).
+        dry_run_result: The sweep's per-pipe status map, carrying what each dry run found without failing,
+            from a sweep run with `collect_dry_run_warnings`.
 
     Returns:
-        The advisory items: optionality, then presence vacuity, then hints.
+        The advisory items: optionality, then presence vacuity, then hints, then the dry-run findings.
     """
     return [
         *build_optionality_warnings(taint_analyses),
         *build_vacuous_presence_warnings(input_form=input_form, entry_pipe_refs=entry_pipe_refs),
         *build_hint_warnings(qualified_crate),
+        *build_dry_run_warnings(dry_run_result),
     ]
 
 
-def collect_advisory_warnings(*, pipes: Sequence[PipeAbstract], entry_pipe_refs: Iterable[str]) -> list[ValidationErrorItem]:
+def collect_advisory_warnings(
+    *, pipes: Sequence[PipeAbstract], entry_pipe_refs: Iterable[str], dry_run_result: Mapping[str, DryRunOutput]
+) -> list[ValidationErrorItem]:
     """Gather every advisory ingredient inside the validation window, then build the warnings.
 
     The crate is qualified ONCE here and handed to both consumers that need it — the descriptors and
@@ -78,6 +93,8 @@ def collect_advisory_warnings(*, pipes: Sequence[PipeAbstract], entry_pipe_refs:
         pipes: The loaded pipes to judge (typically `ValidateBundleResult.pipes`, or every pipe of
             the current library on the library-wide path).
         entry_pipe_refs: The qualified refs of the batch's entry pipes (`collect_entry_pipe_refs`).
+        dry_run_result: The sweep's per-pipe status map (`ValidateBundleResult.dry_run_result`, or what the
+            library-wide sweep returned), from a sweep run with `collect_dry_run_warnings`.
 
     Returns:
         The advisory items, in the order :func:`build_advisory_warnings` fixes.
@@ -88,6 +105,7 @@ def collect_advisory_warnings(*, pipes: Sequence[PipeAbstract], entry_pipe_refs:
         input_form=build_input_form(pipes, qualified_crate=qualified_crate),
         entry_pipe_refs=entry_pipe_refs,
         qualified_crate=qualified_crate,
+        dry_run_result=dry_run_result,
     )
 
 
