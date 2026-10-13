@@ -1,13 +1,35 @@
 """Protocol for trace event storage backends.
 
-Defines the interface that all event log implementations must satisfy.
-The NDJSON backend is the local implementation; cloud backends (e.g. DynamoDB)
-will implement the same protocol later.
+Defines the interface that all event log implementations must satisfy, and the one rule by which every one of them
+returns the events of a run (`deduplicate_and_order_events`): the in-memory, NDJSON, DynamoDB and buffering logs.
 """
 
+from collections.abc import Iterable
 from typing import Protocol
 
 from pipelex.tracing.trace_events import TraceEvent
+
+
+def deduplicate_and_order_events(*, events: Iterable[TraceEvent]) -> list[TraceEvent]:
+    """The events of a run as an event log returns them, whatever order its store holds them in.
+
+    One event is kept per `TraceEvent.store_key` (chain, writer_id, event type, sequence), the first one met: a replay
+    writes an event again under the same key, and a store may hold the same event under two keys of its own, such as
+    a DynamoDB row written before its sort key changed shape. The events are ordered by (chain, sequence, writer_id):
+    a dispatching attempt's events before those of the workflows it dispatched, whose chains continue its own, and,
+    within one attempt, by sequence before writer, so that two writers emitting into the same attempt are not reordered
+    by the lexical order of their ids.
+
+    Args:
+        events: The events read from the store, in any order, repeats included.
+
+    Returns:
+        The distinct events, ordered.
+    """
+    kept: dict[tuple[str, str, str, int], TraceEvent] = {}
+    for event in events:
+        kept.setdefault(event.store_key, event)
+    return sorted(kept.values(), key=lambda event: (event.chain_key, event.sequence, event.writer_id))
 
 
 class EventLogProtocol(Protocol):
@@ -71,7 +93,9 @@ class EventLogProtocol(Protocol):
         Returns events deduplicated by `TraceEvent.store_key` (chain, writer_id,
         event type, sequence) and sorted by (chain, sequence, writer_id) for
         deterministic ordering: a dispatching attempt's events before those of
-        the workflows it dispatched, whose chains continue its own.
+        the workflows it dispatched, whose chains continue its own. Every
+        implementation applies `deduplicate_and_order_events` to what its store
+        holds, so none returns its store's own order.
         Returns an empty list if no events exist for the given run.
         """
         ...

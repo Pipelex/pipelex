@@ -305,12 +305,14 @@ This is what lets a graph-producing dry-run trace entirely in memory (no NDJSON 
 
 The tracer writes one event for each thing that happens in the run, in the order it happens (`pipelex/tracing/trace_events.py`). Every backend carries the events whole: the NDJSON and DynamoDB logs store each one as its JSON and read it back through the discriminated union `AnyTraceEvent`, and the in-memory and buffering logs hold the objects themselves. Every event carries these fields:
 
-- `pipeline_run_id`, `workflow_id` and `writer_id`, which name the run, the execution that wrote it, `direct` in direct mode, and the process that wrote it;
+- `pipeline_run_id`, `workflow_id` and `writer_id`, which name the run, the execution that wrote it, never empty and `direct` in direct mode, and the process that wrote it;
 - `attempt`, the attempt of that execution, counting from 1, and `lineage`, the attempts it was dispatched under (see [Executions and Their Attempts](#executions-and-their-attempts));
 - `path`, the [invocation path](#invocation-paths) of the invocation the event is about, `null` for a binding step, which runs no pipe;
 - `timestamp`, and `sequence`, which rises with each event one writer writes;
 - `event_kind`, which tells the event's kind;
 - `mode`, `live` or `dry`, the mode of the run that wrote it.
+
+An event is frozen, since it records what happened, and it computes its chain, its chain key and its store key once, the first time they are read, since every read and every assembly of a run reads them for each of its events; a copy made with `model_copy(update=...)` computes them again from its own fields. An event whose `workflow_id` is empty is refused when it is read, like any event in a shape this version does not accept, with `EventLogSchemaMismatchError`.
 
 Each event kind that the hosted progress contract, which defines the run progress the hosted API reports, maps to a progress event carries that progress event's fields: the contract's `execution` is `workflow_id`, its `at` is `timestamp`, and its `kind` is read off `event_kind`.
 
@@ -377,7 +379,7 @@ class TraceContext(BaseModel):
         )
 ```
 
-A controller names the place of each pipe it runs before it runs it: it hands the pipe `job_metadata.for_child_at(segment=...)`, a copy whose trace context carries the segment, and the pipe's start derives its path from the context's `parent_path` and that segment (`TraceContext.invocation_path`). A pipe started under a parent path without a segment, or with a segment and no parent path, raises `InvocationPathError`, a fault of the runtime, never of the method.
+A controller names the place of each pipe it runs before it runs it: it hands the pipe `job_metadata.for_child_at(segment=...)`, a copy whose trace context carries the segment, and the pipe's start derives its path from the context's `parent_path` and that segment (`TraceContext.invocation_path`). A pipe started under a parent path without a segment, or with a segment and no parent path, cannot be placed: `TraceContext.invocation_path` raises `InvocationPathError`, a fault of the runtime, never of the method. Tracing never fails a run, so the tracer catches it, traces the pipe with a `null` path, which leaves every pipe under it unplaceable too, and logs the fault as an error, `A pipe was traced without its invocation path`, with the pipe's `pipe_ref` and `node_id` in its fields. An inactive tracer and the no-op tracer record nothing and derive no path at all. The invariant that every invocation has a path is enforced by the test suite instead: an autouse fixture in `tests/conftest.py` fails any test during which a tracer logged that fault.
 
 ### Invocation Paths
 
@@ -401,9 +403,9 @@ An execution is a part of a run that emits events and that its engine runs, and 
 
 `GraphTracerManager.open_tracer` takes the execution as `workflow_id`, which must be the id the engine keeps across attempts, the attempt as `attempt`, and, for an execution another one dispatched, the trace context it received as `received_context`. A received context naming a place hands the new execution the dispatcher's chain as its `lineage`; the run's own workflow receives a context naming no place, and its lineage is empty. Every event the tracer writes stamps `workflow_id`, `attempt` and `lineage`, and so does every usage event, which takes them from the chain of the trace context it is reported under: `ReportingManager.set_event_log` takes no workflow id.
 
-A higher attempt of an execution, dispatched under the same attempts, supersedes the earlier one and everything it dispatched, at any depth (`pipelex/system/execution_chain.py`, `current_chain_keys`). The assembler builds the graph from current events only, so a retried invocation appears once, at its path, and a lost attempt leaves no failed node behind. A superseded attempt's inference was spent all the same, so its usage still counts in the run's total, as unattributed usage.
+A higher attempt of an execution, dispatched under the same attempts, supersedes the earlier one and everything it dispatched, at any depth (`pipelex/system/execution_chain.py`, `current_chain_keys`). The assembler builds the graph from current events only, so a retried invocation appears once, at its path, and a lost attempt leaves no failed node behind; the graph's `created_at` is the timestamp of its earliest current event, so an attempt lost long before its retry does not date it either. A superseded attempt's inference was spent all the same, so its usage still counts in the run's total, as unattributed usage.
 
-The event logs keep every attempt's events: their dedup key is the event's chain, its writer, its kind and its sequence (`TraceEvent.store_key`), since attempts of one execution number their events from the same start. The DynamoDB log's sort key is `EVENT#<chain key>#<writer_id>#<sequence>`, the sequence zero-padded to ten digits and the chain key reading `<execution>@<attempt>` for each entry, percent-encoded and joined by `/`, and the logs return events ordered by chain, then sequence.
+The event logs keep every attempt's events: their dedup key is the event's chain, its writer, its kind and its sequence (`TraceEvent.store_key`), since attempts of one execution number their events from the same start. The chain key reads `<execution>@<attempt>` for each entry of the chain, percent-encoded and joined by `/`. The DynamoDB log's sort key is `EVENT#<chain digest>#<writer_id>#<sequence>`, the chain digest being the SHA-256 hex digest of the chain key and the sequence zero-padded to ten digits: the chain key grows with the lineage and with the length of its workflow ids, while DynamoDB refuses a sort key over 1,024 bytes, so the digest keeps the key one length at any depth, and, being the same for the same chain, lets a replayed write overwrite its own row. The row's chain is read back from its payload, which holds the whole event. Every event log returns a run's events by one rule, `deduplicate_and_order_events` (`pipelex/tracing/event_log_protocol.py`): one event per store key, ordered by chain, then sequence, then writer, whatever order its store holds them in, which for DynamoDB is the order of the digests.
 
 ### Producer/Consumer Paradigm
 

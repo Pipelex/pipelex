@@ -5,6 +5,7 @@ from typing import Any
 
 from typing_extensions import override
 
+from pipelex import log
 from pipelex.graph.condition_output_merge import ConditionOutputMerge, apply_condition_output_merges
 from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol, invocation_path_of_start
 from pipelex.graph.graphspec import (
@@ -24,6 +25,7 @@ from pipelex.graph.graphspec import (
 )
 from pipelex.graph.selected_outcome import derive_selected_outcome_edges
 from pipelex.system.data_inclusion_config import DataInclusionConfig
+from pipelex.system.exceptions import InvocationPathError
 from pipelex.system.execution_chain import ExecutionAttempt
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
@@ -44,6 +46,29 @@ from pipelex.tracing.trace_events import (
     PipeStartEvent,
     TraceEvent,
 )
+
+INVOCATION_PATH_FAULT_MESSAGE = "A pipe was traced without its invocation path"
+"""The error a tracer logs when it cannot derive an invocation's path; the test suite fails any test that logs it."""
+
+
+def _derive_invocation_path(*, trace_context: TraceContext, pipe_ref: str | None, pipe_type: str, node_kind: NodeKind, node_id: str) -> str | None:
+    """The invocation path of a node started under `trace_context`, or None when it has none.
+
+    A binding step runs no pipe, so it has no path. Every invocation has one, given by the segment its controller hands
+    it through `JobMetadata.for_child_at`; a controller that hands it none is a fault of the runtime, never of the
+    method, and tracing never fails a run for it: the node is traced without a path, its children cannot be placed
+    either, and the fault is logged as an error. The test suite fails any test that logs it (`tests/conftest.py`), which
+    is where the invariant that every invocation has a path is enforced.
+    """
+    try:
+        return invocation_path_of_start(trace_context=trace_context, pipe_ref=pipe_ref, node_kind=node_kind)
+    except InvocationPathError:
+        log.error(
+            INVOCATION_PATH_FAULT_MESSAGE,
+            fields={"pipe_ref": pipe_ref, "pipe_type": pipe_type, "node_id": node_id},
+            include_exception=True,
+        )
+        return None
 
 
 class _MutableNodeData:
@@ -838,20 +863,21 @@ class GraphTracer(GraphTracerProtocol):
         """Record the start of a pipe execution.
 
         The node's invocation path is derived here, from the path of the invocation it runs under and the segment its
-        controller gave it, or from its own `pipe_ref` for the run's entry pipe; the pipes it runs continue it.
-
-        Raises:
-            InvocationPathError: The pipe is an invocation whose path the trace context cannot give.
+        controller gave it, or from its own `pipe_ref` for the run's entry pipe; the pipes it runs continue it. Tracing
+        never fails a run: an inactive tracer records nothing and derives no path, and a node whose path cannot be
+        derived is traced without one (see `_derive_invocation_path`).
         """
-        invocation_path = invocation_path_of_start(trace_context=trace_context, pipe_ref=pipe_ref, node_kind=node_kind)
         if not self._is_active:
             # Return dummy values when not active
             node_id = trace_context.make_node_id()
-            child_context = trace_context.copy_for_child(node_id, next_sequence=trace_context.node_sequence + 1, invocation_path=invocation_path)
+            child_context = trace_context.copy_for_child(node_id, next_sequence=trace_context.node_sequence + 1, invocation_path=None)
             return node_id, child_context
 
         # Generate node ID (includes workflow_id in Temporal mode)
         node_id = self._make_node_id()
+        invocation_path = _derive_invocation_path(
+            trace_context=trace_context, pipe_ref=pipe_ref, pipe_type=pipe_type, node_kind=node_kind, node_id=node_id
+        )
 
         # Create mutable node data
         node_data = _MutableNodeData(

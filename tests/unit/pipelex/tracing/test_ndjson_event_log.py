@@ -215,6 +215,23 @@ class TestNdjsonEventLog:
 
         assert "traced-value" not in str(refusal.value)
 
+    def test_a_line_naming_no_execution_is_refused_with_the_others(self, tmp_path: Path) -> None:
+        """A line whose `workflow_id` is empty names no execution: it is counted with the lines the models refuse,
+        rather than read and then failing whoever first asks for its chain.
+        """
+        event_log = NdjsonEventLog(traces_dir=str(tmp_path))
+        event_log.emit(make_trace_event(sequence=0))
+        event_log.close()
+
+        ndjson_file = tmp_path / "run_001" / "wf_wf_abc.ndjson"
+        nameless_line = make_trace_event(sequence=1).model_dump_json().replace('"workflow_id":"wf_abc"', '"workflow_id":""')
+        assert '"workflow_id":""' in nameless_line
+        with open(ndjson_file, "a", encoding="utf-8") as fhandle:
+            fhandle.write(nameless_line + "\n")
+
+        with pytest.raises(EventLogSchemaMismatchError, match="1 trace event"):
+            event_log.read_events("run_001")
+
     def test_multiprocess_concurrent_writes(self, tmp_path: Path) -> None:
         """Multiple processes writing to different workflow files produces no corruption."""
         traces_dir = str(tmp_path)

@@ -5,6 +5,7 @@ from typing import Any, ClassVar
 
 import pytest
 from pydantic import TypeAdapter, ValidationError
+from pytest_mock import MockerFixture
 
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
@@ -14,6 +15,7 @@ from pipelex.graph.graphspec import EdgeKind, ErrorSpec, IOSpec, NodeKind
 from pipelex.system.execution_chain import ExecutionAttempt
 from pipelex.system.job_metadata import JobCategory, JobMetadata, RunMetadata, UnitJobId
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.tracing import trace_events as trace_events_module
 from pipelex.tracing.trace_events import (
     AnyTraceEvent,
     BatchAggregateEvent,
@@ -541,6 +543,47 @@ class TestTraceEvents:
                 pipe_type="PipeNoop",
                 node_kind=NodeKind.OPERATOR,
             )
+
+    def test_an_event_naming_no_execution_is_refused(self) -> None:
+        """An empty `workflow_id` names no execution: the event is refused when it is read, never when its chain is."""
+        base_fields: dict[str, Any] = {**_Shared.make_base_fields(), "workflow_id": ""}
+        with pytest.raises(ValidationError, match="workflow_id"):
+            PipeStartEvent(
+                pipe_ref=None,
+                **base_fields,
+                node_id=_Shared.NODE_ID,
+                pipe_code="noop_pipe",
+                pipe_type="PipeNoop",
+                node_kind=NodeKind.OPERATOR,
+            )
+
+    def test_an_event_computes_its_keys_once_and_a_copy_computes_them_again(self, mocker: MockerFixture) -> None:
+        """Every read and every assembly reads an event's keys, so they are computed once; an event is frozen, and a copy
+        made with an update reads its keys from its own fields.
+        """
+        chain_key_spy = mocker.spy(trace_events_module, "execution_chain_key")
+        event = PipeStartEvent(
+            pipe_ref=None,
+            **_Shared.make_base_fields(sequence=4),
+            node_id=_Shared.NODE_ID,
+            pipe_code="noop_pipe",
+            pipe_type="PipeNoop",
+            node_kind=NodeKind.OPERATOR,
+        )
+
+        for _ in range(3):
+            assert event.chain_key == f"wf_run@1/{_Shared.WORKFLOW_ID}@2"
+            assert event.store_key == (f"wf_run@1/{_Shared.WORKFLOW_ID}@2", "primary", "PipeStartEvent", 4)
+        assert chain_key_spy.call_count == 1
+
+        with pytest.raises(ValidationError, match="frozen"):
+            event.attempt = 3  # type: ignore[misc]  # the static read-only error is the runtime contract under test
+        retried = event.model_copy(update={"attempt": 3})
+        assert retried.chain == [ExecutionAttempt(execution="wf_run", attempt=1), ExecutionAttempt(execution=_Shared.WORKFLOW_ID, attempt=3)]
+        assert retried.store_key == (f"wf_run@1/{_Shared.WORKFLOW_ID}@3", "primary", "PipeStartEvent", 4)
+        # The keys are no field: they are neither serialized nor compared.
+        assert "chain_key" not in event.model_dump()
+        assert _any_trace_event_adapter.validate_json(event.model_dump_json()) == event
 
     def test_all_event_kinds_covered(self) -> None:
         """Every TraceEventKind has a corresponding test case and event class."""

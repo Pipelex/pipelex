@@ -7,11 +7,16 @@ from botocore.exceptions import BotoCoreError, ClientError, EndpointConnectionEr
 from pytest_mock import MockerFixture
 
 from pipelex.graph.graphspec import NodeKind
+from pipelex.system.execution_chain import ExecutionAttempt
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.buffering_event_log import BufferingEventLog
 from pipelex.tracing.dynamodb_event_log import DynamoDBEventLog
 from pipelex.tracing.exceptions import EventLogReadError, EventLogSchemaMismatchError, EventLogSetupError
+from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 from pipelex.tracing.trace_events import BatchFannedOutEvent, ConditionResolvedEvent, PipeStartEvent, TraceEvent
+
+# DynamoDB refuses a sort key longer than this many bytes.
+_DYNAMODB_MAX_SORT_KEY_BYTES = 1024
 
 _RUN_ID = "plr-decisions"
 _T0 = datetime(2026, 10, 13, 9, 0, 0, tzinfo=UTC)
@@ -49,6 +54,39 @@ def _decision_events(*, mode: PipeRunMode) -> list[TraceEvent]:
             branch_pipe_type="PipeCompose",
         ),
     ]
+
+
+def _chain_event(*, lineage: list[ExecutionAttempt], workflow_id: str, attempt: int, sequence: int, writer_id: str = "primary") -> PipeStartEvent:
+    return PipeStartEvent(
+        pipeline_run_id=_RUN_ID,
+        workflow_id=workflow_id,
+        attempt=attempt,
+        lineage=lineage,
+        path=None,
+        writer_id=writer_id,
+        timestamp=_T0,
+        mode=PipeRunMode.LIVE,
+        sequence=sequence,
+        pipe_ref=None,
+        node_id=f"g:{workflow_id}:node_{sequence}",
+        pipe_code="step",
+        pipe_type="PipeCompose",
+        node_kind=NodeKind.OPERATOR,
+    )
+
+
+class _FakeEventsTable:
+    """A DynamoDB table holding one item per (PK, SK), which a query returns in sort-key order, as DynamoDB does."""
+
+    def __init__(self) -> None:
+        self.items: dict[tuple[str, str], dict[str, Any]] = {}
+
+    def put_item(self, *, Item: dict[str, Any]) -> None:  # ruff: ignore[invalid-argument-name]  # boto3 kwarg name
+        self.items[Item["PK"], Item["SK"]] = Item
+
+    def query(self, *, KeyConditionExpression: Any, **_: Any) -> dict[str, Any]:  # ruff: ignore[invalid-argument-name]  # boto3 kwarg name
+        partition_key = KeyConditionExpression.get_expression()["values"][1]
+        return {"Items": [item for (pk, _sk), item in sorted(self.items.items()) if pk == partition_key]}
 
 
 class TestDynamoDBEventLogReadEvents:
@@ -118,6 +156,69 @@ class TestDynamoDBEventLogReadEvents:
 
         with pytest.raises(EventLogSchemaMismatchError):
             event_log.read_events(_RUN_ID)
+
+    def _make_event_log_with_fake_table(self, mocker: MockerFixture) -> tuple[DynamoDBEventLog, _FakeEventsTable]:
+        event_log = DynamoDBEventLog(table_name="trace-events-test", region="us-east-1")
+        fake_table = _FakeEventsTable()
+        mocker.patch.object(event_log, "_table", new=fake_table)
+        return event_log, fake_table
+
+    def test_the_sort_key_stays_bounded_however_deep_and_long_the_lineage(self, mocker: MockerFixture) -> None:
+        """Nested batches dispatched under long workflow ids give a chain key far past DynamoDB's sort-key limit: the sort
+        key carries a digest of the chain, so its length does not grow with it, while a replayed write still overwrites
+        its own row and every attempt keeps its own.
+        """
+        event_log, fake_table = self._make_event_log_with_fake_table(mocker)
+        lineage = [ExecutionAttempt(execution=f"run-{depth:02d}-" + "x" * 200, attempt=depth + 1) for depth in range(12)]
+        first_attempt = _chain_event(lineage=lineage, workflow_id="item-" + "y" * 300, attempt=1, sequence=7, writer_id="act_4242_abcdef12")
+        second_attempt = first_attempt.model_copy(update={"attempt": 2})
+        assert len(first_attempt.chain_key.encode()) > 2 * _DYNAMODB_MAX_SORT_KEY_BYTES
+
+        event_log.emit(first_attempt)
+        event_log.emit(first_attempt)
+        event_log.emit(second_attempt)
+
+        sort_keys = [sort_key for (_partition_key, sort_key) in fake_table.items]
+        assert len(sort_keys) == 2
+        for sort_key in sort_keys:
+            assert len(sort_key.encode()) <= _DYNAMODB_MAX_SORT_KEY_BYTES
+            assert sort_key.startswith("EVENT#")
+            assert sort_key.endswith("#act_4242_abcdef12#0000000007")
+        # The chain itself is read back whole from the row's payload.
+        assert event_log.read_events(_RUN_ID) == [first_attempt, second_attempt]
+
+    def test_read_events_dedupes_and_orders_as_every_event_log_does(self, mocker: MockerFixture) -> None:
+        """The sort keys order the rows by the digest of their chains, which is no order of the run: the read returns
+        the events deduplicated and ordered by (chain, sequence, writer), as the in-memory and NDJSON logs do, and a
+        row written twice under two sort keys, as before and after the sort key changed shape, is read once.
+        """
+        event_log, fake_table = self._make_event_log_with_fake_table(mocker)
+        run_attempt = ExecutionAttempt(execution="exec-run", attempt=1)
+        events = [
+            _chain_event(lineage=[run_attempt], workflow_id="exec-item-2", attempt=1, sequence=0),
+            _chain_event(lineage=[], workflow_id="exec-run", attempt=1, sequence=1, writer_id="act_9_0000"),
+            _chain_event(lineage=[run_attempt], workflow_id="exec-item-1", attempt=1, sequence=0),
+            _chain_event(lineage=[], workflow_id="exec-run", attempt=1, sequence=0),
+            _chain_event(lineage=[], workflow_id="exec-run", attempt=1, sequence=2),
+        ]
+        for event in events:
+            event_log.emit(event)
+        legacy_row = {**fake_table.items[next(iter(fake_table.items))], "SK": "EVENT#exec-run@1/exec-item-2@1#primary#0000000000"}
+        fake_table.put_item(Item=legacy_row)
+        reference_log = InMemoryEventLog()
+        for event in events:
+            reference_log.emit(event)
+
+        read_back = event_log.read_events(_RUN_ID)
+
+        assert [(event.chain_key, event.sequence, event.writer_id) for event in read_back] == [
+            ("exec-run@1", 0, "primary"),
+            ("exec-run@1", 1, "act_9_0000"),
+            ("exec-run@1", 2, "primary"),
+            ("exec-run@1/exec-item-1@1", 0, "primary"),
+            ("exec-run@1/exec-item-2@1", 0, "primary"),
+        ]
+        assert read_back == reference_log.read_events(_RUN_ID)
 
     def test_init_translates_construction_error(self, mocker: MockerFixture) -> None:
         # A botocore failure while building the boto3 client (e.g. a misconfigured region) must surface as

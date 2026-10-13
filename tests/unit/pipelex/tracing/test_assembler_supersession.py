@@ -188,3 +188,26 @@ class TestAssemblerSupersession:
         assert {node.node_id for node in graph_spec.nodes if node.path == _LEAF_PATH} == {f"{_GRAPH_ID}:{_ITEM}:node_1"}
         assert graph_spec.usage is not None
         assert (graph_spec.usage.total.inference_calls, graph_spec.usage.unattributed.inference_calls) == (2, 1)
+
+    def test_a_superseded_attempt_does_not_date_the_graph(self) -> None:
+        """The graph is dated by its earliest current event: the run's first attempt, lost an hour before the second
+        started, is no part of the graph, so it does not date it either.
+        """
+        one_hour = timedelta(hours=1)
+        second_attempt_events = [
+            event.model_copy(update={"timestamp": event.timestamp + one_hour})
+            for event in [
+                *_run_attempt_events(attempt=2, is_ended=True),
+                *_item_attempt_events(attempt=1, run_attempt=2, node_prefix=f"{_GRAPH_ID}:{_ITEM}", is_lost=False),
+            ]
+        ]
+        first_attempt_events = [
+            *_run_attempt_events(attempt=1, is_ended=False),
+            *_item_attempt_events(attempt=1, run_attempt=1, node_prefix=f"{_GRAPH_ID}:{_ITEM}-under-run-1", is_lost=True),
+        ]
+
+        graph_spec = GraphSpecAssembler.assemble(events=[*first_attempt_events, *second_attempt_events], graph_id=_GRAPH_ID)
+
+        second_attempt_start = min(event.timestamp for event in second_attempt_events)
+        assert second_attempt_start - max(event.timestamp for event in first_attempt_events) > one_hour - timedelta(minutes=5)
+        assert graph_spec.created_at == second_attempt_start

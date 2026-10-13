@@ -16,7 +16,7 @@ from pipelex import log
 from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
-from pipelex.tracing.event_log_protocol import EventLogProtocol
+from pipelex.tracing.event_log_protocol import EventLogProtocol, deduplicate_and_order_events
 from pipelex.tracing.exceptions import EventLogSchemaMismatchError
 from pipelex.tracing.trace_events import AnyTraceEvent, TraceEvent, json_invalid_message
 
@@ -145,7 +145,6 @@ class NdjsonEventLog(EventLogProtocol):
 
         ndjson_files = sorted(run_dir.glob("*.ndjson"))
 
-        seen: set[tuple[str, str, str, int]] = set()
         events: list[TraceEvent] = []
         refused_count = 0
         first_refusal: str | None = None
@@ -182,9 +181,7 @@ class NdjsonEventLog(EventLogProtocol):
                             first_refusal = f"{ndjson_path}:{line_number} — {format_pydantic_validation_error(validation_error)}"
                         continue
 
-                    if event.store_key not in seen:
-                        seen.add(event.store_key)
-                        events.append(event)
+                    events.append(event)
 
         if refused_count:
             msg = (
@@ -199,8 +196,7 @@ class NdjsonEventLog(EventLogProtocol):
         # sibling workflows by their names, not by execution order. In parent/child workflow
         # topologies this can cause incorrect producer map overwrites in GraphSpecAssembler.
         # Consider timestamp-based or topology-aware ordering.
-        events.sort(key=lambda evt: (evt.chain_key, evt.sequence, evt.writer_id))
-        return events
+        return deduplicate_and_order_events(events=events)
 
     # ------------------------------------------------------------------
     # Cleanup

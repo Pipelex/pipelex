@@ -366,6 +366,32 @@ class TestEmitRunnerFallback:
         engaged_records = [record for record in caplog.records if record.getMessage() == _ENGAGED_MESSAGE]
         assert len(engaged_records) == 1
 
+    def test_engaged_log_names_the_run_beside_its_execution(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Two direct runs in one process: the line fires once, for the first, and names that run by its tracer key,
+        since the execution of every direct run is `direct`.
+        """
+        _enable_ndjson_tracing(mocker, tmp_path)
+
+        manager = ReportingManager()
+        manager.setup()
+        with caplog.at_level(logging.INFO):
+            for run_id in ("run_first", "run_second"):
+                manager.report_inference_job(_make_llm_job(run_id, trace_context=_make_trace_context(graph_id=run_id)))
+
+        engaged_records = [record for record in caplog.records if record.getMessage() == _ENGAGED_MESSAGE]
+        assert [(getattr(record, "workflow_id", None), getattr(record, "tracer_key", None)) for record in engaged_records] == [
+            ("direct", "run_first")
+        ]
+        # Both runs' usage was emitted all the same, each under the direct execution.
+        for run_id in ("run_first", "run_second"):
+            usage_events = [evt for evt in NdjsonEventLog(traces_dir=str(tmp_path)).read_events(run_id) if isinstance(evt, UsageReportEvent)]
+            assert [evt.workflow_id for evt in usage_events] == ["direct"]
+
     def test_engaged_log_emitted_once_even_with_multiple_managers(
         self,
         tmp_path: Path,

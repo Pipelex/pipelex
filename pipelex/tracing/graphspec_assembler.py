@@ -150,11 +150,11 @@ class GraphSpecAssembler:
     workers, and the stream is ordered by (chain, sequence)), so "is this node
     real?" is only answerable once every event has been seen.
 
-    Only current events build the graph: an event whose chain holds a superseded attempt
-    is dropped, since a new attempt of a workflow replaces what its earlier attempt, and
-    every workflow that attempt dispatched, did. Its usage was spent all the same, so a
-    superseded usage report still counts in the run's total, as unattributed usage: the
-    node it named belongs to an attempt the graph does not show.
+    Only current events build the graph, and the earliest of them dates it: an event whose
+    chain holds a superseded attempt is dropped, since a new attempt of a workflow replaces
+    what its earlier attempt, and every workflow that attempt dispatched, did. Its usage was
+    spent all the same, so a superseded usage report still counts in the run's total, as
+    unattributed usage: the node it named belongs to an attempt the graph does not show.
     """
 
     @staticmethod
@@ -250,14 +250,15 @@ class _AssemblerState:
     def pass_one(self, events: Sequence[TraceEvent]) -> None:
         """Pass 1: Build nodes, producer map, and collect metadata."""
         for event in events:
-            self._track_earliest_timestamp(event)
-
             if event.chain_key not in self._current_chain_keys:
-                # A superseded attempt's event: what it recorded was done again, or undone, by a later attempt. Its
-                # usage was spent all the same, so it counts in the run's total, unattributed.
+                # A superseded attempt's event: what it recorded was done again, or undone, by a later attempt, so it
+                # neither builds the graph nor dates it. Its usage was spent all the same, so it counts in the run's
+                # total, unattributed.
                 if isinstance(event, UsageReportEvent):
                     self._usage_by_reported_node.setdefault(UNATTRIBUTED_NODE_ID, []).append(event.tokens_usage)
                 continue
+
+            self._track_earliest_timestamp(event)
 
             if isinstance(event, PipeStartEvent):
                 self._handle_pipe_start(event)

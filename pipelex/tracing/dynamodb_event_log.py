@@ -2,17 +2,21 @@
 
 Stores trace events in a DynamoDB table with the schema:
     PK: PIPELINE_RUN#{pipeline_run_id}
-    SK: EVENT#{chain_key}#{writer_id}#{sequence:010d}
-    payload: dict (full event via model_dump)
+    SK: EVENT#{chain_digest}#{writer_id}#{sequence:010d}
+    payload: the full event as JSON, its lineage, workflow and attempt included
 
-The chain key names the event's lineage followed by its own workflow and attempt
-(`TraceEvent.chain_key`), so a workflow's new attempt, whose sequence starts
-again, never overwrites the rows of its earlier one.
+The chain digest is the SHA-256 of the event's chain key, the event's lineage
+followed by its own workflow and attempt (`TraceEvent.chain_key`), so a
+workflow's new attempt, whose sequence starts again, never overwrites the rows
+of its earlier one, while the sort key keeps one length however deep the
+lineage and however long its workflow ids: DynamoDB refuses a sort key over
+1,024 bytes. The row's chain itself is read back from its payload.
 
 Compatible with the hosted trace-event DynamoDB adapter schema.
 Requires: pip install "pipelex[dynamodb]"
 """
 
+import hashlib
 import threading
 from typing import Any
 
@@ -23,7 +27,7 @@ from pipelex import log
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
-from pipelex.tracing.event_log_protocol import EventLogProtocol
+from pipelex.tracing.event_log_protocol import EventLogProtocol, deduplicate_and_order_events
 from pipelex.tracing.exceptions import EventLogReadError, EventLogSchemaMismatchError, EventLogSetupError
 from pipelex.tracing.trace_events import AnyTraceEvent, TraceEvent, json_invalid_message
 
@@ -41,9 +45,11 @@ class DynamoDBEventLog(EventLogProtocol):
     """Event log backed by AWS DynamoDB.
 
     Write path: PutItem per event, synchronous. DynamoDB's PK+SK uniqueness
-    provides natural deduplication for Temporal replay re-emissions.
-    Read path: Query on PK, returns events sorted by SK which encodes
-    (chain, writer_id, sequence).
+    provides natural deduplication for Temporal replay re-emissions, since a
+    replayed event has the same chain, writer and sequence, and so the same SK.
+    Read path: Query on PK, then the events deduplicated and ordered as every
+    event log returns them (`deduplicate_and_order_events`): the SK's chain
+    digest orders the rows by no chain.
 
     WARNING: Do not call emit() from inside a Temporal workflow body — the
     synchronous boto3 HTTP call will block the workflow thread and trigger
@@ -101,9 +107,13 @@ class DynamoDBEventLog(EventLogProtocol):
     @staticmethod
     def _make_sk(*, chain_key: str, writer_id: str, sequence: int) -> str:
         """The sort key of one event: its chain, its writer and its sequence, which tell it apart from every other event
-        of its run. The chain key holds no `#`, since it percent-encodes every workflow id it names.
+        of its run.
+
+        The chain is written as the SHA-256 hex digest of its key, so the sort key's length does not grow with the
+        lineage, and the same chain always gives the same digest, so a replayed write still overwrites its own row.
         """
-        return f"EVENT#{chain_key}#{writer_id}#{sequence:010d}"
+        chain_digest = hashlib.sha256(chain_key.encode("utf-8")).hexdigest()
+        return f"EVENT#{chain_digest}#{writer_id}#{sequence:010d}"
 
     def _key_condition(self, pipeline_run_id: str) -> Any:
         """Build a KeyConditionExpression for querying by pipeline_run_id."""
@@ -127,6 +137,10 @@ class DynamoDBEventLog(EventLogProtocol):
     @override
     def read_events(self, pipeline_run_id: str) -> list[TraceEvent]:
         """Read all events for a pipeline run from DynamoDB.
+
+        The events are deduplicated by `TraceEvent.store_key` and ordered by
+        (chain, sequence, writer_id), as every event log returns them, whatever
+        order the sort keys give the rows.
 
         Store-level failures (throttling, auth, network) are translated into
         ``EventLogReadError`` so best-effort callers (graph assembly) can degrade
@@ -197,7 +211,7 @@ class DynamoDBEventLog(EventLogProtocol):
             )
             raise EventLogSchemaMismatchError(msg)
 
-        return events
+        return deduplicate_and_order_events(events=events)
 
     @override
     def close(self) -> None:

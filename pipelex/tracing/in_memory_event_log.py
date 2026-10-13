@@ -4,7 +4,7 @@ import threading
 
 from typing_extensions import override
 
-from pipelex.tracing.event_log_protocol import EventLogProtocol
+from pipelex.tracing.event_log_protocol import EventLogProtocol, deduplicate_and_order_events
 from pipelex.tracing.trace_events import TraceEvent
 
 
@@ -53,17 +53,7 @@ class InMemoryEventLog(EventLogProtocol):
         same attempt's partition do not get reordered by writer-id
         lexicographic sort.
         """
-        filtered = [evt for evt in self._events if evt.pipeline_run_id == pipeline_run_id]
-
-        seen: set[tuple[str, str, str, int]] = set()
-        deduped: list[TraceEvent] = []
-        for event in filtered:
-            if event.store_key not in seen:
-                seen.add(event.store_key)
-                deduped.append(event)
-
-        deduped.sort(key=lambda evt: (evt.chain_key, evt.sequence, evt.writer_id))
-        return deduped
+        return deduplicate_and_order_events(events=[evt for evt in self._events if evt.pipeline_run_id == pipeline_run_id])
 
     @override
     def close(self) -> None:

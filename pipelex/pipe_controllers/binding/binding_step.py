@@ -288,21 +288,23 @@ class BindingStep(BaseModel):
         tracer_manager = GraphTracerManager.get_instance()
         if tracer_manager is None:
             return
+        error_type: str
+        error_message: str
+        caller_facing: bool
         if error is None:
-            tracer_manager.on_pipe_end_error(
-                lookup_key=trace_context.lookup_key,
-                node_id=node_id,
-                ended_at=datetime.now(UTC),
-                error_type="UnknownError",
-                error_message="the binding step stopped without binding a value",
-            )
-            return
-        traced_failure = make_traced_failure(error=error)
+            error_type = "UnknownError"
+            error_message = "the binding step stopped without binding a value"
+            caller_facing = False
+        else:
+            traced_failure = make_traced_failure(error=error)
+            error_type = type(error).__name__
+            error_message = traced_failure.message
+            caller_facing = traced_failure.caller_facing
         tracer_manager.on_pipe_end_error(
             lookup_key=trace_context.lookup_key,
             node_id=node_id,
             ended_at=datetime.now(UTC),
-            error_type=type(error).__name__,
-            error_message=traced_failure.message,
-            caller_facing=traced_failure.caller_facing,
+            error_type=error_type,
+            error_message=error_message,
+            caller_facing=caller_facing,
         )

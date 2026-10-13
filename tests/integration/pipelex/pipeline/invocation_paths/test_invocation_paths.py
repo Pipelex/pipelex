@@ -1,8 +1,10 @@
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
 import pytest
+from pytest_mock import MockerFixture
 
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -11,6 +13,7 @@ from pipelex.interpreter_hub import scoped_pipe_router
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.runtime_hub import scoped_event_log
 from pipelex.system.execution_chain import ExecutionAttempt
+from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.ndjson_event_log import NdjsonEventLog
 from pipelex.tracing.trace_events import PipeEndErrorEvent, PipeStartEvent, TraceEvent
@@ -46,10 +49,15 @@ def _concerned_node_id(line: dict[str, Any]) -> str:
 
 
 def _invocation_paths(lines: list[dict[str, Any]]) -> dict[str, tuple[str, str]]:
-    """By path, the code and type of the pipe each invocation start names, refusing two starts at one path."""
+    """By path, the code and type of the pipe each invocation start names, refusing two starts at one path and an
+    invocation started without a path: only a binding step, which runs no pipe, has none.
+    """
     paths: dict[str, tuple[str, str]] = {}
     for line in lines:
-        if line["event_kind"] != "pipe_start" or line["path"] is None:
+        if line["event_kind"] != "pipe_start":
+            continue
+        if line["path"] is None:
+            assert line["pipe_type"] == _BINDING_PIPE_TYPE, f"an invocation started without a path: {line['pipe_code']}"
             continue
         assert line["path"] not in paths, f"two starts at {line['path']}"
         paths[line["path"]] = (line["pipe_code"], line["pipe_type"])
@@ -222,3 +230,28 @@ class TestInvocationPaths:
         }
         binding_starts = [line for line in lines if line["event_kind"] == "pipe_start" and line["pipe_type"] == _BINDING_PIPE_TYPE]
         assert [(start["pipe_code"], start["path"]) for start in binding_starts] == [("filing.title", None)]
+
+    async def test_a_controller_that_hands_no_place_does_not_fail_the_run(
+        self, tmp_path: Path, mocker: MockerFixture, invocation_path_faults: list[logging.LogRecord]
+    ) -> None:
+        """Tracing never fails a run: a dispatch site that forgets to hand its pipe a place leaves that pipe without a
+        path, and the tracer logs the fault, which fails every other test (`tests/conftest.py`), while the run completes.
+        """
+
+        def _forget_the_place(self: JobMetadata, *, segment: str) -> JobMetadata:  # ruff: ignore[unused-function-argument]
+            return self
+
+        mocker.patch.object(JobMetadata, "for_child_at", _forget_the_place)
+        execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=True)
+        runner = PipelexMTHDSProtocol(execution_config=execution_config)
+        with scoped_event_log(NdjsonEventLog(traces_dir=str(tmp_path))):
+            response = await runner.execute(
+                mthds_contents=[InvocationPathsTestData.BOUND_STEP_BUNDLE],
+                inputs={"filing": {"concept": "bound_steps.Filing", "content": {"title": "Annual accounts"}}},
+            )
+
+        assert response.pipe_output.main_stuff.as_text.text == "Label: Annual accounts"
+        starts = [(line["pipe_code"], line["path"]) for line in _read_trace_lines(tmp_path) if line["event_kind"] == "pipe_start"]
+        assert starts == [("label_filing", "bound_steps.label_filing"), ("filing.title", None), ("write_label", None)]
+        assert [getattr(record, "pipe_ref", None) for record in invocation_path_faults] == ["bound_steps.write_label"]
+        invocation_path_faults.clear()

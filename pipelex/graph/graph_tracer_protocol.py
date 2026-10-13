@@ -128,8 +128,8 @@ class GraphTracerProtocol(Protocol):
         Returns:
             Tuple of (node_id for this pipe, updated TraceContext for children).
 
-        Raises:
-            InvocationPathError: The pipe is an invocation whose path the trace context cannot give.
+        Tracing never fails a run, so a tracer raises nothing when it cannot derive the pipe's invocation path: it
+        traces the pipe without one and logs the fault.
         """
         ...
 
@@ -427,9 +427,9 @@ class GraphTracerNoOp(GraphTracerProtocol):
         step_count: int | None = None,
         branch_count: int | None = None,
     ) -> tuple[str, TraceContext]:
+        # The no-op tracer records nothing, so it derives no invocation path either: tracing never fails a run.
         node_id = trace_context.make_node_id()
-        invocation_path = invocation_path_of_start(trace_context=trace_context, pipe_ref=pipe_ref, node_kind=node_kind)
-        child_context = trace_context.copy_for_child(node_id, next_sequence=trace_context.node_sequence + 1, invocation_path=invocation_path)
+        child_context = trace_context.copy_for_child(node_id, next_sequence=trace_context.node_sequence + 1, invocation_path=None)
         return node_id, child_context
 
     @override

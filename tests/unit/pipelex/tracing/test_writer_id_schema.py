@@ -5,6 +5,7 @@ expose a writer_id property, and that the read-side dedup/sort/file-routing keys
 all incorporate writer_id correctly.
 """
 
+import hashlib
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -199,7 +200,7 @@ class TestWriterIdSchema:
         assert events[2].writer_id == "primary"
 
     def test_dynamodb_sk_includes_writer_id(self, mocker: MockerFixture) -> None:
-        """DynamoDB SK encodes writer_id between the event's chain and its sequence."""
+        """DynamoDB SK encodes writer_id between the digest of the event's chain and its sequence."""
         captured_items: list[dict[str, Any]] = []
 
         class _StubTable:
@@ -220,7 +221,8 @@ class TestWriterIdSchema:
         event_log.emit(_make_pipe_start(sequence=0, writer_id="act_pid42"))
 
         assert len(captured_items) == 1
-        assert captured_items[0]["SK"] == f"EVENT#{_WORKFLOW_ID}@1#act_pid42#0000000000"
+        chain_digest = hashlib.sha256(f"{_WORKFLOW_ID}@1".encode()).hexdigest()
+        assert captured_items[0]["SK"] == f"EVENT#{chain_digest}#act_pid42#0000000000"
 
     def test_event_log_exposes_writer_id_property(self, tmp_path: Path) -> None:
         """Every event log backend exposes its writer_id via a read-only property.

@@ -5,11 +5,14 @@ GraphTracer's in-memory accumulation, but as immutable records suitable
 for NDJSON file storage and cross-worker graph assembly.
 """
 
+from collections.abc import Mapping
 from datetime import datetime
 from enum import StrEnum
-from typing import Annotated, Any, Literal
+from functools import cached_property
+from typing import Annotated, Any, Literal, Self
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from typing_extensions import override
 
 from pipelex.graph.condition_output_merge import ConditionOutputMerge
 from pipelex.graph.graphspec import EdgeKind, ErrorSpec, IOSpec, NodeKind
@@ -72,10 +75,16 @@ class TraceEvent(BaseModel):
 
     A store keeps apart every two events whose chain, writer or sequence differ (`store_key`): keyed on the workflow,
     the writer and the sequence alone, a workflow's new attempt would overwrite the events of its earlier one.
+
+    An event is frozen, since it records what happened: its chain, its chain key and its store key are computed from its
+    fields once, the first time they are read, and kept, as every read and every assembly of a run reads them for each
+    of its events.
     """
 
+    model_config = ConfigDict(frozen=True)
+
     pipeline_run_id: str
-    workflow_id: str
+    workflow_id: str = Field(min_length=1)
     attempt: int = Field(ge=1)
     lineage: list[ExecutionAttempt]
     path: str | None
@@ -84,22 +93,34 @@ class TraceEvent(BaseModel):
     timestamp: datetime
     sequence: int
 
-    @property
+    @cached_property
     def chain(self) -> list[ExecutionAttempt]:
         """The attempts from the run's own workflow down to the one that emitted this event."""
         return [*self.lineage, ExecutionAttempt(execution=self.workflow_id, attempt=self.attempt)]
 
-    @property
+    @cached_property
     def chain_key(self) -> str:
         """One string naming this event's chain, distinct for every two chains that differ."""
         return execution_chain_key(chain=self.chain)
 
-    @property
+    @cached_property
     def store_key(self) -> tuple[str, str, str, int]:
         """What tells this event apart from every other event of its run in a store: its chain, its writer, its kind
         and its sequence. Two writes with the same key are one event, written again by a replay.
         """
         return (self.chain_key, self.writer_id, type(self).__name__, self.sequence)
+
+    @override
+    def model_copy(self, *, update: Mapping[str, Any] | None = None, deep: bool = False) -> Self:
+        """A copy of this event, which computes its keys again: an update can change the fields they are read from."""
+        copied = super().model_copy(update=update, deep=deep)
+        for cached_name in _CACHED_EVENT_KEYS:
+            vars(copied).pop(cached_name, None)
+        return copied
+
+
+# The names under which a trace event keeps the keys it computed from its fields.
+_CACHED_EVENT_KEYS: tuple[str, ...] = ("chain", "chain_key", "store_key")
 
 
 # ---------------------------------------------------------------------------

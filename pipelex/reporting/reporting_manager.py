@@ -313,7 +313,11 @@ class ReportingManager(ReportingProtocol):
         workflow_id = trace_context.own_attempt.execution
         node_id = trace_context.parent_node_id or UNATTRIBUTED_NODE_ID
 
-        ActivityEventLogCache.log_once_runner_fallback_engaged(workflow_id=workflow_id, writer_id=process_event_log.writer_id)
+        # The line names the run's tracer key beside the execution: the execution is `direct` for every run in direct
+        # mode and under the kernel, so it alone would not say which run engaged the fallback.
+        ActivityEventLogCache.log_once_runner_fallback_engaged(
+            workflow_id=workflow_id, tracer_key=trace_context.lookup_key, writer_id=process_event_log.writer_id
+        )
 
         seq = process_event_log.next_sequence()
         event = UsageReportEvent(

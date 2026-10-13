@@ -1,11 +1,12 @@
 """Unit tests for GraphTracer."""
 
+import logging
 from datetime import UTC, datetime, timedelta
 
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graphspec import EdgeKind, GraphSpecMode, IOSpec, NodeKind, NodeStatus
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.unit.pipelex.graph.conftest import make_defaulted_data_inclusion_config
+from tests.unit.pipelex.graph.conftest import make_defaulted_data_inclusion_config, make_trace_context
 
 
 class TestGraphTracer:
@@ -167,6 +168,79 @@ class TestGraphTracer:
         assert all(edge.kind.is_contains for edge in edges)
         assert {edge.source for edge in edges} == {parent_id}
         assert {edge.target for edge in edges} == {child1_id, child2_id}
+
+    def test_a_pipe_started_without_its_place_is_traced_without_a_path(self, invocation_path_faults: list[logging.LogRecord]) -> None:
+        """Tracing never fails a run: a pipe whose controller handed it no segment is traced without a path, and so is
+        every pipe under it, which cannot be placed either, and the tracer logs each fault as an error.
+        """
+        tracer = GraphTracer()
+        context = tracer.setup(graph_id="unplaced-test", data_inclusion=make_defaulted_data_inclusion_config(), run_mode=PipeRunMode.LIVE)
+        started_at = datetime.now(UTC)
+
+        entry_id, entry_ctx = tracer.on_pipe_start(
+            pipe_ref="tests.my_sequence",
+            trace_context=context,
+            pipe_code="my_sequence",
+            pipe_type="PipeSequence",
+            node_kind=NodeKind.CONTROLLER,
+            started_at=started_at,
+        )
+        placed_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.step_one",
+            trace_context=entry_ctx.with_child_segment(segment="step_1"),
+            pipe_code="step_one",
+            pipe_type="PipeCompose",
+            node_kind=NodeKind.OPERATOR,
+            started_at=started_at,
+        )
+        unplaced_id, unplaced_ctx = tracer.on_pipe_start(
+            pipe_ref="tests.step_two",
+            trace_context=entry_ctx,
+            pipe_code="step_two",
+            pipe_type="PipeSequence",
+            node_kind=NodeKind.CONTROLLER,
+            started_at=started_at,
+        )
+        under_unplaced_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.leaf",
+            trace_context=unplaced_ctx.with_child_segment(segment="step_1"),
+            pipe_code="leaf",
+            pipe_type="PipeCompose",
+            node_kind=NodeKind.OPERATOR,
+            started_at=started_at,
+        )
+        for node_id in (under_unplaced_id, unplaced_id, placed_id, entry_id):
+            tracer.on_pipe_end_success(node_id=node_id, ended_at=started_at + timedelta(milliseconds=10))
+        graph_spec = tracer.teardown()
+
+        assert graph_spec is not None
+        assert {node.node_id: node.path for node in graph_spec.nodes} == {
+            entry_id: "tests.my_sequence",
+            placed_id: "tests.my_sequence/step_1",
+            unplaced_id: None,
+            under_unplaced_id: None,
+        }
+        faults = [(record.levelno, getattr(record, "pipe_ref", None), getattr(record, "node_id", None)) for record in invocation_path_faults]
+        assert faults == [(logging.ERROR, "tests.step_two", unplaced_id), (logging.ERROR, "tests.leaf", under_unplaced_id)]
+        invocation_path_faults.clear()
+
+    def test_an_inactive_tracer_derives_no_path(self) -> None:
+        """An inactive tracer records nothing, so it derives nothing that could fail the run, even from a context that
+        could place no pipe.
+        """
+        unplaceable_context = make_trace_context().with_child_segment(segment="step_1")
+
+        node_id, child_context = GraphTracer().on_pipe_start(
+            pipe_ref="tests.step_one",
+            trace_context=unplaceable_context,
+            pipe_code="step_one",
+            pipe_type="PipeCompose",
+            node_kind=NodeKind.OPERATOR,
+            started_at=datetime.now(UTC),
+        )
+
+        assert node_id == "test-graph:node_0"
+        assert (child_context.parent_node_id, child_context.parent_path, child_context.child_segment) == (node_id, None, None)
 
     def test_error_tracking(self) -> None:
         """Test tracking failed pipe execution."""
