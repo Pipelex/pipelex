@@ -218,6 +218,66 @@ class TestGraphTracerDecisionEvents:
 
         assert event_log.read_events(_PIPELINE_RUN_ID) == []
 
+    def test_a_costs_only_run_records_no_decision(self) -> None:
+        """A run that emits no graph events records no decision, even on a tracer it hands an event log."""
+        event_log = InMemoryEventLog()
+        tracer = GraphTracer()
+        context = tracer.setup(
+            graph_id=_GRAPH_ID,
+            data_inclusion=make_defaulted_data_inclusion_config(),
+            event_log=event_log,
+            pipeline_run_id=_PIPELINE_RUN_ID,
+            emit_graph_events=False,
+            run_mode=PipeRunMode.LIVE,
+        )
+        batch_id, batch_ctx = tracer.on_pipe_start(
+            trace_context=context, pipe_code="per_item", pipe_type="PipeBatch", node_kind=NodeKind.CONTROLLER, started_at=_T0
+        )
+        tracer.register_batch_fan_out(
+            batch_node_id=batch_id, item_count=1, branch_pipe_code="route", branch_pipe_ref="flows.route", branch_pipe_type="PipeCondition"
+        )
+        condition_id, _ = tracer.on_pipe_start(
+            trace_context=batch_ctx,
+            pipe_code="route",
+            pipe_type="PipeCondition",
+            node_kind=NodeKind.CONTROLLER,
+            started_at=_T0 + timedelta(seconds=1),
+        )
+        tracer.register_condition_resolution(condition_node_id=condition_id, rendered_value="yes", selected_outcome="yes")
+        assert tracer.teardown() is None
+
+        events = event_log.read_events(_PIPELINE_RUN_ID)
+        assert [event for event in events if isinstance(event, (BatchFannedOutEvent, ConditionResolvedEvent))] == []
+
+    def test_a_tracer_records_no_decision_on_a_node_it_never_started(self) -> None:
+        """A decision looked up on a tracer that does not hold the controller's node is dropped, as its execution data is.
+
+        The pipe started under that node, as a distributed run's child workflow starts its first pipe under its parent's
+        controller, gets no SELECTED_OUTCOME edge from a node absent from this tracer's graph.
+        """
+        tracer, context, event_log = _make_tracer(run_mode=PipeRunMode.LIVE)
+        foreign_node_id = "graph-decisions:other_workflow:node_0"
+        foreign_ctx = context.copy_for_child(child_node_id=foreign_node_id, next_sequence=0)
+
+        tracer.register_batch_fan_out(
+            batch_node_id=foreign_node_id,
+            item_count=1,
+            branch_pipe_code="process",
+            branch_pipe_ref="flows.process",
+            branch_pipe_type="PipeCompose",
+        )
+        tracer.register_condition_resolution(condition_node_id=foreign_node_id, rendered_value="yes", selected_outcome="yes")
+        chosen_id, _ = tracer.on_pipe_start(
+            trace_context=foreign_ctx, pipe_code="handle", pipe_type="PipeCompose", node_kind=NodeKind.OPERATOR, started_at=_T0
+        )
+        tracer.on_pipe_end_success(node_id=chosen_id, ended_at=_T0 + timedelta(seconds=1))
+        graph_spec = tracer.teardown()
+
+        events = event_log.read_events(_PIPELINE_RUN_ID)
+        assert [event for event in events if isinstance(event, (BatchFannedOutEvent, ConditionResolvedEvent))] == []
+        assert graph_spec is not None
+        assert [edge for edge in graph_spec.edges if edge.kind.is_selected_outcome] == []
+
     def test_a_trace_context_states_its_run_mode(self) -> None:
         """A context has no default mode: one built without it would stamp a dry run's events as live."""
         with pytest.raises(ValidationError, match="run_mode"):

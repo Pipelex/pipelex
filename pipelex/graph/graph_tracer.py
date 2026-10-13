@@ -694,7 +694,9 @@ class GraphTracer(GraphTracerProtocol):
     ) -> None:
         """Record that a PipeBatch knows how many items it runs, before it starts any of them.
 
-        Nothing of the graph depends on it: the event is for whoever reads the trace while the run goes on.
+        Nothing of the graph depends on it: the event is for whoever reads the trace while the run goes on. It is a graph
+        event, recorded on a node of this tracer's graph: a run that emits no graph events (costs-only) records none, and
+        neither does a tracer that never started the batch's node.
 
         Args:
             batch_node_id: The PipeBatch's node ID.
@@ -703,7 +705,9 @@ class GraphTracer(GraphTracerProtocol):
             branch_pipe_ref: The `domain.code` reference of the pipe each item runs.
             branch_pipe_type: The type of the pipe each item runs.
         """
-        if not self._is_active:
+        if not self._is_active or not self._emit_graph_events:
+            return
+        if batch_node_id not in self._nodes:
             return
         if self._event_log is not None:
             self._emit_event(
@@ -734,14 +738,19 @@ class GraphTracer(GraphTracerProtocol):
 
         The graph's SELECTED_OUTCOME edge runs from the condition to the pipe it then starts under its node, derived at
         teardown, as the event-replay assembler derives it from this resolution's event and that pipe's start, whichever
-        tracer wrote the start. An outcome mapped to `continue` or `fail` starts no pipe, and so draws no edge.
+        tracer wrote the start. An outcome mapped to `continue` or `fail` starts no pipe, and so draws no edge. A run that
+        emits no graph events (costs-only) records no resolution, and neither does a tracer that never started the
+        condition's node, which would otherwise write an event the assembler could draw an edge from a node absent from
+        the graph with.
 
         Args:
             condition_node_id: The PipeCondition's node ID.
             rendered_value: The value the condition's expression rendered.
             selected_outcome: The outcome-map key the value matched, or None when the default outcome was taken.
         """
-        if not self._is_active:
+        if not self._is_active or not self._emit_graph_events:
+            return
+        if condition_node_id not in self._nodes:
             return
         self._condition_resolutions[condition_node_id] = selected_outcome
         if self._event_log is not None:

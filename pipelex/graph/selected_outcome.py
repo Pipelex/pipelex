@@ -30,7 +30,9 @@ def derive_selected_outcome_edges(
 
     A live condition starts no pipe but the one of the outcome it chose, and an outcome mapped to `continue` or `fail`
     starts none, so every pipe whose parent is a resolved condition is the pipe of its chosen outcome. A dry run resolves
-    no condition, so its graph has no such edge.
+    no condition, so its graph has no such edge. A resolution whose condition node is not in the graph draws no edge,
+    since the edge would have no source: the event-replay assembler reads resolutions from events whichever writer wrote
+    them, and a pipe can name as its parent a node whose start is not among the events it reads.
 
     Args:
         resolutions: The selected outcome of each resolved condition, by the condition's node ID: the outcome-map key
@@ -43,7 +45,7 @@ def derive_selected_outcome_edges(
     """
     edges: list[SelectedOutcomeEdge] = []
     for node_id, parent_node_id in parent_by_node.items():
-        if parent_node_id is None or parent_node_id not in resolutions:
+        if parent_node_id is None or parent_node_id not in resolutions or parent_node_id not in parent_by_node:
             continue
         edges.append(
             SelectedOutcomeEdge(

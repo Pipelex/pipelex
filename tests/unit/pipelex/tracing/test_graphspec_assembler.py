@@ -602,6 +602,38 @@ class TestGraphSpecAssembler:
         selected_edges = [edge for edge in result.edges if edge.kind == EdgeKind.SELECTED_OUTCOME]
         assert [(edge.source, edge.target, edge.label) for edge in selected_edges] == [(condition, outcome, "true")]
 
+    def test_a_resolution_of_a_condition_absent_from_the_graph_draws_no_edge(self) -> None:
+        """A resolution whose condition node no event started draws no SELECTED_OUTCOME edge from a node the graph lacks."""
+        absent_condition = _node_id(_WF_B, 0)
+        outcome = _node_id(_WF_A, 0)
+
+        events = [
+            PipeStartEvent(
+                **_base(_WF_A, 0),
+                node_id=outcome,
+                parent_node_id=absent_condition,
+                pipe_code="branch_true",
+                pipe_type="PipeLLM",
+                node_kind=NodeKind.OPERATOR,
+            ),
+            PipeEndSuccessEvent(
+                **_base(_WF_A, 1),
+                node_id=outcome,
+                ended_at=_time_at(4),
+            ),
+            ConditionResolvedEvent(
+                **_base(_WF_B, 0),
+                node_id=absent_condition,
+                rendered_value="true",
+                selected_outcome="true",
+            ),
+        ]
+
+        result = GraphSpecAssembler.assemble(events=events, graph_id=_GRAPH_ID)
+
+        assert [node.node_id for node in result.nodes] == [outcome]
+        assert [edge for edge in result.edges if edge.kind == EdgeKind.SELECTED_OUTCOME] == []
+
     def test_partial_failure(self) -> None:
         """Child fails with error, parent has no end event → FAILED + CANCELED."""
         parent = _node_id(_WF_A, 0)

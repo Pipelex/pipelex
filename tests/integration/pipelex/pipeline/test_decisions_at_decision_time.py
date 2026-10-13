@@ -7,15 +7,20 @@ sequence and a parallel state their width on their own start, and every line say
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
+from pytest_mock import MockerFixture
 
+import pipelex.pipeline.pipeline_run_setup as pipeline_run_setup_module
 from pipelex.config import get_config
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.runtime_hub import scoped_event_log
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.ndjson_event_log import NdjsonEventLog
+
+if TYPE_CHECKING:
+    from pipelex.pipe_run.pipe_job import PipeJob
 
 _DOMAIN = "decisions_at_decision_time"
 _BUNDLE = f"""
@@ -244,3 +249,37 @@ class TestDecisionsAtDecisionTime:
         starts = _starts_by_code(lines)
         assert starts["triage"][0]["step_count"] == 4
         assert starts["weigh"][0]["branch_count"] == 2
+
+    async def test_a_live_request_on_a_keyless_boot_is_dry_throughout(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """A keyless boot runs a requested live run dry: its job, its trace context, every event and its graph all say dry."""
+        mocker.patch("pipelex.runtime_hub.is_dry_run_forced", return_value=True)
+        prepare_pipe_job_spy = mocker.spy(pipeline_run_setup_module, "prepare_pipe_job")
+        execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=True)
+        runner = PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.LIVE, execution_config=execution_config)
+
+        with scoped_event_log(NdjsonEventLog(traces_dir=str(tmp_path))):
+            response = await runner.execute(
+                mthds_contents=[_BUNDLE],
+                inputs={"request": "urgent", "inbox": {"concept": f"{_DOMAIN}.Inbox", "content": _INBOX}},
+            )
+
+        pipe_job: PipeJob = prepare_pipe_job_spy.spy_return
+        assert pipe_job.pipe_run_params.run_mode.is_dry
+        trace_context = pipe_job.job_metadata.trace_context
+        assert trace_context is not None
+        assert trace_context.run_mode.is_dry
+        lines = _read_trace_lines(tmp_path)
+        assert {line["mode"] for line in lines} == {"dry"}
+        graph_spec = response.pipe_output.graph_spec
+        assert graph_spec is not None
+        assert graph_spec.meta["mode"] == "dry"
+        # The pipes ran dry too: the condition ran every outcome and resolved none.
+        assert [line for line in lines if line["event_kind"] == "condition_resolved"] == []
+
+    async def test_a_keyless_boot_still_refuses_mock_usage_on_a_live_request(self, mocker: MockerFixture) -> None:
+        """The requested mode is validated before the keyless coercion, so it cannot legalise mock usage on a live request."""
+        mocker.patch("pipelex.runtime_hub.is_dry_run_forced", return_value=True)
+        runner = PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.LIVE, is_mock_usage=True)
+
+        with pytest.raises(ValueError, match="is_mock_usage"):
+            await runner.execute(mthds_contents=[_BUNDLE], inputs={"request": "urgent"})
