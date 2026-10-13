@@ -42,7 +42,7 @@ from contextlib import AbstractContextManager
 from typing import Any, Self
 from uuid import uuid4
 
-from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams, check_mock_usage_requires_dry
+from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.llm.llm_setting import LLMModelChoice
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -50,6 +50,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.kernel.exceptions import TraceContextRunModeError
 from pipelex.kernel.llm_ops import (
     resolve_llm_setting_for_object,
     resolve_llm_setting_for_text,
@@ -59,7 +60,7 @@ from pipelex.kernel.llm_ops import (
 from pipelex.kernel.llm_prompt_content import LlmPromptContent
 from pipelex.kernel.llm_results import LlmObjectResult, LlmTextResult
 from pipelex.kernel.templating_style_ops import resolve_templating_style
-from pipelex.runtime_hub import resolve_run_mode_for_boot
+from pipelex.runtime_hub import resolve_effective_run_mode
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
@@ -106,11 +107,18 @@ class PipelexKernel:
         This is a run-params factory, so it owes the same keyless-boot contract as the pipe tier's:
         a process booted with ``needs_inference=False`` forces every run it initiates to DRY, and a
         kernel that skipped that would spend real money on the exact boot this package documents as
-        its target. Applied through the shared ``resolve_run_mode_for_boot`` — a second copy of the
+        its target. Applied through the shared ``resolve_effective_run_mode`` — a second copy of the
         rule at a second factory is how the two would drift. And, like the pipe tier's factory, the
         REQUESTED mode is validated before that coercion: ``is_mock_usage`` is a DRY-only sub-flag,
         so an illegal LIVE request must fail loud on every boot rather than be silently legalised by
         a keyless process forcing it to DRY.
+
+        A ``trace_context`` must state the mode the run takes, the coerced one on a keyless boot: every
+        usage event a step writes states the context's ``run_mode``, so a context saying live for a run
+        whose steps run dry would stamp the whole run live. The caller opened that trace and may share it
+        with writers the kernel never sees, so the kernel refuses a context stating another mode with
+        ``TraceContextRunModeError``, before any step runs, rather than correct its own copy and leave
+        the others disagreeing.
 
         ``request_id`` is the inbound request this run serves, the identifier a hosted deployment
         filters its logs on. It rides the run metadata beside ``user_id``, reaches every step's
@@ -157,7 +165,15 @@ class PipelexKernel:
         replay-safe source here; the kernel stays ignorant of it, which is the point of this tier —
         nothing about a durable backend reaches the runtime or the code it runs.
         """
-        check_mock_usage_requires_dry(run_mode=run_mode, is_mock_usage=is_mock_usage)
+        effective_run_mode = resolve_effective_run_mode(requested=run_mode, is_mock_usage=is_mock_usage)
+        if trace_context is not None and trace_context.run_mode != effective_run_mode:
+            msg = (
+                f"PipelexKernel.make was given a trace context stating a {trace_context.run_mode} run for a run that "
+                f"runs {effective_run_mode}: every event of the run would state a mode its steps do not run in. Open "
+                f"the trace with run_mode={effective_run_mode}, the mode resolve_effective_run_mode gives this request "
+                "on this boot; a boot without inference runs every run dry."
+            )
+            raise TraceContextRunModeError(msg)
         return cls(
             job_metadata=JobMetadata(
                 run_metadata=RunMetadata(
@@ -170,7 +186,7 @@ class PipelexKernel:
                 ),
                 trace_context=trace_context,
             ),
-            cogt_run_params=CogtRunParams(run_mode=resolve_run_mode_for_boot(requested=run_mode), is_mock_usage=is_mock_usage),
+            cogt_run_params=CogtRunParams(run_mode=effective_run_mode, is_mock_usage=is_mock_usage),
             step_id_source=step_id_source,
         )
 

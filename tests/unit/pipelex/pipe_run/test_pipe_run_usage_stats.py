@@ -35,6 +35,7 @@ def _job(*, mocker: MockerFixture, is_traced: bool) -> Any:
         data_inclusion=DataInclusionConfig(pipe_and_concept_registry=False, stuff_json_content=False, error_stack_traces=False),
         emit_graph_events=False,
         emit_usage_events=True,
+        run_mode=PipeRunMode.LIVE,
     )
     job.job_metadata = JobMetadata(
         run_metadata=RunMetadata(user_id="pytest", pipeline_run_id=USAGE_STATS_RUN_ID, storage_scope="test/scope", read_scope=None),

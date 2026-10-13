@@ -24,10 +24,9 @@ from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.runtime_hub import get_event_log_override
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.system.job_metadata import RunMetadata
-from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tracing.event_log_factory import make_event_log
-from pipelex.tracing.exceptions import EventLogError
+from pipelex.tracing.exceptions import EventLogError, TraceEventModeError
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
 from pipelex.tracing.trace_events import TraceEvent
 from pipelex.tracing.usage_aggregator import UsageAggregator
@@ -137,7 +136,6 @@ def assemble_tracing(
     assemble_usage: bool,
     domain_code: str | None = None,
     main_pipe_code: str | None = None,
-    run_mode: PipeRunMode = PipeRunMode.LIVE,
     run_metadata: RunMetadata | None = None,
     trace_events: RunTraceEvents | None = None,
 ) -> TracingAssembly:
@@ -154,8 +152,10 @@ def assemble_tracing(
     errors, missing optional dependencies) are caught and recorded in the ``*_error``
     fields, not propagated. Either backend refuses a log holding an event the current
     models do not accept with ``EventLogSchemaMismatchError``, also an ``EventLogError``:
-    the read fails as a whole, so such a run gets neither its graph nor its usage total. Programming bugs (KeyError,
-    AttributeError, etc.) propagate so they surface during development.
+    the read fails as a whole, so such a run gets neither its graph nor its usage total. The graph's provenance mode is
+    the run mode its events state: events that mix modes hold more than one run, and get no graph, the assembler's
+    ``TraceEventModeError`` recorded in ``graph_assembly_error``. Programming bugs (KeyError, AttributeError, etc.)
+    propagate so they surface during development.
 
     Args:
         pipeline_run_id: The pipeline run ID to query events for.
@@ -163,7 +163,6 @@ def assemble_tracing(
         assemble_usage: Whether to aggregate token usage from the events.
         domain_code: Domain code for the graph's pipeline ref.
         main_pipe_code: Main pipe code for the graph's pipeline ref.
-        run_mode: Final pipe run mode used to stamp GraphSpec provenance.
         run_metadata: The run this assembly belongs to, stamped onto the result so a
             transport that offloads it keys it inside the run's namespace. None for a
             run with no host-supplied scope.
@@ -186,7 +185,6 @@ def assemble_tracing(
             assemble_usage=assemble_usage,
             domain_code=domain_code,
             main_pipe_code=main_pipe_code,
-            run_mode=run_mode,
             trace_events=trace_events,
         )
 
@@ -199,7 +197,6 @@ def _assemble_tracing_events(
     assemble_usage: bool,
     domain_code: str | None,
     main_pipe_code: str | None,
-    run_mode: PipeRunMode,
     trace_events: RunTraceEvents | None,
 ) -> TracingAssembly:
     """The body of ``assemble_tracing``, run inside the log context it binds: read the events once, assemble onto ``result``."""
@@ -230,12 +227,11 @@ def _assemble_tracing_events(
                     domain=domain_code,
                     main_pipe=main_pipe_code,
                 ),
-                mode=run_mode.graphspec_mode,
             )
             log.debug("Assembled the graph from the trace events", fields={"event_count": len(events)})
-        except ValidationError as validation_error:
-            log.warning("The graph could not be assembled from the trace events", fields=error_fields(exc=validation_error))
-            result.graph_assembly_error = f"Graph assembly failed for pipeline_run_id={pipeline_run_id}: {validation_error}"
+        except (ValidationError, TraceEventModeError) as assembly_error:
+            log.warning("The graph could not be assembled from the trace events", fields=error_fields(exc=assembly_error))
+            result.graph_assembly_error = f"Graph assembly failed for pipeline_run_id={pipeline_run_id}: {assembly_error}"
 
     return result
 
@@ -248,7 +244,6 @@ def assemble_tracing_on_output(
     assemble_usage: bool,
     domain_code: str | None = None,
     main_pipe_code: str | None = None,
-    run_mode: PipeRunMode = PipeRunMode.LIVE,
     trace_events: RunTraceEvents | None = None,
 ) -> None:
     """Assemble graph and/or usage from trace events and set them on pipe_output (DIRECT mode).
@@ -264,7 +259,6 @@ def assemble_tracing_on_output(
         assemble_usage: Whether to aggregate and set token usage.
         domain_code: Domain code for the graph's pipeline ref.
         main_pipe_code: Main pipe code for the graph's pipeline ref.
-        run_mode: Final pipe run mode used to stamp GraphSpec provenance.
         trace_events: The run's events when the caller already read them; None to read them here.
     """
     result = assemble_tracing(
@@ -273,7 +267,6 @@ def assemble_tracing_on_output(
         assemble_usage=assemble_usage,
         domain_code=domain_code,
         main_pipe_code=main_pipe_code,
-        run_mode=run_mode,
         # Inherited from the output this assembly decorates, so both key together.
         run_metadata=pipe_output.job_metadata.run_metadata if pipe_output.job_metadata else None,
         trace_events=trace_events,

@@ -183,6 +183,8 @@ class GraphSpec(BaseModel):
 
 `meta.format` is always `"mthds"` on newly emitted Pipelex graphs. `meta.mode` records provenance for renderers and shared tooling: Pipelex execution graphs emit `"dry"` for dry-run/mock execution and `"live"` for real execution. The shared renderer also accepts `"static"` for graphs produced by a static MTHDS graph builder.
 
+Each builder takes the mode from the run itself, never from a default. The in-process tracer takes the `run_mode` its opener states. The assembler takes the `mode` its events state: it is given no mode of its own, and it refuses, with `TraceEventModeError`, a set of events that states more than one mode, which holds more than one run, and an empty set, which states none. `assemble_tracing` records that refusal as the run's `graph_assembly_error` and keeps the run's usage.
+
 ### Node Types
 
 | NodeKind | Description |
@@ -203,7 +205,7 @@ class GraphSpec(BaseModel):
 | `CONTROL` | Execution flow between pipes |
 | `DATA` | Data flow (stuff passed between pipes) |
 | `CONTAINS` | Parent-child containment (controller → children) |
-| `SELECTED_OUTCOME` | Condition outcome selection |
+| `SELECTED_OUTCOME` | From a live `PipeCondition` to the pipe of the outcome it chose, labelled with the outcome-map key the value matched, unlabelled when the default outcome was taken. Both builders derive it from the condition's `condition_resolved` event and the start of the chosen pipe (see [Decisions at Decision Time](#decisions-at-decision-time)) |
 | `BATCH_ITEM` | Batch fan-out: input list → item extracted for each batch iteration |
 | `BATCH_AGGREGATE` | Batch fan-in: item outputs → aggregated output list |
 | `PARALLEL_COMBINE` | Branch outputs → combined output in PipeParallel |
@@ -237,6 +239,7 @@ trace_context = manager.open_tracer(
     data_inclusion=config.data_inclusion,
     pipeline_ref_domain="my_domain",
     pipeline_ref_main_pipe="my_pipe",
+    run_mode=PipeRunMode.LIVE,  # required: whoever opens the trace states the run's mode
 )
 
 # 2. Context flows through JobMetadata to each pipe
@@ -293,6 +296,49 @@ Semantics:
 
 This is what lets a graph-producing dry-run trace entirely in memory (no NDJSON file, no DynamoDB round-trip). Both dry-run entrypoints rely on it: `dry_run_pipe_in_process` (`pipelex/pipe_run/dry_run_in_process.py` — the graph arm of protocol `validate` and of the single Temporal validation activity) and `dry_run_pipeline` (`pipelex/pipeline/dry_run_pipeline.py`) itself — these functions exist to produce a graph, so they install their own scoped `InMemoryEventLog` rather than depending on the host having tracing configured (a host with `runtime.tracing.is_enabled = false`, like pipelex-api's `/validate` in direct mode, still gets its graph). A run that nonetheless finishes without a graph raises the typed `DryRunGraphNotProducedError`.
 
+### Trace Events
+
+The tracer writes one event for each thing that happens in the run, in the order it happens (`pipelex/tracing/trace_events.py`). Every backend carries the events whole: the NDJSON and DynamoDB logs store each one as its JSON and read it back through the discriminated union `AnyTraceEvent`, and the in-memory and buffering logs hold the objects themselves. Every event carries these fields:
+
+- `pipeline_run_id`, `workflow_id` and `writer_id`, which name the run, the workflow and the process that wrote it;
+- `timestamp`, and `sequence`, which rises with each event one writer writes;
+- `event_kind`, which tells the event's kind;
+- `mode`, `live` or `dry`, the mode of the run that wrote it.
+
+The run's `TraceContext` carries the mode as `run_mode`, so a usage event that an activity writes from the context alone states it too. `mode` is required: an event stored by a version that did not write it is refused with `EventLogSchemaMismatchError` rather than read as live, and running the pipeline again writes a log in the current shape. `run_mode` is required too, with no default, on `TraceContext`, on `GraphTracerManager.open_tracer` and on the tracer's `setup`, since a default would stamp a dry run's events as live: whoever opens a trace states the mode, and a workflow that opens a tracer of its own for part of a run passes the `run_mode` of the context it received.
+
+The mode a trace states is the one the run's pipes run in, which is not always the one requested: a keyless boot (`needs_inference=False`) runs a requested live run dry. `pipeline_run_setup` therefore resolves the run's mode once, before it opens the tracer, through `resolve_effective_run_mode` (`pipelex/runtime_hub.py`), which first refuses `is_mock_usage` on a live request and then applies the keyless coercion. The tracer, the trace context, the OpenTelemetry context and the pipe job all take that one value, so a forced dry run states `dry` on every event and on its graph, and opens no OpenTelemetry trace, as no dry run does. The kernel tier holds to the same rule from the other side: its caller opens the trace, so `PipelexKernel.make` refuses, with `TraceContextRunModeError`, a trace context stating another mode than the one `resolve_effective_run_mode` gives the run (see [The Pipelex Kernel](pipelex-kernel.md)).
+
+| `event_kind` | Written when | What it carries |
+|---|---|---|
+| `pipe_start` | A pipe starts | The node, its parent, the pipe's code, type, description and domain, its node kind and its inputs; a `PipeSequence` also states `step_count`, the number of steps its author wrote, and a `PipeParallel` states `branch_count`, the number of its branches, both `null` on every other pipe |
+| `pipe_end_success` | A pipe ends with an output | The node, its end time, its output and its metrics |
+| `pipe_end_error` | A pipe fails | The node, its end time and the error |
+| `pipe_end_skipped` | A pipe is lifted because a plain input is absent | The node, its end time, the reason, and the empty list a plural output still writes |
+| `edge` | The tracer draws an edge | Its source, target, kind, label and stuff digests |
+| `controller_output` | A controller registers an output it produced | The node and the output |
+| `batch_item` | A `PipeBatch` extracts an item from its input list | The list and item digests, the item index and the batch's node |
+| `batch_aggregate` | A `PipeBatch` adds an item's result to its output list | The output list and item digests, the item index and the batch's node |
+| `parallel_combine` | A `PipeParallel` combines its branch outputs | The combined digest, the branch digests and their producers |
+| `condition_output_merge` | A dry-run `PipeCondition` merges its outcomes' outputs (see [A Dry-Run Condition's Output](#a-dry-run-conditions-output)) | The merge record |
+| `condition_resolved` | A live `PipeCondition`'s choice is final, before anything runs under it | The condition's node, `rendered_value`, the value its expression rendered, and `selected_outcome`, the outcome-map key the value matched, or `null` when the default outcome was taken |
+| `batch_fanned_out` | A `PipeBatch` knows how many items it runs, before any item starts | The batch's node, `item_count`, and the pipe each item runs: `branch_pipe_code`, its bare code, `branch_pipe_ref`, its domain-qualified reference, and `branch_pipe_type` |
+| `execution_data` | A pipe records details of its execution | The node, and the entries merged into its `execution_data` |
+| `usage_report` | An inference job reports what it used | The node it is attributed to and its usage |
+
+#### Decisions at Decision Time
+
+A controller records each decision the moment it is final, so a reader following the trace while the run goes on knows a condition's outcome and a batch's width before the work under them runs. A live `PipeCondition` writes `condition_resolved` once its choice is final: at once for an outcome mapped to `continue` or `fail`, which runs nothing, and, for an outcome that runs a pipe, once it has found that pipe's inputs in working memory. A chosen pipe whose inputs are missing fails the condition before it runs, so the trace records no outcome taken, neither the event nor the execution data. A `PipeBatch` writes `batch_fanned_out` before its first item starts. A dry run runs every outcome of a condition and chooses none, so it writes no `condition_resolved` and no `SELECTED_OUTCOME` edge; a dry batch still writes `batch_fanned_out` for the items it runs. Both are graph events about a node of the tracer's graph: a run that emits no graph events, in costs-only mode, writes neither, and a tracer records a decision only on a node it started itself, as it records execution data, so a decision looked up on a tracer that does not hold the controller's node is dropped rather than written for a node that tracer's graph lacks.
+
+The controllers register their execution data at the same moments:
+
+- A `PipeSequence` registers `step_count` as it starts, and `current_step`, the step's number among the steps its author wrote, as each step starts. The binding written for a dotted `batch_over` shares the number of the batch step after it.
+- A `PipeParallel` registers `branch_count`, `add_each_output` and `combined_output_concept` before any branch runs.
+- A `PipeBatch` registers `item_count` and `branch_pipe_code` with its fan-out. The two spellings of `branch_pipe_code` differ: the execution data carries the blueprint's field as its author wrote it, which may be domain-qualified, such as `my_domain.summarize`, while the `batch_fanned_out` event's `branch_pipe_code` is always the bare code, `summarize`, with `branch_pipe_ref` the qualified reference, `my_domain.summarize`.
+- A live `PipeCondition` registers `evaluated_expression` and `selected_outcome` with its resolution. Here `selected_outcome` is the outcome itself, the code of the pipe it runs or `continue` or `fail`, where the `condition_resolved` event names the outcome-map key.
+
+Both graph builders derive the `SELECTED_OUTCOME` edge from two facts of the run, by the one rule in `pipelex/graph/selected_outcome.py`: a condition's `condition_resolved`, and the start of a pipe whose parent is that condition's node, which can only be the pipe of the outcome it chose. The in-process tracer applies the rule at teardown to the resolutions it recorded and the nodes it holds; the assembler applies it after reading every event, whichever tracer wrote them. The edge is never drawn when the chosen pipe starts, because in a distributed run that pipe can start in another workflow, under a tracer of its own that never saw the resolution, so the edge would be missing from one graph of the run and present in the other. An outcome mapped to `continue` or `fail` starts no pipe under the condition, so it has no edge, and a resolution whose condition node is not in the graph draws none either, since the edge would have no source. The tracer still writes the edge as an `edge` event at teardown, as it does every derived edge, and the assembler regenerates it rather than reading that event, so it is never doubled. Neither builder reads `batch_fanned_out`, because a batch's items are already its children. Both builders therefore build the same graph from the same events.
+
 ### TraceContext Propagation
 
 TraceContext is a serializable context that flows through pipe execution:
@@ -303,6 +349,7 @@ class TraceContext(BaseModel):
     parent_node_id: str | None  # Parent pipe's node ID
     node_sequence: int  # Counter for generating node IDs
     data_inclusion: DataInclusionConfig  # What data to capture
+    run_mode: PipeRunMode  # Live or dry, stated on every trace event
 
     def copy_for_child(self, child_node_id: str, *, next_sequence: int) -> TraceContext:
         """Create context for nested pipe execution."""
@@ -311,6 +358,7 @@ class TraceContext(BaseModel):
             parent_node_id=child_node_id,
             node_sequence=next_sequence,
             data_inclusion=self.data_inclusion,
+            run_mode=self.run_mode,
         )
 ```
 
@@ -564,6 +612,8 @@ validate_graphspec(graph_spec)
 | File | Purpose |
 |------|---------|
 | `pipelex/graph/graphspec.py` | Canonical GraphSpec model |
+| `pipelex/tracing/trace_events.py` | The trace events and their discriminated union |
+| `pipelex/tracing/graphspec_assembler.py` | Builds the GraphSpec from a run's trace events |
 | `pipelex/tracing/usage_attribution.py` | Per-node usage accumulation and subtree rollup |
 | `pipelex/graph/graph_tracer.py` | GraphTracer implementation |
 | `pipelex/graph/graph_tracer_manager.py` | Singleton manager for tracers |
@@ -572,6 +622,7 @@ validate_graphspec(graph_spec)
 | `pipelex/system/data_inclusion_config.py` | Data-capture flags carried by the trace context, surfaced in the TOML under `interpreter.pipeline_execution.graph.data_inclusion` |
 | `pipelex/graph/graph_analysis.py` | Pre-computed graph analysis |
 | `pipelex/graph/condition_output_merge.py` | The merge record of a dry-run condition and the rewrite both graph builders apply |
+| `pipelex/graph/selected_outcome.py` | The rule both graph builders derive a live condition's `SELECTED_OUTCOME` edges by |
 | `pipelex/graph/graph_factory.py` | Output generation factory |
 | `pipelex/graph/graph_config.py` | Configuration models |
 | `pipelex/graph/validation.py` | GraphSpec validation |

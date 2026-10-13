@@ -8,6 +8,7 @@ from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.graph.graphspec import NodeKind
 from pipelex.system.job_metadata import JobCategory, JobMetadata, RunMetadata, UnitJobId
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.trace_events import PipeStartEvent, TraceEvent, UsageReportEvent
 from pipelex.tracing.usage_aggregator import UsageAggregator
 
@@ -37,6 +38,7 @@ def _make_base_fields(sequence: int = 0) -> dict[str, Any]:
         "workflow_id": _WORKFLOW_ID,
         "timestamp": _TIMESTAMP,
         "sequence": sequence,
+        "mode": PipeRunMode.LIVE,
     }
 
 

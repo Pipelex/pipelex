@@ -10,6 +10,7 @@ from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.graph.graphspec import GraphSpec, NodeKind, NodeSpec
 from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.system.job_metadata import JobCategory, JobMetadata, RunMetadata, UnitJobId
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
 from pipelex.tracing.trace_events import (
     UNATTRIBUTED_NODE_ID,
@@ -39,6 +40,7 @@ def _base(sequence: int) -> dict[str, Any]:
         "workflow_id": _WORKFLOW_ID,
         "timestamp": _T0 + timedelta(seconds=sequence),
         "sequence": sequence,
+        "mode": PipeRunMode.LIVE,
     }
 
 

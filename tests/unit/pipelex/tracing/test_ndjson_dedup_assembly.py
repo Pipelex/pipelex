@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 
 from pipelex.graph.graphspec import EdgeKind, IOSpec, NodeKind, NodeStatus
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
 from pipelex.tracing.ndjson_event_log import NdjsonEventLog
 from pipelex.tracing.trace_events import (
@@ -35,6 +36,7 @@ def _base(sequence: int) -> dict[str, Any]:
         "workflow_id": _WF_ID,
         "timestamp": _time_at(sequence),
         "sequence": sequence,
+        "mode": PipeRunMode.LIVE,
     }
 
 

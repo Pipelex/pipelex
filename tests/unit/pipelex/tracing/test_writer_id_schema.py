@@ -13,6 +13,7 @@ from typing import Any
 from pytest_mock import MockerFixture
 
 from pipelex.graph.graphspec import NodeKind
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.buffering_event_log import BufferingEventLog
 from pipelex.tracing.dynamodb_event_log import DynamoDBEventLog
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
@@ -31,6 +32,7 @@ def _make_pipe_start(sequence: int, writer_id: str = "primary", workflow_id: str
         writer_id=writer_id,
         timestamp=_TS,
         sequence=sequence,
+        mode=PipeRunMode.LIVE,
         node_id=f"g:{workflow_id}:node_{sequence}",
         pipe_code="pipe_x",
         pipe_type="PipeLLM",
@@ -48,6 +50,7 @@ class TestWriterIdSchema:
             workflow_id=_WORKFLOW_ID,
             timestamp=_TS,
             sequence=0,
+            mode=PipeRunMode.LIVE,
             node_id=f"g:{_WORKFLOW_ID}:node_0",
             pipe_code="pipe_x",
             pipe_type="PipeLLM",
@@ -75,6 +78,7 @@ class TestWriterIdSchema:
             "workflow_id": _WORKFLOW_ID,
             "timestamp": _TS.isoformat(),
             "sequence": 0,
+            "mode": "live",
             "event_kind": "pipe_start",
             "node_id": f"g:{_WORKFLOW_ID}:node_0",
             "pipe_code": "pipe_x",

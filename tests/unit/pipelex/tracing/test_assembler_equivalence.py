@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Callable
 
 import pytest
+from pytest_mock import MockerFixture
 
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
@@ -21,7 +22,9 @@ from pipelex.graph.condition_output_merge import ConditionOutputMerge, Condition
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graphspec import EdgeKind, EdgeSpec, GraphSpec, IOSpec, NodeKind, NodeSpec
 from pipelex.system.job_metadata import JobCategory, JobMetadata, RunMetadata, UnitJobId
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
+from pipelex.tracing import graphspec_assembler as graphspec_assembler_module
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 from pipelex.tracing.trace_events import PipeStartEvent, UsageReportEvent
@@ -129,7 +132,7 @@ def _run_both_paths(scenario: ScenarioFn) -> tuple[GraphSpec, GraphSpec]:
 
     # Path A: direct mode (no event log)
     tracer_direct = GraphTracer()
-    ctx_direct = tracer_direct.setup(graph_id=_GRAPH_ID, data_inclusion=data_inclusion)
+    ctx_direct = tracer_direct.setup(graph_id=_GRAPH_ID, data_inclusion=data_inclusion, run_mode=PipeRunMode.LIVE)
     scenario(tracer_direct, ctx_direct)
     direct_spec = tracer_direct.teardown()
     assert direct_spec is not None
@@ -143,6 +146,7 @@ def _run_both_paths(scenario: ScenarioFn) -> tuple[GraphSpec, GraphSpec]:
         event_log=event_log,
         workflow_id=_WORKFLOW_ID,
         pipeline_run_id=_PIPELINE_RUN_ID,
+        run_mode=PipeRunMode.LIVE,
     )
     scenario(tracer_event, ctx_event)
     # Don't call teardown on the event-log tracer — we want to assemble from events
@@ -474,6 +478,7 @@ def _usage_events_for(*, assembled_child_node_id: str, event_log: InMemoryEventL
             writer_id=event_log.writer_id,
             timestamp=_T0 + timedelta(seconds=2),
             sequence=event_log.next_sequence(),
+            mode=PipeRunMode.LIVE,
             node_id=assembled_child_node_id,
             tokens_usage=LLMTokensUsage(
                 job_metadata=JobMetadata(
@@ -492,7 +497,7 @@ def _usage_events_for(*, assembled_child_node_id: str, event_log: InMemoryEventL
 
 
 def _scenario_condition_selected_outcome(tracer: GraphTracer, context: TraceContext) -> None:
-    """Condition pipe with SELECTED_OUTCOME edge."""
+    """Condition pipe that resolves to a key, then runs that outcome's pipe: both builders derive the SELECTED_OUTCOME edge."""
     started_at = _T0
 
     cond_id, cond_ctx = tracer.on_pipe_start(
@@ -502,6 +507,7 @@ def _scenario_condition_selected_outcome(tracer: GraphTracer, context: TraceCont
         node_kind=NodeKind.CONTROLLER,
         started_at=started_at,
     )
+    tracer.register_condition_resolution(condition_node_id=cond_id, rendered_value="true", selected_outcome="true")
 
     outcome_id, _ = tracer.on_pipe_start(
         trace_context=cond_ctx,
@@ -509,13 +515,6 @@ def _scenario_condition_selected_outcome(tracer: GraphTracer, context: TraceCont
         pipe_type="PipeLLM",
         node_kind=NodeKind.OPERATOR,
         started_at=started_at + timedelta(seconds=1),
-    )
-
-    tracer.add_edge(
-        source_node_id=cond_id,
-        target_node_id=outcome_id,
-        edge_kind=EdgeKind.SELECTED_OUTCOME,
-        label="true",
     )
 
     tracer.on_pipe_end_success(
@@ -526,6 +525,72 @@ def _scenario_condition_selected_outcome(tracer: GraphTracer, context: TraceCont
         node_id=cond_id,
         ended_at=started_at + timedelta(seconds=3),
     )
+
+
+def _scenario_decisions_at_decision_time(tracer: GraphTracer, context: TraceContext) -> None:
+    """A sequence whose steps record each decision as it is made: a condition's resolution, then a batch's fan-out.
+
+    The condition takes its default outcome, so its SELECTED_OUTCOME edge is unlabelled; the batch states its width
+    before its first item starts.
+    """
+    started_at = _T0
+
+    seq_id, seq_ctx = tracer.on_pipe_start(
+        trace_context=context,
+        pipe_code="flow",
+        pipe_type="PipeSequence",
+        node_kind=NodeKind.CONTROLLER,
+        started_at=started_at,
+        step_count=2,
+    )
+
+    cond_id, cond_ctx = tracer.on_pipe_start(
+        trace_context=seq_ctx,
+        pipe_code="route",
+        pipe_type="PipeCondition",
+        node_kind=NodeKind.CONTROLLER,
+        started_at=started_at + timedelta(seconds=1),
+    )
+    tracer.register_condition_resolution(condition_node_id=cond_id, rendered_value="unmatched", selected_outcome=None)
+    outcome_id, _ = tracer.on_pipe_start(
+        trace_context=cond_ctx,
+        pipe_code="fallback",
+        pipe_type="PipeCompose",
+        node_kind=NodeKind.OPERATOR,
+        started_at=started_at + timedelta(seconds=2),
+    )
+    tracer.on_pipe_end_success(
+        node_id=outcome_id, ended_at=started_at + timedelta(seconds=3), output_spec=IOSpec(name="routed", digest="digest_routed")
+    )
+    tracer.on_pipe_end_success(node_id=cond_id, ended_at=started_at + timedelta(seconds=4))
+
+    batch_id, batch_ctx = tracer.on_pipe_start(
+        trace_context=seq_ctx,
+        pipe_code="per_item",
+        pipe_type="PipeBatch",
+        node_kind=NodeKind.CONTROLLER,
+        started_at=started_at + timedelta(seconds=5),
+        input_specs=[IOSpec(name="items", digest="digest_items", multiplicity=True)],
+    )
+    tracer.register_batch_fan_out(
+        batch_node_id=batch_id, item_count=1, branch_pipe_code="process", branch_pipe_ref="flows.process", branch_pipe_type="PipeCompose"
+    )
+    tracer.register_batch_item_extraction(
+        list_stuff_code="digest_items", item_stuff_code="digest_item_0", item_index=0, batch_controller_node_id=batch_id
+    )
+    item_id, _ = tracer.on_pipe_start(
+        trace_context=batch_ctx,
+        pipe_code="process",
+        pipe_type="PipeCompose",
+        node_kind=NodeKind.OPERATOR,
+        started_at=started_at + timedelta(seconds=6),
+        input_specs=[IOSpec(name="item", digest="digest_item_0")],
+    )
+    tracer.on_pipe_end_success(
+        node_id=item_id, ended_at=started_at + timedelta(seconds=7), output_spec=IOSpec(name="result", digest="digest_result_0")
+    )
+    tracer.on_pipe_end_success(node_id=batch_id, ended_at=started_at + timedelta(seconds=8))
+    tracer.on_pipe_end_success(node_id=seq_id, ended_at=started_at + timedelta(seconds=9))
 
 
 def _scenario_dry_condition_merge(tracer: GraphTracer, context: TraceContext) -> None:
@@ -660,12 +725,105 @@ class TestAssemblerEquivalence:
             pytest.param(_scenario_pass_through, id="pass_through"),
             pytest.param(_scenario_condition_selected_outcome, id="condition_selected_outcome"),
             pytest.param(_scenario_dry_condition_merge, id="dry_condition_merge"),
+            pytest.param(_scenario_decisions_at_decision_time, id="decisions_at_decision_time"),
         ],
     )
     def test_equivalence(self, scenario_fn: ScenarioFn) -> None:
         """GraphTracer teardown and GraphSpecAssembler produce structurally identical GraphSpecs."""
         direct_spec, assembled_spec = _run_both_paths(scenario_fn)
         _assert_graphs_equivalent(direct_spec, assembled_spec)
+
+    def test_decision_events_give_both_graphs_the_choice_edge(self, mocker: MockerFixture) -> None:
+        """The decision events are read without a warning, and both graphs derive the condition's choice as its edge."""
+        warning_spy = mocker.spy(graphspec_assembler_module.log, "warning")
+        direct_spec, assembled_spec = _run_both_paths(_scenario_decisions_at_decision_time)
+
+        assert warning_spy.call_count == 0
+        for spec in (direct_spec, assembled_spec):
+            pipe_code_by_node_id = {node.node_id: node.pipe_code for node in spec.nodes}
+            selected_edges = [edge for edge in spec.edges if edge.kind.is_selected_outcome]
+            assert [(pipe_code_by_node_id[edge.source], pipe_code_by_node_id[edge.target], edge.label) for edge in selected_edges] == [
+                ("route", "fallback", None)
+            ]
+
+    def test_selected_outcome_edge_when_the_chosen_pipe_starts_under_another_tracer(self) -> None:
+        """A distributed run: the condition resolves under its workflow's tracer, and the chosen pipe starts under another.
+
+        A sub-pipe dispatched to a workflow of its own runs under a tracer that workflow opens, which keeps the
+        condition as the parent of its first node and never saw the resolution. The graph assembled from the run's
+        events still draws the SELECTED_OUTCOME edge, as the in-process graph of the same run does.
+        """
+        data_inclusion = make_defaulted_data_inclusion_config()
+        event_log = InMemoryEventLog()
+
+        parent_tracer = GraphTracer()
+        parent_ctx = parent_tracer.setup(
+            graph_id=_GRAPH_ID,
+            data_inclusion=data_inclusion,
+            event_log=event_log,
+            workflow_id="wf_parent",
+            pipeline_run_id=_PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
+        )
+        cond_id, cond_ctx = parent_tracer.on_pipe_start(
+            trace_context=parent_ctx, pipe_code="route", pipe_type="PipeCondition", node_kind=NodeKind.CONTROLLER, started_at=_T0
+        )
+        parent_tracer.register_condition_resolution(condition_node_id=cond_id, rendered_value="urgent", selected_outcome="urgent")
+
+        # The dispatched workflow opens its own tracer, and keeps the parent node of the context it received.
+        child_tracer = GraphTracer()
+        child_ctx = child_tracer.setup(
+            graph_id=_GRAPH_ID,
+            data_inclusion=data_inclusion,
+            event_log=event_log,
+            workflow_id="wf_child",
+            pipeline_run_id=_PIPELINE_RUN_ID,
+            run_mode=cond_ctx.run_mode,
+        ).model_copy(update={"parent_node_id": cond_ctx.parent_node_id})
+        chosen_id, _ = child_tracer.on_pipe_start(
+            trace_context=child_ctx,
+            pipe_code="escalate",
+            pipe_type="PipeCompose",
+            node_kind=NodeKind.OPERATOR,
+            started_at=_T0 + timedelta(seconds=1),
+        )
+        child_tracer.on_pipe_end_success(node_id=chosen_id, ended_at=_T0 + timedelta(seconds=2))
+        child_tracer.teardown()
+        parent_tracer.on_pipe_end_success(node_id=cond_id, ended_at=_T0 + timedelta(seconds=3))
+        parent_tracer.teardown()
+        assembled_spec = GraphSpecAssembler.assemble(events=event_log.read_events(_PIPELINE_RUN_ID), graph_id=_GRAPH_ID)
+
+        # The same run, in process: one tracer sees both the resolution and the chosen pipe's start.
+        direct_tracer = GraphTracer()
+        direct_ctx = direct_tracer.setup(graph_id=_GRAPH_ID, data_inclusion=data_inclusion, run_mode=PipeRunMode.LIVE)
+        direct_cond_id, direct_cond_ctx = direct_tracer.on_pipe_start(
+            trace_context=direct_ctx, pipe_code="route", pipe_type="PipeCondition", node_kind=NodeKind.CONTROLLER, started_at=_T0
+        )
+        direct_tracer.register_condition_resolution(condition_node_id=direct_cond_id, rendered_value="urgent", selected_outcome="urgent")
+        direct_chosen_id, _ = direct_tracer.on_pipe_start(
+            trace_context=direct_cond_ctx,
+            pipe_code="escalate",
+            pipe_type="PipeCompose",
+            node_kind=NodeKind.OPERATOR,
+            started_at=_T0 + timedelta(seconds=1),
+        )
+        direct_tracer.on_pipe_end_success(node_id=direct_chosen_id, ended_at=_T0 + timedelta(seconds=2))
+        direct_tracer.on_pipe_end_success(node_id=direct_cond_id, ended_at=_T0 + timedelta(seconds=3))
+        direct_spec = direct_tracer.teardown()
+        assert direct_spec is not None
+
+        assert [(edge.source, edge.target, edge.label) for edge in assembled_spec.edges if edge.kind.is_selected_outcome] == [
+            (cond_id, chosen_id, "urgent")
+        ]
+        for spec in (direct_spec, assembled_spec):
+            pipe_code_by_node_id = {node.node_id: node.pipe_code for node in spec.nodes}
+            edges_by_codes = sorted(
+                (pipe_code_by_node_id[edge.source], pipe_code_by_node_id[edge.target], edge.kind, edge.label) for edge in spec.edges
+            )
+            assert edges_by_codes == [
+                ("route", "escalate", EdgeKind.CONTAINS, None),
+                ("route", "escalate", EdgeKind.SELECTED_OUTCOME, "urgent"),
+            ]
 
     def test_multiplicity_survives_both_builders(self) -> None:
         """Agreement alone would pass if both builders dropped the marker, so pin its value too:
@@ -709,7 +867,7 @@ class TestAssemblerEquivalence:
         data_inclusion = make_defaulted_data_inclusion_config()
 
         tracer_direct = GraphTracer()
-        ctx_direct = tracer_direct.setup(graph_id=_GRAPH_ID, data_inclusion=data_inclusion)
+        ctx_direct = tracer_direct.setup(graph_id=_GRAPH_ID, data_inclusion=data_inclusion, run_mode=PipeRunMode.LIVE)
         _scenario_with_usage(tracer_direct, ctx_direct)
         direct_spec = tracer_direct.teardown()
         assert direct_spec is not None
@@ -722,6 +880,7 @@ class TestAssemblerEquivalence:
             event_log=event_log,
             workflow_id=_WORKFLOW_ID,
             pipeline_run_id=_PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
         _scenario_with_usage(tracer_event, ctx_event)
         tracer_event.teardown()

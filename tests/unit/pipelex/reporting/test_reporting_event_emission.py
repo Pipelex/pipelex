@@ -21,6 +21,7 @@ from pipelex.config import get_config
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.system.data_inclusion_config import DataInclusionConfig
 from pipelex.system.job_metadata import JobMetadata, RunMetadata, UnitJobId
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 from pipelex.tracing.trace_events import UsageReportEvent
@@ -66,6 +67,7 @@ def _make_trace_context(
     parent_node_id: str | None = None,
     tracer_key: str | None = None,
     node_sequence: int = 0,
+    run_mode: PipeRunMode = PipeRunMode.LIVE,
 ) -> TraceContext:
     """Create a TraceContext for testing with lookup_key resolution."""
     return TraceContext(
@@ -74,6 +76,7 @@ def _make_trace_context(
         parent_node_id=parent_node_id,
         node_sequence=node_sequence,
         data_inclusion=DATA_INCLUSION_OFF,
+        run_mode=run_mode,
     )
 
 
@@ -117,6 +120,17 @@ class TestReportingEventEmission:
         assert len(usage_events) == 1
         assert usage_events[0].tokens_usage.nb_tokens_by_category[TokenCategory.INPUT] == 100
         assert usage_events[0].node_id == "unknown"  # No trace_context parent set
+
+    @pytest.mark.parametrize("run_mode", [PipeRunMode.LIVE, PipeRunMode.DRY], ids=["live", "dry"])
+    def test_usage_event_states_the_run_mode(self, run_mode: PipeRunMode) -> None:
+        """A usage event states the mode its trace context carries, the one fact of the run the reporting side holds."""
+        manager, event_log = self._make_reporting_manager_with_event_log()
+
+        trace_context = _make_trace_context(graph_id=self.PIPELINE_RUN_ID, run_mode=run_mode)
+        manager.report_inference_job(_make_test_llm_job(self.PIPELINE_RUN_ID, trace_context=trace_context))
+
+        usage_events = [evt for evt in event_log.read_events(self.PIPELINE_RUN_ID) if isinstance(evt, UsageReportEvent)]
+        assert [evt.mode for evt in usage_events] == [run_mode]
 
     def test_report_inference_job_captures_node_id_from_trace_context(self) -> None:
         """UsageReportEvent captures the parent node_id from graph context."""

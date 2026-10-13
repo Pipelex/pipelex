@@ -473,18 +473,15 @@ class PipeCondition(PipeController):
         # Select the outcome based on the evaluated expression
         outcome = self.outcome_map.get(evaluated_expression, self.default_outcome)
 
-        # Capture execution data for the graph tracer
-        execution_data_dict: dict[str, Any] = {
-            "evaluated_expression": evaluated_expression,
-            "selected_outcome": str(outcome),
-        }
+        # The condition records its choice the moment the choice is final, before anything runs under it: at once for
+        # `continue` and `fail`, which run nothing, and for a pipe once its inputs are known to be there to run it.
 
         # Handle continue case (phase 1): `continue` resolves the declared output as
         # ABSENT — a declared-absent record with provenance, memory otherwise unchanged. A previous
         # main stuff stays under its own name (the migration idiom: consume it explicitly
         # downstream); it no longer passes through as this pipe's output.
         if SpecialOutcome.is_continue(outcome):
-            self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
+            self._record_resolution(job_metadata=job_metadata, evaluated_expression=evaluated_expression, outcome=outcome)
             # The reason names only the pipe and the outcome: a pipe that force-unwraps this output quotes it to the caller
             # under STRICT disclosure, and the value the expression rendered can be literal text of a condition a host
             # library declared. The execution data above keeps that value.
@@ -496,7 +493,7 @@ class PipeCondition(PipeController):
             return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.run_metadata.pipeline_run_id)
 
         if SpecialOutcome.is_fail(outcome):
-            self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
+            self._record_resolution(job_metadata=job_metadata, evaluated_expression=evaluated_expression, outcome=outcome)
             # The caller's method maps this outcome to 'fail' on purpose, a refusal of the run it was given. The
             # message names only the pipe: the value the expression rendered can be literal text of the expression,
             # or an outcome key, of a condition a host library declared. The execution data above keeps that value.
@@ -540,9 +537,11 @@ class PipeCondition(PipeController):
                 )
             )
 
-        pipe_output = await get_pipe_router().run(
+        # Recorded only now: a choice whose pipe cannot run is a failure of the condition, never an outcome it took.
+        self._record_resolution(job_metadata=job_metadata, evaluated_expression=evaluated_expression, outcome=outcome)
+        return await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
-                pipe=get_required_pipe(pipe_code=outcome),
+                pipe=chosen_pipe,
                 job_metadata=job_metadata,
                 working_memory=working_memory,
                 pipe_run_params=pipe_run_params,
@@ -550,8 +549,33 @@ class PipeCondition(PipeController):
                 library_crate=library_crate,
             ),
         )
+
+    def _record_resolution(self, *, job_metadata: JobMetadata, evaluated_expression: str, outcome: str) -> None:
+        """Record the outcome a live run chose, in the execution data and as the condition's resolution trace event.
+
+        The execution data keeps the value the expression rendered and the outcome it selected, a pipe code or a special
+        outcome. The trace event names the outcome by the key of the outcome map the value matched, or by None when it
+        matched none and the default outcome was taken, since `"default"` can itself be a key.
+
+        Args:
+            job_metadata: The condition's job metadata, whose trace context names its graph node.
+            evaluated_expression: The value the condition's expression rendered.
+            outcome: The outcome selected: a pipe code, `continue` or `fail`.
+        """
+        execution_data_dict: dict[str, Any] = {
+            "evaluated_expression": evaluated_expression,
+            "selected_outcome": outcome,
+        }
         self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
-        return pipe_output
+        trace_node = self._trace_node(job_metadata=job_metadata)
+        if trace_node is None:
+            return
+        trace_node.tracer_manager.register_condition_resolution(
+            lookup_key=trace_node.lookup_key,
+            condition_node_id=trace_node.node_id,
+            rendered_value=evaluated_expression,
+            selected_outcome=evaluated_expression if evaluated_expression in self.outcome_map else None,
+        )
 
     @override
     async def _dry_run_controller_pipe(

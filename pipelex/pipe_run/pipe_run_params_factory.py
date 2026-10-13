@@ -1,10 +1,9 @@
 from typing import Any, Literal
 
-from pipelex.cogt.content_generation.cogt_run_params import check_mock_usage_requires_dry
 from pipelex.config import get_config
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
-from pipelex.runtime_hub import resolve_run_mode_for_boot
+from pipelex.runtime_hub import resolve_effective_run_mode
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 
@@ -45,13 +44,13 @@ class PipeRunParamsFactory:
 
         The REQUESTED mode is validated before the forced-DRY coercion, so a contract violation
         (``is_mock_usage`` on a LIVE request) fails loud on every boot — the keyless coercion must
-        not silently turn an illegal request into a legal one.
+        not silently turn an illegal request into a legal one. Both steps are ``resolve_effective_run_mode``,
+        which ``pipeline_run_setup`` also calls before it opens the run's tracer.
 
         ``batch_max_concurrency`` is resolved here for the same single-writer reason and because the
         read must happen ONCE, at submit time: see the field's docstring on ``PipeRunParams``.
         """
-        check_mock_usage_requires_dry(run_mode=pipe_run_mode, is_mock_usage=is_mock_usage)
-        pipe_run_mode = resolve_run_mode_for_boot(requested=pipe_run_mode)
+        pipe_run_mode = resolve_effective_run_mode(requested=pipe_run_mode, is_mock_usage=is_mock_usage)
         config = get_config().interpreter
         pipe_stack_limit = pipe_stack_limit or config.pipe_run.pipe_stack_limit
         return PipeRunParams(

@@ -15,6 +15,7 @@ from pytest_mock import MockerFixture
 
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.system.data_inclusion_config import DataInclusionConfig
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 _DATA_INCLUSION_OFF = DataInclusionConfig(
     pipe_and_concept_registry=False,
@@ -48,6 +49,7 @@ class TestGraphTracerManagerStaleKeyHealing:
             tracer_key=_TRACER_KEY,
             emit_graph_events=False,
             emit_usage_events=True,
+            run_mode=PipeRunMode.LIVE,
         )
 
     def test_open_tracer_replaces_stale_tracer_under_same_key(self, caplog: pytest.LogCaptureFixture) -> None:

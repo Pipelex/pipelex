@@ -115,6 +115,14 @@ class CompanionSlot(NamedTuple):
     producing_pipe_code: str
 
 
+class PipeTraceNode(NamedTuple):
+    """A running pipe's own node in the run's trace, with the tracer manager that records what happens on it."""
+
+    tracer_manager: GraphTracerManager
+    lookup_key: str
+    node_id: str
+
+
 class InputPresenceScan(NamedTuple):
     """The runtime trichotomy (D3) applied to a pipe's needed inputs against working memory.
 
@@ -170,6 +178,20 @@ class PipeAbstract(ABC, BaseModel):
         # overrides this to True. (`pipe_category` no longer encodes signature-ness.)
         return False
 
+    def traced_step_count(self) -> int | None:
+        """The number of steps a sequence's author wrote, which the trace records on the pipe's start.
+
+        None for every pipe that runs no steps; `PipeSequence` overrides it.
+        """
+        return None
+
+    def traced_branch_count(self) -> int | None:
+        """The number of branches a parallel runs, which the trace records on the pipe's start.
+
+        None for every pipe that runs no branches; `PipeParallel` overrides it.
+        """
+        return None
+
     def pipe_dependencies(self) -> set[str]:
         """Return the set of pipe codes that this pipe depends on.
 
@@ -196,21 +218,32 @@ class PipeAbstract(ABC, BaseModel):
 
         return unique_concepts
 
+    def _trace_node(self, *, job_metadata: JobMetadata) -> PipeTraceNode | None:
+        """This running pipe's own node in the run's trace, or None when nothing traces the run.
+
+        The pipe's start hands it the trace context its children run under, whose `parent_node_id` is the pipe's own
+        node: whatever the pipe records about itself while it runs is recorded on that node.
+        """
+        trace_context = job_metadata.trace_context
+        if trace_context is None or trace_context.parent_node_id is None:
+            return None
+        tracer_manager = GraphTracerManager.get_instance()
+        if tracer_manager is None:
+            return None
+        return PipeTraceNode(tracer_manager=tracer_manager, lookup_key=trace_context.lookup_key, node_id=trace_context.parent_node_id)
+
     def _register_execution_data(self, *, job_metadata: JobMetadata, execution_data: dict[str, Any]) -> None:
         """Register execution metadata with the graph tracer.
 
         Called by pipe subclasses during execution to capture runtime-resolved data
         (rendered prompts, resolved models, etc.) for the GraphSpec.
         """
-        trace_context = job_metadata.trace_context
-        if trace_context is None:
+        trace_node = self._trace_node(job_metadata=job_metadata)
+        if trace_node is None:
             return
-        tracer_manager = GraphTracerManager.get_instance()
-        if tracer_manager is None or trace_context.parent_node_id is None:
-            return
-        tracer_manager.register_execution_data(
-            lookup_key=trace_context.lookup_key,
-            node_id=trace_context.parent_node_id,
+        trace_node.tracer_manager.register_execution_data(
+            lookup_key=trace_node.lookup_key,
+            node_id=trace_node.node_id,
             execution_data=execution_data,
         )
 
@@ -787,6 +820,8 @@ class PipeAbstract(ABC, BaseModel):
                     concept_data=concept_data,
                     description=self.description,
                     domain_code=self.domain_code,
+                    step_count=self.traced_step_count(),
+                    branch_count=self.traced_branch_count(),
                 )
                 # Update job metadata with child trace context for nested pipes
                 if child_trace_context is not None:

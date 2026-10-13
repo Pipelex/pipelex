@@ -6932,6 +6932,10 @@ rationale = "Dispatch handler: handles the event; single operand."
 param = "event"
 rationale = "An event handler of the assembler's pass one, called with the one event it folds in, like its sibling handlers."
 
+["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_condition_resolved"]
+param = "event"
+rationale = "An event handler of the assembler's pass one, called with the one event it folds in, like its sibling handlers."
+
 ["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_controller_output"]
 param = "event"
 rationale = "Dispatch handler: handles the event; single operand."

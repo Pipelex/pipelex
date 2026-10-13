@@ -12,7 +12,6 @@ from pipelex.graph.graphspec import (
     EdgeSpec,
     ErrorSpec,
     GraphSpec,
-    GraphSpecMode,
     IOSpec,
     NodeIOSpec,
     NodeKind,
@@ -23,13 +22,17 @@ from pipelex.graph.graphspec import (
     make_graphspec_meta,
     output_digest_is_optional,
 )
+from pipelex.graph.selected_outcome import derive_selected_outcome_edges
 from pipelex.system.data_inclusion_config import DataInclusionConfig
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # ruff: ignore[typing-only-first-party-import] - used in __init__ annotations
 from pipelex.tracing.trace_events import (
     BatchAggregateEvent,
+    BatchFannedOutEvent,
     BatchItemEvent,
     ConditionOutputMergeEvent,
+    ConditionResolvedEvent,
     ControllerOutputEvent,
     EdgeEvent,
     ExecutionDataEvent,
@@ -161,7 +164,10 @@ class GraphTracer(GraphTracerProtocol):
         # Registries for pipe and concept data (keyed by pipe_ref and concept_ref)
         self._pipe_registry: dict[str, dict[str, Any]] = {}
         self._concept_registry: dict[str, dict[str, Any]] = {}
-        self._mode: GraphSpecMode = GraphSpecMode.LIVE
+        self._run_mode: PipeRunMode = PipeRunMode.LIVE
+        # The live conditions that have chosen their outcome, by condition node id, each with the outcome-map key it
+        # matched (None for the default outcome): teardown derives the SELECTED_OUTCOME edges from them
+        self._condition_resolutions: dict[str, str | None] = {}
 
     @property
     def is_active(self) -> bool:
@@ -235,7 +241,7 @@ class GraphTracer(GraphTracerProtocol):
         pipeline_run_id: str | None = None,
         emit_graph_events: bool = True,
         emit_usage_events: bool = True,
-        mode: GraphSpecMode = GraphSpecMode.LIVE,
+        run_mode: PipeRunMode,
     ) -> TraceContext:
         """Initialize tracing for a new pipeline run.
 
@@ -253,7 +259,8 @@ class GraphTracer(GraphTracerProtocol):
                 teardown skips the discarded spec build; the returned TraceContext carries the flag.
             emit_usage_events: Whether this run emits usage (cost) events. Stamped onto the returned
                 TraceContext so it is born with the correct flag.
-            mode: Provenance mode to stamp onto generated GraphSpecs.
+            run_mode: Whether the run is live or a dry run: stamped on every trace event and on the returned
+                TraceContext, and turned into the provenance mode of the generated GraphSpec.
         """
         self._is_active = True
         self._emit_graph_events = emit_graph_events
@@ -278,7 +285,8 @@ class GraphTracer(GraphTracerProtocol):
         self._event_sequence = 0
         self._pipe_registry = {}
         self._concept_registry = {}
-        self._mode = mode
+        self._run_mode = run_mode
+        self._condition_resolutions = {}
 
         return TraceContext(
             graph_id=graph_id,
@@ -287,6 +295,7 @@ class GraphTracer(GraphTracerProtocol):
             data_inclusion=data_inclusion,
             emit_graph_events=emit_graph_events,
             emit_usage_events=emit_usage_events,
+            run_mode=run_mode,
         )
 
     @override
@@ -314,6 +323,7 @@ class GraphTracer(GraphTracerProtocol):
             self._generate_batch_item_edges()
             self._generate_batch_aggregate_edges()
             self._generate_parallel_combine_edges()
+            self._generate_selected_outcome_edges()
 
             self._is_active = False
 
@@ -326,7 +336,7 @@ class GraphTracer(GraphTracerProtocol):
                 pipeline_ref=self._pipeline_ref or PipelineRef(),
                 nodes=nodes,
                 edges=self._edges,
-                meta=make_graphspec_meta(mode=self._mode),
+                meta=make_graphspec_meta(mode=self._run_mode.graphspec_mode),
                 pipe_registry=dict(self._pipe_registry),
                 concept_registry=dict(self._concept_registry),
             )
@@ -353,7 +363,8 @@ class GraphTracer(GraphTracerProtocol):
         self._event_sequence = 0
         self._pipe_registry = {}
         self._concept_registry = {}
-        self._mode = GraphSpecMode.LIVE
+        self._run_mode = PipeRunMode.LIVE
+        self._condition_resolutions = {}
 
         return graph
 
@@ -494,6 +505,20 @@ class GraphTracer(GraphTracerProtocol):
                         target_stuff_digest=combined_stuff_code,
                     )
 
+    def _generate_selected_outcome_edges(self) -> None:
+        """Generate the SELECTED_OUTCOME edges from each resolved condition to the pipe it then started.
+
+        The rule is the one the event-replay assembler applies (`derive_selected_outcome_edges`), so both graphs of a run
+        carry the same edges.
+        """
+        parent_by_node = {node_id: node_data.parent_node_id for node_id, node_data in self._nodes.items()}
+        for edge in derive_selected_outcome_edges(resolutions=self._condition_resolutions, parent_by_node=parent_by_node):
+            self.add_selected_outcome_edge(
+                condition_node_id=edge.condition_node_id,
+                outcome_node_id=edge.outcome_node_id,
+                selected_outcome=edge.selected_outcome,
+            )
+
     @override
     def register_batch_item_extraction(
         self,
@@ -529,6 +554,7 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
+                    mode=self._run_mode,
                     timestamp=datetime.now(UTC),
                     sequence=self._next_event_sequence(),
                     list_stuff_code=list_stuff_code,
@@ -573,6 +599,7 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
+                    mode=self._run_mode,
                     timestamp=datetime.now(UTC),
                     sequence=self._next_event_sequence(),
                     output_list_stuff_code=output_list_stuff_code,
@@ -616,6 +643,7 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
+                    mode=self._run_mode,
                     timestamp=datetime.now(UTC),
                     sequence=self._next_event_sequence(),
                     combined_stuff_code=combined_stuff_code,
@@ -647,9 +675,96 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
+                    mode=self._run_mode,
                     timestamp=datetime.now(UTC),
                     sequence=self._next_event_sequence(),
                     merge=merge,
+                )
+            )
+
+    @override
+    def register_batch_fan_out(
+        self,
+        *,
+        batch_node_id: str,
+        item_count: int,
+        branch_pipe_code: str,
+        branch_pipe_ref: str,
+        branch_pipe_type: str,
+    ) -> None:
+        """Record that a PipeBatch knows how many items it runs, before it starts any of them.
+
+        Nothing of the graph depends on it: the event is for whoever reads the trace while the run goes on. It is a graph
+        event, recorded on a node of this tracer's graph: a run that emits no graph events (costs-only) records none, and
+        neither does a tracer that never started the batch's node.
+
+        Args:
+            batch_node_id: The PipeBatch's node ID.
+            item_count: The number of items the batch runs.
+            branch_pipe_code: The bare code of the pipe each item runs.
+            branch_pipe_ref: The `domain.code` reference of the pipe each item runs.
+            branch_pipe_type: The type of the pipe each item runs.
+        """
+        if not self._is_active or not self._emit_graph_events:
+            return
+        if batch_node_id not in self._nodes:
+            return
+        if self._event_log is not None:
+            self._emit_event(
+                BatchFannedOutEvent(
+                    pipeline_run_id=self._event_pipeline_run_id,
+                    writer_id=self._event_writer_id(),
+                    workflow_id=self._workflow_id,
+                    mode=self._run_mode,
+                    timestamp=datetime.now(UTC),
+                    sequence=self._next_event_sequence(),
+                    node_id=batch_node_id,
+                    item_count=item_count,
+                    branch_pipe_code=branch_pipe_code,
+                    branch_pipe_ref=branch_pipe_ref,
+                    branch_pipe_type=branch_pipe_type,
+                )
+            )
+
+    @override
+    def register_condition_resolution(
+        self,
+        *,
+        condition_node_id: str,
+        rendered_value: str,
+        selected_outcome: str | None,
+    ) -> None:
+        """Record that a live PipeCondition has chosen its outcome, before the chosen pipe starts.
+
+        The graph's SELECTED_OUTCOME edge runs from the condition to the pipe it then starts under its node, derived at
+        teardown, as the event-replay assembler derives it from this resolution's event and that pipe's start, whichever
+        tracer wrote the start. An outcome mapped to `continue` or `fail` starts no pipe, and so draws no edge. A run that
+        emits no graph events (costs-only) records no resolution, and neither does a tracer that never started the
+        condition's node, which would otherwise write an event the assembler could draw an edge from a node absent from
+        the graph with.
+
+        Args:
+            condition_node_id: The PipeCondition's node ID.
+            rendered_value: The value the condition's expression rendered.
+            selected_outcome: The outcome-map key the value matched, or None when the default outcome was taken.
+        """
+        if not self._is_active or not self._emit_graph_events:
+            return
+        if condition_node_id not in self._nodes:
+            return
+        self._condition_resolutions[condition_node_id] = selected_outcome
+        if self._event_log is not None:
+            self._emit_event(
+                ConditionResolvedEvent(
+                    pipeline_run_id=self._event_pipeline_run_id,
+                    writer_id=self._event_writer_id(),
+                    workflow_id=self._workflow_id,
+                    mode=self._run_mode,
+                    timestamp=datetime.now(UTC),
+                    sequence=self._next_event_sequence(),
+                    node_id=condition_node_id,
+                    rendered_value=rendered_value,
+                    selected_outcome=selected_outcome,
                 )
             )
 
@@ -667,6 +782,8 @@ class GraphTracer(GraphTracerProtocol):
         concept_data: list[dict[str, Any]] | None = None,
         description: str | None = None,
         domain_code: str | None = None,
+        step_count: int | None = None,
+        branch_count: int | None = None,
     ) -> tuple[str, TraceContext]:
         """Record the start of a pipe execution."""
         if not self._is_active:
@@ -711,6 +828,7 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
+                    mode=self._run_mode,
                     timestamp=started_at,
                     sequence=self._next_event_sequence(),
                     node_id=node_id,
@@ -723,6 +841,8 @@ class GraphTracer(GraphTracerProtocol):
                     input_specs=input_specs or [],
                     pipe_data=pipe_data or {},
                     concept_data=concept_data or [],
+                    step_count=step_count,
+                    branch_count=branch_count,
                 )
             )
 
@@ -764,6 +884,7 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
+                    mode=self._run_mode,
                     timestamp=datetime.now(UTC),
                     sequence=self._next_event_sequence(),
                     node_id=node_id,
@@ -824,6 +945,7 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
+                    mode=self._run_mode,
                     timestamp=ended_at,
                     sequence=self._next_event_sequence(),
                     node_id=node_id,
@@ -869,6 +991,7 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
+                    mode=self._run_mode,
                     timestamp=datetime.now(UTC),
                     sequence=self._next_event_sequence(),
                     node_id=node_id,
@@ -910,6 +1033,7 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
+                    mode=self._run_mode,
                     timestamp=ended_at,
                     sequence=self._next_event_sequence(),
                     node_id=node_id,
@@ -967,6 +1091,7 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
+                    mode=self._run_mode,
                     timestamp=ended_at,
                     sequence=self._next_event_sequence(),
                     node_id=node_id,
@@ -1014,6 +1139,7 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
+                    mode=self._run_mode,
                     timestamp=datetime.now(UTC),
                     sequence=self._next_event_sequence(),
                     edge_id=edge_id,
@@ -1032,18 +1158,19 @@ class GraphTracer(GraphTracerProtocol):
         *,
         condition_node_id: str,
         outcome_node_id: str,
-        outcome_value: str,
+        selected_outcome: str | None,
     ) -> None:
-        """Add an edge indicating a selected condition outcome.
+        """Add an edge from a condition to the pipe of the outcome it chose.
 
         Args:
             condition_node_id: The condition pipe's node ID.
-            outcome_node_id: The selected outcome pipe's node ID.
-            outcome_value: The value that was selected.
+            outcome_node_id: The node ID of the pipe the chosen outcome runs.
+            selected_outcome: The outcome-map key the condition matched, which labels the edge, or None when it took
+                its default outcome, which leaves the edge unlabelled.
         """
         self.add_edge(
             source_node_id=condition_node_id,
             target_node_id=outcome_node_id,
             edge_kind=EdgeKind.SELECTED_OUTCOME,
-            label=outcome_value,
+            label=selected_outcome,
         )

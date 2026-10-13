@@ -17,6 +17,7 @@ The node tree is always built when either stream is on — including costs-only
 from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.system.data_inclusion_config import DataInclusionConfig
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 class TraceContext(BaseModel):
@@ -41,6 +42,9 @@ class TraceContext(BaseModel):
         describe_pipe_io: Whether the run builds the three I/O artifacts that describe its graphspec's
             data (driven by ``graphs_inclusion.graphspec_json``). Off for a run that writes no
             graphspec, and for validate's own graph dry run, which already built them for its report.
+        run_mode: Whether the run is live or a dry run. Every trace event the run emits states it, the
+            usage events an activity emits included, which have this context and nothing else of the run.
+            Required, with no default: a context built without it would stamp a dry run's events as live.
     """
 
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -53,6 +57,7 @@ class TraceContext(BaseModel):
     emit_graph_events: bool = Field(default=True, description="Whether to emit graph (node/edge) trace events")
     emit_usage_events: bool = Field(default=True, description="Whether to emit usage (cost) trace events")
     describe_pipe_io: bool = Field(default=True, description="Whether to build the I/O artifacts describing the graphspec's data")
+    run_mode: PipeRunMode = Field(strict=False, description="Whether the run is live or a dry run, stated by whoever opens the trace")
 
     @property
     def lookup_key(self) -> str:
@@ -86,4 +91,5 @@ class TraceContext(BaseModel):
             emit_graph_events=self.emit_graph_events,
             emit_usage_events=self.emit_usage_events,
             describe_pipe_io=self.describe_pipe_io,
+            run_mode=self.run_mode,
         )

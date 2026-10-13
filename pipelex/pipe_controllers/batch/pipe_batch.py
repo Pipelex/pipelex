@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 
     from pipelex.core.stuffs.stuff_content import StuffContent
     from pipelex.libraries.library_crate import LibraryCrate
+    from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 
 # When a single PipeBatch fans out over more than this many items, log a one-time advisory pointing at
 # durable execution — bounded fan-out is a basic backpressure effort, not durable, rate-limited execution.
@@ -148,6 +149,8 @@ class PipeBatch(PipeController):
         batch_output_stuff_code = StuffFactory.make_stuff_code()
 
         item_count = len(input_content.items)
+        # The batch records its width the moment it knows it, before it starts any item.
+        self._register_fan_out(job_metadata=job_metadata, item_count=item_count, branch_pipe=sub_pipe)
         # Read off the payload, never off live config: the bound was frozen into the run params at
         # submit time precisely so the fan-out shape stays a pure function of the run. See
         # `PipeRunParams.batch_max_concurrency`.
@@ -275,16 +278,28 @@ class PipeBatch(PipeController):
             name=output_name,
         )
 
-        # Capture execution data for the graph tracer
-        execution_data_dict: dict[str, Any] = {
-            "item_count": len(input_content.items),
-            "branch_pipe_code": self.branch_pipe_code,
-        }
-        self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
-
         return PipeOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.run_metadata.pipeline_run_id,
+        )
+
+    def _register_fan_out(self, *, job_metadata: JobMetadata, item_count: int, branch_pipe: "PipeAbstract") -> None:
+        """Record the batch's width and the pipe each item runs, in its execution data and as its fan-out trace event."""
+        execution_data_dict: dict[str, Any] = {
+            "item_count": item_count,
+            "branch_pipe_code": self.branch_pipe_code,
+        }
+        self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
+        trace_node = self._trace_node(job_metadata=job_metadata)
+        if trace_node is None:
+            return
+        trace_node.tracer_manager.register_batch_fan_out(
+            lookup_key=trace_node.lookup_key,
+            batch_node_id=trace_node.node_id,
+            item_count=item_count,
+            branch_pipe_code=branch_pipe.code,
+            branch_pipe_ref=branch_pipe.pipe_ref,
+            branch_pipe_type=branch_pipe.type,
         )
 
     @override
