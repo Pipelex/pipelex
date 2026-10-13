@@ -29,6 +29,7 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.graph.graphspec import NodeKind
 from pipelex.graph.stuff_io_spec import make_stuff_io_spec
+from pipelex.graph.traced_failure import make_traced_failure
 from pipelex.pipe_controllers.binding.binding_derivation import BindingDerivation
 from pipelex.pipe_controllers.binding.binding_value import FoundNothing, bind_content
 from pipelex.system.job_metadata import JobMetadata
@@ -234,9 +235,11 @@ class BindingStep(BaseModel):
             if root_stuff is not None
             else None
         )
+        # A binding runs no pipe, so it has no pipe reference and no invocation path.
         node_id, _ = tracer_manager.on_pipe_start(
             trace_context=trace_context,
             pipe_code=self.from_path,
+            pipe_ref=None,
             pipe_type=BINDING_NODE_PIPE_TYPE,
             node_kind=NodeKind.BINDING,
             started_at=datetime.now(UTC),
@@ -285,10 +288,21 @@ class BindingStep(BaseModel):
         tracer_manager = GraphTracerManager.get_instance()
         if tracer_manager is None:
             return
+        if error is None:
+            tracer_manager.on_pipe_end_error(
+                lookup_key=trace_context.lookup_key,
+                node_id=node_id,
+                ended_at=datetime.now(UTC),
+                error_type="UnknownError",
+                error_message="the binding step stopped without binding a value",
+            )
+            return
+        traced_failure = make_traced_failure(error=error)
         tracer_manager.on_pipe_end_error(
             lookup_key=trace_context.lookup_key,
             node_id=node_id,
             ended_at=datetime.now(UTC),
-            error_type=type(error).__name__ if error is not None else "UnknownError",
-            error_message=str(error) if error is not None else "the binding step stopped without binding a value",
+            error_type=type(error).__name__,
+            error_message=traced_failure.message,
+            caller_facing=traced_failure.caller_facing,
         )

@@ -33,6 +33,7 @@ class TestGraphTracerNoOp:
 
         started_at = datetime.now(UTC)
         node_id, child_ctx = tracer.on_pipe_start(
+            pipe_ref="tests.test_pipe",
             trace_context=context,
             pipe_code="test_pipe",
             pipe_type="PipeLLM",

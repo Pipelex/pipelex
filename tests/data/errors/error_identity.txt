@@ -141,6 +141,7 @@ InputShapingError | Input shaping | https://docs.pipelex.com/latest/errors/input
 InputStuffSpecNotFoundError | Input stuff spec not found | https://docs.pipelex.com/latest/errors/input-stuff-spec-not-found-error/
 InputStuffSpecsError | Input stuff specs | https://docs.pipelex.com/latest/errors/input-stuff-specs-error/
 InputStuffSpecsFactoryError | Input stuff specs factory | https://docs.pipelex.com/latest/errors/input-stuff-specs-factory-error/
+InvocationPathError | Invocation path not derivable | https://docs.pipelex.com/latest/errors/invocation-path-error/
 Jinja2ContextError | Jinja 2 context | https://docs.pipelex.com/latest/errors/jinja2-context-error/
 Jinja2DetectVariablesError | Jinja 2 detect variables | https://docs.pipelex.com/latest/errors/jinja2-detect-variables-error/
 Jinja2StuffError | Jinja 2 stuff | https://docs.pipelex.com/latest/errors/jinja2-stuff-error/

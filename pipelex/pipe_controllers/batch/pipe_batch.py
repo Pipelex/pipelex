@@ -16,6 +16,7 @@ from pipelex.interpreter_hub import get_pipe_router, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
+from pipelex.system.invocation_path import item_segment
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.log.log_fields import USER_ACTION_FIELD
@@ -189,10 +190,13 @@ class PipeBatch(PipeController):
             # `run_batch_branch`, not `run`: this is the one dispatch in the pipe tree whose
             # semantics are "a per-item fan-out branch". In-process routers treat it as a plain
             # run (the protocol's default body); a distributed router may isolate it.
+            # The item's pipe is named by its invocation path, whose `item_<n>` segment numbers the items from 1: the
+            # item at index 0 of the list is `item_1`. A router that runs the item as an execution of its own hands it
+            # this metadata, so every path that execution stamps continues the item's.
             return await get_pipe_router().run_batch_branch(
                 pipe_job=PipeJobFactory.make_pipe_job(
                     pipe=sub_pipe,
-                    job_metadata=job_metadata,
+                    job_metadata=job_metadata.for_child_at(segment=item_segment(item_number=branch_index + 1)),
                     working_memory=branch_memory,
                     pipe_run_params=branch_pipe_run_params,
                     output_name=None,

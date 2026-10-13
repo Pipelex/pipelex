@@ -33,6 +33,7 @@ from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
+from pipelex.system.invocation_path import DEFAULT_OUTCOME_SEGMENT, outcome_segment
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
@@ -542,13 +543,29 @@ class PipeCondition(PipeController):
         return await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=chosen_pipe,
-                job_metadata=job_metadata,
+                job_metadata=job_metadata.for_child_at(segment=self.outcome_group_segment(pipe_code=outcome)),
                 working_memory=working_memory,
                 pipe_run_params=pipe_run_params,
                 output_name=output_name,
                 library_crate=library_crate,
             ),
         )
+
+    def outcome_group_segment(self, *, pipe_code: str) -> str:
+        """The invocation-path segment of the outcome group that runs `pipe_code`.
+
+        The outcomes that run one pipe form one group, the default included: the group is named by the first key, in the
+        order the outcome map declares them, that runs its pipe, and a group only the default outcome runs is `default`.
+        A live run, which takes one group, and a dry run, which runs the pipe of every group, so name each pipe by the
+        same path. Pipes are told apart as the outcome map writes them, as the dry run tells them apart.
+
+        Args:
+            pipe_code: The pipe an outcome runs, as the outcome map or the default outcome writes it.
+        """
+        for outcome_key, outcome_value in self.outcome_map.items():
+            if outcome_value == pipe_code:
+                return outcome_segment(outcome_key=outcome_key)
+        return DEFAULT_OUTCOME_SEGMENT
 
     def _record_resolution(self, *, job_metadata: JobMetadata, evaluated_expression: str, outcome: str) -> None:
         """Record the outcome a live run chose, in the execution data and as the condition's resolution trace event.
@@ -642,7 +659,7 @@ class PipeCondition(PipeController):
             is_last_outcome = outcome_index == len(outcome_pipe_codes) - 1
             outcome_pipe = get_required_pipe(pipe_code=pipe_code)
             outcome_output = await outcome_pipe.run_pipe(
-                job_metadata=job_metadata,
+                job_metadata=job_metadata.for_child_at(segment=self.outcome_group_segment(pipe_code=pipe_code)),
                 working_memory=working_memory if is_last_outcome else working_memory.make_deep_copy(),
                 pipe_run_params=pipe_run_params if is_last_outcome else pipe_run_params.make_deep_copy(),
                 output_name=output_name,

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from pipelex.system.execution_chain import ExecutionAttempt
 from pipelex.tracing.exceptions import EventLogSchemaMismatchError
 from pipelex.tracing.ndjson_event_log import NdjsonEventLog
 from pipelex.tracing.trace_events import EdgeEvent, PipeStartEvent
@@ -45,7 +46,7 @@ class TestNdjsonEventLog:
             assert read_event.pipe_code == "test_pipe"
 
     def test_deduplication(self, tmp_path: Path) -> None:
-        """Duplicate (workflow_id, event_kind, sequence) triples are deduplicated."""
+        """Events of one chain, writer, kind and sequence are one event written twice, and are deduplicated."""
         event_log = NdjsonEventLog(traces_dir=str(tmp_path))
         event_log.emit(make_trace_event(sequence=0))
         event_log.emit(make_trace_event(sequence=0))
@@ -66,6 +67,22 @@ class TestNdjsonEventLog:
         event_kinds = {type(evt) for evt in result}
         assert PipeStartEvent in event_kinds
         assert EdgeEvent in event_kinds
+
+    def test_each_attempt_keeps_its_own_events(self, tmp_path: Path) -> None:
+        """Attempts of one execution number their events from the same start, and every attempt's events are kept.
+
+        They are read back attempt by attempt, an execution's earlier attempt first, and an execution dispatched under
+        another attempt of its dispatcher is another chain.
+        """
+        event_log = NdjsonEventLog(traces_dir=str(tmp_path))
+        event_log.emit(make_trace_event(workflow_id="exec-item", sequence=0, attempt=2, lineage=[ExecutionAttempt(execution="exec-run", attempt=1)]))
+        event_log.emit(make_trace_event(workflow_id="exec-item", sequence=0, attempt=1, lineage=[ExecutionAttempt(execution="exec-run", attempt=1)]))
+        event_log.emit(make_trace_event(workflow_id="exec-item", sequence=0, attempt=1, lineage=[ExecutionAttempt(execution="exec-run", attempt=2)]))
+        event_log.emit(make_trace_event(workflow_id="exec-item", sequence=0, attempt=2, lineage=[ExecutionAttempt(execution="exec-run", attempt=1)]))
+
+        result = event_log.read_events("run_001")
+
+        assert [event.chain_key for event in result] == ["exec-run@1/exec-item@1", "exec-run@1/exec-item@2", "exec-run@2/exec-item@1"]
 
     def test_multiple_workflows(self, tmp_path: Path) -> None:
         """Events from multiple workflows are returned sorted by (workflow_id, sequence)."""

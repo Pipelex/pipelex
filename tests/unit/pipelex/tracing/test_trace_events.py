@@ -11,6 +11,7 @@ from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.graph.condition_output_merge import ConditionOutputMerge, ConditionOutputTyping
 from pipelex.graph.graphspec import EdgeKind, ErrorSpec, IOSpec, NodeKind
+from pipelex.system.execution_chain import ExecutionAttempt
 from pipelex.system.job_metadata import JobCategory, JobMetadata, RunMetadata, UnitJobId
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.trace_events import (
@@ -42,12 +43,16 @@ class _Shared:
     TIMESTAMP = datetime(2025, 6, 15, 10, 30, 0, tzinfo=UTC)
     NODE_ID = "graph_1:wf_pipe_router_xyz:node_0"
     PARENT_NODE_ID = "graph_1:wf_pipe_router_xyz:node_1"
+    PATH = "records.review_records/step_2/item_3"
 
     @staticmethod
     def make_base_fields(sequence: int = 0) -> dict[str, Any]:
         return {
             "pipeline_run_id": _Shared.PIPELINE_RUN_ID,
             "workflow_id": _Shared.WORKFLOW_ID,
+            "attempt": 2,
+            "lineage": [ExecutionAttempt(execution="wf_run", attempt=1)],
+            "path": _Shared.PATH,
             "timestamp": _Shared.TIMESTAMP,
             "sequence": sequence,
             "mode": PipeRunMode.LIVE,
@@ -70,6 +75,7 @@ class _Shared:
             error_type="LLMError",
             message="Model returned an error",
             stack="Traceback (most recent call last):\n  File ...",
+            caller_facing=True,
         )
 
     @staticmethod
@@ -107,6 +113,7 @@ class TestTraceEvents:
                 "node_id": _Shared.NODE_ID,
                 "parent_node_id": _Shared.PARENT_NODE_ID,
                 "pipe_code": "gen_summary",
+                "pipe_ref": "records.gen_summary",
                 "pipe_type": "PipeLLM",
                 "node_kind": NodeKind.OPERATOR,
                 "input_specs": [_Shared.make_io_spec()],
@@ -117,6 +124,9 @@ class TestTraceEvents:
             TraceEventKind.PIPE_END_SUCCESS,
             {
                 "node_id": _Shared.NODE_ID,
+                "pipe_code": "gen_summary",
+                "pipe_ref": "records.gen_summary",
+                "pipe_type": "PipeLLM",
                 "ended_at": _Shared.TIMESTAMP,
                 "output_spec": _Shared.make_io_spec(name="output_text", digest="def456"),
                 "metrics": {"tokens": 150.0},
@@ -127,6 +137,9 @@ class TestTraceEvents:
             TraceEventKind.PIPE_END_ERROR,
             {
                 "node_id": _Shared.NODE_ID,
+                "pipe_code": "gen_summary",
+                "pipe_ref": "records.gen_summary",
+                "pipe_type": "PipeLLM",
                 "ended_at": _Shared.TIMESTAMP,
                 "error": _Shared.make_error_spec(),
             },
@@ -136,6 +149,9 @@ class TestTraceEvents:
             TraceEventKind.PIPE_END_SKIPPED,
             {
                 "node_id": _Shared.NODE_ID,
+                "pipe_code": "gen_summary",
+                "pipe_ref": "records.gen_summary",
+                "pipe_type": "PipeLLM",
                 "ended_at": _Shared.TIMESTAMP,
                 "skip_reason": "skipped because input 'source' is absent",
             },
@@ -293,6 +309,7 @@ class TestTraceEvents:
     def test_pipe_start_with_empty_inputs(self) -> None:
         """PipeStartEvent works with no input specs."""
         event = PipeStartEvent(
+            pipe_ref=None,
             **_Shared.make_base_fields(),
             node_id=_Shared.NODE_ID,
             pipe_code="noop_pipe",
@@ -309,6 +326,9 @@ class TestTraceEvents:
     def test_pipe_end_success_with_no_output(self) -> None:
         """PipeEndSuccessEvent works with no output spec."""
         event = PipeEndSuccessEvent(
+            pipe_code="test_pipe",
+            pipe_ref=None,
+            pipe_type="PipeFunc",
             **_Shared.make_base_fields(),
             node_id=_Shared.NODE_ID,
             ended_at=_Shared.TIMESTAMP,
@@ -333,6 +353,7 @@ class TestTraceEvents:
             extra={"custom_field": "custom_value"},
         )
         event = PipeStartEvent(
+            pipe_ref=None,
             **_Shared.make_base_fields(),
             node_id=_Shared.NODE_ID,
             pipe_code="test_pipe",
@@ -359,6 +380,9 @@ class TestTraceEvents:
             stack="long stack trace here...",
         )
         event = PipeEndErrorEvent(
+            pipe_code="test_pipe",
+            pipe_ref=None,
+            pipe_type="PipeFunc",
             **_Shared.make_base_fields(),
             node_id=_Shared.NODE_ID,
             ended_at=_Shared.TIMESTAMP,
@@ -392,6 +416,7 @@ class TestTraceEvents:
 
     def test_pipe_start_carries_description_and_domain_code(self) -> None:
         event = PipeStartEvent(
+            pipe_ref=None,
             **_Shared.make_base_fields(),
             node_id=_Shared.NODE_ID,
             pipe_code="gen_summary",
@@ -406,6 +431,7 @@ class TestTraceEvents:
 
     def test_pipe_start_description_and_domain_code_default_to_none(self) -> None:
         event = PipeStartEvent(
+            pipe_ref=None,
             **_Shared.make_base_fields(),
             node_id=_Shared.NODE_ID,
             pipe_code="noop_pipe",
@@ -418,6 +444,7 @@ class TestTraceEvents:
 
     def test_pipe_start_description_and_domain_code_round_trip(self) -> None:
         event = PipeStartEvent(
+            pipe_ref=None,
             **_Shared.make_base_fields(),
             node_id=_Shared.NODE_ID,
             pipe_code="gen_summary",
@@ -441,6 +468,7 @@ class TestTraceEvents:
     def test_pipe_start_carries_step_and_branch_counts(self, step_count: int | None, branch_count: int | None) -> None:
         """A sequence states its authored step count and a parallel its branch count as they start; any other pipe states neither."""
         event = PipeStartEvent(
+            pipe_ref=None,
             **_Shared.make_base_fields(),
             node_id=_Shared.NODE_ID,
             pipe_code="controller",
@@ -506,6 +534,7 @@ class TestTraceEvents:
         del base_fields["mode"]
         with pytest.raises(ValidationError):
             PipeStartEvent(
+                pipe_ref=None,
                 **base_fields,
                 node_id=_Shared.NODE_ID,
                 pipe_code="noop_pipe",

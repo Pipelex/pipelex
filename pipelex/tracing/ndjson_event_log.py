@@ -28,9 +28,11 @@ class NdjsonEventLog(EventLogProtocol):
 
     Write path: appends one JSON line per event, flushed immediately.
     Read path: globs all .ndjson files in the run directory, parses,
-    deduplicates by (workflow_id, writer_id, type, sequence), and sorts
-    by (workflow_id, sequence, writer_id) — sequence primary so a
+    deduplicates by `TraceEvent.store_key` (chain, writer_id, type, sequence),
+    and sorts by (chain, sequence, writer_id) — sequence before writer so a
     runner-side writer's events do not sort before earlier router events.
+    Every attempt of one workflow appends to the workflow's one file, and the
+    chain in the key keeps their events apart.
 
     Multi-writer file naming: events from writer_id="primary" land in the
     legacy file `wf_{workflow_id}.ndjson`; events from any other writer
@@ -64,7 +66,7 @@ class NdjsonEventLog(EventLogProtocol):
         threads sharing this backend (via ``get_or_create_activity_event_log``)
         cannot read the same value before either increments — duplicate
         sequence numbers would collide on the
-        ``(workflow_id, writer_id, type, sequence)`` dedup key and silently
+        ``(chain, writer_id, type, sequence)`` dedup key and silently
         drop one event.
         """
         with self._sequence_lock:
@@ -125,8 +127,10 @@ class NdjsonEventLog(EventLogProtocol):
     def read_events(self, pipeline_run_id: str) -> list[TraceEvent]:
         """Read all events for a pipeline run from NDJSON files.
 
-        Deduplicates by (workflow_id, sequence) to handle Temporal replay
-        re-emission. Sorts by (workflow_id, sequence) for deterministic ordering.
+        Deduplicates by `TraceEvent.store_key` (chain, writer_id, type,
+        sequence) to handle Temporal replay re-emission, while keeping the
+        events of every attempt. Sorts by (chain, sequence, writer_id) for
+        deterministic ordering.
         Corrupt lines (truncated JSON from crash-mid-write) are skipped with
         a warning log.
 
@@ -178,9 +182,8 @@ class NdjsonEventLog(EventLogProtocol):
                             first_refusal = f"{ndjson_path}:{line_number} — {format_pydantic_validation_error(validation_error)}"
                         continue
 
-                    dedup_key = (event.workflow_id, event.writer_id, type(event).__name__, event.sequence)
-                    if dedup_key not in seen:
-                        seen.add(dedup_key)
+                    if event.store_key not in seen:
+                        seen.add(event.store_key)
                         events.append(event)
 
         if refused_count:
@@ -191,11 +194,12 @@ class NdjsonEventLog(EventLogProtocol):
             )
             raise EventLogSchemaMismatchError(msg)
 
-        # TODO: causal ordering — sorting by (workflow_id, sequence) groups by lexicographic
-        # workflow ID, not execution order. In parent/child workflow topologies this can cause
-        # incorrect producer map overwrites in GraphSpecAssembler. Consider timestamp-based
-        # or topology-aware ordering.
-        events.sort(key=lambda evt: (evt.workflow_id, evt.sequence, evt.writer_id))
+        # TODO: causal ordering — sorting by (chain, sequence) puts a dispatching attempt's events
+        # before those of the workflows it dispatched, whose chains continue its own, but orders
+        # sibling workflows by their names, not by execution order. In parent/child workflow
+        # topologies this can cause incorrect producer map overwrites in GraphSpecAssembler.
+        # Consider timestamp-based or topology-aware ordering.
+        events.sort(key=lambda evt: (evt.chain_key, evt.sequence, evt.writer_id))
         return events
 
     # ------------------------------------------------------------------

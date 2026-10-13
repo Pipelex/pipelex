@@ -159,7 +159,7 @@ from pipelex.tracing.usage_aggregator import UsageAggregator
 run_mode = resolve_effective_run_mode(requested=PipeRunMode.LIVE, is_mock_usage=False)
 event_log = InMemoryEventLog()
 trace_context = TraceContext(graph_id=run_id, data_inclusion=data_inclusion, emit_graph_events=False, emit_usage_events=True, run_mode=run_mode)
-get_report_delegate().set_event_log(context_key=trace_context.lookup_key, event_log=event_log, workflow_id="direct", pipeline_run_id=run_id)
+get_report_delegate().set_event_log(context_key=trace_context.lookup_key, event_log=event_log, pipeline_run_id=run_id)
 try:
     kernel = PipelexKernel.make(user_id="my-service", storage_scope="my-service", read_scope=None, run_mode=run_mode, trace_context=trace_context)
     ...

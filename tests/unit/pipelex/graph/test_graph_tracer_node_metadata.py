@@ -15,6 +15,7 @@ class TestGraphTracerNodeMetadata:
 
         started_at = datetime.now(UTC)
         node_id, _child = tracer.on_pipe_start(
+            pipe_ref="tests.summarize",
             trace_context=context,
             pipe_code="summarize",
             pipe_type="PipeLLM",
@@ -43,6 +44,7 @@ class TestGraphTracerNodeMetadata:
 
         started_at = datetime.now(UTC)
         node_id, _child = tracer.on_pipe_start(
+            pipe_ref="tests.noop",
             trace_context=context,
             pipe_code="noop",
             pipe_type="PipeLLM",

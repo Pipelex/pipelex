@@ -6896,10 +6896,6 @@ rationale = "Derivation: encodes the run id into a key condition; single operand
 param = "pipeline_run_id"
 rationale = "Derivation: encodes the run id into the partition key; single operand."
 
-["pipelex/tracing/dynamodb_event_log.py::DynamoDBEventLog._make_sk"]
-param = "workflow_id"
-rationale = "Derivation: encodes the workflow id into the sort key; writer/sequence stay keyword."
-
 ["pipelex/tracing/event_log_factory.py::make_event_log"]
 param = "tracing_config"
 rationale = "Factory from source: builds the event log from the tracing config; writer_id stays keyword."

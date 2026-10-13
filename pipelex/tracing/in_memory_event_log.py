@@ -47,22 +47,22 @@ class InMemoryEventLog(EventLogProtocol):
     def read_events(self, pipeline_run_id: str) -> list[TraceEvent]:
         """Return events for a pipeline run, deduplicated and sorted.
 
-        Deduplicates by (workflow_id, writer_id, type, sequence), keeping
-        the first occurrence. Sorts by (workflow_id, sequence, writer_id) —
-        sequence is primary so two writers emitting into the same workflow
-        partition do not get reordered by writer-id lexicographic sort.
+        Deduplicates by `TraceEvent.store_key` (chain, writer_id, type,
+        sequence), keeping the first occurrence. Sorts by (chain, sequence,
+        writer_id) — sequence before writer so two writers emitting into the
+        same attempt's partition do not get reordered by writer-id
+        lexicographic sort.
         """
         filtered = [evt for evt in self._events if evt.pipeline_run_id == pipeline_run_id]
 
         seen: set[tuple[str, str, str, int]] = set()
         deduped: list[TraceEvent] = []
         for event in filtered:
-            dedup_key = (event.workflow_id, event.writer_id, type(event).__name__, event.sequence)
-            if dedup_key not in seen:
-                seen.add(dedup_key)
+            if event.store_key not in seen:
+                seen.add(event.store_key)
                 deduped.append(event)
 
-        deduped.sort(key=lambda evt: (evt.workflow_id, evt.sequence, evt.writer_id))
+        deduped.sort(key=lambda evt: (evt.chain_key, evt.sequence, evt.writer_id))
         return deduped
 
     @override

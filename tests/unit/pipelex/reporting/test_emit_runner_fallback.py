@@ -29,6 +29,7 @@ from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.system.configuration.configs import NdjsonTracingConfig, TracingBackend
 from pipelex.system.data_inclusion_config import DataInclusionConfig
 from pipelex.system.exceptions import MissingDependencyError
+from pipelex.system.execution_chain import ExecutionAttempt
 from pipelex.system.job_metadata import JobMetadata, RunMetadata, UnitJobId
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
@@ -83,6 +84,8 @@ def _make_trace_context(
     parent_node_id: str | None = "g:node_0",
     tracer_key: str | None = None,
     run_mode: PipeRunMode = PipeRunMode.LIVE,
+    chain: list[ExecutionAttempt] | None = None,
+    parent_path: str | None = None,
 ) -> TraceContext:
     return TraceContext(
         graph_id=graph_id,
@@ -91,6 +94,8 @@ def _make_trace_context(
         node_sequence=0,
         data_inclusion=DATA_INCLUSION_OFF,
         run_mode=run_mode,
+        chain=chain or [ExecutionAttempt(execution=tracer_key or "direct", attempt=1)],
+        parent_path=parent_path,
     )
 
 
@@ -158,33 +163,33 @@ class TestEmitRunnerFallback:
         usage_events = [evt for evt in NdjsonEventLog(traces_dir=str(tmp_path)).read_events("run_dry") if isinstance(evt, UsageReportEvent)]
         assert [evt.mode for evt in usage_events] == [PipeRunMode.DRY]
 
-    def test_runner_fallback_uses_tracer_key_when_set(
+    def test_runner_fallback_stamps_the_chain_and_path_of_its_trace_context(
         self,
         tmp_path: Path,
         mocker: MockerFixture,
     ) -> None:
-        """workflow_id on the emitted event is trace_context.tracer_key when set, else graph_id."""
+        """An activity's usage event names the workflow attempt its trace context says it ran under, never the tracer key.
+
+        A new attempt of that workflow supersedes it, so the event must carry the attempt and the lineage, and the path of
+        the invocation whose work the inference served.
+        """
         _enable_ndjson_tracing(mocker, tmp_path)
 
         manager = ReportingManager()
         manager.setup()
+        chain = [ExecutionAttempt(execution="wf_run", attempt=1), ExecutionAttempt(execution="wf_item_2", attempt=3)]
+        trace_context = _make_trace_context(
+            graph_id="run_abc",
+            tracer_key="temporal_run_id_of_attempt_3",
+            chain=chain,
+            parent_path="flows.review/step_3/item_2/step_1",
+        )
+        manager.report_inference_job(_make_llm_job("run_abc", trace_context=trace_context))
 
-        # Case 1: tracer_key set → workflow_id == tracer_key
-        ctx_with_tracer = _make_trace_context(graph_id="run_abc", tracer_key="wf_xyz")
-        manager.report_inference_job(_make_llm_job("run_abc", trace_context=ctx_with_tracer))
-
-        # Case 2: tracer_key None → workflow_id == graph_id
-        ctx_no_tracer = _make_trace_context(graph_id="run_def", tracer_key=None)
-        manager.report_inference_job(_make_llm_job("run_def", trace_context=ctx_no_tracer))
-
-        reader = NdjsonEventLog(traces_dir=str(tmp_path))
-        events_abc = [evt for evt in reader.read_events("run_abc") if isinstance(evt, UsageReportEvent)]
-        events_def = [evt for evt in reader.read_events("run_def") if isinstance(evt, UsageReportEvent)]
-
-        assert len(events_abc) == 1
-        assert events_abc[0].workflow_id == "wf_xyz"
-        assert len(events_def) == 1
-        assert events_def[0].workflow_id == "run_def"
+        usage_events = [evt for evt in NdjsonEventLog(traces_dir=str(tmp_path)).read_events("run_abc") if isinstance(evt, UsageReportEvent)]
+        assert [(evt.workflow_id, evt.attempt, evt.lineage, evt.path) for evt in usage_events] == [
+            ("wf_item_2", 3, [ExecutionAttempt(execution="wf_run", attempt=1)], "flows.review/step_3/item_2/step_1")
+        ]
 
     def test_fallback_caches_event_log_per_process(
         self,

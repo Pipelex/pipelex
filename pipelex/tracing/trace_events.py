@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field, ValidationError
 from pipelex.graph.condition_output_merge import ConditionOutputMerge
 from pipelex.graph.graphspec import EdgeKind, ErrorSpec, IOSpec, NodeKind
 from pipelex.reporting.reporting_types import AnyTokensUsage
+from pipelex.system.execution_chain import ExecutionAttempt, execution_chain_key
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
@@ -40,28 +41,65 @@ class TraceEventKind(StrEnum):
 class TraceEvent(BaseModel):
     """Base model for all trace events.
 
+    The fields of the hosted progress contract (`conformance/specs/pipelex-platform-api.md`, "How the runtime
+    carries them") are read off these: `execution` is `workflow_id`, `attempt` and `lineage` are their own, `at` is
+    `timestamp` and `sequence` is `sequence`.
+
     Shared fields:
     - pipeline_run_id: identifies the pipeline execution
-    - workflow_id: Temporal workflow ID or "direct" for in-process mode
+    - workflow_id: the id of the workflow whose code emitted the event, the same in each of its attempts, or
+        "direct" in the runtime's direct mode. It names the event's execution.
+    - attempt: the attempt of that workflow which emitted the event, counting from 1; 1 in direct mode.
+    - lineage: the attempts that workflow was dispatched under, from the run's own workflow down to the one that
+        dispatched it; empty for the run's own workflow. An event's chain is its lineage followed by its own
+        `{execution, attempt}`, and a higher attempt of an execution supersedes the earlier one and everything it
+        dispatched (`pipelex.system.execution_chain`).
+    - path: the invocation path of the pipe run the event is about (`pipelex.system.invocation_path`): the batch's for
+        a fan-out, the condition's for a resolution, the target's for an edge, the pipe whose work an inference
+        served for a usage report. None for an event about no invocation, such as a binding step's.
     - writer_id: identifies the emitting event-log instance, so two writers
         sharing the same (pipeline_run_id, workflow_id) partition can emit
         independent sequence streams without colliding. Defaults to "primary",
-        which preserves the legacy single-writer NDJSON file naming and DDB
-        sort-key shape; non-default values come from the per-process activity
-        event log used by separate-process workers.
+        which preserves the legacy single-writer NDJSON file naming; non-default values
+        come from the per-process activity event log used by separate-process workers.
+        It names no execution: one writer may carry the events of several at once.
     - event_kind: discriminator for the event subclass (defined on each subclass as Literal)
     - mode: whether the run that emitted the event is live or a dry run. Every event of one run
         carries the same mode, so a reader tells dry events from live ones by this field alone.
-    - timestamp: UTC, for display/debugging only
+    - timestamp: UTC, when the event happened: a start's start, an end's end, a decision's moment. It is recorded
+        once, so every write of one event carries the same value; ordering and deduplication never read it.
     - sequence: per-writer monotonic counter, for ordering and deduplication
+
+    A store keeps apart every two events whose chain, writer or sequence differ (`store_key`): keyed on the workflow,
+    the writer and the sequence alone, a workflow's new attempt would overwrite the events of its earlier one.
     """
 
     pipeline_run_id: str
     workflow_id: str
+    attempt: int = Field(ge=1)
+    lineage: list[ExecutionAttempt]
+    path: str | None
     writer_id: str = "primary"
     mode: PipeRunMode
     timestamp: datetime
     sequence: int
+
+    @property
+    def chain(self) -> list[ExecutionAttempt]:
+        """The attempts from the run's own workflow down to the one that emitted this event."""
+        return [*self.lineage, ExecutionAttempt(execution=self.workflow_id, attempt=self.attempt)]
+
+    @property
+    def chain_key(self) -> str:
+        """One string naming this event's chain, distinct for every two chains that differ."""
+        return execution_chain_key(chain=self.chain)
+
+    @property
+    def store_key(self) -> tuple[str, str, str, int]:
+        """What tells this event apart from every other event of its run in a store: its chain, its writer, its kind
+        and its sequence. Two writes with the same key are one event, written again by a replay.
+        """
+        return (self.chain_key, self.writer_id, type(self).__name__, self.sequence)
 
 
 # ---------------------------------------------------------------------------
@@ -76,6 +114,8 @@ class PipeStartEvent(TraceEvent):
     node_id: str
     parent_node_id: str | None = None
     pipe_code: str
+    pipe_ref: str | None
+    """The `domain.code` reference of the pipe; None on a binding step's node, which runs no pipe."""
     pipe_type: str
     node_kind: NodeKind
     description: str | None = None
@@ -95,6 +135,9 @@ class PipeEndSuccessEvent(TraceEvent):
 
     event_kind: Literal[TraceEventKind.PIPE_END_SUCCESS] = TraceEventKind.PIPE_END_SUCCESS
     node_id: str
+    pipe_code: str
+    pipe_ref: str | None
+    pipe_type: str
     ended_at: datetime
     output_spec: IOSpec | None = None
     metrics: dict[str, float] = Field(default_factory=dict)
@@ -102,10 +145,17 @@ class PipeEndSuccessEvent(TraceEvent):
 
 
 class PipeEndErrorEvent(TraceEvent):
-    """Emitted when a pipe fails."""
+    """Emitted when a pipe fails.
+
+    Its `error` gives the progress contract's `failure`: `message`, and `caller_facing`, true when that message was
+    written for the caller.
+    """
 
     event_kind: Literal[TraceEventKind.PIPE_END_ERROR] = TraceEventKind.PIPE_END_ERROR
     node_id: str
+    pipe_code: str
+    pipe_ref: str | None
+    pipe_type: str
     ended_at: datetime
     error: ErrorSpec
 
@@ -119,6 +169,9 @@ class PipeEndSkippedEvent(TraceEvent):
 
     event_kind: Literal[TraceEventKind.PIPE_END_SKIPPED] = TraceEventKind.PIPE_END_SKIPPED
     node_id: str
+    pipe_code: str
+    pipe_ref: str | None
+    pipe_type: str
     ended_at: datetime
     skip_reason: str
     output_spec: IOSpec | None = None

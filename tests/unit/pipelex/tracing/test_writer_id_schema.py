@@ -27,6 +27,10 @@ _WORKFLOW_ID = "wf_writer_id_xyz"
 
 def _make_pipe_start(sequence: int, writer_id: str = "primary", workflow_id: str = _WORKFLOW_ID) -> PipeStartEvent:
     return PipeStartEvent(
+        attempt=1,
+        lineage=[],
+        path=None,
+        pipe_ref=None,
         pipeline_run_id=_PIPELINE_RUN_ID,
         workflow_id=workflow_id,
         writer_id=writer_id,
@@ -46,6 +50,10 @@ class TestWriterIdSchema:
     def test_trace_event_has_writer_id_default_primary(self) -> None:
         """A TraceEvent built without writer_id round-trips with writer_id="primary"."""
         event = PipeStartEvent(
+            attempt=1,
+            lineage=[],
+            path=None,
+            pipe_ref=None,
             pipeline_run_id=_PIPELINE_RUN_ID,
             workflow_id=_WORKFLOW_ID,
             timestamp=_TS,
@@ -76,12 +84,16 @@ class TestWriterIdSchema:
         legacy_payload: dict[str, Any] = {
             "pipeline_run_id": _PIPELINE_RUN_ID,
             "workflow_id": _WORKFLOW_ID,
+            "attempt": 1,
+            "lineage": [],
+            "path": None,
             "timestamp": _TS.isoformat(),
             "sequence": 0,
             "mode": "live",
             "event_kind": "pipe_start",
             "node_id": f"g:{_WORKFLOW_ID}:node_0",
             "pipe_code": "pipe_x",
+            "pipe_ref": "tests.pipe_x",
             "pipe_type": "PipeLLM",
             "node_kind": NodeKind.OPERATOR,
         }
@@ -187,7 +199,7 @@ class TestWriterIdSchema:
         assert events[2].writer_id == "primary"
 
     def test_dynamodb_sk_includes_writer_id(self, mocker: MockerFixture) -> None:
-        """DynamoDB SK encodes writer_id between workflow_id and sequence."""
+        """DynamoDB SK encodes writer_id between the event's chain and its sequence."""
         captured_items: list[dict[str, Any]] = []
 
         class _StubTable:
@@ -208,7 +220,7 @@ class TestWriterIdSchema:
         event_log.emit(_make_pipe_start(sequence=0, writer_id="act_pid42"))
 
         assert len(captured_items) == 1
-        assert captured_items[0]["SK"] == f"EVENT#{_WORKFLOW_ID}#act_pid42#0000000000"
+        assert captured_items[0]["SK"] == f"EVENT#{_WORKFLOW_ID}@1#act_pid42#0000000000"
 
     def test_event_log_exposes_writer_id_property(self, tmp_path: Path) -> None:
         """Every event log backend exposes its writer_id via a read-only property.

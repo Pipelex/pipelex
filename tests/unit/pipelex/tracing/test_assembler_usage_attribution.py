@@ -38,6 +38,9 @@ def _base(sequence: int) -> dict[str, Any]:
     return {
         "pipeline_run_id": _PIPELINE_RUN_ID,
         "workflow_id": _WORKFLOW_ID,
+        "attempt": 1,
+        "lineage": [],
+        "path": None,
         "timestamp": _T0 + timedelta(seconds=sequence),
         "sequence": sequence,
         "mode": PipeRunMode.LIVE,
@@ -61,6 +64,7 @@ def _make_usage(*, unit_costs: CostsByCategoryDict, model_name: str = "test-mode
 
 def _pipe_start(*, sequence: int, node_id: str, parent_node_id: str | None, node_kind: NodeKind, pipe_type: str) -> PipeStartEvent:
     return PipeStartEvent(
+        pipe_ref=None,
         **_base(sequence),
         node_id=node_id,
         parent_node_id=parent_node_id,
@@ -71,7 +75,9 @@ def _pipe_start(*, sequence: int, node_id: str, parent_node_id: str | None, node
 
 
 def _pipe_end(*, sequence: int, node_id: str) -> PipeEndSuccessEvent:
-    return PipeEndSuccessEvent(**_base(sequence), node_id=node_id, ended_at=_T0 + timedelta(seconds=sequence))
+    return PipeEndSuccessEvent(
+        pipe_code="test_pipe", pipe_ref=None, pipe_type="PipeFunc", **_base(sequence), node_id=node_id, ended_at=_T0 + timedelta(seconds=sequence)
+    )
 
 
 def _usage_event(*, sequence: int, node_id: str, unit_costs: CostsByCategoryDict, model_name: str = "test-model") -> UsageReportEvent:

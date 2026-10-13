@@ -18,9 +18,18 @@ _T0 = datetime(2026, 10, 13, 9, 0, 0, tzinfo=UTC)
 
 
 def _decision_events(*, mode: PipeRunMode) -> list[TraceEvent]:
-    base: dict[str, Any] = {"pipeline_run_id": _RUN_ID, "workflow_id": "wf_flow", "timestamp": _T0, "mode": mode}
+    base: dict[str, Any] = {
+        "pipeline_run_id": _RUN_ID,
+        "workflow_id": "wf_flow",
+        "attempt": 1,
+        "lineage": [],
+        "path": None,
+        "timestamp": _T0,
+        "mode": mode,
+    }
     return [
         PipeStartEvent(
+            pipe_ref=None,
             **base,
             sequence=0,
             node_id="g:wf_flow:node_0",

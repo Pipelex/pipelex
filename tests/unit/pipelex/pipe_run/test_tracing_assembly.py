@@ -35,6 +35,9 @@ def _make_usage_event(pipeline_run_id: str, node_id: str, run_mode: PipeRunMode 
         nb_tokens_by_category={TokenCategory.INPUT: 3, TokenCategory.OUTPUT: 5},
     )
     return UsageReportEvent(
+        attempt=1,
+        lineage=[],
+        path=None,
         pipeline_run_id=pipeline_run_id,
         workflow_id="direct",
         timestamp=datetime.now(UTC),

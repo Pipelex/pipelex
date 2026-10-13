@@ -62,6 +62,7 @@ class TestGraphTracerEventEmission:
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_id, _child_ctx = tracer.on_pipe_start(
+            pipe_ref="tests.test_pipe",
             trace_context=context,
             pipe_code="test_pipe",
             pipe_type="PipeLLM",
@@ -97,6 +98,7 @@ class TestGraphTracerEventEmission:
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         parent_id, child_ctx = tracer.on_pipe_start(
+            pipe_ref="tests.parent_pipe",
             trace_context=context,
             pipe_code="parent_pipe",
             pipe_type="PipeSequence",
@@ -105,7 +107,8 @@ class TestGraphTracerEventEmission:
         )
 
         child_id, _ = tracer.on_pipe_start(
-            trace_context=child_ctx,
+            pipe_ref="tests.child_pipe",
+            trace_context=child_ctx.with_child_segment(segment="step_1"),
             pipe_code="child_pipe",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -134,6 +137,7 @@ class TestGraphTracerEventEmission:
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.test_pipe",
             trace_context=context,
             pipe_code="test_pipe",
             pipe_type="PipeLLM",
@@ -176,6 +180,7 @@ class TestGraphTracerEventEmission:
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.test_pipe",
             trace_context=context,
             pipe_code="test_pipe",
             pipe_type="PipeLLM",
@@ -201,6 +206,47 @@ class TestGraphTracerEventEmission:
         assert evt.ended_at == ended_at
         assert evt.error.error_type == "ValueError"
         assert evt.error.message == "Something went wrong"
+        assert evt.error.caller_facing is False
+        # An end event names the pipe it ends, as its start does, and the invocation's path.
+        assert (evt.pipe_code, evt.pipe_ref, evt.pipe_type, evt.path) == ("test_pipe", "tests.test_pipe", "PipeLLM", "tests.test_pipe")
+
+    def test_pipe_end_error_states_whether_its_message_was_written_for_the_caller(self) -> None:
+        """The failure's `caller_facing` reaches the event and the node of the graph."""
+        tracer, event_log = self._make_tracer_with_event_log()
+        context = tracer.setup(
+            graph_id=self.GRAPH_ID,
+            data_inclusion=make_defaulted_data_inclusion_config(),
+            event_log=event_log,
+            workflow_id=self.WORKFLOW_ID,
+            pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
+        )
+        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
+        node_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.test_pipe",
+            trace_context=context,
+            pipe_code="test_pipe",
+            pipe_type="PipeParallel",
+            node_kind=NodeKind.CONTROLLER,
+            started_at=started_at,
+        )
+
+        tracer.on_pipe_end_error(
+            node_id=node_id,
+            ended_at=started_at + timedelta(milliseconds=50),
+            error_type="StuffFactoryError",
+            error_message="PipeParallel 'test_pipe' cannot combine its branch results into its output 'Report'.",
+            caller_facing=True,
+        )
+        graph_spec = tracer.teardown()
+
+        error_events = [evt for evt in event_log.read_events(self.PIPELINE_RUN_ID) if isinstance(evt, PipeEndErrorEvent)]
+        assert [evt.error.caller_facing for evt in error_events] == [True]
+        assert graph_spec is not None
+        failed_node = next(node for node in graph_spec.nodes if node.node_id == node_id)
+        assert failed_node.error is not None
+        assert failed_node.error.caller_facing is True
+        assert failed_node.path == "tests.test_pipe"
 
     def test_add_edge_emits_event(self) -> None:
         """EdgeEvent is emitted on add_edge."""
@@ -217,6 +263,7 @@ class TestGraphTracerEventEmission:
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_a, _ctx_a = tracer.on_pipe_start(
+            pipe_ref="tests.pipe_a",
             trace_context=context,
             pipe_code="pipe_a",
             pipe_type="PipeLLM",
@@ -224,6 +271,7 @@ class TestGraphTracerEventEmission:
             started_at=started_at,
         )
         node_b, _ = tracer.on_pipe_start(
+            pipe_ref="tests.pipe_b",
             trace_context=context,
             pipe_code="pipe_b",
             pipe_type="PipeLLM",
@@ -266,6 +314,7 @@ class TestGraphTracerEventEmission:
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.parallel_pipe",
             trace_context=context,
             pipe_code="parallel_pipe",
             pipe_type="PipeParallel",
@@ -361,6 +410,7 @@ class TestGraphTracerEventEmission:
 
         # Create controller node
         ctrl_id, ctrl_ctx = tracer.on_pipe_start(
+            pipe_ref="tests.parallel_ctrl",
             trace_context=context,
             pipe_code="parallel_ctrl",
             pipe_type="PipeParallel",
@@ -370,7 +420,8 @@ class TestGraphTracerEventEmission:
 
         # Create branch nodes and end them with outputs
         branch_a_id, _ = tracer.on_pipe_start(
-            trace_context=ctrl_ctx,
+            pipe_ref="tests.branch_a",
+            trace_context=ctrl_ctx.with_child_segment(segment="step_1"),
             pipe_code="branch_a",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -383,7 +434,8 @@ class TestGraphTracerEventEmission:
         )
 
         branch_b_id, _ = tracer.on_pipe_start(
-            trace_context=ctrl_ctx,
+            pipe_ref="tests.branch_b",
+            trace_context=ctrl_ctx.with_child_segment(segment="step_2"),
             pipe_code="branch_b",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -421,6 +473,7 @@ class TestGraphTracerEventEmission:
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_id, _child_ctx = tracer.on_pipe_start(
+            pipe_ref="tests.test_pipe",
             trace_context=context,
             pipe_code="test_pipe",
             pipe_type="PipeLLM",
@@ -455,6 +508,7 @@ class TestGraphTracerEventEmission:
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.test_pipe",
             trace_context=context,
             pipe_code="test_pipe",
             pipe_type="PipeLLM",
@@ -480,6 +534,7 @@ class TestGraphTracerEventEmission:
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_a, _ = tracer.on_pipe_start(
+            pipe_ref="tests.pipe_a",
             trace_context=context,
             pipe_code="pipe_a",
             pipe_type="PipeLLM",
@@ -487,6 +542,7 @@ class TestGraphTracerEventEmission:
             started_at=started_at,
         )
         node_b, _ = tracer.on_pipe_start(
+            pipe_ref="tests.pipe_b",
             trace_context=context,
             pipe_code="pipe_b",
             pipe_type="PipeLLM",
@@ -521,6 +577,7 @@ class TestGraphTracerEventEmission:
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         for index in range(5):
             node_id, _ = tracer.on_pipe_start(
+                pipe_ref=f"tests.{f'pipe_{index}'}",
                 trace_context=context,
                 pipe_code=f"pipe_{index}",
                 pipe_type="PipeLLM",
@@ -544,6 +601,7 @@ class TestGraphTracerEventEmission:
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.test_pipe",
             trace_context=context,
             pipe_code="test_pipe",
             pipe_type="PipeLLM",

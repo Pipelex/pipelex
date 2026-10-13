@@ -32,6 +32,9 @@ def _job_metadata() -> JobMetadata:
 
 def _usage_event(tokens_usage: AnyTokensUsage, sequence: int) -> UsageReportEvent:
     return UsageReportEvent(
+        attempt=1,
+        lineage=[],
+        path=None,
         pipeline_run_id="run-non-llm",
         workflow_id="wf-non-llm",
         writer_id="act_test",

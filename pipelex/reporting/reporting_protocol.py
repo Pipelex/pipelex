@@ -18,7 +18,6 @@ class ReportingProtocol(Protocol):
         *,
         context_key: str,
         event_log: EventLogProtocol,
-        workflow_id: str,
         pipeline_run_id: str,
     ) -> None: ...
 
@@ -44,7 +43,6 @@ class ReportingNoOp(ReportingProtocol):
         *,
         context_key: str,
         event_log: EventLogProtocol,
-        workflow_id: str,
         pipeline_run_id: str,
     ) -> None:
         pass

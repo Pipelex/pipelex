@@ -47,6 +47,7 @@ from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_machinery.memory_writes import MemoryWrite, SlotTaint, is_same_value_spec, taint_after_write, write_after_lift
 from pipelex.pipe_machinery.validation import is_valid_input_name, suggest_plain_name
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams, output_multiplicity_to_apply
+from pipelex.system.invocation_path import step_segment
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.validation_error_types import PipeValidationErrorType
 
@@ -1038,17 +1039,12 @@ class PipeSequence(PipeController):
         typed_flow: SequenceTypedFlow | None = None
         # By step index, each binding the run derived from the value its root held, the flow having no spec for that root.
         runtime_bindings: dict[int, DerivedBinding] = {}
-        # The sequence records how many steps it runs as it starts, and the number of each step as that step starts.
+        # The sequence records how many steps it runs as it starts. Each step's pipe is named by its invocation path,
+        # whose `step_<n>` segment is the step's number among the steps the author wrote.
         self._register_execution_data(job_metadata=job_metadata, execution_data={"step_count": self.traced_step_count()})
-        current_step: int | None = None
 
         for sub_pipe_index, sub_pipe in enumerate(self.sequential_sub_pipes):
             is_last_step = sub_pipe_index == len(self.sequential_sub_pipes) - 1
-            step_number = self._step_number(step_index=sub_pipe_index)
-            # The binding written for a dotted `batch_over` shares the number of the batch step after it: one record each.
-            if step_number != current_step:
-                current_step = step_number
-                self._register_execution_data(job_metadata=job_metadata, execution_data={"current_step": step_number})
             if isinstance(sub_pipe, BindingStep):
                 if typed_flow is None:
                     typed_flow = self.build_typed_flow()
@@ -1072,10 +1068,11 @@ class PipeSequence(PipeController):
                 sub_pipe_run_params = pipe_run_params.model_copy()
             else:
                 sub_pipe_run_params = pipe_run_params.model_copy(update=({"final_stuff_code": None}))
+            # A step that batches runs as the PipeBatch made for it, at the step's own segment.
             pipe_output = await sub_pipe.run_pipe(
                 calling_pipe_code=self.code,
                 working_memory=evolving_memory,
-                job_metadata=job_metadata,
+                job_metadata=job_metadata.for_child_at(segment=step_segment(step_number=self._step_number(step_index=sub_pipe_index))),
                 sub_pipe_run_params=sub_pipe_run_params,
                 library_crate=library_crate,
             )

@@ -51,6 +51,9 @@ def _base(workflow_id: str, sequence: int, timestamp_offset: int = 0, run_mode: 
     return {
         "pipeline_run_id": _PIPELINE_RUN_ID,
         "workflow_id": workflow_id,
+        "attempt": 1,
+        "lineage": [],
+        "path": None,
         "timestamp": _time_at(timestamp_offset or sequence),
         "sequence": sequence,
         "mode": run_mode,
@@ -79,9 +82,21 @@ class TestGraphSpecAssembler:
         result = GraphSpecAssembler.assemble(
             events=[
                 PipeStartEvent(
-                    **_base(_WF_A, 0, run_mode=run_mode), node_id=node_id, pipe_code="only", pipe_type="PipeLLM", node_kind=NodeKind.OPERATOR
+                    pipe_ref=None,
+                    **_base(_WF_A, 0, run_mode=run_mode),
+                    node_id=node_id,
+                    pipe_code="only",
+                    pipe_type="PipeLLM",
+                    node_kind=NodeKind.OPERATOR,
                 ),
-                PipeEndSuccessEvent(**_base(_WF_A, 1, run_mode=run_mode), node_id=node_id, ended_at=_time_at(1)),
+                PipeEndSuccessEvent(
+                    pipe_code="test_pipe",
+                    pipe_ref=None,
+                    pipe_type="PipeFunc",
+                    **_base(_WF_A, 1, run_mode=run_mode),
+                    node_id=node_id,
+                    ended_at=_time_at(1),
+                ),
             ],
             graph_id=_GRAPH_ID,
         )
@@ -100,6 +115,7 @@ class TestGraphSpecAssembler:
         """A set of events that mixes modes holds more than one run, and an empty one states no mode: neither gets a graph."""
         events = [
             PipeStartEvent(
+                pipe_ref=None,
                 **_base(_WF_A, index_event, run_mode=run_mode),
                 node_id=_node_id(_WF_A, index_event),
                 pipe_code=f"pipe_{index_event}",
@@ -122,6 +138,7 @@ class TestGraphSpecAssembler:
         result = GraphSpecAssembler.assemble(
             events=[
                 PipeStartEvent(
+                    pipe_ref=None,
                     **_base(_WF_A, 0),
                     node_id=node_id,
                     pipe_code="sourceful_pipe",
@@ -143,6 +160,9 @@ class TestGraphSpecAssembler:
                     ],
                 ),
                 PipeEndSuccessEvent(
+                    pipe_code="test_pipe",
+                    pipe_ref=None,
+                    pipe_type="PipeFunc",
                     **_base(_WF_A, 1),
                     node_id=node_id,
                     ended_at=_time_at(1),
@@ -171,6 +191,7 @@ class TestGraphSpecAssembler:
         result = GraphSpecAssembler.assemble(
             events=[
                 PipeStartEvent(
+                    pipe_ref=None,
                     **_base(_WF_A, 0),
                     node_id=producer_node,
                     pipe_code="lifted_plural_pipe",
@@ -178,6 +199,9 @@ class TestGraphSpecAssembler:
                     node_kind=NodeKind.OPERATOR,
                 ),
                 PipeEndSkippedEvent(
+                    pipe_code="test_pipe",
+                    pipe_ref=None,
+                    pipe_type="PipeFunc",
                     **_base(_WF_A, 1),
                     node_id=producer_node,
                     ended_at=_time_at(1),
@@ -185,6 +209,7 @@ class TestGraphSpecAssembler:
                     output_spec=_io_spec("items", "stuff-empty-list"),
                 ),
                 PipeStartEvent(
+                    pipe_ref=None,
                     **_base(_WF_A, 2),
                     node_id=consumer_node,
                     pipe_code="items_consumer",
@@ -193,6 +218,9 @@ class TestGraphSpecAssembler:
                     input_specs=[_io_spec("items", "stuff-empty-list")],
                 ),
                 PipeEndSuccessEvent(
+                    pipe_code="test_pipe",
+                    pipe_ref=None,
+                    pipe_type="PipeFunc",
                     **_base(_WF_A, 3),
                     node_id=consumer_node,
                     ended_at=_time_at(3),
@@ -226,6 +254,7 @@ class TestGraphSpecAssembler:
         events = [
             # Parent starts
             PipeStartEvent(
+                pipe_ref=None,
                 **_base(_WF_A, 0),
                 node_id=parent,
                 pipe_code="sequence",
@@ -234,6 +263,7 @@ class TestGraphSpecAssembler:
             ),
             # Child 1 starts
             PipeStartEvent(
+                pipe_ref=None,
                 **_base(_WF_A, 1),
                 node_id=child_1,
                 parent_node_id=parent,
@@ -251,6 +281,9 @@ class TestGraphSpecAssembler:
             ),
             # Child 1 ends with output digest_a
             PipeEndSuccessEvent(
+                pipe_code="test_pipe",
+                pipe_ref=None,
+                pipe_type="PipeFunc",
                 **_base(_WF_A, 3),
                 node_id=child_1,
                 ended_at=_time_at(3),
@@ -258,6 +291,7 @@ class TestGraphSpecAssembler:
             ),
             # Child 2 starts with input digest_a
             PipeStartEvent(
+                pipe_ref=None,
                 **_base(_WF_A, 4),
                 node_id=child_2,
                 parent_node_id=parent,
@@ -276,6 +310,9 @@ class TestGraphSpecAssembler:
             ),
             # Child 2 ends with output digest_b
             PipeEndSuccessEvent(
+                pipe_code="test_pipe",
+                pipe_ref=None,
+                pipe_type="PipeFunc",
                 **_base(_WF_A, 6),
                 node_id=child_2,
                 ended_at=_time_at(6),
@@ -283,6 +320,7 @@ class TestGraphSpecAssembler:
             ),
             # Child 3 starts with input digest_b
             PipeStartEvent(
+                pipe_ref=None,
                 **_base(_WF_A, 7),
                 node_id=child_3,
                 parent_node_id=parent,
@@ -301,6 +339,9 @@ class TestGraphSpecAssembler:
             ),
             # Child 3 ends
             PipeEndSuccessEvent(
+                pipe_code="test_pipe",
+                pipe_ref=None,
+                pipe_type="PipeFunc",
                 **_base(_WF_A, 9),
                 node_id=child_3,
                 ended_at=_time_at(9),
@@ -308,6 +349,9 @@ class TestGraphSpecAssembler:
             ),
             # Parent ends
             PipeEndSuccessEvent(
+                pipe_code="test_pipe",
+                pipe_ref=None,
+                pipe_type="PipeFunc",
                 **_base(_WF_A, 10),
                 node_id=parent,
                 ended_at=_time_at(10),
@@ -341,6 +385,7 @@ class TestGraphSpecAssembler:
 
         events = [
             PipeStartEvent(
+                pipe_ref=None,
                 **_base(_WF_A, 0),
                 node_id=controller,
                 pipe_code="parallel",
@@ -348,6 +393,7 @@ class TestGraphSpecAssembler:
                 node_kind=NodeKind.CONTROLLER,
             ),
             PipeStartEvent(
+                pipe_ref=None,
                 **_base(_WF_A, 1),
                 node_id=branch_1,
                 parent_node_id=controller,
@@ -363,12 +409,16 @@ class TestGraphSpecAssembler:
                 edge_kind=EdgeKind.CONTAINS,
             ),
             PipeEndSuccessEvent(
+                pipe_code="test_pipe",
+                pipe_ref=None,
+                pipe_type="PipeFunc",
                 **_base(_WF_A, 3),
                 node_id=branch_1,
                 ended_at=_time_at(3),
                 output_spec=_io_spec("branch_out", "digest_branch_1"),
             ),
             PipeStartEvent(
+                pipe_ref=None,
                 **_base(_WF_A, 4),
                 node_id=branch_2,
                 parent_node_id=controller,
@@ -384,6 +434,9 @@ class TestGraphSpecAssembler:
                 edge_kind=EdgeKind.CONTAINS,
             ),
             PipeEndSuccessEvent(
+                pipe_code="test_pipe",
+                pipe_ref=None,
+                pipe_type="PipeFunc",
                 **_base(_WF_A, 6),
                 node_id=branch_2,
                 ended_at=_time_at(6),
@@ -407,6 +460,9 @@ class TestGraphSpecAssembler:
                 output_spec=_io_spec("combined_out", "digest_combined"),
             ),
             PipeEndSuccessEvent(
+                pipe_code="test_pipe",
+                pipe_ref=None,
+                pipe_type="PipeFunc",
                 **_base(_WF_A, 9),
                 node_id=controller,
                 ended_at=_time_at(9),
@@ -430,6 +486,7 @@ class TestGraphSpecAssembler:
 
         events = [
             PipeStartEvent(
+                pipe_ref=None,
                 **_base(_WF_A, 0),
                 node_id=controller,
                 pipe_code="batch",
@@ -454,6 +511,7 @@ class TestGraphSpecAssembler:
             ),
             # Branch 0 processes item 0
             PipeStartEvent(
+                pipe_ref=None,
                 **_base(_WF_A, 3),
                 node_id=branch_0,
                 parent_node_id=controller,
@@ -470,6 +528,9 @@ class TestGraphSpecAssembler:
                 edge_kind=EdgeKind.CONTAINS,
             ),
             PipeEndSuccessEvent(
+                pipe_code="test_pipe",
+                pipe_ref=None,
+                pipe_type="PipeFunc",
                 **_base(_WF_A, 5),
                 node_id=branch_0,
                 ended_at=_time_at(5),
@@ -477,6 +538,7 @@ class TestGraphSpecAssembler:
             ),
             # Branch 1 processes item 1
             PipeStartEvent(
+                pipe_ref=None,
                 **_base(_WF_A, 6),
                 node_id=branch_1,
                 parent_node_id=controller,
@@ -493,6 +555,9 @@ class TestGraphSpecAssembler:
                 edge_kind=EdgeKind.CONTAINS,
             ),
             PipeEndSuccessEvent(
+                pipe_code="test_pipe",
+                pipe_ref=None,
+                pipe_type="PipeFunc",
                 **_base(_WF_A, 8),
                 node_id=branch_1,
                 ended_at=_time_at(8),
@@ -515,6 +580,9 @@ class TestGraphSpecAssembler:
             ),
             # Controller ends
             PipeEndSuccessEvent(
+                pipe_code="test_pipe",
+                pipe_ref=None,
+                pipe_type="PipeFunc",
                 **_base(_WF_A, 11),
                 node_id=controller,
                 ended_at=_time_at(11),
@@ -550,6 +618,7 @@ class TestGraphSpecAssembler:
 
         events = [
             PipeStartEvent(
+                pipe_ref=None,
                 **_base(_WF_A, 0),
                 node_id=outcome,
                 parent_node_id=condition,
@@ -565,11 +634,15 @@ class TestGraphSpecAssembler:
                 edge_kind=EdgeKind.CONTAINS,
             ),
             PipeEndSuccessEvent(
+                pipe_code="test_pipe",
+                pipe_ref=None,
+                pipe_type="PipeFunc",
                 **_base(_WF_A, 2),
                 node_id=outcome,
                 ended_at=_time_at(4),
             ),
             PipeStartEvent(
+                pipe_ref=None,
                 **_base(_WF_B, 0),
                 node_id=condition,
                 pipe_code="check",
@@ -591,6 +664,9 @@ class TestGraphSpecAssembler:
                 label="true",
             ),
             PipeEndSuccessEvent(
+                pipe_code="test_pipe",
+                pipe_ref=None,
+                pipe_type="PipeFunc",
                 **_base(_WF_B, 3),
                 node_id=condition,
                 ended_at=_time_at(5),
@@ -609,6 +685,7 @@ class TestGraphSpecAssembler:
 
         events = [
             PipeStartEvent(
+                pipe_ref=None,
                 **_base(_WF_A, 0),
                 node_id=outcome,
                 parent_node_id=absent_condition,
@@ -617,6 +694,9 @@ class TestGraphSpecAssembler:
                 node_kind=NodeKind.OPERATOR,
             ),
             PipeEndSuccessEvent(
+                pipe_code="test_pipe",
+                pipe_ref=None,
+                pipe_type="PipeFunc",
                 **_base(_WF_A, 1),
                 node_id=outcome,
                 ended_at=_time_at(4),
@@ -641,6 +721,7 @@ class TestGraphSpecAssembler:
 
         events = [
             PipeStartEvent(
+                pipe_ref=None,
                 **_base(_WF_A, 0),
                 node_id=parent,
                 pipe_code="sequence",
@@ -648,6 +729,7 @@ class TestGraphSpecAssembler:
                 node_kind=NodeKind.CONTROLLER,
             ),
             PipeStartEvent(
+                pipe_ref=None,
                 **_base(_WF_A, 1),
                 node_id=child,
                 parent_node_id=parent,
@@ -663,6 +745,9 @@ class TestGraphSpecAssembler:
                 edge_kind=EdgeKind.CONTAINS,
             ),
             PipeEndErrorEvent(
+                pipe_code="test_pipe",
+                pipe_ref=None,
+                pipe_type="PipeFunc",
                 **_base(_WF_A, 3),
                 node_id=child,
                 ended_at=_time_at(3),
@@ -691,6 +776,7 @@ class TestGraphSpecAssembler:
         events = [
             # wf_a events (sorted first alphabetically)
             PipeStartEvent(
+                pipe_ref=None,
                 **_base(_WF_A, 0),
                 node_id=node_a0,
                 pipe_code="pipe_a",
@@ -698,6 +784,9 @@ class TestGraphSpecAssembler:
                 node_kind=NodeKind.OPERATOR,
             ),
             PipeEndSuccessEvent(
+                pipe_code="test_pipe",
+                pipe_ref=None,
+                pipe_type="PipeFunc",
                 **_base(_WF_A, 1),
                 node_id=node_a0,
                 ended_at=_time_at(1),
@@ -705,6 +794,7 @@ class TestGraphSpecAssembler:
             ),
             # wf_b events (sorted second)
             PipeStartEvent(
+                pipe_ref=None,
                 **_base(_WF_B, 0),
                 node_id=node_b0,
                 pipe_code="pipe_b",
@@ -713,6 +803,9 @@ class TestGraphSpecAssembler:
                 input_specs=[_io_spec("input", "digest_from_a")],
             ),
             PipeEndSuccessEvent(
+                pipe_code="test_pipe",
+                pipe_ref=None,
+                pipe_type="PipeFunc",
                 **_base(_WF_B, 1),
                 node_id=node_b0,
                 ended_at=_time_at(3),
@@ -741,6 +834,7 @@ class TestGraphSpecAssembler:
         events = [
             # wf_a: consumer (sorted first)
             PipeStartEvent(
+                pipe_ref=None,
                 **_base(_WF_A, 0),
                 node_id=consumer,
                 pipe_code="consumer_pipe",
@@ -749,12 +843,16 @@ class TestGraphSpecAssembler:
                 input_specs=[_io_spec("input", "digest_x")],
             ),
             PipeEndSuccessEvent(
+                pipe_code="test_pipe",
+                pipe_ref=None,
+                pipe_type="PipeFunc",
                 **_base(_WF_A, 1),
                 node_id=consumer,
                 ended_at=_time_at(5),
             ),
             # wf_b: producer (sorted second)
             PipeStartEvent(
+                pipe_ref=None,
                 **_base(_WF_B, 0),
                 node_id=producer,
                 pipe_code="producer_pipe",
@@ -762,6 +860,9 @@ class TestGraphSpecAssembler:
                 node_kind=NodeKind.OPERATOR,
             ),
             PipeEndSuccessEvent(
+                pipe_code="test_pipe",
+                pipe_ref=None,
+                pipe_type="PipeFunc",
                 **_base(_WF_B, 1),
                 node_id=producer,
                 ended_at=_time_at(3),
@@ -784,6 +885,7 @@ class TestGraphSpecAssembler:
         events = [
             # Pass-through pipe: input digest_a → output digest_a (same)
             PipeStartEvent(
+                pipe_ref=None,
                 **_base(_WF_A, 0),
                 node_id=passthrough,
                 pipe_code="passthrough",
@@ -792,6 +894,9 @@ class TestGraphSpecAssembler:
                 input_specs=[_io_spec("main_input", "digest_a")],
             ),
             PipeEndSuccessEvent(
+                pipe_code="test_pipe",
+                pipe_ref=None,
+                pipe_type="PipeFunc",
                 **_base(_WF_A, 1),
                 node_id=passthrough,
                 ended_at=_time_at(1),
@@ -799,6 +904,7 @@ class TestGraphSpecAssembler:
             ),
             # Downstream pipe consumes digest_a
             PipeStartEvent(
+                pipe_ref=None,
                 **_base(_WF_A, 2),
                 node_id=downstream,
                 pipe_code="consumer",
@@ -807,6 +913,9 @@ class TestGraphSpecAssembler:
                 input_specs=[_io_spec("input", "digest_a")],
             ),
             PipeEndSuccessEvent(
+                pipe_code="test_pipe",
+                pipe_ref=None,
+                pipe_type="PipeFunc",
                 **_base(_WF_A, 3),
                 node_id=downstream,
                 ended_at=_time_at(3),
@@ -827,6 +936,7 @@ class TestGraphSpecAssembler:
         node = _node_id(_WF_A, 0)
         events = [
             PipeStartEvent(
+                pipe_ref=None,
                 **_base(_WF_A, 0),
                 node_id=node,
                 pipe_code="summarize",
@@ -836,6 +946,9 @@ class TestGraphSpecAssembler:
                 domain_code="summarization",
             ),
             PipeEndSuccessEvent(
+                pipe_code="test_pipe",
+                pipe_ref=None,
+                pipe_type="PipeFunc",
                 **_base(_WF_A, 1),
                 node_id=node,
                 ended_at=_time_at(1),
@@ -853,6 +966,7 @@ class TestGraphSpecAssembler:
         node = _node_id(_WF_A, 0)
         events = [
             PipeStartEvent(
+                pipe_ref=None,
                 **_base(_WF_A, 0),
                 node_id=node,
                 pipe_code="noop",
@@ -860,6 +974,9 @@ class TestGraphSpecAssembler:
                 node_kind=NodeKind.OPERATOR,
             ),
             PipeEndSuccessEvent(
+                pipe_code="test_pipe",
+                pipe_ref=None,
+                pipe_type="PipeFunc",
                 **_base(_WF_A, 1),
                 node_id=node,
                 ended_at=_time_at(1),

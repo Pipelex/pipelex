@@ -11,6 +11,7 @@ class TestGraphTracerEmitGating:
 
     def _start_a_node(self, tracer: GraphTracer, context: object) -> None:
         tracer.on_pipe_start(
+            pipe_ref="tests.some_pipe",
             trace_context=context,  # type: ignore[arg-type]
             pipe_code="some_pipe",
             pipe_type="PipeLLM",

@@ -5,6 +5,12 @@ GraphTracer.teardown() but working from serialized events instead of
 in-memory state. Used after Temporal execution to assemble cross-worker
 graphs from NDJSON event files. The graph's provenance mode is the run mode
 its events state, never one the caller passes.
+
+A run's record holds the events of every attempt of every workflow, and the
+graph is built from the current ones alone: a higher attempt of a workflow
+supersedes the earlier one and everything it dispatched
+(`pipelex.system.execution_chain`), so a retried invocation is one node, the
+one its latest attempt ran, and never a failed node beside a succeeded one.
 """
 
 from collections.abc import Sequence
@@ -32,6 +38,7 @@ from pipelex.graph.graphspec import (
     output_digest_is_optional,
 )
 from pipelex.graph.selected_outcome import derive_selected_outcome_edges
+from pipelex.system.execution_chain import current_chain_keys
 from pipelex.tracing.exceptions import TraceEventModeError
 from pipelex.tracing.trace_events import (
     UNATTRIBUTED_NODE_ID,
@@ -63,6 +70,7 @@ class _AssemblerNodeData:
     def __init__(
         self,
         node_id: str,
+        path: str | None,
         pipe_code: str,
         pipe_type: str,
         node_kind: NodeKind,
@@ -73,6 +81,7 @@ class _AssemblerNodeData:
         domain_code: str | None = None,
     ) -> None:
         self.node_id = node_id
+        self.path = path
         self.pipe_code = pipe_code
         self.pipe_type = pipe_type
         self.node_kind = node_kind
@@ -106,6 +115,7 @@ class _AssemblerNodeData:
 
         return NodeSpec(
             node_id=self.node_id,
+            path=self.path,
             kind=self.node_kind,
             pipe_code=self.pipe_code,
             pipe_type=self.pipe_type,
@@ -137,8 +147,14 @@ class GraphSpecAssembler:
 
     Usage attribution deliberately waits for pass 2: a ``UsageReportEvent`` can be read
     before the ``PipeStartEvent`` of the node it names (they can come from different
-    workers, and the stream is ordered by (workflow_id, sequence)), so "is this node
+    workers, and the stream is ordered by (chain, sequence)), so "is this node
     real?" is only answerable once every event has been seen.
+
+    Only current events build the graph: an event whose chain holds a superseded attempt
+    is dropped, since a new attempt of a workflow replaces what its earlier attempt, and
+    every workflow that attempt dispatched, did. Its usage was spent all the same, so a
+    superseded usage report still counts in the run's total, as unattributed usage: the
+    node it named belongs to an attempt the graph does not show.
     """
 
     @staticmethod
@@ -153,7 +169,8 @@ class GraphSpecAssembler:
         The GraphSpec's provenance mode is the run mode every event states.
 
         Args:
-            events: Flat list of trace events, pre-sorted by (workflow_id, sequence).
+            events: Flat list of trace events, pre-sorted by (chain, sequence), the events of
+                superseded attempts included.
             graph_id: The graph identifier for the assembled GraphSpec.
             pipeline_ref: Optional pipeline reference metadata.
 
@@ -164,7 +181,12 @@ class GraphSpecAssembler:
             TraceEventModeError: When the events mix modes, or there are none, and so state no single run mode.
         """
         mode = _graphspec_mode_of_events(events=events, graph_id=graph_id)
-        assembler = _AssemblerState(graph_id=graph_id, pipeline_ref=pipeline_ref or PipelineRef(), mode=mode)
+        assembler = _AssemblerState(
+            graph_id=graph_id,
+            pipeline_ref=pipeline_ref or PipelineRef(),
+            mode=mode,
+            current_chain_keys=current_chain_keys(chains=[event.chain for event in events]),
+        )
         assembler.pass_one(events)
         assembler.pass_two()
         return assembler.build_graph_spec()
@@ -190,10 +212,12 @@ def _graphspec_mode_of_events(*, events: Sequence[TraceEvent], graph_id: str) ->
 class _AssemblerState:
     """Mutable state for a single assembler invocation."""
 
-    def __init__(self, graph_id: str, pipeline_ref: PipelineRef, mode: GraphSpecMode) -> None:
+    def __init__(self, graph_id: str, pipeline_ref: PipelineRef, mode: GraphSpecMode, current_chain_keys: set[str]) -> None:
         self._graph_id = graph_id
         self._pipeline_ref = pipeline_ref
         self._mode = mode
+        # The chains no attempt of the run supersedes: only their events build the graph
+        self._current_chain_keys = current_chain_keys
         self._earliest_timestamp: datetime | None = None
 
         # Pass 1 accumulation
@@ -227,6 +251,13 @@ class _AssemblerState:
         """Pass 1: Build nodes, producer map, and collect metadata."""
         for event in events:
             self._track_earliest_timestamp(event)
+
+            if event.chain_key not in self._current_chain_keys:
+                # A superseded attempt's event: what it recorded was done again, or undone, by a later attempt. Its
+                # usage was spent all the same, so it counts in the run's total, unattributed.
+                if isinstance(event, UsageReportEvent):
+                    self._usage_by_reported_node.setdefault(UNATTRIBUTED_NODE_ID, []).append(event.tokens_usage)
+                continue
 
             if isinstance(event, PipeStartEvent):
                 self._handle_pipe_start(event)
@@ -303,6 +334,7 @@ class _AssemblerState:
     def _handle_pipe_start(self, event: PipeStartEvent) -> None:
         node_data = _AssemblerNodeData(
             node_id=event.node_id,
+            path=event.path,
             pipe_code=event.pipe_code,
             pipe_type=event.pipe_type,
             node_kind=event.node_kind,

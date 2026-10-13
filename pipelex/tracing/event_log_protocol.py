@@ -20,8 +20,13 @@ class EventLogProtocol(Protocol):
     Each event log instance carries an immutable `writer_id` that emitters
     stamp on every TraceEvent they construct via this log. Two writers
     sharing the same (pipeline_run_id, workflow_id) partition must use
-    distinct writer_ids so the read-side dedup key
-    (workflow_id, writer_id, type, sequence) keeps their events apart.
+    distinct writer_ids so the read-side dedup key, `TraceEvent.store_key`
+    (chain, writer_id, type, sequence), keeps their events apart.
+
+    The chain, an event's lineage followed by its own workflow and attempt, is
+    in the key so that a workflow's new attempt, which restarts its sequence,
+    never overwrites the events of its earlier one, and neither does a workflow
+    that a new attempt dispatched again under the same name.
     """
 
     @property
@@ -39,8 +44,8 @@ class EventLogProtocol(Protocol):
 
         All emitters sharing the same event log must use this method to
         obtain sequence numbers. Combined with writer_id, this guarantees
-        events never collide on the (workflow_id, writer_id, sequence) key
-        regardless of storage backend.
+        events of one attempt never collide on the (chain, writer_id, sequence)
+        key regardless of storage backend.
 
         Implementations MUST be safe to call from multiple threads
         concurrently — the runner-side activity event log is cached
@@ -63,8 +68,10 @@ class EventLogProtocol(Protocol):
     def read_events(self, pipeline_run_id: str) -> list[TraceEvent]:
         """Read all events for a pipeline run.
 
-        Returns events deduplicated by (workflow_id, event_type, sequence) and sorted
-        by (workflow_id, sequence) for deterministic ordering.
+        Returns events deduplicated by `TraceEvent.store_key` (chain, writer_id,
+        event type, sequence) and sorted by (chain, sequence, writer_id) for
+        deterministic ordering: a dispatching attempt's events before those of
+        the workflows it dispatched, whose chains continue its own.
         Returns an empty list if no events exist for the given run.
         """
         ...

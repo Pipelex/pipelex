@@ -140,7 +140,6 @@ class TestEmitUsageEventGating:
         manager.set_event_log(
             context_key=trace_context.lookup_key,
             event_log=event_log_spy,
-            workflow_id="direct",
             pipeline_run_id="run_leaked",
         )
 
@@ -164,7 +163,6 @@ class TestEmitUsageEventGating:
         manager.set_event_log(
             context_key=trace_context.lookup_key,
             event_log=event_log_spy,
-            workflow_id="direct",
             pipeline_run_id="run_fastpath",
         )
 
@@ -198,7 +196,6 @@ class TestEmitUsageEventGating:
         manager.set_event_log(
             context_key=trace_context.lookup_key,
             event_log=event_log_spy,
-            workflow_id="wf_run_isolated",
             pipeline_run_id="run_isolated",
         )
 

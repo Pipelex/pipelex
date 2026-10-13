@@ -20,6 +20,7 @@ from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.config import get_config
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.system.data_inclusion_config import DataInclusionConfig
+from pipelex.system.execution_chain import ExecutionAttempt
 from pipelex.system.job_metadata import JobMetadata, RunMetadata, UnitJobId
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
@@ -68,8 +69,10 @@ def _make_trace_context(
     tracer_key: str | None = None,
     node_sequence: int = 0,
     run_mode: PipeRunMode = PipeRunMode.LIVE,
+    chain: list[ExecutionAttempt] | None = None,
+    parent_path: str | None = None,
 ) -> TraceContext:
-    """Create a TraceContext for testing with lookup_key resolution."""
+    """Create a TraceContext for testing with lookup_key resolution, its execution named after its tracer key."""
     return TraceContext(
         graph_id=graph_id,
         tracer_key=tracer_key,
@@ -77,6 +80,8 @@ def _make_trace_context(
         node_sequence=node_sequence,
         data_inclusion=DATA_INCLUSION_OFF,
         run_mode=run_mode,
+        chain=chain or [ExecutionAttempt(execution=tracer_key or "direct", attempt=1)],
+        parent_path=parent_path,
     )
 
 
@@ -98,7 +103,6 @@ class TestReportingEventEmission:
         manager.set_event_log(
             context_key=self.PIPELINE_RUN_ID,
             event_log=event_log,
-            workflow_id=self.WORKFLOW_ID,
             pipeline_run_id=self.PIPELINE_RUN_ID,
         )
         return manager, event_log
@@ -136,10 +140,13 @@ class TestReportingEventEmission:
         """UsageReportEvent captures the parent node_id from graph context."""
         manager, event_log = self._make_reporting_manager_with_event_log()
 
+        lineage = [ExecutionAttempt(execution="wf_rpt_run", attempt=1)]
         trace_context = _make_trace_context(
             graph_id=self.PIPELINE_RUN_ID,
             parent_node_id="test-graph:node_42",
             node_sequence=43,
+            chain=[*lineage, ExecutionAttempt(execution=self.WORKFLOW_ID, attempt=2)],
+            parent_path="flows.review/step_3/item_1/step_2",
         )
 
         llm_job = _make_test_llm_job(self.PIPELINE_RUN_ID, trace_context=trace_context)
@@ -149,7 +156,9 @@ class TestReportingEventEmission:
         usage_events = [evt for evt in events if isinstance(evt, UsageReportEvent)]
         assert len(usage_events) == 1
         assert usage_events[0].node_id == "test-graph:node_42"
-        assert usage_events[0].workflow_id == self.WORKFLOW_ID
+        # The execution, its attempt and its lineage are the trace context's, and so is the path of the invocation
+        assert (usage_events[0].workflow_id, usage_events[0].attempt, usage_events[0].lineage) == (self.WORKFLOW_ID, 2, lineage)
+        assert usage_events[0].path == "flows.review/step_3/item_1/step_2"
 
     @pytest.mark.parametrize(
         "emit_error",
@@ -209,8 +218,8 @@ class TestReportingEventEmission:
         manager = ReportingManager()
         manager.setup()
 
-        manager.set_event_log(context_key="wf_a", event_log=event_log_a, workflow_id="wf_a", pipeline_run_id="run_a")
-        manager.set_event_log(context_key="wf_b", event_log=event_log_b, workflow_id="wf_b", pipeline_run_id="run_b")
+        manager.set_event_log(context_key="wf_a", event_log=event_log_a, pipeline_run_id="run_a")
+        manager.set_event_log(context_key="wf_b", event_log=event_log_b, pipeline_run_id="run_b")
 
         ctx_a = _make_trace_context(graph_id="run_a", tracer_key="wf_a")
         ctx_b = _make_trace_context(graph_id="run_b", tracer_key="wf_b")
@@ -240,9 +249,9 @@ class TestReportingEventEmission:
         manager = ReportingManager()
         manager.setup()
 
-        manager.set_event_log(context_key="wf_a", event_log=stale_log, workflow_id="wf_a", pipeline_run_id="run_stale")
+        manager.set_event_log(context_key="wf_a", event_log=stale_log, pipeline_run_id="run_stale")
         # Same key again — must not raise, must replace.
-        manager.set_event_log(context_key="wf_a", event_log=fresh_log, workflow_id="wf_a", pipeline_run_id="run_fresh")
+        manager.set_event_log(context_key="wf_a", event_log=fresh_log, pipeline_run_id="run_fresh")
 
         ctx = _make_trace_context(graph_id="run_fresh", tracer_key="wf_a")
         manager.report_inference_job(_make_test_llm_job("run_fresh", trace_context=ctx))
@@ -260,8 +269,8 @@ class TestReportingEventEmission:
         manager = ReportingManager()
         manager.setup()
 
-        manager.set_event_log(context_key="wf_a", event_log=event_log_a, workflow_id="wf_a", pipeline_run_id="run_a")
-        manager.set_event_log(context_key="wf_b", event_log=event_log_b, workflow_id="wf_b", pipeline_run_id="run_b")
+        manager.set_event_log(context_key="wf_a", event_log=event_log_a, pipeline_run_id="run_a")
+        manager.set_event_log(context_key="wf_b", event_log=event_log_b, pipeline_run_id="run_b")
 
         # Clear context A before any emission
         manager.clear_event_log(context_key="wf_a")
@@ -310,8 +319,8 @@ class TestReportingEventEmission:
         manager = ReportingManager()
         manager.setup()
 
-        manager.set_event_log(context_key="wf_a", event_log=event_log_a, workflow_id="wf_a", pipeline_run_id="run_a")
-        manager.set_event_log(context_key="wf_b", event_log=event_log_b, workflow_id="wf_b", pipeline_run_id="run_b")
+        manager.set_event_log(context_key="wf_a", event_log=event_log_a, pipeline_run_id="run_a")
+        manager.set_event_log(context_key="wf_b", event_log=event_log_b, pipeline_run_id="run_b")
 
         ctx_a = _make_trace_context(graph_id="run_a", tracer_key="wf_a")
         ctx_b = _make_trace_context(graph_id="run_b", tracer_key="wf_b")

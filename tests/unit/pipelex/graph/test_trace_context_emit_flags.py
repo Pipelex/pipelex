@@ -29,7 +29,7 @@ class TestTraceContextEmitFlags:
         parent = TraceContext(
             graph_id="run_1", data_inclusion=DATA_INCLUSION_OFF, emit_graph_events=False, emit_usage_events=True, run_mode=PipeRunMode.LIVE
         )
-        child = parent.copy_for_child(child_node_id="run_1:node_0", next_sequence=1)
+        child = parent.copy_for_child(child_node_id="run_1:node_0", next_sequence=1, invocation_path="tests.ctx_pipe")
         assert child.parent_node_id == "run_1:node_0"
         assert child.node_sequence == 1
         assert child.emit_graph_events is False
@@ -40,12 +40,12 @@ class TestTraceContextEmitFlags:
         parent = TraceContext(
             graph_id="run_1", data_inclusion=DATA_INCLUSION_OFF, emit_graph_events=True, emit_usage_events=False, run_mode=PipeRunMode.LIVE
         )
-        child = parent.copy_for_child(child_node_id="run_1:node_0", next_sequence=2)
+        child = parent.copy_for_child(child_node_id="run_1:node_0", next_sequence=2, invocation_path="tests.ctx_pipe")
         assert child.emit_graph_events is True
         assert child.emit_usage_events is False
 
     def test_copy_for_child_preserves_describe_pipe_io_off(self) -> None:
         """A run that will write no graphspec keeps its I/O description off in every child context."""
         parent = TraceContext(graph_id="run_1", data_inclusion=DATA_INCLUSION_OFF, describe_pipe_io=False, run_mode=PipeRunMode.LIVE)
-        child = parent.copy_for_child(child_node_id="run_1:node_0", next_sequence=1)
+        child = parent.copy_for_child(child_node_id="run_1:node_0", next_sequence=1, invocation_path="tests.ctx_pipe")
         assert child.describe_pipe_io is False

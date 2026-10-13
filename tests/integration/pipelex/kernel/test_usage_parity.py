@@ -123,7 +123,6 @@ class TestKernelUsageParity:
         get_report_delegate().set_event_log(
             context_key=trace_context.lookup_key,
             event_log=event_log,
-            workflow_id="direct",
             pipeline_run_id=trace_context.graph_id,
         )
         try:

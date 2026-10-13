@@ -52,12 +52,13 @@ class TestGraphTracerDecisionEvents:
         """The resolution is recorded before the chosen pipe starts, and the graph's SELECTED_OUTCOME edge to it is labelled with the key."""
         tracer, context, event_log = _make_tracer(run_mode=PipeRunMode.LIVE)
         condition_id, condition_ctx = tracer.on_pipe_start(
-            trace_context=context, pipe_code="route", pipe_type="PipeCondition", node_kind=NodeKind.CONTROLLER, started_at=_T0
+            pipe_ref="tests.route", trace_context=context, pipe_code="route", pipe_type="PipeCondition", node_kind=NodeKind.CONTROLLER, started_at=_T0
         )
 
         tracer.register_condition_resolution(condition_node_id=condition_id, rendered_value=rendered_value, selected_outcome=selected_outcome)
         chosen_id, _ = tracer.on_pipe_start(
-            trace_context=condition_ctx,
+            pipe_ref="tests.handle",
+            trace_context=condition_ctx.with_child_segment(segment="step_1"),
             pipe_code="handle",
             pipe_type="PipeCompose",
             node_kind=NodeKind.OPERATOR,
@@ -84,17 +85,29 @@ class TestGraphTracerDecisionEvents:
         """An outcome mapped to `continue` or `fail` starts no pipe: the resolution is recorded, and the graph has no edge from it."""
         tracer, context, event_log = _make_tracer(run_mode=PipeRunMode.LIVE)
         sequence_id, sequence_ctx = tracer.on_pipe_start(
-            trace_context=context, pipe_code="flow", pipe_type="PipeSequence", node_kind=NodeKind.CONTROLLER, started_at=_T0, step_count=2
+            pipe_ref="tests.flow",
+            trace_context=context,
+            pipe_code="flow",
+            pipe_type="PipeSequence",
+            node_kind=NodeKind.CONTROLLER,
+            started_at=_T0,
+            step_count=2,
         )
         condition_id, _ = tracer.on_pipe_start(
-            trace_context=sequence_ctx, pipe_code="route", pipe_type="PipeCondition", node_kind=NodeKind.CONTROLLER, started_at=_T0
+            pipe_ref="tests.route",
+            trace_context=sequence_ctx.with_child_segment(segment="step_1"),
+            pipe_code="route",
+            pipe_type="PipeCondition",
+            node_kind=NodeKind.CONTROLLER,
+            started_at=_T0,
         )
 
         tracer.register_condition_resolution(condition_node_id=condition_id, rendered_value="skip", selected_outcome="skip")
         tracer.on_pipe_end_success(node_id=condition_id, ended_at=_T0 + timedelta(seconds=1))
         # The next step starts under the sequence, never under the condition
         next_step_id, _ = tracer.on_pipe_start(
-            trace_context=sequence_ctx,
+            pipe_ref="tests.later",
+            trace_context=sequence_ctx.with_child_segment(segment="step_2"),
             pipe_code="later",
             pipe_type="PipeCompose",
             node_kind=NodeKind.OPERATOR,
@@ -112,6 +125,7 @@ class TestGraphTracerDecisionEvents:
     def test_batch_fan_out_precedes_the_first_item(self) -> None:
         tracer, context, event_log = _make_tracer(run_mode=PipeRunMode.LIVE)
         batch_id, batch_ctx = tracer.on_pipe_start(
+            pipe_ref="tests.per_item",
             trace_context=context,
             pipe_code="per_item",
             pipe_type="PipeBatch",
@@ -126,7 +140,8 @@ class TestGraphTracerDecisionEvents:
         item_ids: list[str] = []
         for index_item in range(2):
             item_id, _ = tracer.on_pipe_start(
-                trace_context=batch_ctx,
+                pipe_ref="tests.process",
+                trace_context=batch_ctx.with_child_segment(segment="step_1"),
                 pipe_code="process",
                 pipe_type="PipeCompose",
                 node_kind=NodeKind.OPERATOR,
@@ -149,10 +164,17 @@ class TestGraphTracerDecisionEvents:
     def test_controllers_state_their_width_as_they_start(self) -> None:
         tracer, context, event_log = _make_tracer(run_mode=PipeRunMode.LIVE)
         sequence_id, sequence_ctx = tracer.on_pipe_start(
-            trace_context=context, pipe_code="flow", pipe_type="PipeSequence", node_kind=NodeKind.CONTROLLER, started_at=_T0, step_count=3
+            pipe_ref="tests.flow",
+            trace_context=context,
+            pipe_code="flow",
+            pipe_type="PipeSequence",
+            node_kind=NodeKind.CONTROLLER,
+            started_at=_T0,
+            step_count=3,
         )
         parallel_id, _ = tracer.on_pipe_start(
-            trace_context=sequence_ctx,
+            pipe_ref="tests.fan",
+            trace_context=sequence_ctx.with_child_segment(segment="step_1"),
             pipe_code="fan",
             pipe_type="PipeParallel",
             node_kind=NodeKind.CONTROLLER,
@@ -173,7 +195,12 @@ class TestGraphTracerDecisionEvents:
         assert context.run_mode == run_mode
 
         batch_id, batch_ctx = tracer.on_pipe_start(
-            trace_context=context, pipe_code="per_item", pipe_type="PipeBatch", node_kind=NodeKind.CONTROLLER, started_at=_T0
+            pipe_ref="tests.per_item",
+            trace_context=context,
+            pipe_code="per_item",
+            pipe_type="PipeBatch",
+            node_kind=NodeKind.CONTROLLER,
+            started_at=_T0,
         )
         assert batch_ctx.run_mode == run_mode
         tracer.register_batch_fan_out(
@@ -181,7 +208,8 @@ class TestGraphTracerDecisionEvents:
         )
         tracer.register_batch_item_extraction(list_stuff_code="list", item_stuff_code="item", item_index=0, batch_controller_node_id=batch_id)
         condition_id, condition_ctx = tracer.on_pipe_start(
-            trace_context=batch_ctx,
+            pipe_ref="tests.route",
+            trace_context=batch_ctx.with_child_segment(segment="step_1"),
             pipe_code="route",
             pipe_type="PipeCondition",
             node_kind=NodeKind.CONTROLLER,
@@ -189,7 +217,8 @@ class TestGraphTracerDecisionEvents:
         )
         tracer.register_condition_resolution(condition_node_id=condition_id, rendered_value="yes", selected_outcome="yes")
         chosen_id, _ = tracer.on_pipe_start(
-            trace_context=condition_ctx,
+            pipe_ref="tests.handle",
+            trace_context=condition_ctx.with_child_segment(segment="step_1"),
             pipe_code="handle",
             pipe_type="PipeCompose",
             node_kind=NodeKind.OPERATOR,
@@ -231,13 +260,19 @@ class TestGraphTracerDecisionEvents:
             run_mode=PipeRunMode.LIVE,
         )
         batch_id, batch_ctx = tracer.on_pipe_start(
-            trace_context=context, pipe_code="per_item", pipe_type="PipeBatch", node_kind=NodeKind.CONTROLLER, started_at=_T0
+            pipe_ref="tests.per_item",
+            trace_context=context,
+            pipe_code="per_item",
+            pipe_type="PipeBatch",
+            node_kind=NodeKind.CONTROLLER,
+            started_at=_T0,
         )
         tracer.register_batch_fan_out(
             batch_node_id=batch_id, item_count=1, branch_pipe_code="route", branch_pipe_ref="flows.route", branch_pipe_type="PipeCondition"
         )
         condition_id, _ = tracer.on_pipe_start(
-            trace_context=batch_ctx,
+            pipe_ref="tests.route",
+            trace_context=batch_ctx.with_child_segment(segment="step_1"),
             pipe_code="route",
             pipe_type="PipeCondition",
             node_kind=NodeKind.CONTROLLER,
@@ -257,7 +292,9 @@ class TestGraphTracerDecisionEvents:
         """
         tracer, context, event_log = _make_tracer(run_mode=PipeRunMode.LIVE)
         foreign_node_id = "graph-decisions:other_workflow:node_0"
-        foreign_ctx = context.copy_for_child(child_node_id=foreign_node_id, next_sequence=0)
+        foreign_ctx = context.copy_for_child(child_node_id=foreign_node_id, next_sequence=0, invocation_path="flows.route/step_1").with_child_segment(
+            segment="outcome_yes"
+        )
 
         tracer.register_batch_fan_out(
             batch_node_id=foreign_node_id,
@@ -268,7 +305,12 @@ class TestGraphTracerDecisionEvents:
         )
         tracer.register_condition_resolution(condition_node_id=foreign_node_id, rendered_value="yes", selected_outcome="yes")
         chosen_id, _ = tracer.on_pipe_start(
-            trace_context=foreign_ctx, pipe_code="handle", pipe_type="PipeCompose", node_kind=NodeKind.OPERATOR, started_at=_T0
+            pipe_ref="tests.handle",
+            trace_context=foreign_ctx,
+            pipe_code="handle",
+            pipe_type="PipeCompose",
+            node_kind=NodeKind.OPERATOR,
+            started_at=_T0,
         )
         tracer.on_pipe_end_success(node_id=chosen_id, ended_at=_T0 + timedelta(seconds=1))
         graph_spec = tracer.teardown()
@@ -308,7 +350,12 @@ class TestGraphTracerDecisionEvents:
                 run_mode=PipeRunMode.DRY,
             )
             batch_id, _ = manager.on_pipe_start(
-                trace_context=context, pipe_code="per_item", pipe_type="PipeBatch", node_kind=NodeKind.CONTROLLER, started_at=_T0
+                pipe_ref="tests.per_item",
+                trace_context=context,
+                pipe_code="per_item",
+                pipe_type="PipeBatch",
+                node_kind=NodeKind.CONTROLLER,
+                started_at=_T0,
             )
             assert batch_id is not None
             manager.register_batch_fan_out(
