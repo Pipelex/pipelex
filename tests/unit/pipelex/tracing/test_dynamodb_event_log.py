@@ -1,18 +1,25 @@
 import json
+import time
 from datetime import UTC, datetime
 from typing import Any
 
 import pytest
 from botocore.exceptions import BotoCoreError, ClientError, EndpointConnectionError
+from pydantic import ValidationError
 from pytest_mock import MockerFixture
 
 from pipelex.graph.graphspec import NodeKind
+from pipelex.system.configuration.configs import DynamoDBTracingConfig, TracingConfig
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.buffering_event_log import BufferingEventLog
 from pipelex.tracing.dynamodb_event_log import DynamoDBEventLog
+from pipelex.tracing.event_log_factory import make_event_log
+from pipelex.tracing.event_log_protocol import EventLogProtocol
 from pipelex.tracing.exceptions import EventLogReadError, EventLogSchemaMismatchError, EventLogSetupError
 from pipelex.tracing.trace_events import BatchFannedOutEvent, ConditionResolvedEvent, PipeStartEvent, TraceEvent
+from tests.unit.pipelex.tracing.conftest import make_trace_event
 
+_SECONDS_PER_DAY = 86_400
 _RUN_ID = "plr-decisions"
 _T0 = datetime(2026, 10, 13, 9, 0, 0, tzinfo=UTC)
 
@@ -42,13 +49,64 @@ def _decision_events(*, mode: PipeRunMode) -> list[TraceEvent]:
     ]
 
 
-class TestDynamoDBEventLogReadEvents:
-    def _make_event_log_with_table(self, mocker: MockerFixture) -> tuple[DynamoDBEventLog, Any]:
+class TestDynamoDBEventLog:
+    def _make_event_log_with_table(self, mocker: MockerFixture, *, retention_days: int = 30) -> tuple[DynamoDBEventLog, Any]:
         # boto3.resource(...) does not perform any network call at construction.
-        event_log = DynamoDBEventLog(table_name="trace-events-test", region="us-east-1")
+        event_log = DynamoDBEventLog(table_name="trace-events-test", region="us-east-1", retention_days=retention_days)
         mock_table = mocker.MagicMock()
         mocker.patch.object(event_log, "_table", new=mock_table)
         return event_log, mock_table
+
+    @staticmethod
+    def _emit_and_capture_ttl(event_log: EventLogProtocol, mock_table: Any) -> tuple[int, int, int]:
+        """Emit one event and return the written item's ttl with the epoch seconds read just before and just after."""
+        before = int(time.time())
+        event_log.emit(make_trace_event())
+        after = int(time.time())
+        item: dict[str, Any] = mock_table.put_item.call_args.kwargs["Item"]
+        ttl = item["ttl"]
+        assert isinstance(ttl, int)
+        return ttl, before, after
+
+    @pytest.mark.parametrize("retention_days", [1, 30, 365])
+    def test_emit_writes_ttl_retention_days_past_the_write(self, mocker: MockerFixture, retention_days: int) -> None:
+        """Every item carries a `ttl` in epoch seconds, the attribute the events table expires items on."""
+        event_log, mock_table = self._make_event_log_with_table(mocker, retention_days=retention_days)
+
+        ttl, before, after = self._emit_and_capture_ttl(event_log, mock_table)
+
+        retention_seconds = retention_days * _SECONDS_PER_DAY
+        assert before + retention_seconds <= ttl <= after + retention_seconds
+
+    def test_make_event_log_writes_the_configured_retention(self, mocker: MockerFixture) -> None:
+        """The factory hands `runtime.tracing.dynamodb.retention_days` to the writer, so the setting decides the `ttl`."""
+        tracing_config = TracingConfig.model_validate(
+            {
+                "is_enabled": True,
+                "backend": "dynamodb",
+                "dynamodb": {"table_name": "trace-events-test", "region": "us-east-1", "retention_days": 7},
+            }
+        )
+        event_log = make_event_log(tracing_config)
+        assert isinstance(event_log, DynamoDBEventLog)
+        mock_table = mocker.MagicMock()
+        mocker.patch.object(event_log, "_table", new=mock_table)
+
+        ttl, before, after = self._emit_and_capture_ttl(event_log, mock_table)
+
+        assert before + 7 * _SECONDS_PER_DAY <= ttl <= after + 7 * _SECONDS_PER_DAY
+
+    @pytest.mark.parametrize("retention_days", [0, -1])
+    def test_config_refuses_a_retention_under_one_day(self, retention_days: int) -> None:
+        """A retention of zero or less would expire every event as it is written, so the configuration refuses it."""
+        with pytest.raises(ValidationError):
+            DynamoDBTracingConfig.model_validate({"table_name": "trace-events-test", "region": "us-east-1", "retention_days": retention_days})
+
+    @pytest.mark.parametrize("retention_days", [0, -1])
+    def test_init_refuses_a_retention_under_one_day(self, retention_days: int) -> None:
+        """A direct construction bypasses the config's check, so the writer refuses such a retention itself."""
+        with pytest.raises(EventLogSetupError, match="at least one day"):
+            DynamoDBEventLog(table_name="trace-events-test", region="us-east-1", retention_days=retention_days)
 
     @pytest.mark.parametrize(
         "backend_error",
@@ -94,6 +152,7 @@ class TestDynamoDBEventLogReadEvents:
         for event in buffer.drain():
             event_log.emit(event)
         stored_items = [call.kwargs["Item"] for call in mock_table.put_item.call_args_list]
+        assert all(isinstance(item["ttl"], int) for item in stored_items)
         mock_table.query.return_value = {"Items": stored_items}
 
         assert event_log.read_events(_RUN_ID) == events
@@ -117,6 +176,6 @@ class TestDynamoDBEventLogReadEvents:
         mocker.patch("pipelex.tracing.dynamodb_event_log.boto3.resource", side_effect=construction_error)
 
         with pytest.raises(EventLogSetupError) as exc_info:
-            DynamoDBEventLog(table_name="trace-events-test", region="bad-region")
+            DynamoDBEventLog(table_name="trace-events-test", region="bad-region", retention_days=30)
 
         assert exc_info.value.__cause__ is construction_error

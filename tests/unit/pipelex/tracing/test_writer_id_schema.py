@@ -204,7 +204,7 @@ class TestWriterIdSchema:
             return_value=_StubResource(),
         )
 
-        event_log = DynamoDBEventLog(table_name="my_table", region="us-east-1", writer_id="act_pid42")
+        event_log = DynamoDBEventLog(table_name="my_table", region="us-east-1", retention_days=30, writer_id="act_pid42")
         event_log.emit(_make_pipe_start(sequence=0, writer_id="act_pid42"))
 
         assert len(captured_items) == 1
