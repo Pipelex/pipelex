@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graphspec import EdgeKind, IOSpec, NodeKind, NodeStatus
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 from pipelex.tracing.trace_events import (
     BatchAggregateEvent,
@@ -42,6 +43,7 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id=workflow_id or self.WORKFLOW_ID,
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
         return tracer, event_log
 
@@ -55,6 +57,7 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id=self.WORKFLOW_ID,
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
@@ -89,6 +92,7 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id=self.WORKFLOW_ID,
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
@@ -125,6 +129,7 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id=self.WORKFLOW_ID,
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
@@ -166,6 +171,7 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id=self.WORKFLOW_ID,
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
@@ -206,6 +212,7 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id=self.WORKFLOW_ID,
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
@@ -254,6 +261,7 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id=self.WORKFLOW_ID,
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
@@ -286,6 +294,7 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id=self.WORKFLOW_ID,
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
 
         tracer.register_batch_item_extraction(
@@ -315,6 +324,7 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id=self.WORKFLOW_ID,
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
 
         tracer.register_batch_aggregation(
@@ -344,6 +354,7 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id=self.WORKFLOW_ID,
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
@@ -406,10 +417,7 @@ class TestGraphTracerEventEmission:
     def test_no_event_log_works_as_before(self) -> None:
         """GraphTracer without event_log (direct mode) works exactly as before."""
         tracer = GraphTracer()
-        context = tracer.setup(
-            graph_id="direct-mode-test",
-            data_inclusion=make_defaulted_data_inclusion_config(),
-        )
+        context = tracer.setup(graph_id="direct-mode-test", data_inclusion=make_defaulted_data_inclusion_config(), run_mode=PipeRunMode.LIVE)
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_id, _child_ctx = tracer.on_pipe_start(
@@ -442,6 +450,7 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id="wf_run_123",
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
@@ -466,6 +475,7 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id="wf_run_456",
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
@@ -505,6 +515,7 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id=self.WORKFLOW_ID,
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
@@ -529,10 +540,7 @@ class TestGraphTracerEventEmission:
     def test_direct_mode_node_id_unchanged(self) -> None:
         """In direct mode (no workflow_id), node ID format is unchanged."""
         tracer = GraphTracer()
-        context = tracer.setup(
-            graph_id="direct-graph",
-            data_inclusion=make_defaulted_data_inclusion_config(),
-        )
+        context = tracer.setup(graph_id="direct-graph", data_inclusion=make_defaulted_data_inclusion_config(), run_mode=PipeRunMode.LIVE)
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_id, _ = tracer.on_pipe_start(

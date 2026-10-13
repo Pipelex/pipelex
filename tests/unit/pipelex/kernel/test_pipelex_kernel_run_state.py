@@ -49,6 +49,7 @@ def _trace_context() -> TraceContext:
         ),
         emit_graph_events=False,
         emit_usage_events=True,
+        run_mode=PipeRunMode.LIVE,
     )
 
 

@@ -44,6 +44,7 @@ class TraceContext(BaseModel):
             graphspec, and for validate's own graph dry run, which already built them for its report.
         run_mode: Whether the run is live or a dry run. Every trace event the run emits states it, the
             usage events an activity emits included, which have this context and nothing else of the run.
+            Required, with no default: a context built without it would stamp a dry run's events as live.
     """
 
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -56,7 +57,7 @@ class TraceContext(BaseModel):
     emit_graph_events: bool = Field(default=True, description="Whether to emit graph (node/edge) trace events")
     emit_usage_events: bool = Field(default=True, description="Whether to emit usage (cost) trace events")
     describe_pipe_io: bool = Field(default=True, description="Whether to build the I/O artifacts describing the graphspec's data")
-    run_mode: PipeRunMode = Field(default=PipeRunMode.LIVE, strict=False, description="Whether the run is live or a dry run")
+    run_mode: PipeRunMode = Field(strict=False, description="Whether the run is live or a dry run, stated by whoever opens the trace")
 
     @property
     def lookup_key(self) -> str:

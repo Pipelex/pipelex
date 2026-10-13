@@ -30,7 +30,7 @@ class GraphTracerProtocol(Protocol):
         pipeline_run_id: str | None = None,
         emit_graph_events: bool = True,
         emit_usage_events: bool = True,
-        run_mode: PipeRunMode = PipeRunMode.LIVE,
+        run_mode: PipeRunMode,
     ) -> TraceContext:
         """Initialize tracing for a new pipeline run.
 
@@ -308,15 +308,16 @@ class GraphTracerProtocol(Protocol):
         condition_node_id: str,
         rendered_value: str,
         selected_outcome: str | None,
-        runs_pipe: bool,
     ) -> None:
         """Register that a live PipeCondition has chosen its outcome, before the chosen pipe starts.
+
+        A graph builder derives the SELECTED_OUTCOME edge from this resolution and the start of the pipe it then runs
+        under the condition's node (see `pipelex.graph.selected_outcome`).
 
         Args:
             condition_node_id: The PipeCondition's node ID.
             rendered_value: The value the condition's expression rendered.
             selected_outcome: The outcome-map key the value matched, or None when the default outcome was taken.
-            runs_pipe: Whether the chosen outcome runs a pipe, whose start then draws the SELECTED_OUTCOME edge.
         """
         ...
 
@@ -354,7 +355,7 @@ class GraphTracerNoOp(GraphTracerProtocol):
         pipeline_run_id: str | None = None,
         emit_graph_events: bool = True,
         emit_usage_events: bool = True,
-        run_mode: PipeRunMode = PipeRunMode.LIVE,
+        run_mode: PipeRunMode,
     ) -> TraceContext:
         return TraceContext(
             graph_id=graph_id,
@@ -517,6 +518,5 @@ class GraphTracerNoOp(GraphTracerProtocol):
         condition_node_id: str,
         rendered_value: str,
         selected_outcome: str | None,
-        runs_pipe: bool,
     ) -> None:
         pass

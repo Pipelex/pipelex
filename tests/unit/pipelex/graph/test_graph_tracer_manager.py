@@ -6,6 +6,7 @@ from pytest_mock import MockerFixture
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.system.data_inclusion_config import DataInclusionConfig
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 def _make_data_inclusion() -> DataInclusionConfig:
@@ -22,7 +23,7 @@ class TestGraphTracerManagerOpenTracer:
         GraphTracerManager.clear_instance()
         manager = GraphTracerManager.get_or_create_instance()
         try:
-            trace_context = manager.open_tracer(graph_id="lifecycle_graph", data_inclusion=_make_data_inclusion())
+            trace_context = manager.open_tracer(graph_id="lifecycle_graph", data_inclusion=_make_data_inclusion(), run_mode=PipeRunMode.LIVE)
             assert trace_context.graph_id == "lifecycle_graph"
             assert manager.get_tracer("lifecycle_graph") is not None
 
@@ -39,7 +40,7 @@ class TestGraphTracerManagerOpenTracer:
             mocker.patch.object(GraphTracer, "setup", side_effect=ValueError("setup blew up"))
 
             with pytest.raises(ValueError, match="setup blew up"):
-                manager.open_tracer(graph_id="leak_check_graph", data_inclusion=_make_data_inclusion())
+                manager.open_tracer(graph_id="leak_check_graph", data_inclusion=_make_data_inclusion(), run_mode=PipeRunMode.LIVE)
 
             assert manager.get_tracer("leak_check_graph") is None
         finally:

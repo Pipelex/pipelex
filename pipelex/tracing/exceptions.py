@@ -41,3 +41,13 @@ class EventLogSetupError(EventLogError):
     cannot even be built degrades to an ``*_assembly_error`` note rather than
     aborting the pipeline run.
     """
+
+
+class TraceEventModeError(PipelexError):
+    """Raised when a set of trace events states no single run mode to build a graph in.
+
+    Every trace event states the mode of the run that wrote it, `live` or `dry`, and the graph the event-replay
+    assembler builds from a run's events takes that mode as its provenance. A set that mixes modes holds the events of
+    more than one run, such as a dry run and a live run written under one pipeline run id, and an empty set states no
+    mode at all: neither describes one run, so the assembler builds no graph from it rather than guess its mode.
+    """

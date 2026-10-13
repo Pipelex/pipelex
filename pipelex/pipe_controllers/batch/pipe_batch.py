@@ -290,15 +290,12 @@ class PipeBatch(PipeController):
             "branch_pipe_code": self.branch_pipe_code,
         }
         self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
-        trace_context = job_metadata.trace_context
-        if trace_context is None or trace_context.parent_node_id is None:
+        trace_node = self._trace_node(job_metadata=job_metadata)
+        if trace_node is None:
             return
-        tracer_manager = GraphTracerManager.get_instance()
-        if tracer_manager is None:
-            return
-        tracer_manager.register_batch_fan_out(
-            lookup_key=trace_context.lookup_key,
-            batch_node_id=trace_context.parent_node_id,
+        trace_node.tracer_manager.register_batch_fan_out(
+            lookup_key=trace_node.lookup_key,
+            batch_node_id=trace_node.node_id,
             item_count=item_count,
             branch_pipe_code=branch_pipe.code,
             branch_pipe_ref=branch_pipe.pipe_ref,

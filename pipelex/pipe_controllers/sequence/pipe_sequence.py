@@ -37,6 +37,7 @@ from pipelex.pipe_controllers.sequence.sequence_typed_flow import (
     SequenceFlowMemo,
     SequenceStep,
     SequenceTypedFlow,
+    authored_step_count,
     authored_step_number,
     build_sequence_typed_flow,
     derive_binding_spec,
@@ -92,7 +93,7 @@ class PipeSequence(PipeController):
     @override
     def traced_step_count(self) -> int:
         """The number of steps the author wrote: the binding written for a dotted `batch_over` is no step of theirs."""
-        return sum(1 for step in self.sequential_sub_pipes if not (isinstance(step, BindingStep) and step.is_dotted_batch_over))
+        return authored_step_count(steps=self.sequential_sub_pipes)
 
     @property
     def has_binding_step(self) -> bool:

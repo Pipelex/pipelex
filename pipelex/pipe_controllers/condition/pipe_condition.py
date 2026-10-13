@@ -472,14 +472,16 @@ class PipeCondition(PipeController):
         evaluated_expression = await self._evaluate_expression(working_memory=working_memory)
         # Select the outcome based on the evaluated expression
         outcome = self.outcome_map.get(evaluated_expression, self.default_outcome)
-        # The condition records its choice the moment it makes it, before the chosen pipe starts.
-        self._record_resolution(job_metadata=job_metadata, evaluated_expression=evaluated_expression, outcome=outcome)
+
+        # The condition records its choice the moment the choice is final, before anything runs under it: at once for
+        # `continue` and `fail`, which run nothing, and for a pipe once its inputs are known to be there to run it.
 
         # Handle continue case (phase 1): `continue` resolves the declared output as
         # ABSENT — a declared-absent record with provenance, memory otherwise unchanged. A previous
         # main stuff stays under its own name (the migration idiom: consume it explicitly
         # downstream); it no longer passes through as this pipe's output.
         if SpecialOutcome.is_continue(outcome):
+            self._record_resolution(job_metadata=job_metadata, evaluated_expression=evaluated_expression, outcome=outcome)
             # The reason names only the pipe and the outcome: a pipe that force-unwraps this output quotes it to the caller
             # under STRICT disclosure, and the value the expression rendered can be literal text of a condition a host
             # library declared. The execution data above keeps that value.
@@ -491,6 +493,7 @@ class PipeCondition(PipeController):
             return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.run_metadata.pipeline_run_id)
 
         if SpecialOutcome.is_fail(outcome):
+            self._record_resolution(job_metadata=job_metadata, evaluated_expression=evaluated_expression, outcome=outcome)
             # The caller's method maps this outcome to 'fail' on purpose, a refusal of the run it was given. The
             # message names only the pipe: the value the expression rendered can be literal text of the expression,
             # or an outcome key, of a condition a host library declared. The execution data above keeps that value.
@@ -534,9 +537,11 @@ class PipeCondition(PipeController):
                 )
             )
 
+        # Recorded only now: a choice whose pipe cannot run is a failure of the condition, never an outcome it took.
+        self._record_resolution(job_metadata=job_metadata, evaluated_expression=evaluated_expression, outcome=outcome)
         return await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
-                pipe=get_required_pipe(pipe_code=outcome),
+                pipe=chosen_pipe,
                 job_metadata=job_metadata,
                 working_memory=working_memory,
                 pipe_run_params=pipe_run_params,
@@ -562,18 +567,14 @@ class PipeCondition(PipeController):
             "selected_outcome": outcome,
         }
         self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
-        trace_context = job_metadata.trace_context
-        if trace_context is None or trace_context.parent_node_id is None:
+        trace_node = self._trace_node(job_metadata=job_metadata)
+        if trace_node is None:
             return
-        tracer_manager = GraphTracerManager.get_instance()
-        if tracer_manager is None:
-            return
-        tracer_manager.register_condition_resolution(
-            lookup_key=trace_context.lookup_key,
-            condition_node_id=trace_context.parent_node_id,
+        trace_node.tracer_manager.register_condition_resolution(
+            lookup_key=trace_node.lookup_key,
+            condition_node_id=trace_node.node_id,
             rendered_value=evaluated_expression,
             selected_outcome=evaluated_expression if evaluated_expression in self.outcome_map else None,
-            runs_pipe=not (SpecialOutcome.is_continue(outcome) or SpecialOutcome.is_fail(outcome)),
         )
 
     @override

@@ -108,7 +108,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         emit_graph_events: bool = True,
         emit_usage_events: bool = True,
         describe_pipe_io: bool = True,
-        run_mode: PipeRunMode = PipeRunMode.LIVE,
+        run_mode: PipeRunMode,
     ) -> TraceContext:
         """Create and initialize a new tracer for a pipeline run.
 
@@ -576,7 +576,6 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         condition_node_id: str,
         rendered_value: str,
         selected_outcome: str | None,
-        runs_pipe: bool,
     ) -> None:
         """Register that a live PipeCondition has chosen its outcome, before the chosen pipe starts.
 
@@ -585,7 +584,6 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             condition_node_id: The PipeCondition's node ID.
             rendered_value: The value the condition's expression rendered.
             selected_outcome: The outcome-map key the value matched, or None when the default outcome was taken.
-            runs_pipe: Whether the chosen outcome runs a pipe, whose start then draws the SELECTED_OUTCOME edge.
         """
         tracer = self._get_tracer(lookup_key)
         if tracer is None:
@@ -594,5 +592,4 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             condition_node_id=condition_node_id,
             rendered_value=rendered_value,
             selected_outcome=selected_outcome,
-            runs_pipe=runs_pipe,
         )

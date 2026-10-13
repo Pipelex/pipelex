@@ -3,12 +3,16 @@
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import pytest
+
 from pipelex.graph.graphspec import EdgeKind, ErrorSpec, GraphSpecMode, IOSpec, NodeKind, NodeStatus
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.tracing.exceptions import TraceEventModeError
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
 from pipelex.tracing.trace_events import (
     BatchAggregateEvent,
     BatchItemEvent,
+    ConditionResolvedEvent,
     ControllerOutputEvent,
     EdgeEvent,
     ParallelCombineEvent,
@@ -42,14 +46,14 @@ def _edge_id(workflow_id: str, index: int) -> str:
     return f"{_GRAPH_ID}:{workflow_id}:edge_{index}"
 
 
-def _base(workflow_id: str, sequence: int, timestamp_offset: int = 0) -> dict[str, Any]:
+def _base(workflow_id: str, sequence: int, timestamp_offset: int = 0, run_mode: PipeRunMode = PipeRunMode.LIVE) -> dict[str, Any]:
     """Base fields for event construction."""
     return {
         "pipeline_run_id": _PIPELINE_RUN_ID,
         "workflow_id": workflow_id,
         "timestamp": _time_at(timestamp_offset or sequence),
         "sequence": sequence,
-        "mode": PipeRunMode.LIVE,
+        "mode": run_mode,
     }
 
 
@@ -65,19 +69,48 @@ def _io_spec(name: str, digest: str) -> IOSpec:
 class TestGraphSpecAssembler:
     """Tests for GraphSpecAssembler.assemble()."""
 
-    def test_empty_events(self) -> None:
-        """Empty event list produces empty GraphSpec."""
-        result = GraphSpecAssembler.assemble(events=[], graph_id=_GRAPH_ID)
-        assert result.graph_id == _GRAPH_ID
-        assert result.nodes == []
-        assert result.edges == []
-        assert result.meta["mode"] == GraphSpecMode.LIVE
-
-    def test_explicit_mode(self) -> None:
-        """Assembler stamps the requested GraphSpec provenance mode."""
-        result = GraphSpecAssembler.assemble(events=[], graph_id=_GRAPH_ID, mode=GraphSpecMode.DRY)
+    @pytest.mark.parametrize(
+        ("run_mode", "graphspec_mode"),
+        [(PipeRunMode.LIVE, GraphSpecMode.LIVE), (PipeRunMode.DRY, GraphSpecMode.DRY)],
+        ids=["live", "dry"],
+    )
+    def test_the_graph_takes_the_mode_its_events_state(self, run_mode: PipeRunMode, graphspec_mode: GraphSpecMode) -> None:
+        node_id = _node_id(_WF_A, 0)
+        result = GraphSpecAssembler.assemble(
+            events=[
+                PipeStartEvent(
+                    **_base(_WF_A, 0, run_mode=run_mode), node_id=node_id, pipe_code="only", pipe_type="PipeLLM", node_kind=NodeKind.OPERATOR
+                ),
+                PipeEndSuccessEvent(**_base(_WF_A, 1, run_mode=run_mode), node_id=node_id, ended_at=_time_at(1)),
+            ],
+            graph_id=_GRAPH_ID,
+        )
         assert result.meta["format"] == "mthds"
-        assert result.meta["mode"] == GraphSpecMode.DRY
+        assert result.meta["mode"] == graphspec_mode
+
+    @pytest.mark.parametrize(
+        ("run_modes", "expected_message"),
+        [
+            ([], "No trace events to assemble graph 'test_graph' from"),
+            ([PipeRunMode.LIVE, PipeRunMode.DRY], "The trace events of graph 'test_graph' mix run modes (dry, live)"),
+        ],
+        ids=["no_events", "mixed_modes"],
+    )
+    def test_events_stating_no_single_mode_are_refused(self, run_modes: list[PipeRunMode], expected_message: str) -> None:
+        """A set of events that mixes modes holds more than one run, and an empty one states no mode: neither gets a graph."""
+        events = [
+            PipeStartEvent(
+                **_base(_WF_A, index_event, run_mode=run_mode),
+                node_id=_node_id(_WF_A, index_event),
+                pipe_code=f"pipe_{index_event}",
+                pipe_type="PipeLLM",
+                node_kind=NodeKind.OPERATOR,
+            )
+            for index_event, run_mode in enumerate(run_modes)
+        ]
+        with pytest.raises(TraceEventModeError) as exc_info:
+            GraphSpecAssembler.assemble(events=events, graph_id=_GRAPH_ID)
+        assert str(exc_info.value).startswith(expected_message)
 
     def test_registry_source_payloads_survive_assembly(self) -> None:
         """PipeStartEvent and PipeEndSuccessEvent registry payloads are copied unchanged."""
@@ -507,20 +540,17 @@ class TestGraphSpecAssembler:
         assert (branch_1, controller) in batch_agg_pairs
 
     def test_condition_selected_outcome(self) -> None:
-        """Condition pipe with SELECTED_OUTCOME edge."""
-        condition = _node_id(_WF_A, 0)
-        outcome = _node_id(_WF_A, 1)
+        """The SELECTED_OUTCOME edge is derived from the condition's resolution and the start of the pipe it chose.
+
+        The chosen pipe starts in another workflow than the condition, whose events sort first, as a dispatched sub-pipe
+        does in a distributed run; an edge event of the same kind a tracer drew is regenerated, never duplicated.
+        """
+        condition = _node_id(_WF_B, 0)
+        outcome = _node_id(_WF_A, 0)
 
         events = [
             PipeStartEvent(
                 **_base(_WF_A, 0),
-                node_id=condition,
-                pipe_code="check",
-                pipe_type="PipeCondition",
-                node_kind=NodeKind.CONTROLLER,
-            ),
-            PipeStartEvent(
-                **_base(_WF_A, 1),
                 node_id=outcome,
                 parent_node_id=condition,
                 pipe_code="branch_true",
@@ -528,27 +558,40 @@ class TestGraphSpecAssembler:
                 node_kind=NodeKind.OPERATOR,
             ),
             EdgeEvent(
-                **_base(_WF_A, 2),
+                **_base(_WF_A, 1),
                 edge_id=_edge_id(_WF_A, 0),
                 source_node_id=condition,
                 target_node_id=outcome,
                 edge_kind=EdgeKind.CONTAINS,
             ),
+            PipeEndSuccessEvent(
+                **_base(_WF_A, 2),
+                node_id=outcome,
+                ended_at=_time_at(4),
+            ),
+            PipeStartEvent(
+                **_base(_WF_B, 0),
+                node_id=condition,
+                pipe_code="check",
+                pipe_type="PipeCondition",
+                node_kind=NodeKind.CONTROLLER,
+            ),
+            ConditionResolvedEvent(
+                **_base(_WF_B, 1),
+                node_id=condition,
+                rendered_value="true",
+                selected_outcome="true",
+            ),
             EdgeEvent(
-                **_base(_WF_A, 3),
-                edge_id=_edge_id(_WF_A, 1),
+                **_base(_WF_B, 2),
+                edge_id=_edge_id(_WF_B, 0),
                 source_node_id=condition,
                 target_node_id=outcome,
                 edge_kind=EdgeKind.SELECTED_OUTCOME,
                 label="true",
             ),
             PipeEndSuccessEvent(
-                **_base(_WF_A, 4),
-                node_id=outcome,
-                ended_at=_time_at(4),
-            ),
-            PipeEndSuccessEvent(
-                **_base(_WF_A, 5),
+                **_base(_WF_B, 3),
                 node_id=condition,
                 ended_at=_time_at(5),
             ),
@@ -557,10 +600,7 @@ class TestGraphSpecAssembler:
         result = GraphSpecAssembler.assemble(events=events, graph_id=_GRAPH_ID)
 
         selected_edges = [edge for edge in result.edges if edge.kind == EdgeKind.SELECTED_OUTCOME]
-        assert len(selected_edges) == 1
-        assert selected_edges[0].source == condition
-        assert selected_edges[0].target == outcome
-        assert selected_edges[0].label == "true"
+        assert [(edge.source, edge.target, edge.label) for edge in selected_edges] == [(condition, outcome, "true")]
 
     def test_partial_failure(self) -> None:
         """Child fails with error, parent has no end event → FAILED + CANCELED."""

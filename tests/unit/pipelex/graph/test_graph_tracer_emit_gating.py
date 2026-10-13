@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graphspec import NodeKind
+from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.unit.pipelex.graph.conftest import make_defaulted_data_inclusion_config
 
 
@@ -24,13 +25,14 @@ class TestGraphTracerEmitGating:
             data_inclusion=make_defaulted_data_inclusion_config(),
             emit_graph_events=False,
             emit_usage_events=True,
+            run_mode=PipeRunMode.LIVE,
         )
         assert context.emit_graph_events is False
         assert context.emit_usage_events is True
 
     def test_setup_defaults_emit_flags_true(self) -> None:
         tracer = GraphTracer()
-        context = tracer.setup(graph_id="emit-defaults", data_inclusion=make_defaulted_data_inclusion_config())
+        context = tracer.setup(graph_id="emit-defaults", data_inclusion=make_defaulted_data_inclusion_config(), run_mode=PipeRunMode.LIVE)
         assert context.emit_graph_events is True
         assert context.emit_usage_events is True
 
@@ -38,9 +40,7 @@ class TestGraphTracerEmitGating:
         """Costs-only mode: the tracer still mints node ids, but teardown skips the discarded spec build."""
         tracer = GraphTracer()
         context = tracer.setup(
-            graph_id="costs-only",
-            data_inclusion=make_defaulted_data_inclusion_config(),
-            emit_graph_events=False,
+            graph_id="costs-only", data_inclusion=make_defaulted_data_inclusion_config(), emit_graph_events=False, run_mode=PipeRunMode.LIVE
         )
         self._start_a_node(tracer, context)
         assert tracer.teardown() is None
@@ -49,9 +49,7 @@ class TestGraphTracerEmitGating:
     def test_teardown_builds_spec_when_graph_events_on(self) -> None:
         tracer = GraphTracer()
         context = tracer.setup(
-            graph_id="graph-on",
-            data_inclusion=make_defaulted_data_inclusion_config(),
-            emit_graph_events=True,
+            graph_id="graph-on", data_inclusion=make_defaulted_data_inclusion_config(), emit_graph_events=True, run_mode=PipeRunMode.LIVE
         )
         self._start_a_node(tracer, context)
         graph_spec = tracer.teardown()

@@ -4,13 +4,14 @@ from datetime import UTC, datetime, timedelta
 
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graphspec import NodeKind
+from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.unit.pipelex.graph.conftest import make_defaulted_data_inclusion_config
 
 
 class TestGraphTracerNodeMetadata:
     def test_on_pipe_start_persists_description_and_domain_code(self) -> None:
         tracer = GraphTracer()
-        context = tracer.setup(graph_id="meta-test", data_inclusion=make_defaulted_data_inclusion_config())
+        context = tracer.setup(graph_id="meta-test", data_inclusion=make_defaulted_data_inclusion_config(), run_mode=PipeRunMode.LIVE)
 
         started_at = datetime.now(UTC)
         node_id, _child = tracer.on_pipe_start(
@@ -38,7 +39,7 @@ class TestGraphTracerNodeMetadata:
 
     def test_on_pipe_start_defaults_metadata_to_none(self) -> None:
         tracer = GraphTracer()
-        context = tracer.setup(graph_id="meta-default-test", data_inclusion=make_defaulted_data_inclusion_config())
+        context = tracer.setup(graph_id="meta-default-test", data_inclusion=make_defaulted_data_inclusion_config(), run_mode=PipeRunMode.LIVE)
 
         started_at = datetime.now(UTC)
         node_id, _child = tracer.on_pipe_start(

@@ -11,7 +11,6 @@ from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.graph.graphspec import GraphSpecMode
 from pipelex.pipe_run.tracing_assembly import TracingAssembly, assemble_tracing, assemble_tracing_on_output
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
@@ -23,7 +22,7 @@ from pipelex.tracing.trace_events import UsageReportEvent
 _MODULE = "pipelex.pipe_run.tracing_assembly"
 
 
-def _make_usage_event(pipeline_run_id: str, node_id: str) -> UsageReportEvent:
+def _make_usage_event(pipeline_run_id: str, node_id: str, run_mode: PipeRunMode = PipeRunMode.LIVE) -> UsageReportEvent:
     """A UsageReportEvent carrying a real LLMTokensUsage (so the aggregator returns it)."""
     metadata = JobMetadata(
         run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="tracing-assembly-test", pipeline_run_id=pipeline_run_id)
@@ -40,7 +39,7 @@ def _make_usage_event(pipeline_run_id: str, node_id: str) -> UsageReportEvent:
         workflow_id="direct",
         timestamp=datetime.now(UTC),
         sequence=0,
-        mode=PipeRunMode.LIVE,
+        mode=run_mode,
         node_id=node_id,
         tokens_usage=tokens_usage,
     )
@@ -117,13 +116,41 @@ class TestTracingAssembly:
             assemble_usage=False,
             domain_code="dom",
             main_pipe_code="main",
-            run_mode=PipeRunMode.DRY,
         )
 
         assert result.graph_spec is sentinel_graph
         assert result.tokens_usages is None
         assemble.assert_called_once()
-        assert assemble.call_args.kwargs["mode"] == GraphSpecMode.DRY
+
+    @pytest.mark.parametrize("run_mode", [PipeRunMode.LIVE, PipeRunMode.DRY], ids=["live", "dry"])
+    def test_the_graph_states_the_mode_its_events_state(self, mocker: MockerFixture, run_mode: PipeRunMode) -> None:
+        """No caller passes the graph's mode: the assembled graph takes the one its events state."""
+        self._enable_tracing(mocker)
+        event_log = mocker.MagicMock()
+        event_log.read_events = mocker.MagicMock(return_value=[_make_usage_event("plr-mode", "plr-mode:node_0", run_mode=run_mode)])
+        mocker.patch(f"{_MODULE}.make_event_log", return_value=event_log)
+
+        result = assemble_tracing(pipeline_run_id="plr-mode", assemble_graph=True, assemble_usage=False)
+
+        assert result.graph_assembly_error is None
+        assert result.graph_spec is not None
+        assert result.graph_spec.meta["mode"] == run_mode.graphspec_mode
+
+    def test_events_that_mix_modes_get_no_graph_and_keep_their_usage(self, mocker: MockerFixture) -> None:
+        """Events of a dry run and a live run under one pipeline run id describe no one run: no graph, and the reason why."""
+        self._enable_tracing(mocker)
+        live_event = _make_usage_event("plr-mixed-modes", "plr-mixed-modes:node_0", run_mode=PipeRunMode.LIVE)
+        dry_event = _make_usage_event("plr-mixed-modes", "plr-mixed-modes:node_1", run_mode=PipeRunMode.DRY)
+        event_log = mocker.MagicMock()
+        event_log.read_events = mocker.MagicMock(return_value=[live_event, dry_event])
+        mocker.patch(f"{_MODULE}.make_event_log", return_value=event_log)
+
+        result = assemble_tracing(pipeline_run_id="plr-mixed-modes", assemble_graph=True, assemble_usage=True)
+
+        assert result.graph_spec is None
+        assert result.graph_assembly_error is not None
+        assert "mix run modes (dry, live)" in result.graph_assembly_error
+        assert result.tokens_usages == [live_event.tokens_usage, dry_event.tokens_usage]
 
     def test_graph_and_usage_both_assembled(self, mocker: MockerFixture) -> None:
         self._enable_tracing(mocker)

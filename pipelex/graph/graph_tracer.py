@@ -22,6 +22,7 @@ from pipelex.graph.graphspec import (
     make_graphspec_meta,
     output_digest_is_optional,
 )
+from pipelex.graph.selected_outcome import derive_selected_outcome_edges
 from pipelex.system.data_inclusion_config import DataInclusionConfig
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
@@ -164,9 +165,9 @@ class GraphTracer(GraphTracerProtocol):
         self._pipe_registry: dict[str, dict[str, Any]] = {}
         self._concept_registry: dict[str, dict[str, Any]] = {}
         self._run_mode: PipeRunMode = PipeRunMode.LIVE
-        # Live conditions that have chosen an outcome running a pipe, by condition node id, each with the outcome-map
-        # key it matched (None for the default outcome): the chosen pipe's start draws the SELECTED_OUTCOME edge to it
-        self._pending_selected_outcomes: dict[str, str | None] = {}
+        # The live conditions that have chosen their outcome, by condition node id, each with the outcome-map key it
+        # matched (None for the default outcome): teardown derives the SELECTED_OUTCOME edges from them
+        self._condition_resolutions: dict[str, str | None] = {}
 
     @property
     def is_active(self) -> bool:
@@ -240,7 +241,7 @@ class GraphTracer(GraphTracerProtocol):
         pipeline_run_id: str | None = None,
         emit_graph_events: bool = True,
         emit_usage_events: bool = True,
-        run_mode: PipeRunMode = PipeRunMode.LIVE,
+        run_mode: PipeRunMode,
     ) -> TraceContext:
         """Initialize tracing for a new pipeline run.
 
@@ -285,7 +286,7 @@ class GraphTracer(GraphTracerProtocol):
         self._pipe_registry = {}
         self._concept_registry = {}
         self._run_mode = run_mode
-        self._pending_selected_outcomes = {}
+        self._condition_resolutions = {}
 
         return TraceContext(
             graph_id=graph_id,
@@ -322,6 +323,7 @@ class GraphTracer(GraphTracerProtocol):
             self._generate_batch_item_edges()
             self._generate_batch_aggregate_edges()
             self._generate_parallel_combine_edges()
+            self._generate_selected_outcome_edges()
 
             self._is_active = False
 
@@ -362,7 +364,7 @@ class GraphTracer(GraphTracerProtocol):
         self._pipe_registry = {}
         self._concept_registry = {}
         self._run_mode = PipeRunMode.LIVE
-        self._pending_selected_outcomes = {}
+        self._condition_resolutions = {}
 
         return graph
 
@@ -502,6 +504,20 @@ class GraphTracer(GraphTracerProtocol):
                         source_stuff_digest=branch_stuff_code,
                         target_stuff_digest=combined_stuff_code,
                     )
+
+    def _generate_selected_outcome_edges(self) -> None:
+        """Generate the SELECTED_OUTCOME edges from each resolved condition to the pipe it then started.
+
+        The rule is the one the event-replay assembler applies (`derive_selected_outcome_edges`), so both graphs of a run
+        carry the same edges.
+        """
+        parent_by_node = {node_id: node_data.parent_node_id for node_id, node_data in self._nodes.items()}
+        for edge in derive_selected_outcome_edges(resolutions=self._condition_resolutions, parent_by_node=parent_by_node):
+            self.add_selected_outcome_edge(
+                condition_node_id=edge.condition_node_id,
+                outcome_node_id=edge.outcome_node_id,
+                selected_outcome=edge.selected_outcome,
+            )
 
     @override
     def register_batch_item_extraction(
@@ -713,23 +729,21 @@ class GraphTracer(GraphTracerProtocol):
         condition_node_id: str,
         rendered_value: str,
         selected_outcome: str | None,
-        runs_pipe: bool,
     ) -> None:
         """Record that a live PipeCondition has chosen its outcome, before the chosen pipe starts.
 
-        When the outcome runs a pipe, the start of that pipe under the condition draws the SELECTED_OUTCOME edge
-        from the condition to it. An outcome mapped to `continue` or `fail` runs none, and draws no edge.
+        The graph's SELECTED_OUTCOME edge runs from the condition to the pipe it then starts under its node, derived at
+        teardown, as the event-replay assembler derives it from this resolution's event and that pipe's start, whichever
+        tracer wrote the start. An outcome mapped to `continue` or `fail` starts no pipe, and so draws no edge.
 
         Args:
             condition_node_id: The PipeCondition's node ID.
             rendered_value: The value the condition's expression rendered.
             selected_outcome: The outcome-map key the value matched, or None when the default outcome was taken.
-            runs_pipe: Whether the chosen outcome runs a pipe.
         """
         if not self._is_active:
             return
-        if runs_pipe:
-            self._pending_selected_outcomes[condition_node_id] = selected_outcome
+        self._condition_resolutions[condition_node_id] = selected_outcome
         if self._event_log is not None:
             self._emit_event(
                 ConditionResolvedEvent(
@@ -830,14 +844,6 @@ class GraphTracer(GraphTracerProtocol):
                 target_node_id=node_id,
                 edge_kind=EdgeKind.CONTAINS,
             )
-            # The first pipe a resolved condition starts is the pipe of the outcome it chose
-            if trace_context.parent_node_id in self._pending_selected_outcomes:
-                selected_outcome = self._pending_selected_outcomes.pop(trace_context.parent_node_id)
-                self.add_selected_outcome_edge(
-                    condition_node_id=trace_context.parent_node_id,
-                    outcome_node_id=node_id,
-                    selected_outcome=selected_outcome,
-                )
 
         # Create child context - use copy_for_child to preserve include_full_data
         child_context = trace_context.copy_for_child(

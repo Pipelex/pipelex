@@ -183,8 +183,10 @@ class TestDecisionsAtDecisionTime:
         assert response.pipe_output.main_stuff.as_text.text.startswith(f"Short: {prefix}: {request_text} / Long: {prefix}: {request_text} / ")
         lines = _read_trace_lines(tmp_path)
 
-        # Every line states the run's mode.
+        # Every line states the run's mode, and so does the graph built from them.
         assert {line["mode"] for line in lines} == {"live"}
+        assert response.pipe_output.graph_spec is not None
+        assert response.pipe_output.graph_spec.meta["mode"] == "live"
 
         # The condition's resolution precedes the first event of the pipe it chose.
         resolution_position, resolution = _one(lines=lines, event_kind="condition_resolved")
@@ -196,8 +198,10 @@ class TestDecisionsAtDecisionTime:
         assert resolution_position < _first_line_under(lines=lines, node_id=route_start["node_id"])
         chosen_start = starts[chosen_pipe_code][0]
         assert chosen_start["parent_node_id"] == route_start["node_id"]
-        selected_edges = [line for line in lines if line["event_kind"] == "edge" and line["edge_kind"] == "selected_outcome"]
-        assert [(edge["source_node_id"], edge["target_node_id"], edge["label"]) for edge in selected_edges] == [
+        # The graph built from those events draws the choice as its SELECTED_OUTCOME edge, labelled with the key.
+        graph_spec = response.pipe_output.graph_spec
+        assert graph_spec is not None
+        assert [(edge.source, edge.target, edge.label) for edge in graph_spec.edges if edge.kind.is_selected_outcome] == [
             (route_start["node_id"], chosen_start["node_id"], selected_outcome)
         ]
 
@@ -228,12 +232,15 @@ class TestDecisionsAtDecisionTime:
         runner = PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, execution_config=execution_config)
 
         with scoped_event_log(NdjsonEventLog(traces_dir=str(tmp_path))):
-            await runner.execute(mthds_contents=[_BUNDLE])
+            response = await runner.execute(mthds_contents=[_BUNDLE])
 
         lines = _read_trace_lines(tmp_path)
         assert {line["mode"] for line in lines} == {"dry"}
         assert [line for line in lines if line["event_kind"] == "condition_resolved"] == []
-        assert [line for line in lines if line["event_kind"] == "edge" and line["edge_kind"] == "selected_outcome"] == []
+        graph_spec = response.pipe_output.graph_spec
+        assert graph_spec is not None
+        assert graph_spec.meta["mode"] == "dry"
+        assert [edge for edge in graph_spec.edges if edge.kind.is_selected_outcome] == []
         starts = _starts_by_code(lines)
         assert starts["triage"][0]["step_count"] == 4
         assert starts["weigh"][0]["branch_count"] == 2

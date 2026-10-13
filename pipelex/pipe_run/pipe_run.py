@@ -136,7 +136,6 @@ class PipeRun(PipeRunProtocol):
                     assemble_usage=trace_context.emit_usage_events,
                     domain_code=pipe_job.pipe.domain_code,
                     main_pipe_code=pipe_job.pipe.code,
-                    run_mode=pipe_job.pipe_run_params.run_mode,
                     trace_events=trace_events,
                 )
                 if trace_context.describe_pipe_io and pipe_output.graph_spec is not None:
