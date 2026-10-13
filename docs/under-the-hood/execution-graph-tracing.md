@@ -283,6 +283,8 @@ graph_spec = manager.close_tracer(pipeline_run_id)
 
 Trace events travel through an `EventLogProtocol` backend (`pipelex/tracing/`): the tracer emits events into it during the run (write side, wired in `pipeline_run_setup`), and `assemble_tracing` reads them back after the run to build the `GraphSpec` and usage aggregates (read side, triggered from `PipeRun.run`). Both sides normally build their backend instance independently from `tracing_config` via `make_event_log` — NDJSON files or DynamoDB bridge the two instances through external storage.
 
+The DynamoDB backend (`pipelex/tracing/dynamodb_event_log.py`) writes each event as one item keyed by the run (`PK = PIPELINE_RUN#{pipeline_run_id}`, `SK = EVENT#{chain_digest}#{writer_id}#{sequence}`, see [Executions and Their Attempts](#executions-and-their-attempts)), and every item carries a `ttl` in epoch seconds, set to the time of the write plus `runtime.tracing.dynamodb.retention_days` (30 days by default). DynamoDB deletes an item once its `ttl` has passed, provided the table names `ttl` as its TTL attribute, so a run's events, which by default hold its full output data, are not kept forever. The retention counts from the write rather than from the event's own `timestamp`, and a Temporal replay that re-emits an event overwrites the same item, pushing its expiry back by no more than the time between the two writes. A reader that needs a run's events, such as the graph and usage assembly, must therefore read them within the retention. Only the items written by a version that sets `ttl` expire: an item an earlier version wrote has no `ttl`, so it stays in the table until it is deleted or given one.
+
 The assembled usage rides back on `pipe_output.tokens_usages` (with any assembly failure on `usage_assembly_error`), which the sync `/execute` response returns directly. For delivery-enabled runs (a storage target set), the delivery executor (`pipelex/pipe_run/delivery_executor.py`) also persists it as a `tokens_usages.json` result artifact — `{"tokens_usages": [...], "usage_assembly_error": null}` — next to `working_memory.json`, the `main_stuff.*` renders, and the graph outputs (`graphspec.json` with its three companions `pipe_io_contracts.json`, `input_form.json` and `output_form.json`, see [Outputs](#outputs)), so a durable client polling result files gets the same usage records a sync caller does. The artifact is written unconditionally on every successful result delivery: explicit nulls mean usage assembly was off for that run. A failed run stores no result files at all, so an absent `tokens_usages.json` means either the run failed or it was delivered before the artifact existed — tell those apart from the delivery status, not from the file's presence.
 
 For fully in-process runs, `pipelex.runtime_hub.scoped_event_log` pins one shared instance for both sides instead:
@@ -536,6 +538,25 @@ ReactFlow HTML is generated directly from GraphSpec — no intermediate ViewSpec
 ---
 
 ## Configuration
+
+### Event Log Backend
+
+```toml
+# pipelex.toml (default values)
+[runtime.tracing]
+is_enabled = true
+backend = "ndjson"              # "ndjson" or "dynamodb"
+
+[runtime.tracing.ndjson]
+traces_dir = ".pipelex/traces"
+
+[runtime.tracing.dynamodb]
+table_name = ""                 # Required when backend = "dynamodb"
+region = ""                     # Required when backend = "dynamodb"
+retention_days = 30             # Each event's `ttl` is its write time plus this many days (at least 1)
+```
+
+See [Event-Log Transport and the Scoped Override](#event-log-transport-and-the-scoped-override) for what each backend does with these settings.
 
 ### GraphConfig
 

@@ -59,7 +59,7 @@ class TestEventLogSequenceThreadSafety:
                 event_log = BufferingEventLog()
             case "dynamodb":
                 mocker.patch("pipelex.tracing.dynamodb_event_log.boto3")
-                event_log = DynamoDBEventLog(table_name="t", region="us-east-1")
+                event_log = DynamoDBEventLog(table_name="t", region="us-east-1", retention_days=30)
             case _:
                 msg = f"Unknown backend_name: {backend_name}"
                 raise ValueError(msg)
