@@ -12,11 +12,15 @@ of its earlier one, while the sort key keeps one length however deep the
 lineage and however long its workflow ids: DynamoDB refuses a sort key over
 1,024 bytes. The row's chain itself is read back from its payload.
 
-Compatible with the hosted trace-event DynamoDB adapter schema.
+The schema is this backend's own, and no other writer's is promised to match
+it. A row written by a version whose sort key named the workflow and no chain
+holds an event without `attempt`, `lineage` or `path`, which the read refuses
+with `EventLogSchemaMismatchError` rather than deduplicating it against a
+current row.
+
 Requires: pip install "pipelex[dynamodb]"
 """
 
-import hashlib
 import threading
 from typing import Any
 
@@ -25,6 +29,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.system.exceptions import MissingDependencyError
+from pipelex.system.execution_chain import execution_chain_digest
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.tracing.event_log_protocol import EventLogProtocol, deduplicate_and_order_events
@@ -47,9 +52,10 @@ class DynamoDBEventLog(EventLogProtocol):
     Write path: PutItem per event, synchronous. DynamoDB's PK+SK uniqueness
     provides natural deduplication for Temporal replay re-emissions, since a
     replayed event has the same chain, writer and sequence, and so the same SK.
-    Read path: Query on PK, then the events deduplicated and ordered as every
-    event log returns them (`deduplicate_and_order_events`): the SK's chain
-    digest orders the rows by no chain.
+    Read path: Query on PK, then the events ordered as every event log returns
+    them (`deduplicate_and_order_events`): the SK's chain digest orders the
+    rows by no chain. The rule's deduplication finds nothing to drop here,
+    the key having already kept one row per event.
 
     WARNING: Do not call emit() from inside a Temporal workflow body — the
     synchronous boto3 HTTP call will block the workflow thread and trigger
@@ -112,8 +118,7 @@ class DynamoDBEventLog(EventLogProtocol):
         The chain is written as the SHA-256 hex digest of its key, so the sort key's length does not grow with the
         lineage, and the same chain always gives the same digest, so a replayed write still overwrites its own row.
         """
-        chain_digest = hashlib.sha256(chain_key.encode("utf-8")).hexdigest()
-        return f"EVENT#{chain_digest}#{writer_id}#{sequence:010d}"
+        return f"EVENT#{execution_chain_digest(chain_key=chain_key)}#{writer_id}#{sequence:010d}"
 
     def _key_condition(self, pipeline_run_id: str) -> Any:
         """Build a KeyConditionExpression for querying by pipeline_run_id."""
@@ -138,9 +143,11 @@ class DynamoDBEventLog(EventLogProtocol):
     def read_events(self, pipeline_run_id: str) -> list[TraceEvent]:
         """Read all events for a pipeline run from DynamoDB.
 
-        The events are deduplicated by `TraceEvent.store_key` and ordered by
-        (chain, sequence, writer_id), as every event log returns them, whatever
-        order the sort keys give the rows.
+        The events are ordered by (chain, sequence, writer_id), as every event
+        log returns them, whatever order the sort keys give the rows. A row in
+        the shape an earlier version wrote, without `attempt`, `lineage` or
+        `path`, is refused with ``EventLogSchemaMismatchError``, never read as
+        the direct mode's first attempt.
 
         Store-level failures (throttling, auth, network) are translated into
         ``EventLogReadError`` so best-effort callers (graph assembly) can degrade

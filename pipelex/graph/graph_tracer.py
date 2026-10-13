@@ -28,7 +28,7 @@ from pipelex.system.data_inclusion_config import DataInclusionConfig
 from pipelex.system.exceptions import InvocationPathError
 from pipelex.system.execution_chain import ExecutionAttempt
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.trace_context import TraceContext
+from pipelex.system.trace_context import TraceContext, make_trace_id_prefix
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # ruff: ignore[typing-only-first-party-import] - used in __init__ annotations
 from pipelex.tracing.trace_events import (
     BatchAggregateEvent,
@@ -192,6 +192,10 @@ class GraphTracer(GraphTracerProtocol):
         # The attempt of that workflow its engine runs, and the attempts it was dispatched under (empty for the run's own)
         self._attempt: int = 1
         self._lineage: list[ExecutionAttempt] = []
+        # The prefix of every node and edge id this attempt mints, which names the trace and the chain, so that no two
+        # attempts of one execution, and no two executions dispatched under the same name by different attempts, share
+        # an id (`make_trace_id_prefix`)
+        self._id_prefix: str = ""
         # Pipeline run ID for event emission
         self._pipeline_run_id: str | None = None
         # Per-writer monotonic counter for event sequencing
@@ -255,20 +259,14 @@ class GraphTracer(GraphTracerProtocol):
         return node_data.path
 
     def _make_node_id(self) -> str:
-        """Generate a node ID, including workflow_id when in Temporal mode."""
-        if self._workflow_id != "direct":
-            node_id = f"{self._graph_id}:{self._workflow_id}:node_{self._node_sequence}"
-        else:
-            node_id = f"{self._graph_id}:node_{self._node_sequence}"
+        """Generate a node ID, unique to this attempt's chain: the prefix names the trace and the chain."""
+        node_id = f"{self._id_prefix}:node_{self._node_sequence}"
         self._node_sequence += 1
         return node_id
 
     def _make_edge_id(self) -> str:
-        """Generate an edge ID, including workflow_id when in Temporal mode."""
-        if self._workflow_id != "direct":
-            edge_id = f"{self._graph_id}:{self._workflow_id}:edge_{self._edge_sequence}"
-        else:
-            edge_id = f"{self._graph_id}:edge_{self._edge_sequence}"
+        """Generate an edge ID, unique to this attempt's chain: the prefix names the trace and the chain."""
+        edge_id = f"{self._id_prefix}:edge_{self._edge_sequence}"
         self._edge_sequence += 1
         return edge_id
 
@@ -299,8 +297,9 @@ class GraphTracer(GraphTracerProtocol):
             event_log: Optional event log for distributed tracing. When set,
                 every tracing method emits a TraceEvent as a side effect.
             workflow_id: The id of the workflow whose code emits the events, the same in each of its attempts, or
-                "direct" for single-process mode. It names the events' execution. When not "direct", node/edge IDs
-                include the workflow_id segment.
+                "direct" for single-process mode. It names the events' execution. Outside the direct mode's first
+                attempt, node and edge IDs name the chain: the workflow, its attempt and a digest of its lineage
+                (`make_trace_id_prefix`).
             attempt: The attempt of that workflow its engine runs, counting from 1, stamped on every event; 1 in
                 single-process mode.
             lineage: The attempts the workflow was dispatched under, from the run's own down to the one that
@@ -334,6 +333,8 @@ class GraphTracer(GraphTracerProtocol):
         self._workflow_id = workflow_id
         self._attempt = attempt
         self._lineage = list(lineage or [])
+        chain = [*self._lineage, ExecutionAttempt(execution=workflow_id, attempt=attempt)]
+        self._id_prefix = make_trace_id_prefix(graph_id=graph_id, chain=chain)
         self._pipeline_run_id = pipeline_run_id
         self._event_sequence = 0
         self._pipe_registry = {}
@@ -349,7 +350,7 @@ class GraphTracer(GraphTracerProtocol):
             emit_graph_events=emit_graph_events,
             emit_usage_events=emit_usage_events,
             run_mode=run_mode,
-            chain=[*self._lineage, ExecutionAttempt(execution=workflow_id, attempt=attempt)],
+            chain=chain,
         )
 
     @override
@@ -415,6 +416,7 @@ class GraphTracer(GraphTracerProtocol):
         self._workflow_id = "direct"
         self._attempt = 1
         self._lineage = []
+        self._id_prefix = ""
         self._pipeline_run_id = None
         self._event_sequence = 0
         self._pipe_registry = {}
@@ -873,7 +875,7 @@ class GraphTracer(GraphTracerProtocol):
             child_context = trace_context.copy_for_child(node_id, next_sequence=trace_context.node_sequence + 1, invocation_path=None)
             return node_id, child_context
 
-        # Generate node ID (includes workflow_id in Temporal mode)
+        # Generate node ID (names the chain outside the direct mode's first attempt)
         node_id = self._make_node_id()
         invocation_path = _derive_invocation_path(
             trace_context=trace_context, pipe_ref=pipe_ref, pipe_type=pipe_type, node_kind=node_kind, node_id=node_id

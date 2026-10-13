@@ -136,7 +136,8 @@ class TestEmitRunnerFallback:
         run_dir = tmp_path / "run_abc"
         ndjson_files = list(run_dir.glob("*.ndjson"))
         assert len(ndjson_files) == 1
-        assert ndjson_files[0].name.startswith("wf_wf_xyz__w_act_"), ndjson_files[0].name
+        assert ndjson_files[0].name.startswith("wf_wf_xyz__c_"), ndjson_files[0].name
+        assert "__w_act_" in ndjson_files[0].name, ndjson_files[0].name
 
         reader = NdjsonEventLog(traces_dir=str(tmp_path))
         events = reader.read_events("run_abc")

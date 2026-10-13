@@ -6,6 +6,7 @@ carried — so a costs-only or graph-only run keeps its gating as nested pipes s
 """
 
 from pipelex.system.data_inclusion_config import DataInclusionConfig
+from pipelex.system.execution_chain import make_direct_chain
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
 
@@ -19,7 +20,7 @@ DATA_INCLUSION_OFF = DataInclusionConfig(
 class TestTraceContextEmitFlags:
     def test_defaults_emit_both_streams(self) -> None:
         """A TraceContext built without explicit flags emits both streams (legacy behavior)."""
-        context = TraceContext(graph_id="run_1", data_inclusion=DATA_INCLUSION_OFF, run_mode=PipeRunMode.LIVE)
+        context = TraceContext(graph_id="run_1", data_inclusion=DATA_INCLUSION_OFF, run_mode=PipeRunMode.LIVE, chain=make_direct_chain())
         assert context.emit_graph_events is True
         assert context.emit_usage_events is True
         assert context.describe_pipe_io is True
@@ -27,7 +28,12 @@ class TestTraceContextEmitFlags:
     def test_copy_for_child_preserves_costs_only_flags(self) -> None:
         """costs-only flags survive into a child context (graph off, costs on)."""
         parent = TraceContext(
-            graph_id="run_1", data_inclusion=DATA_INCLUSION_OFF, emit_graph_events=False, emit_usage_events=True, run_mode=PipeRunMode.LIVE
+            graph_id="run_1",
+            data_inclusion=DATA_INCLUSION_OFF,
+            emit_graph_events=False,
+            emit_usage_events=True,
+            run_mode=PipeRunMode.LIVE,
+            chain=make_direct_chain(),
         )
         child = parent.copy_for_child(child_node_id="run_1:node_0", next_sequence=1, invocation_path="tests.ctx_pipe")
         assert child.parent_node_id == "run_1:node_0"
@@ -38,7 +44,12 @@ class TestTraceContextEmitFlags:
     def test_copy_for_child_preserves_graph_only_flags(self) -> None:
         """graph-only flags survive into a child context (graph on, costs off)."""
         parent = TraceContext(
-            graph_id="run_1", data_inclusion=DATA_INCLUSION_OFF, emit_graph_events=True, emit_usage_events=False, run_mode=PipeRunMode.LIVE
+            graph_id="run_1",
+            data_inclusion=DATA_INCLUSION_OFF,
+            emit_graph_events=True,
+            emit_usage_events=False,
+            run_mode=PipeRunMode.LIVE,
+            chain=make_direct_chain(),
         )
         child = parent.copy_for_child(child_node_id="run_1:node_0", next_sequence=2, invocation_path="tests.ctx_pipe")
         assert child.emit_graph_events is True
@@ -46,6 +57,8 @@ class TestTraceContextEmitFlags:
 
     def test_copy_for_child_preserves_describe_pipe_io_off(self) -> None:
         """A run that will write no graphspec keeps its I/O description off in every child context."""
-        parent = TraceContext(graph_id="run_1", data_inclusion=DATA_INCLUSION_OFF, describe_pipe_io=False, run_mode=PipeRunMode.LIVE)
+        parent = TraceContext(
+            graph_id="run_1", data_inclusion=DATA_INCLUSION_OFF, describe_pipe_io=False, run_mode=PipeRunMode.LIVE, chain=make_direct_chain()
+        )
         child = parent.copy_for_child(child_node_id="run_1:node_0", next_sequence=1, invocation_path="tests.ctx_pipe")
         assert child.describe_pipe_io is False

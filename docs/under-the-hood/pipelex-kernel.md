@@ -150,6 +150,7 @@ Everything else is yours:
 
 ```python
 from pipelex.runtime_hub import get_report_delegate, resolve_effective_run_mode
+from pipelex.system.execution_chain import make_direct_chain
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
@@ -158,7 +159,9 @@ from pipelex.tracing.usage_aggregator import UsageAggregator
 # The mode the run takes on this boot: a boot without inference runs a live request dry.
 run_mode = resolve_effective_run_mode(requested=PipeRunMode.LIVE, is_mock_usage=False)
 event_log = InMemoryEventLog()
-trace_context = TraceContext(graph_id=run_id, data_inclusion=data_inclusion, emit_graph_events=False, emit_usage_events=True, run_mode=run_mode)
+trace_context = TraceContext(
+    graph_id=run_id, data_inclusion=data_inclusion, emit_graph_events=False, emit_usage_events=True, run_mode=run_mode, chain=make_direct_chain()
+)
 get_report_delegate().set_event_log(context_key=trace_context.lookup_key, event_log=event_log, pipeline_run_id=run_id)
 try:
     kernel = PipelexKernel.make(user_id="my-service", storage_scope="my-service", read_scope=None, run_mode=run_mode, trace_context=trace_context)
@@ -167,6 +170,8 @@ try:
 finally:
     get_report_delegate().clear_event_log(context_key=trace_context.lookup_key)
 ```
+
+The trace context also states the chain of execution attempts its events belong to, required as the mode is, since every usage event takes its execution, its attempt and its lineage from it (see [Executions and Their Attempts](execution-graph-tracing.md#executions-and-their-attempts)). A host running the kernel in its own process states `make_direct_chain()`, the direct mode's one execution in its first attempt. A host running it inside a durable workflow states that workflow's own chain, its lineage followed by its id and the attempt its engine runs, so that the usage of a new attempt supersedes the earlier one's, where both would otherwise be written as `direct@1`.
 
 The trace context states the mode the run takes, which `resolve_effective_run_mode` gives: every usage event a step writes states the context's `run_mode`, so a context saying live for a run whose steps run dry would stamp the whole run live. `PipelexKernel.make` refuses a context stating another mode with `TraceContextRunModeError` (`pipelex/kernel/exceptions.py`), a `ValueError` raised before any step runs. It refuses rather than correct its own copy because the trace is the caller's, possibly shared with writers the kernel never sees, which a corrected copy would leave disagreeing with the kernel's events.
 

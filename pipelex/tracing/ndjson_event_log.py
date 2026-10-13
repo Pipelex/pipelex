@@ -1,7 +1,12 @@
 """NDJSON file-based event log implementation.
 
-One JSON event per line, one file per workflow, organized by pipeline run:
-    {traces_dir}/{pipeline_run_id}/wf_{workflow_id}.ndjson
+One JSON event per line, one file per attempt of each execution and per writer, organized by pipeline run:
+    {traces_dir}/{pipeline_run_id}/wf_{workflow_id}__c_{chain_digest}.ndjson
+    {traces_dir}/{pipeline_run_id}/wf_{workflow_id}__c_{chain_digest}__w_{writer_id}.ndjson
+
+The chain digest is the SHA-256 of the events' chain key, their lineage followed by their own workflow and attempt
+(`TraceEvent.chain_key`), as the DynamoDB backend's sort key writes it. The reader reads every file of the run's
+directory.
 """
 
 import shutil
@@ -13,6 +18,7 @@ from pydantic import TypeAdapter, ValidationError
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.system.execution_chain import execution_chain_digest
 from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
@@ -31,13 +37,16 @@ class NdjsonEventLog(EventLogProtocol):
     deduplicates by `TraceEvent.store_key` (chain, writer_id, type, sequence),
     and sorts by (chain, sequence, writer_id) — sequence before writer so a
     runner-side writer's events do not sort before earlier router events.
-    Every attempt of one workflow appends to the workflow's one file, and the
-    chain in the key keeps their events apart.
 
-    Multi-writer file naming: events from writer_id="primary" land in the
-    legacy file `wf_{workflow_id}.ndjson`; events from any other writer
-    land in `wf_{workflow_id}__w_{writer_id}.ndjson`. The file-handle cache
-    key is `(pipeline_run_id, workflow_id, writer_id)` so two writers
+    File naming: each attempt of each execution writes its own file, named by
+    its chain, so two attempts of one workflow, or a workflow that a new
+    attempt dispatched again under the same name while its predecessor still
+    drains, never append to one file through two handles, whose writes could
+    interleave partial lines and leave the run's whole log unreadable. Events
+    from writer_id="primary" land in `wf_{workflow_id}__c_{chain_digest}.ndjson`;
+    events from any other writer land in
+    `wf_{workflow_id}__c_{chain_digest}__w_{writer_id}.ndjson`. The file-handle
+    cache key is `(pipeline_run_id, chain_key, writer_id)` so two writers
     emitting concurrently never share a stale handle.
 
     For multi-process / multi-host deployments, traces_dir must be a
@@ -75,21 +84,25 @@ class NdjsonEventLog(EventLogProtocol):
             return seq
 
     @staticmethod
-    def _file_name_for(workflow_id: str, *, writer_id: str) -> str:
-        """File name for a (workflow_id, writer_id) pair.
+    def _file_name_for(*, workflow_id: str, chain_key: str, writer_id: str) -> str:
+        """File name for the events one writer writes for one attempt of one execution.
+
+        The chain is written as its digest (`execution_chain_digest`), as the
+        DynamoDB sort key writes it, so the name does not grow with the
+        lineage, and the same chain always names the same file, so a replayed
+        attempt appends to its own. The workflow id leads the name so that a
+        person reading the run directory sees whose file it is.
 
         Workflow ids use ``_`` as their separator and so should not contain
         ``/`` (e.g. ``ut-{uuid}_step_two-9a262f1f``). The ``replace`` below is a
         defensive guard that keeps the derived file name flat inside the run
         directory even if a ``/`` ever slips into an id.
-
-        The legacy single-writer name is preserved when writer_id="primary"
-        so existing files continue to be written and read correctly.
         """
         safe_id = workflow_id.replace("/", "__")
+        chain_digest = execution_chain_digest(chain_key=chain_key)
         if writer_id == "primary":
-            return f"wf_{safe_id}.ndjson"
-        return f"wf_{safe_id}__w_{writer_id}.ndjson"
+            return f"wf_{safe_id}__c_{chain_digest}.ndjson"
+        return f"wf_{safe_id}__c_{chain_digest}__w_{writer_id}.ndjson"
 
     # ------------------------------------------------------------------
     # Write
@@ -100,10 +113,10 @@ class NdjsonEventLog(EventLogProtocol):
         """Append event as a JSON line, flush immediately.
 
         Creates the run directory on first write. Caches file handles
-        keyed by (pipeline_run_id, workflow_id, writer_id) to avoid
+        keyed by (pipeline_run_id, chain_key, writer_id) to avoid
         repeated open() calls for high-frequency events.
         """
-        cache_key = (event.pipeline_run_id, event.workflow_id, event.writer_id)
+        cache_key = (event.pipeline_run_id, event.chain_key, event.writer_id)
         handle = self._file_handles.get(cache_key)
 
         if handle is None:
@@ -112,7 +125,8 @@ class NdjsonEventLog(EventLogProtocol):
                 if handle is None:
                     run_dir = self._traces_dir / event.pipeline_run_id
                     run_dir.mkdir(parents=True, exist_ok=True)
-                    file_path = run_dir / self._file_name_for(event.workflow_id, writer_id=event.writer_id)
+                    file_name = self._file_name_for(workflow_id=event.workflow_id, chain_key=event.chain_key, writer_id=event.writer_id)
+                    file_path = run_dir / file_name
                     handle = open(file_path, "a", encoding="utf-8")  # ruff: ignore[open-file-with-context-handler]
                     self._file_handles[cache_key] = handle
 

@@ -5,7 +5,7 @@ Runs identical tracing scenarios through both paths:
 - Path B: GraphTracer with InMemoryEventLog → read events → GraphSpecAssembler.assemble() → GraphSpec
 
 The two GraphSpecs must be structurally identical (same nodes, edges, statuses, data flow),
-allowing for normalized IDs (workflow_id segment stripped) and ignored TimingSpec.
+allowing for normalized IDs (chain segment stripped) and ignored TimingSpec.
 """
 
 import re
@@ -43,14 +43,14 @@ _T0 = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
 # Structural comparison helpers
 # ---------------------------------------------------------------------------
 
-# Pattern to strip the workflow_id segment from node/edge IDs:
-# "graph_id:wf_xxx:node_0" → "graph_id:node_0"
-_WF_SEGMENT_RE = re.compile(r":" + re.escape(_WORKFLOW_ID) + r":")
+# Pattern to strip the chain segment, the workflow and its attempt, from node/edge IDs:
+# "graph_id:wf_xxx:attempt_1:node_0" → "graph_id:node_0"
+_CHAIN_SEGMENT_RE = re.compile(r":" + re.escape(_WORKFLOW_ID) + r":attempt_\d+(:lineage_[0-9a-f]+)?:")
 
 
 def _normalize_id(identifier: str) -> str:
-    """Strip the workflow_id segment from a node or edge ID."""
-    return _WF_SEGMENT_RE.sub(":", identifier)
+    """Strip the chain segment from a node or edge ID."""
+    return _CHAIN_SEGMENT_RE.sub(":", identifier)
 
 
 def _normalize_node(node: NodeSpec) -> dict[str, Any]:

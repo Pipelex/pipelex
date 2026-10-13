@@ -19,13 +19,48 @@ segment a controller gives the next pipe it runs, and the chain of execution att
 written under it belong to (``pipelex.system.execution_chain``).
 """
 
+from collections.abc import Sequence
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.system.data_inclusion_config import DataInclusionConfig
 from pipelex.system.exceptions import InvocationPathError
-from pipelex.system.execution_chain import ExecutionAttempt, make_direct_chain
+from pipelex.system.execution_chain import ExecutionAttempt, execution_chain_digest, execution_chain_key, make_direct_chain
 from pipelex.system.invocation_path import child_path
 from pipelex.system.pipe_run_mode import PipeRunMode
+
+LINEAGE_DIGEST_LENGTH = 16
+"""How many hexadecimal digits of its lineage's digest an id minted by a dispatched execution carries."""
+
+
+def make_trace_id_prefix(*, graph_id: str, chain: Sequence[ExecutionAttempt]) -> str:
+    """The prefix of every node and edge id that one attempt of one execution mints in the trace `graph_id`.
+
+    An attempt numbers its nodes and edges from 0, and an execution keeps its name in each of its attempts, so ids made
+    of the trace, the execution and that number alone would give a retried attempt the ids of the attempt it replaces,
+    and an execution that a new attempt dispatched again under the same name the ids of its predecessor: a reader keyed
+    on `node_id` would then merge a failed node and a succeeded one. The prefix therefore names the whole chain: the
+    execution, its attempt, and, for an execution another one dispatched, the first `LINEAGE_DIGEST_LENGTH` digits of its
+    lineage's digest, which keeps the id one length however deep the lineage. The prefix is a function of the chain
+    alone, so every replay of an attempt mints the same ids. The direct mode's one execution, in its first attempt, is
+    the only chain of its run and keeps the bare `graph_id`.
+
+    Examples: `run_1` in direct mode, `run_1:exec-run:attempt_2` for the second attempt of the run's own workflow, and
+    `run_1:exec-item-2:attempt_1:lineage_<16 hexadecimal digits>` for a batch item's workflow.
+
+    Args:
+        graph_id: The trace the ids belong to.
+        chain: The chain of the attempt minting the ids: its lineage followed by its own `{execution, attempt}`.
+    """
+    if list(chain) == make_direct_chain():
+        return graph_id
+    own_attempt = chain[-1]
+    prefix = f"{graph_id}:{own_attempt.execution}:attempt_{own_attempt.attempt}"
+    lineage = chain[:-1]
+    if lineage:
+        lineage_digest = execution_chain_digest(chain_key=execution_chain_key(chain=lineage))
+        prefix += f":lineage_{lineage_digest[:LINEAGE_DIGEST_LENGTH]}"
+    return prefix
 
 
 class TraceContext(BaseModel):
@@ -59,7 +94,11 @@ class TraceContext(BaseModel):
         child_segment: The segment, under ``parent_path``, that a controller gives the next pipe it runs. Set
             on the copy of the context the controller hands that pipe, and never carried further down.
         chain: The execution attempts the events written under this context belong to, from the run's own
-            execution down to the one writing them: its lineage followed by its own ``{execution, attempt}``.
+            execution down to the one writing them: its lineage followed by its own ``{execution, attempt}``. Required,
+            with no default: a usage event takes its execution, its attempt and its lineage from it, so a context built
+            without it would write a retried workflow's usage as the direct mode's first attempt, which no later attempt
+            supersedes. A tracer's ``setup`` states it; a host building a context of its own states it too, the direct
+            mode's being ``make_direct_chain()``.
     """
 
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -76,9 +115,8 @@ class TraceContext(BaseModel):
     parent_path: str | None = Field(default=None, description="Invocation path of the pipe whose children run under this context")
     child_segment: str | None = Field(default=None, description="Segment a controller gives the next pipe it runs, under parent_path")
     chain: list[ExecutionAttempt] = Field(
-        default_factory=make_direct_chain,
         min_length=1,
-        description="The execution attempts this context's events belong to, ending with the one writing them",
+        description="The execution attempts this context's events belong to, ending with the one writing them, stated by whoever builds it",
     )
 
     @property
@@ -127,12 +165,12 @@ class TraceContext(BaseModel):
         return child_path(parent_path=self.parent_path, segment=self.child_segment)
 
     def make_node_id(self) -> str:
-        """Generate a unique node ID within this trace.
+        """Generate a node ID unique within this trace, as the tracer does (see `make_trace_id_prefix`).
 
         Returns:
-            A unique node ID in format "{graph_id}:node_{sequence}".
+            A node ID in format "{prefix}:node_{sequence}", the prefix naming the trace and the chain.
         """
-        return f"{self.graph_id}:node_{self.node_sequence}"
+        return f"{make_trace_id_prefix(graph_id=self.graph_id, chain=self.chain)}:node_{self.node_sequence}"
 
     def copy_for_child(self, child_node_id: str, *, next_sequence: int, invocation_path: str | None) -> "TraceContext":
         """Create a child context for a nested pipe execution.

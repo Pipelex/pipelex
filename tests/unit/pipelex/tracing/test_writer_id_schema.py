@@ -14,6 +14,7 @@ from typing import Any
 from pytest_mock import MockerFixture
 
 from pipelex.graph.graphspec import NodeKind
+from pipelex.system.execution_chain import execution_chain_digest
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.buffering_event_log import BufferingEventLog
 from pipelex.tracing.dynamodb_event_log import DynamoDBEventLog
@@ -24,6 +25,8 @@ from pipelex.tracing.trace_events import PipeStartEvent
 _TS = datetime(2025, 6, 15, 10, 30, 0, tzinfo=UTC)
 _PIPELINE_RUN_ID = "run_writer_id_001"
 _WORKFLOW_ID = "wf_writer_id_xyz"
+# The digest naming the chain of an event written by the first attempt of the run's own workflow
+_CHAIN_DIGEST = execution_chain_digest(chain_key=f"{_WORKFLOW_ID}@1")
 
 
 def _make_pipe_start(sequence: int, writer_id: str = "primary", workflow_id: str = _WORKFLOW_ID) -> PipeStartEvent:
@@ -123,7 +126,7 @@ class TestWriterIdSchema:
         assert writer_ids == {"a", "b"}
 
     def test_ndjson_writer_id_in_filename_for_non_primary(self, tmp_path: Path) -> None:
-        """NDJSON file naming includes writer_id when non-primary; legacy name when primary."""
+        """NDJSON file naming includes writer_id when non-primary, after the workflow and its chain's digest."""
         primary_log = NdjsonEventLog(traces_dir=str(tmp_path))
         runner_log = NdjsonEventLog(traces_dir=str(tmp_path), writer_id="act_pid42")
 
@@ -133,12 +136,12 @@ class TestWriterIdSchema:
         run_dir = tmp_path / _PIPELINE_RUN_ID
         ndjson_files = sorted(path.name for path in run_dir.glob("*.ndjson"))
 
-        assert ndjson_files == [f"wf_{_WORKFLOW_ID}.ndjson", f"wf_{_WORKFLOW_ID}__w_act_pid42.ndjson"]
+        assert ndjson_files == [f"wf_{_WORKFLOW_ID}__c_{_CHAIN_DIGEST}.ndjson", f"wf_{_WORKFLOW_ID}__c_{_CHAIN_DIGEST}__w_act_pid42.ndjson"]
 
     def test_two_writers_same_workflow_get_separate_handles(self, tmp_path: Path) -> None:
         """Two NdjsonEventLogs with different writer_ids must not share the file-handle cache slot.
 
-        Pins the (pipeline_run_id, workflow_id, writer_id) cache key. With a 2-tuple key,
+        Pins the (pipeline_run_id, chain_key, writer_id) cache key. With a 2-tuple key,
         the second writer would steal the first writer's file handle and corrupt routing.
         """
         log_a = NdjsonEventLog(traces_dir=str(tmp_path), writer_id="writer_a")
@@ -150,8 +153,8 @@ class TestWriterIdSchema:
         log_b.close()
 
         run_dir = tmp_path / _PIPELINE_RUN_ID
-        a_lines = (run_dir / f"wf_{_WORKFLOW_ID}__w_writer_a.ndjson").read_text(encoding="utf-8").splitlines()
-        b_lines = (run_dir / f"wf_{_WORKFLOW_ID}__w_writer_b.ndjson").read_text(encoding="utf-8").splitlines()
+        a_lines = (run_dir / f"wf_{_WORKFLOW_ID}__c_{_CHAIN_DIGEST}__w_writer_a.ndjson").read_text(encoding="utf-8").splitlines()
+        b_lines = (run_dir / f"wf_{_WORKFLOW_ID}__c_{_CHAIN_DIGEST}__w_writer_b.ndjson").read_text(encoding="utf-8").splitlines()
 
         assert len(a_lines) == 1
         assert len(b_lines) == 1

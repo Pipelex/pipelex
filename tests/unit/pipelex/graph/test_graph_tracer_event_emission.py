@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graphspec import EdgeKind, IOSpec, NodeKind, NodeStatus
+from pipelex.system.execution_chain import ExecutionAttempt
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 from pipelex.tracing.trace_events import (
@@ -494,7 +495,7 @@ class TestGraphTracerEventEmission:
         assert graph_spec.nodes[0].status == NodeStatus.SUCCEEDED
 
     def test_node_id_includes_workflow_id_in_temporal_mode(self) -> None:
-        """Node IDs include workflow_id segment when not in direct mode."""
+        """Node IDs name the workflow and its attempt when not in direct mode."""
         tracer, event_log = self._make_tracer_with_event_log(workflow_id="wf_run_123")
 
         context = tracer.setup(
@@ -517,7 +518,61 @@ class TestGraphTracerEventEmission:
         )
 
         assert "wf_run_123" in node_id
-        assert node_id == f"{self.GRAPH_ID}:wf_run_123:node_0"
+        assert node_id == f"{self.GRAPH_ID}:wf_run_123:attempt_1:node_0"
+
+    def test_each_attempt_and_each_dispatch_mints_its_own_ids(self) -> None:
+        """Two attempts of one workflow, and a workflow two attempts of its parent dispatched under one name, number
+        their nodes and edges from 0 alike: their ids differ by the chain alone, so no reader keyed on an id merges the
+        node a lost attempt failed with the one its retry ran.
+        """
+        run_1 = ExecutionAttempt(execution="wf_run", attempt=1)
+        run_2 = ExecutionAttempt(execution="wf_run", attempt=2)
+        setups: list[tuple[str, int, list[ExecutionAttempt]]] = [
+            ("wf_run", 1, []),
+            ("wf_run", 2, []),
+            ("wf_item", 1, [run_1]),
+            ("wf_item", 2, [run_1]),
+            ("wf_item", 1, [run_2]),
+        ]
+        ids_by_chain: list[set[str]] = []
+        for workflow_id, attempt, lineage in setups:
+            event_log = InMemoryEventLog()
+            tracer = GraphTracer()
+            context = tracer.setup(
+                graph_id=self.GRAPH_ID,
+                data_inclusion=make_defaulted_data_inclusion_config(),
+                event_log=event_log,
+                workflow_id=workflow_id,
+                attempt=attempt,
+                lineage=lineage,
+                pipeline_run_id=self.PIPELINE_RUN_ID,
+                run_mode=PipeRunMode.LIVE,
+            )
+            started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
+            node_a, _ = tracer.on_pipe_start(
+                pipe_ref="tests.pipe_a",
+                trace_context=context,
+                pipe_code="pipe_a",
+                pipe_type="PipeLLM",
+                node_kind=NodeKind.OPERATOR,
+                started_at=started_at,
+            )
+            node_b, _ = tracer.on_pipe_start(
+                pipe_ref="tests.pipe_b",
+                trace_context=context,
+                pipe_code="pipe_b",
+                pipe_type="PipeLLM",
+                node_kind=NodeKind.OPERATOR,
+                started_at=started_at,
+            )
+            tracer.add_edge(source_node_id=node_a, target_node_id=node_b, edge_kind=EdgeKind.DATA)
+            edge_ids = {evt.edge_id for evt in event_log.read_events(self.PIPELINE_RUN_ID) if isinstance(evt, EdgeEvent)}
+            assert len(edge_ids) == 1
+            ids_by_chain.append({node_a, node_b, *edge_ids})
+            tracer.teardown()
+
+        all_ids = [minted_id for chain_ids in ids_by_chain for minted_id in chain_ids]
+        assert len(all_ids) == len(set(all_ids)) == 3 * len(setups)
 
     def test_edge_id_includes_workflow_id_in_temporal_mode(self) -> None:
         """Edge IDs include workflow_id segment when not in direct mode."""
@@ -559,7 +614,7 @@ class TestGraphTracerEventEmission:
         events = event_log.read_events(self.PIPELINE_RUN_ID)
         edge_events = [evt for evt in events if isinstance(evt, EdgeEvent) and evt.edge_kind == EdgeKind.DATA]
         assert len(edge_events) == 1
-        assert "wf_run_456" in edge_events[0].edge_id
+        assert edge_events[0].edge_id == f"{self.GRAPH_ID}:wf_run_456:attempt_1:edge_0"
 
     def test_event_sequence_is_monotonic(self) -> None:
         """Events have monotonically increasing sequence numbers."""

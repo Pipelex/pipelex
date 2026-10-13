@@ -205,11 +205,41 @@ class TestInvocationPaths:
         lost_failures = [event for event in events if isinstance(event, PipeEndErrorEvent) and event.workflow_id == "exec-item_2"]
         assert {(event.attempt, event.path) for event in lost_failures} >= {(1, f"{batch_path}/item_2/step_2")}
 
+        # Each attempt of each execution mints its own node ids, the two attempts of item 2 included, and each item's
+        # root node names as its parent the batch node that the run's execution minted.
+        starts = [event for event in events if isinstance(event, PipeStartEvent)]
+        assert len({event.node_id for event in starts}) == len(starts)
+        batch_node_id = next(event.node_id for event in starts if event.path == batch_path)
+        item_roots = [event for event in starts if event.workflow_id != "direct" and event.path is not None and event.path.count("/") == 2]
+        assert sorted((event.workflow_id, event.attempt) for event in item_roots) == [
+            ("exec-item_1", 1),
+            ("exec-item_2", 1),
+            ("exec-item_2", 2),
+            ("exec-item_3", 1),
+        ]
+        assert {event.parent_node_id for event in item_roots} == {batch_node_id}
+
+        # Each attempt of each execution wrote its own file, which the reader found with the others.
+        ndjson_files = sorted((tmp_path / pipe_output.pipeline_run_id).glob("*.ndjson"))
+        for ndjson_file in ndjson_files:
+            file_lines = [json.loads(line) for line in ndjson_file.read_text(encoding="utf-8").splitlines() if line.strip()]
+            assert len({json.dumps([line["lineage"], line["workflow_id"], line["attempt"]]) for line in file_lines}) == 1, ndjson_file.name
+        assert len(ndjson_files) == len({(event.chain_key, event.writer_id) for event in events})
+
         # The graph holds every invocation once, from the current attempts, and nothing of the lost attempt failed in it.
         graph_spec = pipe_output.graph_spec
         assert _graph_paths(graph_spec) == sorted(InvocationPathsTestData.LIVE_DETAILED_PATHS)
         assert graph_spec is not None
         assert [node.path for node in graph_spec.nodes if node.status == NodeStatus.FAILED] == []
+        # The parent references across the dispatch still resolve: the batch node contains each item's current node.
+        item_node_ids = {
+            node.node_id
+            for node in graph_spec.nodes
+            if node.path is not None and node.path.startswith(f"{batch_path}/item_") and node.path.count("/") == 2
+        }
+        assert len(item_node_ids) == len(InvocationPathsTestData.DOSSIER["filings"])
+        contained_by_batch = {edge.target for edge in graph_spec.edges if edge.kind.is_contains and edge.source == batch_node_id}
+        assert item_node_ids <= contained_by_batch
         main_text = pipe_output.main_stuff.as_text.text
         for filing in InvocationPathsTestData.DOSSIER["filings"]:
             assert f"Condensed: Read {filing['title']}" in main_text

@@ -1,11 +1,18 @@
 """Unit tests for TraceContext."""
 
 import pytest
+from pydantic import ValidationError
 
 from pipelex.system.exceptions import InvocationPathError
-from pipelex.system.execution_chain import ExecutionAttempt
-from pipelex.system.trace_context import TraceContext
-from tests.unit.pipelex.graph.conftest import make_trace_context
+from pipelex.system.execution_chain import ExecutionAttempt, execution_chain_digest, execution_chain_key
+from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.system.trace_context import TraceContext, make_trace_id_prefix
+from tests.unit.pipelex.graph.conftest import make_defaulted_data_inclusion_config, make_trace_context
+
+_RUN_1 = ExecutionAttempt(execution="exec-run", attempt=1)
+_RUN_2 = ExecutionAttempt(execution="exec-run", attempt=2)
+_ITEM_1 = ExecutionAttempt(execution="exec-item-2", attempt=1)
+_ITEM_2 = ExecutionAttempt(execution="exec-item-2", attempt=2)
 
 
 class TestTraceContext:
@@ -17,6 +24,42 @@ class TestTraceContext:
         node_id = context.make_node_id()
 
         assert node_id == "ctx-test:node_5"
+
+    def test_a_trace_context_states_its_chain(self) -> None:
+        """A context has no default chain: one built without it would write a retried workflow's usage as `direct@1`."""
+        with pytest.raises(ValidationError, match="chain"):
+            TraceContext(graph_id="ctx-test", data_inclusion=make_defaulted_data_inclusion_config(), run_mode=PipeRunMode.LIVE)  # type: ignore[call-arg] # pyright: ignore[reportCallIssue] # the static error is the runtime contract under test
+
+    @pytest.mark.parametrize(
+        ("chain", "expected_prefix"),
+        [
+            ([ExecutionAttempt(execution="direct", attempt=1)], "run_1"),
+            ([_RUN_2], "run_1:exec-run:attempt_2"),
+            (
+                [_RUN_1, _ITEM_2],
+                f"run_1:exec-item-2:attempt_2:lineage_{execution_chain_digest(chain_key=execution_chain_key(chain=[_RUN_1]))[:16]}",
+            ),
+        ],
+        ids=["direct_mode", "run_workflow_retried", "dispatched_workflow"],
+    )
+    def test_node_ids_name_the_chain_that_mints_them(self, chain: list[ExecutionAttempt], expected_prefix: str) -> None:
+        context = make_trace_context(graph_id="run_1", node_sequence=3).model_copy(update={"chain": chain})
+
+        assert make_trace_id_prefix(graph_id="run_1", chain=chain) == expected_prefix
+        assert context.make_node_id() == f"{expected_prefix}:node_3"
+
+    def test_every_chain_of_a_run_mints_its_own_node_ids(self) -> None:
+        """Each attempt numbers its nodes from 0 and keeps its execution's name, so the ids name the whole chain: a retry
+        of the run's workflow, a retry of an item's, and an item dispatched again under the same name by a new attempt
+        of the run's workflow each mint ids no other chain mints.
+        """
+        chains = [[_RUN_1], [_RUN_2], [_RUN_1, _ITEM_1], [_RUN_1, _ITEM_2], [_RUN_2, _ITEM_1]]
+        first_node_ids = [make_trace_context(graph_id="run_1").model_copy(update={"chain": chain}).make_node_id() for chain in chains]
+
+        assert len(set(first_node_ids)) == len(chains)
+        # The same chain, as a replay of an attempt has, mints the same ids.
+        replayed = make_trace_context(graph_id="run_1").model_copy(update={"chain": [_RUN_2, _ITEM_1]})
+        assert replayed.make_node_id() == first_node_ids[-1]
 
     def test_copy_for_child(self) -> None:
         """Test creating child context."""

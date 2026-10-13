@@ -9,6 +9,7 @@ from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.graph.graph_tracer_protocol import GraphTracerNoOp
 from pipelex.graph.graphspec import IOSpec, NodeKind
+from pipelex.system.execution_chain import make_direct_chain
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
@@ -323,7 +324,7 @@ class TestGraphTracerDecisionEvents:
     def test_a_trace_context_states_its_run_mode(self) -> None:
         """A context has no default mode: one built without it would stamp a dry run's events as live."""
         with pytest.raises(ValidationError, match="run_mode"):
-            TraceContext(graph_id=_GRAPH_ID, data_inclusion=make_defaulted_data_inclusion_config())  # type: ignore[call-arg] # pyright: ignore[reportCallIssue] # the static error is the runtime contract under test
+            TraceContext(graph_id=_GRAPH_ID, data_inclusion=make_defaulted_data_inclusion_config(), chain=make_direct_chain())  # type: ignore[call-arg] # pyright: ignore[reportCallIssue] # the static error is the runtime contract under test
 
     def test_the_noop_tracer_accepts_decisions_and_carries_the_mode(self) -> None:
         tracer = GraphTracerNoOp()

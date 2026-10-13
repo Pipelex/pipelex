@@ -54,6 +54,7 @@ from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.reporting.usage_records import TokensUsageRecord, make_tokens_usage_record
 from pipelex.runtime_hub import get_report_delegate
 from pipelex.system.configuration.configs import NdjsonTracingConfig, TracingBackend
+from pipelex.system.execution_chain import make_direct_chain
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
@@ -119,6 +120,7 @@ class TestKernelUsageParity:
             emit_graph_events=False,
             emit_usage_events=True,
             run_mode=PipeRunMode.DRY,
+            chain=make_direct_chain(),
         )
         get_report_delegate().set_event_log(
             context_key=trace_context.lookup_key,

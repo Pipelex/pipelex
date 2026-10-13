@@ -12,6 +12,7 @@ emitted it. A higher attempt of an execution, dispatched under the same attempts
 everything it dispatched, at any depth: an event is current when no attempt in its chain is superseded.
 """
 
+import hashlib
 from collections.abc import Iterable, Sequence
 from urllib.parse import quote
 
@@ -47,6 +48,16 @@ def execution_chain_key(*, chain: Sequence[ExecutionAttempt]) -> str:
     entries are joined by `/`. The empty chain, the lineage of the run's own execution, gives the empty string.
     """
     return "/".join(f"{quote(entry.execution, safe='')}@{entry.attempt}" for entry in chain)
+
+
+def execution_chain_digest(*, chain_key: str) -> str:
+    """The SHA-256 hexadecimal digest of a chain's key, which names the chain in one length however deep it is.
+
+    A chain key grows with the lineage and with the length of its execution names, while the places that key on a chain
+    bound their keys, such as a DynamoDB sort key or a file name. The digest is the same for the same chain, so a
+    replayed write lands where its first write did, and differs for every two chains that differ.
+    """
+    return hashlib.sha256(chain_key.encode("utf-8")).hexdigest()
 
 
 def current_chain_keys(*, chains: Iterable[Sequence[ExecutionAttempt]]) -> set[str]:

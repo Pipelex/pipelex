@@ -14,8 +14,10 @@ def deduplicate_and_order_events(*, events: Iterable[TraceEvent]) -> list[TraceE
     """The events of a run as an event log returns them, whatever order its store holds them in.
 
     One event is kept per `TraceEvent.store_key` (chain, writer_id, event type, sequence), the first one met: a replay
-    writes an event again under the same key, and a store may hold the same event under two keys of its own, such as
-    a DynamoDB row written before its sort key changed shape. The events are ordered by (chain, sequence, writer_id):
+    writes an event again under the same key, which a log that appends, such as the NDJSON and in-memory ones, holds
+    twice, while a log keyed on the event, such as the DynamoDB one, overwrites its row and so holds it once. An event
+    stored by a version that wrote no `attempt`, `lineage` or `path` never reaches this rule: the log's read refuses it
+    with `EventLogSchemaMismatchError`. The events are ordered by (chain, sequence, writer_id):
     a dispatching attempt's events before those of the workflows it dispatched, whose chains continue its own, and,
     within one attempt, by sequence before writer, so that two writers emitting into the same attempt are not reordered
     by the lexical order of their ids.

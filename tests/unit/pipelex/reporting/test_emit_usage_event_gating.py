@@ -22,6 +22,7 @@ from pipelex.config import get_config
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.system.configuration.configs import NdjsonTracingConfig, TracingBackend
 from pipelex.system.data_inclusion_config import DataInclusionConfig
+from pipelex.system.execution_chain import make_direct_chain
 from pipelex.system.job_metadata import JobMetadata, RunMetadata, UnitJobId
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
@@ -71,6 +72,7 @@ def _make_trace_context(graph_id: str, *, emit_usage_events: bool, emit_graph_ev
         emit_graph_events=emit_graph_events,
         emit_usage_events=emit_usage_events,
         run_mode=PipeRunMode.LIVE,
+        chain=make_direct_chain(),
     )
 
 

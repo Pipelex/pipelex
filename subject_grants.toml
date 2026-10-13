@@ -6976,10 +6976,6 @@ rationale = "Verb-object: reads the event to track its timestamp; single operand
 param = "events"
 rationale = "First pass over the event sequence; single operand."
 
-["pipelex/tracing/ndjson_event_log.py::NdjsonEventLog._file_name_for"]
-param = "workflow_id"
-rationale = "Derivation: encodes the workflow id into a file name; writer_id stays keyword."
-
 ["pipelex/tracing/usage_aggregator.py::UsageAggregator.aggregate"]
 param = "events"
 rationale = "Verb-object: aggregates the events; single operand."
