@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field, ValidationError
 from pipelex.graph.condition_output_merge import ConditionOutputMerge
 from pipelex.graph.graphspec import EdgeKind, ErrorSpec, IOSpec, NodeKind
 from pipelex.reporting.reporting_types import AnyTokensUsage
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 
@@ -30,6 +31,8 @@ class TraceEventKind(StrEnum):
     BATCH_AGGREGATE = "batch_aggregate"
     PARALLEL_COMBINE = "parallel_combine"
     CONDITION_OUTPUT_MERGE = "condition_output_merge"
+    BATCH_FANNED_OUT = "batch_fanned_out"
+    CONDITION_RESOLVED = "condition_resolved"
     EXECUTION_DATA = "execution_data"
     USAGE_REPORT = "usage_report"
 
@@ -47,6 +50,8 @@ class TraceEvent(BaseModel):
         sort-key shape; non-default values come from the per-process activity
         event log used by separate-process workers.
     - event_kind: discriminator for the event subclass (defined on each subclass as Literal)
+    - mode: whether the run that emitted the event is live or a dry run. Every event of one run
+        carries the same mode, so a reader tells dry events from live ones by this field alone.
     - timestamp: UTC, for display/debugging only
     - sequence: per-writer monotonic counter, for ordering and deduplication
     """
@@ -54,6 +59,7 @@ class TraceEvent(BaseModel):
     pipeline_run_id: str
     workflow_id: str
     writer_id: str = "primary"
+    mode: PipeRunMode
     timestamp: datetime
     sequence: int
 
@@ -64,7 +70,7 @@ class TraceEvent(BaseModel):
 
 
 class PipeStartEvent(TraceEvent):
-    """Emitted when a pipe begins execution."""
+    """Emitted when a pipe begins execution, before it runs anything."""
 
     event_kind: Literal[TraceEventKind.PIPE_START] = TraceEventKind.PIPE_START
     node_id: str
@@ -77,6 +83,11 @@ class PipeStartEvent(TraceEvent):
     input_specs: list[IOSpec] = Field(default_factory=empty_list_factory_of(IOSpec))
     pipe_data: dict[str, Any] = Field(default_factory=dict)
     concept_data: list[dict[str, Any]] = Field(default_factory=empty_list_factory_of(dict))
+    step_count: int | None = None
+    """On a PipeSequence, the number of steps its author wrote. The binding a sequence writes for a dotted
+    `batch_over` is no step of the author's and is not counted. None on every other pipe."""
+    branch_count: int | None = None
+    """On a PipeParallel, the number of its branches. None on every other pipe."""
 
 
 class PipeEndSuccessEvent(TraceEvent):
@@ -183,6 +194,42 @@ class ConditionOutputMergeEvent(TraceEvent):
     merge: ConditionOutputMerge
 
 
+class BatchFannedOutEvent(TraceEvent):
+    """Emitted when a PipeBatch knows how many items it runs, before it starts any of them.
+
+    A live reader learns the batch's width the moment it is fixed, so it never has to guess it from the
+    items that have started.
+    """
+
+    event_kind: Literal[TraceEventKind.BATCH_FANNED_OUT] = TraceEventKind.BATCH_FANNED_OUT
+    node_id: str
+    """The PipeBatch's own node."""
+    item_count: int = Field(ge=0)
+    branch_pipe_code: str
+    """The bare code of the pipe each item runs."""
+    branch_pipe_ref: str
+    """The `domain.code` reference of the pipe each item runs."""
+    branch_pipe_type: str
+    """The type of the pipe each item runs, such as `PipeSequence` or `PipeLLM`."""
+
+
+class ConditionResolvedEvent(TraceEvent):
+    """Emitted when a live PipeCondition has chosen its outcome, before the chosen pipe starts.
+
+    A dry run emits none, since its condition runs the pipe of every outcome.
+    """
+
+    event_kind: Literal[TraceEventKind.CONDITION_RESOLVED] = TraceEventKind.CONDITION_RESOLVED
+    node_id: str
+    """The PipeCondition's own node."""
+    rendered_value: str
+    """The value the condition's expression rendered. It may quote text of the method, or of a library the method
+    depends on, so it is kept for whoever reads the trace and never reaches a caller-facing summary."""
+    selected_outcome: str | None
+    """The key of the outcome map the rendered value matched, or None when it matched none and the condition took its
+    default outcome: `"default"` can itself be a key of an outcome map, so it cannot stand for the default."""
+
+
 class ExecutionDataEvent(TraceEvent):
     """Emitted when a pipe registers execution metadata (rendered prompts, resolved models, etc.)."""
 
@@ -220,6 +267,8 @@ AnyTraceEvent = Annotated[
     | BatchAggregateEvent
     | ParallelCombineEvent
     | ConditionOutputMergeEvent
+    | BatchFannedOutEvent
+    | ConditionResolvedEvent
     | ExecutionDataEvent
     | UsageReportEvent,
     Field(discriminator="event_kind"),

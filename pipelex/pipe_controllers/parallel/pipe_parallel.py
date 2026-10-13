@@ -439,6 +439,10 @@ class PipeParallel(PipeController):
                 )
 
     @override
+    def traced_branch_count(self) -> int:
+        return len(self.parallel_sub_pipes)
+
+    @override
     def pipe_dependencies(self) -> set[str]:
         return {sub_pipe.pipe_code for sub_pipe in self.parallel_sub_pipes}
 
@@ -462,6 +466,14 @@ class PipeParallel(PipeController):
         # branch runs (which deep-copy the params) don't stamp it on their own outputs.
         final_stuff_code = pipe_run_params.final_stuff_code
         pipe_run_params.final_stuff_code = None
+
+        # The parallel records how many branches it runs, and how it combines them, as it starts, before any branch runs.
+        execution_data_dict: dict[str, Any] = {
+            "branch_count": self.traced_branch_count(),
+            "add_each_output": self.add_each_output,
+            "combined_output_concept": self.output.concept.concept_ref,
+        }
+        self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
 
         tasks: list[Coroutine[Any, Any, PipeOutput]] = []
 
@@ -595,14 +607,6 @@ class PipeParallel(PipeController):
             job_metadata=job_metadata,
             output_stuffs=output_stuffs,
         )
-
-        # Capture execution data for the graph tracer
-        execution_data_dict: dict[str, Any] = {
-            "branch_count": len(self.parallel_sub_pipes),
-            "add_each_output": self.add_each_output,
-            "combined_output_concept": self.output.concept.concept_ref,
-        }
-        self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
 
         return PipeOutput(
             working_memory=working_memory,

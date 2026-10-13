@@ -40,6 +40,7 @@ def _make_usage_event(pipeline_run_id: str, node_id: str) -> UsageReportEvent:
         workflow_id="direct",
         timestamp=datetime.now(UTC),
         sequence=0,
+        mode=PipeRunMode.LIVE,
         node_id=node_id,
         tokens_usage=tokens_usage,
     )

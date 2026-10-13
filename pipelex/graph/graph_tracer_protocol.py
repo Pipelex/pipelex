@@ -4,8 +4,9 @@ from typing import Any, Protocol
 from typing_extensions import override
 
 from pipelex.graph.condition_output_merge import ConditionOutputMerge
-from pipelex.graph.graphspec import EdgeKind, GraphSpec, GraphSpecMode, IOSpec, NodeKind
+from pipelex.graph.graphspec import EdgeKind, GraphSpec, IOSpec, NodeKind
 from pipelex.system.data_inclusion_config import DataInclusionConfig
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # ruff: ignore[typing-only-first-party-import] - used in setup signature
 
@@ -29,7 +30,7 @@ class GraphTracerProtocol(Protocol):
         pipeline_run_id: str | None = None,
         emit_graph_events: bool = True,
         emit_usage_events: bool = True,
-        mode: GraphSpecMode = GraphSpecMode.LIVE,
+        run_mode: PipeRunMode = PipeRunMode.LIVE,
     ) -> TraceContext:
         """Initialize tracing for a new pipeline run.
 
@@ -45,7 +46,8 @@ class GraphTracerProtocol(Protocol):
                 Stamped onto the returned TraceContext so it is born with the correct flag.
             emit_usage_events: Whether usage (cost) trace events should be emitted for this run.
                 Stamped onto the returned TraceContext so it is born with the correct flag.
-            mode: Provenance mode to stamp onto generated GraphSpecs.
+            run_mode: Whether the run is live or a dry run: stamped on every trace event and on the returned
+                TraceContext, and turned into the provenance mode of the generated GraphSpec.
 
         Returns:
             Initial TraceContext to pass through JobMetadata.
@@ -73,6 +75,8 @@ class GraphTracerProtocol(Protocol):
         concept_data: list[dict[str, Any]] | None = None,
         description: str | None = None,
         domain_code: str | None = None,
+        step_count: int | None = None,
+        branch_count: int | None = None,
     ) -> tuple[str, TraceContext]:
         """Record the start of a pipe execution.
 
@@ -87,6 +91,8 @@ class GraphTracerProtocol(Protocol):
             concept_data: Optional list of serialized concept dicts for the concept registry.
             description: Optional human-readable pipe description (mirrored onto NodeSpec).
             domain_code: Optional domain code of the pipe (mirrored onto NodeSpec).
+            step_count: On a PipeSequence, the number of steps its author wrote.
+            branch_count: On a PipeParallel, the number of its branches.
 
         Returns:
             Tuple of (node_id for this pipe, updated TraceContext for children).
@@ -276,6 +282,44 @@ class GraphTracerProtocol(Protocol):
         """
         ...
 
+    def register_batch_fan_out(
+        self,
+        *,
+        batch_node_id: str,
+        item_count: int,
+        branch_pipe_code: str,
+        branch_pipe_ref: str,
+        branch_pipe_type: str,
+    ) -> None:
+        """Register that a PipeBatch knows how many items it runs, before it starts any of them.
+
+        Args:
+            batch_node_id: The PipeBatch's node ID.
+            item_count: The number of items the batch runs.
+            branch_pipe_code: The bare code of the pipe each item runs.
+            branch_pipe_ref: The `domain.code` reference of the pipe each item runs.
+            branch_pipe_type: The type of the pipe each item runs.
+        """
+        ...
+
+    def register_condition_resolution(
+        self,
+        *,
+        condition_node_id: str,
+        rendered_value: str,
+        selected_outcome: str | None,
+        runs_pipe: bool,
+    ) -> None:
+        """Register that a live PipeCondition has chosen its outcome, before the chosen pipe starts.
+
+        Args:
+            condition_node_id: The PipeCondition's node ID.
+            rendered_value: The value the condition's expression rendered.
+            selected_outcome: The outcome-map key the value matched, or None when the default outcome was taken.
+            runs_pipe: Whether the chosen outcome runs a pipe, whose start then draws the SELECTED_OUTCOME edge.
+        """
+        ...
+
     def register_execution_data(
         self,
         *,
@@ -310,13 +354,14 @@ class GraphTracerNoOp(GraphTracerProtocol):
         pipeline_run_id: str | None = None,
         emit_graph_events: bool = True,
         emit_usage_events: bool = True,
-        mode: GraphSpecMode = GraphSpecMode.LIVE,
+        run_mode: PipeRunMode = PipeRunMode.LIVE,
     ) -> TraceContext:
         return TraceContext(
             graph_id=graph_id,
             data_inclusion=data_inclusion,
             emit_graph_events=emit_graph_events,
             emit_usage_events=emit_usage_events,
+            run_mode=run_mode,
         )
 
     @override
@@ -337,6 +382,8 @@ class GraphTracerNoOp(GraphTracerProtocol):
         concept_data: list[dict[str, Any]] | None = None,
         description: str | None = None,
         domain_code: str | None = None,
+        step_count: int | None = None,
+        branch_count: int | None = None,
     ) -> tuple[str, TraceContext]:
         node_id = trace_context.make_node_id()
         child_context = trace_context.copy_for_child(node_id, next_sequence=trace_context.node_sequence + 1)
@@ -448,5 +495,28 @@ class GraphTracerNoOp(GraphTracerProtocol):
         self,
         *,
         merge: ConditionOutputMerge,
+    ) -> None:
+        pass
+
+    @override
+    def register_batch_fan_out(
+        self,
+        *,
+        batch_node_id: str,
+        item_count: int,
+        branch_pipe_code: str,
+        branch_pipe_ref: str,
+        branch_pipe_type: str,
+    ) -> None:
+        pass
+
+    @override
+    def register_condition_resolution(
+        self,
+        *,
+        condition_node_id: str,
+        rendered_value: str,
+        selected_outcome: str | None,
+        runs_pipe: bool,
     ) -> None:
         pass

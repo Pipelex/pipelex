@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Any, ClassVar
 
 import pytest
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
@@ -12,11 +12,14 @@ from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.graph.condition_output_merge import ConditionOutputMerge, ConditionOutputTyping
 from pipelex.graph.graphspec import EdgeKind, ErrorSpec, IOSpec, NodeKind
 from pipelex.system.job_metadata import JobCategory, JobMetadata, RunMetadata, UnitJobId
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.trace_events import (
     AnyTraceEvent,
     BatchAggregateEvent,
+    BatchFannedOutEvent,
     BatchItemEvent,
     ConditionOutputMergeEvent,
+    ConditionResolvedEvent,
     ControllerOutputEvent,
     EdgeEvent,
     ExecutionDataEvent,
@@ -47,6 +50,7 @@ class _Shared:
             "workflow_id": _Shared.WORKFLOW_ID,
             "timestamp": _Shared.TIMESTAMP,
             "sequence": sequence,
+            "mode": PipeRunMode.LIVE,
         }
 
     @staticmethod
@@ -200,6 +204,26 @@ class TestTraceEvents:
             },
         ),
         (
+            "batch_fanned_out",
+            TraceEventKind.BATCH_FANNED_OUT,
+            {
+                "node_id": _Shared.NODE_ID,
+                "item_count": 3,
+                "branch_pipe_code": "summarize_record",
+                "branch_pipe_ref": "records.summarize_record",
+                "branch_pipe_type": "PipeLLM",
+            },
+        ),
+        (
+            "condition_resolved",
+            TraceEventKind.CONDITION_RESOLVED,
+            {
+                "node_id": _Shared.NODE_ID,
+                "rendered_value": "urgent",
+                "selected_outcome": "urgent",
+            },
+        ),
+        (
             "execution_data",
             TraceEventKind.EXECUTION_DATA,
             {
@@ -228,6 +252,8 @@ class TestTraceEvents:
         TraceEventKind.BATCH_AGGREGATE: BatchAggregateEvent,
         TraceEventKind.PARALLEL_COMBINE: ParallelCombineEvent,
         TraceEventKind.CONDITION_OUTPUT_MERGE: ConditionOutputMergeEvent,
+        TraceEventKind.BATCH_FANNED_OUT: BatchFannedOutEvent,
+        TraceEventKind.CONDITION_RESOLVED: ConditionResolvedEvent,
         TraceEventKind.EXECUTION_DATA: ExecutionDataEvent,
         TraceEventKind.USAGE_REPORT: UsageReportEvent,
     }
@@ -406,6 +432,86 @@ class TestTraceEvents:
 
         assert restored.description == "Summarize the input document."
         assert restored.domain_code == "summarization"
+
+    @pytest.mark.parametrize(
+        ("step_count", "branch_count"),
+        [(None, None), (3, None), (None, 2)],
+        ids=["operator", "sequence", "parallel"],
+    )
+    def test_pipe_start_carries_step_and_branch_counts(self, step_count: int | None, branch_count: int | None) -> None:
+        """A sequence states its authored step count and a parallel its branch count as they start; any other pipe states neither."""
+        event = PipeStartEvent(
+            **_Shared.make_base_fields(),
+            node_id=_Shared.NODE_ID,
+            pipe_code="controller",
+            pipe_type="PipeSequence",
+            node_kind=NodeKind.CONTROLLER,
+            step_count=step_count,
+            branch_count=branch_count,
+        )
+
+        payload = event.model_dump(mode="json")
+        restored = _any_trace_event_adapter.validate_json(event.model_dump_json())
+
+        assert payload["step_count"] == step_count
+        assert payload["branch_count"] == branch_count
+        assert isinstance(restored, PipeStartEvent)
+        assert restored.step_count == step_count
+        assert restored.branch_count == branch_count
+
+    def test_condition_resolved_default_outcome_reads_null(self) -> None:
+        """A condition that took its default outcome states `selected_outcome` as null, with the value it rendered."""
+        event = ConditionResolvedEvent(
+            **_Shared.make_base_fields(),
+            node_id=_Shared.NODE_ID,
+            rendered_value="unmatched",
+            selected_outcome=None,
+        )
+
+        payload = event.model_dump(mode="json")
+        restored = _any_trace_event_adapter.validate_json(event.model_dump_json())
+
+        assert payload["event_kind"] == "condition_resolved"
+        assert payload["selected_outcome"] is None
+        assert payload["rendered_value"] == "unmatched"
+        assert restored == event
+
+    def test_batch_fanned_out_refuses_a_negative_item_count(self) -> None:
+        with pytest.raises(ValidationError):
+            BatchFannedOutEvent(
+                **_Shared.make_base_fields(),
+                node_id=_Shared.NODE_ID,
+                item_count=-1,
+                branch_pipe_code="summarize_record",
+                branch_pipe_ref="records.summarize_record",
+                branch_pipe_type="PipeLLM",
+            )
+
+    @pytest.mark.parametrize("mode", [PipeRunMode.LIVE, PipeRunMode.DRY], ids=["live", "dry"])
+    def test_every_event_states_its_mode(self, mode: PipeRunMode) -> None:
+        """Every event kind serializes the run mode it was written in, and reads it back."""
+        for _, event_kind, extra_fields in self.EVENTS_AND_KINDS:
+            event_cls = self.EVENT_CLASSES[event_kind]
+            event = event_cls(**{**_Shared.make_base_fields(), "mode": mode}, **extra_fields)
+
+            payload = event.model_dump(mode="json")
+            restored = _any_trace_event_adapter.validate_json(event.model_dump_json())
+
+            assert payload["mode"] == mode, event_kind
+            assert restored.mode == mode, event_kind
+
+    def test_an_event_without_a_mode_is_refused(self) -> None:
+        """The mode is required: a line written before it existed fails to load rather than reading as live."""
+        base_fields = _Shared.make_base_fields()
+        del base_fields["mode"]
+        with pytest.raises(ValidationError):
+            PipeStartEvent(
+                **base_fields,
+                node_id=_Shared.NODE_ID,
+                pipe_code="noop_pipe",
+                pipe_type="PipeNoop",
+                node_kind=NodeKind.OPERATOR,
+            )
 
     def test_all_event_kinds_covered(self) -> None:
         """Every TraceEventKind has a corresponding test case and event class."""

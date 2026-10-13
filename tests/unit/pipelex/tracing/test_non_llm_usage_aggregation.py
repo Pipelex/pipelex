@@ -21,6 +21,7 @@ from pipelex.cogt.usage.cost_registry import CostRegistry, ModelUsageKey
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.trace_events import UsageReportEvent
 from pipelex.tracing.usage_aggregator import UsageAggregator
 
@@ -36,6 +37,7 @@ def _usage_event(tokens_usage: AnyTokensUsage, sequence: int) -> UsageReportEven
         writer_id="act_test",
         timestamp=datetime.now(UTC),
         sequence=sequence,
+        mode=PipeRunMode.LIVE,
         node_id=f"g:node_{sequence}",
         tokens_usage=tokens_usage,
     )

@@ -8,6 +8,7 @@ from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.graph.graphspec import NodeKind
 from pipelex.system.job_metadata import JobCategory, JobMetadata, RunMetadata, UnitJobId
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsArch, UsageStatsIntegration, UsageStatsOs, UsageStatsSurface
 from pipelex.system.usage_stats.usage_stats_events import CommonProperties, UsageStatsEvent, make_envelope
 from pipelex.tracing.trace_events import PipeStartEvent, UsageReportEvent
@@ -50,6 +51,7 @@ def llm_usage_event(
         workflow_id="direct",
         timestamp=datetime.now(UTC),
         sequence=sequence,
+        mode=PipeRunMode.LIVE,
         node_id=f"{USAGE_STATS_RUN_ID}:node_{sequence}",
         tokens_usage=tokens_usage,
     )
@@ -61,6 +63,7 @@ def pipe_start_event(*, pipe_type: str, sequence: int) -> PipeStartEvent:
         workflow_id="direct",
         timestamp=datetime.now(UTC),
         sequence=sequence,
+        mode=PipeRunMode.LIVE,
         node_id=f"{USAGE_STATS_RUN_ID}:node_{sequence}",
         pipe_code=f"secret_pipe_{sequence}",
         pipe_type=pipe_type,

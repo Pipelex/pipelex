@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graphspec import EdgeKind, GraphSpecMode, IOSpec, NodeKind, NodeStatus
+from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.unit.pipelex.graph.conftest import make_defaulted_data_inclusion_config
 
 
@@ -39,11 +40,12 @@ class TestGraphTracer:
 
     def test_setup_with_dry_mode_stamps_graphspec_meta(self) -> None:
         tracer = GraphTracer()
-        tracer.setup(
+        context = tracer.setup(
             graph_id="test-graph-dry",
             data_inclusion=make_defaulted_data_inclusion_config(),
-            mode=GraphSpecMode.DRY,
+            run_mode=PipeRunMode.DRY,
         )
+        assert context.run_mode == PipeRunMode.DRY
 
         graph_spec = tracer.teardown()
 
@@ -396,7 +398,7 @@ class TestGraphTracer:
         tracer.add_selected_outcome_edge(
             condition_node_id=condition_id,
             outcome_node_id=outcome_id,
-            outcome_value="true",
+            selected_outcome="true",
         )
 
         tracer.on_pipe_end_success(node_id=condition_id, ended_at=started_at + timedelta(milliseconds=25))

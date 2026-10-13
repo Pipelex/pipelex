@@ -472,19 +472,14 @@ class PipeCondition(PipeController):
         evaluated_expression = await self._evaluate_expression(working_memory=working_memory)
         # Select the outcome based on the evaluated expression
         outcome = self.outcome_map.get(evaluated_expression, self.default_outcome)
-
-        # Capture execution data for the graph tracer
-        execution_data_dict: dict[str, Any] = {
-            "evaluated_expression": evaluated_expression,
-            "selected_outcome": str(outcome),
-        }
+        # The condition records its choice the moment it makes it, before the chosen pipe starts.
+        self._record_resolution(job_metadata=job_metadata, evaluated_expression=evaluated_expression, outcome=outcome)
 
         # Handle continue case (phase 1): `continue` resolves the declared output as
         # ABSENT — a declared-absent record with provenance, memory otherwise unchanged. A previous
         # main stuff stays under its own name (the migration idiom: consume it explicitly
         # downstream); it no longer passes through as this pipe's output.
         if SpecialOutcome.is_continue(outcome):
-            self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
             # The reason names only the pipe and the outcome: a pipe that force-unwraps this output quotes it to the caller
             # under STRICT disclosure, and the value the expression rendered can be literal text of a condition a host
             # library declared. The execution data above keeps that value.
@@ -496,7 +491,6 @@ class PipeCondition(PipeController):
             return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.run_metadata.pipeline_run_id)
 
         if SpecialOutcome.is_fail(outcome):
-            self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
             # The caller's method maps this outcome to 'fail' on purpose, a refusal of the run it was given. The
             # message names only the pipe: the value the expression rendered can be literal text of the expression,
             # or an outcome key, of a condition a host library declared. The execution data above keeps that value.
@@ -540,7 +534,7 @@ class PipeCondition(PipeController):
                 )
             )
 
-        pipe_output = await get_pipe_router().run(
+        return await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code=outcome),
                 job_metadata=job_metadata,
@@ -550,8 +544,37 @@ class PipeCondition(PipeController):
                 library_crate=library_crate,
             ),
         )
+
+    def _record_resolution(self, *, job_metadata: JobMetadata, evaluated_expression: str, outcome: str) -> None:
+        """Record the outcome a live run chose, in the execution data and as the condition's resolution trace event.
+
+        The execution data keeps the value the expression rendered and the outcome it selected, a pipe code or a special
+        outcome. The trace event names the outcome by the key of the outcome map the value matched, or by None when it
+        matched none and the default outcome was taken, since `"default"` can itself be a key.
+
+        Args:
+            job_metadata: The condition's job metadata, whose trace context names its graph node.
+            evaluated_expression: The value the condition's expression rendered.
+            outcome: The outcome selected: a pipe code, `continue` or `fail`.
+        """
+        execution_data_dict: dict[str, Any] = {
+            "evaluated_expression": evaluated_expression,
+            "selected_outcome": outcome,
+        }
         self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
-        return pipe_output
+        trace_context = job_metadata.trace_context
+        if trace_context is None or trace_context.parent_node_id is None:
+            return
+        tracer_manager = GraphTracerManager.get_instance()
+        if tracer_manager is None:
+            return
+        tracer_manager.register_condition_resolution(
+            lookup_key=trace_context.lookup_key,
+            condition_node_id=trace_context.parent_node_id,
+            rendered_value=evaluated_expression,
+            selected_outcome=evaluated_expression if evaluated_expression in self.outcome_map else None,
+            runs_pipe=not (SpecialOutcome.is_continue(outcome) or SpecialOutcome.is_fail(outcome)),
+        )
 
     @override
     async def _dry_run_controller_pipe(

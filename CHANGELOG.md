@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`condition_resolved` and `batch_fanned_out` trace events**: a live `PipeCondition` writes `condition_resolved` the moment it chooses, before the chosen pipe starts, with the `rendered_value` its expression rendered and the `selected_outcome` key of the outcome map it matched, `null` when it took the default outcome, and the start of the chosen pipe draws the `selected_outcome` edge from the condition, labelled with that key, which no run drew before; a `PipeBatch` writes `batch_fanned_out` once it knows its width, before any item starts, with `item_count`, `branch_pipe_code`, `branch_pipe_ref` and `branch_pipe_type`. A dry run resolves no condition, so it writes no `condition_resolved`, and both graph builders build the same graph as before from the events.
+- **`step_count` and `branch_count` on `pipe_start`**: a `PipeSequence`'s start event states the number of steps its author wrote, the binding of a dotted `batch_over` not among them, and a `PipeParallel`'s the number of its branches; both are `null` on every other pipe.
+
+### Changed
+
+- **Every trace event states its `mode` (Breaking)**: each trace event carries `mode`, `live` or `dry`, which the run's `TraceContext` carries as the new `run_mode`, so a usage event an activity writes states it too; an event stored without it by an earlier version is refused with `EventLogSchemaMismatchError` rather than read as live, and a consumer that builds trace events passes it. `GraphTracerManager.open_tracer` and `GraphTracerProtocol.setup` take `run_mode: PipeRunMode` in place of `mode: GraphSpecMode`, and a workflow opening a tracer of its own for part of a run passes the `run_mode` of the context it received.
+- **Controllers register their execution data as they decide (Breaking)**: a `PipeSequence` registers `step_count` as it starts, now the number of steps its author wrote, and the new `current_step` as each step starts; a `PipeParallel` registers its `branch_count`, `add_each_output` and `combined_output_concept` before its branches run, a `PipeBatch` its `item_count` and `branch_pipe_code` before its items run, and a live `PipeCondition` its `evaluated_expression` and `selected_outcome` before the chosen pipe runs, where each used to register them once it had finished. `GraphTracerProtocol` adds `register_batch_fan_out` and `register_condition_resolution`, and `add_selected_outcome_edge` takes `selected_outcome: str | None` in place of `outcome_value`.
+
 ## [v0.85.1] - 2026-10-12
 
 ### Fixed

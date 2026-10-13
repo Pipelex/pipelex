@@ -7,8 +7,9 @@ from pipelex import log
 from pipelex.graph.condition_output_merge import ConditionOutputMerge
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol
-from pipelex.graph.graphspec import GraphSpec, GraphSpecMode, IOSpec, NodeKind
+from pipelex.graph.graphspec import GraphSpec, IOSpec, NodeKind
 from pipelex.system.data_inclusion_config import DataInclusionConfig
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.singleton import ABCSingletonMeta, MetaSingleton
 from pipelex.system.trace_context import TraceContext
 from pipelex.tools.log.error_fields import error_fields
@@ -107,7 +108,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         emit_graph_events: bool = True,
         emit_usage_events: bool = True,
         describe_pipe_io: bool = True,
-        mode: GraphSpecMode = GraphSpecMode.LIVE,
+        run_mode: PipeRunMode = PipeRunMode.LIVE,
     ) -> TraceContext:
         """Create and initialize a new tracer for a pipeline run.
 
@@ -131,7 +132,9 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             describe_pipe_io: Whether the run builds the I/O artifacts describing its graphspec's
                 data. Read by the run, never by the tracer, so it is stamped on the context here
                 rather than threaded into setup.
-            mode: Provenance mode to stamp onto generated GraphSpecs.
+            run_mode: Whether the run is live or a dry run: stamped on every trace event and on the returned
+                TraceContext, and turned into the provenance mode of the generated GraphSpec. A workflow that opens
+                a tracer of its own for part of a run passes the mode of the context it received.
 
         Returns:
             Initial TraceContext to pass through JobMetadata.
@@ -172,7 +175,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             pipeline_run_id=pipeline_run_id,
             emit_graph_events=emit_graph_events,
             emit_usage_events=emit_usage_events,
-            mode=mode,
+            run_mode=run_mode,
         )
         # Set the tracer_key on the TraceContext so downstream lookups use the same key
         if tracer_key is not None:
@@ -242,6 +245,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         concept_data: list[dict[str, Any]] | None = None,
         description: str | None = None,
         domain_code: str | None = None,
+        step_count: int | None = None,
+        branch_count: int | None = None,
     ) -> tuple[str | None, TraceContext | None]:
         """Record the start of a pipe execution.
 
@@ -256,6 +261,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             concept_data: Optional list of serialized concept dicts for the concept registry.
             description: Optional human-readable pipe description (mirrored onto NodeSpec).
             domain_code: Optional domain code of the pipe (mirrored onto NodeSpec).
+            step_count: On a PipeSequence, the number of steps its author wrote.
+            branch_count: On a PipeParallel, the number of its branches.
 
         Returns:
             Tuple of (node_id, child_trace_context) if tracing is active, (None, None) otherwise.
@@ -275,6 +282,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             concept_data=concept_data,
             description=description,
             domain_code=domain_code,
+            step_count=step_count,
+            branch_count=branch_count,
         )
 
     def on_pipe_end_success(
@@ -528,3 +537,62 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         if tracer is None:
             return
         tracer.register_condition_output_merge(merge=merge)
+
+    def register_batch_fan_out(
+        self,
+        *,
+        lookup_key: str,
+        batch_node_id: str,
+        item_count: int,
+        branch_pipe_code: str,
+        branch_pipe_ref: str,
+        branch_pipe_type: str,
+    ) -> None:
+        """Register that a PipeBatch knows how many items it runs, before it starts any of them.
+
+        Args:
+            lookup_key: The tracer lookup key.
+            batch_node_id: The PipeBatch's node ID.
+            item_count: The number of items the batch runs.
+            branch_pipe_code: The bare code of the pipe each item runs.
+            branch_pipe_ref: The `domain.code` reference of the pipe each item runs.
+            branch_pipe_type: The type of the pipe each item runs.
+        """
+        tracer = self._get_tracer(lookup_key)
+        if tracer is None:
+            return
+        tracer.register_batch_fan_out(
+            batch_node_id=batch_node_id,
+            item_count=item_count,
+            branch_pipe_code=branch_pipe_code,
+            branch_pipe_ref=branch_pipe_ref,
+            branch_pipe_type=branch_pipe_type,
+        )
+
+    def register_condition_resolution(
+        self,
+        *,
+        lookup_key: str,
+        condition_node_id: str,
+        rendered_value: str,
+        selected_outcome: str | None,
+        runs_pipe: bool,
+    ) -> None:
+        """Register that a live PipeCondition has chosen its outcome, before the chosen pipe starts.
+
+        Args:
+            lookup_key: The tracer lookup key.
+            condition_node_id: The PipeCondition's node ID.
+            rendered_value: The value the condition's expression rendered.
+            selected_outcome: The outcome-map key the value matched, or None when the default outcome was taken.
+            runs_pipe: Whether the chosen outcome runs a pipe, whose start then draws the SELECTED_OUTCOME edge.
+        """
+        tracer = self._get_tracer(lookup_key)
+        if tracer is None:
+            return
+        tracer.register_condition_resolution(
+            condition_node_id=condition_node_id,
+            rendered_value=rendered_value,
+            selected_outcome=selected_outcome,
+            runs_pipe=runs_pipe,
+        )

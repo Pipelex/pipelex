@@ -170,6 +170,20 @@ class PipeAbstract(ABC, BaseModel):
         # overrides this to True. (`pipe_category` no longer encodes signature-ness.)
         return False
 
+    def traced_step_count(self) -> int | None:
+        """The number of steps a sequence's author wrote, which the trace records on the pipe's start.
+
+        None for every pipe that runs no steps; `PipeSequence` overrides it.
+        """
+        return None
+
+    def traced_branch_count(self) -> int | None:
+        """The number of branches a parallel runs, which the trace records on the pipe's start.
+
+        None for every pipe that runs no branches; `PipeParallel` overrides it.
+        """
+        return None
+
     def pipe_dependencies(self) -> set[str]:
         """Return the set of pipe codes that this pipe depends on.
 
@@ -787,6 +801,8 @@ class PipeAbstract(ABC, BaseModel):
                     concept_data=concept_data,
                     description=self.description,
                     domain_code=self.domain_code,
+                    step_count=self.traced_step_count(),
+                    branch_count=self.traced_branch_count(),
                 )
                 # Update job metadata with child trace context for nested pipes
                 if child_trace_context is not None:

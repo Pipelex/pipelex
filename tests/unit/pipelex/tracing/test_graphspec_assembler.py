@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from pipelex.graph.graphspec import EdgeKind, ErrorSpec, GraphSpecMode, IOSpec, NodeKind, NodeStatus
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
 from pipelex.tracing.trace_events import (
     BatchAggregateEvent,
@@ -48,6 +49,7 @@ def _base(workflow_id: str, sequence: int, timestamp_offset: int = 0) -> dict[st
         "workflow_id": workflow_id,
         "timestamp": _time_at(timestamp_offset or sequence),
         "sequence": sequence,
+        "mode": PipeRunMode.LIVE,
     }
 
 

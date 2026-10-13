@@ -1,5 +1,5 @@
 import sys
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import PrivateAttr, field_validator
 from typing_extensions import override
@@ -88,6 +88,11 @@ class PipeSequence(PipeController):
     def _step_number(self, *, step_index: int) -> int:
         """The number messages give a step: its place among the steps the author wrote, counting from 1."""
         return authored_step_number(steps=self.sequential_sub_pipes, step_index=step_index)
+
+    @override
+    def traced_step_count(self) -> int:
+        """The number of steps the author wrote: the binding written for a dotted `batch_over` is no step of theirs."""
+        return sum(1 for step in self.sequential_sub_pipes if not (isinstance(step, BindingStep) and step.is_dotted_batch_over))
 
     @property
     def has_binding_step(self) -> bool:
@@ -1032,9 +1037,17 @@ class PipeSequence(PipeController):
         typed_flow: SequenceTypedFlow | None = None
         # By step index, each binding the run derived from the value its root held, the flow having no spec for that root.
         runtime_bindings: dict[int, DerivedBinding] = {}
+        # The sequence records how many steps it runs as it starts, and the number of each step as that step starts.
+        self._register_execution_data(job_metadata=job_metadata, execution_data={"step_count": self.traced_step_count()})
+        current_step: int | None = None
 
         for sub_pipe_index, sub_pipe in enumerate(self.sequential_sub_pipes):
             is_last_step = sub_pipe_index == len(self.sequential_sub_pipes) - 1
+            step_number = self._step_number(step_index=sub_pipe_index)
+            # The binding written for a dotted `batch_over` shares the number of the batch step after it: one record each.
+            if step_number != current_step:
+                current_step = step_number
+                self._register_execution_data(job_metadata=job_metadata, execution_data={"current_step": step_number})
             if isinstance(sub_pipe, BindingStep):
                 if typed_flow is None:
                     typed_flow = self.build_typed_flow()
@@ -1066,11 +1079,6 @@ class PipeSequence(PipeController):
                 library_crate=library_crate,
             )
             evolving_memory = pipe_output.working_memory
-        # Capture execution data for the graph tracer
-        execution_data_dict: dict[str, Any] = {
-            "step_count": len(self.sequential_sub_pipes),
-        }
-        self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
 
         return PipeOutput(
             working_memory=evolving_memory,

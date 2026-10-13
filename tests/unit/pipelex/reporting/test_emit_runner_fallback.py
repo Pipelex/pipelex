@@ -30,6 +30,7 @@ from pipelex.system.configuration.configs import NdjsonTracingConfig, TracingBac
 from pipelex.system.data_inclusion_config import DataInclusionConfig
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.system.job_metadata import JobMetadata, RunMetadata, UnitJobId
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
 from pipelex.tracing import activity_event_log
 from pipelex.tracing.activity_event_log import ActivityEventLogCache
@@ -81,6 +82,7 @@ def _make_trace_context(
     graph_id: str,
     parent_node_id: str | None = "g:node_0",
     tracer_key: str | None = None,
+    run_mode: PipeRunMode = PipeRunMode.LIVE,
 ) -> TraceContext:
     return TraceContext(
         graph_id=graph_id,
@@ -88,6 +90,7 @@ def _make_trace_context(
         parent_node_id=parent_node_id,
         node_sequence=0,
         data_inclusion=DATA_INCLUSION_OFF,
+        run_mode=run_mode,
     )
 
 
@@ -138,6 +141,22 @@ class TestEmitRunnerFallback:
         assert usage_events[0].pipeline_run_id == "run_abc"
         assert usage_events[0].node_id == "g:node_2"
         assert usage_events[0].writer_id.startswith("act_")
+
+    def test_fallback_states_the_run_mode_of_the_trace_context(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+    ) -> None:
+        """An activity's usage event states the mode its trace context carries, since it holds nothing else of the run."""
+        _enable_ndjson_tracing(mocker, tmp_path)
+
+        manager = ReportingManager()
+        manager.setup()
+        trace_context = _make_trace_context(graph_id="run_dry", tracer_key="wf_dry", run_mode=PipeRunMode.DRY)
+        manager.report_inference_job(_make_llm_job("run_dry", trace_context=trace_context))
+
+        usage_events = [evt for evt in NdjsonEventLog(traces_dir=str(tmp_path)).read_events("run_dry") if isinstance(evt, UsageReportEvent)]
+        assert [evt.mode for evt in usage_events] == [PipeRunMode.DRY]
 
     def test_runner_fallback_uses_tracer_key_when_set(
         self,

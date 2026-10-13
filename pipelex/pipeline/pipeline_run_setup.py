@@ -387,7 +387,7 @@ async def pipeline_run_setup(
                 emit_usage_events=is_generate_usage,
                 # The I/O artifacts are the graphspec's companions: a run that writes no graphspec builds none.
                 describe_pipe_io=is_generate_graph and execution_config.graph.graphs_inclusion.graphspec_json,
-                mode=pipe_run_mode.graphspec_mode,
+                run_mode=pipe_run_mode,
             )
 
         # Register the event log on the report delegate for usage event emission — only when cost reporting

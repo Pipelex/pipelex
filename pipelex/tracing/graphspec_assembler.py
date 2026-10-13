@@ -33,8 +33,10 @@ from pipelex.graph.graphspec import (
 from pipelex.tracing.trace_events import (
     UNATTRIBUTED_NODE_ID,
     BatchAggregateEvent,
+    BatchFannedOutEvent,
     BatchItemEvent,
     ConditionOutputMergeEvent,
+    ConditionResolvedEvent,
     ControllerOutputEvent,
     EdgeEvent,
     ExecutionDataEvent,
@@ -221,6 +223,11 @@ class _AssemblerState:
                 self._handle_execution_data(event)
             elif isinstance(event, UsageReportEvent):
                 self._handle_usage_report(event)
+            elif isinstance(event, BatchFannedOutEvent | ConditionResolvedEvent):
+                # The decisions a controller records as it makes them are for the readers following a run while it goes
+                # on. The graph already holds what they say: a batch's items as its children, and a live condition's
+                # choice as the SELECTED_OUTCOME edge its EdgeEvent carries.
+                pass
             else:
                 log.warning("A trace event of a type the assembler does not handle was dropped", fields={"trace_event_type": type(event).__name__})
 
