@@ -47,6 +47,9 @@ def llm_usage_event(
         },
     )
     return UsageReportEvent(
+        attempt=1,
+        lineage=[],
+        path=None,
         pipeline_run_id=USAGE_STATS_RUN_ID,
         workflow_id="direct",
         timestamp=datetime.now(UTC),
@@ -59,6 +62,10 @@ def llm_usage_event(
 
 def pipe_start_event(*, pipe_type: str, sequence: int) -> PipeStartEvent:
     return PipeStartEvent(
+        attempt=1,
+        lineage=[],
+        path=None,
+        pipe_ref=None,
         pipeline_run_id=USAGE_STATS_RUN_ID,
         workflow_id="direct",
         timestamp=datetime.now(UTC),

@@ -1,11 +1,12 @@
 """Unit tests for GraphTracer."""
 
+import logging
 from datetime import UTC, datetime, timedelta
 
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graphspec import EdgeKind, GraphSpecMode, IOSpec, NodeKind, NodeStatus
 from pipelex.system.pipe_run_mode import PipeRunMode
-from tests.unit.pipelex.graph.conftest import make_defaulted_data_inclusion_config
+from tests.unit.pipelex.graph.conftest import make_defaulted_data_inclusion_config, make_trace_context
 
 
 class TestGraphTracer:
@@ -68,6 +69,7 @@ class TestGraphTracer:
 
         started_at = datetime.now(UTC)
         node_id, child_context = tracer.on_pipe_start(
+            pipe_ref="tests.test_pipe",
             trace_context=context,
             pipe_code="test_pipe",
             pipe_type="PipeLLM",
@@ -111,6 +113,7 @@ class TestGraphTracer:
         # Start parent (sequence controller)
         started_at = datetime.now(UTC)
         parent_id, parent_child_ctx = tracer.on_pipe_start(
+            pipe_ref="tests.my_sequence",
             trace_context=context,
             pipe_code="my_sequence",
             pipe_type="PipeSequence",
@@ -120,7 +123,8 @@ class TestGraphTracer:
 
         # Start child 1 (operator)
         child1_id, _child1_ctx = tracer.on_pipe_start(
-            trace_context=parent_child_ctx,
+            pipe_ref="tests.llm_step_1",
+            trace_context=parent_child_ctx.with_child_segment(segment="step_1"),
             pipe_code="llm_step_1",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -134,7 +138,8 @@ class TestGraphTracer:
 
         # Start child 2 (operator)
         child2_id, _child2_ctx = tracer.on_pipe_start(
-            trace_context=parent_child_ctx,
+            pipe_ref="tests.llm_step_2",
+            trace_context=parent_child_ctx.with_child_segment(segment="step_2"),
             pipe_code="llm_step_2",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -164,6 +169,79 @@ class TestGraphTracer:
         assert {edge.source for edge in edges} == {parent_id}
         assert {edge.target for edge in edges} == {child1_id, child2_id}
 
+    def test_a_pipe_started_without_its_place_is_traced_without_a_path(self, invocation_path_faults: list[logging.LogRecord]) -> None:
+        """Tracing never fails a run: a pipe whose controller handed it no segment is traced without a path, and so is
+        every pipe under it, which cannot be placed either, and the tracer logs each fault as an error.
+        """
+        tracer = GraphTracer()
+        context = tracer.setup(graph_id="unplaced-test", data_inclusion=make_defaulted_data_inclusion_config(), run_mode=PipeRunMode.LIVE)
+        started_at = datetime.now(UTC)
+
+        entry_id, entry_ctx = tracer.on_pipe_start(
+            pipe_ref="tests.my_sequence",
+            trace_context=context,
+            pipe_code="my_sequence",
+            pipe_type="PipeSequence",
+            node_kind=NodeKind.CONTROLLER,
+            started_at=started_at,
+        )
+        placed_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.step_one",
+            trace_context=entry_ctx.with_child_segment(segment="step_1"),
+            pipe_code="step_one",
+            pipe_type="PipeCompose",
+            node_kind=NodeKind.OPERATOR,
+            started_at=started_at,
+        )
+        unplaced_id, unplaced_ctx = tracer.on_pipe_start(
+            pipe_ref="tests.step_two",
+            trace_context=entry_ctx,
+            pipe_code="step_two",
+            pipe_type="PipeSequence",
+            node_kind=NodeKind.CONTROLLER,
+            started_at=started_at,
+        )
+        under_unplaced_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.leaf",
+            trace_context=unplaced_ctx.with_child_segment(segment="step_1"),
+            pipe_code="leaf",
+            pipe_type="PipeCompose",
+            node_kind=NodeKind.OPERATOR,
+            started_at=started_at,
+        )
+        for node_id in (under_unplaced_id, unplaced_id, placed_id, entry_id):
+            tracer.on_pipe_end_success(node_id=node_id, ended_at=started_at + timedelta(milliseconds=10))
+        graph_spec = tracer.teardown()
+
+        assert graph_spec is not None
+        assert {node.node_id: node.path for node in graph_spec.nodes} == {
+            entry_id: "tests.my_sequence",
+            placed_id: "tests.my_sequence/step_1",
+            unplaced_id: None,
+            under_unplaced_id: None,
+        }
+        faults = [(record.levelno, getattr(record, "pipe_ref", None), getattr(record, "node_id", None)) for record in invocation_path_faults]
+        assert faults == [(logging.ERROR, "tests.step_two", unplaced_id), (logging.ERROR, "tests.leaf", under_unplaced_id)]
+        invocation_path_faults.clear()
+
+    def test_an_inactive_tracer_derives_no_path(self) -> None:
+        """An inactive tracer records nothing, so it derives nothing that could fail the run, even from a context that
+        could place no pipe.
+        """
+        unplaceable_context = make_trace_context().with_child_segment(segment="step_1")
+
+        node_id, child_context = GraphTracer().on_pipe_start(
+            pipe_ref="tests.step_one",
+            trace_context=unplaceable_context,
+            pipe_code="step_one",
+            pipe_type="PipeCompose",
+            node_kind=NodeKind.OPERATOR,
+            started_at=datetime.now(UTC),
+        )
+
+        assert node_id == "test-graph:node_0"
+        assert (child_context.parent_node_id, child_context.parent_path, child_context.child_segment) == (node_id, None, None)
+
     def test_error_tracking(self) -> None:
         """Test tracking failed pipe execution."""
         tracer = GraphTracer()
@@ -171,6 +249,7 @@ class TestGraphTracer:
 
         started_at = datetime.now(UTC)
         node_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.failing_pipe",
             trace_context=context,
             pipe_code="failing_pipe",
             pipe_type="PipeFunc",
@@ -203,6 +282,7 @@ class TestGraphTracer:
 
         started_at = datetime.now(UTC)
         node_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.lifted_pipe",
             trace_context=context,
             pipe_code="lifted_pipe",
             pipe_type="PipeFunc",
@@ -234,6 +314,7 @@ class TestGraphTracer:
 
         started_at = datetime.now(UTC)
         producer_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.lifted_plural_pipe",
             trace_context=context,
             pipe_code="lifted_plural_pipe",
             pipe_type="PipeFunc",
@@ -248,6 +329,7 @@ class TestGraphTracer:
         )
 
         consumer_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.items_consumer",
             trace_context=context,
             pipe_code="items_consumer",
             pipe_type="PipeFunc",
@@ -276,6 +358,7 @@ class TestGraphTracer:
 
         started_at = datetime.now(UTC)
         producer_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.maybe_producer",
             trace_context=context,
             pipe_code="maybe_producer",
             pipe_type="PipeCondition",
@@ -289,6 +372,7 @@ class TestGraphTracer:
         )
 
         consumer_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.verdict_consumer",
             trace_context=context,
             pipe_code="verdict_consumer",
             pipe_type="PipeLLM",
@@ -314,6 +398,7 @@ class TestGraphTracer:
 
         started_at = datetime.now(UTC)
         _node_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.stuck_pipe",
             trace_context=context,
             pipe_code="stuck_pipe",
             pipe_type="PipeLLM",
@@ -337,6 +422,7 @@ class TestGraphTracer:
 
         started_at = datetime.now(UTC)
         node1_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.pipe_1",
             trace_context=context,
             pipe_code="pipe_1",
             pipe_type="PipeLLM",
@@ -346,6 +432,7 @@ class TestGraphTracer:
         tracer.on_pipe_end_success(node_id=node1_id, ended_at=started_at + timedelta(milliseconds=10))
 
         node2_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.pipe_2",
             trace_context=context,
             pipe_code="pipe_2",
             pipe_type="PipeLLM",
@@ -379,6 +466,7 @@ class TestGraphTracer:
 
         started_at = datetime.now(UTC)
         condition_id, cond_ctx = tracer.on_pipe_start(
+            pipe_ref="tests.my_condition",
             trace_context=context,
             pipe_code="my_condition",
             pipe_type="PipeCondition",
@@ -387,7 +475,8 @@ class TestGraphTracer:
         )
 
         outcome_id, _ = tracer.on_pipe_start(
-            trace_context=cond_ctx,
+            pipe_ref="tests.outcome_true",
+            trace_context=cond_ctx.with_child_segment(segment="step_1"),
             pipe_code="outcome_true",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -423,6 +512,7 @@ class TestGraphTracer:
 
         started_at = datetime.now(UTC)
         node_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.test_pipe",
             trace_context=context,
             pipe_code="test_pipe",
             pipe_type="PipeLLM",
@@ -456,6 +546,7 @@ class TestGraphTracer:
 
         started_at = datetime.now(UTC)
         node_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.summarize",
             trace_context=context,
             pipe_code="summarize",
             pipe_type="PipeLLM",
@@ -486,6 +577,7 @@ class TestGraphTracer:
 
         # Pipe 1: produces stuff with digest "stuff_001"
         node1_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.producer_pipe",
             trace_context=context,
             pipe_code="producer_pipe",
             pipe_type="PipeLLM",
@@ -500,6 +592,7 @@ class TestGraphTracer:
 
         # Pipe 2: consumes stuff with digest "stuff_001"
         node2_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.consumer_pipe",
             trace_context=context,
             pipe_code="consumer_pipe",
             pipe_type="PipeLLM",
@@ -530,6 +623,7 @@ class TestGraphTracer:
 
         # Pipe consumes stuff that wasn't produced by any tracked pipe
         node_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.consumer_only",
             trace_context=context,
             pipe_code="consumer_only",
             pipe_type="PipeLLM",
@@ -557,6 +651,7 @@ class TestGraphTracer:
 
         # Pipe produces and consumes the same stuff (shouldn't happen, but guard against it)
         node_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.self_ref_pipe",
             trace_context=context,
             pipe_code="self_ref_pipe",
             pipe_type="PipeLLM",
@@ -586,6 +681,7 @@ class TestGraphTracer:
 
         # Producer pipe
         producer_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.producer",
             trace_context=context,
             pipe_code="producer",
             pipe_type="PipeLLM",
@@ -600,6 +696,7 @@ class TestGraphTracer:
 
         # Consumer 1
         consumer1_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.consumer_1",
             trace_context=context,
             pipe_code="consumer_1",
             pipe_type="PipeLLM",
@@ -611,6 +708,7 @@ class TestGraphTracer:
 
         # Consumer 2
         consumer2_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.consumer_2",
             trace_context=context,
             pipe_code="consumer_2",
             pipe_type="PipeLLM",
@@ -644,6 +742,7 @@ class TestGraphTracer:
 
         # PipeBatch that consumes the list
         batch_id, batch_ctx = tracer.on_pipe_start(
+            pipe_ref="tests.my_batch",
             trace_context=context,
             pipe_code="my_batch",
             pipe_type="PipeBatch",
@@ -654,7 +753,8 @@ class TestGraphTracer:
 
         # Branch 0: processes item 0
         branch0_id, _ = tracer.on_pipe_start(
-            trace_context=batch_ctx,
+            pipe_ref="tests.branch_pipe",
+            trace_context=batch_ctx.with_child_segment(segment="step_1"),
             pipe_code="branch_pipe",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -669,7 +769,8 @@ class TestGraphTracer:
 
         # Branch 1: processes item 1
         branch1_id, _ = tracer.on_pipe_start(
-            trace_context=batch_ctx,
+            pipe_ref="tests.branch_pipe",
+            trace_context=batch_ctx.with_child_segment(segment="step_2"),
             pipe_code="branch_pipe",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -728,6 +829,7 @@ class TestGraphTracer:
 
         # PipeBatch that produces the output list
         batch_id, batch_ctx = tracer.on_pipe_start(
+            pipe_ref="tests.my_batch",
             trace_context=context,
             pipe_code="my_batch",
             pipe_type="PipeBatch",
@@ -738,7 +840,8 @@ class TestGraphTracer:
 
         # Branch 0: produces item 0
         branch0_id, _ = tracer.on_pipe_start(
-            trace_context=batch_ctx,
+            pipe_ref="tests.branch_pipe",
+            trace_context=batch_ctx.with_child_segment(segment="step_1"),
             pipe_code="branch_pipe",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -752,7 +855,8 @@ class TestGraphTracer:
 
         # Branch 1: produces item 1
         branch1_id, _ = tracer.on_pipe_start(
-            trace_context=batch_ctx,
+            pipe_ref="tests.branch_pipe",
+            trace_context=batch_ctx.with_child_segment(segment="step_2"),
             pipe_code="branch_pipe",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -806,6 +910,7 @@ class TestGraphTracer:
 
         # PipeBatch
         batch_id, batch_ctx = tracer.on_pipe_start(
+            pipe_ref="tests.my_batch",
             trace_context=context,
             pipe_code="my_batch",
             pipe_type="PipeBatch",
@@ -816,7 +921,8 @@ class TestGraphTracer:
 
         # Branch 0
         branch0_id, _ = tracer.on_pipe_start(
-            trace_context=batch_ctx,
+            pipe_ref="tests.process_item",
+            trace_context=batch_ctx.with_child_segment(segment="step_1"),
             pipe_code="process_item",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -900,6 +1006,7 @@ class TestGraphTracer:
 
         # PipeBatch that consumes the list
         batch_id, batch_ctx = tracer.on_pipe_start(
+            pipe_ref="tests.my_batch",
             trace_context=context,
             pipe_code="my_batch",
             pipe_type="PipeBatch",
@@ -910,7 +1017,8 @@ class TestGraphTracer:
 
         # Branch: processes item
         branch_id, _ = tracer.on_pipe_start(
-            trace_context=batch_ctx,
+            pipe_ref="tests.branch_pipe",
+            trace_context=batch_ctx.with_child_segment(segment="step_1"),
             pipe_code="branch_pipe",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -957,6 +1065,7 @@ class TestGraphTracer:
 
         # PipeBatch
         batch_id, batch_ctx = tracer.on_pipe_start(
+            pipe_ref="tests.my_batch",
             trace_context=context,
             pipe_code="my_batch",
             pipe_type="PipeBatch",
@@ -967,7 +1076,8 @@ class TestGraphTracer:
 
         # Branch: produces item
         branch_id, _ = tracer.on_pipe_start(
-            trace_context=batch_ctx,
+            pipe_ref="tests.branch_pipe",
+            trace_context=batch_ctx.with_child_segment(segment="step_1"),
             pipe_code="branch_pipe",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -1015,6 +1125,7 @@ class TestGraphTracer:
 
         # Controller node (e.g., PipeParallel)
         controller_id, ctrl_ctx = tracer.on_pipe_start(
+            pipe_ref="tests.my_parallel",
             trace_context=context,
             pipe_code="my_parallel",
             pipe_type="PipeParallel",
@@ -1025,7 +1136,8 @@ class TestGraphTracer:
 
         # Branch 1: produces output with digest "branch_output_1"
         branch1_id, _ = tracer.on_pipe_start(
-            trace_context=ctrl_ctx,
+            pipe_ref="tests.branch_pipe_1",
+            trace_context=ctrl_ctx.with_child_segment(segment="step_1"),
             pipe_code="branch_pipe_1",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -1040,7 +1152,8 @@ class TestGraphTracer:
 
         # Branch 2: produces output with digest "branch_output_2"
         branch2_id, _ = tracer.on_pipe_start(
-            trace_context=ctrl_ctx,
+            pipe_ref="tests.branch_pipe_2",
+            trace_context=ctrl_ctx.with_child_segment(segment="step_2"),
             pipe_code="branch_pipe_2",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -1065,6 +1178,7 @@ class TestGraphTracer:
 
         # Consumer pipe that uses branch_output_1
         consumer_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.consumer_pipe",
             trace_context=context,
             pipe_code="consumer_pipe",
             pipe_type="PipeLLM",
@@ -1112,6 +1226,7 @@ class TestGraphTracer:
 
         # Producer pipe creates stuff with digest "original_stuff"
         producer_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.producer",
             trace_context=context,
             pipe_code="producer",
             pipe_type="PipeLLM",
@@ -1126,6 +1241,7 @@ class TestGraphTracer:
 
         # Controller consumes "original_stuff" and its main_stuff is the same
         controller_id, _ctrl_ctx = tracer.on_pipe_start(
+            pipe_ref="tests.my_parallel",
             trace_context=context,
             pipe_code="my_parallel",
             pipe_type="PipeParallel",
@@ -1143,6 +1259,7 @@ class TestGraphTracer:
 
         # Consumer should still get the edge from the original producer, not the controller
         consumer_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.consumer",
             trace_context=context,
             pipe_code="consumer",
             pipe_type="PipeLLM",
@@ -1183,6 +1300,7 @@ class TestGraphTracer:
 
         # Controller with multiple outputs
         controller_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.multi_output_pipe",
             trace_context=context,
             pipe_code="multi_output_pipe",
             pipe_type="PipeParallel",
@@ -1211,6 +1329,7 @@ class TestGraphTracer:
 
         # Consumer A reads digest_a
         consumer_a_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.consumer_a",
             trace_context=context,
             pipe_code="consumer_a",
             pipe_type="PipeLLM",
@@ -1222,6 +1341,7 @@ class TestGraphTracer:
 
         # Consumer B reads digest_b
         consumer_b_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.consumer_b",
             trace_context=context,
             pipe_code="consumer_b",
             pipe_type="PipeLLM",
@@ -1233,6 +1353,7 @@ class TestGraphTracer:
 
         # Consumer C reads digest_c
         consumer_c_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.consumer_c",
             trace_context=context,
             pipe_code="consumer_c",
             pipe_type="PipeLLM",

@@ -225,6 +225,14 @@ Every `EdgeSpec` also carries an `optional` boolean (default `false`). On a `DAT
 
 A `SKIPPED` node also carries `skip_reason` (a human-readable sentence naming the absent input, e.g. `skipped because input 'source' is absent`). A lifted pipe with a plural output still writes a real empty-list value, so its node registers that output and downstream `DATA` edges resolve normally; a lifted singular output is a recorded absence with no output spec.
 
+A failed node's `error` carries `caller_facing`, true when its `message` was written for the caller: the error report of the error the pipe raised says so in its `caller_facing_message`, as the run's own failure report does. A reader that shows failures to a caller under the strict disclosure shows the message only when it is true. Tracing never changes how a run fails: the report is built while the pipe's error is on its way to the caller (`pipelex/graph/traced_failure.py`), so when building it raises, the fault is logged as an error, the node records the error's text with `caller_facing` false, and the run fails with the pipe's own error.
+
+### Node Paths
+
+Every node that runs a pipe carries its `path`, the [invocation path](#invocation-paths) of that run of the pipe, which names it the same way in every run of the method, live or dry, on every engine. A binding step's node runs no pipe and has no path. The `node_id` stays the graph's own key, unique within one graph and different from one run to the next; the path is the name a reader joins the views of a run on.
+
+A `node_id`, like an `edge_id`, names the attempt that minted it (`make_trace_id_prefix`, `pipelex/system/trace_context.py`). Each attempt of an execution numbers its nodes and edges from 0, so the id carries the whole [chain](#executions-and-their-attempts): `<graph_id>:<workflow_id>:attempt_<n>:node_<k>` for the run's own workflow, followed after the attempt by `:lineage_<16 hex digits>`, the start of the SHA-256 digest of its lineage's key, for a workflow another one dispatched. Two attempts of one workflow, and a workflow that two attempts of its dispatcher dispatched under the same name, therefore mint different ids, and a reader keyed on `node_id` never merges a lost attempt's failed node with the one its retry ran. The direct mode's one execution, in its first attempt, mints `<graph_id>:node_<k>`.
+
 ---
 
 ## Implementation
@@ -252,6 +260,7 @@ job_metadata = JobMetadata(
 node_id, child_context = manager.on_pipe_start(
     trace_context=trace_context,
     pipe_code="extract_text",
+    pipe_ref="my_domain.extract_text",  # names the entry pipe in every path; None for a binding step
     pipe_type="PipeExtract",
     node_kind=NodeKind.OPERATOR,
     started_at=datetime.now(timezone.utc),
@@ -274,7 +283,7 @@ graph_spec = manager.close_tracer(pipeline_run_id)
 
 Trace events travel through an `EventLogProtocol` backend (`pipelex/tracing/`): the tracer emits events into it during the run (write side, wired in `pipeline_run_setup`), and `assemble_tracing` reads them back after the run to build the `GraphSpec` and usage aggregates (read side, triggered from `PipeRun.run`). Both sides normally build their backend instance independently from `tracing_config` via `make_event_log` — NDJSON files or DynamoDB bridge the two instances through external storage.
 
-The DynamoDB backend (`pipelex/tracing/dynamodb_event_log.py`) writes each event as one item keyed by the run (`PK = PIPELINE_RUN#{pipeline_run_id}`, `SK = EVENT#{workflow_id}#{writer_id}#{sequence}`), and every item carries a `ttl` in epoch seconds, set to the time of the write plus `runtime.tracing.dynamodb.retention_days` (30 days by default). DynamoDB deletes an item once its `ttl` has passed, provided the table names `ttl` as its TTL attribute, so a run's events, which by default hold its full output data, are not kept forever. The retention counts from the write rather than from the event's own `timestamp`, and a Temporal replay that re-emits an event overwrites the same item, pushing its expiry back by no more than the time between the two writes. A reader that needs a run's events, such as the graph and usage assembly, must therefore read them within the retention. Only the items written by a version that sets `ttl` expire: an item an earlier version wrote has no `ttl`, so it stays in the table until it is deleted or given one.
+The DynamoDB backend (`pipelex/tracing/dynamodb_event_log.py`) writes each event as one item keyed by the run (`PK = PIPELINE_RUN#{pipeline_run_id}`, `SK = EVENT#{chain_digest}#{writer_id}#{sequence}`, see [Executions and Their Attempts](#executions-and-their-attempts)), and every item carries a `ttl` in epoch seconds, set to the time of the write plus `runtime.tracing.dynamodb.retention_days` (30 days by default). DynamoDB deletes an item once its `ttl` has passed, provided the table names `ttl` as its TTL attribute, so a run's events, which by default hold its full output data, are not kept forever. The retention counts from the write rather than from the event's own `timestamp`, and a Temporal replay that re-emits an event overwrites the same item, pushing its expiry back by no more than the time between the two writes. A reader that needs a run's events, such as the graph and usage assembly, must therefore read them within the retention. Only the items written by a version that sets `ttl` expire: an item an earlier version wrote has no `ttl`, so it stays in the table until it is deleted or given one.
 
 The assembled usage rides back on `pipe_output.tokens_usages` (with any assembly failure on `usage_assembly_error`), which the sync `/execute` response returns directly. For delivery-enabled runs (a storage target set), the delivery executor (`pipelex/pipe_run/delivery_executor.py`) also persists it as a `tokens_usages.json` result artifact — `{"tokens_usages": [...], "usage_assembly_error": null}` — next to `working_memory.json`, the `main_stuff.*` renders, and the graph outputs (`graphspec.json` with its three companions `pipe_io_contracts.json`, `input_form.json` and `output_form.json`, see [Outputs](#outputs)), so a durable client polling result files gets the same usage records a sync caller does. The artifact is written unconditionally on every successful result delivery: explicit nulls mean usage assembly was off for that run. A failed run stores no result files at all, so an absent `tokens_usages.json` means either the run failed or it was delivered before the artifact existed — tell those apart from the delivery status, not from the file's presence.
 
@@ -300,10 +309,16 @@ This is what lets a graph-producing dry-run trace entirely in memory (no NDJSON 
 
 The tracer writes one event for each thing that happens in the run, in the order it happens (`pipelex/tracing/trace_events.py`). Every backend carries the events whole: the NDJSON and DynamoDB logs store each one as its JSON and read it back through the discriminated union `AnyTraceEvent`, and the in-memory and buffering logs hold the objects themselves. Every event carries these fields:
 
-- `pipeline_run_id`, `workflow_id` and `writer_id`, which name the run, the workflow and the process that wrote it;
+- `pipeline_run_id`, `workflow_id` and `writer_id`, which name the run, the execution that wrote it, never empty and `direct` in direct mode, and the process that wrote it;
+- `attempt`, the attempt of that execution, counting from 1, and `lineage`, the attempts it was dispatched under (see [Executions and Their Attempts](#executions-and-their-attempts));
+- `path`, the [invocation path](#invocation-paths) of the invocation the event is about, `null` for a binding step, which runs no pipe;
 - `timestamp`, and `sequence`, which rises with each event one writer writes;
 - `event_kind`, which tells the event's kind;
 - `mode`, `live` or `dry`, the mode of the run that wrote it.
+
+An event is frozen, since it records what happened, and it computes its chain, its chain key and its store key once, the first time they are read, since every read and every assembly of a run reads them for each of its events; a copy made with `model_copy(update=...)` computes them again from its own fields. An event whose `workflow_id` is empty is refused when it is read, like any event in a shape this version does not accept, with `EventLogSchemaMismatchError`.
+
+Each event kind that the hosted progress contract, which defines the run progress the hosted API reports, maps to a progress event carries that progress event's fields: the contract's `execution` is `workflow_id`, its `at` is `timestamp`, and its `kind` is read off `event_kind`.
 
 The run's `TraceContext` carries the mode as `run_mode`, so a usage event that an activity writes from the context alone states it too. `mode` is required: an event stored by a version that did not write it is refused with `EventLogSchemaMismatchError` rather than read as live, and running the pipeline again writes a log in the current shape. `run_mode` is required too, with no default, on `TraceContext`, on `GraphTracerManager.open_tracer` and on the tracer's `setup`, since a default would stamp a dry run's events as live: whoever opens a trace states the mode, and a workflow that opens a tracer of its own for part of a run passes the `run_mode` of the context it received.
 
@@ -311,10 +326,10 @@ The mode a trace states is the one the run's pipes run in, which is not always t
 
 | `event_kind` | Written when | What it carries |
 |---|---|---|
-| `pipe_start` | A pipe starts | The node, its parent, the pipe's code, type, description and domain, its node kind and its inputs; a `PipeSequence` also states `step_count`, the number of steps its author wrote, and a `PipeParallel` states `branch_count`, the number of its branches, both `null` on every other pipe |
-| `pipe_end_success` | A pipe ends with an output | The node, its end time, its output and its metrics |
-| `pipe_end_error` | A pipe fails | The node, its end time and the error |
-| `pipe_end_skipped` | A pipe is lifted because a plain input is absent | The node, its end time, the reason, and the empty list a plural output still writes |
+| `pipe_start` | A pipe starts | The node, its parent, the pipe's code, its `pipe_ref`, its domain-qualified reference (`null` for a binding step), its type, description and domain, its node kind and its inputs; a `PipeSequence` also states `step_count`, the number of steps its author wrote, and a `PipeParallel` states `branch_count`, the number of its branches, both `null` on every other pipe |
+| `pipe_end_success` | A pipe ends with an output | The node, the pipe's `pipe_code`, `pipe_ref` and `pipe_type`, as its start states them, its end time, its output and its metrics |
+| `pipe_end_error` | A pipe fails | The node, the pipe's code, reference and type, its end time and the error, whose `caller_facing` says whether its message was written for the caller |
+| `pipe_end_skipped` | A pipe is lifted because a plain input is absent | The node, the pipe's code, reference and type, its end time, the reason, and the empty list a plural output still writes |
 | `edge` | The tracer draws an edge | Its source, target, kind, label and stuff digests |
 | `controller_output` | A controller registers an output it produced | The node and the output |
 | `batch_item` | A `PipeBatch` extracts an item from its input list | The list and item digests, the item index and the batch's node |
@@ -332,7 +347,7 @@ A controller records each decision the moment it is final, so a reader following
 
 The controllers register their execution data at the same moments:
 
-- A `PipeSequence` registers `step_count` as it starts, and `current_step`, the step's number among the steps its author wrote, as each step starts. The binding written for a dotted `batch_over` shares the number of the batch step after it.
+- A `PipeSequence` registers `step_count` as it starts. It records no step number as each step starts: the number of a step is in the path of the pipe the step runs, `<sequence path>/step_<n>`.
 - A `PipeParallel` registers `branch_count`, `add_each_output` and `combined_output_concept` before any branch runs.
 - A `PipeBatch` registers `item_count` and `branch_pipe_code` with its fan-out. The two spellings of `branch_pipe_code` differ: the execution data carries the blueprint's field as its author wrote it, which may be domain-qualified, such as `my_domain.summarize`, while the `batch_fanned_out` event's `branch_pipe_code` is always the bare code, `summarize`, with `branch_pipe_ref` the qualified reference, `my_domain.summarize`.
 - A live `PipeCondition` registers `evaluated_expression` and `selected_outcome` with its resolution. Here `selected_outcome` is the outcome itself, the code of the pipe it runs or `continue` or `fail`, where the `condition_resolved` event names the outcome-map key.
@@ -350,17 +365,55 @@ class TraceContext(BaseModel):
     node_sequence: int  # Counter for generating node IDs
     data_inclusion: DataInclusionConfig  # What data to capture
     run_mode: PipeRunMode  # Live or dry, stated on every trace event
+    parent_path: str | None  # Invocation path of the pipe whose children run under this context
+    child_segment: str | None  # Segment a controller gives the next pipe it runs
+    chain: list[ExecutionAttempt]  # The lineage of the writing execution, then its own {execution, attempt}; required
 
-    def copy_for_child(self, child_node_id: str, *, next_sequence: int) -> TraceContext:
-        """Create context for nested pipe execution."""
+    def copy_for_child(self, child_node_id: str, *, next_sequence: int, invocation_path: str | None) -> TraceContext:
+        """Create context for nested pipe execution, under the child's own invocation path."""
         return TraceContext(
             graph_id=self.graph_id,
             parent_node_id=child_node_id,
             node_sequence=next_sequence,
             data_inclusion=self.data_inclusion,
             run_mode=self.run_mode,
+            parent_path=invocation_path,
+            child_segment=None,
+            chain=list(self.chain),
         )
 ```
+
+A controller names the place of each pipe it runs before it runs it: it hands the pipe `job_metadata.for_child_at(segment=...)`, a copy whose trace context carries the segment, and the pipe's start derives its path from the context's `parent_path` and that segment (`TraceContext.invocation_path`). A pipe started under a parent path without a segment, or with a segment and no parent path, cannot be placed: `TraceContext.invocation_path` raises `InvocationPathError`, a fault of the runtime, never of the method. Tracing never fails a run, so the tracer catches it, traces the pipe with a `null` path, which leaves every pipe under it unplaceable too, and logs the fault as an error, `A pipe was traced without its invocation path`, with the pipe's `pipe_ref` and `node_id` in its fields. An inactive tracer and the no-op tracer record nothing and derive no path at all. The invariant that every invocation has a path is enforced by the test suite instead: an autouse fixture in `tests/conftest.py` fails any test during which a tracer logged that fault.
+
+### Invocation Paths
+
+The hosted progress contract names every invocation of a run by its path (`pipelex/system/invocation_path.py`): the run's entry pipe's `pipe_ref`, then one segment per controller level, such as `filings.review_filings/step_3/item_2/step_1`. A path holds no counter, no run-scoped id and no engine's name, so the same invocation has the same path in every run of the same method, live or dry, on every engine.
+
+| Segment | Added by | Names |
+|---|---|---|
+| `step_<n>` | `PipeSequence` | The pipe its step `n` runs, numbered from 1 as the author wrote the steps, binding steps included. The binding written for a dotted `batch_over` is no step of the author's, takes no number and has no path |
+| `branch_<n>` | `PipeParallel` | The pipe of its branch `n`, numbered from 1 in declaration order |
+| `item_<n>` | `PipeBatch` | Its branch pipe, run for item `n` of the list: the item at index 0 is `item_1` |
+| `outcome_<key>` | `PipeCondition` | The pipe of one outcome group: the outcomes that run one pipe, the default included, form one group, named by the first key of the outcome map that runs it, percent-encoded (`high risk` gives `outcome_high%20risk`). Outcomes are grouped by the pipe the library resolves each to, however they spell it, so a dependency's pipe written `alias->domain.code` by one outcome and `alias->code` by another is one group |
+| `default` | `PipeCondition` | The pipe of its default outcome, when no key runs that pipe |
+
+A step or a branch that batches runs as the `PipeBatch` the runtime makes for it, at the step's or the branch's segment, with its items under it. A live condition, which takes one group, and a dry one, which runs the pipe of every group once (`PipeCondition.outcome_group_pipes`), name each pipe by the same path.
+
+A path is absolute whichever execution emits it. A batch item that runs as an execution of its own receives its item's place with its input: the item's `JobMetadata` carries the trace context whose `parent_path` is the batch's path and whose `child_segment` is `item_<n>`, so the execution's tracer, opened with `received_context`, stamps every path under the item's.
+
+### Executions and Their Attempts
+
+An execution is a part of a run that emits events and that its engine runs, and may run again, as a whole: the run's own workflow, and each batch item a distributed engine runs as a child workflow. In direct mode the whole run is one execution, `direct`. Each run of an execution is an attempt, numbered from 1.
+
+`GraphTracerManager.open_tracer` takes the execution as `workflow_id`, which must be the id the engine keeps across attempts, the attempt as `attempt`, and, for an execution another one dispatched, the trace context it received as `received_context`. A received context naming a place hands the new execution the dispatcher's chain as its `lineage`; the run's own workflow receives a context naming no place, and its lineage is empty. Every event the tracer writes stamps `workflow_id`, `attempt` and `lineage`, and so does every usage event, which takes them from the chain of the trace context it is reported under: `ReportingManager.set_event_log` takes no workflow id.
+
+`TraceContext.chain` is therefore required, with no default, as `run_mode` is: a context that defaulted to the direct mode's chain would write the usage of a durable workflow's second attempt under `direct@1`, a chain no attempt of that workflow has: no later attempt would supersede it, and the store keys would no longer tell the two attempts' usage apart. A tracer's `setup` states the chain on the context it returns; a host that builds a context of its own, as one driving the [kernel](pipelex-kernel.md) does, states it too, `make_direct_chain()` in a single process.
+
+A higher attempt of an execution, dispatched under the same attempts, supersedes the earlier one and everything it dispatched, at any depth (`pipelex/system/execution_chain.py`, `current_chain_keys`). The assembler builds the graph from current events only, so a retried invocation appears once, at its path, and a lost attempt leaves no failed node behind; the graph's `created_at` is the timestamp of its earliest current event, so an attempt lost long before its retry does not date it either. A superseded attempt's inference was spent all the same, so its usage still counts in the run's total, as unattributed usage.
+
+The event logs keep every attempt's events: their dedup key is the event's chain, its writer, its kind and its sequence (`TraceEvent.store_key`), since attempts of one execution number their events from the same start. The chain key reads `<execution>@<attempt>` for each entry of the chain, percent-encoded and joined by `/`. The DynamoDB log's sort key is `EVENT#<chain digest>#<writer_id>#<sequence>`, the chain digest being the SHA-256 hex digest of the chain key and the sequence zero-padded to ten digits: the chain key grows with the lineage and with the length of its workflow ids, while DynamoDB refuses a sort key over 1,024 bytes, so the digest keeps the key one length at any depth, and, being the same for the same chain, lets a replayed write overwrite its own row. The row's chain is read back from its payload, which holds the whole event. A row an earlier version wrote, whose event carries no `attempt`, `lineage` or `path`, is refused with `EventLogSchemaMismatchError` when it is read, as in every event log, rather than deduplicated against a current row; the schema is the backend's own, and no other writer's is promised to match it. Every event log returns a run's events by one rule, `deduplicate_and_order_events` (`pipelex/tracing/event_log_protocol.py`): one event per store key, ordered by chain, then sequence, then writer, whatever order its store holds them in, which for DynamoDB is the order of the digests. The deduplication drops the second write of an event that a replay wrote again, which a log that appends holds twice; the DynamoDB log's key already keeps one row per event.
+
+The NDJSON log writes one file per attempt of each execution and per writer, `<pipeline_run_id>/wf_<workflow_id>__c_<chain digest>.ndjson`, with `__w_<writer_id>` before the extension for a writer other than `primary`, the chain digest being the one the DynamoDB sort key carries. Two attempts of one workflow, or a workflow that a new attempt dispatched again under the same name while its predecessor still drains, may write at once through handles of their own; naming the file by the chain keeps them from appending to one file, where their partial lines could interleave and leave the whole run's log unreadable. The reader reads every `.ndjson` file of the run's directory.
 
 ### Producer/Consumer Paradigm
 

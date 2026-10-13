@@ -5,8 +5,9 @@ from typing import Any
 
 from typing_extensions import override
 
+from pipelex import log
 from pipelex.graph.condition_output_merge import ConditionOutputMerge, apply_condition_output_merges
-from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol
+from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol, invocation_path_of_start
 from pipelex.graph.graphspec import (
     EdgeKind,
     EdgeSpec,
@@ -24,8 +25,10 @@ from pipelex.graph.graphspec import (
 )
 from pipelex.graph.selected_outcome import derive_selected_outcome_edges
 from pipelex.system.data_inclusion_config import DataInclusionConfig
+from pipelex.system.exceptions import InvocationPathError
+from pipelex.system.execution_chain import ExecutionAttempt
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.trace_context import TraceContext
+from pipelex.system.trace_context import TraceContext, make_trace_id_prefix
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # ruff: ignore[typing-only-first-party-import] - used in __init__ annotations
 from pipelex.tracing.trace_events import (
     BatchAggregateEvent,
@@ -44,6 +47,29 @@ from pipelex.tracing.trace_events import (
     TraceEvent,
 )
 
+INVOCATION_PATH_FAULT_MESSAGE = "A pipe was traced without its invocation path"
+"""The error a tracer logs when it cannot derive an invocation's path; the test suite fails any test that logs it."""
+
+
+def _derive_invocation_path(*, trace_context: TraceContext, pipe_ref: str | None, pipe_type: str, node_kind: NodeKind, node_id: str) -> str | None:
+    """The invocation path of a node started under `trace_context`, or None when it has none.
+
+    A binding step runs no pipe, so it has no path. Every invocation has one, given by the segment its controller hands
+    it through `JobMetadata.for_child_at`; a controller that hands it none is a fault of the runtime, never of the
+    method, and tracing never fails a run for it: the node is traced without a path, its children cannot be placed
+    either, and the fault is logged as an error. The test suite fails any test that logs it (`tests/conftest.py`), which
+    is where the invariant that every invocation has a path is enforced.
+    """
+    try:
+        return invocation_path_of_start(trace_context=trace_context, pipe_ref=pipe_ref, node_kind=node_kind)
+    except InvocationPathError:
+        log.error(
+            INVOCATION_PATH_FAULT_MESSAGE,
+            fields={"pipe_ref": pipe_ref, "pipe_type": pipe_type, "node_id": node_id},
+            include_exception=True,
+        )
+        return None
+
 
 class _MutableNodeData:
     """Internal mutable data structure for building a node before finalization."""
@@ -51,7 +77,9 @@ class _MutableNodeData:
     def __init__(
         self,
         node_id: str,
+        path: str | None,
         pipe_code: str,
+        pipe_ref: str | None,
         pipe_type: str,
         node_kind: NodeKind,
         started_at: datetime,
@@ -61,7 +89,9 @@ class _MutableNodeData:
         domain_code: str | None = None,
     ) -> None:
         self.node_id = node_id
+        self.path = path
         self.pipe_code = pipe_code
+        self.pipe_ref = pipe_ref
         self.pipe_type = pipe_type
         self.node_kind = node_kind
         self.started_at = started_at
@@ -97,6 +127,7 @@ class _MutableNodeData:
 
         return NodeSpec(
             node_id=self.node_id,
+            path=self.path,
             kind=self.node_kind,
             pipe_code=self.pipe_code,
             pipe_type=self.pipe_type,
@@ -155,8 +186,16 @@ class GraphTracer(GraphTracerProtocol):
         self._emit_graph_events: bool = True
         # Event log for distributed tracing (None = no event emission, direct mode)
         self._event_log: EventLogProtocol | None = None
-        # "direct" for single-process mode, full Temporal workflow ID otherwise
+        # "direct" for single-process mode, the workflow's id otherwise: it names the events' execution, the same in
+        # each of its attempts
         self._workflow_id: str = "direct"
+        # The attempt of that workflow its engine runs, and the attempts it was dispatched under (empty for the run's own)
+        self._attempt: int = 1
+        self._lineage: list[ExecutionAttempt] = []
+        # The prefix of every node and edge id this attempt mints, which names the trace and the chain, so that no two
+        # attempts of one execution, and no two executions dispatched under the same name by different attempts, share
+        # an id (`make_trace_id_prefix`)
+        self._id_prefix: str = ""
         # Pipeline run ID for event emission
         self._pipeline_run_id: str | None = None
         # Per-writer monotonic counter for event sequencing
@@ -210,21 +249,24 @@ class GraphTracer(GraphTracerProtocol):
         assert self._event_log is not None
         return self._event_log.writer_id
 
+    def _path_of(self, *, node_id: str | None) -> str | None:
+        """The invocation path of a node this tracer started, or None for any other node and for one that runs no pipe."""
+        if node_id is None:
+            return None
+        node_data = self._nodes.get(node_id)
+        if node_data is None:
+            return None
+        return node_data.path
+
     def _make_node_id(self) -> str:
-        """Generate a node ID, including workflow_id when in Temporal mode."""
-        if self._workflow_id != "direct":
-            node_id = f"{self._graph_id}:{self._workflow_id}:node_{self._node_sequence}"
-        else:
-            node_id = f"{self._graph_id}:node_{self._node_sequence}"
+        """Generate a node ID, unique to this attempt's chain: the prefix names the trace and the chain."""
+        node_id = f"{self._id_prefix}:node_{self._node_sequence}"
         self._node_sequence += 1
         return node_id
 
     def _make_edge_id(self) -> str:
-        """Generate an edge ID, including workflow_id when in Temporal mode."""
-        if self._workflow_id != "direct":
-            edge_id = f"{self._graph_id}:{self._workflow_id}:edge_{self._edge_sequence}"
-        else:
-            edge_id = f"{self._graph_id}:edge_{self._edge_sequence}"
+        """Generate an edge ID, unique to this attempt's chain: the prefix names the trace and the chain."""
+        edge_id = f"{self._id_prefix}:edge_{self._edge_sequence}"
         self._edge_sequence += 1
         return edge_id
 
@@ -238,6 +280,8 @@ class GraphTracer(GraphTracerProtocol):
         pipeline_ref_main_pipe: str | None = None,
         event_log: "EventLogProtocol | None" = None,
         workflow_id: str = "direct",
+        attempt: int = 1,
+        lineage: list[ExecutionAttempt] | None = None,
         pipeline_run_id: str | None = None,
         emit_graph_events: bool = True,
         emit_usage_events: bool = True,
@@ -252,8 +296,14 @@ class GraphTracer(GraphTracerProtocol):
             pipeline_ref_main_pipe: Optional main pipe name.
             event_log: Optional event log for distributed tracing. When set,
                 every tracing method emits a TraceEvent as a side effect.
-            workflow_id: Temporal workflow ID or "direct" for single-process mode.
-                When not "direct", node/edge IDs include the workflow_id segment.
+            workflow_id: The id of the workflow whose code emits the events, the same in each of its attempts, or
+                "direct" for single-process mode. It names the events' execution. Outside the direct mode's first
+                attempt, node and edge IDs name the chain: the workflow, its attempt and a digest of its lineage
+                (`make_trace_id_prefix`).
+            attempt: The attempt of that workflow its engine runs, counting from 1, stamped on every event; 1 in
+                single-process mode.
+            lineage: The attempts the workflow was dispatched under, from the run's own down to the one that
+                dispatched it, stamped on every event; None or empty for the run's own workflow.
             pipeline_run_id: Pipeline run ID for event emission. Required when event_log is set.
             emit_graph_events: Whether this run assembles a GraphSpec. When False (costs-only mode),
                 teardown skips the discarded spec build; the returned TraceContext carries the flag.
@@ -281,6 +331,10 @@ class GraphTracer(GraphTracerProtocol):
         self._condition_output_merges = []
         self._event_log = event_log
         self._workflow_id = workflow_id
+        self._attempt = attempt
+        self._lineage = list(lineage or [])
+        chain = [*self._lineage, ExecutionAttempt(execution=workflow_id, attempt=attempt)]
+        self._id_prefix = make_trace_id_prefix(graph_id=graph_id, chain=chain)
         self._pipeline_run_id = pipeline_run_id
         self._event_sequence = 0
         self._pipe_registry = {}
@@ -296,6 +350,7 @@ class GraphTracer(GraphTracerProtocol):
             emit_graph_events=emit_graph_events,
             emit_usage_events=emit_usage_events,
             run_mode=run_mode,
+            chain=chain,
         )
 
     @override
@@ -359,6 +414,9 @@ class GraphTracer(GraphTracerProtocol):
             self._event_log.close()
         self._event_log = None
         self._workflow_id = "direct"
+        self._attempt = 1
+        self._lineage = []
+        self._id_prefix = ""
         self._pipeline_run_id = None
         self._event_sequence = 0
         self._pipe_registry = {}
@@ -554,6 +612,9 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
+                    attempt=self._attempt,
+                    lineage=list(self._lineage),
+                    path=self._path_of(node_id=batch_controller_node_id),
                     mode=self._run_mode,
                     timestamp=datetime.now(UTC),
                     sequence=self._next_event_sequence(),
@@ -599,6 +660,9 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
+                    attempt=self._attempt,
+                    lineage=list(self._lineage),
+                    path=self._path_of(node_id=batch_controller_node_id),
                     mode=self._run_mode,
                     timestamp=datetime.now(UTC),
                     sequence=self._next_event_sequence(),
@@ -643,6 +707,9 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
+                    attempt=self._attempt,
+                    lineage=list(self._lineage),
+                    path=self._path_of(node_id=parallel_controller_node_id),
                     mode=self._run_mode,
                     timestamp=datetime.now(UTC),
                     sequence=self._next_event_sequence(),
@@ -675,6 +742,9 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
+                    attempt=self._attempt,
+                    lineage=list(self._lineage),
+                    path=self._path_of(node_id=merge.condition_node_id),
                     mode=self._run_mode,
                     timestamp=datetime.now(UTC),
                     sequence=self._next_event_sequence(),
@@ -715,6 +785,9 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
+                    attempt=self._attempt,
+                    lineage=list(self._lineage),
+                    path=self._path_of(node_id=batch_node_id),
                     mode=self._run_mode,
                     timestamp=datetime.now(UTC),
                     sequence=self._next_event_sequence(),
@@ -759,6 +832,9 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
+                    attempt=self._attempt,
+                    lineage=list(self._lineage),
+                    path=self._path_of(node_id=condition_node_id),
                     mode=self._run_mode,
                     timestamp=datetime.now(UTC),
                     sequence=self._next_event_sequence(),
@@ -774,6 +850,7 @@ class GraphTracer(GraphTracerProtocol):
         trace_context: TraceContext,
         *,
         pipe_code: str,
+        pipe_ref: str | None,
         pipe_type: str,
         node_kind: NodeKind,
         started_at: datetime,
@@ -785,20 +862,31 @@ class GraphTracer(GraphTracerProtocol):
         step_count: int | None = None,
         branch_count: int | None = None,
     ) -> tuple[str, TraceContext]:
-        """Record the start of a pipe execution."""
+        """Record the start of a pipe execution.
+
+        The node's invocation path is derived here, from the path of the invocation it runs under and the segment its
+        controller gave it, or from its own `pipe_ref` for the run's entry pipe; the pipes it runs continue it. Tracing
+        never fails a run: an inactive tracer records nothing and derives no path, and a node whose path cannot be
+        derived is traced without one (see `_derive_invocation_path`).
+        """
         if not self._is_active:
             # Return dummy values when not active
             node_id = trace_context.make_node_id()
-            child_context = trace_context.copy_for_child(node_id, next_sequence=trace_context.node_sequence + 1)
+            child_context = trace_context.copy_for_child(node_id, next_sequence=trace_context.node_sequence + 1, invocation_path=None)
             return node_id, child_context
 
-        # Generate node ID (includes workflow_id in Temporal mode)
+        # Generate node ID (names the chain outside the direct mode's first attempt)
         node_id = self._make_node_id()
+        invocation_path = _derive_invocation_path(
+            trace_context=trace_context, pipe_ref=pipe_ref, pipe_type=pipe_type, node_kind=node_kind, node_id=node_id
+        )
 
         # Create mutable node data
         node_data = _MutableNodeData(
             node_id=node_id,
+            path=invocation_path,
             pipe_code=pipe_code,
+            pipe_ref=pipe_ref,
             pipe_type=pipe_type,
             node_kind=node_kind,
             started_at=started_at,
@@ -828,12 +916,16 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
+                    attempt=self._attempt,
+                    lineage=list(self._lineage),
+                    path=node_data.path,
                     mode=self._run_mode,
                     timestamp=started_at,
                     sequence=self._next_event_sequence(),
                     node_id=node_id,
                     parent_node_id=trace_context.parent_node_id,
                     pipe_code=pipe_code,
+                    pipe_ref=pipe_ref,
                     pipe_type=pipe_type,
                     node_kind=node_kind,
                     description=description,
@@ -858,6 +950,7 @@ class GraphTracer(GraphTracerProtocol):
         child_context = trace_context.copy_for_child(
             child_node_id=node_id,
             next_sequence=self._node_sequence,
+            invocation_path=invocation_path,
         )
 
         return node_id, child_context
@@ -884,6 +977,9 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
+                    attempt=self._attempt,
+                    lineage=list(self._lineage),
+                    path=node_data.path,
                     mode=self._run_mode,
                     timestamp=datetime.now(UTC),
                     sequence=self._next_event_sequence(),
@@ -945,10 +1041,16 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
+                    attempt=self._attempt,
+                    lineage=list(self._lineage),
+                    path=node_data.path,
                     mode=self._run_mode,
                     timestamp=ended_at,
                     sequence=self._next_event_sequence(),
                     node_id=node_id,
+                    pipe_code=node_data.pipe_code,
+                    pipe_ref=node_data.pipe_ref,
+                    pipe_type=node_data.pipe_type,
                     ended_at=ended_at,
                     output_spec=output_spec,
                     metrics=metrics or {},
@@ -991,6 +1093,9 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
+                    attempt=self._attempt,
+                    lineage=list(self._lineage),
+                    path=node_data.path,
                     mode=self._run_mode,
                     timestamp=datetime.now(UTC),
                     sequence=self._next_event_sequence(),
@@ -1008,6 +1113,7 @@ class GraphTracer(GraphTracerProtocol):
         error_type: str,
         error_message: str,
         error_stack: str | None = None,
+        caller_facing: bool = False,
     ) -> None:
         """Record failed completion of a pipe execution."""
         if not self._is_active:
@@ -1023,6 +1129,7 @@ class GraphTracer(GraphTracerProtocol):
             error_type=error_type,
             message=error_message,
             stack=error_stack,
+            caller_facing=caller_facing,
         )
         node_data.error = error
 
@@ -1033,10 +1140,16 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
+                    attempt=self._attempt,
+                    lineage=list(self._lineage),
+                    path=node_data.path,
                     mode=self._run_mode,
                     timestamp=ended_at,
                     sequence=self._next_event_sequence(),
                     node_id=node_id,
+                    pipe_code=node_data.pipe_code,
+                    pipe_ref=node_data.pipe_ref,
+                    pipe_type=node_data.pipe_type,
                     ended_at=ended_at,
                     error=error,
                 )
@@ -1091,10 +1204,16 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
+                    attempt=self._attempt,
+                    lineage=list(self._lineage),
+                    path=node_data.path,
                     mode=self._run_mode,
                     timestamp=ended_at,
                     sequence=self._next_event_sequence(),
                     node_id=node_id,
+                    pipe_code=node_data.pipe_code,
+                    pipe_ref=node_data.pipe_ref,
+                    pipe_type=node_data.pipe_type,
                     ended_at=ended_at,
                     skip_reason=skip_reason,
                     output_spec=output_spec,
@@ -1139,6 +1258,9 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
+                    attempt=self._attempt,
+                    lineage=list(self._lineage),
+                    path=self._path_of(node_id=target_node_id),
                     mode=self._run_mode,
                     timestamp=datetime.now(UTC),
                     sequence=self._next_event_sequence(),

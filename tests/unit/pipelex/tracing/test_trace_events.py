@@ -5,14 +5,17 @@ from typing import Any, ClassVar
 
 import pytest
 from pydantic import TypeAdapter, ValidationError
+from pytest_mock import MockerFixture
 
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.graph.condition_output_merge import ConditionOutputMerge, ConditionOutputTyping
 from pipelex.graph.graphspec import EdgeKind, ErrorSpec, IOSpec, NodeKind
+from pipelex.system.execution_chain import ExecutionAttempt
 from pipelex.system.job_metadata import JobCategory, JobMetadata, RunMetadata, UnitJobId
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.tracing import trace_events as trace_events_module
 from pipelex.tracing.trace_events import (
     AnyTraceEvent,
     BatchAggregateEvent,
@@ -42,12 +45,16 @@ class _Shared:
     TIMESTAMP = datetime(2025, 6, 15, 10, 30, 0, tzinfo=UTC)
     NODE_ID = "graph_1:wf_pipe_router_xyz:node_0"
     PARENT_NODE_ID = "graph_1:wf_pipe_router_xyz:node_1"
+    PATH = "records.review_records/step_2/item_3"
 
     @staticmethod
     def make_base_fields(sequence: int = 0) -> dict[str, Any]:
         return {
             "pipeline_run_id": _Shared.PIPELINE_RUN_ID,
             "workflow_id": _Shared.WORKFLOW_ID,
+            "attempt": 2,
+            "lineage": [ExecutionAttempt(execution="wf_run", attempt=1)],
+            "path": _Shared.PATH,
             "timestamp": _Shared.TIMESTAMP,
             "sequence": sequence,
             "mode": PipeRunMode.LIVE,
@@ -70,6 +77,7 @@ class _Shared:
             error_type="LLMError",
             message="Model returned an error",
             stack="Traceback (most recent call last):\n  File ...",
+            caller_facing=True,
         )
 
     @staticmethod
@@ -107,6 +115,7 @@ class TestTraceEvents:
                 "node_id": _Shared.NODE_ID,
                 "parent_node_id": _Shared.PARENT_NODE_ID,
                 "pipe_code": "gen_summary",
+                "pipe_ref": "records.gen_summary",
                 "pipe_type": "PipeLLM",
                 "node_kind": NodeKind.OPERATOR,
                 "input_specs": [_Shared.make_io_spec()],
@@ -117,6 +126,9 @@ class TestTraceEvents:
             TraceEventKind.PIPE_END_SUCCESS,
             {
                 "node_id": _Shared.NODE_ID,
+                "pipe_code": "gen_summary",
+                "pipe_ref": "records.gen_summary",
+                "pipe_type": "PipeLLM",
                 "ended_at": _Shared.TIMESTAMP,
                 "output_spec": _Shared.make_io_spec(name="output_text", digest="def456"),
                 "metrics": {"tokens": 150.0},
@@ -127,6 +139,9 @@ class TestTraceEvents:
             TraceEventKind.PIPE_END_ERROR,
             {
                 "node_id": _Shared.NODE_ID,
+                "pipe_code": "gen_summary",
+                "pipe_ref": "records.gen_summary",
+                "pipe_type": "PipeLLM",
                 "ended_at": _Shared.TIMESTAMP,
                 "error": _Shared.make_error_spec(),
             },
@@ -136,6 +151,9 @@ class TestTraceEvents:
             TraceEventKind.PIPE_END_SKIPPED,
             {
                 "node_id": _Shared.NODE_ID,
+                "pipe_code": "gen_summary",
+                "pipe_ref": "records.gen_summary",
+                "pipe_type": "PipeLLM",
                 "ended_at": _Shared.TIMESTAMP,
                 "skip_reason": "skipped because input 'source' is absent",
             },
@@ -293,6 +311,7 @@ class TestTraceEvents:
     def test_pipe_start_with_empty_inputs(self) -> None:
         """PipeStartEvent works with no input specs."""
         event = PipeStartEvent(
+            pipe_ref=None,
             **_Shared.make_base_fields(),
             node_id=_Shared.NODE_ID,
             pipe_code="noop_pipe",
@@ -309,6 +328,9 @@ class TestTraceEvents:
     def test_pipe_end_success_with_no_output(self) -> None:
         """PipeEndSuccessEvent works with no output spec."""
         event = PipeEndSuccessEvent(
+            pipe_code="test_pipe",
+            pipe_ref=None,
+            pipe_type="PipeFunc",
             **_Shared.make_base_fields(),
             node_id=_Shared.NODE_ID,
             ended_at=_Shared.TIMESTAMP,
@@ -333,6 +355,7 @@ class TestTraceEvents:
             extra={"custom_field": "custom_value"},
         )
         event = PipeStartEvent(
+            pipe_ref=None,
             **_Shared.make_base_fields(),
             node_id=_Shared.NODE_ID,
             pipe_code="test_pipe",
@@ -359,6 +382,9 @@ class TestTraceEvents:
             stack="long stack trace here...",
         )
         event = PipeEndErrorEvent(
+            pipe_code="test_pipe",
+            pipe_ref=None,
+            pipe_type="PipeFunc",
             **_Shared.make_base_fields(),
             node_id=_Shared.NODE_ID,
             ended_at=_Shared.TIMESTAMP,
@@ -392,6 +418,7 @@ class TestTraceEvents:
 
     def test_pipe_start_carries_description_and_domain_code(self) -> None:
         event = PipeStartEvent(
+            pipe_ref=None,
             **_Shared.make_base_fields(),
             node_id=_Shared.NODE_ID,
             pipe_code="gen_summary",
@@ -406,6 +433,7 @@ class TestTraceEvents:
 
     def test_pipe_start_description_and_domain_code_default_to_none(self) -> None:
         event = PipeStartEvent(
+            pipe_ref=None,
             **_Shared.make_base_fields(),
             node_id=_Shared.NODE_ID,
             pipe_code="noop_pipe",
@@ -418,6 +446,7 @@ class TestTraceEvents:
 
     def test_pipe_start_description_and_domain_code_round_trip(self) -> None:
         event = PipeStartEvent(
+            pipe_ref=None,
             **_Shared.make_base_fields(),
             node_id=_Shared.NODE_ID,
             pipe_code="gen_summary",
@@ -441,6 +470,7 @@ class TestTraceEvents:
     def test_pipe_start_carries_step_and_branch_counts(self, step_count: int | None, branch_count: int | None) -> None:
         """A sequence states its authored step count and a parallel its branch count as they start; any other pipe states neither."""
         event = PipeStartEvent(
+            pipe_ref=None,
             **_Shared.make_base_fields(),
             node_id=_Shared.NODE_ID,
             pipe_code="controller",
@@ -506,12 +536,54 @@ class TestTraceEvents:
         del base_fields["mode"]
         with pytest.raises(ValidationError):
             PipeStartEvent(
+                pipe_ref=None,
                 **base_fields,
                 node_id=_Shared.NODE_ID,
                 pipe_code="noop_pipe",
                 pipe_type="PipeNoop",
                 node_kind=NodeKind.OPERATOR,
             )
+
+    def test_an_event_naming_no_execution_is_refused(self) -> None:
+        """An empty `workflow_id` names no execution: the event is refused when it is read, never when its chain is."""
+        base_fields: dict[str, Any] = {**_Shared.make_base_fields(), "workflow_id": ""}
+        with pytest.raises(ValidationError, match="workflow_id"):
+            PipeStartEvent(
+                pipe_ref=None,
+                **base_fields,
+                node_id=_Shared.NODE_ID,
+                pipe_code="noop_pipe",
+                pipe_type="PipeNoop",
+                node_kind=NodeKind.OPERATOR,
+            )
+
+    def test_an_event_computes_its_keys_once_and_a_copy_computes_them_again(self, mocker: MockerFixture) -> None:
+        """Every read and every assembly reads an event's keys, so they are computed once; an event is frozen, and a copy
+        made with an update reads its keys from its own fields.
+        """
+        chain_key_spy = mocker.spy(trace_events_module, "execution_chain_key")
+        event = PipeStartEvent(
+            pipe_ref=None,
+            **_Shared.make_base_fields(sequence=4),
+            node_id=_Shared.NODE_ID,
+            pipe_code="noop_pipe",
+            pipe_type="PipeNoop",
+            node_kind=NodeKind.OPERATOR,
+        )
+
+        for _ in range(3):
+            assert event.chain_key == f"wf_run@1/{_Shared.WORKFLOW_ID}@2"
+            assert event.store_key == (f"wf_run@1/{_Shared.WORKFLOW_ID}@2", "primary", "PipeStartEvent", 4)
+        assert chain_key_spy.call_count == 1
+
+        with pytest.raises(ValidationError, match="frozen"):
+            event.attempt = 3  # type: ignore[misc]  # the static read-only error is the runtime contract under test
+        retried = event.model_copy(update={"attempt": 3})
+        assert retried.chain == [ExecutionAttempt(execution="wf_run", attempt=1), ExecutionAttempt(execution=_Shared.WORKFLOW_ID, attempt=3)]
+        assert retried.store_key == (f"wf_run@1/{_Shared.WORKFLOW_ID}@3", "primary", "PipeStartEvent", 4)
+        # The keys are no field: they are neither serialized nor compared.
+        assert "chain_key" not in event.model_dump()
+        assert _any_trace_event_adapter.validate_json(event.model_dump_json()) == event
 
     def test_all_event_kinds_covered(self) -> None:
         """Every TraceEventKind has a corresponding test case and event class."""

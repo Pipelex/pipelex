@@ -51,6 +51,15 @@ class NodeKind(StrEnum):
     # A PipeSequence binding step: it runs no pipe, and produces the stuff it binds from a path in working memory.
     BINDING = "binding"
 
+    @property
+    def is_invocation(self) -> bool:
+        """Whether a node of this kind is the run of a pipe, which an invocation path names."""
+        match self:
+            case NodeKind.PIPE_CALL | NodeKind.CONTROLLER | NodeKind.OPERATOR:
+                return True
+            case NodeKind.INPUT | NodeKind.OUTPUT | NodeKind.ARTIFACT | NodeKind.ERROR | NodeKind.BINDING:
+                return False
+
 
 class NodeStatus(StrEnum):
     """Execution status of a node."""
@@ -279,6 +288,10 @@ class ErrorSpec(BaseModel):
     error_type: str
     message: str
     stack: str | None = None
+    # Whether `message` was written for the caller, as the `caller_facing_message` of the error report of the error the
+    # pipe raised says: a reader that discloses failures to the caller under the strict disclosure shows the message
+    # only when this is true.
+    caller_facing: bool = False
 
     @field_validator("stack", mode="after")
     @classmethod
@@ -424,6 +437,10 @@ class NodeSpec(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, populate_by_name=True)
 
     node_id: str = Field(validation_alias="id", serialization_alias="id")
+    # The invocation path naming the pipe run this node is, the same in every run of the method and on every engine
+    # (`pipelex.system.invocation_path`), beside the run-scoped `node_id`; None for a node that runs no pipe, such as a
+    # binding step.
+    path: str | None = None
     kind: NodeKind = Field(strict=False)
     pipe_code: str | None = None
     pipe_type: str | None = None

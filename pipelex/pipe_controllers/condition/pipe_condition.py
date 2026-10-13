@@ -33,6 +33,7 @@ from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
+from pipelex.system.invocation_path import DEFAULT_OUTCOME_SEGMENT, outcome_segment
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
@@ -542,13 +543,55 @@ class PipeCondition(PipeController):
         return await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=chosen_pipe,
-                job_metadata=job_metadata,
+                job_metadata=job_metadata.for_child_at(segment=self.outcome_group_segment(pipe=chosen_pipe)),
                 working_memory=working_memory,
                 pipe_run_params=pipe_run_params,
                 output_name=output_name,
                 library_crate=library_crate,
             ),
         )
+
+    def outcome_group_segment(self, *, pipe: PipeAbstract) -> str:
+        """The invocation-path segment of the outcome group that runs `pipe`.
+
+        The outcomes that run one pipe form one group, the default included: the group is named by the first key, in the
+        order the outcome map declares them, that runs its pipe, and a group only the default outcome runs is `default`.
+        A live run, which takes one group, and a dry run, which runs the pipe of every group, so name each pipe by the
+        same path. Outcomes are told apart by the pipe the library resolves each to, never by how they spell it: a
+        dependency's pipe may be written `alias->domain.code` in one outcome and `alias->code` in another, and both run
+        the one pipe. An outcome naming no pipe the library holds runs nothing here, so it joins no group.
+
+        Args:
+            pipe: The pipe an outcome runs, as the library resolves it.
+        """
+        for outcome_key, outcome_value in self.outcome_map.items():
+            if outcome_value in SpecialOutcome.value_list():
+                continue
+            if get_optional_pipe(pipe_code=outcome_value) is pipe:
+                return outcome_segment(outcome_key=outcome_key)
+        return DEFAULT_OUTCOME_SEGMENT
+
+    def outcome_group_pipes(self) -> list[PipeAbstract]:
+        """The pipe of each outcome group, once per group, in the order a dry run runs them.
+
+        A dry run cannot know which outcome a live run takes, so it runs the pipe of every group, and runs it once
+        however many outcomes run it and however they spell it: the outcomes are grouped by the pipe the library
+        resolves each to, as `outcome_group_segment` groups them. The groups run in the order of the sorted spellings
+        of their pipes, the default outcome's pipe last, so that the steps after the condition read the value a live
+        run falls back to when nothing matches, and the order is a property of the method rather than of set iteration.
+
+        Raises:
+            PipeNotFoundError: An outcome names a pipe the library does not hold.
+        """
+        pipes_by_visit_key: dict[str, PipeAbstract] = {}
+        for pipe_code in sorted(self.pipe_dependencies()):
+            outcome_pipe = get_required_pipe(pipe_code=pipe_code)
+            pipes_by_visit_key.setdefault(outcome_pipe.visit_key, outcome_pipe)
+        group_pipes = list(pipes_by_visit_key.values())
+        if not self.default_outcome or self.default_outcome in SpecialOutcome.value_list():
+            return group_pipes
+        default_pipe = get_required_pipe(pipe_code=self.default_outcome)
+        return [outcome_pipe for outcome_pipe in group_pipes if outcome_pipe is not default_pipe] + [default_pipe]
 
     def _record_resolution(self, *, job_metadata: JobMetadata, evaluated_expression: str, outcome: str) -> None:
         """Record the outcome a live run chose, in the execution data and as the condition's resolution trace event.
@@ -627,22 +670,21 @@ class PipeCondition(PipeController):
                 )
             )
 
-        # A dry run cannot know which outcome a live run takes, so every pipe outcome runs. Each
-        # outcome but the last runs on a copy of the memory and run params this condition received,
-        # as PipeParallel runs its branches: no outcome sees what a sibling wrote, and the memory
-        # this condition leaves is the one a live run choosing the last outcome would leave. The
-        # last outcome is the default outcome's pipe, so the steps after the condition read the
-        # value a live run falls back to when nothing matches, and the order is a property of the
-        # method rather than of set iteration order. The graph then shows the condition's result
-        # as one stuff that every outcome produces, which the merge registered below records.
+        # A dry run cannot know which outcome a live run takes, so the pipe of every outcome group
+        # runs, once per group (`outcome_group_pipes`). Each group but the last runs on a copy of the
+        # memory and run params this condition received, as PipeParallel runs its branches: no group
+        # sees what a sibling wrote, and the memory this condition leaves is the one a live run
+        # choosing the last group would leave. The last group is the default outcome's, so the steps
+        # after the condition read the value a live run falls back to when nothing matches. The graph
+        # then shows the condition's result as one stuff that every outcome produces, which the merge
+        # registered below records.
         received_stuff_codes = {stuff.stuff_code for stuff in working_memory.root.values()}
         outcome_slots: list[DryRunOutcomeSlot] = []
-        outcome_pipe_codes = self._dry_run_outcome_order()
-        for outcome_index, pipe_code in enumerate(outcome_pipe_codes):
-            is_last_outcome = outcome_index == len(outcome_pipe_codes) - 1
-            outcome_pipe = get_required_pipe(pipe_code=pipe_code)
+        outcome_pipes = self.outcome_group_pipes()
+        for outcome_index, outcome_pipe in enumerate(outcome_pipes):
+            is_last_outcome = outcome_index == len(outcome_pipes) - 1
             outcome_output = await outcome_pipe.run_pipe(
-                job_metadata=job_metadata,
+                job_metadata=job_metadata.for_child_at(segment=self.outcome_group_segment(pipe=outcome_pipe)),
                 working_memory=working_memory if is_last_outcome else working_memory.make_deep_copy(),
                 pipe_run_params=pipe_run_params if is_last_outcome else pipe_run_params.make_deep_copy(),
                 output_name=output_name,
@@ -691,14 +733,6 @@ class PipeCondition(PipeController):
                 reason=f"dry run of PipeCondition '{self.code}': all outcomes are special, the declared output resolves absent",
             )
         return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.run_metadata.pipeline_run_id)
-
-    def _dry_run_outcome_order(self) -> list[str]:
-        """The pipe outcomes in the order a dry run runs them: sorted, with the default outcome's pipe last."""
-        pipe_codes = sorted(self.pipe_dependencies())
-        if self.default_outcome in pipe_codes:
-            pipe_codes.remove(self.default_outcome)
-            pipe_codes.append(self.default_outcome)
-        return pipe_codes
 
     def _register_dry_run_output_merge(
         self,

@@ -415,7 +415,6 @@ async def pipeline_run_setup(
             get_report_delegate().set_event_log(
                 context_key=pipeline_run_id,
                 event_log=event_log,
-                workflow_id="direct",
                 pipeline_run_id=pipeline_run_id,
             )
 

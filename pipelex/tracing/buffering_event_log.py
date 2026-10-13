@@ -8,7 +8,7 @@ import threading
 
 from typing_extensions import override
 
-from pipelex.tracing.event_log_protocol import EventLogProtocol
+from pipelex.tracing.event_log_protocol import EventLogProtocol, deduplicate_and_order_events
 from pipelex.tracing.trace_events import TraceEvent
 
 
@@ -58,8 +58,8 @@ class BufferingEventLog(EventLogProtocol):
 
     @override
     def read_events(self, pipeline_run_id: str) -> list[TraceEvent]:
-        """Return buffered events matching the pipeline_run_id."""
-        return [event for event in self._buffer if event.pipeline_run_id == pipeline_run_id]
+        """Return the buffered events of the run, deduplicated and ordered as every event log returns them."""
+        return deduplicate_and_order_events(events=[event for event in self._buffer if event.pipeline_run_id == pipeline_run_id])
 
     @override
     def close(self) -> None:

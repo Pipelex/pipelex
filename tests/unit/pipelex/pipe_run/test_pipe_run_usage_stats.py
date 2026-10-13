@@ -11,6 +11,7 @@ from pipelex.pipe_run import pipe_run as pipe_run_module
 from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipe_run.tracing_assembly import RunTraceEvents
 from pipelex.system.data_inclusion_config import DataInclusionConfig
+from pipelex.system.execution_chain import make_direct_chain
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.runtime import IntegrationMode
@@ -36,6 +37,7 @@ def _job(*, mocker: MockerFixture, is_traced: bool) -> Any:
         emit_graph_events=False,
         emit_usage_events=True,
         run_mode=PipeRunMode.LIVE,
+        chain=make_direct_chain(),
     )
     job.job_metadata = JobMetadata(
         run_metadata=RunMetadata(user_id="pytest", pipeline_run_id=USAGE_STATS_RUN_ID, storage_scope="test/scope", read_scope=None),

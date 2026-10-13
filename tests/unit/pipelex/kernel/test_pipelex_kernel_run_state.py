@@ -30,6 +30,7 @@ from pipelex.kernel.memory_ops import (
 )
 from pipelex.kernel.pipelex_kernel import PipelexKernel
 from pipelex.system.data_inclusion_config import DataInclusionConfig
+from pipelex.system.execution_chain import make_direct_chain
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
 from pipelex.tools.log.log_context import LogContext, get_log_context
@@ -51,6 +52,7 @@ def _trace_context(*, run_mode: PipeRunMode = PipeRunMode.DRY) -> TraceContext:
         emit_graph_events=False,
         emit_usage_events=True,
         run_mode=run_mode,
+        chain=make_direct_chain(),
     )
 
 

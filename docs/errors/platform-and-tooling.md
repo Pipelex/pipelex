@@ -72,6 +72,7 @@ own page. Classes are grouped by subsystem.
 - [`EnvVarNotFoundError`](env-var-not-found-error.md) — Environment variable not set
 - [`FatalError`](fatal-error.md) — Fatal error
 - [`FuncRegistryError`](func-registry-error.md) — Func registry
+- [`InvocationPathError`](invocation-path-error.md) — Invocation path not derivable
 - [`JobMetadataError`](job-metadata-error.md) — Job metadata
 - [`LangfuseCredentialsError`](langfuse-credentials-error.md) — Langfuse credentials
 - [`MissingDependencyError`](missing-dependency-error.md) — Missing dependency

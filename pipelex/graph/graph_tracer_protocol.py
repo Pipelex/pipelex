@@ -6,9 +6,31 @@ from typing_extensions import override
 from pipelex.graph.condition_output_merge import ConditionOutputMerge
 from pipelex.graph.graphspec import EdgeKind, GraphSpec, IOSpec, NodeKind
 from pipelex.system.data_inclusion_config import DataInclusionConfig
+from pipelex.system.exceptions import InvocationPathError
+from pipelex.system.execution_chain import ExecutionAttempt
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # ruff: ignore[typing-only-first-party-import] - used in setup signature
+
+
+def invocation_path_of_start(*, trace_context: TraceContext, pipe_ref: str | None, node_kind: NodeKind) -> str | None:
+    """The invocation path of a node started under `trace_context`, or None for a node that runs no pipe.
+
+    Args:
+        trace_context: The context the node starts under, carrying its parent's path and the segment its controller
+            gave it.
+        pipe_ref: The `domain.code` reference of the pipe the node runs, which names the run's entry pipe.
+        node_kind: The node's kind: a binding step runs no pipe, so no invocation has its path.
+
+    Raises:
+        InvocationPathError: The node runs a pipe, and either no `pipe_ref` was given or the context cannot place it.
+    """
+    if not node_kind.is_invocation:
+        return None
+    if pipe_ref is None:
+        msg = f"A {node_kind} node was started without the reference of the pipe it runs, so its invocation path cannot be derived."
+        raise InvocationPathError(msg)
+    return trace_context.invocation_path(pipe_ref=pipe_ref)
 
 
 class GraphTracerProtocol(Protocol):
@@ -27,6 +49,8 @@ class GraphTracerProtocol(Protocol):
         pipeline_ref_main_pipe: str | None = None,
         event_log: "EventLogProtocol | None" = None,
         workflow_id: str = "direct",
+        attempt: int = 1,
+        lineage: list[ExecutionAttempt] | None = None,
         pipeline_run_id: str | None = None,
         emit_graph_events: bool = True,
         emit_usage_events: bool = True,
@@ -40,7 +64,11 @@ class GraphTracerProtocol(Protocol):
             pipeline_ref_domain: Optional domain name for the pipeline.
             pipeline_ref_main_pipe: Optional main pipe name.
             event_log: Optional event log for distributed tracing.
-            workflow_id: Temporal workflow ID or "direct" for single-process mode.
+            workflow_id: The id of the workflow whose code emits the events, the same in each of its attempts, or
+                "direct" for single-process mode. It names the events' execution.
+            attempt: The attempt of that workflow its engine runs, counting from 1; 1 in single-process mode.
+            lineage: The attempts the workflow was dispatched under, from the run's own down to the one that
+                dispatched it; None or empty for the run's own workflow.
             pipeline_run_id: Pipeline run ID for event emission.
             emit_graph_events: Whether graph (node/edge) trace events should be emitted for this run.
                 Stamped onto the returned TraceContext so it is born with the correct flag.
@@ -67,6 +95,7 @@ class GraphTracerProtocol(Protocol):
         trace_context: TraceContext,
         *,
         pipe_code: str,
+        pipe_ref: str | None,
         pipe_type: str,
         node_kind: NodeKind,
         started_at: datetime,
@@ -83,6 +112,8 @@ class GraphTracerProtocol(Protocol):
         Args:
             trace_context: Current trace context from JobMetadata.
             pipe_code: The pipe code being executed.
+            pipe_ref: The `domain.code` reference of the pipe, which names the run's entry pipe in every invocation
+                path; None for a node that runs no pipe, such as a binding step.
             pipe_type: The pipe type (e.g., "PipeLLM", "PipeSequence").
             node_kind: The kind of node (controller, operator, etc.).
             started_at: When the pipe started executing.
@@ -96,6 +127,9 @@ class GraphTracerProtocol(Protocol):
 
         Returns:
             Tuple of (node_id for this pipe, updated TraceContext for children).
+
+        Tracing never fails a run, so a tracer raises nothing when it cannot derive the pipe's invocation path: it
+        traces the pipe without one and logs the fault.
         """
         ...
 
@@ -129,6 +163,7 @@ class GraphTracerProtocol(Protocol):
         error_type: str,
         error_message: str,
         error_stack: str | None = None,
+        caller_facing: bool = False,
     ) -> None:
         """Record failed completion of a pipe execution.
 
@@ -138,6 +173,8 @@ class GraphTracerProtocol(Protocol):
             error_type: The exception type name.
             error_message: The error message.
             error_stack: Optional stack trace.
+            caller_facing: Whether the message was written for the caller, as an error report's
+                `caller_facing_message` says.
         """
         ...
 
@@ -352,6 +389,8 @@ class GraphTracerNoOp(GraphTracerProtocol):
         pipeline_ref_main_pipe: str | None = None,
         event_log: "EventLogProtocol | None" = None,
         workflow_id: str = "direct",
+        attempt: int = 1,
+        lineage: list[ExecutionAttempt] | None = None,
         pipeline_run_id: str | None = None,
         emit_graph_events: bool = True,
         emit_usage_events: bool = True,
@@ -363,6 +402,7 @@ class GraphTracerNoOp(GraphTracerProtocol):
             emit_graph_events=emit_graph_events,
             emit_usage_events=emit_usage_events,
             run_mode=run_mode,
+            chain=[*(lineage or []), ExecutionAttempt(execution=workflow_id, attempt=attempt)],
         )
 
     @override
@@ -375,6 +415,7 @@ class GraphTracerNoOp(GraphTracerProtocol):
         trace_context: TraceContext,
         *,
         pipe_code: str,
+        pipe_ref: str | None,
         pipe_type: str,
         node_kind: NodeKind,
         started_at: datetime,
@@ -386,8 +427,9 @@ class GraphTracerNoOp(GraphTracerProtocol):
         step_count: int | None = None,
         branch_count: int | None = None,
     ) -> tuple[str, TraceContext]:
+        # The no-op tracer records nothing, so it derives no invocation path either: tracing never fails a run.
         node_id = trace_context.make_node_id()
-        child_context = trace_context.copy_for_child(node_id, next_sequence=trace_context.node_sequence + 1)
+        child_context = trace_context.copy_for_child(node_id, next_sequence=trace_context.node_sequence + 1, invocation_path=None)
         return node_id, child_context
 
     @override
@@ -421,6 +463,7 @@ class GraphTracerNoOp(GraphTracerProtocol):
         error_type: str,
         error_message: str,
         error_stack: str | None = None,
+        caller_facing: bool = False,
     ) -> None:
         pass
 

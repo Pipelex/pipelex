@@ -36,6 +36,9 @@ def _make_base_fields(sequence: int = 0) -> dict[str, Any]:
     return {
         "pipeline_run_id": _PIPELINE_RUN_ID,
         "workflow_id": _WORKFLOW_ID,
+        "attempt": 1,
+        "lineage": [],
+        "path": None,
         "timestamp": _TIMESTAMP,
         "sequence": sequence,
         "mode": PipeRunMode.LIVE,
@@ -52,6 +55,7 @@ def _make_usage_event(sequence: int, model_name: str = "claude-sonnet") -> Usage
 
 def _make_pipe_start_event(sequence: int) -> PipeStartEvent:
     return PipeStartEvent(
+        pipe_ref=None,
         **_make_base_fields(sequence),
         node_id=f"graph_1:{_WORKFLOW_ID}:node_{sequence}",
         pipe_code="test_pipe",

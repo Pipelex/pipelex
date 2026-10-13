@@ -295,6 +295,20 @@ class JobMetadata(BaseModel):
             pipe_run_id=self.pipe_run_id,
         )
 
+    def for_child_at(self, *, segment: str) -> "JobMetadata":
+        """A copy of this metadata for a pipe a controller runs, naming that pipe's place under the controller.
+
+        The segment rides on the trace context, beside the controller's own invocation path, and the pipe's start
+        derives its path from the two (see ``TraceContext.invocation_path``). Without a trace context there is no
+        path to derive, so the metadata is returned as it is.
+
+        Args:
+            segment: The pipe's segment under its controller, from ``pipelex.system.invocation_path``.
+        """
+        if self.trace_context is None:
+            return self
+        return self.model_copy(update={"trace_context": self.trace_context.with_child_segment(segment=segment)})
+
     def copy_with_update(
         self,
         *,

@@ -5,7 +5,7 @@ Runs identical tracing scenarios through both paths:
 - Path B: GraphTracer with InMemoryEventLog → read events → GraphSpecAssembler.assemble() → GraphSpec
 
 The two GraphSpecs must be structurally identical (same nodes, edges, statuses, data flow),
-allowing for normalized IDs (workflow_id segment stripped) and ignored TimingSpec.
+allowing for normalized IDs (chain segment stripped) and ignored TimingSpec.
 """
 
 import re
@@ -43,14 +43,14 @@ _T0 = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
 # Structural comparison helpers
 # ---------------------------------------------------------------------------
 
-# Pattern to strip the workflow_id segment from node/edge IDs:
-# "graph_id:wf_xxx:node_0" → "graph_id:node_0"
-_WF_SEGMENT_RE = re.compile(r":" + re.escape(_WORKFLOW_ID) + r":")
+# Pattern to strip the chain segment, the workflow and its attempt, from node/edge IDs:
+# "graph_id:wf_xxx:attempt_1:node_0" → "graph_id:node_0"
+_CHAIN_SEGMENT_RE = re.compile(r":" + re.escape(_WORKFLOW_ID) + r":attempt_\d+(:lineage_[0-9a-f]+)?:")
 
 
 def _normalize_id(identifier: str) -> str:
-    """Strip the workflow_id segment from a node or edge ID."""
-    return _WF_SEGMENT_RE.sub(":", identifier)
+    """Strip the chain segment from a node or edge ID."""
+    return _CHAIN_SEGMENT_RE.sub(":", identifier)
 
 
 def _normalize_node(node: NodeSpec) -> dict[str, Any]:
@@ -170,6 +170,7 @@ def _scenario_simple_sequence(tracer: GraphTracer, context: TraceContext) -> Non
 
     # Parent controller
     parent_id, child_ctx = tracer.on_pipe_start(
+        pipe_ref="tests.sequence",
         trace_context=context,
         pipe_code="sequence",
         pipe_type="PipeSequence",
@@ -179,7 +180,8 @@ def _scenario_simple_sequence(tracer: GraphTracer, context: TraceContext) -> Non
 
     # Child 1: produces digest_a
     child1_id, _ = tracer.on_pipe_start(
-        trace_context=child_ctx,
+        pipe_ref="tests.gen_text",
+        trace_context=child_ctx.with_child_segment(segment="step_1"),
         pipe_code="gen_text",
         pipe_type="PipeLLM",
         node_kind=NodeKind.OPERATOR,
@@ -193,7 +195,8 @@ def _scenario_simple_sequence(tracer: GraphTracer, context: TraceContext) -> Non
 
     # Child 2: consumes digest_a, produces digest_b
     child2_id, _ = tracer.on_pipe_start(
-        trace_context=child_ctx,
+        pipe_ref="tests.refine",
+        trace_context=child_ctx.with_child_segment(segment="step_2"),
         pipe_code="refine",
         pipe_type="PipeLLM",
         node_kind=NodeKind.OPERATOR,
@@ -208,7 +211,8 @@ def _scenario_simple_sequence(tracer: GraphTracer, context: TraceContext) -> Non
 
     # Child 3: consumes digest_b
     child3_id, _ = tracer.on_pipe_start(
-        trace_context=child_ctx,
+        pipe_ref="tests.format",
+        trace_context=child_ctx.with_child_segment(segment="step_3"),
         pipe_code="format",
         pipe_type="PipeLLM",
         node_kind=NodeKind.OPERATOR,
@@ -233,6 +237,7 @@ def _scenario_parallel_branches(tracer: GraphTracer, context: TraceContext) -> N
     started_at = _T0
 
     ctrl_id, ctrl_ctx = tracer.on_pipe_start(
+        pipe_ref="tests.parallel",
         trace_context=context,
         pipe_code="parallel",
         pipe_type="PipeParallel",
@@ -242,7 +247,8 @@ def _scenario_parallel_branches(tracer: GraphTracer, context: TraceContext) -> N
 
     # Branch A
     branch_a_id, _ = tracer.on_pipe_start(
-        trace_context=ctrl_ctx,
+        pipe_ref="tests.branch_a",
+        trace_context=ctrl_ctx.with_child_segment(segment="step_1"),
         pipe_code="branch_a",
         pipe_type="PipeLLM",
         node_kind=NodeKind.OPERATOR,
@@ -256,7 +262,8 @@ def _scenario_parallel_branches(tracer: GraphTracer, context: TraceContext) -> N
 
     # Branch B
     branch_b_id, _ = tracer.on_pipe_start(
-        trace_context=ctrl_ctx,
+        pipe_ref="tests.branch_b",
+        trace_context=ctrl_ctx.with_child_segment(segment="step_2"),
         pipe_code="branch_b",
         pipe_type="PipeLLM",
         node_kind=NodeKind.OPERATOR,
@@ -298,6 +305,7 @@ def _scenario_batch_fan_out_fan_in(tracer: GraphTracer, context: TraceContext) -
     started_at = _T0
 
     ctrl_id, ctrl_ctx = tracer.on_pipe_start(
+        pipe_ref="tests.batch",
         trace_context=context,
         pipe_code="batch",
         pipe_type="PipeBatch",
@@ -322,7 +330,8 @@ def _scenario_batch_fan_out_fan_in(tracer: GraphTracer, context: TraceContext) -
 
     # Branch 0: processes item 0
     branch0_id, _ = tracer.on_pipe_start(
-        trace_context=ctrl_ctx,
+        pipe_ref="tests.process",
+        trace_context=ctrl_ctx.with_child_segment(segment="step_1"),
         pipe_code="process",
         pipe_type="PipeLLM",
         node_kind=NodeKind.OPERATOR,
@@ -337,7 +346,8 @@ def _scenario_batch_fan_out_fan_in(tracer: GraphTracer, context: TraceContext) -
 
     # Branch 1: processes item 1
     branch1_id, _ = tracer.on_pipe_start(
-        trace_context=ctrl_ctx,
+        pipe_ref="tests.process",
+        trace_context=ctrl_ctx.with_child_segment(segment="step_2"),
         pipe_code="process",
         pipe_type="PipeLLM",
         node_kind=NodeKind.OPERATOR,
@@ -377,6 +387,7 @@ def _scenario_partial_failure(tracer: GraphTracer, context: TraceContext) -> Non
     started_at = _T0
 
     _parent_id, child_ctx = tracer.on_pipe_start(
+        pipe_ref="tests.sequence",
         trace_context=context,
         pipe_code="sequence",
         pipe_type="PipeSequence",
@@ -385,7 +396,8 @@ def _scenario_partial_failure(tracer: GraphTracer, context: TraceContext) -> Non
     )
 
     child_id, _ = tracer.on_pipe_start(
-        trace_context=child_ctx,
+        pipe_ref="tests.gen_text",
+        trace_context=child_ctx.with_child_segment(segment="step_1"),
         pipe_code="gen_text",
         pipe_type="PipeLLM",
         node_kind=NodeKind.OPERATOR,
@@ -407,6 +419,7 @@ def _scenario_pass_through(tracer: GraphTracer, context: TraceContext) -> None:
 
     # Pass-through pipe: input digest_a → output digest_a (same)
     pt_id, _ = tracer.on_pipe_start(
+        pipe_ref="tests.passthrough",
         trace_context=context,
         pipe_code="passthrough",
         pipe_type="PipeParallel",
@@ -422,6 +435,7 @@ def _scenario_pass_through(tracer: GraphTracer, context: TraceContext) -> None:
 
     # Downstream pipe consumes digest_a
     down_id, _ = tracer.on_pipe_start(
+        pipe_ref="tests.consumer",
         trace_context=context,
         pipe_code="consumer",
         pipe_type="PipeLLM",
@@ -444,6 +458,7 @@ def _scenario_with_usage(tracer: GraphTracer, context: TraceContext) -> None:
     started_at = _T0
 
     parent_id, child_ctx = tracer.on_pipe_start(
+        pipe_ref="tests.sequence",
         trace_context=context,
         pipe_code="sequence",
         pipe_type="PipeSequence",
@@ -452,7 +467,8 @@ def _scenario_with_usage(tracer: GraphTracer, context: TraceContext) -> None:
     )
 
     child_id, _ = tracer.on_pipe_start(
-        trace_context=child_ctx,
+        pipe_ref="tests.gen_text",
+        trace_context=child_ctx.with_child_segment(segment="step_1"),
         pipe_code="gen_text",
         pipe_type="PipeLLM",
         node_kind=NodeKind.OPERATOR,
@@ -473,6 +489,9 @@ def _usage_events_for(*, assembled_child_node_id: str, event_log: InMemoryEventL
     """One rated LLM call attributed to ``assembled_child_node_id``."""
     return [
         UsageReportEvent(
+            attempt=1,
+            lineage=[],
+            path=None,
             pipeline_run_id=_PIPELINE_RUN_ID,
             workflow_id=_WORKFLOW_ID,
             writer_id=event_log.writer_id,
@@ -501,6 +520,7 @@ def _scenario_condition_selected_outcome(tracer: GraphTracer, context: TraceCont
     started_at = _T0
 
     cond_id, cond_ctx = tracer.on_pipe_start(
+        pipe_ref="tests.check",
         trace_context=context,
         pipe_code="check",
         pipe_type="PipeCondition",
@@ -510,7 +530,8 @@ def _scenario_condition_selected_outcome(tracer: GraphTracer, context: TraceCont
     tracer.register_condition_resolution(condition_node_id=cond_id, rendered_value="true", selected_outcome="true")
 
     outcome_id, _ = tracer.on_pipe_start(
-        trace_context=cond_ctx,
+        pipe_ref="tests.branch_true",
+        trace_context=cond_ctx.with_child_segment(segment="step_1"),
         pipe_code="branch_true",
         pipe_type="PipeLLM",
         node_kind=NodeKind.OPERATOR,
@@ -536,6 +557,7 @@ def _scenario_decisions_at_decision_time(tracer: GraphTracer, context: TraceCont
     started_at = _T0
 
     seq_id, seq_ctx = tracer.on_pipe_start(
+        pipe_ref="tests.flow",
         trace_context=context,
         pipe_code="flow",
         pipe_type="PipeSequence",
@@ -545,7 +567,8 @@ def _scenario_decisions_at_decision_time(tracer: GraphTracer, context: TraceCont
     )
 
     cond_id, cond_ctx = tracer.on_pipe_start(
-        trace_context=seq_ctx,
+        pipe_ref="tests.route",
+        trace_context=seq_ctx.with_child_segment(segment="step_1"),
         pipe_code="route",
         pipe_type="PipeCondition",
         node_kind=NodeKind.CONTROLLER,
@@ -553,7 +576,8 @@ def _scenario_decisions_at_decision_time(tracer: GraphTracer, context: TraceCont
     )
     tracer.register_condition_resolution(condition_node_id=cond_id, rendered_value="unmatched", selected_outcome=None)
     outcome_id, _ = tracer.on_pipe_start(
-        trace_context=cond_ctx,
+        pipe_ref="tests.fallback",
+        trace_context=cond_ctx.with_child_segment(segment="step_1"),
         pipe_code="fallback",
         pipe_type="PipeCompose",
         node_kind=NodeKind.OPERATOR,
@@ -565,7 +589,8 @@ def _scenario_decisions_at_decision_time(tracer: GraphTracer, context: TraceCont
     tracer.on_pipe_end_success(node_id=cond_id, ended_at=started_at + timedelta(seconds=4))
 
     batch_id, batch_ctx = tracer.on_pipe_start(
-        trace_context=seq_ctx,
+        pipe_ref="tests.per_item",
+        trace_context=seq_ctx.with_child_segment(segment="step_2"),
         pipe_code="per_item",
         pipe_type="PipeBatch",
         node_kind=NodeKind.CONTROLLER,
@@ -579,7 +604,8 @@ def _scenario_decisions_at_decision_time(tracer: GraphTracer, context: TraceCont
         list_stuff_code="digest_items", item_stuff_code="digest_item_0", item_index=0, batch_controller_node_id=batch_id
     )
     item_id, _ = tracer.on_pipe_start(
-        trace_context=batch_ctx,
+        pipe_ref="tests.process",
+        trace_context=batch_ctx.with_child_segment(segment="step_1"),
         pipe_code="process",
         pipe_type="PipeCompose",
         node_kind=NodeKind.OPERATOR,
@@ -603,6 +629,7 @@ def _scenario_dry_condition_merge(tracer: GraphTracer, context: TraceContext) ->
     started_at = _T0
 
     seq_id, seq_ctx = tracer.on_pipe_start(
+        pipe_ref="tests.screen",
         trace_context=context,
         pipe_code="screen",
         pipe_type="PipeSequence",
@@ -610,14 +637,16 @@ def _scenario_dry_condition_merge(tracer: GraphTracer, context: TraceContext) ->
         started_at=started_at,
     )
     flow_id, flow_ctx = tracer.on_pipe_start(
-        trace_context=seq_ctx,
+        pipe_ref="tests.follow_up_flow",
+        trace_context=seq_ctx.with_child_segment(segment="step_1"),
         pipe_code="follow_up_flow",
         pipe_type="PipeSequence",
         node_kind=NodeKind.CONTROLLER,
         started_at=started_at + timedelta(milliseconds=500),
     )
     cond_id, cond_ctx = tracer.on_pipe_start(
-        trace_context=flow_ctx,
+        pipe_ref="tests.route",
+        trace_context=flow_ctx.with_child_segment(segment="step_1"),
         pipe_code="route",
         pipe_type="PipeCondition",
         node_kind=NodeKind.CONTROLLER,
@@ -626,14 +655,16 @@ def _scenario_dry_condition_merge(tracer: GraphTracer, context: TraceContext) ->
     )
 
     batch_id, batch_ctx = tracer.on_pipe_start(
-        trace_context=cond_ctx,
+        pipe_ref="tests.write_questions",
+        trace_context=cond_ctx.with_child_segment(segment="step_1"),
         pipe_code="write_questions",
         pipe_type="PipeBatch",
         node_kind=NodeKind.CONTROLLER,
         started_at=started_at + timedelta(seconds=2),
     )
     item_id, _ = tracer.on_pipe_start(
-        trace_context=batch_ctx,
+        pipe_ref="tests.write_question",
+        trace_context=batch_ctx.with_child_segment(segment="step_1"),
         pipe_code="write_question",
         pipe_type="PipeLLM",
         node_kind=NodeKind.OPERATOR,
@@ -657,7 +688,8 @@ def _scenario_dry_condition_merge(tracer: GraphTracer, context: TraceContext) ->
     )
 
     rejection_id, _ = tracer.on_pipe_start(
-        trace_context=cond_ctx,
+        pipe_ref="tests.write_rejection",
+        trace_context=cond_ctx.with_child_segment(segment="step_2"),
         pipe_code="write_rejection",
         pipe_type="PipeLLM",
         node_kind=NodeKind.OPERATOR,
@@ -688,7 +720,8 @@ def _scenario_dry_condition_merge(tracer: GraphTracer, context: TraceContext) ->
     )
 
     assemble_id, _ = tracer.on_pipe_start(
-        trace_context=seq_ctx,
+        pipe_ref="tests.assemble",
+        trace_context=seq_ctx.with_child_segment(segment="step_2"),
         pipe_code="assemble",
         pipe_type="PipeLLM",
         node_kind=NodeKind.OPERATOR,
@@ -766,7 +799,12 @@ class TestAssemblerEquivalence:
             run_mode=PipeRunMode.LIVE,
         )
         cond_id, cond_ctx = parent_tracer.on_pipe_start(
-            trace_context=parent_ctx, pipe_code="route", pipe_type="PipeCondition", node_kind=NodeKind.CONTROLLER, started_at=_T0
+            pipe_ref="tests.route",
+            trace_context=parent_ctx,
+            pipe_code="route",
+            pipe_type="PipeCondition",
+            node_kind=NodeKind.CONTROLLER,
+            started_at=_T0,
         )
         parent_tracer.register_condition_resolution(condition_node_id=cond_id, rendered_value="urgent", selected_outcome="urgent")
 
@@ -781,6 +819,7 @@ class TestAssemblerEquivalence:
             run_mode=cond_ctx.run_mode,
         ).model_copy(update={"parent_node_id": cond_ctx.parent_node_id})
         chosen_id, _ = child_tracer.on_pipe_start(
+            pipe_ref="tests.escalate",
             trace_context=child_ctx,
             pipe_code="escalate",
             pipe_type="PipeCompose",
@@ -797,11 +836,17 @@ class TestAssemblerEquivalence:
         direct_tracer = GraphTracer()
         direct_ctx = direct_tracer.setup(graph_id=_GRAPH_ID, data_inclusion=data_inclusion, run_mode=PipeRunMode.LIVE)
         direct_cond_id, direct_cond_ctx = direct_tracer.on_pipe_start(
-            trace_context=direct_ctx, pipe_code="route", pipe_type="PipeCondition", node_kind=NodeKind.CONTROLLER, started_at=_T0
+            pipe_ref="tests.route",
+            trace_context=direct_ctx,
+            pipe_code="route",
+            pipe_type="PipeCondition",
+            node_kind=NodeKind.CONTROLLER,
+            started_at=_T0,
         )
         direct_tracer.register_condition_resolution(condition_node_id=direct_cond_id, rendered_value="urgent", selected_outcome="urgent")
         direct_chosen_id, _ = direct_tracer.on_pipe_start(
-            trace_context=direct_cond_ctx,
+            pipe_ref="tests.escalate",
+            trace_context=direct_cond_ctx.with_child_segment(segment="step_1"),
             pipe_code="escalate",
             pipe_type="PipeCompose",
             node_kind=NodeKind.OPERATOR,

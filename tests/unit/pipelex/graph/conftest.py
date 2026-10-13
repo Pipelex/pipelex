@@ -5,6 +5,7 @@ import pytest
 from pipelex.config import get_config
 from pipelex.graph.graph_config import GraphConfig
 from pipelex.system.data_inclusion_config import DataInclusionConfig
+from pipelex.system.execution_chain import make_direct_chain
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
 
@@ -59,6 +60,7 @@ def make_trace_context(
             error_stack_traces=error_stack_traces,
         ),
         run_mode=PipeRunMode.LIVE,
+        chain=make_direct_chain(),
     )
 
 

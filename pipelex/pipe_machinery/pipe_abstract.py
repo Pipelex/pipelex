@@ -26,6 +26,7 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.graph.graph_tracer_manager import GraphTracerManager, IOSpec, NodeKind
 from pipelex.graph.stuff_io_spec import make_stuff_io_spec
+from pipelex.graph.traced_failure import make_traced_failure
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_machinery.memory_writes import MemoryWrite
 from pipelex.pipe_machinery.pipe_blueprint import PipeCategory, PipeType, valid_pipe_type_tags
@@ -812,6 +813,7 @@ class PipeAbstract(ABC, BaseModel):
                 graph_node_id, child_trace_context = tracer_manager.on_pipe_start(
                     trace_context=parent_trace_context,
                     pipe_code=self.code,
+                    pipe_ref=self.pipe_ref,
                     pipe_type=self.type,
                     node_kind=node_kind,
                     started_at=started_at,
@@ -875,13 +877,15 @@ class PipeAbstract(ABC, BaseModel):
                 error_stack: str | None = None
                 if parent_trace_context.data_inclusion.error_stack_traces:
                     error_stack = traceback.format_exc()
+                traced_failure = make_traced_failure(error=exc)
                 tracer_manager.on_pipe_end_error(
                     lookup_key=parent_trace_context.lookup_key,
                     node_id=graph_node_id,
                     ended_at=datetime.now(UTC),
                     error_type=type(exc).__name__,
-                    error_message=str(exc),
+                    error_message=traced_failure.message,
                     error_stack=error_stack,
+                    caller_facing=traced_failure.caller_facing,
                 )
             raise
 

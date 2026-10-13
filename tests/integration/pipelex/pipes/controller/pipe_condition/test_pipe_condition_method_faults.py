@@ -124,6 +124,7 @@ class TestPipeConditionMethodFaults:
         )
         try:
             condition_node_id, condition_context = tracer_manager.on_pipe_start(
+                pipe_ref=f"tests.{pipe_condition.code}",
                 trace_context=root_context,
                 pipe_code=pipe_condition.code,
                 pipe_type=pipe_condition.type,
