@@ -23,10 +23,15 @@ from pipelex.pipe_run.pipe_run_params import (
     FORCE_DRY_RUN_MODE_ENV_KEY,
     VariableMultiplicity,
 )
-from pipelex.pipe_run.pipe_run_params_factory import resolve_effective_run_mode
 from pipelex.pipeline.exceptions import PipeExecutionError
 from pipelex.pipeline.execution_seams import acquire_library, prepare_pipe_job
-from pipelex.runtime_hub import get_event_log_override, get_otel_tracer, get_report_delegate, get_telemetry_manager
+from pipelex.runtime_hub import (
+    get_event_log_override,
+    get_otel_tracer,
+    get_report_delegate,
+    get_telemetry_manager,
+    resolve_effective_run_mode,
+)
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.environment import get_optional_env
 from pipelex.system.job_metadata import OtelContext

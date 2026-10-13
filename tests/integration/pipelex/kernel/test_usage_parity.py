@@ -118,7 +118,7 @@ class TestKernelUsageParity:
             data_inclusion=get_config().interpreter.pipeline_execution.graph.data_inclusion,
             emit_graph_events=False,
             emit_usage_events=True,
-            run_mode=PipeRunMode.LIVE,
+            run_mode=PipeRunMode.DRY,
         )
         get_report_delegate().set_event_log(
             context_key=trace_context.lookup_key,

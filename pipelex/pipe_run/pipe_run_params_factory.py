@@ -1,10 +1,9 @@
 from typing import Any, Literal
 
-from pipelex.cogt.content_generation.cogt_run_params import check_mock_usage_requires_dry
 from pipelex.config import get_config
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
-from pipelex.runtime_hub import resolve_run_mode_for_boot
+from pipelex.runtime_hub import resolve_effective_run_mode
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 
@@ -20,29 +19,6 @@ def resolve_batch_max_concurrency(max_concurrency_setting: int | Literal["unboun
     frozen into ``PipeRunParams.batch_max_concurrency`` at construction, never re-read at fan-out time.
     """
     return None if isinstance(max_concurrency_setting, str) else max_concurrency_setting
-
-
-def resolve_effective_run_mode(*, requested: PipeRunMode, is_mock_usage: bool) -> PipeRunMode:
-    """The mode a run this process initiates takes on this boot: the requested mode, validated, then forced DRY when keyless.
-
-    The REQUESTED mode is validated before the keyless-boot coercion (eng review D4), so a contract violation
-    (``is_mock_usage`` on a LIVE request) fails loud on every boot: the coercion must not silently turn an illegal
-    request into a legal one. ``PipeRunParamsFactory.make_run_params`` resolves its mode through it, and so does
-    ``pipeline_run_setup``, which needs the effective mode before it opens the run's tracer, so that the trace states the
-    mode the pipes run in rather than the one requested.
-
-    Args:
-        requested: The run mode the caller asked for.
-        is_mock_usage: Whether the caller asked for the dry sub-flag that reports synthetic usage.
-
-    Returns:
-        The requested mode, or DRY when a keyless boot forces a LIVE request dry.
-
-    Raises:
-        ValueError: When ``is_mock_usage`` is set on a LIVE request.
-    """
-    check_mock_usage_requires_dry(run_mode=requested, is_mock_usage=is_mock_usage)
-    return resolve_run_mode_for_boot(requested=requested)
 
 
 class PipeRunParamsFactory:

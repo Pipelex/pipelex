@@ -45,7 +45,7 @@ There is deliberately **no** `pipelex.hub`. It was deleted rather than kept as a
 | inference | `get_inference_manager`, `get_llm_worker`, `get_img_gen_worker`, `get_extract_worker` |
 | content generation | `get_content_generator`, `scoped_content_generator` |
 | reporting | `get_report_delegate`, `is_in_isolated_execution` |
-| run mode | `is_dry_run_forced`, `resolve_run_mode_for_boot` |
+| run mode | `is_dry_run_forced`, `resolve_run_mode_for_boot`, `resolve_effective_run_mode` |
 | boot orchestrator | `get_boot_orchestrator` |
 | tracing | `scoped_event_log`, `get_event_log_override` |
 | plugin registries | `get_inference_backend_registry`, `get_model_lister_registry`, `get_orchestrator_registry`, `get_bundle_validator_registry`, `get_storage_provider_registry`, `get_secrets_provider_registry`, `get_optional_service_error_vocabulary` |
@@ -78,7 +78,7 @@ Placement is decided by *kind*, not by who currently imports it. Several accesso
 
 `get_pipe_func_executor_registry` is the one placement worth flagging: it is a plugin registry by kind (which would put it in the kernel layer) but its protocol lives in `pipe_operators/func/` (which puts it in the interpreter layer). It is **interpreter-layer**. See [Known inversions](#known-inversions) for the underlying wart.
 
-Not everything a hub module exports is an accessor. `resolve_run_mode_for_boot` *applies* the keyless-boot forced-DRY flag rather than reading it, and it lives beside `is_dry_run_forced`, the accessor it consumes. The lifecycle question above still decides placement — the flag is set once at boot and identical for every method the process runs, so the rule that interprets it is kernel-layer by kind. What makes the *module* the right home rather than either caller is that there are now two: the pipe tier's `PipeRunParamsFactory.make_run_params` and the kernel tier's `PipelexKernel.make` both mint run params, and a boot-scoped invariant copied into each is one that drifts. When a rule over hub state acquires a second caller, move the rule to the hub — do not let the second caller reimplement it.
+Not everything a hub module exports is an accessor. `resolve_run_mode_for_boot` *applies* the keyless-boot forced-DRY flag rather than reading it, and it lives beside `is_dry_run_forced`, the accessor it consumes. The lifecycle question above still decides placement — the flag is set once at boot and identical for every method the process runs, so the rule that interprets it is kernel-layer by kind. What makes the *module* the right home rather than either caller is that there are now two: the pipe tier's `PipeRunParamsFactory.make_run_params` and the kernel tier's `PipelexKernel.make` both mint run params, and a boot-scoped invariant copied into each is one that drifts. When a rule over hub state acquires a second caller, move the rule to the hub — do not let the second caller reimplement it. `resolve_effective_run_mode` sits beside it for the same reason: it validates the requested mode against `is_mock_usage` before applying the flag, and its callers are `make_run_params`, `pipeline_run_setup`, which needs the mode before it opens the run's tracer, and `PipelexKernel.make`, which is kernel-layer and so could not reach it in the pipe tier.
 
 ## Why the boundary exists
 

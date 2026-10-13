@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Optional, TextIO
 from kajson.class_registry_abstract import ClassRegistryAbstract
 
 from pipelex import log
+from pipelex.cogt.content_generation.cogt_run_params import check_mock_usage_requires_dry
 from pipelex.cogt.content_generation.content_generator_protocol import (
     ContentGeneratorProtocol,
 )
@@ -669,6 +670,31 @@ def resolve_run_mode_for_boot(*, requested: PipeRunMode) -> PipeRunMode:
         )
         return PipeRunMode.DRY
     return requested
+
+
+def resolve_effective_run_mode(*, requested: PipeRunMode, is_mock_usage: bool) -> PipeRunMode:
+    """The mode a run this process initiates takes on this boot: the requested mode, validated, then forced DRY when keyless.
+
+    The REQUESTED mode is validated before the keyless-boot coercion (eng review D4), so a contract violation
+    (``is_mock_usage`` on a LIVE request) fails loud on every boot: the coercion must not silently turn an illegal
+    request into a legal one. Every entry point resolves its mode through it: the pipe tier's
+    ``PipeRunParamsFactory.make_run_params``, ``pipeline_run_setup``, which needs the effective mode before it opens
+    the run's tracer so that the trace states the mode the pipes run in, and the kernel tier's ``PipelexKernel.make``.
+    It lives here, beside the flag it applies, so the kernel layer reaches it without importing the interpreter. A
+    caller that opens a trace for a kernel run states this mode on its ``TraceContext``.
+
+    Args:
+        requested: The run mode the caller asked for.
+        is_mock_usage: Whether the caller asked for the dry sub-flag that reports synthetic usage.
+
+    Returns:
+        The requested mode, or DRY when a keyless boot forces a LIVE request dry.
+
+    Raises:
+        ValueError: When ``is_mock_usage`` is set on a LIVE request.
+    """
+    check_mock_usage_requires_dry(run_mode=requested, is_mock_usage=is_mock_usage)
+    return resolve_run_mode_for_boot(requested=requested)
 
 
 def get_content_generator() -> ContentGeneratorProtocol:
