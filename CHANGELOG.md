@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [v0.86.0] - 2026-10-13
+
+### Highlights
+
+**A run's trace now records each decision as it is made and names every pipe by its place in the method.** A condition's chosen outcome and a batch's width are written before anything runs under them, and every trace event carries its invocation path, its mode and the attempt of the execution that wrote it, so a graph built from a run's events names each pipe the same way in every run, live or dry, and shows a retried step once.
 
 ### Added
 
