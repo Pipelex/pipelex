@@ -12,11 +12,55 @@ Both streams hang off the same node tree, so the node-minting machinery
 (``make_node_id`` / ``copy_for_child`` / ``node_sequence``) is shared, not graph-only.
 The node tree is always built when either stream is on — including costs-only
 (``--no-graph --costs``) mode, where usage still needs ``parent_node_id`` to attribute to.
+
+Beside the run-scoped node ids, the context carries what names an invocation in every view of a
+run (``pipelex.system.invocation_path``): the path of the invocation its pipes run under, the
+segment a controller gives the next pipe it runs, and the chain of execution attempts the events
+written under it belong to (``pipelex.system.execution_chain``).
 """
+
+from collections.abc import Sequence
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.system.data_inclusion_config import DataInclusionConfig
+from pipelex.system.exceptions import InvocationPathError
+from pipelex.system.execution_chain import ExecutionAttempt, execution_chain_digest, execution_chain_key, make_direct_chain
+from pipelex.system.invocation_path import child_path
+from pipelex.system.pipe_run_mode import PipeRunMode
+
+LINEAGE_DIGEST_LENGTH = 16
+"""How many hexadecimal digits of its lineage's digest an id minted by a dispatched execution carries."""
+
+
+def make_trace_id_prefix(*, graph_id: str, chain: Sequence[ExecutionAttempt]) -> str:
+    """The prefix of every node and edge id that one attempt of one execution mints in the trace `graph_id`.
+
+    An attempt numbers its nodes and edges from 0, and an execution keeps its name in each of its attempts, so ids made
+    of the trace, the execution and that number alone would give a retried attempt the ids of the attempt it replaces,
+    and an execution that a new attempt dispatched again under the same name the ids of its predecessor: a reader keyed
+    on `node_id` would then merge a failed node and a succeeded one. The prefix therefore names the whole chain: the
+    execution, its attempt, and, for an execution another one dispatched, the first `LINEAGE_DIGEST_LENGTH` digits of its
+    lineage's digest, which keeps the id one length however deep the lineage. The prefix is a function of the chain
+    alone, so every replay of an attempt mints the same ids. The direct mode's one execution, in its first attempt, is
+    the only chain of its run and keeps the bare `graph_id`.
+
+    Examples: `run_1` in direct mode, `run_1:exec-run:attempt_2` for the second attempt of the run's own workflow, and
+    `run_1:exec-item-2:attempt_1:lineage_<16 hexadecimal digits>` for a batch item's workflow.
+
+    Args:
+        graph_id: The trace the ids belong to.
+        chain: The chain of the attempt minting the ids: its lineage followed by its own `{execution, attempt}`.
+    """
+    if list(chain) == make_direct_chain():
+        return graph_id
+    own_attempt = chain[-1]
+    prefix = f"{graph_id}:{own_attempt.execution}:attempt_{own_attempt.attempt}"
+    lineage = chain[:-1]
+    if lineage:
+        lineage_digest = execution_chain_digest(chain_key=execution_chain_key(chain=lineage))
+        prefix += f":lineage_{lineage_digest[:LINEAGE_DIGEST_LENGTH]}"
+    return prefix
 
 
 class TraceContext(BaseModel):
@@ -41,6 +85,20 @@ class TraceContext(BaseModel):
         describe_pipe_io: Whether the run builds the three I/O artifacts that describe its graphspec's
             data (driven by ``graphs_inclusion.graphspec_json``). Off for a run that writes no
             graphspec, and for validate's own graph dry run, which already built them for its report.
+        run_mode: Whether the run is live or a dry run. Every trace event the run emits states it, the
+            usage events an activity emits included, which have this context and nothing else of the run.
+            Required, with no default: a context built without it would stamp a dry run's events as live.
+        parent_path: The invocation path of the pipe whose children run under this context, None above the
+            run's entry pipe. It is absolute from the entry pipe, whichever execution reads it: a batch item's
+            own execution receives its item's path as the prefix of every path it stamps.
+        child_segment: The segment, under ``parent_path``, that a controller gives the next pipe it runs. Set
+            on the copy of the context the controller hands that pipe, and never carried further down.
+        chain: The execution attempts the events written under this context belong to, from the run's own
+            execution down to the one writing them: its lineage followed by its own ``{execution, attempt}``. Required,
+            with no default: a usage event takes its execution, its attempt and its lineage from it, so a context built
+            without it would write a retried workflow's usage as the direct mode's first attempt, which no later attempt
+            supersedes. A tracer's ``setup`` states it; a host building a context of its own states it too, the direct
+            mode's being ``make_direct_chain()``.
     """
 
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -53,29 +111,78 @@ class TraceContext(BaseModel):
     emit_graph_events: bool = Field(default=True, description="Whether to emit graph (node/edge) trace events")
     emit_usage_events: bool = Field(default=True, description="Whether to emit usage (cost) trace events")
     describe_pipe_io: bool = Field(default=True, description="Whether to build the I/O artifacts describing the graphspec's data")
+    run_mode: PipeRunMode = Field(strict=False, description="Whether the run is live or a dry run, stated by whoever opens the trace")
+    parent_path: str | None = Field(default=None, description="Invocation path of the pipe whose children run under this context")
+    child_segment: str | None = Field(default=None, description="Segment a controller gives the next pipe it runs, under parent_path")
+    chain: list[ExecutionAttempt] = Field(
+        min_length=1,
+        description="The execution attempts this context's events belong to, ending with the one writing them, stated by whoever builds it",
+    )
 
     @property
     def lookup_key(self) -> str:
         """Key for looking up the tracer in GraphTracerManager."""
         return self.tracer_key or self.graph_id
 
+    @property
+    def own_attempt(self) -> ExecutionAttempt:
+        """The attempt of the execution that writes the events under this context."""
+        return self.chain[-1]
+
+    @property
+    def lineage(self) -> list[ExecutionAttempt]:
+        """The attempts the writing execution was dispatched under, empty for the run's own execution."""
+        return self.chain[:-1]
+
+    def with_child_segment(self, *, segment: str) -> "TraceContext":
+        """A copy of this context naming the place, under its parent path, of the next pipe a controller runs."""
+        return self.model_copy(update={"child_segment": segment})
+
+    def invocation_path(self, *, pipe_ref: str) -> str:
+        """The path of the invocation of a pipe started under this context.
+
+        The run's entry pipe, started above any parent path, is named by its `pipe_ref`. Any other pipe is named by
+        the parent path followed by the segment its controller gave it.
+
+        Args:
+            pipe_ref: The `domain.code` reference of the pipe started, which names the run's entry pipe.
+
+        Raises:
+            InvocationPathError: A pipe started under a parent path without a segment, or with a segment and no
+                parent path to put it under.
+        """
+        if self.parent_path is None:
+            if self.child_segment is not None:
+                msg = f"The pipe '{pipe_ref}' was given the segment '{self.child_segment}' with no parent invocation to place it under."
+                raise InvocationPathError(msg)
+            return pipe_ref
+        if self.child_segment is None:
+            msg = (
+                f"The pipe '{pipe_ref}' started under the invocation '{self.parent_path}' without the segment its "
+                "controller gives it, so its invocation path cannot be derived."
+            )
+            raise InvocationPathError(msg)
+        return child_path(parent_path=self.parent_path, segment=self.child_segment)
+
     def make_node_id(self) -> str:
-        """Generate a unique node ID within this trace.
+        """Generate a node ID unique within this trace, as the tracer does (see `make_trace_id_prefix`).
 
         Returns:
-            A unique node ID in format "{graph_id}:node_{sequence}".
+            A node ID in format "{prefix}:node_{sequence}", the prefix naming the trace and the chain.
         """
-        return f"{self.graph_id}:node_{self.node_sequence}"
+        return f"{make_trace_id_prefix(graph_id=self.graph_id, chain=self.chain)}:node_{self.node_sequence}"
 
-    def copy_for_child(self, child_node_id: str, *, next_sequence: int) -> "TraceContext":
+    def copy_for_child(self, child_node_id: str, *, next_sequence: int, invocation_path: str | None) -> "TraceContext":
         """Create a child context for a nested pipe execution.
 
         Args:
             child_node_id: The node ID assigned to the child pipe.
             next_sequence: The next sequence number for the child context.
+            invocation_path: The child pipe's invocation path, which the pipes it runs continue; None for a node that
+                is no invocation, such as a binding step, under which no pipe runs.
 
         Returns:
-            A new TraceContext with updated parent_node_id and node_sequence.
+            A new TraceContext with updated parent_node_id, node_sequence and parent_path, and no child segment.
         """
         return TraceContext(
             graph_id=self.graph_id,
@@ -86,4 +193,8 @@ class TraceContext(BaseModel):
             emit_graph_events=self.emit_graph_events,
             emit_usage_events=self.emit_usage_events,
             describe_pipe_io=self.describe_pipe_io,
+            run_mode=self.run_mode,
+            parent_path=invocation_path,
+            child_segment=None,
+            chain=list(self.chain),
         )

@@ -16,7 +16,7 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.config import get_config
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
-from pipelex.graph.graphspec import GraphSpec, GraphSpecMode
+from pipelex.graph.graphspec import GraphSpec
 from pipelex.interpreter_hub import get_library_manager, scoped_pipe_router
 from pipelex.observer.observer_protocol import ObserverNoOp
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
@@ -160,7 +160,7 @@ async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str, caller
         emit_usage_events=False,
         # Validate builds the I/O artifacts once, for its report; this dry run keeps only the graph.
         describe_pipe_io=False,
-        mode=GraphSpecMode.DRY,
+        run_mode=PipeRunMode.DRY,
     )
     try:
         with (

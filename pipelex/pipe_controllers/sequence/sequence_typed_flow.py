@@ -177,14 +177,24 @@ class DerivedBinding(NamedTuple):
     stuff_spec: StuffSpec
 
 
+def is_authored_step(*, step: SequenceStep) -> bool:
+    """Whether the author wrote this step: the binding a sequence writes for a dotted `batch_over` is no step of theirs."""
+    return not (isinstance(step, BindingStep) and step.is_dotted_batch_over)
+
+
 def authored_step_number(*, steps: list[SequenceStep], step_index: int) -> int:
     """The number of a step, counting from 1, as its author wrote the sequence.
 
     The binding a sequence writes for a dotted `batch_over` is no step of the author's: it shares the number of the pipe
     step it was written for, which follows it.
     """
-    rewritten_before = sum(1 for step in steps[:step_index] if isinstance(step, BindingStep) and step.is_dotted_batch_over)
+    rewritten_before = sum(1 for step in steps[:step_index] if not is_authored_step(step=step))
     return step_index + 1 - rewritten_before
+
+
+def authored_step_count(*, steps: list[SequenceStep]) -> int:
+    """The number of steps the author wrote, the number `authored_step_number` gives the last of them."""
+    return sum(1 for step in steps if is_authored_step(step=step))
 
 
 def resolve_library_concept(*, concept_library: ConceptLibraryAbstract, concept_ref: str) -> Concept | None:

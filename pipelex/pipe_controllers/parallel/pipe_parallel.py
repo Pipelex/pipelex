@@ -41,6 +41,7 @@ from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_machinery.memory_writes import MemoryWrite, SlotTaint
 from pipelex.pipe_machinery.pipe_abstract import CompanionSlot
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
+from pipelex.system.invocation_path import branch_segment
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.validation_error_types import PipeValidationErrorType
 
@@ -439,6 +440,10 @@ class PipeParallel(PipeController):
                 )
 
     @override
+    def traced_branch_count(self) -> int:
+        return len(self.parallel_sub_pipes)
+
+    @override
     def pipe_dependencies(self) -> set[str]:
         return {sub_pipe.pipe_code for sub_pipe in self.parallel_sub_pipes}
 
@@ -463,13 +468,23 @@ class PipeParallel(PipeController):
         final_stuff_code = pipe_run_params.final_stuff_code
         pipe_run_params.final_stuff_code = None
 
+        # The parallel records how many branches it runs, and how it combines them, as it starts, before any branch runs.
+        execution_data_dict: dict[str, Any] = {
+            "branch_count": self.traced_branch_count(),
+            "add_each_output": self.add_each_output,
+            "combined_output_concept": self.output.concept.concept_ref,
+        }
+        self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
+
         tasks: list[Coroutine[Any, Any, PipeOutput]] = []
 
-        for sub_pipe in self.parallel_sub_pipes:
+        # Each branch's pipe is named by its invocation path, whose `branch_<n>` segment numbers the branches from 1 in
+        # the order they are declared; a branch that batches runs as the PipeBatch made for it, at that segment.
+        for branch_index, sub_pipe in enumerate(self.parallel_sub_pipes):
             tasks.append(
                 sub_pipe.run_pipe(
                     calling_pipe_code=self.code,
-                    job_metadata=job_metadata,
+                    job_metadata=job_metadata.for_child_at(segment=branch_segment(branch_number=branch_index + 1)),
                     working_memory=working_memory.make_deep_copy(),
                     sub_pipe_run_params=pipe_run_params.make_deep_copy(),
                     library_crate=library_crate,
@@ -595,14 +610,6 @@ class PipeParallel(PipeController):
             job_metadata=job_metadata,
             output_stuffs=output_stuffs,
         )
-
-        # Capture execution data for the graph tracer
-        execution_data_dict: dict[str, Any] = {
-            "branch_count": len(self.parallel_sub_pipes),
-            "add_each_output": self.add_each_output,
-            "combined_output_concept": self.output.concept.concept_ref,
-        }
-        self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
 
         return PipeOutput(
             working_memory=working_memory,

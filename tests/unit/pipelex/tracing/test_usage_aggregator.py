@@ -8,6 +8,7 @@ from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.graph.graphspec import NodeKind
 from pipelex.system.job_metadata import JobCategory, JobMetadata, RunMetadata, UnitJobId
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.trace_events import PipeStartEvent, TraceEvent, UsageReportEvent
 from pipelex.tracing.usage_aggregator import UsageAggregator
 
@@ -35,8 +36,12 @@ def _make_base_fields(sequence: int = 0) -> dict[str, Any]:
     return {
         "pipeline_run_id": _PIPELINE_RUN_ID,
         "workflow_id": _WORKFLOW_ID,
+        "attempt": 1,
+        "lineage": [],
+        "path": None,
         "timestamp": _TIMESTAMP,
         "sequence": sequence,
+        "mode": PipeRunMode.LIVE,
     }
 
 
@@ -50,6 +55,7 @@ def _make_usage_event(sequence: int, model_name: str = "claude-sonnet") -> Usage
 
 def _make_pipe_start_event(sequence: int) -> PipeStartEvent:
     return PipeStartEvent(
+        pipe_ref=None,
         **_make_base_fields(sequence),
         node_id=f"graph_1:{_WORKFLOW_ID}:node_{sequence}",
         pipe_code="test_pipe",

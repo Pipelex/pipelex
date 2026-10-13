@@ -3,7 +3,14 @@
 This is the core algorithm for distributed tracing — equivalent to
 GraphTracer.teardown() but working from serialized events instead of
 in-memory state. Used after Temporal execution to assemble cross-worker
-graphs from NDJSON event files.
+graphs from NDJSON event files. The graph's provenance mode is the run mode
+its events state, never one the caller passes.
+
+A run's record holds the events of every attempt of every workflow, and the
+graph is built from the current ones alone: a higher attempt of a workflow
+supersedes the earlier one and everything it dispatched
+(`pipelex.system.execution_chain`), so a retried invocation is one node, the
+one its latest attempt ran, and never a failed node beside a succeeded one.
 """
 
 from collections.abc import Sequence
@@ -30,11 +37,16 @@ from pipelex.graph.graphspec import (
     make_graphspec_meta,
     output_digest_is_optional,
 )
+from pipelex.graph.selected_outcome import derive_selected_outcome_edges
+from pipelex.system.execution_chain import current_chain_keys
+from pipelex.tracing.exceptions import TraceEventModeError
 from pipelex.tracing.trace_events import (
     UNATTRIBUTED_NODE_ID,
     BatchAggregateEvent,
+    BatchFannedOutEvent,
     BatchItemEvent,
     ConditionOutputMergeEvent,
+    ConditionResolvedEvent,
     ControllerOutputEvent,
     EdgeEvent,
     ExecutionDataEvent,
@@ -58,6 +70,7 @@ class _AssemblerNodeData:
     def __init__(
         self,
         node_id: str,
+        path: str | None,
         pipe_code: str,
         pipe_type: str,
         node_kind: NodeKind,
@@ -68,6 +81,7 @@ class _AssemblerNodeData:
         domain_code: str | None = None,
     ) -> None:
         self.node_id = node_id
+        self.path = path
         self.pipe_code = pipe_code
         self.pipe_type = pipe_type
         self.node_kind = node_kind
@@ -101,6 +115,7 @@ class _AssemblerNodeData:
 
         return NodeSpec(
             node_id=self.node_id,
+            path=self.path,
             kind=self.node_kind,
             pipe_code=self.pipe_code,
             pipe_type=self.pipe_type,
@@ -124,14 +139,22 @@ class GraphSpecAssembler:
     - Pass 1: Build nodes, producer map, per-node usage totals, and collect metadata
       from all events.
     - Pass 2: Generate DATA, BATCH_ITEM, BATCH_AGGREGATE, PARALLEL_COMBINE edges
-      using the complete producer map, then attribute usage — resolve each usage
+      using the complete producer map, and SELECTED_OUTCOME edges from each live
+      condition's resolution to the pipe it then started, whichever workflow wrote
+      that start, then attribute usage — resolve each usage
       total against the now-complete node set, roll subtrees up the parentage chain,
       and compute the run total.
 
     Usage attribution deliberately waits for pass 2: a ``UsageReportEvent`` can be read
     before the ``PipeStartEvent`` of the node it names (they can come from different
-    workers, and the stream is ordered by (workflow_id, sequence)), so "is this node
+    workers, and the stream is ordered by (chain, sequence)), so "is this node
     real?" is only answerable once every event has been seen.
+
+    Only current events build the graph, and the earliest of them dates it: an event whose
+    chain holds a superseded attempt is dropped, since a new attempt of a workflow replaces
+    what its earlier attempt, and every workflow that attempt dispatched, did. Its usage was
+    spent all the same, so a superseded usage report still counts in the run's total, as
+    unattributed usage: the node it named belongs to an attempt the graph does not show.
     """
 
     @staticmethod
@@ -140,32 +163,61 @@ class GraphSpecAssembler:
         *,
         graph_id: str,
         pipeline_ref: PipelineRef | None = None,
-        mode: GraphSpecMode = GraphSpecMode.LIVE,
     ) -> GraphSpec:
         """Assemble a GraphSpec from a flat list of trace events.
 
+        The GraphSpec's provenance mode is the run mode every event states.
+
         Args:
-            events: Flat list of trace events, pre-sorted by (workflow_id, sequence).
+            events: Flat list of trace events, pre-sorted by (chain, sequence), the events of
+                superseded attempts included.
             graph_id: The graph identifier for the assembled GraphSpec.
             pipeline_ref: Optional pipeline reference metadata.
-            mode: Provenance mode to stamp onto the assembled GraphSpec.
 
         Returns:
             A complete GraphSpec with nodes and edges.
+
+        Raises:
+            TraceEventModeError: When the events mix modes, or there are none, and so state no single run mode.
         """
-        assembler = _AssemblerState(graph_id=graph_id, pipeline_ref=pipeline_ref or PipelineRef(), mode=mode)
+        mode = _graphspec_mode_of_events(events=events, graph_id=graph_id)
+        assembler = _AssemblerState(
+            graph_id=graph_id,
+            pipeline_ref=pipeline_ref or PipelineRef(),
+            mode=mode,
+            current_chain_keys=current_chain_keys(chains=[event.chain for event in events]),
+        )
         assembler.pass_one(events)
         assembler.pass_two()
         return assembler.build_graph_spec()
 
 
+def _graphspec_mode_of_events(*, events: Sequence[TraceEvent], graph_id: str) -> GraphSpecMode:
+    """The provenance mode of the graph built from `events`: the one run mode they all state.
+
+    Raises:
+        TraceEventModeError: When the events mix modes, or there are none.
+    """
+    run_modes = {event.mode for event in events}
+    if not run_modes:
+        msg = f"No trace events to assemble graph '{graph_id}' from, so no run mode to state as its provenance."
+        raise TraceEventModeError(msg)
+    if len(run_modes) > 1:
+        modes_str = ", ".join(sorted(run_modes))
+        msg = f"The trace events of graph '{graph_id}' mix run modes ({modes_str}), so they hold more than one run; no graph is built from them."
+        raise TraceEventModeError(msg)
+    return run_modes.pop().graphspec_mode
+
+
 class _AssemblerState:
     """Mutable state for a single assembler invocation."""
 
-    def __init__(self, graph_id: str, pipeline_ref: PipelineRef, mode: GraphSpecMode) -> None:
+    def __init__(self, graph_id: str, pipeline_ref: PipelineRef, mode: GraphSpecMode, current_chain_keys: set[str]) -> None:
         self._graph_id = graph_id
         self._pipeline_ref = pipeline_ref
         self._mode = mode
+        # The chains no attempt of the run supersedes: only their events build the graph
+        self._current_chain_keys = current_chain_keys
         self._earliest_timestamp: datetime | None = None
 
         # Pass 1 accumulation
@@ -176,6 +228,9 @@ class _AssemblerState:
         self._batch_aggregate_map: dict[str, tuple[str | None, list[tuple[str, int]]]] = {}
         self._parallel_combine_map: dict[str, tuple[str, list[tuple[str, str]]]] = {}
         self._condition_output_merges: list[ConditionOutputMerge] = []
+        # The live conditions that have chosen their outcome, by condition node id, each with the outcome-map key it
+        # matched (None for the default outcome): pass 2 derives the SELECTED_OUTCOME edges from them
+        self._condition_resolutions: dict[str, str | None] = {}
 
         # Registries (accumulated from events, deduplicated)
         self._pipe_registry: dict[str, dict[str, Any]] = {}
@@ -195,6 +250,14 @@ class _AssemblerState:
     def pass_one(self, events: Sequence[TraceEvent]) -> None:
         """Pass 1: Build nodes, producer map, and collect metadata."""
         for event in events:
+            if event.chain_key not in self._current_chain_keys:
+                # A superseded attempt's event: what it recorded was done again, or undone, by a later attempt, so it
+                # neither builds the graph nor dates it. Its usage was spent all the same, so it counts in the run's
+                # total, unattributed.
+                if isinstance(event, UsageReportEvent):
+                    self._usage_by_reported_node.setdefault(UNATTRIBUTED_NODE_ID, []).append(event.tokens_usage)
+                continue
+
             self._track_earliest_timestamp(event)
 
             if isinstance(event, PipeStartEvent):
@@ -221,6 +284,12 @@ class _AssemblerState:
                 self._handle_execution_data(event)
             elif isinstance(event, UsageReportEvent):
                 self._handle_usage_report(event)
+            elif isinstance(event, ConditionResolvedEvent):
+                self._handle_condition_resolved(event)
+            elif isinstance(event, BatchFannedOutEvent):
+                # A batch's width is for the readers following a run while it goes on: the graph already holds its
+                # items, as the batch's children.
+                pass
             else:
                 log.warning("A trace event of a type the assembler does not handle was dropped", fields={"trace_event_type": type(event).__name__})
 
@@ -233,6 +302,7 @@ class _AssemblerState:
         self._generate_batch_item_edges()
         self._generate_batch_aggregate_edges()
         self._generate_parallel_combine_edges()
+        self._generate_selected_outcome_edges()
         self._attribute_usage()
 
     def build_graph_spec(self) -> GraphSpec:
@@ -265,6 +335,7 @@ class _AssemblerState:
     def _handle_pipe_start(self, event: PipeStartEvent) -> None:
         node_data = _AssemblerNodeData(
             node_id=event.node_id,
+            path=event.path,
             pipe_code=event.pipe_code,
             pipe_type=event.pipe_type,
             node_kind=event.node_kind,
@@ -357,10 +428,10 @@ class _AssemblerState:
                     self._stuff_producer_map[event.output_spec.digest] = event.node_id
 
     def _handle_edge_event(self, event: EdgeEvent) -> None:
-        # DATA, BATCH_ITEM, BATCH_AGGREGATE, PARALLEL_COMBINE are regenerated
+        # DATA, BATCH_ITEM, BATCH_AGGREGATE, PARALLEL_COMBINE and SELECTED_OUTCOME are regenerated
         # in pass 2 with full cross-worker visibility — skip to avoid duplicates.
         match event.edge_kind:
-            case EdgeKind.CONTAINS | EdgeKind.SELECTED_OUTCOME | EdgeKind.CONTROL:
+            case EdgeKind.CONTAINS | EdgeKind.CONTROL:
                 edge = EdgeSpec(
                     edge_id=event.edge_id,
                     source=event.source_node_id,
@@ -372,7 +443,7 @@ class _AssemblerState:
                     target_stuff_digest=event.target_stuff_digest,
                 )
                 self._explicit_edges.append(edge)
-            case EdgeKind.DATA | EdgeKind.BATCH_ITEM | EdgeKind.BATCH_AGGREGATE | EdgeKind.PARALLEL_COMBINE:
+            case EdgeKind.DATA | EdgeKind.BATCH_ITEM | EdgeKind.BATCH_AGGREGATE | EdgeKind.PARALLEL_COMBINE | EdgeKind.SELECTED_OUTCOME:
                 pass  # Regenerated in pass 2
 
     def _handle_controller_output(self, event: ControllerOutputEvent) -> None:
@@ -428,6 +499,10 @@ class _AssemblerState:
 
     def _handle_condition_output_merge(self, event: ConditionOutputMergeEvent) -> None:
         self._condition_output_merges.append(event.merge)
+
+    def _handle_condition_resolved(self, event: ConditionResolvedEvent) -> None:
+        # No node lookup: the condition's start can come from another workflow, read later in the stream.
+        self._condition_resolutions[event.node_id] = event.selected_outcome
 
     def _mark_canceled_nodes(self) -> None:
         """Mark any still-RUNNING nodes as CANCELED (mirrors graph_tracer.py:160-164)."""
@@ -578,6 +653,22 @@ class _AssemblerState:
                         source_stuff_digest=branch_stuff_code,
                         target_stuff_digest=combined_stuff_code,
                     )
+
+    def _generate_selected_outcome_edges(self) -> None:
+        """Generate the SELECTED_OUTCOME edges from each resolved condition to the pipe it then started.
+
+        Mirrors GraphTracer._generate_selected_outcome_edges(), through the same rule. The chosen pipe's start can come
+        from a workflow other than the condition's, under a tracer that never saw the resolution, so the edge is derived
+        here from both events rather than read from an edge event one tracer would have had to draw.
+        """
+        parent_by_node = {node_id: node_data.parent_node_id for node_id, node_data in self._nodes.items()}
+        for edge in derive_selected_outcome_edges(resolutions=self._condition_resolutions, parent_by_node=parent_by_node):
+            self._add_generated_edge(
+                source_node_id=edge.condition_node_id,
+                target_node_id=edge.outcome_node_id,
+                edge_kind=EdgeKind.SELECTED_OUTCOME,
+                label=edge.selected_outcome,
+            )
 
     # ------------------------------------------------------------------
     # Pass 2 usage attribution

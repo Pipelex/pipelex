@@ -27,5 +27,6 @@ def make_event_log(tracing_config: TracingConfig, *, writer_id: str = "primary")
             return DynamoDBEventLog(
                 table_name=tracing_config.dynamodb.table_name,
                 region=tracing_config.dynamodb.region,
+                retention_days=tracing_config.dynamodb.retention_days,
                 writer_id=writer_id,
             )

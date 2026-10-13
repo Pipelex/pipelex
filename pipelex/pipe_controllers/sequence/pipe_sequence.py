@@ -1,5 +1,5 @@
 import sys
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import PrivateAttr, field_validator
 from typing_extensions import override
@@ -37,6 +37,7 @@ from pipelex.pipe_controllers.sequence.sequence_typed_flow import (
     SequenceFlowMemo,
     SequenceStep,
     SequenceTypedFlow,
+    authored_step_count,
     authored_step_number,
     build_sequence_typed_flow,
     derive_binding_spec,
@@ -46,6 +47,7 @@ from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_machinery.memory_writes import MemoryWrite, SlotTaint, is_same_value_spec, taint_after_write, write_after_lift
 from pipelex.pipe_machinery.validation import is_valid_input_name, suggest_plain_name
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams, output_multiplicity_to_apply
+from pipelex.system.invocation_path import step_segment
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.validation_error_types import PipeValidationErrorType
 
@@ -88,6 +90,11 @@ class PipeSequence(PipeController):
     def _step_number(self, *, step_index: int) -> int:
         """The number messages give a step: its place among the steps the author wrote, counting from 1."""
         return authored_step_number(steps=self.sequential_sub_pipes, step_index=step_index)
+
+    @override
+    def traced_step_count(self) -> int:
+        """The number of steps the author wrote: the binding written for a dotted `batch_over` is no step of theirs."""
+        return authored_step_count(steps=self.sequential_sub_pipes)
 
     @property
     def has_binding_step(self) -> bool:
@@ -1032,6 +1039,9 @@ class PipeSequence(PipeController):
         typed_flow: SequenceTypedFlow | None = None
         # By step index, each binding the run derived from the value its root held, the flow having no spec for that root.
         runtime_bindings: dict[int, DerivedBinding] = {}
+        # The sequence records how many steps it runs as it starts. Each step's pipe is named by its invocation path,
+        # whose `step_<n>` segment is the step's number among the steps the author wrote.
+        self._register_execution_data(job_metadata=job_metadata, execution_data={"step_count": self.traced_step_count()})
 
         for sub_pipe_index, sub_pipe in enumerate(self.sequential_sub_pipes):
             is_last_step = sub_pipe_index == len(self.sequential_sub_pipes) - 1
@@ -1058,19 +1068,15 @@ class PipeSequence(PipeController):
                 sub_pipe_run_params = pipe_run_params.model_copy()
             else:
                 sub_pipe_run_params = pipe_run_params.model_copy(update=({"final_stuff_code": None}))
+            # A step that batches runs as the PipeBatch made for it, at the step's own segment.
             pipe_output = await sub_pipe.run_pipe(
                 calling_pipe_code=self.code,
                 working_memory=evolving_memory,
-                job_metadata=job_metadata,
+                job_metadata=job_metadata.for_child_at(segment=step_segment(step_number=self._step_number(step_index=sub_pipe_index))),
                 sub_pipe_run_params=sub_pipe_run_params,
                 library_crate=library_crate,
             )
             evolving_memory = pipe_output.working_memory
-        # Capture execution data for the graph tracer
-        execution_data_dict: dict[str, Any] = {
-            "step_count": len(self.sequential_sub_pipes),
-        }
-        self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
 
         return PipeOutput(
             working_memory=evolving_memory,

@@ -8,6 +8,8 @@ from datetime import UTC, datetime, timedelta
 
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graphspec import EdgeKind, IOSpec, NodeKind, NodeStatus
+from pipelex.system.execution_chain import ExecutionAttempt
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 from pipelex.tracing.trace_events import (
     BatchAggregateEvent,
@@ -42,6 +44,7 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id=workflow_id or self.WORKFLOW_ID,
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
         return tracer, event_log
 
@@ -55,10 +58,12 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id=self.WORKFLOW_ID,
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_id, _child_ctx = tracer.on_pipe_start(
+            pipe_ref="tests.test_pipe",
             trace_context=context,
             pipe_code="test_pipe",
             pipe_type="PipeLLM",
@@ -89,10 +94,12 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id=self.WORKFLOW_ID,
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         parent_id, child_ctx = tracer.on_pipe_start(
+            pipe_ref="tests.parent_pipe",
             trace_context=context,
             pipe_code="parent_pipe",
             pipe_type="PipeSequence",
@@ -101,7 +108,8 @@ class TestGraphTracerEventEmission:
         )
 
         child_id, _ = tracer.on_pipe_start(
-            trace_context=child_ctx,
+            pipe_ref="tests.child_pipe",
+            trace_context=child_ctx.with_child_segment(segment="step_1"),
             pipe_code="child_pipe",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -125,10 +133,12 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id=self.WORKFLOW_ID,
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.test_pipe",
             trace_context=context,
             pipe_code="test_pipe",
             pipe_type="PipeLLM",
@@ -166,10 +176,12 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id=self.WORKFLOW_ID,
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.test_pipe",
             trace_context=context,
             pipe_code="test_pipe",
             pipe_type="PipeLLM",
@@ -195,6 +207,47 @@ class TestGraphTracerEventEmission:
         assert evt.ended_at == ended_at
         assert evt.error.error_type == "ValueError"
         assert evt.error.message == "Something went wrong"
+        assert evt.error.caller_facing is False
+        # An end event names the pipe it ends, as its start does, and the invocation's path.
+        assert (evt.pipe_code, evt.pipe_ref, evt.pipe_type, evt.path) == ("test_pipe", "tests.test_pipe", "PipeLLM", "tests.test_pipe")
+
+    def test_pipe_end_error_states_whether_its_message_was_written_for_the_caller(self) -> None:
+        """The failure's `caller_facing` reaches the event and the node of the graph."""
+        tracer, event_log = self._make_tracer_with_event_log()
+        context = tracer.setup(
+            graph_id=self.GRAPH_ID,
+            data_inclusion=make_defaulted_data_inclusion_config(),
+            event_log=event_log,
+            workflow_id=self.WORKFLOW_ID,
+            pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
+        )
+        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
+        node_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.test_pipe",
+            trace_context=context,
+            pipe_code="test_pipe",
+            pipe_type="PipeParallel",
+            node_kind=NodeKind.CONTROLLER,
+            started_at=started_at,
+        )
+
+        tracer.on_pipe_end_error(
+            node_id=node_id,
+            ended_at=started_at + timedelta(milliseconds=50),
+            error_type="StuffFactoryError",
+            error_message="PipeParallel 'test_pipe' cannot combine its branch results into its output 'Report'.",
+            caller_facing=True,
+        )
+        graph_spec = tracer.teardown()
+
+        error_events = [evt for evt in event_log.read_events(self.PIPELINE_RUN_ID) if isinstance(evt, PipeEndErrorEvent)]
+        assert [evt.error.caller_facing for evt in error_events] == [True]
+        assert graph_spec is not None
+        failed_node = next(node for node in graph_spec.nodes if node.node_id == node_id)
+        assert failed_node.error is not None
+        assert failed_node.error.caller_facing is True
+        assert failed_node.path == "tests.test_pipe"
 
     def test_add_edge_emits_event(self) -> None:
         """EdgeEvent is emitted on add_edge."""
@@ -206,10 +259,12 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id=self.WORKFLOW_ID,
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_a, _ctx_a = tracer.on_pipe_start(
+            pipe_ref="tests.pipe_a",
             trace_context=context,
             pipe_code="pipe_a",
             pipe_type="PipeLLM",
@@ -217,6 +272,7 @@ class TestGraphTracerEventEmission:
             started_at=started_at,
         )
         node_b, _ = tracer.on_pipe_start(
+            pipe_ref="tests.pipe_b",
             trace_context=context,
             pipe_code="pipe_b",
             pipe_type="PipeLLM",
@@ -254,10 +310,12 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id=self.WORKFLOW_ID,
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.parallel_pipe",
             trace_context=context,
             pipe_code="parallel_pipe",
             pipe_type="PipeParallel",
@@ -286,6 +344,7 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id=self.WORKFLOW_ID,
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
 
         tracer.register_batch_item_extraction(
@@ -315,6 +374,7 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id=self.WORKFLOW_ID,
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
 
         tracer.register_batch_aggregation(
@@ -344,12 +404,14 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id=self.WORKFLOW_ID,
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
 
         # Create controller node
         ctrl_id, ctrl_ctx = tracer.on_pipe_start(
+            pipe_ref="tests.parallel_ctrl",
             trace_context=context,
             pipe_code="parallel_ctrl",
             pipe_type="PipeParallel",
@@ -359,7 +421,8 @@ class TestGraphTracerEventEmission:
 
         # Create branch nodes and end them with outputs
         branch_a_id, _ = tracer.on_pipe_start(
-            trace_context=ctrl_ctx,
+            pipe_ref="tests.branch_a",
+            trace_context=ctrl_ctx.with_child_segment(segment="step_1"),
             pipe_code="branch_a",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -372,7 +435,8 @@ class TestGraphTracerEventEmission:
         )
 
         branch_b_id, _ = tracer.on_pipe_start(
-            trace_context=ctrl_ctx,
+            pipe_ref="tests.branch_b",
+            trace_context=ctrl_ctx.with_child_segment(segment="step_2"),
             pipe_code="branch_b",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
@@ -406,13 +470,11 @@ class TestGraphTracerEventEmission:
     def test_no_event_log_works_as_before(self) -> None:
         """GraphTracer without event_log (direct mode) works exactly as before."""
         tracer = GraphTracer()
-        context = tracer.setup(
-            graph_id="direct-mode-test",
-            data_inclusion=make_defaulted_data_inclusion_config(),
-        )
+        context = tracer.setup(graph_id="direct-mode-test", data_inclusion=make_defaulted_data_inclusion_config(), run_mode=PipeRunMode.LIVE)
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_id, _child_ctx = tracer.on_pipe_start(
+            pipe_ref="tests.test_pipe",
             trace_context=context,
             pipe_code="test_pipe",
             pipe_type="PipeLLM",
@@ -433,7 +495,7 @@ class TestGraphTracerEventEmission:
         assert graph_spec.nodes[0].status == NodeStatus.SUCCEEDED
 
     def test_node_id_includes_workflow_id_in_temporal_mode(self) -> None:
-        """Node IDs include workflow_id segment when not in direct mode."""
+        """Node IDs name the workflow and its attempt when not in direct mode."""
         tracer, event_log = self._make_tracer_with_event_log(workflow_id="wf_run_123")
 
         context = tracer.setup(
@@ -442,10 +504,12 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id="wf_run_123",
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.test_pipe",
             trace_context=context,
             pipe_code="test_pipe",
             pipe_type="PipeLLM",
@@ -454,7 +518,61 @@ class TestGraphTracerEventEmission:
         )
 
         assert "wf_run_123" in node_id
-        assert node_id == f"{self.GRAPH_ID}:wf_run_123:node_0"
+        assert node_id == f"{self.GRAPH_ID}:wf_run_123:attempt_1:node_0"
+
+    def test_each_attempt_and_each_dispatch_mints_its_own_ids(self) -> None:
+        """Two attempts of one workflow, and a workflow two attempts of its parent dispatched under one name, number
+        their nodes and edges from 0 alike: their ids differ by the chain alone, so no reader keyed on an id merges the
+        node a lost attempt failed with the one its retry ran.
+        """
+        run_1 = ExecutionAttempt(execution="wf_run", attempt=1)
+        run_2 = ExecutionAttempt(execution="wf_run", attempt=2)
+        setups: list[tuple[str, int, list[ExecutionAttempt]]] = [
+            ("wf_run", 1, []),
+            ("wf_run", 2, []),
+            ("wf_item", 1, [run_1]),
+            ("wf_item", 2, [run_1]),
+            ("wf_item", 1, [run_2]),
+        ]
+        ids_by_chain: list[set[str]] = []
+        for workflow_id, attempt, lineage in setups:
+            event_log = InMemoryEventLog()
+            tracer = GraphTracer()
+            context = tracer.setup(
+                graph_id=self.GRAPH_ID,
+                data_inclusion=make_defaulted_data_inclusion_config(),
+                event_log=event_log,
+                workflow_id=workflow_id,
+                attempt=attempt,
+                lineage=lineage,
+                pipeline_run_id=self.PIPELINE_RUN_ID,
+                run_mode=PipeRunMode.LIVE,
+            )
+            started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
+            node_a, _ = tracer.on_pipe_start(
+                pipe_ref="tests.pipe_a",
+                trace_context=context,
+                pipe_code="pipe_a",
+                pipe_type="PipeLLM",
+                node_kind=NodeKind.OPERATOR,
+                started_at=started_at,
+            )
+            node_b, _ = tracer.on_pipe_start(
+                pipe_ref="tests.pipe_b",
+                trace_context=context,
+                pipe_code="pipe_b",
+                pipe_type="PipeLLM",
+                node_kind=NodeKind.OPERATOR,
+                started_at=started_at,
+            )
+            tracer.add_edge(source_node_id=node_a, target_node_id=node_b, edge_kind=EdgeKind.DATA)
+            edge_ids = {evt.edge_id for evt in event_log.read_events(self.PIPELINE_RUN_ID) if isinstance(evt, EdgeEvent)}
+            assert len(edge_ids) == 1
+            ids_by_chain.append({node_a, node_b, *edge_ids})
+            tracer.teardown()
+
+        all_ids = [minted_id for chain_ids in ids_by_chain for minted_id in chain_ids]
+        assert len(all_ids) == len(set(all_ids)) == 3 * len(setups)
 
     def test_edge_id_includes_workflow_id_in_temporal_mode(self) -> None:
         """Edge IDs include workflow_id segment when not in direct mode."""
@@ -466,10 +584,12 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id="wf_run_456",
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_a, _ = tracer.on_pipe_start(
+            pipe_ref="tests.pipe_a",
             trace_context=context,
             pipe_code="pipe_a",
             pipe_type="PipeLLM",
@@ -477,6 +597,7 @@ class TestGraphTracerEventEmission:
             started_at=started_at,
         )
         node_b, _ = tracer.on_pipe_start(
+            pipe_ref="tests.pipe_b",
             trace_context=context,
             pipe_code="pipe_b",
             pipe_type="PipeLLM",
@@ -493,7 +614,7 @@ class TestGraphTracerEventEmission:
         events = event_log.read_events(self.PIPELINE_RUN_ID)
         edge_events = [evt for evt in events if isinstance(evt, EdgeEvent) and evt.edge_kind == EdgeKind.DATA]
         assert len(edge_events) == 1
-        assert "wf_run_456" in edge_events[0].edge_id
+        assert edge_events[0].edge_id == f"{self.GRAPH_ID}:wf_run_456:attempt_1:edge_0"
 
     def test_event_sequence_is_monotonic(self) -> None:
         """Events have monotonically increasing sequence numbers."""
@@ -505,11 +626,13 @@ class TestGraphTracerEventEmission:
             event_log=event_log,
             workflow_id=self.WORKFLOW_ID,
             pipeline_run_id=self.PIPELINE_RUN_ID,
+            run_mode=PipeRunMode.LIVE,
         )
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         for index in range(5):
             node_id, _ = tracer.on_pipe_start(
+                pipe_ref=f"tests.{f'pipe_{index}'}",
                 trace_context=context,
                 pipe_code=f"pipe_{index}",
                 pipe_type="PipeLLM",
@@ -529,13 +652,11 @@ class TestGraphTracerEventEmission:
     def test_direct_mode_node_id_unchanged(self) -> None:
         """In direct mode (no workflow_id), node ID format is unchanged."""
         tracer = GraphTracer()
-        context = tracer.setup(
-            graph_id="direct-graph",
-            data_inclusion=make_defaulted_data_inclusion_config(),
-        )
+        context = tracer.setup(graph_id="direct-graph", data_inclusion=make_defaulted_data_inclusion_config(), run_mode=PipeRunMode.LIVE)
 
         started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_id, _ = tracer.on_pipe_start(
+            pipe_ref="tests.test_pipe",
             trace_context=context,
             pipe_code="test_pipe",
             pipe_type="PipeLLM",

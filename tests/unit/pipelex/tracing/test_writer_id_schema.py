@@ -5,6 +5,7 @@ expose a writer_id property, and that the read-side dedup/sort/file-routing keys
 all incorporate writer_id correctly.
 """
 
+import hashlib
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -13,6 +14,8 @@ from typing import Any
 from pytest_mock import MockerFixture
 
 from pipelex.graph.graphspec import NodeKind
+from pipelex.system.execution_chain import execution_chain_digest
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.buffering_event_log import BufferingEventLog
 from pipelex.tracing.dynamodb_event_log import DynamoDBEventLog
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
@@ -22,15 +25,22 @@ from pipelex.tracing.trace_events import PipeStartEvent
 _TS = datetime(2025, 6, 15, 10, 30, 0, tzinfo=UTC)
 _PIPELINE_RUN_ID = "run_writer_id_001"
 _WORKFLOW_ID = "wf_writer_id_xyz"
+# The digest naming the chain of an event written by the first attempt of the run's own workflow
+_CHAIN_DIGEST = execution_chain_digest(chain_key=f"{_WORKFLOW_ID}@1")
 
 
 def _make_pipe_start(sequence: int, writer_id: str = "primary", workflow_id: str = _WORKFLOW_ID) -> PipeStartEvent:
     return PipeStartEvent(
+        attempt=1,
+        lineage=[],
+        path=None,
+        pipe_ref=None,
         pipeline_run_id=_PIPELINE_RUN_ID,
         workflow_id=workflow_id,
         writer_id=writer_id,
         timestamp=_TS,
         sequence=sequence,
+        mode=PipeRunMode.LIVE,
         node_id=f"g:{workflow_id}:node_{sequence}",
         pipe_code="pipe_x",
         pipe_type="PipeLLM",
@@ -44,10 +54,15 @@ class TestWriterIdSchema:
     def test_trace_event_has_writer_id_default_primary(self) -> None:
         """A TraceEvent built without writer_id round-trips with writer_id="primary"."""
         event = PipeStartEvent(
+            attempt=1,
+            lineage=[],
+            path=None,
+            pipe_ref=None,
             pipeline_run_id=_PIPELINE_RUN_ID,
             workflow_id=_WORKFLOW_ID,
             timestamp=_TS,
             sequence=0,
+            mode=PipeRunMode.LIVE,
             node_id=f"g:{_WORKFLOW_ID}:node_0",
             pipe_code="pipe_x",
             pipe_type="PipeLLM",
@@ -73,11 +88,16 @@ class TestWriterIdSchema:
         legacy_payload: dict[str, Any] = {
             "pipeline_run_id": _PIPELINE_RUN_ID,
             "workflow_id": _WORKFLOW_ID,
+            "attempt": 1,
+            "lineage": [],
+            "path": None,
             "timestamp": _TS.isoformat(),
             "sequence": 0,
+            "mode": "live",
             "event_kind": "pipe_start",
             "node_id": f"g:{_WORKFLOW_ID}:node_0",
             "pipe_code": "pipe_x",
+            "pipe_ref": "tests.pipe_x",
             "pipe_type": "PipeLLM",
             "node_kind": NodeKind.OPERATOR,
         }
@@ -106,7 +126,7 @@ class TestWriterIdSchema:
         assert writer_ids == {"a", "b"}
 
     def test_ndjson_writer_id_in_filename_for_non_primary(self, tmp_path: Path) -> None:
-        """NDJSON file naming includes writer_id when non-primary; legacy name when primary."""
+        """NDJSON file naming includes writer_id when non-primary, after the workflow and its chain's digest."""
         primary_log = NdjsonEventLog(traces_dir=str(tmp_path))
         runner_log = NdjsonEventLog(traces_dir=str(tmp_path), writer_id="act_pid42")
 
@@ -116,12 +136,12 @@ class TestWriterIdSchema:
         run_dir = tmp_path / _PIPELINE_RUN_ID
         ndjson_files = sorted(path.name for path in run_dir.glob("*.ndjson"))
 
-        assert ndjson_files == [f"wf_{_WORKFLOW_ID}.ndjson", f"wf_{_WORKFLOW_ID}__w_act_pid42.ndjson"]
+        assert ndjson_files == [f"wf_{_WORKFLOW_ID}__c_{_CHAIN_DIGEST}.ndjson", f"wf_{_WORKFLOW_ID}__c_{_CHAIN_DIGEST}__w_act_pid42.ndjson"]
 
     def test_two_writers_same_workflow_get_separate_handles(self, tmp_path: Path) -> None:
         """Two NdjsonEventLogs with different writer_ids must not share the file-handle cache slot.
 
-        Pins the (pipeline_run_id, workflow_id, writer_id) cache key. With a 2-tuple key,
+        Pins the (pipeline_run_id, chain_key, writer_id) cache key. With a 2-tuple key,
         the second writer would steal the first writer's file handle and corrupt routing.
         """
         log_a = NdjsonEventLog(traces_dir=str(tmp_path), writer_id="writer_a")
@@ -133,8 +153,8 @@ class TestWriterIdSchema:
         log_b.close()
 
         run_dir = tmp_path / _PIPELINE_RUN_ID
-        a_lines = (run_dir / f"wf_{_WORKFLOW_ID}__w_writer_a.ndjson").read_text(encoding="utf-8").splitlines()
-        b_lines = (run_dir / f"wf_{_WORKFLOW_ID}__w_writer_b.ndjson").read_text(encoding="utf-8").splitlines()
+        a_lines = (run_dir / f"wf_{_WORKFLOW_ID}__c_{_CHAIN_DIGEST}__w_writer_a.ndjson").read_text(encoding="utf-8").splitlines()
+        b_lines = (run_dir / f"wf_{_WORKFLOW_ID}__c_{_CHAIN_DIGEST}__w_writer_b.ndjson").read_text(encoding="utf-8").splitlines()
 
         assert len(a_lines) == 1
         assert len(b_lines) == 1
@@ -183,7 +203,7 @@ class TestWriterIdSchema:
         assert events[2].writer_id == "primary"
 
     def test_dynamodb_sk_includes_writer_id(self, mocker: MockerFixture) -> None:
-        """DynamoDB SK encodes writer_id between workflow_id and sequence."""
+        """DynamoDB SK encodes writer_id between the digest of the event's chain and its sequence."""
         captured_items: list[dict[str, Any]] = []
 
         class _StubTable:
@@ -200,11 +220,12 @@ class TestWriterIdSchema:
             return_value=_StubResource(),
         )
 
-        event_log = DynamoDBEventLog(table_name="my_table", region="us-east-1", writer_id="act_pid42")
+        event_log = DynamoDBEventLog(table_name="my_table", region="us-east-1", retention_days=30, writer_id="act_pid42")
         event_log.emit(_make_pipe_start(sequence=0, writer_id="act_pid42"))
 
         assert len(captured_items) == 1
-        assert captured_items[0]["SK"] == f"EVENT#{_WORKFLOW_ID}#act_pid42#0000000000"
+        chain_digest = hashlib.sha256(f"{_WORKFLOW_ID}@1".encode()).hexdigest()
+        assert captured_items[0]["SK"] == f"EVENT#{chain_digest}#act_pid42#0000000000"
 
     def test_event_log_exposes_writer_id_property(self, tmp_path: Path) -> None:
         """Every event log backend exposes its writer_id via a read-only property.

@@ -21,7 +21,7 @@ flowchart TB
     CALL["inference call completes"]
     EVENT["UsageReportEvent<br/>{ node_id, tokens_usage }"]
 
-    subgraph LOG["event log — one stream, ordered by (workflow_id, sequence)"]
+    subgraph LOG["event log — one stream, ordered by (chain, sequence)"]
         STREAM["PipeStart · PipeEndSuccess · Edge · UsageReport"]
     end
 
@@ -49,7 +49,9 @@ flowchart TB
 
 ## When attribution happens, and why it waits
 
-`GraphSpecAssembler` folds usage events during pass 1, keyed by the `node_id` the event *named* — with no node lookup. Resolution against the real node set happens in pass 2. This is not an optimisation: a `UsageReportEvent` can legitimately be read **before** the `PipeStartEvent` of the node it names, because the two can come from different workers and the stream is ordered by `(workflow_id, sequence)`. "Is this node real?" is only answerable once every event has been seen.
+`GraphSpecAssembler` folds usage events during pass 1, keyed by the `node_id` the event *named* — with no node lookup. Resolution against the real node set happens in pass 2. This is not an optimisation: a `UsageReportEvent` can legitimately be read **before** the `PipeStartEvent` of the node it names, because the two can come from different workers and the stream is ordered by `(chain, sequence)`, the chain being the attempts of the executions that wrote the event. "Is this node real?" is only answerable once every event has been seen.
+
+A usage event of a superseded attempt, one a later attempt of its execution or of an execution that dispatched it replaced, names a node the graph does not show, since the graph is built from current events only (see [Executions and Their Attempts](execution-graph-tracing.md#executions-and-their-attempts)). Its inference was spent all the same, so the assembler counts it in the run's total, as unattributed usage.
 
 Pass 2 then does three things: resolves each accumulated total onto its node (or into the unattributed bucket), rolls subtrees up the `parent_node_id` chain, and computes the run total.
 

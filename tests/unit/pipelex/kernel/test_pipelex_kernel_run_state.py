@@ -20,6 +20,7 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.exceptions import StuffContentTypeError
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.kernel.exceptions import TraceContextRunModeError
 from pipelex.kernel.memory_ops import (
     extract_main_content,
     extract_main_content_as_list,
@@ -29,6 +30,7 @@ from pipelex.kernel.memory_ops import (
 )
 from pipelex.kernel.pipelex_kernel import PipelexKernel
 from pipelex.system.data_inclusion_config import DataInclusionConfig
+from pipelex.system.execution_chain import make_direct_chain
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
 from pipelex.tools.log.log_context import LogContext, get_log_context
@@ -39,7 +41,7 @@ if TYPE_CHECKING:
 _GRAPH_ID = "kernel-run-state"
 
 
-def _trace_context() -> TraceContext:
+def _trace_context(*, run_mode: PipeRunMode = PipeRunMode.DRY) -> TraceContext:
     return TraceContext(
         graph_id=_GRAPH_ID,
         data_inclusion=DataInclusionConfig(
@@ -49,6 +51,8 @@ def _trace_context() -> TraceContext:
         ),
         emit_graph_events=False,
         emit_usage_events=True,
+        run_mode=run_mode,
+        chain=make_direct_chain(),
     )
 
 
@@ -123,6 +127,51 @@ class TestPipelexKernelRunState:
                 trace_context=_trace_context(),
                 pipeline_run_id="plr-elsewhere",
             )
+
+    @pytest.mark.parametrize(
+        ("is_dry_run_forced", "requested_run_mode", "context_run_mode"),
+        [
+            (True, PipeRunMode.LIVE, PipeRunMode.LIVE),
+            (False, PipeRunMode.DRY, PipeRunMode.LIVE),
+            (False, PipeRunMode.LIVE, PipeRunMode.DRY),
+        ],
+        ids=["keyless_boot_forces_the_live_request_dry", "dry_request_live_context", "live_request_dry_context"],
+    )
+    def test_a_trace_context_stating_another_mode_than_the_run_takes_is_refused(
+        self, mocker: MockerFixture, is_dry_run_forced: bool, requested_run_mode: PipeRunMode, context_run_mode: PipeRunMode
+    ) -> None:
+        """Every usage event states the context's mode, so a context saying live for a run whose steps run dry is refused.
+
+        The keyless arm is the one a caller cannot see in its own arguments: it requests a live run and opens a live
+        trace, and the boot runs the steps dry.
+        """
+        mocker.patch("pipelex.runtime_hub.is_dry_run_forced", return_value=is_dry_run_forced)
+
+        with pytest.raises(TraceContextRunModeError, match="trace context stating a"):
+            PipelexKernel.make(
+                storage_scope="test/scope",
+                read_scope=None,
+                run_mode=requested_run_mode,
+                user_id="test-user",
+                trace_context=_trace_context(run_mode=context_run_mode),
+            )
+
+    def test_on_a_keyless_boot_a_dry_trace_context_carries_a_live_request(self, mocker: MockerFixture) -> None:
+        """A caller that opens its trace with the mode the boot gives the run gets a dry run whose every step states dry."""
+        mocker.patch("pipelex.runtime_hub.is_dry_run_forced", return_value=True)
+
+        kernel = PipelexKernel.make(
+            storage_scope="test/scope",
+            read_scope=None,
+            run_mode=PipeRunMode.LIVE,
+            user_id="test-user",
+            trace_context=_trace_context(run_mode=PipeRunMode.DRY),
+        )
+
+        assert kernel.cogt_run_params.run_mode.is_dry
+        step_trace_context = kernel.make_step_metadata().trace_context
+        assert step_trace_context is not None
+        assert step_trace_context.run_mode.is_dry
 
     def test_an_empty_pipeline_run_id_is_refused(self) -> None:
         """An empty id is a caller's bug, and minting one in its place would hide it from a replaying host."""

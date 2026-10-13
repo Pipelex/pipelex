@@ -6896,10 +6896,6 @@ rationale = "Derivation: encodes the run id into a key condition; single operand
 param = "pipeline_run_id"
 rationale = "Derivation: encodes the run id into the partition key; single operand."
 
-["pipelex/tracing/dynamodb_event_log.py::DynamoDBEventLog._make_sk"]
-param = "workflow_id"
-rationale = "Derivation: encodes the workflow id into the sort key; writer/sequence stay keyword."
-
 ["pipelex/tracing/event_log_factory.py::make_event_log"]
 param = "tracing_config"
 rationale = "Factory from source: builds the event log from the tracing config; writer_id stays keyword."
@@ -6929,6 +6925,10 @@ param = "event"
 rationale = "Dispatch handler: handles the event; single operand."
 
 ["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_condition_output_merge"]
+param = "event"
+rationale = "An event handler of the assembler's pass one, called with the one event it folds in, like its sibling handlers."
+
+["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_condition_resolved"]
 param = "event"
 rationale = "An event handler of the assembler's pass one, called with the one event it folds in, like its sibling handlers."
 
@@ -6975,10 +6975,6 @@ rationale = "Verb-object: reads the event to track its timestamp; single operand
 ["pipelex/tracing/graphspec_assembler.py::_AssemblerState.pass_one"]
 param = "events"
 rationale = "First pass over the event sequence; single operand."
-
-["pipelex/tracing/ndjson_event_log.py::NdjsonEventLog._file_name_for"]
-param = "workflow_id"
-rationale = "Derivation: encodes the workflow id into a file name; writer_id stays keyword."
 
 ["pipelex/tracing/usage_aggregator.py::UsageAggregator.aggregate"]
 param = "events"

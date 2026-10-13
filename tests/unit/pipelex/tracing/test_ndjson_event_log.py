@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from pipelex.system.execution_chain import ExecutionAttempt, execution_chain_digest
 from pipelex.tracing.exceptions import EventLogSchemaMismatchError
 from pipelex.tracing.ndjson_event_log import NdjsonEventLog
 from pipelex.tracing.trace_events import EdgeEvent, PipeStartEvent
@@ -23,6 +24,12 @@ def _worker_fn(traces_dir: str, pipeline_run_id: str, workflow_id: str, num_even
         )
         event_log.emit(event)
     event_log.close()
+
+
+def _only_run_file(run_dir: Path) -> Path:
+    """The one file a run written by one attempt of one execution, through one writer, holds."""
+    (ndjson_file,) = run_dir.glob("*.ndjson")
+    return ndjson_file
 
 
 class TestNdjsonEventLog:
@@ -45,7 +52,7 @@ class TestNdjsonEventLog:
             assert read_event.pipe_code == "test_pipe"
 
     def test_deduplication(self, tmp_path: Path) -> None:
-        """Duplicate (workflow_id, event_kind, sequence) triples are deduplicated."""
+        """Events of one chain, writer, kind and sequence are one event written twice, and are deduplicated."""
         event_log = NdjsonEventLog(traces_dir=str(tmp_path))
         event_log.emit(make_trace_event(sequence=0))
         event_log.emit(make_trace_event(sequence=0))
@@ -67,6 +74,22 @@ class TestNdjsonEventLog:
         assert PipeStartEvent in event_kinds
         assert EdgeEvent in event_kinds
 
+    def test_each_attempt_keeps_its_own_events(self, tmp_path: Path) -> None:
+        """Attempts of one execution number their events from the same start, and every attempt's events are kept.
+
+        They are read back attempt by attempt, an execution's earlier attempt first, and an execution dispatched under
+        another attempt of its dispatcher is another chain.
+        """
+        event_log = NdjsonEventLog(traces_dir=str(tmp_path))
+        event_log.emit(make_trace_event(workflow_id="exec-item", sequence=0, attempt=2, lineage=[ExecutionAttempt(execution="exec-run", attempt=1)]))
+        event_log.emit(make_trace_event(workflow_id="exec-item", sequence=0, attempt=1, lineage=[ExecutionAttempt(execution="exec-run", attempt=1)]))
+        event_log.emit(make_trace_event(workflow_id="exec-item", sequence=0, attempt=1, lineage=[ExecutionAttempt(execution="exec-run", attempt=2)]))
+        event_log.emit(make_trace_event(workflow_id="exec-item", sequence=0, attempt=2, lineage=[ExecutionAttempt(execution="exec-run", attempt=1)]))
+
+        result = event_log.read_events("run_001")
+
+        assert [event.chain_key for event in result] == ["exec-run@1/exec-item@1", "exec-run@1/exec-item@2", "exec-run@2/exec-item@1"]
+
     def test_multiple_workflows(self, tmp_path: Path) -> None:
         """Events from multiple workflows are returned sorted by (workflow_id, sequence)."""
         event_log = NdjsonEventLog(traces_dir=str(tmp_path))
@@ -86,7 +109,7 @@ class TestNdjsonEventLog:
         assert result[3].workflow_id == "wf_zzz"
 
     def test_separate_files_per_workflow(self, tmp_path: Path) -> None:
-        """Each workflow_id gets its own NDJSON file."""
+        """Each workflow gets its own NDJSON file, named by the workflow and by its chain's digest."""
         event_log = NdjsonEventLog(traces_dir=str(tmp_path))
         event_log.emit(make_trace_event(workflow_id="wf_alpha", sequence=0))
         event_log.emit(make_trace_event(workflow_id="wf_beta", sequence=0))
@@ -94,8 +117,40 @@ class TestNdjsonEventLog:
         run_dir = tmp_path / "run_001"
         ndjson_files = sorted(run_dir.glob("*.ndjson"))
         assert len(ndjson_files) == 2
-        assert ndjson_files[0].name == "wf_wf_alpha.ndjson"
-        assert ndjson_files[1].name == "wf_wf_beta.ndjson"
+        assert ndjson_files[0].name == f"wf_wf_alpha__c_{execution_chain_digest(chain_key='wf_alpha@1')}.ndjson"
+        assert ndjson_files[1].name == f"wf_wf_beta__c_{execution_chain_digest(chain_key='wf_beta@1')}.ndjson"
+
+    def test_each_attempt_of_each_execution_writes_its_own_file(self, tmp_path: Path) -> None:
+        """Two attempts of one workflow, and one workflow two attempts of its dispatcher dispatched under one name, may
+        write at once, each through a handle of its own: they never append to one file, where their partial lines could
+        interleave and leave the whole run's log unreadable. The reader finds every file of the run.
+        """
+        run_1 = ExecutionAttempt(execution="exec-run", attempt=1)
+        run_2 = ExecutionAttempt(execution="exec-run", attempt=2)
+        chains: list[tuple[int, list[ExecutionAttempt]]] = [(1, [run_1]), (2, [run_1]), (1, [run_2])]
+        writers = [NdjsonEventLog(traces_dir=str(tmp_path)) for _ in chains]
+        for sequence in range(2):
+            for writer, (attempt, lineage) in zip(writers, chains, strict=True):
+                writer.emit(make_trace_event(workflow_id="exec-item", sequence=sequence, attempt=attempt, lineage=lineage))
+        for writer in writers:
+            writer.close()
+
+        run_dir = tmp_path / "run_001"
+        ndjson_files = sorted(run_dir.glob("*.ndjson"))
+        assert len(ndjson_files) == len(chains)
+        for ndjson_file in ndjson_files:
+            assert ndjson_file.name.startswith("wf_exec-item__c_")
+            assert len(ndjson_file.read_text(encoding="utf-8").splitlines()) == 2
+
+        result = NdjsonEventLog(traces_dir=str(tmp_path)).read_events("run_001")
+        assert [(event.chain_key, event.sequence) for event in result] == [
+            ("exec-run@1/exec-item@1", 0),
+            ("exec-run@1/exec-item@1", 1),
+            ("exec-run@1/exec-item@2", 0),
+            ("exec-run@1/exec-item@2", 1),
+            ("exec-run@2/exec-item@1", 0),
+            ("exec-run@2/exec-item@1", 1),
+        ]
 
     def test_cleanup_removes_directory(self, tmp_path: Path) -> None:
         """Cleanup removes the pipeline run directory and closes file handles."""
@@ -126,7 +181,7 @@ class TestNdjsonEventLog:
         event_log.emit(make_trace_event(sequence=1))
         event_log.close()
 
-        ndjson_file = tmp_path / "run_001" / "wf_wf_abc.ndjson"
+        ndjson_file = _only_run_file(tmp_path / "run_001")
         with open(ndjson_file, "a", encoding="utf-8") as fhandle:
             fhandle.write("not valid json\n")
 
@@ -146,7 +201,7 @@ class TestNdjsonEventLog:
         event_log = NdjsonEventLog(traces_dir=str(tmp_path))
         event_log.emit(make_trace_event(sequence=0))
         event_log.close()
-        ndjson_file = tmp_path / "run_001" / "wf_wf_abc.ndjson"
+        ndjson_file = _only_run_file(tmp_path / "run_001")
         with open(ndjson_file, "a", encoding="utf-8") as fhandle:
             fhandle.write('{"event_kind": "pipe_start", "traced_value": "a_value_from_the_run\n')
 
@@ -171,7 +226,7 @@ class TestNdjsonEventLog:
         event_log.emit(make_trace_event(sequence=0))
         event_log.close()
 
-        ndjson_file = tmp_path / "run_001" / "wf_wf_abc.ndjson"
+        ndjson_file = _only_run_file(tmp_path / "run_001")
         with open(ndjson_file, "a", encoding="utf-8") as fhandle:
             fhandle.write('{"event_kind": "pipe_start", "bad": "traced-value"}\n')
 
@@ -189,7 +244,7 @@ class TestNdjsonEventLog:
         event_log.emit(make_trace_event(sequence=0))
         event_log.close()
 
-        ndjson_file = tmp_path / "run_001" / "wf_wf_abc.ndjson"
+        ndjson_file = _only_run_file(tmp_path / "run_001")
         with open(ndjson_file, "a", encoding="utf-8") as fhandle:
             fhandle.write('{"event_kind": "pipe_start", "bad": "traced-value"}\n')
 
@@ -197,6 +252,23 @@ class TestNdjsonEventLog:
             event_log.read_events("run_001")
 
         assert "traced-value" not in str(refusal.value)
+
+    def test_a_line_naming_no_execution_is_refused_with_the_others(self, tmp_path: Path) -> None:
+        """A line whose `workflow_id` is empty names no execution: it is counted with the lines the models refuse,
+        rather than read and then failing whoever first asks for its chain.
+        """
+        event_log = NdjsonEventLog(traces_dir=str(tmp_path))
+        event_log.emit(make_trace_event(sequence=0))
+        event_log.close()
+
+        ndjson_file = _only_run_file(tmp_path / "run_001")
+        nameless_line = make_trace_event(sequence=1).model_dump_json().replace('"workflow_id":"wf_abc"', '"workflow_id":""')
+        assert '"workflow_id":""' in nameless_line
+        with open(ndjson_file, "a", encoding="utf-8") as fhandle:
+            fhandle.write(nameless_line + "\n")
+
+        with pytest.raises(EventLogSchemaMismatchError, match="1 trace event"):
+            event_log.read_events("run_001")
 
     def test_multiprocess_concurrent_writes(self, tmp_path: Path) -> None:
         """Multiple processes writing to different workflow files produces no corruption."""

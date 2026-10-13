@@ -2,16 +2,28 @@
 
 Stores trace events in a DynamoDB table with the schema:
     PK: PIPELINE_RUN#{pipeline_run_id}
-    SK: EVENT#{workflow_id}#{writer_id}#{sequence:010d}
-    payload: dict (full event via model_dump)
+    SK: EVENT#{chain_digest}#{writer_id}#{sequence:010d}
+    payload: the full event as JSON, its lineage, workflow and attempt included
+    ttl: epoch seconds at which DynamoDB may delete the item, the write time plus the configured retention
 
-Legacy emissions write writer_id="primary" so existing rows remain valid.
+The chain digest is the SHA-256 of the event's chain key, the event's lineage
+followed by its own workflow and attempt (`TraceEvent.chain_key`), so a
+workflow's new attempt, whose sequence starts again, never overwrites the rows
+of its earlier one, while the sort key keeps one length however deep the
+lineage and however long its workflow ids: DynamoDB refuses a sort key over
+1,024 bytes. The row's chain itself is read back from its payload.
 
-Compatible with the hosted trace-event DynamoDB adapter schema.
+The schema is this backend's own, and no other writer's is promised to match
+it. A row written by a version whose sort key named the workflow and no chain
+holds an event without `attempt`, `lineage` or `path`, which the read refuses
+with `EventLogSchemaMismatchError` rather than deduplicating it against a
+current row.
+
 Requires: pip install "pipelex[dynamodb]"
 """
 
 import threading
+import time
 from typing import Any
 
 from pydantic import TypeAdapter, ValidationError
@@ -19,9 +31,10 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.system.exceptions import MissingDependencyError
+from pipelex.system.execution_chain import execution_chain_digest
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
-from pipelex.tracing.event_log_protocol import EventLogProtocol
+from pipelex.tracing.event_log_protocol import EventLogProtocol, deduplicate_and_order_events
 from pipelex.tracing.exceptions import EventLogReadError, EventLogSchemaMismatchError, EventLogSetupError
 from pipelex.tracing.trace_events import AnyTraceEvent, TraceEvent, json_invalid_message
 
@@ -34,30 +47,44 @@ except ImportError:
 
 _any_trace_event_adapter: TypeAdapter[TraceEvent] = TypeAdapter(AnyTraceEvent)
 
+_SECONDS_PER_DAY = 86_400
+
 
 class DynamoDBEventLog(EventLogProtocol):
     """Event log backed by AWS DynamoDB.
 
     Write path: PutItem per event, synchronous. DynamoDB's PK+SK uniqueness
-    provides natural deduplication for Temporal replay re-emissions.
-    Read path: Query on PK, returns events sorted by SK which encodes
-    (workflow_id, sequence) — matching the NDJSON ordering contract.
+    provides natural deduplication for Temporal replay re-emissions, since a
+    replayed event has the same chain, writer and sequence, and so the same SK.
+    Read path: Query on PK, then the events ordered as every event log returns
+    them (`deduplicate_and_order_events`): the SK's chain digest orders the
+    rows by no chain. The rule's deduplication finds nothing to drop here,
+    the key having already kept one row per event.
+    Retention: every item carries a `ttl` in epoch seconds, `retention_days`
+    past its write, which is the attribute the events table expires items on,
+    so a run's events are deleted by DynamoDB instead of being kept forever.
 
     WARNING: Do not call emit() from inside a Temporal workflow body — the
     synchronous boto3 HTTP call will block the workflow thread and trigger
     the deadlock detector. Use BufferingEventLog + act_flush_trace_events instead.
     """
 
-    def __init__(self, table_name: str, region: str, writer_id: str = "primary") -> None:
+    def __init__(self, *, table_name: str, region: str, retention_days: int, writer_id: str = "primary") -> None:
         if boto3 is None:
             lib_name = "boto3"
             lib_extra_name = "dynamodb"
             msg = "boto3 is required for the DynamoDB event log backend."
             raise MissingDependencyError(lib_name, lib_extra_name, msg)
+        # The config refuses a retention under one day too, but a direct construction bypasses it,
+        # and such a retention would expire every event as it is written.
+        if retention_days < 1:
+            msg = f"The DynamoDB event log needs a retention of at least one day, got retention_days={retention_days}."
+            raise EventLogSetupError(msg)
 
         self._table_name = table_name
         self._region = region
         self._writer_id = writer_id
+        self._retention_seconds = retention_days * _SECONDS_PER_DAY
         self._sequence: int = 0
         self._sequence_lock = threading.Lock()
         # Translate construction-time botocore failures (e.g. a misconfigured region) into our
@@ -97,8 +124,14 @@ class DynamoDBEventLog(EventLogProtocol):
         return f"PIPELINE_RUN#{pipeline_run_id}"
 
     @staticmethod
-    def _make_sk(workflow_id: str, *, writer_id: str, sequence: int) -> str:
-        return f"EVENT#{workflow_id}#{writer_id}#{sequence:010d}"
+    def _make_sk(*, chain_key: str, writer_id: str, sequence: int) -> str:
+        """The sort key of one event: its chain, its writer and its sequence, which tell it apart from every other event
+        of its run.
+
+        The chain is written as the SHA-256 hex digest of its key, so the sort key's length does not grow with the
+        lineage, and the same chain always gives the same digest, so a replayed write still overwrites its own row.
+        """
+        return f"EVENT#{execution_chain_digest(chain_key=chain_key)}#{writer_id}#{sequence:010d}"
 
     def _key_condition(self, pipeline_run_id: str) -> Any:
         """Build a KeyConditionExpression for querying by pipeline_run_id."""
@@ -107,20 +140,31 @@ class DynamoDBEventLog(EventLogProtocol):
     @override
     def emit(self, event: TraceEvent) -> None:
         """Write a single event to DynamoDB. Synchronous and idempotent."""
+        # The retention counts from the write rather than from the event's own timestamp, which is for display only.
+        # A replay's re-emission overwrites the item under the same key and only pushes its expiry a little later.
+        ttl = int(time.time()) + self._retention_seconds
         item: dict[str, Any] = {
             "PK": self._make_pk(event.pipeline_run_id),
-            "SK": self._make_sk(event.workflow_id, writer_id=event.writer_id, sequence=event.sequence),
+            "SK": self._make_sk(chain_key=event.chain_key, writer_id=event.writer_id, sequence=event.sequence),
             "pipeline_run_id": event.pipeline_run_id,
             "workflow_id": event.workflow_id,
+            "attempt": event.attempt,
             "writer_id": event.writer_id,
             "sequence": event.sequence,
             "payload": event.model_dump_json(),
+            "ttl": ttl,
         }
         self._table.put_item(Item=item)
 
     @override
     def read_events(self, pipeline_run_id: str) -> list[TraceEvent]:
         """Read all events for a pipeline run from DynamoDB.
+
+        The events are ordered by (chain, sequence, writer_id), as every event
+        log returns them, whatever order the sort keys give the rows. A row in
+        the shape an earlier version wrote, without `attempt`, `lineage` or
+        `path`, is refused with ``EventLogSchemaMismatchError``, never read as
+        the direct mode's first attempt.
 
         Store-level failures (throttling, auth, network) are translated into
         ``EventLogReadError`` so best-effort callers (graph assembly) can degrade
@@ -191,7 +235,7 @@ class DynamoDBEventLog(EventLogProtocol):
             )
             raise EventLogSchemaMismatchError(msg)
 
-        return events
+        return deduplicate_and_order_events(events=events)
 
     @override
     def close(self) -> None:
@@ -199,7 +243,7 @@ class DynamoDBEventLog(EventLogProtocol):
 
     @override
     def cleanup(self, pipeline_run_id: str) -> None:
-        """Delete all events for a pipeline run. In practice TTL handles this."""
+        """Delete all events for a pipeline run, ahead of the expiry their `ttl` sets."""
         response = self._table.query(
             KeyConditionExpression=self._key_condition(pipeline_run_id),
             ProjectionExpression="PK, SK",

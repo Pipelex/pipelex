@@ -5,15 +5,20 @@ GraphTracer's in-memory accumulation, but as immutable records suitable
 for NDJSON file storage and cross-worker graph assembly.
 """
 
+from collections.abc import Mapping
 from datetime import datetime
 from enum import StrEnum
-from typing import Annotated, Any, Literal
+from functools import cached_property
+from typing import Annotated, Any, Literal, Self
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from typing_extensions import override
 
 from pipelex.graph.condition_output_merge import ConditionOutputMerge
 from pipelex.graph.graphspec import EdgeKind, ErrorSpec, IOSpec, NodeKind
 from pipelex.reporting.reporting_types import AnyTokensUsage
+from pipelex.system.execution_chain import ExecutionAttempt, execution_chain_key
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 
@@ -30,6 +35,8 @@ class TraceEventKind(StrEnum):
     BATCH_AGGREGATE = "batch_aggregate"
     PARALLEL_COMBINE = "parallel_combine"
     CONDITION_OUTPUT_MERGE = "condition_output_merge"
+    BATCH_FANNED_OUT = "batch_fanned_out"
+    CONDITION_RESOLVED = "condition_resolved"
     EXECUTION_DATA = "execution_data"
     USAGE_REPORT = "usage_report"
 
@@ -37,25 +44,83 @@ class TraceEventKind(StrEnum):
 class TraceEvent(BaseModel):
     """Base model for all trace events.
 
+    The fields of the hosted progress contract (`conformance/specs/pipelex-platform-api.md`, "How the runtime
+    carries them") are read off these: `execution` is `workflow_id`, `attempt` and `lineage` are their own, `at` is
+    `timestamp` and `sequence` is `sequence`.
+
     Shared fields:
     - pipeline_run_id: identifies the pipeline execution
-    - workflow_id: Temporal workflow ID or "direct" for in-process mode
+    - workflow_id: the id of the workflow whose code emitted the event, the same in each of its attempts, or
+        "direct" in the runtime's direct mode. It names the event's execution.
+    - attempt: the attempt of that workflow which emitted the event, counting from 1; 1 in direct mode.
+    - lineage: the attempts that workflow was dispatched under, from the run's own workflow down to the one that
+        dispatched it; empty for the run's own workflow. An event's chain is its lineage followed by its own
+        `{execution, attempt}`, and a higher attempt of an execution supersedes the earlier one and everything it
+        dispatched (`pipelex.system.execution_chain`).
+    - path: the invocation path of the pipe run the event is about (`pipelex.system.invocation_path`): the batch's for
+        a fan-out, the condition's for a resolution, the target's for an edge, the pipe whose work an inference
+        served for a usage report. None for an event about no invocation, such as a binding step's.
     - writer_id: identifies the emitting event-log instance, so two writers
         sharing the same (pipeline_run_id, workflow_id) partition can emit
         independent sequence streams without colliding. Defaults to "primary",
-        which preserves the legacy single-writer NDJSON file naming and DDB
-        sort-key shape; non-default values come from the per-process activity
-        event log used by separate-process workers.
+        which preserves the legacy single-writer NDJSON file naming; non-default values
+        come from the per-process activity event log used by separate-process workers.
+        It names no execution: one writer may carry the events of several at once.
     - event_kind: discriminator for the event subclass (defined on each subclass as Literal)
-    - timestamp: UTC, for display/debugging only
+    - mode: whether the run that emitted the event is live or a dry run. Every event of one run
+        carries the same mode, so a reader tells dry events from live ones by this field alone.
+    - timestamp: UTC, when the event happened: a start's start, an end's end, a decision's moment. It is recorded
+        once, so every write of one event carries the same value; ordering and deduplication never read it.
     - sequence: per-writer monotonic counter, for ordering and deduplication
+
+    A store keeps apart every two events whose chain, writer or sequence differ (`store_key`): keyed on the workflow,
+    the writer and the sequence alone, a workflow's new attempt would overwrite the events of its earlier one.
+
+    An event is frozen, since it records what happened: its chain, its chain key and its store key are computed from its
+    fields once, the first time they are read, and kept, as every read and every assembly of a run reads them for each
+    of its events.
     """
 
+    model_config = ConfigDict(frozen=True)
+
     pipeline_run_id: str
-    workflow_id: str
+    workflow_id: str = Field(min_length=1)
+    attempt: int = Field(ge=1)
+    lineage: list[ExecutionAttempt]
+    path: str | None
     writer_id: str = "primary"
+    mode: PipeRunMode
     timestamp: datetime
     sequence: int
+
+    @cached_property
+    def chain(self) -> list[ExecutionAttempt]:
+        """The attempts from the run's own workflow down to the one that emitted this event."""
+        return [*self.lineage, ExecutionAttempt(execution=self.workflow_id, attempt=self.attempt)]
+
+    @cached_property
+    def chain_key(self) -> str:
+        """One string naming this event's chain, distinct for every two chains that differ."""
+        return execution_chain_key(chain=self.chain)
+
+    @cached_property
+    def store_key(self) -> tuple[str, str, str, int]:
+        """What tells this event apart from every other event of its run in a store: its chain, its writer, its kind
+        and its sequence. Two writes with the same key are one event, written again by a replay.
+        """
+        return (self.chain_key, self.writer_id, type(self).__name__, self.sequence)
+
+    @override
+    def model_copy(self, *, update: Mapping[str, Any] | None = None, deep: bool = False) -> Self:
+        """A copy of this event, which computes its keys again: an update can change the fields they are read from."""
+        copied = super().model_copy(update=update, deep=deep)
+        for cached_name in _CACHED_EVENT_KEYS:
+            vars(copied).pop(cached_name, None)
+        return copied
+
+
+# The names under which a trace event keeps the keys it computed from its fields.
+_CACHED_EVENT_KEYS: tuple[str, ...] = ("chain", "chain_key", "store_key")
 
 
 # ---------------------------------------------------------------------------
@@ -64,12 +129,14 @@ class TraceEvent(BaseModel):
 
 
 class PipeStartEvent(TraceEvent):
-    """Emitted when a pipe begins execution."""
+    """Emitted when a pipe begins execution, before it runs anything."""
 
     event_kind: Literal[TraceEventKind.PIPE_START] = TraceEventKind.PIPE_START
     node_id: str
     parent_node_id: str | None = None
     pipe_code: str
+    pipe_ref: str | None
+    """The `domain.code` reference of the pipe; None on a binding step's node, which runs no pipe."""
     pipe_type: str
     node_kind: NodeKind
     description: str | None = None
@@ -77,6 +144,11 @@ class PipeStartEvent(TraceEvent):
     input_specs: list[IOSpec] = Field(default_factory=empty_list_factory_of(IOSpec))
     pipe_data: dict[str, Any] = Field(default_factory=dict)
     concept_data: list[dict[str, Any]] = Field(default_factory=empty_list_factory_of(dict))
+    step_count: int | None = None
+    """On a PipeSequence, the number of steps its author wrote. The binding a sequence writes for a dotted
+    `batch_over` is no step of the author's and is not counted. None on every other pipe."""
+    branch_count: int | None = None
+    """On a PipeParallel, the number of its branches. None on every other pipe."""
 
 
 class PipeEndSuccessEvent(TraceEvent):
@@ -84,6 +156,9 @@ class PipeEndSuccessEvent(TraceEvent):
 
     event_kind: Literal[TraceEventKind.PIPE_END_SUCCESS] = TraceEventKind.PIPE_END_SUCCESS
     node_id: str
+    pipe_code: str
+    pipe_ref: str | None
+    pipe_type: str
     ended_at: datetime
     output_spec: IOSpec | None = None
     metrics: dict[str, float] = Field(default_factory=dict)
@@ -91,10 +166,17 @@ class PipeEndSuccessEvent(TraceEvent):
 
 
 class PipeEndErrorEvent(TraceEvent):
-    """Emitted when a pipe fails."""
+    """Emitted when a pipe fails.
+
+    Its `error` gives the progress contract's `failure`: `message`, and `caller_facing`, true when that message was
+    written for the caller.
+    """
 
     event_kind: Literal[TraceEventKind.PIPE_END_ERROR] = TraceEventKind.PIPE_END_ERROR
     node_id: str
+    pipe_code: str
+    pipe_ref: str | None
+    pipe_type: str
     ended_at: datetime
     error: ErrorSpec
 
@@ -108,6 +190,9 @@ class PipeEndSkippedEvent(TraceEvent):
 
     event_kind: Literal[TraceEventKind.PIPE_END_SKIPPED] = TraceEventKind.PIPE_END_SKIPPED
     node_id: str
+    pipe_code: str
+    pipe_ref: str | None
+    pipe_type: str
     ended_at: datetime
     skip_reason: str
     output_spec: IOSpec | None = None
@@ -183,6 +268,42 @@ class ConditionOutputMergeEvent(TraceEvent):
     merge: ConditionOutputMerge
 
 
+class BatchFannedOutEvent(TraceEvent):
+    """Emitted when a PipeBatch knows how many items it runs, before it starts any of them.
+
+    A live reader learns the batch's width the moment it is fixed, so it never has to guess it from the
+    items that have started.
+    """
+
+    event_kind: Literal[TraceEventKind.BATCH_FANNED_OUT] = TraceEventKind.BATCH_FANNED_OUT
+    node_id: str
+    """The PipeBatch's own node."""
+    item_count: int = Field(ge=0)
+    branch_pipe_code: str
+    """The bare code of the pipe each item runs."""
+    branch_pipe_ref: str
+    """The `domain.code` reference of the pipe each item runs."""
+    branch_pipe_type: str
+    """The type of the pipe each item runs, such as `PipeSequence` or `PipeLLM`."""
+
+
+class ConditionResolvedEvent(TraceEvent):
+    """Emitted when a live PipeCondition has chosen its outcome, before the chosen pipe starts.
+
+    A dry run emits none, since its condition runs the pipe of every outcome.
+    """
+
+    event_kind: Literal[TraceEventKind.CONDITION_RESOLVED] = TraceEventKind.CONDITION_RESOLVED
+    node_id: str
+    """The PipeCondition's own node."""
+    rendered_value: str
+    """The value the condition's expression rendered. It may quote text of the method, or of a library the method
+    depends on, so it is kept for whoever reads the trace and never reaches a caller-facing summary."""
+    selected_outcome: str | None
+    """The key of the outcome map the rendered value matched, or None when it matched none and the condition took its
+    default outcome: `"default"` can itself be a key of an outcome map, so it cannot stand for the default."""
+
+
 class ExecutionDataEvent(TraceEvent):
     """Emitted when a pipe registers execution metadata (rendered prompts, resolved models, etc.)."""
 
@@ -220,6 +341,8 @@ AnyTraceEvent = Annotated[
     | BatchAggregateEvent
     | ParallelCombineEvent
     | ConditionOutputMergeEvent
+    | BatchFannedOutEvent
+    | ConditionResolvedEvent
     | ExecutionDataEvent
     | UsageReportEvent,
     Field(discriminator="event_kind"),

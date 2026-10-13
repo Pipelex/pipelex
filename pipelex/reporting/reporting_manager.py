@@ -53,10 +53,13 @@ _EMIT_BEST_EFFORT_EXCEPTIONS: tuple[type[BaseException], ...] = (
 
 
 class _EventLogContext(NamedTuple):
-    """Per-workflow/run event log state. Private to ReportingManager."""
+    """Per-workflow/run event log state. Private to ReportingManager.
+
+    It holds no workflow id: a usage event names its execution, its attempt and its lineage from the trace context it was
+    reported under, whose chain the workflow's tracer opened, so the event's chain is always the one its context states.
+    """
 
     event_log: EventLogProtocol
-    workflow_id: str
     pipeline_run_id: str
 
 
@@ -76,7 +79,6 @@ class ReportingManager(ReportingProtocol):
         *,
         context_key: str,
         event_log: EventLogProtocol,
-        workflow_id: str,
         pipeline_run_id: str,
     ) -> None:
         """Configure event log for a specific workflow/run context.
@@ -84,8 +86,6 @@ class ReportingManager(ReportingProtocol):
         Args:
             context_key: Unique key for this context (trace_context.lookup_key).
             event_log: The event log backend for emitting UsageReportEvents.
-            workflow_id: Run-scoped execution identity stamped into events
-                (Temporal run ID, or "direct" outside Temporal).
             pipeline_run_id: Pipeline run ID for event correlation.
         """
         # The silent overwrite-on-existing-key below is intentional and load-bearing.
@@ -99,7 +99,6 @@ class ReportingManager(ReportingProtocol):
         # the eviction-poison class on the cost path (pre-M1 open_tracer did exactly that).
         self._event_log_contexts[context_key] = _EventLogContext(
             event_log=event_log,
-            workflow_id=workflow_id,
             pipeline_run_id=pipeline_run_id,
         )
 
@@ -237,8 +236,12 @@ class ReportingManager(ReportingProtocol):
 
         event = UsageReportEvent(
             pipeline_run_id=context.pipeline_run_id,
-            workflow_id=context.workflow_id,
+            workflow_id=trace_context.own_attempt.execution,
+            attempt=trace_context.own_attempt.attempt,
+            lineage=trace_context.lineage,
+            path=trace_context.parent_path,
             writer_id=context.event_log.writer_id,
+            mode=trace_context.run_mode,
             timestamp=datetime.now(UTC),
             sequence=seq,
             node_id=node_id,
@@ -305,16 +308,26 @@ class ReportingManager(ReportingProtocol):
         if process_event_log is None:
             return
 
-        workflow_id = trace_context.tracer_key or trace_context.graph_id
+        # The execution, its attempt and its lineage are the trace context's, as on the fast path: an activity's usage
+        # belongs to the attempt of the workflow that ran it, which a new attempt of that workflow supersedes.
+        workflow_id = trace_context.own_attempt.execution
         node_id = trace_context.parent_node_id or UNATTRIBUTED_NODE_ID
 
-        ActivityEventLogCache.log_once_runner_fallback_engaged(workflow_id=workflow_id, writer_id=process_event_log.writer_id)
+        # The line names the run's tracer key beside the execution: the execution is `direct` for every run in direct
+        # mode and under the kernel, so it alone would not say which run engaged the fallback.
+        ActivityEventLogCache.log_once_runner_fallback_engaged(
+            workflow_id=workflow_id, tracer_key=trace_context.lookup_key, writer_id=process_event_log.writer_id
+        )
 
         seq = process_event_log.next_sequence()
         event = UsageReportEvent(
             pipeline_run_id=inference_job.job_metadata.run_metadata.pipeline_run_id,
             workflow_id=workflow_id,
+            attempt=trace_context.own_attempt.attempt,
+            lineage=trace_context.lineage,
+            path=trace_context.parent_path,
             writer_id=process_event_log.writer_id,
+            mode=trace_context.run_mode,
             timestamp=datetime.now(UTC),
             sequence=seq,
             node_id=node_id,

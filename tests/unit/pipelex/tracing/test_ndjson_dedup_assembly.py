@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 
 from pipelex.graph.graphspec import EdgeKind, IOSpec, NodeKind, NodeStatus
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
 from pipelex.tracing.ndjson_event_log import NdjsonEventLog
 from pipelex.tracing.trace_events import (
@@ -33,8 +34,12 @@ def _base(sequence: int) -> dict[str, Any]:
     return {
         "pipeline_run_id": _PIPELINE_RUN_ID,
         "workflow_id": _WF_ID,
+        "attempt": 1,
+        "lineage": [],
+        "path": None,
         "timestamp": _time_at(sequence),
         "sequence": sequence,
+        "mode": PipeRunMode.LIVE,
     }
 
 
@@ -46,6 +51,7 @@ def _make_sequence_events() -> list[TraceEvent]:
 
     return [
         PipeStartEvent(
+            pipe_ref=None,
             **_base(0),
             node_id=parent,
             pipe_code="sequence",
@@ -53,6 +59,7 @@ def _make_sequence_events() -> list[TraceEvent]:
             node_kind=NodeKind.CONTROLLER,
         ),
         PipeStartEvent(
+            pipe_ref=None,
             **_base(1),
             node_id=child_1,
             parent_node_id=parent,
@@ -68,12 +75,16 @@ def _make_sequence_events() -> list[TraceEvent]:
             edge_kind=EdgeKind.CONTAINS,
         ),
         PipeEndSuccessEvent(
+            pipe_code="test_pipe",
+            pipe_ref=None,
+            pipe_type="PipeFunc",
             **_base(3),
             node_id=child_1,
             ended_at=_time_at(3),
             output_spec=IOSpec(name="output", digest="digest_a"),
         ),
         PipeStartEvent(
+            pipe_ref=None,
             **_base(4),
             node_id=child_2,
             parent_node_id=parent,
@@ -90,12 +101,18 @@ def _make_sequence_events() -> list[TraceEvent]:
             edge_kind=EdgeKind.CONTAINS,
         ),
         PipeEndSuccessEvent(
+            pipe_code="test_pipe",
+            pipe_ref=None,
+            pipe_type="PipeFunc",
             **_base(6),
             node_id=child_2,
             ended_at=_time_at(6),
             output_spec=IOSpec(name="output", digest="digest_b"),
         ),
         PipeEndSuccessEvent(
+            pipe_code="test_pipe",
+            pipe_ref=None,
+            pipe_type="PipeFunc",
             **_base(7),
             node_id=parent,
             ended_at=_time_at(7),

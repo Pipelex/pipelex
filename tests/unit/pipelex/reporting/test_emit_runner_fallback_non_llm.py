@@ -36,7 +36,9 @@ from pipelex.config import get_config
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.system.configuration.configs import NdjsonTracingConfig, TracingBackend
 from pipelex.system.data_inclusion_config import DataInclusionConfig
+from pipelex.system.execution_chain import make_direct_chain
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tracing.activity_event_log import ActivityEventLogCache
@@ -72,6 +74,8 @@ def _trace_context(run_id: str, tracer_key: str) -> TraceContext:
         parent_node_id="g:node_0",
         node_sequence=0,
         data_inclusion=_DATA_INCLUSION_OFF,
+        run_mode=PipeRunMode.LIVE,
+        chain=make_direct_chain(),
     )
 
 

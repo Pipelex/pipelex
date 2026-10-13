@@ -13,6 +13,16 @@ class JobMetadataError(PipelexUnexpectedError):
     pass
 
 
+class InvocationPathError(PipelexUnexpectedError):
+    """Raised when an invocation's path cannot be derived: a controller dispatched a pipe without naming its segment.
+
+    Every controller names the place of each pipe it runs before it runs it, so this is a fault of the runtime, never
+    of the method.
+    """
+
+    _declared_title = "Invocation path not derivable"
+
+
 class NestedKeyConflictError(ToolError):
     """Raised when attempting to create nested keys under a non-dict value."""
 

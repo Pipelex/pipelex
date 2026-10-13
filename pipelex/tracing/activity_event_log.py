@@ -77,7 +77,7 @@ class ActivityEventLogCache:
             return cls._cached_event_log
 
     @classmethod
-    def log_once_runner_fallback_engaged(cls, *, workflow_id: str, writer_id: str) -> None:
+    def log_once_runner_fallback_engaged(cls, *, workflow_id: str, tracer_key: str, writer_id: str) -> None:
         """Log a single INFO the first time activity-side emission engages.
 
         The log is per-process; subsequent emissions from the same process are
@@ -85,6 +85,11 @@ class ActivityEventLogCache:
         (co-located or split deployment alike) — INFO level, one line, so
         operators can see the writer_id in the worker logs without log spam at
         high activity throughput.
+
+        Args:
+            workflow_id: The execution whose usage engaged it, `direct` in direct mode and under the kernel.
+            tracer_key: The lookup key of the run's tracer, its tracer key or its graph id, which names the run.
+            writer_id: The process's writer id, stamped on every event it emits.
         """
         if cls._fallback_logged:
             return
@@ -97,7 +102,7 @@ class ActivityEventLogCache:
         # the workflow router or on a separate worker pool.
         log.info(
             "Usage events are emitted through this process's activity event log",
-            fields={"writer_id": writer_id, "workflow_id": workflow_id},
+            fields={"writer_id": writer_id, "workflow_id": workflow_id, "tracer_key": tracer_key},
         )
 
     @classmethod

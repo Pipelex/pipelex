@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:a936b7ba24211f227bcc1b60046075b56522c24b7f6de366ee2fa091ce821267"
+digest = "sha256:558d2a12672e159edf2827791bcb5370781df2b576b958e0ea48989833087f8b"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-12T02:37:48Z"
-rationale = "real-catch: interpreter_hub.py gains the module-level does_pipe_run_leave_process (and InterpreterHub.set_pipe_run takes leaves_process, stored beside the pipe run), so the run row of the partition table now names it. No import was added to either hub, KERNEL_LAYER_PACKAGES is unchanged, and every public module-level function and class of both hubs is in the tables."
+reviewed_at = "2026-10-13T02:26:31Z"
+rationale = "real-catch: runtime_hub.py gains the module-level resolve_effective_run_mode, moved from the pipe tier so the kernel layer can reach it; the run-mode row of the partition table now names it and the resolve_run_mode_for_boot paragraph says why it sits beside it. No import crosses the boundary: runtime_hub imports cogt_run_params, which is kernel-layer, and KERNEL_LAYER_PACKAGES is unchanged."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:fda2237457fe0b6830ff2ae8f720698735bec4c3"
 "pipelex/interpreter_hub.py" = "blob:023f8452daf76dde409afc7c0966b149b11edabb"
-"pipelex/runtime_hub.py" = "blob:65beba670c857897858b75fd17bbbc03ba84e750"
+"pipelex/runtime_hub.py" = "blob:8269c5d9d549dd06eb8329e3763efed403f95fed"

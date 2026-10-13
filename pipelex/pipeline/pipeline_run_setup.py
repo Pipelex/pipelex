@@ -25,7 +25,13 @@ from pipelex.pipe_run.pipe_run_params import (
 )
 from pipelex.pipeline.exceptions import PipeExecutionError
 from pipelex.pipeline.execution_seams import acquire_library, prepare_pipe_job
-from pipelex.runtime_hub import get_event_log_override, get_otel_tracer, get_report_delegate, get_telemetry_manager
+from pipelex.runtime_hub import (
+    get_event_log_override,
+    get_otel_tracer,
+    get_report_delegate,
+    get_telemetry_manager,
+    resolve_effective_run_mode,
+)
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.environment import get_optional_env
 from pipelex.system.job_metadata import OtelContext
@@ -122,7 +128,9 @@ async def pipeline_run_setup(
     pipe_run_mode:
         Pipe run mode: ``PipeRunMode.LIVE`` or ``PipeRunMode.DRY``. If not specified,
         inferred from the environment variable ``PIPELEX_FORCE_DRY_RUN_MODE``. Defaults
-        to ``PipeRunMode.LIVE`` if the environment variable is not set.
+        to ``PipeRunMode.LIVE`` if the environment variable is not set. A keyless boot
+        (``needs_inference=False``) runs a LIVE request DRY, and the run's trace, its
+        graph and its pipe job all state DRY.
     is_mock_usage:
         Internal sub-flag of ``run_mode=DRY`` — only CLI access is the hidden ``--mock-usage``
         test trigger (requires ``--dry-run``, not shown in --help): when True, the dry
@@ -266,6 +274,15 @@ async def pipeline_run_setup(
         else:
             pipe_run_mode = PipeRunMode.LIVE
 
+    # The mode the run takes, resolved ONCE, here, above everything this function opens. A keyless
+    # boot forces a requested LIVE run DRY (eng review D4), and the tracer, the trace context, the
+    # OTel context and the pipe job must all state the mode the pipes run in. The coercion used to
+    # happen only in the run-params factory, below the tracer, so a forced-dry run stamped every
+    # trace event live, and the graph built from those events said live too. The requested mode is
+    # validated against `is_mock_usage` first, so the coercion cannot legalise a LIVE request
+    # carrying the dry sub-flag; the factory below sees DRY and coerces nothing again.
+    pipe_run_mode = resolve_effective_run_mode(requested=pipe_run_mode, is_mock_usage=is_mock_usage)
+
     pipeline = get_pipeline_manager().add_new_pipeline(pipe_code=pipe_code, pipeline_run_id=pipeline_run_id)
     pipeline_run_id = pipeline.pipeline_run_id
 
@@ -387,7 +404,7 @@ async def pipeline_run_setup(
                 emit_usage_events=is_generate_usage,
                 # The I/O artifacts are the graphspec's companions: a run that writes no graphspec builds none.
                 describe_pipe_io=is_generate_graph and execution_config.graph.graphs_inclusion.graphspec_json,
-                mode=pipe_run_mode.graphspec_mode,
+                run_mode=pipe_run_mode,
             )
 
         # Register the event log on the report delegate for usage event emission — only when cost reporting
@@ -398,7 +415,6 @@ async def pipeline_run_setup(
             get_report_delegate().set_event_log(
                 context_key=pipeline_run_id,
                 event_log=event_log,
-                workflow_id="direct",
                 pipeline_run_id=pipeline_run_id,
             )
 

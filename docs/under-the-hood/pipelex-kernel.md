@@ -34,7 +34,7 @@ That boot stands up the model deck, the content generator, the class registry, t
 
 **`read_scope` is required too, and `None` is a value you pass, not a default.** It bounds what the run may read: every `pipelex-storage://` key a step reads must lie under it, compared segment by segment, and no step reads a bare path or a `file://` URI from the local disk. `https://` and `data:` URLs are untouched. A value can carry any URL its method or its model chose, so the check runs where values are read, in every content-generation leaf before the dry-run branch, and `shape_inputs` applies it to a table given as a CSV input, which is always a local file. The storage scope must lie under the read scope, since a run reads its own outputs back, and a mismatch is refused at construction. A multi-tenant host passes its tenant's prefix (the hosted platform passes the organization id); `None` is the explicit statement that the run is unscoped, which is the truth for a single-tenant service or a laptop. It has no default for the storage scope's reason: a host that forgot it would run unscoped, and an unscoped run reads every key the process's credentials reach. A refused read raises `UriReadRefusedError`, a caller-facing input error that names where the URL sat and never quotes it.
 
-`needs_inference=False` boots keyless (every enabled backend and model loaded, no credential resolved, no model-deck validation) and sets the forced-DRY flag: every run the process initiates is coerced to `run_mode=DRY`, so the leaves mock instead of calling a provider. `PipelexKernel.make` applies that rule through the same `runtime_hub.resolve_run_mode_for_boot` the pipe tier uses — a second copy of the rule at a second factory is how the two would drift apart.
+`needs_inference=False` boots keyless (every enabled backend and model loaded, no credential resolved, no model-deck validation) and sets the forced-DRY flag: every run the process initiates is coerced to `run_mode=DRY`, so the leaves mock instead of calling a provider. `PipelexKernel.make` applies that rule through the same `runtime_hub.resolve_effective_run_mode` the pipe tier uses, which refuses `is_mock_usage` on a live request before it coerces — a second copy of the rule at a second factory is how the two would drift apart.
 
 ---
 
@@ -149,21 +149,31 @@ Nothing derived from config or the model deck is cached on the instance — reso
 Everything else is yours:
 
 ```python
-from pipelex.runtime_hub import get_report_delegate
+from pipelex.runtime_hub import get_report_delegate, resolve_effective_run_mode
+from pipelex.system.execution_chain import make_direct_chain
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 from pipelex.tracing.usage_aggregator import UsageAggregator
 
+# The mode the run takes on this boot: a boot without inference runs a live request dry.
+run_mode = resolve_effective_run_mode(requested=PipeRunMode.LIVE, is_mock_usage=False)
 event_log = InMemoryEventLog()
-trace_context = TraceContext(graph_id=run_id, data_inclusion=data_inclusion, emit_graph_events=False, emit_usage_events=True)
-get_report_delegate().set_event_log(context_key=trace_context.lookup_key, event_log=event_log, workflow_id="direct", pipeline_run_id=run_id)
+trace_context = TraceContext(
+    graph_id=run_id, data_inclusion=data_inclusion, emit_graph_events=False, emit_usage_events=True, run_mode=run_mode, chain=make_direct_chain()
+)
+get_report_delegate().set_event_log(context_key=trace_context.lookup_key, event_log=event_log, pipeline_run_id=run_id)
 try:
-    kernel = PipelexKernel.make(user_id="my-service", storage_scope="my-service", read_scope=None, trace_context=trace_context)
+    kernel = PipelexKernel.make(user_id="my-service", storage_scope="my-service", read_scope=None, run_mode=run_mode, trace_context=trace_context)
     ...
     tokens_usages = UsageAggregator.aggregate(event_log.read_events(run_id))
 finally:
     get_report_delegate().clear_event_log(context_key=trace_context.lookup_key)
 ```
+
+The trace context also states the chain of execution attempts its events belong to, required as the mode is, since every usage event takes its execution, its attempt and its lineage from it (see [Executions and Their Attempts](execution-graph-tracing.md#executions-and-their-attempts)). A host running the kernel in its own process states `make_direct_chain()`, the direct mode's one execution in its first attempt. A host running it inside a durable workflow states that workflow's own chain, its lineage followed by its id and the attempt its engine runs, so that the usage of a new attempt supersedes the earlier one's, where both would otherwise be written as `direct@1`.
+
+The trace context states the mode the run takes, which `resolve_effective_run_mode` gives: every usage event a step writes states the context's `run_mode`, so a context saying live for a run whose steps run dry would stamp the whole run live. `PipelexKernel.make` refuses a context stating another mode with `TraceContextRunModeError` (`pipelex/kernel/exceptions.py`), a `ValueError` raised before any step runs. It refuses rather than correct its own copy because the trace is the caller's, possibly shared with writers the kernel never sees, which a corrected copy would leave disagreeing with the kernel's events.
 
 Passing a `trace_context` adopts its `graph_id` as the run's `pipeline_run_id`, and passing a `pipeline_run_id` that differs from it raises `ValueError` rather than letting either win. The two are one identity: letting them diverge would scatter a single run's usage events across two ids, because the registered-context emit path stamps the event log's id while the runner fallback stamps the metadata's — and a read-back keyed on either would silently miss the other's.
 

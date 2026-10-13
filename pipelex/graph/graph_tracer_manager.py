@@ -1,18 +1,22 @@
 """Graph tracer manager with singleton pattern for access from PipeAbstract without hub imports."""
 
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pipelex import log
 from pipelex.graph.condition_output_merge import ConditionOutputMerge
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol
-from pipelex.graph.graphspec import GraphSpec, GraphSpecMode, IOSpec, NodeKind
+from pipelex.graph.graphspec import GraphSpec, IOSpec, NodeKind
 from pipelex.system.data_inclusion_config import DataInclusionConfig
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.singleton import ABCSingletonMeta, MetaSingleton
 from pipelex.system.trace_context import TraceContext
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # ruff: ignore[typing-only-first-party-import] - used in open_tracer signature
+
+if TYPE_CHECKING:
+    from pipelex.system.execution_chain import ExecutionAttempt
 
 
 class GraphTracerManager(metaclass=ABCSingletonMeta):
@@ -102,12 +106,14 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         pipeline_ref_main_pipe: str | None = None,
         event_log: "EventLogProtocol | None" = None,
         workflow_id: str = "direct",
+        attempt: int = 1,
+        received_context: TraceContext | None = None,
         pipeline_run_id: str | None = None,
         tracer_key: str | None = None,
         emit_graph_events: bool = True,
         emit_usage_events: bool = True,
         describe_pipe_io: bool = True,
-        mode: GraphSpecMode = GraphSpecMode.LIVE,
+        run_mode: PipeRunMode,
     ) -> TraceContext:
         """Create and initialize a new tracer for a pipeline run.
 
@@ -118,7 +124,16 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             pipeline_ref_main_pipe: Optional main pipe name.
             event_log: Optional event log for distributed tracing. When set,
                 the tracer emits trace events as a side effect alongside in-memory accumulation.
-            workflow_id: Temporal workflow ID or "direct" for single-process mode.
+            workflow_id: The id of the workflow whose code emits the events, the same in each of its attempts, or
+                "direct" for single-process mode. It names the events' execution, so it must never be an id the
+                engine changes from one attempt to the next.
+            attempt: The attempt of that workflow its engine runs, counting from 1; 1 in single-process mode.
+            received_context: The trace context a workflow received with its input, when it runs part of a run that
+                another workflow dispatched to it, such as a batch item. The returned context continues it: the
+                parent node, so that CONTAINS edges link back to the dispatching workflow's node, the parent path and
+                the segment the dispatcher gave, so that every path the workflow stamps continues the one it was handed,
+                and, when the dispatcher named the workflow's place, the received chain as the workflow's lineage.
+                A received context naming no place, as the run's own workflow receives, leaves the lineage empty.
             pipeline_run_id: Pipeline run ID for event emission.
             tracer_key: Lookup key for the tracer in the manager's dict. Defaults to graph_id.
                 In Temporal mode, use the workflow_id to avoid collisions when multiple
@@ -131,7 +146,9 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             describe_pipe_io: Whether the run builds the I/O artifacts describing its graphspec's
                 data. Read by the run, never by the tracer, so it is stamped on the context here
                 rather than threaded into setup.
-            mode: Provenance mode to stamp onto generated GraphSpecs.
+            run_mode: Whether the run is live or a dry run: stamped on every trace event and on the returned
+                TraceContext, and turned into the provenance mode of the generated GraphSpec. A workflow that opens
+                a tracer of its own for part of a run passes the mode of the context it received.
 
         Returns:
             Initial TraceContext to pass through JobMetadata.
@@ -162,6 +179,12 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
         tracer = GraphTracer()
 
+        # The dispatching attempt hands a dispatched workflow its own chain beside the path prefix: that chain is the
+        # lineage of every event the dispatched workflow writes. The run's own workflow was handed no place, and has none.
+        lineage: list[ExecutionAttempt] = []
+        if received_context is not None and received_context.child_segment is not None:
+            lineage = list(received_context.chain)
+
         trace_context = tracer.setup(
             graph_id=graph_id,
             data_inclusion=data_inclusion,
@@ -169,16 +192,26 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             pipeline_ref_main_pipe=pipeline_ref_main_pipe,
             event_log=event_log,
             workflow_id=workflow_id,
+            attempt=attempt,
+            lineage=lineage,
             pipeline_run_id=pipeline_run_id,
             emit_graph_events=emit_graph_events,
             emit_usage_events=emit_usage_events,
-            mode=mode,
+            run_mode=run_mode,
         )
         # Set the tracer_key on the TraceContext so downstream lookups use the same key
         if tracer_key is not None:
             trace_context = trace_context.model_copy(update={"tracer_key": tracer_key})
         if not describe_pipe_io:
             trace_context = trace_context.model_copy(update={"describe_pipe_io": False})
+        if received_context is not None:
+            trace_context = trace_context.model_copy(
+                update={
+                    "parent_node_id": received_context.parent_node_id,
+                    "parent_path": received_context.parent_path,
+                    "child_segment": received_context.child_segment,
+                }
+            )
 
         # Register only once setup has fully succeeded: a failure above must not leave
         # an unusable tracer entry in the process-wide manager.
@@ -234,6 +267,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         trace_context: TraceContext,
         *,
         pipe_code: str,
+        pipe_ref: str | None,
         pipe_type: str,
         node_kind: NodeKind,
         started_at: datetime,
@@ -242,12 +276,16 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         concept_data: list[dict[str, Any]] | None = None,
         description: str | None = None,
         domain_code: str | None = None,
+        step_count: int | None = None,
+        branch_count: int | None = None,
     ) -> tuple[str | None, TraceContext | None]:
         """Record the start of a pipe execution.
 
         Args:
             trace_context: Current trace context containing graph_id.
             pipe_code: The pipe code being executed.
+            pipe_ref: The `domain.code` reference of the pipe, which names the run's entry pipe in every invocation
+                path; None for a node that runs no pipe, such as a binding step.
             pipe_type: The pipe type (e.g., "PipeLLM", "PipeSequence").
             node_kind: The kind of node (controller, operator, etc.).
             started_at: When the pipe started executing.
@@ -256,6 +294,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             concept_data: Optional list of serialized concept dicts for the concept registry.
             description: Optional human-readable pipe description (mirrored onto NodeSpec).
             domain_code: Optional domain code of the pipe (mirrored onto NodeSpec).
+            step_count: On a PipeSequence, the number of steps its author wrote.
+            branch_count: On a PipeParallel, the number of its branches.
 
         Returns:
             Tuple of (node_id, child_trace_context) if tracing is active, (None, None) otherwise.
@@ -267,6 +307,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         return tracer.on_pipe_start(
             trace_context=trace_context,
             pipe_code=pipe_code,
+            pipe_ref=pipe_ref,
             pipe_type=pipe_type,
             node_kind=node_kind,
             started_at=started_at,
@@ -275,6 +316,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             concept_data=concept_data,
             description=description,
             domain_code=domain_code,
+            step_count=step_count,
+            branch_count=branch_count,
         )
 
     def on_pipe_end_success(
@@ -381,6 +424,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         error_type: str,
         error_message: str,
         error_stack: str | None = None,
+        caller_facing: bool = False,
     ) -> None:
         """Record failed completion of a pipe execution.
 
@@ -391,6 +435,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             error_type: The exception type name.
             error_message: The error message.
             error_stack: Optional stack trace.
+            caller_facing: Whether the message was written for the caller, as the error report of the error the
+                pipe raised says in its `caller_facing_message`.
         """
         if node_id is None:
             return
@@ -405,6 +451,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             error_type=error_type,
             error_message=error_message,
             error_stack=error_stack,
+            caller_facing=caller_facing,
         )
 
     def register_controller_output(
@@ -528,3 +575,59 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         if tracer is None:
             return
         tracer.register_condition_output_merge(merge=merge)
+
+    def register_batch_fan_out(
+        self,
+        *,
+        lookup_key: str,
+        batch_node_id: str,
+        item_count: int,
+        branch_pipe_code: str,
+        branch_pipe_ref: str,
+        branch_pipe_type: str,
+    ) -> None:
+        """Register that a PipeBatch knows how many items it runs, before it starts any of them.
+
+        Args:
+            lookup_key: The tracer lookup key.
+            batch_node_id: The PipeBatch's node ID.
+            item_count: The number of items the batch runs.
+            branch_pipe_code: The bare code of the pipe each item runs.
+            branch_pipe_ref: The `domain.code` reference of the pipe each item runs.
+            branch_pipe_type: The type of the pipe each item runs.
+        """
+        tracer = self._get_tracer(lookup_key)
+        if tracer is None:
+            return
+        tracer.register_batch_fan_out(
+            batch_node_id=batch_node_id,
+            item_count=item_count,
+            branch_pipe_code=branch_pipe_code,
+            branch_pipe_ref=branch_pipe_ref,
+            branch_pipe_type=branch_pipe_type,
+        )
+
+    def register_condition_resolution(
+        self,
+        *,
+        lookup_key: str,
+        condition_node_id: str,
+        rendered_value: str,
+        selected_outcome: str | None,
+    ) -> None:
+        """Register that a live PipeCondition has chosen its outcome, before the chosen pipe starts.
+
+        Args:
+            lookup_key: The tracer lookup key.
+            condition_node_id: The PipeCondition's node ID.
+            rendered_value: The value the condition's expression rendered.
+            selected_outcome: The outcome-map key the value matched, or None when the default outcome was taken.
+        """
+        tracer = self._get_tracer(lookup_key)
+        if tracer is None:
+            return
+        tracer.register_condition_resolution(
+            condition_node_id=condition_node_id,
+            rendered_value=rendered_value,
+            selected_outcome=selected_outcome,
+        )

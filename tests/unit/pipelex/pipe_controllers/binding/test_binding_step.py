@@ -1,4 +1,5 @@
 import pytest
+from pytest_mock import MockerFixture
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
@@ -8,9 +9,12 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.pipe_controllers.binding import binding_step as binding_step_module
 from pipelex.pipe_controllers.binding.binding_derivation import BindingDerivation, BindingRoot, derive_binding
 from pipelex.pipe_controllers.binding.binding_step import BindingStep
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
+from tests.unit.pipelex.graph.conftest import make_trace_context
 from tests.unit.pipelex.pipe_controllers.binding.test_data import INVOICE, RESOLVER, SupplierRecord, make_invoice_record
 
 _INVOICE_CONCEPT = Concept(domain_code="billing", code="Invoice", description="An invoice", structure_class_name="InvoiceRecord")
@@ -238,6 +242,33 @@ class TestBindingStep:
 
         with pytest.raises(PipeRunInputsError, match="reads 'invoice', which is not in working memory"):
             step.skip_untyped_root(working_memory=WorkingMemory(), calling_pipe_code=_SEQUENCE_CODE, run_mode=PipeRunMode.LIVE)
+
+    @pytest.mark.parametrize(
+        ("error", "expected_failure"),
+        [
+            (None, ("UnknownError", "the binding step stopped without binding a value", False)),
+            (RuntimeError("the root could not be read"), ("RuntimeError", "the root could not be read", False)),
+        ],
+        ids=["stopped_without_an_error", "stopped_by_an_error"],
+    )
+    def test_a_stopped_binding_closes_its_node_as_failed_once(
+        self, mocker: MockerFixture, error: BaseException | None, expected_failure: tuple[str, str, bool]
+    ) -> None:
+        tracer_manager = mocker.MagicMock()
+        mocker.patch.object(binding_step_module.GraphTracerManager, "get_instance", return_value=tracer_manager)
+        job_metadata = JobMetadata(
+            run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="test_user", pipeline_run_id="run_binding"),
+            trace_context=make_trace_context(graph_id="run_binding"),
+        )
+
+        BindingStep(from_path="invoice.supplier", output_name="supplier").trace_error(
+            job_metadata=job_metadata, node_id="run_binding:node_3", error=error
+        )
+
+        tracer_manager.on_pipe_end_error.assert_called_once()
+        call_kwargs = tracer_manager.on_pipe_end_error.call_args.kwargs
+        assert (call_kwargs["lookup_key"], call_kwargs["node_id"]) == ("run_binding", "run_binding:node_3")
+        assert (call_kwargs["error_type"], call_kwargs["error_message"], call_kwargs["caller_facing"]) == expected_failure
 
     def test_the_step_is_written_back_as_mthds_writes_it(self) -> None:
         step = BindingStep(from_path="invoice.supplier.address.city", output_name="city")

@@ -12,7 +12,7 @@ info:
   license:
     name: Elastic License 2.0
     identifier: Elastic-2.0
-  version: 0.85.1
+  version: 0.86.0
 paths:
   /health:
     get:
@@ -2590,6 +2590,10 @@ components:
           - type: string
           - type: 'null'
           title: Stack
+        caller_facing:
+          type: boolean
+          title: Caller Facing
+          default: false
       additionalProperties: false
       type: object
       required:
@@ -4015,6 +4019,11 @@ components:
         id:
           type: string
           title: Id
+        path:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Path
         kind:
           $ref: '#/components/schemas/NodeKind'
         pipe_code:

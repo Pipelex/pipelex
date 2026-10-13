@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Callable, Generator
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -5,8 +6,10 @@ from typing import TYPE_CHECKING
 import pytest
 import shortuuid
 from pytest_mock import MockerFixture
+from typing_extensions import override
 
 from pipelex import log
+from pipelex.graph.graph_tracer import INVOCATION_PATH_FAULT_MESSAGE
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.pipelex import Pipelex
 from pipelex.system.environment import PIPELEX_HOME_ENV_KEY
@@ -69,6 +72,39 @@ def isolate_usage_stats() -> Generator[None, None, None]:
     """Keep the shared statistics state in a temporary home, and fail any attempt to send to a host that is not loopback."""
     with usage_stats_guarded(home=USAGE_STATS_TEST_HOME):
         yield
+
+
+class _InvocationPathFaultCollector(logging.Handler):
+    """Collects the errors a tracer logs when it traces an invocation without its path."""
+
+    def __init__(self) -> None:
+        super().__init__(level=logging.ERROR)
+        self.records: list[logging.LogRecord] = []
+
+    @override
+    def emit(self, record: logging.LogRecord) -> None:
+        # A configured caller prefix may precede the message, so the message is matched at the end of the line.
+        if record.getMessage().endswith(INVOCATION_PATH_FAULT_MESSAGE):
+            self.records.append(record)
+
+
+@pytest.fixture(autouse=True)
+def invocation_path_faults() -> Generator[list[logging.LogRecord], None, None]:
+    """Fail any test during which a tracer traced an invocation without its invocation path.
+
+    Tracing never fails a run, so a controller that hands a pipe no place only makes the tracer log the fault
+    (`pipelex/graph/graph_tracer.py`): this is where the invariant that every invocation gets a path is enforced, over
+    every test that runs a pipe. A test that provokes the fault on purpose requests this fixture by name, checks the
+    records it holds, and empties the list.
+    """
+    collector = _InvocationPathFaultCollector()
+    root_logger = logging.getLogger()
+    root_logger.addHandler(collector)
+    yield collector.records
+    root_logger.removeHandler(collector)
+    if collector.records:
+        fields = [{"pipe_ref": getattr(record, "pipe_ref", None), "node_id": getattr(record, "node_id", None)} for record in collector.records]
+        pytest.fail(f"An invocation was traced without its invocation path, which every invocation must have: {fields}")
 
 
 def _get_test_integration_mode() -> IntegrationMode:
