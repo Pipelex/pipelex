@@ -102,6 +102,19 @@ class ScanConfig(ConfigModel):
     excluded_dirs: frozenset[str] = Field(strict=False)
 
 
+class MethodTreeLimitsConfig(ConfigModel):
+    """`[interpreter.method_tree_limits]`: the limits this machine lists a method tree under before reading any file.
+
+    A limit left unset is not checked. They are this machine's own policy, not the hosted plane's: the lister counts
+    files and sums their sizes while it walks, and refuses a tree past one of them before hashing anything, so a
+    directory handed over by mistake is refused in moments rather than read in full.
+    """
+
+    max_files: int | None = Field(default=None, ge=1)
+    max_total_bytes: int | None = Field(default=None, ge=0)
+    max_file_bytes: int | None = Field(default=None, ge=0)
+
+
 class BuilderConfig(ConfigModel):
     fix_loop_max_attempts: int
     default_output_dir: str
@@ -205,6 +218,7 @@ class InterpreterConfig(ConfigModel):
     pipe_func: PipeFuncConfig
     pipeline_execution: PipelineExecutionConfig
     scan: ScanConfig
+    method_tree_limits: MethodTreeLimitsConfig
     builder: BuilderConfig
 
 

@@ -1,4 +1,4 @@
-from pipelex.base_exceptions import PipelexError
+from pipelex.base_exceptions import ErrorDomain, PipelexError
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
 
 
@@ -10,6 +10,12 @@ class CrateNormalizationError(LibraryError):
     """Raised when a library crate cannot be normalized (e.g. a non-domain-qualified key, or a pipe ref matching no crate pipe, or several)."""
 
     _declared_title = "Crate normalization error"
+
+
+class CrateIntegrityError(LibraryError):
+    """Raised when a library crate names a method tree it does not carry: the host that assembled it built it wrong."""
+
+    _declared_title = "Crate integrity error"
 
 
 class LibraryLoadingError(LibraryError):
@@ -85,3 +91,18 @@ class PipeLoadingError(LibraryLoadingError):
         self.source = source
         self.original_error = original_error
         super().__init__(message)
+
+
+class MethodTreeLoadError(LibraryLoadingError):
+    """Raised when a method tree a load reads from this host's disk cannot be listed.
+
+    The tree of a method's folder, of a library directory, of a `.mthds` file named alone or of a dependency package:
+    the standard refused it (a symbolic link, a name that is not a tree path, a lone file the membership rule keeps
+    out), it passed a limit this machine lists trees under, or a directory or a file of it could not be read. The
+    tree is the caller's own method, so the message, which names the tree's root and the files by their tree paths,
+    is theirs to read, and the same load is refused again until the tree changes.
+    """
+
+    error_domain = ErrorDomain.INPUT
+    retryable = False
+    _authors_caller_facing_message = True

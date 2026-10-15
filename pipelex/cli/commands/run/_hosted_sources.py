@@ -25,11 +25,11 @@ from pydantic import BaseModel, ConfigDict
 from pipelex.cli.installed_methods import DuplicateMethodNameError, MethodNotFoundError, find_method_by_name
 from pipelex.cli.method_resolver import method_output_base_dir, resolve_method_target
 from pipelex.hosted.exceptions import HostedRunSourceError
-from pipelex.hosted.execution import get_or_load_pipelex_config
+from pipelex.libraries.exceptions import MethodTreeLoadError
+from pipelex.libraries.method_trees import list_library_bundle_files
 from pipelex.methods.method_ref import looks_like_method_ref, parse_method_ref
-from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
+from pipelex.mthds_parsing.helpers import is_pipelex_file
 from pipelex.system.environment import PIPELEXPATH_ENV_KEY, get_pipelexpath_dirs
-from pipelex.tools.misc.file_utils import find_files_in_dir
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -71,15 +71,15 @@ def hosted_library_dirs(*, library_dirs: Sequence[str] | None) -> Sequence[str |
 def collect_mthds_files(*, primary: Path | None, library_dirs: Sequence[str | Path] | None) -> list[MthdsFileItem]:
     """Read the `.mthds` files a local run would load: `primary` first, then each library directory's, each file once.
 
-    A library directory is scanned recursively, skipping the configured `[interpreter.scan] excluded_dirs`, as a
-    local load scans it; a library entry naming a `.mthds` file is taken as it is; a missing one is skipped, as a
-    local load skips it. Each file carries its path as its label: the hosted API names it in the validation errors
-    of the method's signature, read before the run, while the run route takes the bare contents.
+    A library directory's files are the bundles of its method tree and of the trees nested in it, as a local load
+    reads them (`pipelex.libraries.method_trees`), so a file the membership rule keeps out, a `.gitignore`d or hidden
+    one, is never sent; a library entry naming a `.mthds` file is taken as it is; a missing one is skipped, as a local
+    load skips it. Each file carries its path as its label: the hosted API names it in the validation errors of the
+    method's signature, read before the run, while the run route takes the bare contents.
 
     Raises:
-        HostedRunSourceError: If a file cannot be read.
+        HostedRunSourceError: If a tree cannot be listed or a file cannot be read.
     """
-    excluded_dirs = list(get_or_load_pipelex_config().interpreter.scan.excluded_dirs)
     ordered: list[Path] = []
     if primary is not None:
         ordered.append(primary)
@@ -88,8 +88,12 @@ def collect_mthds_files(*, primary: Path | None, library_dirs: Sequence[str | Pa
         if library_path.is_file() and is_pipelex_file(library_path):
             ordered.append(library_path)
         elif library_path.is_dir():
-            found = find_files_in_dir(dir_path=library_path, pattern=f"*{MTHDS_EXTENSION}", excluded_dirs=excluded_dirs)
-            ordered.extend(path for path in found if is_pipelex_file(path))
+            try:
+                library_bundle_files = list_library_bundle_files(library_dirs=[library_path])
+            except MethodTreeLoadError as exc:
+                msg = f"Could not list the method tree of '{library_path}' to send its bundles to the hosted API: {exc.message}"
+                raise HostedRunSourceError(msg) from exc
+            ordered.extend(bundle_file.path for bundle_file in library_bundle_files)
 
     seen: set[Path] = set()
     files: list[MthdsFileItem] = []

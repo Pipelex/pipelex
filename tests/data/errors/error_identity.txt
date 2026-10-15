@@ -49,6 +49,7 @@ ConstructFieldBlueprintValueError | Construct field blueprint value | https://do
 ContextProviderError | Context provider | https://docs.pipelex.com/latest/errors/context-provider-error/
 CoreUnconditionalPluginDisabledError | Core unconditional plugin disabled | https://docs.pipelex.com/latest/errors/core-unconditional-plugin-disabled-error/
 CostRegistryError | Cost registry | https://docs.pipelex.com/latest/errors/cost-registry-error/
+CrateIntegrityError | Crate integrity error | https://docs.pipelex.com/latest/errors/crate-integrity-error/
 CrateNormalizationError | Crate normalization error | https://docs.pipelex.com/latest/errors/crate-normalization-error/
 CredentialsError | Missing or invalid credentials | https://docs.pipelex.com/latest/errors/credentials-error/
 CsvCoercionError | CSV coercion error | https://docs.pipelex.com/latest/errors/csv-coercion-error/
@@ -183,6 +184,7 @@ LogSinkHeaderValueError | Log sink header value holds a line break | https://doc
 LogSinkVariableError | Log sink variable did not resolve | https://docs.pipelex.com/latest/errors/log-sink-variable-error/
 MarkdownFormattingBudgetError | Markdown formatting budget exceeded | https://docs.pipelex.com/latest/errors/markdown-formatting-budget-error/
 MethodDependencyFetchError | Method dependency fetch | https://docs.pipelex.com/latest/errors/method-dependency-fetch-error/
+MethodEntryError | Method entry | https://docs.pipelex.com/latest/errors/method-entry-error/
 MethodFetchDisabledError | Method fetch disabled | https://docs.pipelex.com/latest/errors/method-fetch-disabled-error/
 MethodFetchError | Method fetch | https://docs.pipelex.com/latest/errors/method-fetch-error/
 MethodInstallError | Method install | https://docs.pipelex.com/latest/errors/method-install-error/
@@ -193,6 +195,7 @@ MethodPackageTooLargeError | Method package too large | https://docs.pipelex.com
 MethodRefError | Method reference error | https://docs.pipelex.com/latest/errors/method-ref-error/
 MethodRefParseError | Method ref parse | https://docs.pipelex.com/latest/errors/method-ref-parse-error/
 MethodStructuresRefusedError | Method structures refused | https://docs.pipelex.com/latest/errors/method-structures-refused-error/
+MethodTreeLoadError | Method tree load | https://docs.pipelex.com/latest/errors/method-tree-load-error/
 MigrationError | Migration error | https://docs.pipelex.com/latest/errors/migration-error/
 MigrationGoldenError | Migration golden error | https://docs.pipelex.com/latest/errors/migration-golden-error/
 MigrationLedgerError | Migration ledger error | https://docs.pipelex.com/latest/errors/migration-ledger-error/

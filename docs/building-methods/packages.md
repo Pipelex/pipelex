@@ -170,7 +170,7 @@ your-project/
 └── requirements.txt
 ```
 
-The `METHODS.toml` file sits at the project root. Pipelex discovers it by walking up from bundle locations until it finds the manifest.
+The `METHODS.toml` file sits at the project root. Pipelex discovers it by walking up from bundle locations until it finds the manifest, stopping at a repository's root, and the folder holding it roots the package's [method tree](method-trees.md): the files of the package its steps can read.
 
 ## Current Public CLI Workflow
 

@@ -4224,10 +4224,6 @@ rationale = "Reads the step's inputs out of one working memory."
 param = "named_contents"
 rationale = "Derives the document's title from its one mapping of named contents."
 
-["pipelex/pipe_operators/doc_gen/pipe_doc_gen_factory.py::bundle_dir_of_source"]
-param = "source"
-rationale = "Resolves the bundle directory of one source."
-
 ["pipelex/pipe_operators/doc_gen/template_field_check.py::_describe_fields"]
 param = "model_class"
 rationale = "Lists the fields of one model class."

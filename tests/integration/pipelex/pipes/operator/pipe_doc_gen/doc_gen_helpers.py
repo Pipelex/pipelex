@@ -160,10 +160,24 @@ async def refusal_report(*, step_fields: str) -> str:
     return str(exc_info.value.to_error_report().model_dump())
 
 
-def write_bundle(*, directory: Path, step_fields: str) -> Path:
-    """Write the test bundle with the given PipeDocGen step into a directory, for a step that names a template file."""
+METHOD_MANIFEST = """[package]
+address = "github.com/pipelex-tests/invoice-printer"
+version = "1.0.0"
+description = "Prints an invoice from a template file"
+"""
+
+
+def write_bundle(*, directory: Path, step_fields: str, as_method: bool = True) -> Path:
+    """Write the test bundle with the given PipeDocGen step into a directory, for a step that names a template file.
+
+    With `as_method`, the directory also holds a `METHODS.toml`, so the bundle file named alone is rooted at the
+    directory and its step finds the files beside it in its method tree. Without one, the file named alone is the
+    one-file tree of that file, from which a reference to any other file is refused.
+    """
     bundle_path = directory / "invoice.mthds"
     bundle_path.write_text(PipeDocGenTestData.bundle(step_fields=step_fields), encoding="utf-8")
+    if as_method:
+        (directory / "METHODS.toml").write_text(METHOD_MANIFEST, encoding="utf-8")
     return bundle_path
 
 
