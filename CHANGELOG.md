@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **`mthds` and `pipelex-sdk` versions, MTHDS protocol 1.0.0 and standard 7.0.0 (Breaking)**: the pins move to `mthds==0.22.0`, the release that lists method trees, carries protocol 1.0.0 and implements MTHDS standard 7.0.0, and `pipelex-sdk==0.45.0`, the release built on it, so the runner and `GET /v1/version` report `protocol_version` `1.0.0`, a crate pipelex normalizes is stamped `mthds_version` `7.0.0`, and a `METHODS.toml` declaring `mthds_version = "^5.0.0"` now warns that the engine does not satisfy it. A dependency package fetched before is fetched again into the release's new cache layout, a package's `METHODS.toml` is found only at its root and manifest discovery stops at any `.git` entry; everyone downstream inherits those exact versions.
+
 ## [v0.86.0] - 2026-10-13
 
 ### Highlights
