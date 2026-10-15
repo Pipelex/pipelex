@@ -1,18 +1,24 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.cli.commands.run._hosted_sources import collect_mthds_files, hosted_library_dirs
 from pipelex.cli.commands.run._inputs_file_loader import find_default_inputs_file
+from pipelex.cli.commands.run._method_folder import list_bundle_file_tree, resolve_method_folder_run
 from pipelex.cli.commands.run._run_core import COMMAND, execute_run, validate_run_flag_combination
 from pipelex.cli.commands.run._run_hosted import bundle_main_pipe_code, execute_hosted_run, refuse_local_only_flags, resolve_cli_run_execution
 from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError
+from pipelex.cli.error_handlers import handle_validate_bundle_error
 from pipelex.hosted.exceptions import HostedRunSourceError
-from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
-from pipelex.pipeline.default_file_names import DEFAULT_BUNDLE_FILE_NAME
+from pipelex.mthds_parsing.helpers import is_pipelex_file
+from pipelex.pipeline.exceptions import ValidateBundleError
+
+if TYPE_CHECKING:
+    from mthds.method_tree.models import MethodTree
 
 
 def run_bundle_cmd(
@@ -140,31 +146,22 @@ def run_bundle_cmd(
     bundle_path: str | None = None
     target_path = Path(path)
 
+    # The method tree the run reads, whose digest the run records: the folder's, or the bundle file's own.
+    method_tree: MethodTree
+    # The pipe a hosted run names: `--pipe`, else the bare main pipe the hosted API resolves among the files it is sent.
+    hosted_pipe_code: str | None = pipe
     if target_path.is_dir():
-        # Directory mode: auto-detect bundle and inputs
-        bundle_file = target_path / DEFAULT_BUNDLE_FILE_NAME
-        if bundle_file.is_file():
-            bundle_path = str(bundle_file)
-        else:
-            mthds_files = list(target_path.glob(f"*{MTHDS_EXTENSION}"))
-            if len(mthds_files) == 0:
-                typer.secho(
-                    f"Failed to run: no .mthds bundle file found in directory '{path}'",
-                    fg=typer.colors.RED,
-                    err=True,
-                )
-                raise typer.Exit(1)
-            if len(mthds_files) > 1:
-                mthds_names = ", ".join(mthds_file.name for mthds_file in mthds_files)
-                typer.secho(
-                    f"Failed to run: multiple .mthds files found in '{path}' ({mthds_names}) "
-                    f"and no '{DEFAULT_BUNDLE_FILE_NAME}'. "
-                    f"Pass the .mthds file directly, e.g.: pipelex run bundle {target_path / mthds_files[0].name}",
-                    fg=typer.colors.RED,
-                    err=True,
-                )
-                raise typer.Exit(1)
-            bundle_path = str(mthds_files[0])
+        # Directory mode: the method rooted at or above the folder, started where the protocol's rule says
+        try:
+            folder_run = resolve_method_folder_run(directory=target_path, pipe_override=pipe)
+        except ValidateBundleError as exc:
+            handle_validate_bundle_error(exc, library_dirs=[Path(one_dir) for one_dir in library_dir] if library_dir else None)
+        method_tree = folder_run.tree
+        pipe_code = folder_run.pipe_code
+        if folder_run.entry is not None and folder_run.entry_bundle_file is not None:
+            bundle_path = str(folder_run.entry_bundle_file)
+            hosted_pipe_code = folder_run.entry.pipe_code
+            typer.echo(f"Starting at the method's main pipe {folder_run.entry.pipe_ref}, in {folder_run.entry.tree_path}")
 
         # Auto-detect inputs (inputs.json or inputs.toml) if --inputs not explicitly provided
         if not inputs:
@@ -184,10 +181,14 @@ def run_bundle_cmd(
         elif target_dir_str not in library_dir:
             library_dir = [target_dir_str, *library_dir]
 
-        typer.echo(f"Auto-detected bundle: {bundle_path}")
-
     elif is_pipelex_file(target_path):
         bundle_path = path
+        try:
+            method_tree = list_bundle_file_tree(bundle_file=target_path)
+        except ValidateBundleError as exc:
+            handle_validate_bundle_error(
+                exc, bundle_path=target_path, library_dirs=[Path(one_dir) for one_dir in library_dir] if library_dir else None
+            )
     else:
         typer.secho(
             f"Failed to run: '{path}' is not a .mthds file or directory.\n"
@@ -209,10 +210,17 @@ def run_bundle_cmd(
             costs=costs,
             graph_full_data=graph_full_data,
         )
-        hosted_pipe_code = pipe_code or bundle_main_pipe_code(bundle_path=bundle_path, library_dirs=library_dir)
-        # The bundle goes first, then the rest of the library a local run would load with it: -L, else PIPELEXPATH.
+        if hosted_pipe_code is None:
+            if bundle_path is None:
+                msg = "A hosted run of a method's folder names its pipe, or the bundle defining its main pipe."
+                raise PipelexUnexpectedError(msg)
+            hosted_pipe_code = bundle_main_pipe_code(bundle_path=bundle_path, library_dirs=library_dir)
+        # The entry bundle goes first, then the rest of the library a local run would load with it: the method's folder
+        # and -L, else PIPELEXPATH.
         try:
-            bundle_files = collect_mthds_files(primary=Path(bundle_path), library_dirs=hosted_library_dirs(library_dirs=library_dir))
+            bundle_files = collect_mthds_files(
+                primary=Path(bundle_path) if bundle_path else None, library_dirs=hosted_library_dirs(library_dirs=library_dir)
+            )
         except HostedRunSourceError as exc:
             typer.secho(f"Failed to run: {exc.message}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
@@ -252,4 +260,5 @@ def run_bundle_cmd(
         orchestrator=orchestrator,
         dynamic_output_concept_ref=dynamic_output_concept_ref,
         save_csv=save_csv,
+        method_tree=method_tree,
     )

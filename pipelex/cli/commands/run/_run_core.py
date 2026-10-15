@@ -15,6 +15,7 @@ from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.commands.run._inputs_file_loader import load_inputs_dict_from_path
 from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths
 from pipelex.cli.commands.run._main_stuff_file import save_main_stuff_file
+from pipelex.cli.commands.run._run_output_folder import make_run_output_folder, write_method_tree_record
 from pipelex.cli.deck_notice import warn_if_deck_stale
 from pipelex.cli.error_handlers import (
     ErrorContext,
@@ -49,13 +50,14 @@ from pipelex.system.telemetry.events import EventProperty
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsMethodSource
 from pipelex.system.usage_stats.usage_stats_runs import method_source_scope
 from pipelex.tools.misc.exceptions import JsonTypeError, TomlError
-from pipelex.tools.misc.file_utils import get_incremental_directory_path
 from pipelex.tools.misc.json_utils import save_as_json_to_path
 from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.tabular.csv_codec import assert_supported_table_suffix, csv_from_list_content, flat_field_names
 from pipelex.tools.tabular.exceptions import CsvError
 
 if TYPE_CHECKING:
+    from mthds.method_tree.models import MethodTree
+
     from pipelex.core.concepts.concept import Concept
     from pipelex.core.stuffs.stuff_content import StuffContent
 
@@ -193,10 +195,12 @@ async def _execute_run(
     costs: bool | None = None,
     dynamic_output_concept_ref: str | None = None,
     save_csv: str | None = None,
+    method_tree: MethodTree | None = None,
 ) -> None:
     """Core async execution logic for running a pipe.
 
-    Shared between the ``method`` and ``pipe`` subcommands.
+    Shared between the ``method``, ``pipe`` and ``bundle`` subcommands. ``method_tree`` is the method tree the run
+    reads, when the command listed one, recorded as ``method_tree.json`` in the run's output folder.
     """
     # Fail fast on an unusable --save-csv target BEFORE running the pipeline, so a bad path (empty,
     # or an unsupported suffix like .xlsx) doesn't waste a full inference run. The output-shape and
@@ -312,8 +316,13 @@ async def _execute_run(
     needs_output_path = (graph_spec is not None) or save_main_stuff or save_working_memory
 
     if needs_output_path:
-        output_path = get_incremental_directory_path(base_path=Path(output_dir), base_name=f"{pipe_code}_output")
-        output_path.mkdir(parents=True, exist_ok=True)
+        # Named after the pipe's own code: a qualified `domain.pipe_code` keeps its domain out of the folder's name.
+        output_path = make_run_output_folder(output_dir=Path(output_dir), label=pipe_code.rsplit(".", 1)[-1])
+
+    # The method tree the run read, recorded beside its outputs: its digest names the exact files of the method.
+    method_tree_record_path: Path | None = None
+    if output_path is not None and method_tree is not None:
+        method_tree_record_path = write_method_tree_record(output_path=output_path, method_tree=method_tree)
 
     # Save graph outputs if requested
     saved_graphs: list[str] = []
@@ -480,6 +489,10 @@ async def _execute_run(
                 console.print(f"    [green]✓[/green] {_WORKING_MEMORY_FILENAME}")
             else:
                 console.print(f"    [green]✓[/green] working_memory: {escape(working_memory_output_path)}")
+        if method_tree_record_path:
+            console.print(f"    [green]✓[/green] {method_tree_record_path.name}")
+    if method_tree is not None:
+        console.print(f"  Method tree: {escape(method_tree.digest)}, {len(method_tree.files)} files")
     # CSV output is written to a literal cwd-relative path (CQ1), independent of --output-dir.
     if save_csv is not None:
         console.print(f"  [green]✓[/green] CSV saved to [bold magenta]{escape(save_csv)}[/bold magenta]")
@@ -506,6 +519,7 @@ def execute_run(
     orchestrator: str | None = None,
     dynamic_output_concept_ref: str | None = None,
     save_csv: str | None = None,
+    method_tree: MethodTree | None = None,
 ) -> None:
     """Synchronous entry point that wraps the async execution with Pipelex setup/teardown.
 
@@ -549,6 +563,7 @@ def execute_run(
                     costs=costs,
                     dynamic_output_concept_ref=dynamic_output_concept_ref,
                     save_csv=save_csv,
+                    method_tree=method_tree,
                 )
             )
 

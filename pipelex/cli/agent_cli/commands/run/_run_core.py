@@ -23,6 +23,8 @@ from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.json_utils import clean_json_dumps
 
 if TYPE_CHECKING:
+    from mthds.method_tree.models import MethodTree
+
     from pipelex.system.configuration.configs import PipelineExecutionConfig
 
 
@@ -52,6 +54,7 @@ async def run_pipeline_core(
     with_memory: bool = False,
     inputs_base_dir: Path | None = None,
     output_dir_override: Path | None = None,
+    method_tree: MethodTree | None = None,
 ) -> dict[str, Any]:
     """Core logic for running a pipeline and returning JSON-serializable output.
 
@@ -72,6 +75,8 @@ async def run_pipeline_core(
         output_dir_override: Directory to write run outputs (output JSON, graph files) into,
             overriding the bundle-adjacent default. The caller passes one when the bundle lives
             in a directory that will not survive the process — a fetched method's ephemeral clone.
+        method_tree: The method tree the run reads, when the command listed one: its digest is recorded as
+            ``method_tree_digest`` beside the run's other side effects, on disk and under ``with_memory``.
 
     Returns:
         Dictionary with execution results suitable for JSON serialization.
@@ -157,6 +162,9 @@ async def run_pipeline_core(
     # leaks into the compact stdout output.  It is written to the on-disk
     # JSON file and, when with_memory is True, included in the returned dict.
     side_effects: dict[str, Any] = {}
+    # The digest of the method tree the run read names the exact files of the method it ran.
+    if method_tree is not None:
+        side_effects["method_tree_digest"] = method_tree.digest
 
     # Cost report: best-effort structured `cost_report` object in the JSON output (machine-first; no Rich
     # table on stderr like the human CLI). build_cost_summary returns None for runs that did no reportable

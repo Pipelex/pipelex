@@ -80,15 +80,17 @@ pipelex run pipe my_pipe -L ./pipelines --hosted --inputs data.json
 pipelex run bundle <PATH> [OPTIONS]
 ```
 
-Runs a pipeline from a bundle file (`.mthds`) or a pipeline directory. When a directory is given, the bundle file is auto-detected inside it — and so is an inputs file (`inputs.json` or `inputs.toml`) when `--inputs` is not passed (see [Input File Formats](#input-file-formats)).
+Runs a method from a bundle file (`.mthds`) or a method's folder, read through its [method tree](../../building-methods/method-trees.md). A folder is the method rooted at the nearest `METHODS.toml` at or above it, else at the folder itself, and with no `--pipe` the run starts at the manifest's `main_pipe`, or, with no manifest, at the one `main_pipe` its bundles declare; none or several is refused, naming each bundle by its path in the tree. An inputs file (`inputs.json` or `inputs.toml`) in the folder is auto-detected when `--inputs` is not passed (see [Input File Formats](#input-file-formats)). A bundle file named alone starts at its own `main_pipe`, and with no `METHODS.toml` at or above its folder its method is that one file, so a step naming a file beside it, such as a `template_file`, is refused: run the folder instead, or add a `METHODS.toml`.
+
+The run prints the digest of the tree it read with its recap, and records the tree as `method_tree.json` in its output folder (see [The results directory](#the-results-directory)).
 
 **Arguments:**
 
-- `PATH` - Path to a `.mthds` bundle file or a directory containing one
+- `PATH` - Path to a `.mthds` bundle file or a method's folder
 
 **Options:**
 
-- `--pipe PIPE_CODE` - Run a specific pipe from the bundle (defaults to the bundle's main pipe)
+- `--pipe PIPE_CODE` - Run a specific pipe, as `pipe_code` or `domain.pipe_code` (defaults to the method's main pipe)
 - `--inputs`, `-i` - Path to a JSON or TOML file containing inputs (discriminated by file extension), or inline JSON starting with `{` — see [Input File Formats](#input-file-formats)
 - `--output-dir`, `-o` - Directory to save outputs
 - `--save-main-stuff` / `--no-save-main-stuff` - Whether to save the main output
@@ -202,7 +204,7 @@ Every request a hosted run sends names its client in its `User-Agent` as `pipele
 
 **What a hosted run sends** is what a local run would load:
 
-- `run bundle` sends the bundle, then every `.mthds` file of its library directories (the bundle's own directory for `run bundle <dir>`, then `-L`; for a bundle file with no `-L`, `PIPELEXPATH`), each once. Without `--pipe`, the bundle's `main_pipe` is read from the bundle here, as a local run reads it.
+- `run bundle` sends the bundle, then every `.mthds` file of its library directories' method trees (the method's folder for `run bundle <dir>`, then `-L`; for a bundle file with no `-L`, `PIPELEXPATH`), each once, so a bundle the membership rule keeps out is never sent. Without `--pipe`, the pipe is the one a local run would start at: the bundle's `main_pipe`, or for a folder the method's, selected here as a local run selects it.
 - `run pipe` sends every `.mthds` file of its library directories: the installed method exporting the pipe and `-L`, else `PIPELEXPATH`. With none of them, the run is refused and asks for `-L`.
 - `run method` sends an installed or local method's files. A published address goes as a reference and a catalog id (`mt_…`) as an id, both resolved by the hosted API: nothing is fetched or read locally, `-L` is refused with them, and a relative `--inputs` path resolves against the working directory rather than the method's. A method installed under a name spelled like a catalog id, such as `mt_reports`, is that installed method, not an id.
 
@@ -283,7 +285,7 @@ The output JSON contains the complete working memory after pipeline execution, i
 
 ### The results directory
 
-Each run that saves anything gets its own numbered directory under `--output-dir` (`results/<pipe_code>_output_01/`, then `_02`, and so on). With `--save-working-memory` it holds `working_memory.json`, with `--save-main-stuff` the `main_stuff.*` renders, and with `--graph` the graph outputs that `graphs_inclusion` enables: `graphspec.json`, the Mermaid code and viewer, and the ReactFlow viewer. When the main output is a Document or an Image, `--save-main-stuff` also copies the file itself into the directory under its own name, so a PDF that a [`PipeDocGen`](../../building-methods/pipes/pipe-operators/PipeDocGen.md) step produced lands as `invoice-INV-2026-0142.pdf` and opens with a double-click, and the run prints its path. It never replaces a file the run writes in the directory: a file whose name is taken, such as a document passed through from an earlier run as `main_stuff.json`, is saved as `main_stuff-1.json`. A dry run produces no file, so it copies nothing. In `working_memory.json` each stuff names its concept by ref — `{"stuff_code": …, "stuff_name": …, "concept": "<domain>.<Code>", "content": …}` — and carries no concept definition; see [Working Memory](../../building-methods/pipes/working-memory.md#in-memory-and-on-the-wire).
+Each run that saves anything gets its own numbered directory under `--output-dir` (`results/<pipe_code>_output_01/`, then `_02`, and so on), named after the pipe's own code even when it was named as `domain.pipe_code`. The directory holds a `.gitignore` ignoring everything in it, so a run started from inside a method's folder never adds its outputs to the method's tree. A local run of a bundle or a folder also writes `method_tree.json` there, the record of the [method tree](../../building-methods/method-trees.md#limits-and-the-tree-digest) it read: its digest, its root on this machine, its entry and each file's path, hash and size. With `--save-working-memory` it holds `working_memory.json`, with `--save-main-stuff` the `main_stuff.*` renders, and with `--graph` the graph outputs that `graphs_inclusion` enables: `graphspec.json`, the Mermaid code and viewer, and the ReactFlow viewer. When the main output is a Document or an Image, `--save-main-stuff` also copies the file itself into the directory under its own name, so a PDF that a [`PipeDocGen`](../../building-methods/pipes/pipe-operators/PipeDocGen.md) step produced lands as `invoice-INV-2026-0142.pdf` and opens with a double-click, and the run prints its path. It never replaces a file the run writes in the directory: a file whose name is taken, such as a document passed through from an earlier run as `main_stuff.json`, is saved as `main_stuff-1.json`. A dry run produces no file, so it copies nothing. In `working_memory.json` each stuff names its concept by ref — `{"stuff_code": …, "stuff_name": …, "concept": "<domain>.<Code>", "content": …}` — and carries no concept definition; see [Working Memory](../../building-methods/pipes/working-memory.md#in-memory-and-on-the-wire).
 
 Beside `graphspec.json`, and gated by the same `graphspec_json` flag, the run writes the three files that describe the data the graph carries:
 
@@ -299,7 +301,7 @@ A run whose main output resolves as a recorded absence (an optional `?` output t
 
 ## An Invalid Bundle
 
-A run loads its bundle before any pipe runs, and refuses an invalid one there, before spending anything. The refusal is reported the way [`pipelex validate`](validate.md) reports the same bundle: the grouped invalid-bundle panel, with one located item per refusal (its pipe, its field, its message and its suggested fix when it has one), and exit code `1`. A bundle file run on its own is loaded from its text, so the items of a refusal found while loading it name no file, and the panel names the bundle instead; a bundle that does not parse when `run bundle` looks for its `main_pipe` (no `--pipe`) names its file on the item too. That holds whether the parse or the load refuses the bundle, and for a refusal found while loading a library directory you pass with `-L` (or the bundle's own directory, for `run bundle <dir>`). When the items carry automatic fixes, the panel names the `pipelex fix bundle` command that applies them.
+A run loads its bundle before any pipe runs, and refuses an invalid one there, before spending anything. The refusal is reported the way [`pipelex validate`](validate.md) reports the same bundle: the grouped invalid-bundle panel, with one located item per refusal (its pipe, its field, its message and its suggested fix when it has one), and exit code `1`. A bundle file run on its own is loaded from its text, so the items of a refusal found while loading it name no file, and the panel names the bundle instead; a bundle that does not parse when `run bundle` looks for its `main_pipe` (no `--pipe`) names its file on the item too. That holds whether the parse or the load refuses the bundle, and for a refusal found while loading a library directory you pass with `-L` (or the method's folder, for `run bundle <dir>`). When the items carry automatic fixes, the panel names the `pipelex fix bundle` command that applies them.
 
 ## Related Documentation
 
