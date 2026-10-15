@@ -14,7 +14,7 @@ from pipelex.cogt.search.search_job import SearchJob
 from pipelex.config import get_config
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.reporting.reporting_types import AnyTokensUsage
-from pipelex.runtime_hub import is_in_isolated_execution
+from pipelex.runtime_hub import get_event_log_override, is_in_isolated_execution
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.system.trace_context import TraceContext
 from pipelex.tools.log.error_fields import error_fields
@@ -37,11 +37,11 @@ except ImportError:
 # Infra-level failures an event-log backend can raise from emit(). Usage/cost reporting is a side
 # concern: by the time report_inference_job runs, the inference has already succeeded (and been
 # billed), so a transient event-log write failure must never propagate and turn a successful
-# inference into a failed pipeline. Both emit paths — the registered-context fast path and the
-# runner fallback — drop these with a WARNING. OSError covers the NDJSON backend (dir/file write
-# errors); ClientError (service-side throttle / auth) and BotoCoreError (transport / credential /
-# timeout, e.g. EndpointConnectionError, ReadTimeoutError, NoCredentialsError) cover the DynamoDB
-# backend when boto3 is installed. ClientError and BotoCoreError are sibling botocore base classes
+# inference into a failed pipeline. Every emit path — the scoped override, the registered-context
+# fast path and the runner fallback — drops these with a WARNING. OSError covers the NDJSON backend
+# (dir/file write errors); ClientError (service-side throttle / auth) and BotoCoreError (transport /
+# credential / timeout, e.g. EndpointConnectionError, ReadTimeoutError, NoCredentialsError) cover the
+# DynamoDB backend when boto3 is installed. ClientError and BotoCoreError are sibling botocore base classes
 # (neither subclasses the other), so both must be listed.
 # cast: botocore is untyped, so the imported classes are Unknown; we know they are BaseException types.
 # Single assignment (no reassignment) so the uppercase constant satisfies reportConstantRedefinition.
@@ -176,6 +176,20 @@ class ReportingManager(ReportingProtocol):
     def _emit_usage_event(self, inference_job: InferenceJobAbstract, *, tokens_usage: AnyTokensUsage) -> None:
         """Emit a UsageReportEvent for this job.
 
+        Scoped path, ahead of every other: when a scoped event log is set
+        (``runtime_hub.scoped_event_log``), the event goes into it and nowhere else —
+        not into a registered context, not into the runner fallback — whether or not
+        the code runs in an isolated sub-execution, and whether or not tracing is
+        enabled, since a set override implies tracing-enabled, as it does for the
+        tracer setup in ``pipeline_run_setup`` and for ``assemble_tracing``. This is
+        what lets code running a leaf inside an isolated sub-execution capture the
+        usage that leaf emits and return it with its result, for a backend such as
+        Mistral Workflows that has no shared store for the run to read usage back from.
+        It is safe inside an isolated sub-execution, unlike the registered fast path
+        below: the override is a ContextVar, so it reaches only code running in the
+        context that set it and the tasks started from it, and an isolated
+        sub-execution sees one only when its own code scoped it.
+
         Fast path: when set_event_log was registered for this trace context's
         lookup_key (workflow-thread or direct mode), emit through the cached
         per-context event log.
@@ -200,8 +214,8 @@ class ReportingManager(ReportingProtocol):
         if trace_context is None:
             return
 
-        # Gate cost emission on emit_usage_events BEFORE the context lookup, so both the fast path
-        # (_emit_via_registered_context) and the runner fallback are guarded by the same check. This
+        # Gate cost emission on emit_usage_events BEFORE any routing, so the scoped override, the fast
+        # path (a registered context) and the runner fallback are all guarded by the same check. This
         # keeps correctness from resting on the cross-file invariant "a context is registered (via
         # set_event_log) only when costs are on": _event_log_contexts is a process-global singleton
         # and clear_event_log is best-effort in finally blocks, so a leaked context from a prior
@@ -211,10 +225,29 @@ class ReportingManager(ReportingProtocol):
         if not trace_context.emit_usage_events:
             return
 
+        # A scoped override (see hub.scoped_event_log) is the transport of whatever runs in its scope and
+        # implies tracing-enabled: the event goes into it and nowhere else, ahead of the registered contexts
+        # and the runner fallback, inside an isolated sub-execution too (see the docstring). The run is the
+        # job's own, as on the runner fallback, since no registration names one here.
+        event_log_override = get_event_log_override()
+        if event_log_override is not None:
+            self._emit_into_event_log(
+                event_log=event_log_override,
+                pipeline_run_id=inference_job.job_metadata.run_metadata.pipeline_run_id,
+                trace_context=trace_context,
+                tokens_usage=tokens_usage,
+            )
+            return
+
         if not is_in_isolated_execution():
             context = self._event_log_contexts.get(trace_context.lookup_key)
             if context is not None:
-                self._emit_via_registered_context(context=context, trace_context=trace_context, tokens_usage=tokens_usage)
+                self._emit_into_event_log(
+                    event_log=context.event_log,
+                    pipeline_run_id=context.pipeline_run_id,
+                    trace_context=trace_context,
+                    tokens_usage=tokens_usage,
+                )
                 return
 
         self._emit_usage_event_runner_fallback(
@@ -224,36 +257,40 @@ class ReportingManager(ReportingProtocol):
         )
 
     @staticmethod
-    def _emit_via_registered_context(
+    def _emit_into_event_log(
         *,
-        context: _EventLogContext,
+        event_log: EventLogProtocol,
+        pipeline_run_id: str,
         trace_context: TraceContext,
         tokens_usage: AnyTokensUsage,
     ) -> None:
-        """Fast-path emit through a context registered via set_event_log."""
-        node_id = trace_context.parent_node_id or UNATTRIBUTED_NODE_ID
-        seq = context.event_log.next_sequence()
+        """Build the usage event a trace context states and emit it into ``event_log``, best-effort.
 
+        Shared by every emit path — the scoped override, a context registered via set_event_log and the
+        runner fallback — which differ only in the event log they write into and the run they name. The
+        execution, its attempt and its lineage are the trace context's on every path: a usage event belongs
+        to the attempt of the workflow that ran it, which a new attempt of that workflow supersedes.
+        """
         event = UsageReportEvent(
-            pipeline_run_id=context.pipeline_run_id,
+            pipeline_run_id=pipeline_run_id,
             workflow_id=trace_context.own_attempt.execution,
             attempt=trace_context.own_attempt.attempt,
             lineage=trace_context.lineage,
             path=trace_context.parent_path,
-            writer_id=context.event_log.writer_id,
+            writer_id=event_log.writer_id,
             mode=trace_context.run_mode,
             timestamp=datetime.now(UTC),
-            sequence=seq,
-            node_id=node_id,
+            sequence=event_log.next_sequence(),
+            node_id=trace_context.parent_node_id or UNATTRIBUTED_NODE_ID,
             tokens_usage=tokens_usage,
         )
-        ReportingManager._emit_best_effort(event_log=context.event_log, event=event)
+        ReportingManager._emit_best_effort(event_log=event_log, event=event)
 
     @staticmethod
     def _emit_best_effort(*, event_log: EventLogProtocol, event: UsageReportEvent) -> None:
         """Emit a usage event, dropping infra-level backend failures with a WARNING.
 
-        Shared by both emit paths (the registered-context fast path and the runner fallback).
+        Shared by every emit path (the scoped override, the registered-context fast path and the runner fallback).
         report_inference_job runs synchronously after the inference has already succeeded, so an
         event-log write failure must not propagate and fail the pipeline. We catch the specific
         infra exception classes the backends raise at emit() time (see
@@ -276,7 +313,8 @@ class ReportingManager(ReportingProtocol):
         This is the universal path for activity-side usage emissions (audit finding
         H1): every emission from inside a Temporal activity routes here, co-located
         or remote alike, so the workflow's in-sandbox buffer stays a pure function
-        of inline execution. It also covers the original fallback case — a runner
+        of inline execution — unless the activity's own code set a scoped event log,
+        which takes the emission instead. It also covers the original fallback case — a runner
         process where ``set_event_log`` was never called. The event log is
         process-local, built from ``tracing_config``, stamped with a stable
         per-process writer_id of the form ``act_{pid}_{uuid8}``.
@@ -308,33 +346,18 @@ class ReportingManager(ReportingProtocol):
         if process_event_log is None:
             return
 
-        # The execution, its attempt and its lineage are the trace context's, as on the fast path: an activity's usage
-        # belongs to the attempt of the workflow that ran it, which a new attempt of that workflow supersedes.
-        workflow_id = trace_context.own_attempt.execution
-        node_id = trace_context.parent_node_id or UNATTRIBUTED_NODE_ID
-
         # The line names the run's tracer key beside the execution: the execution is `direct` for every run in direct
         # mode and under the kernel, so it alone would not say which run engaged the fallback.
         ActivityEventLogCache.log_once_runner_fallback_engaged(
-            workflow_id=workflow_id, tracer_key=trace_context.lookup_key, writer_id=process_event_log.writer_id
+            workflow_id=trace_context.own_attempt.execution, tracer_key=trace_context.lookup_key, writer_id=process_event_log.writer_id
         )
 
-        seq = process_event_log.next_sequence()
-        event = UsageReportEvent(
+        self._emit_into_event_log(
+            event_log=process_event_log,
             pipeline_run_id=inference_job.job_metadata.run_metadata.pipeline_run_id,
-            workflow_id=workflow_id,
-            attempt=trace_context.own_attempt.attempt,
-            lineage=trace_context.lineage,
-            path=trace_context.parent_path,
-            writer_id=process_event_log.writer_id,
-            mode=trace_context.run_mode,
-            timestamp=datetime.now(UTC),
-            sequence=seq,
-            node_id=node_id,
+            trace_context=trace_context,
             tokens_usage=tokens_usage,
         )
-
-        self._emit_best_effort(event_log=process_event_log, event=event)
 
     @override
     def report_inference_job(self, inference_job: InferenceJobAbstract):
