@@ -57,7 +57,8 @@ class TestCsvRun:
         mock_execute = mocker.patch("pipelex.cli.commands.run.bundle_cmd.execute_run")
         # Build the kwargs dynamically so this stays type-clean before `save_csv` exists
         # (Phase 4 adds it); the RED failure is a runtime TypeError, not a type-check error.
-        call_kwargs: dict[str, object] = {"path": str(BUNDLE_SRC), "save_csv": "out.csv", "dry_run": True}
+        # The demo's bundle declares no main_pipe, so its folder runs from the pipe it is told to start at.
+        call_kwargs: dict[str, object] = {"path": str(BUNDLE_SRC), "pipe": "summarize_people", "save_csv": "out.csv", "dry_run": True}
         run_bundle_cmd(**call_kwargs)  # type: ignore[arg-type]
         assert mock_execute.call_args is not None
         assert mock_execute.call_args.kwargs.get("save_csv") == "out.csv"
