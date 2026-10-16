@@ -133,6 +133,10 @@
          <lastmod>2026-10-16</lastmod>
     </url>
     <url>
+         <loc>https://docs.pipelex.com/latest/building-methods/method-trees/</loc>
+         <lastmod>2026-10-16</lastmod>
+    </url>
+    <url>
          <loc>https://docs.pipelex.com/latest/building-methods/packages/</loc>
          <lastmod>2026-10-16</lastmod>
     </url>
@@ -465,19 +469,11 @@
          <lastmod>2026-10-16</lastmod>
     </url>
     <url>
-         <loc>https://docs.pipelex.com/latest/errors/bundle-resource-error/</loc>
-         <lastmod>2026-10-16</lastmod>
-    </url>
-    <url>
          <loc>https://docs.pipelex.com/latest/errors/bundle-resource-not-named-error/</loc>
          <lastmod>2026-10-16</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/bundle-resource-path-error/</loc>
-         <lastmod>2026-10-16</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.pipelex.com/latest/errors/bundle-resources-too-large-error/</loc>
          <lastmod>2026-10-16</lastmod>
     </url>
     <url>
@@ -705,6 +701,10 @@
          <lastmod>2026-10-16</lastmod>
     </url>
     <url>
+         <loc>https://docs.pipelex.com/latest/errors/duplicate-pipe-func-package-offer-error/</loc>
+         <lastmod>2026-10-16</lastmod>
+    </url>
+    <url>
          <loc>https://docs.pipelex.com/latest/errors/duplicate-secrets-provider-error/</loc>
          <lastmod>2026-10-16</lastmod>
     </url>
@@ -805,7 +805,7 @@
          <lastmod>2026-10-16</lastmod>
     </url>
     <url>
-         <loc>https://docs.pipelex.com/latest/errors/func-registry-error/</loc>
+         <loc>https://docs.pipelex.com/latest/errors/function-names-migration-error/</loc>
          <lastmod>2026-10-16</lastmod>
     </url>
     <url>
@@ -830,6 +830,14 @@
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/graph-spec-validation-error/</loc>
+         <lastmod>2026-10-16</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/host-library-requirements-error/</loc>
+         <lastmod>2026-10-16</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/host-library-tree-error/</loc>
          <lastmod>2026-10-16</lastmod>
     </url>
     <url>
@@ -1113,11 +1121,19 @@
          <lastmod>2026-10-16</lastmod>
     </url>
     <url>
+         <loc>https://docs.pipelex.com/latest/errors/method-entry-error/</loc>
+         <lastmod>2026-10-16</lastmod>
+    </url>
+    <url>
          <loc>https://docs.pipelex.com/latest/errors/method-fetch-disabled-error/</loc>
          <lastmod>2026-10-16</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/method-fetch-error/</loc>
+         <lastmod>2026-10-16</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/method-file-unavailable-error/</loc>
          <lastmod>2026-10-16</lastmod>
     </url>
     <url>
@@ -1149,7 +1165,23 @@
          <lastmod>2026-10-16</lastmod>
     </url>
     <url>
+         <loc>https://docs.pipelex.com/latest/errors/method-requirements-error/</loc>
+         <lastmod>2026-10-16</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/method-requirements-file-error/</loc>
+         <lastmod>2026-10-16</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/method-requirements-not-met-error/</loc>
+         <lastmod>2026-10-16</lastmod>
+    </url>
+    <url>
          <loc>https://docs.pipelex.com/latest/errors/method-structures-refused-error/</loc>
+         <lastmod>2026-10-16</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/method-tree-load-error/</loc>
          <lastmod>2026-10-16</lastmod>
     </url>
     <url>
@@ -1317,6 +1349,10 @@
          <lastmod>2026-10-16</lastmod>
     </url>
     <url>
+         <loc>https://docs.pipelex.com/latest/errors/pipe-doc-gen-template-file-unchecked-error/</loc>
+         <lastmod>2026-10-16</lastmod>
+    </url>
+    <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-doc-gen-undefined-value-error/</loc>
          <lastmod>2026-10-16</lastmod>
     </url>
@@ -1334,6 +1370,14 @@
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-func-execution-error/</loc>
+         <lastmod>2026-10-16</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/pipe-func-function-error/</loc>
+         <lastmod>2026-10-16</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/pipe-func-package-set-unstated-error/</loc>
          <lastmod>2026-10-16</lastmod>
     </url>
     <url>
@@ -1737,6 +1781,10 @@
          <lastmod>2026-10-16</lastmod>
     </url>
     <url>
+         <loc>https://docs.pipelex.com/latest/errors/template-url-refused-error/</loc>
+         <lastmod>2026-10-16</lastmod>
+    </url>
+    <url>
          <loc>https://docs.pipelex.com/latest/errors/toml-error/</loc>
          <lastmod>2026-10-16</lastmod>
     </url>
@@ -1750,6 +1798,18 @@
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/traceback-message-error/</loc>
+         <lastmod>2026-10-16</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/tree-module-shadowing-error/</loc>
+         <lastmod>2026-10-16</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/tree-python-error/</loc>
+         <lastmod>2026-10-16</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/tree-python-held-error/</loc>
          <lastmod>2026-10-16</lastmod>
     </url>
     <url>
@@ -2134,6 +2194,10 @@
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/under-the-hood/per-node-usage-attribution/</loc>
+         <lastmod>2026-10-16</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/under-the-hood/pipe-func-requirements/</loc>
          <lastmod>2026-10-16</lastmod>
     </url>
     <url>
