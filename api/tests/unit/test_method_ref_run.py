@@ -212,7 +212,7 @@ class TestMethodRefRun:
 
     def test_fetch_failure_is_422_with_fetch_error_type(self, mocker: MockerFixture):
         stub_cache = mocker.MagicMock()
-        stub_cache.get_or_fetch.side_effect = MethodFetchError("Failed to fetch method 'github.com/pipelex/methods/documents': boom")
+        stub_cache.pinned_package.side_effect = MethodFetchError("Failed to fetch method 'github.com/pipelex/methods/documents': boom")
         mocker.patch("pipelex_api.method_source.get_method_clone_cache", return_value=stub_cache)
         client, _ = _build_client(mocker)
         response = client.post("/v1/execute", json={"method_ref": STUB_METHOD_ADDRESS, "inputs": {}})

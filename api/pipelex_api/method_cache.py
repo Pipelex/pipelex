@@ -17,9 +17,13 @@ deployment-mode change (or a ceiling change) applies immediately.
 
 Concurrency: clones land in a per-request staging directory and are installed with an atomic
 `rename`, so two concurrent requests for the same SHA cannot corrupt each other — the loser
-of the rename race discards its staging copy and uses the winner's. The resolution seam
-(`pipelex_api.method_source`) copies everything it needs out of the cached clone before the run
-starts, so eviction can never pull a directory out from under a running pipeline.
+of the rename race discards its staging copy and uses the winner's. Fetches run concurrently,
+each on a thread of its own, so a request reads its package from the clone while another
+request's miss may be evicting: `pinned_package` pins the clone for as long as its caller reads
+it, and eviction skips a pinned clone. The resolution seam (`pipelex_api.method_source`) reads
+everything it needs out of the clone under that pin, before the run starts, so eviction never
+pulls a directory out from under a read or a running pipeline. The pins are this process's: a
+deployment running several worker processes gives each its own `METHOD_CACHE_DIR`.
 """
 
 import os
@@ -29,6 +33,8 @@ import tempfile
 import threading
 import time
 import uuid
+from collections.abc import Generator
+from contextlib import contextmanager
 from functools import cache
 from pathlib import Path
 
@@ -138,9 +144,39 @@ class MethodCloneCache:
     def __init__(self, *, root_dir: Path) -> None:
         self._root = root_dir
         self._lock = threading.Lock()
+        # How many callers read each clone, by its directory's name; eviction skips a clone named here.
+        self._pins: dict[str, int] = {}
 
-    def get_or_fetch(self, *, ref: MethodRef, clone_url: str | None = None) -> FetchedMethodPackage:
-        """Return the package a reference points at, cloning only when its SHA is not cached.
+    @contextmanager
+    def pinned_package(self, *, ref: MethodRef, clone_url: str | None = None) -> Generator[FetchedMethodPackage, None, None]:
+        """The package a reference points at, its clone kept from eviction until the caller leaves the block.
+
+        Args:
+            ref: The parsed method reference.
+            clone_url: Override for the derived clone URL (tests, non-default remotes).
+
+        Raises:
+            The failures of `_fetch_and_pin`.
+        """
+        package = self._fetch_and_pin(ref=ref, clone_url=clone_url)
+        try:
+            yield package
+        finally:
+            with self._lock:
+                self._unpin(clone_name=package.clone_dir.name)
+
+    def _pin(self, *, clone_name: str) -> None:
+        self._pins[clone_name] = self._pins.get(clone_name, 0) + 1
+
+    def _unpin(self, *, clone_name: str) -> None:
+        remaining = self._pins.get(clone_name, 0) - 1
+        if remaining > 0:
+            self._pins[clone_name] = remaining
+        else:
+            self._pins.pop(clone_name, None)
+
+    def _fetch_and_pin(self, *, ref: MethodRef, clone_url: str | None) -> FetchedMethodPackage:
+        """Return the package a reference points at, its clone pinned, cloning only when its SHA is not cached.
 
         Always re-runs package location and the bounds check against the (possibly cached)
         clone — only the clone itself is cached, never a verdict about it.
@@ -164,7 +200,9 @@ class MethodCloneCache:
         with self._lock:
             if clone_dir.is_dir():
                 os.utime(clone_dir)  # LRU bookkeeping: mtime is the eviction order
-                return self._package_from_clone(ref=ref, clone_dir=clone_dir, commit_sha=commit_sha)
+                package = self._package_from_clone(ref=ref, clone_dir=clone_dir, commit_sha=commit_sha)
+                self._pin(clone_name=clone_dir.name)
+                return package
 
         # Miss: clone into a per-request staging dir (outside the lock — clones are slow),
         # then install atomically. A tag repointed between ls-remote and clone resolves to the
@@ -183,8 +221,13 @@ class MethodCloneCache:
                         # A concurrent request installed the same SHA between the check and the
                         # rename; its copy is identical (same commit), so use it.
                         log.debug(f"A concurrent request installed method clone {fetched.commit_sha} first, and its copy is used")
-                self._evict()
-                return self._package_from_clone(ref=ref, clone_dir=target_dir, commit_sha=fetched.commit_sha)
+                os.utime(target_dir)  # the clone just installed, or used, is the newest entry
+                try:
+                    package = self._package_from_clone(ref=ref, clone_dir=target_dir, commit_sha=fetched.commit_sha)
+                    self._pin(clone_name=target_dir.name)
+                finally:
+                    self._evict()
+                return package
         finally:
             shutil.rmtree(staging_dir, ignore_errors=True)
 
@@ -204,7 +247,8 @@ class MethodCloneCache:
     def _evict(self) -> None:
         """Enforce the age, count, and byte bounds — oldest-first, keeping the newest entry.
 
-        Called with the lock held, right after an install. Best-effort by design: a clone
+        Called with the lock held, right after an install. A clone a caller is reading, pinned, is
+        never evicted, though it still counts toward the bounds. Best-effort by design: a clone
         directory another process already removed is simply skipped.
         """
         entries = sorted(
@@ -217,13 +261,16 @@ class MethodCloneCache:
         now = time.time()
         survivors: list[Path] = []
         for entry in entries:
-            if entry != newest and now - entry.stat().st_mtime > MAX_METHOD_CACHE_AGE_SECONDS:
+            if entry != newest and entry.name not in self._pins and now - entry.stat().st_mtime > MAX_METHOD_CACHE_AGE_SECONDS:
                 shutil.rmtree(entry, ignore_errors=True)
             else:
                 survivors.append(entry)
+        clone_count = len(survivors)
         total_bytes = sum(_directory_size_bytes(entry) for entry in survivors)
-        while len(survivors) > 1 and (len(survivors) > MAX_METHOD_CACHE_CLONES or total_bytes > MAX_METHOD_CACHE_TOTAL_BYTES):
-            oldest = survivors.pop(0)
+        evictable = [entry for entry in survivors if entry != newest and entry.name not in self._pins]
+        while evictable and (clone_count > MAX_METHOD_CACHE_CLONES or total_bytes > MAX_METHOD_CACHE_TOTAL_BYTES):
+            oldest = evictable.pop(0)
+            clone_count -= 1
             total_bytes -= _directory_size_bytes(oldest)
             shutil.rmtree(oldest, ignore_errors=True)
 

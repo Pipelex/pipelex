@@ -28,6 +28,7 @@ from pipelex.runtime_bridge.payloads import PipelexPipeDispatchAck, PipelexPipeR
 from pytest_mock import MockerFixture
 
 from pipelex_api.api_config import ApiConfig
+from pipelex_api.errors import ApiError
 from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.method_source import fetch_method_mthds_files, fetched_method
 from pipelex_api.routes import router as api_router
@@ -279,6 +280,41 @@ class TestVendoredMethodPackages:
 
         tooling = fetch_method_mthds_files(_METHOD_REF)
         assert [item.source for item in tooling.files] == ["smoke.mthds"]
+
+    def test_a_dot_directory_under_the_shipped_packages_is_no_package_of_a_method_ref(self, install_method_package: Callable[..., Path]):
+        """A fetched package and an archive hold `.mthds/methods/<name>/` to one rule: a dot directory there is no package.
+
+        A copy of the probe under `.mthds/methods/.cache/` would otherwise declare the probe's identity a second time.
+        """
+        hidden_copy = {
+            f".mthds/methods/.cache/{relpath.removeprefix('.mthds/methods/probe/')}": content
+            for relpath, content in _package_vendoring_files().items()
+        }
+        install_method_package(files={"smoke.mthds": UNRESOLVED_PACKAGE_MTHDS, **_package_vendoring_files(), **hidden_copy})
+
+        fetched = fetched_method(_METHOD_REF)
+
+        assert list(fetched.request_method.dependencies) == [VENDORED_PROBE_ADDRESS]
+
+    def test_the_tooling_read_keeps_the_tree_s_bundles_alone(self, install_method_package: Callable[..., Path]):
+        """The tooling routes read the `.mthds` files the tree keeps, without the shipped packages a run needs whole."""
+        no_manifest = {".mthds/methods/unfinished/draft.mthds": UNRESOLVED_PACKAGE_MTHDS}
+        install_method_package(
+            files={
+                "smoke.mthds": UNRESOLVED_PACKAGE_MTHDS,
+                "ignored/old.mthds": UNRESOLVED_PACKAGE_MTHDS,
+                ".gitignore": "ignored/\n",
+                "notes/readme.txt": "Not read by the tooling routes",
+                **no_manifest,
+            }
+        )
+
+        tooling = fetch_method_mthds_files(_METHOD_REF)
+
+        assert [item.source for item in tooling.files] == ["smoke.mthds"]
+        assert tooling.main_pipe == "echo"
+        with pytest.raises(ApiError, match="unfinished"):
+            fetched_method(_METHOD_REF)
 
     def test_validate_by_method_ref_resolves_the_dependency_it_ships(
         self, mocker: MockerFixture, tmp_path: Path, install_method_package: Callable[..., Path]

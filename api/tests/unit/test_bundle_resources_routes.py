@@ -9,6 +9,7 @@ The hermetic API environment has no document engine, so the step's engine is stu
 records the bytes it reads through the method file store, which is the read the engine's checker would be handed.
 """
 
+import asyncio
 import base64
 import io
 import json
@@ -23,6 +24,7 @@ from fastapi.testclient import TestClient
 from mthds.method_tree.digest import digest_of_contents, sha256_hex, tree_files_from_contents, tree_listing
 from pipelex.cogt.content_generation.assignment_models import RenderDocumentAssignment
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
+from pipelex.core.method_trees.exceptions import MethodFileUnavailableError
 from pipelex.core.method_trees.method_files import StoredTree, read_method_file, read_stored_trees
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
@@ -402,6 +404,28 @@ class TestBundleResourcesRoutes:
         _assert_the_job_names_the_tree_of(pipe_job=pipe_job, files=tree_files)
         _assert_the_orchestrator_copied_the_tree_of(orchestrator=orchestrator, files=tree_files)
         assert "invoice.number }}" not in pipe_job.model_dump_json()
+
+    def test_a_tree_sent_to_start_is_served_in_this_process_only_until_start_returns(self, mocker: MockerFixture) -> None:
+        """Why an orchestrator copies a job's trees before its `start` returns: the runner drops them as soon as it does.
+
+        The runner wrote the sent tree into a temporary directory and its library held it for the request; both are
+        gone once `/start` answers, so a job still running in any process reads its files from where its orchestrator
+        copied them.
+        """
+        _stub_the_document_engine(mocker)
+        orchestrator = _record_dispatches_to_a_temporal_like_orchestrator(mocker)
+        html_mthds = _INVOICE_MTHDS.replace('format        = "docx"', 'format        = "pdf"').replace(_TEMPLATE_PATH, "templates/invoice.html")
+        files = {"invoicing.mthds": html_mthds, "templates/invoice.html": "<h1>{{ invoice.number }}</h1>"}
+
+        response = _build_client().post("/v1/start", json={"files": files, "inputs": _INVOICE_INPUTS})
+
+        assert response.status_code == 202, response.text
+        (pipe_job,) = orchestrator.pipe_jobs
+        crate = pipe_job.library_crate
+        assert crate is not None
+        assert [copied.tree_digest for copied in orchestrator.copied_trees] == list(crate.tree_digests())
+        with pytest.raises(MethodFileUnavailableError):
+            asyncio.run(read_stored_trees(tree_digests=crate.tree_digests(), read_scope=pipe_job.job_metadata.run_metadata.read_scope))
 
     def test_a_file_of_the_method_and_other_bytes_in_resources_under_one_path_are_refused(self, mocker: MockerFixture) -> None:
         """`resources` joins the method's tree, so other bytes under a path the tree holds are two files under one path."""

@@ -3,8 +3,9 @@
 This router mounts OUTSIDE the authenticated composite `/v1` router, like `/v1/version`: the upload is authorized by
 the signed query of its target (`pipelex_api.blob_upload`), which only a caller who passed the deployment's
 authentication on `POST /v1/blobs/missing` holds, so a sender uploads with exactly the headers the target names. The
-bytes are written under the scope the signature binds, once: a blob is never changed, so uploading bytes the runner
-already holds succeeds and changes nothing. Only `blobs/` is ever written here, never a tree's listing under `trees/`,
+bytes are written under the scope the signature binds, whole: a blob is never changed, so uploading bytes the runner
+already holds at their size succeeds and changes nothing, and only bytes held short, which a storage that does not
+publish writes whole could leave, are written over. Only `blobs/` is ever written here, never a tree's listing under `trees/`,
 so an uploaded file that happens to read as a listing proves nothing.
 """
 
@@ -45,15 +46,16 @@ async def put_blob(
     request: Request,
     sha256: Annotated[str, Path(pattern=SHA256_PATTERN, description="The SHA-256 of the body, in lowercase hexadecimal.")],
     scope: Annotated[str | None, Query(alias=SCOPE_PARAM, description="The blob store's scope, as the signed target names it.")] = None,
-    expires: Annotated[int | None, Query(alias=EXPIRES_PARAM, description="When the target expires, in seconds since the epoch.")] = None,
+    expires: Annotated[str | None, Query(alias=EXPIRES_PARAM, description="When the target expires, in seconds since the epoch.")] = None,
     signature: Annotated[str | None, Query(alias=SIGNATURE_PARAM, description="The target's signature.")] = None,
 ) -> Response:
     """Store one blob's bytes under its SHA-256, as the upload target `POST /v1/blobs/missing` named (MTHDS Protocol).
 
     The body is the blob's bytes and nothing else. A target whose signature does not hold, or that has expired, is a
-    403 `BlobUploadNotAuthorized`; a body past `MAX_METHOD_TREE_FILE_KIB` a 422 `MethodTreeTooLarge`; and a body whose
-    SHA-256 is not the path's a 422 `BlobMismatch`. A blob is written once and never changed: uploading bytes the
-    runner already holds answers 204 and changes nothing.
+    403 `BlobUploadNotAuthorized`, as is a query that is not one this runner signs, such as an expiry that is not a
+    decimal integer; a body past `MAX_METHOD_TREE_FILE_KIB` a 422 `MethodTreeTooLarge`; and a body whose SHA-256 is not
+    the path's a 422 `BlobMismatch`. A blob is never changed: uploading bytes the runner already holds answers 204 and
+    changes nothing.
     """
     if not is_upload_authorized(scope=scope, sha256=sha256, expires=expires, signature=signature) or scope is None:
         msg = "This upload carries no valid target: ask POST /v1/blobs/missing for one, and upload to the URL it names before it expires."

@@ -63,17 +63,27 @@ from pipelex_api.bundle import decode_bundle_archive
 from pipelex_api.bundle_resources import refuse_two_files_under_one_path
 from pipelex_api.error_types import ErrorType
 from pipelex_api.errors import raise_forbidden, raise_validation_error, raise_validation_problem
-from pipelex_api.limits import MAX_METHOD_TREE_FILE_BYTES, MAX_METHOD_TREE_FILES, MAX_METHOD_TREE_TOTAL_BYTES
+from pipelex_api.limits import (
+    MAX_METHOD_DEPENDENCIES,
+    MAX_METHOD_REQUEST_TOTAL_BYTES,
+    MAX_METHOD_TREE_FILE_BYTES,
+    MAX_METHOD_TREE_FILES,
+    MAX_METHOD_TREE_TOTAL_BYTES,
+)
 
 FILES_FIELD = "files"
 DEPENDENCIES_FIELD = "dependencies"
 PYTHON_SUFFIX = ".py"
 FILES_LABEL = "The `files` map"
 ARCHIVE_LABEL = "The `bundle_b64` archive"
+_METHOD_LABEL = "The method sent in `files`"
+_WITH_RESOURCES_LABEL = "The method's tree with the files sent in `resources`"
 # How a request's method is named in the messages of the entry rule: "The method sent in `files` holds no …".
 REQUEST_METHOD_LABEL = "sent in the request"
 # Where a `bundle_b64` archive ships the method packages it calls, the layout of the local method cache.
-_VENDORED_PREFIX = ".mthds/methods/"
+VENDORED_METHODS_PREFIX = ".mthds/methods/"
+# A file the membership rule judges a directory by, which stands in for any file inside a directory being judged.
+_ANY_FILE_NAME = "file"
 
 
 class RequestTree(NamedTuple):
@@ -121,13 +131,18 @@ class _JsonObject(NamedTuple):
     pairs: list[tuple[str, Any]]
 
 
-def _refuse_json_constant(constant: str) -> Any:
-    msg = f"{constant} is not a JSON value"
-    raise ValueError(msg)
+class _JsonConstant(NamedTuple):
+    """`NaN`, `Infinity` or `-Infinity`, which `json.loads` accepts and JSON does not hold, kept as it was written.
+
+    The body's other members are the rest of the server's to judge, so a constant is refused here only inside a map of
+    file entries, where it reaches the standard's reader as it was written, and that reader refuses it.
+    """
+
+    text: str
 
 
 def _parse_keeping_pairs(text: str) -> Any:
-    return json.loads(text, object_pairs_hook=_JsonObject, parse_constant=_refuse_json_constant)
+    return json.loads(text, object_pairs_hook=_JsonObject, parse_constant=_JsonConstant)
 
 
 def _serialized(value: Any) -> str:
@@ -141,6 +156,8 @@ def _serialized(value: Any) -> str:
     if isinstance(value, _JsonObject):
         members = ",".join(f"{json.dumps(key)}:{_serialized(member)}" for key, member in value.pairs)
         return f"{{{members}}}"
+    if isinstance(value, _JsonConstant):
+        return value.text
     if isinstance(value, list):
         return f"[{','.join(_serialized(item) for item in cast('list[Any]', value))}]"
     return json.dumps(value)
@@ -150,12 +167,19 @@ def tree_documents_of(*, body: bytes) -> TreeDocuments:
     """The `files` and `dependencies` members of a request body, each map as JSON text, or None where a member is absent.
 
     The body was already parsed and checked as JSON (`pipelex_api.json_body`); it is parsed again here keeping every
-    object's pairs, since a receiver reads a map from its text. A member given twice in the body is read as JSON reads
-    it, the last one counting, and a `null` member is absent.
+    object's pairs, since a receiver reads a map from its text, so a route calls this only for a body that sends a
+    tree. It is decoded as `json.loads` decodes bytes, UTF-8, UTF-16 or UTF-32, as the route's own parser accepted it.
+    A member given twice in the body is read as JSON reads it, the last one counting, and a `null` member is absent.
 
-    Raises (as a 422 `InvalidMethodFiles`): `dependencies` that is not an object, or that gives one address twice.
+    Raises (as problem documents): a 422 `InvalidJSON` for a body that does not decode or parse, and a 422
+    `InvalidMethodFiles` for `dependencies` that is not an object, or that gives one address twice.
     """
-    parsed = _parse_keeping_pairs(body.decode("utf-8"))
+    try:
+        parsed = _parse_keeping_pairs(body.decode(json.detect_encoding(body), "surrogatepass"))
+    except (UnicodeDecodeError, ValueError) as exc:
+        # The route's parser read these bytes already, so this is a second line of defence: `JSONDecodeError` and
+        # an integer longer than Python converts are both a `ValueError`.
+        raise_validation_error(message=f"Request body is not valid JSON: {exc!s}", error_type=ErrorType.INVALID_JSON)
     if not isinstance(parsed, _JsonObject):
         return TreeDocuments(files=None, dependencies=None)
     members = dict(parsed.pairs)
@@ -180,13 +204,13 @@ def tree_documents_of(*, body: bytes) -> TreeDocuments:
 
 
 class _MapCensus(NamedTuple):
-    """What a map's entries state before any is read: how many files, how many bytes, and which hashes they name."""
+    """What a map's entries state before any is read: how many files, how many bytes, and which hashes at which sizes."""
 
     file_count: int
     stated_bytes: int
     largest_path: str | None
     largest_bytes: int
-    hashes: set[str]
+    stated_sizes: dict[str, set[int]]
 
 
 def _stated_size(entry: Any) -> tuple[int, str | None]:
@@ -218,15 +242,21 @@ def _census(*, document: str) -> _MapCensus | None:
     stated_bytes = 0
     largest_path: str | None = None
     largest_bytes = 0
-    hashes: set[str] = set()
+    stated_sizes: dict[str, set[int]] = {}
     for tree_path, entry in parsed.pairs:
         size, sha256 = _stated_size(entry)
         stated_bytes += size
         if size > largest_bytes:
             largest_path, largest_bytes = tree_path, size
         if sha256 is not None:
-            hashes.add(sha256)
-    return _MapCensus(file_count=len(parsed.pairs), stated_bytes=stated_bytes, largest_path=largest_path, largest_bytes=largest_bytes, hashes=hashes)
+            stated_sizes.setdefault(sha256, set()).add(size)
+    return _MapCensus(
+        file_count=len(parsed.pairs),
+        stated_bytes=stated_bytes,
+        largest_path=largest_path,
+        largest_bytes=largest_bytes,
+        stated_sizes=stated_sizes,
+    )
 
 
 def wire_name(name: str) -> str:
@@ -262,6 +292,33 @@ def ensure_tree_within_limits(*, tree: RequestTree, label: str) -> None:
         total_bytes=sum(len(data) for data in tree.contents.values()),
         largest_path=largest_path,
         largest_bytes=largest_bytes,
+        label=label,
+    )
+
+
+def ensure_trees_within_request_limits(*, dependency_count: int, total_bytes: int, label: str) -> None:
+    """Refuse a method whose trees together pass this runner's limits, with a 422 `MethodTreeTooLarge`.
+
+    Each tree is held to the tree limits on its own; these bound what one request carries in all, its method's tree and
+    every dependency tree beside it, so the memory and the disk a request takes do not grow with its dependencies.
+    """
+    if dependency_count > MAX_METHOD_DEPENDENCIES:
+        msg = f"{label} carries {dependency_count} dependencies, past this runner's limit of {MAX_METHOD_DEPENDENCIES} dependency trees."
+        raise_validation_error(message=msg, error_type=ErrorType.METHOD_TREE_TOO_LARGE)
+    if total_bytes > MAX_METHOD_REQUEST_TOTAL_BYTES:
+        msg = (
+            f"{label} holds {total_bytes} bytes across its tree and its dependency trees, past this runner's limit of "
+            f"{MAX_METHOD_REQUEST_TOTAL_BYTES // 1024} KiB for a method and its dependencies."
+        )
+        raise_validation_error(message=msg, error_type=ErrorType.METHOD_TREE_TOO_LARGE)
+
+
+def ensure_method_within_limits(*, request_method: "RequestMethod", label: str) -> None:
+    """Refuse a method read in full whose trees together pass this runner's limits, with a 422 `MethodTreeTooLarge`."""
+    trees = [request_method.tree, *request_method.dependencies.values()]
+    ensure_trees_within_request_limits(
+        dependency_count=len(request_method.dependencies),
+        total_bytes=sum(len(data) for tree in trees for data in tree.contents.values()),
         label=label,
     )
 
@@ -305,17 +362,46 @@ def _refuse_map(*, refusal_error: MethodTreeRefusedError, label: str) -> NoRetur
             )
 
 
-async def read_request_tree(*, document: str, blob_store: RunnerBlobStore | None, label: str) -> RequestTree:
+async def _held_blobs(*, blob_store: RunnerBlobStore, stated_sizes: dict[str, set[int]], label: str) -> BlobStore:
+    """The bytes a map's hash entries name that the blob store holds, looked up by size before any is read.
+
+    A hash held at another size than one of its entries states is refused, since uploading its bytes again would not
+    change the size the store holds them at. Every other held hash is held at the one size its entries state, which the
+    census bounded, so reading them reads no more than the census allowed. A hash not held is left out, for the reader
+    to report among the blobs this runner does not hold.
+
+    Raises (as a problem document): a 422 `BlobMismatch` whose `mismatched_blobs` member lists each hash held at another
+    size, with that size.
+    """
+    stored = await blob_store.stored_sizes(sha256s=sorted(stated_sizes))
+    mismatched = {sha256: size for sha256, size in stored.items() if size is not None and stated_sizes[sha256] != {size}}
+    if mismatched:
+        described = ", ".join(f"{sha256} (held at {size} bytes)" for sha256, size in mismatched.items())
+        msg = (
+            f"{label} states a size for a hash other than the size of the bytes this runner holds under it: {described}. "
+            "A hash names one set of bytes, so state the size of those bytes."
+        )
+        raise_validation_problem(
+            message=msg,
+            error_type=ErrorType.BLOB_MISMATCH,
+            members={"mismatched_blobs": [{"sha256": sha256, "held_size": size} for sha256, size in mismatched.items()]},
+        )
+    return await blob_store.read_held(sizes={sha256: size for sha256, size in stored.items() if size is not None})
+
+
+async def read_request_tree(*, document: str, blob_store: RunnerBlobStore | None, label: str, census: _MapCensus | None = None) -> RequestTree:
     """Read one map of file entries a request carried, its hash entries from the runner's blob store.
 
     Args:
         document: The map's JSON text, as the request carried it.
         blob_store: The blob store of the caller's scope, or None for a map that names no bytes by hash.
         label: How a refusal names the map, such as "The `files` map".
+        census: The map's census when the caller took it already, else taken here.
 
     Raises (as problem documents): `MethodTreeTooLarge`, `InvalidMethodFiles` and `MissingBlobs`, each a 422.
     """
-    census = _census(document=document)
+    if census is None:
+        census = _census(document=document)
     held: BlobStore = InMemoryBlobStore()
     if census is not None:
         ensure_within_tree_limits(
@@ -325,8 +411,8 @@ async def read_request_tree(*, document: str, blob_store: RunnerBlobStore | None
             largest_bytes=census.largest_bytes,
             label=label,
         )
-        if census.hashes and blob_store is not None:
-            held = await blob_store.prefetched(sha256s=census.hashes)
+        if census.stated_sizes and blob_store is not None:
+            held = await _held_blobs(blob_store=blob_store, stated_sizes=census.stated_sizes, label=label)
     try:
         reading = read_file_map(document, blob_store=held)
     except MethodTreeRefusedError as exc:
@@ -363,13 +449,27 @@ def manifest_of(*, tree: RequestTree, label: str) -> MethodsManifest | None:
         raise MethodEntryError(msg) from exc
 
 
+def is_package_dir_name(name: str) -> bool:
+    """Whether `name` can name a package's directory: one tree path segment the membership rule keeps.
+
+    That refuses an empty name, `.` and `..`, a name holding a separator or a character no tree path holds, and a name
+    the rule keeps out of every tree, such as a dot directory or `node_modules`. Both readers of a method's shipped
+    packages, a `bundle_b64` archive's and a fetched package's, hold each directory under `.mthds/methods/` to it, as
+    the name a manifest declaring none gives its package.
+    """
+    if not name or "/" in name or tree_path_violation(name) is not None:
+        return False
+    return not excluded_name_violation(f"{name}/{_ANY_FILE_NAME}")
+
+
 def dependency_address_of(*, tree: RequestTree, fallback_name: str, label: str) -> str:
     """The address a dependency tree's manifest declares, `address/name`, as a reference names the package.
 
     A manifest declaring no name takes `fallback_name`, the name of the directory the tree is written as, which is the
-    name the engine's discovery gives such a package.
+    name the engine's discovery gives such a package; it must then be a name a package's directory can take.
 
-    Raises (as a 422 `InvalidMethodFiles`): a tree with no valid `METHODS.toml` at its root.
+    Raises (as a 422 `InvalidMethodFiles`): a tree with no valid `METHODS.toml` at its root, or one whose manifest
+    declares no name when `fallback_name` cannot name a package's directory.
     """
     try:
         manifest = manifest_of(tree=tree, label=label)
@@ -378,7 +478,15 @@ def dependency_address_of(*, tree: RequestTree, fallback_name: str, label: str) 
     if manifest is None:
         msg = f"{label} holds no {MANIFEST_NAME} at its root, so no reference could find it as a package."
         raise_validation_error(message=msg, error_type=ErrorType.INVALID_METHOD_FILES)
-    return f"{manifest.address}/{manifest.name or fallback_name}"
+    if manifest.name is not None:
+        return f"{manifest.address}/{manifest.name}"
+    if not is_package_dir_name(fallback_name):
+        msg = (
+            f"{label} declares no name in its {MANIFEST_NAME}, so it takes the last segment of its address, "
+            f"'{wire_name(fallback_name)}', which cannot name a package's directory: declare the package's name in its {MANIFEST_NAME}."
+        )
+        raise_validation_error(message=msg, error_type=ErrorType.INVALID_METHOD_FILES)
+    return f"{manifest.address}/{fallback_name}"
 
 
 def dependency_dir_name(*, address: str) -> str:
@@ -415,17 +523,30 @@ async def read_request_method(*, documents: TreeDocuments, blob_store: RunnerBlo
             msg = "`dependencies` accompany the method's own `files`: send the method's tree in `files`, and its dependencies beside it."
             raise_validation_error(message=msg, error_type=ErrorType.INVALID_METHOD_FILES)
         return None
-    tree = await read_request_tree(document=documents.files, blob_store=blob_store, label=FILES_LABEL)
+    dependency_documents = documents.dependencies or {}
+    # Every map's census first, so the request's trees together are held to their limits before any blob is read.
+    files_census = _census(document=documents.files)
+    dependency_censuses = {address: _census(document=dependency_document) for address, dependency_document in dependency_documents.items()}
+    ensure_trees_within_request_limits(
+        dependency_count=len(dependency_documents),
+        total_bytes=sum(census.stated_bytes for census in [files_census, *dependency_censuses.values()] if census is not None),
+        label=_METHOD_LABEL,
+    )
+    tree = await read_request_tree(document=documents.files, blob_store=blob_store, label=FILES_LABEL, census=files_census)
     dependencies: dict[str, RequestTree] = {}
-    for address, dependency_document in (documents.dependencies or {}).items():
+    for address, dependency_document in dependency_documents.items():
         label = f"The dependency '{wire_name(address)}'"
-        dependency_tree = await read_request_tree(document=dependency_document, blob_store=blob_store, label=label)
+        dependency_tree = await read_request_tree(
+            document=dependency_document, blob_store=blob_store, label=label, census=dependency_censuses[address]
+        )
         declared = dependency_address_of(tree=dependency_tree, fallback_name=dependency_dir_name(address=address), label=label)
         if declared != address:
             msg = f"{label} is keyed by an address its {MANIFEST_NAME} does not declare: it declares '{declared}'."
             raise_validation_error(message=msg, error_type=ErrorType.INVALID_METHOD_FILES)
         add_dependency(dependencies=dependencies, address=address, tree=dependency_tree, label=label)
-    return RequestMethod(tree=tree, dependencies=dependencies)
+    request_method = RequestMethod(tree=tree, dependencies=dependencies)
+    ensure_method_within_limits(request_method=request_method, label=_METHOD_LABEL)
+    return request_method
 
 
 async def read_archive_method(*, bundle_b64: str) -> RequestMethod:
@@ -444,10 +565,10 @@ async def read_archive_method(*, bundle_b64: str) -> RequestMethod:
     own_entries: list[tuple[str, bytes]] = []
     vendored_entries: dict[str, list[tuple[str, bytes]]] = {}
     for name, data in archive_entries:
-        package_name, _, package_path = name.removeprefix(_VENDORED_PREFIX).partition("/")
+        package_name, _, package_path = name.removeprefix(VENDORED_METHODS_PREFIX).partition("/")
         # A package directory the membership rule would keep out of the store, a dot directory, is no package: its
         # entries stay the method's own, which the tree's rule refuses.
-        if name.startswith(_VENDORED_PREFIX) and package_name and package_path and not excluded_name_violation(package_name):
+        if name.startswith(VENDORED_METHODS_PREFIX) and package_path and is_package_dir_name(package_name):
             # The store's provenance sidecar records how the package was installed, and is no file of its tree.
             if package_path != PROVENANCE_FILENAME:
                 vendored_entries.setdefault(package_name, []).append((package_path, data))
@@ -456,11 +577,13 @@ async def read_archive_method(*, bundle_b64: str) -> RequestMethod:
     tree = await read_request_tree(document=_base64_map_document(entries=own_entries), blob_store=None, label=ARCHIVE_LABEL)
     dependencies: dict[str, RequestTree] = {}
     for package_name, package_entries in vendored_entries.items():
-        label = f"The package '{_VENDORED_PREFIX}{package_name}/' of {ARCHIVE_LABEL[0].lower()}{ARCHIVE_LABEL[1:]}"
+        label = f"The package '{VENDORED_METHODS_PREFIX}{package_name}/' of {ARCHIVE_LABEL[0].lower()}{ARCHIVE_LABEL[1:]}"
         dependency_tree = await read_request_tree(document=_base64_map_document(entries=package_entries), blob_store=None, label=label)
         address = dependency_address_of(tree=dependency_tree, fallback_name=package_name, label=label)
         add_dependency(dependencies=dependencies, address=address, tree=dependency_tree, label=label)
-    return RequestMethod(tree=tree, dependencies=dependencies)
+    request_method = RequestMethod(tree=tree, dependencies=dependencies)
+    ensure_method_within_limits(request_method=request_method, label=ARCHIVE_LABEL)
+    return request_method
 
 
 def with_resources(*, request_method: RequestMethod, resources: Mapping[str, bytes] | None) -> RequestMethod:
@@ -469,7 +592,8 @@ def with_resources(*, request_method: RequestMethod, resources: Mapping[str, byt
     A file the tree already holds with the same bytes changes nothing; other bytes under a path the tree holds, or a path
     that cannot name a file of a tree, are refused naming the path.
 
-    Raises (as a 422 `InvalidResourcePath`): two different files under one path, or a path no tree could hold.
+    Raises (as problem documents): a 422 `InvalidResourcePath` for two different files under one path or a path no tree
+    could hold, and a 422 `MethodTreeTooLarge` for a tree the files take past this runner's limits.
     """
     if not resources:
         return request_method
@@ -490,7 +614,10 @@ def with_resources(*, request_method: RequestMethod, resources: Mapping[str, byt
     if collisions:
         msg = f"The files sent in `resources` collide with the method's files: {', '.join(repr(path) for path in collisions)}."
         raise_validation_error(message=msg, error_type=ErrorType.INVALID_RESOURCE_PATH)
-    return RequestMethod(tree=RequestTree.make_from_contents(contents=contents), dependencies=request_method.dependencies)
+    merged = RequestMethod(tree=RequestTree.make_from_contents(contents=contents), dependencies=request_method.dependencies)
+    ensure_tree_within_limits(tree=merged.tree, label=_WITH_RESOURCES_LABEL)
+    ensure_method_within_limits(request_method=merged, label=_WITH_RESOURCES_LABEL)
+    return merged
 
 
 def _python_sources(*, tree: RequestTree) -> dict[str, str]:

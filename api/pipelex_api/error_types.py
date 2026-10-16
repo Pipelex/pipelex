@@ -75,9 +75,14 @@ class ErrorType(StrEnum):
     # size or one file's size (`MAX_METHOD_TREE_FILES`, `MAX_METHOD_TREE_TOTAL_KIB`,
     # `MAX_METHOD_TREE_FILE_KIB`). A 422 naming the limit, refused before any blob is read or uploaded.
     METHOD_TREE_TOO_LARGE = "MethodTreeTooLarge"
-    # `PUT /v1/blobs/{sha256}` was sent bytes whose SHA-256 is not the one its path names, or
-    # `POST /v1/blobs/missing` named one hash twice with different sizes. A 422: nothing is stored.
+    # `PUT /v1/blobs/{sha256}` was sent bytes whose SHA-256 is not the one its path names,
+    # `POST /v1/blobs/missing` named one hash twice with different sizes, or a request's hash entry states a size other
+    # than the one this runner holds that hash's bytes at, which uploading them again would not change. A 422 whose
+    # `mismatched_blobs` member, on a request's entries, lists each such hash with the size held.
     BLOB_MISMATCH = "BlobMismatch"
+    # The bytes this runner's blob store holds under a hash do not hash to it: the storage is damaged. A 500 no caller
+    # can repair; the operator removes the object, and the blob is then uploaded again.
+    BLOB_STORE_CORRUPTED = "BlobStoreCorrupted"
     # `PUT /v1/blobs/{sha256}` was called without the signed query `POST /v1/blobs/missing` names in its upload
     # target, with one whose signature does not hold, or past its expiry. A 403: the upload is not stored.
     BLOB_UPLOAD_NOT_AUTHORIZED = "BlobUploadNotAuthorized"

@@ -13,6 +13,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from mthds.method_tree.digest import digest_of_contents, sha256_hex, tree_files_from_contents, tree_listing
+from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 from pytest_mock import MockerFixture
 
 from pipelex_api.exception_handlers import register_exception_handlers
@@ -204,3 +205,73 @@ class TestBlobRoutes:
         missing = _missing(client, *contents.values(), digest=digest_of_contents(contents))
 
         assert [blob["sha256"] for blob in missing] == [sha256_hex(data) for data in contents.values()]
+
+    @pytest.mark.parametrize(
+        ("name", "value"),
+        [
+            pytest.param("signature", "é" * 64, id="signature_outside_ascii"),
+            pytest.param("expires", "soon", id="expires_not_a_number"),
+            pytest.param("expires", "١٢٣", id="expires_in_other_digits"),
+            pytest.param("expires", "-5", id="expires_signed"),
+        ],
+    )
+    def test_a_malformed_target_is_refused_as_no_valid_target(self, name: str, value: str) -> None:
+        """Every part of the query is the caller's text: one no target of this runner holds is a 403, never a server error."""
+        client = _build_client()
+        (target,) = _missing(client, _TEMPLATE)
+        url = urlsplit(str(target["upload"]["url"]))
+        query: dict[str, str] = {key: values[0] for key, values in parse_qs(url.query).items()}
+        query[name] = value
+
+        response = client.put(url.path, params=query, content=_TEMPLATE, headers={"content-type": "application/octet-stream"})
+
+        _assert_problem(response, status=403, error_type="BlobUploadNotAuthorized")
+
+    def test_upload_targets_start_with_the_configured_public_base_url(self, mocker: MockerFixture) -> None:
+        """Behind a proxy terminating TLS, the URL a request arrived at is not the one a sender reaches."""
+        mocker.patch("pipelex_api.blob_upload.get_optional_env", return_value="https://runner.example.com/api/")
+        client = _build_client()
+
+        (target,) = _missing(client, _TEMPLATE)
+
+        url_text: str = target["upload"]["url"]
+        assert url_text.startswith(f"https://runner.example.com/api/v1/blobs/{sha256_hex(_TEMPLATE)}?")
+        url = urlsplit(url_text)
+        query: dict[str, str] = {key: values[0] for key, values in parse_qs(url.query).items()}
+        uploaded = client.put(f"/v1/blobs/{sha256_hex(_TEMPLATE)}", params=query, content=_TEMPLATE, headers=target["upload"]["headers"])
+        assert uploaded.status_code == 204, uploaded.text
+
+    def test_without_a_public_base_url_targets_start_with_the_request_s_url(self) -> None:
+        (target,) = _missing(_build_client(), _TEMPLATE)
+
+        assert str(target["upload"]["url"]).startswith(f"http://testserver/v1/blobs/{sha256_hex(_TEMPLATE)}?")
+
+    def test_a_public_base_url_that_is_not_an_http_url_is_a_configuration_error(self, mocker: MockerFixture) -> None:
+        mocker.patch("pipelex_api.blob_upload.get_optional_env", return_value="runner.example.com")
+
+        response = _build_client().post("/v1/blobs/missing", json={"blobs": [_blob_ref(_TEMPLATE)]})
+
+        _assert_problem(response, status=500, error_type="ServerMisconfigured")
+
+    def test_a_blob_held_at_another_size_is_listed_for_its_upload_to_write_over(self, blob_storage: InMemoryStorageProvider) -> None:
+        """Bytes held short, as a storage that does not publish writes whole could leave them, are asked for again and repaired."""
+        client = _build_client()
+        blob_storage.root[f"single-tenant/blobs/{sha256_hex(_TEMPLATE)}"] = _TEMPLATE[:5]
+
+        (target,) = _missing(client, _TEMPLATE)
+        uploaded = _upload(client, target=target, data=_TEMPLATE)
+
+        assert uploaded.status_code == 204, uploaded.text
+        assert blob_storage.root[f"single-tenant/blobs/{sha256_hex(_TEMPLATE)}"] == _TEMPLATE
+        assert _missing(client, _TEMPLATE) == []
+
+    def test_a_held_digest_answers_alone_only_for_blobs_of_its_tree(self) -> None:
+        """A digest the runner holds says nothing of blobs outside its tree, which are looked up one by one."""
+        client = _build_client()
+        contents = {"main.mthds": VALID_MTHDS.encode("utf-8"), "notes.txt": _NOTES}
+        validated = client.post("/v1/validate", json={"files": {"main.mthds": VALID_MTHDS, "notes.txt": _NOTES.decode("utf-8")}})
+        assert validated.status_code == 200, validated.text
+
+        missing = _missing(client, *contents.values(), _TEMPLATE, digest=digest_of_contents(contents))
+
+        assert [blob["sha256"] for blob in missing] == [sha256_hex(_TEMPLATE)]

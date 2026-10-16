@@ -187,6 +187,45 @@ class S3StorageProvider(StorageProviderAbstract):
                 raise StorageS3Error(msg) from exc
 
     @override
+    async def _load_size(self, key: str) -> int:
+        """The size of an S3 object, read with a HEAD request instead of its bytes.
+
+        Args:
+            key: Storage key (without scheme prefix).
+
+        Returns:
+            The object's `ContentLength`.
+
+        Raises:
+            StorageFileNotFoundError: If the object does not exist.
+            StorageS3Error: If the S3 operation fails (any other ClientError or BotoCoreError).
+        """
+        from botocore.exceptions import (  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
+            BotoCoreError,
+            ClientError,
+        )
+
+        session = self._get_session()
+        client_config = self._get_client_config()
+
+        async with session.create_client(**client_config) as client:
+            try:
+                response = await client.head_object(Bucket=self._bucket_name, Key=key)
+            except ClientError as exc:
+                error_code = (exc.response.get("Error") or {}).get("Code", "Unknown")
+                # A HEAD answer has no body, so a missing object comes back as the bare status code.
+                if error_code in {"404", "NoSuchKey", "NotFound"}:
+                    msg = f"Object not found in S3: '{key}'"
+                    raise StorageFileNotFoundError(msg) from exc
+                msg = f"S3 ClientError ({error_code}) for key '{key}'"
+                raise StorageS3Error(msg) from exc
+            except BotoCoreError as exc:
+                msg = f"S3 backend error for key '{key}': {type(exc).__name__}"
+                raise StorageS3Error(msg) from exc
+            content_length: int = response["ContentLength"]
+            return content_length
+
+    @override
     async def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
         """Store bytes to an S3 object.
 

@@ -41,6 +41,15 @@ template = "Hello $text"
 
 _BROKEN_MTHDS = 'domain = "broken"\n\n[pipe.oops\ntype = "PipeCompose"\n'
 
+_DEPENDENCY_ADDRESS = "github.com/acme/methods/library"
+_DEPENDENCY_MANIFEST = """\
+[package]
+name = "library"
+address = "github.com/acme/methods"
+version = "0.1.0"
+description = "A dependency a request sends beside its method."
+"""
+
 _NOTES = b"Some notes \xe2\x80\x94 kept with the method"
 _ICON = b"\x89PNG\r\n\x1a\n not text"
 
@@ -113,20 +122,39 @@ class TestMethodTreeRuns:
         assert body["state"] == "COMPLETED"
         assert "Hello world" in _run_output(body)
 
-    @pytest.mark.parametrize("stated_size", ["exact", "wrong"])
-    def test_a_hash_the_runner_does_not_hold_at_its_size_is_a_422_naming_it(self, mocker: MockerFixture, stated_size: str) -> None:
+    def test_a_hash_the_runner_does_not_hold_is_a_422_naming_it(self, mocker: MockerFixture) -> None:
         client = _build_client(mocker)
-        if stated_size == "wrong":
-            _upload_all(client, _NOTES)
-        notes_entry = {"sha256": sha256_hex(_NOTES), "size": len(_NOTES) + (1 if stated_size == "wrong" else 0)}
 
-        response = client.post("/v1/execute", json={"files": {"greet.mthds": _GREET_MTHDS, "notes.txt": notes_entry}, "inputs": {"text": "x"}})
+        response = client.post(
+            "/v1/execute", json={"files": {"greet.mthds": _GREET_MTHDS, "notes.txt": _hash_entry(_NOTES)}, "inputs": {"text": "x"}}
+        )
 
         assert response.status_code == 422, response.text
         problem = response.json()
         assert problem["error_type"] == "MissingBlobs"
         assert problem["missing_blobs"] == [sha256_hex(_NOTES)]
         assert "/v1/blobs/missing" in problem["detail"]
+
+    def test_a_size_other_than_the_held_bytes_is_a_mismatch_no_upload_repeats(self, mocker: MockerFixture) -> None:
+        """A sender following the answers, asking which blobs are missing and uploading them, ends at the mismatch, never in a loop."""
+        client = _build_client(mocker)
+        _upload_all(client, _NOTES)
+        wrong_entry = {"sha256": sha256_hex(_NOTES), "size": len(_NOTES) + 1}
+        body = {"files": {"greet.mthds": _GREET_MTHDS, "notes.txt": wrong_entry}, "inputs": {"text": "x"}}
+
+        first = client.post("/v1/execute", json=body)
+        asked = client.post("/v1/blobs/missing", json={"blobs": [wrong_entry]})
+        (target,) = asked.json()["missing"]
+        upload = target["upload"]
+        uploaded = client.request(upload["method"], upload["url"], content=_NOTES, headers=upload["headers"])
+        again = client.post("/v1/execute", json=body)
+
+        assert uploaded.status_code == 204, uploaded.text
+        for response in (first, again):
+            assert response.status_code == 422, response.text
+            problem = response.json()
+            assert problem["error_type"] == "BlobMismatch"
+            assert problem["mismatched_blobs"] == [{"sha256": sha256_hex(_NOTES), "held_size": len(_NOTES)}]
 
     def test_a_hash_resolves_only_in_the_callers_own_scope(self, mocker: MockerFixture) -> None:
         client = _build_client(mocker)
@@ -200,3 +228,103 @@ class TestMethodTreeRuns:
 
         assert response.status_code == 403, response.text
         assert response.json()["error_type"] == "CustomCodeRequiresSandbox"
+
+    def test_a_json_constant_outside_the_tree_is_never_a_server_error(self, mocker: MockerFixture) -> None:
+        """`NaN` is the rest of the server's to judge where it stands outside a map of file entries, and a 422 inside one."""
+        client = _build_client(mocker)
+        files = json.dumps({"greet.mthds": _GREET_MTHDS})
+        headers = {"content-type": "application/json"}
+
+        inline = client.post("/v1/execute", content=f'{{"mthds_contents": {json.dumps([_GREET_MTHDS])}, "inputs": {{"text": NaN}}}}', headers=headers)
+        beside_a_tree = client.post("/v1/execute", content=f'{{"files": {files}, "inputs": {{"text": NaN}}}}', headers=headers)
+        inside_the_tree = client.post("/v1/execute", content='{"files": {"greet.mthds": NaN}, "inputs": {"text": "x"}}', headers=headers)
+
+        for response in (inline, beside_a_tree):
+            assert response.status_code == 422, response.text
+            assert response.json()["error_type"] == "WrongScalarKindError"
+        assert inside_the_tree.status_code == 422, inside_the_tree.text
+        assert inside_the_tree.json()["error_type"] == "InvalidMethodFiles"
+
+    @pytest.mark.parametrize("encoding", ["utf-16", "utf-32", "utf-8-sig"])
+    def test_validate_reads_a_tree_from_a_body_in_any_json_encoding(self, mocker: MockerFixture, encoding: str) -> None:
+        client = _build_client(mocker)
+        body = json.dumps({"files": {"greet.mthds": _GREET_MTHDS, "notes.txt": _NOTES.decode("utf-8")}}).encode(encoding)
+
+        response = client.post("/v1/validate", content=body, headers={"content-type": "application/json"})
+
+        assert response.status_code == 200, response.text
+        assert response.json()["is_valid"] is True, response.text
+
+    def test_a_bundle_that_is_not_utf8_text_is_the_callers_located_diagnostic(self, mocker: MockerFixture) -> None:
+        client = _build_client(mocker)
+        files = {"greet.mthds": _GREET_MTHDS, "bad.mthds": {"base64": "/w=="}}
+
+        run = client.post("/v1/execute", json={"files": files, "pipe_code": "greeting.greet", "inputs": {"text": "x"}})
+        run_from_the_entry = client.post("/v1/execute", json={"files": files, "inputs": {"text": "x"}})
+        validated = client.post("/v1/validate", json={"files": files})
+
+        assert run.status_code == 422, run.text
+        assert run.json()["error_type"] == "ValidateBundleError"
+        assert [(item["source"], item["line"], item["column"]) for item in run.json()["validation_errors"]] == [("bad.mthds", 1, 1)]
+        assert run_from_the_entry.status_code == 422, run_from_the_entry.text
+        assert run_from_the_entry.json()["error_type"] == "MethodEntryError"
+        assert "'bad.mthds'" in run_from_the_entry.json()["detail"]
+        assert validated.status_code == 200, validated.text
+        verdict = validated.json()
+        assert verdict["is_valid"] is False
+        assert [item["source"] for item in verdict["validation_errors"]] == ["bad.mthds"]
+        _assert_no_host_path(verdict)
+
+    @pytest.mark.usefixtures("sandbox_hosted_mode")
+    def test_validate_reports_a_python_file_holding_a_nul_byte_at_its_tree_path(self, mocker: MockerFixture) -> None:
+        """Python 3.11 refuses a NUL byte with a ValueError where later versions raise a SyntaxError: both are the file's verdict."""
+        client = _build_client(mocker)
+
+        response = client.post("/v1/validate", json={"files": {"greet.mthds": _GREET_MTHDS, "helpers/nul.py": "x = 1\u0000\n"}})
+
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["is_valid"] is False, body
+        assert [item["source"] for item in body["validation_errors"]] == ["helpers/nul.py"]
+
+    def test_files_sent_in_resources_are_held_to_the_tree_limits(self, mocker: MockerFixture) -> None:
+        mocker.patch("pipelex_api.method_tree_request.MAX_METHOD_TREE_FILES", 2)
+        client = _build_client(mocker)
+        files = {"greet.mthds": _GREET_MTHDS, "notes.txt": _NOTES.decode("utf-8")}
+
+        within = client.post("/v1/validate", json={"files": files})
+        past = client.post("/v1/validate", json={"files": files, "resources": {"extra.txt": base64.b64encode(b"one more").decode("ascii")}})
+
+        assert within.status_code == 200, within.text
+        assert past.status_code == 422, past.text
+        assert past.json()["error_type"] == "MethodTreeTooLarge"
+        assert "`resources`" in past.json()["detail"]
+
+    @pytest.mark.parametrize(
+        ("limit", "value"),
+        [("MAX_METHOD_DEPENDENCIES", 0), ("MAX_METHOD_REQUEST_TOTAL_BYTES", len(_GREET_MTHDS) + 10)],
+    )
+    def test_a_method_and_its_dependencies_are_held_to_limits_together(self, mocker: MockerFixture, limit: str, value: int) -> None:
+        """Each tree passes its own limits, yet the request carries too many trees, or too many bytes across them."""
+        mocker.patch(f"pipelex_api.method_tree_request.{limit}", value)
+        client = _build_client(mocker)
+        dependency = {"METHODS.toml": _DEPENDENCY_MANIFEST, "lib.mthds": _GREET_MTHDS.replace('"greeting"', '"library"')}
+
+        response = client.post("/v1/validate", json={"files": {"greet.mthds": _GREET_MTHDS}, "dependencies": {_DEPENDENCY_ADDRESS: dependency}})
+
+        assert response.status_code == 422, response.text
+        assert response.json()["error_type"] == "MethodTreeTooLarge"
+
+    @pytest.mark.parametrize("last_segment", ["..", "."])
+    def test_a_nameless_dependency_keyed_by_an_address_no_directory_can_take_is_refused(self, mocker: MockerFixture, last_segment: str) -> None:
+        client = _build_client(mocker)
+        nameless_manifest = _DEPENDENCY_MANIFEST.replace('name = "library"\n', "")
+        dependency = {"METHODS.toml": nameless_manifest, "lib.mthds": _GREET_MTHDS.replace('"greeting"', '"library"')}
+        address = f"{_DEPENDENCY_ADDRESS.rsplit('/', 1)[0]}/{last_segment}"
+
+        response = client.post("/v1/validate", json={"files": {"greet.mthds": _GREET_MTHDS}, "dependencies": {address: dependency}})
+
+        assert response.status_code == 422, response.text
+        problem = response.json()
+        assert problem["error_type"] == "InvalidMethodFiles"
+        assert "cannot name a package's directory" in problem["detail"]

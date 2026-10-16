@@ -14,6 +14,16 @@ from pipelex.tools.misc.toml_utils import load_toml_from_content, load_toml_from
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
+def _decode_error_position(exc: UnicodeDecodeError) -> tuple[int, int]:
+    """The line and the column, both counted from 1 as tomli counts them, of the first byte that did not decode.
+
+    The bytes before it decode, so the column counts the characters before it on its line.
+    """
+    before = exc.object[: exc.start].decode("utf-8")
+    line_start = before.rfind("\n") + 1
+    return before.count("\n") + 1, len(before) - line_start + 1
+
+
 class MthdsParser(BaseModel):
     """MTHDS -> PipelexBundleBlueprint"""
 
@@ -84,6 +94,15 @@ class MthdsParser(BaseModel):
                         column=exc.colno,
                     )
                 ],
+            ) from exc
+        except UnicodeDecodeError as exc:
+            # tomli reads a file as bytes and decodes them as UTF-8, so a file of a tree that is not text fails here.
+            source = mthds_source if mthds_source is not None else str(bundle_path)
+            line, column = _decode_error_position(exc)
+            msg = f"The MTHDS file is not UTF-8 text: the byte at line {line}, column {column} does not decode."
+            raise MthdsParserError(
+                msg,
+                validation_errors=[PipelexBundleBlueprintValidationErrorData(source=source, message=msg, line=line, column=column)],
             ) from exc
 
         if not blueprint_dict:

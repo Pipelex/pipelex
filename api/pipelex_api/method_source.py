@@ -26,25 +26,30 @@ The routes use it two ways:
   sent method run the same path, the files a step reads, such as a `PipeDocGen` template, included.
 - The tooling routes (`/resolve`, `/codegen`, `/pipe-io`) use :func:`fetch_method_mthds_files`: the tree's `.mthds`
   files, as `files[]` items labelled with their tree paths, paired with the manifest's `main_pipe` so the per-pipe route
-  defaults its selector as a run does. No Python ever loads there, so the execution-locus gate does not apply.
+  defaults its selector as a run does. It reads only what the membership rule needs to tell which `.mthds` files are
+  the tree's, never the shipped packages, so it neither stages nor hashes the rest of the package. No Python ever loads
+  there, so the execution-locus gate does not apply.
 
 The security gate (packaging invariant 7 — execution locus decides) is the request tree's
 (`pipelex_api.method_tree_request.ensure_python_allowed`): on a deployment that is not sandbox-hosted, a package
 carrying any `.py` is refused with a 403 `CustomCodeRequiresSandbox`; on a sandbox-hosted one, PipeFunc `.py` is
 acceptable but a package declaring `StructuredContent` subclasses is refused (`MethodStructuresRefusedError` → 403).
 
-Everything a run needs is read OUT of the cached clone before this module returns — the tree's bytes into memory — so
-cache eviction can never race a running pipeline.
+Everything a run needs is read OUT of the cached clone before this module returns — the tree's bytes into memory —
+while the clone is pinned against eviction (`MethodCloneCache.pinned_package`), so cache eviction never races a read or
+a running pipeline.
 """
 
 import os
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Callable, Generator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import NamedTuple
 
-from mthds.method_tree.discovery import BUNDLE_SUFFIX
+from mthds.method_tree.discovery import BUNDLE_SUFFIX, GITIGNORE_NAME, MANIFEST_NAME
 from pipelex import log
 from pipelex.libraries.method_trees import list_package_method_tree
 from pipelex.methods.exceptions import MethodFetchError
@@ -60,7 +65,9 @@ from pipelex_api.method_tree_request import (
     RequestTree,
     add_dependency,
     dependency_address_of,
+    ensure_method_within_limits,
     ensure_tree_within_limits,
+    is_package_dir_name,
 )
 from pipelex_api.schemas.models import MthdsFileItem
 
@@ -71,6 +78,9 @@ _GIT_MODE_SYMLINK = "120000"
 _GIT_MODE_SUBMODULE = "160000"
 # Where a package ships the method packages it calls, the layout of the local method cache.
 _VENDORED_METHODS_DIR = Path(".mthds") / "methods"
+# The files the membership rule reads to judge an entry beside the entry's own name: the patterns of a `.gitignore` file
+# and of the manifest, a manifest marking a nested package, and a `pyvenv.cfg` marking a virtual environment.
+_MEMBERSHIP_RULE_NAMES = frozenset({GITIGNORE_NAME, MANIFEST_NAME, "pyvenv.cfg"})
 
 
 class FetchedMethod(NamedTuple):
@@ -190,13 +200,18 @@ def _read_git_objects(*, package: FetchedMethodPackage, object_shas: list[str]) 
     return contents
 
 
-def _stage_package(*, package: FetchedMethodPackage, staging_dir: Path) -> None:
+def _stage_package(*, package: FetchedMethodPackage, staging_dir: Path, keeps: Callable[[str], bool] | None = None) -> None:
     """Write the package's directory as its commit stores it into `staging_dir`, from the clone's git objects.
 
     A symbolic link is written as one, for the tree's lister to refuse unless the membership rule excludes it, and a
     submodule contributes no file.
+
+    Args:
+        package: The fetched package.
+        staging_dir: The directory to write it into.
+        keeps: Which paths, relative to the package's directory, to write; every path when None.
     """
-    entries = _package_tree_entries(package=package)
+    entries = [entry for entry in _package_tree_entries(package=package) if keeps is None or keeps(entry.path)]
     blobs = _read_git_objects(package=package, object_shas=[entry.object_sha for entry in entries if entry.mode != _GIT_MODE_SUBMODULE])
     for entry in entries:
         if entry.mode == _GIT_MODE_SUBMODULE:
@@ -238,38 +253,64 @@ def _read_package_method(*, package: FetchedMethodPackage) -> RequestMethod:
         vendored_root = package_root / _VENDORED_METHODS_DIR
         if vendored_root.is_dir():
             for vendored_dir in sorted(vendored_root.iterdir()):
-                if not vendored_dir.is_dir() or vendored_dir.is_symlink():
+                # A shipped package is a directory with a name a package's directory can take, as a `bundle_b64`
+                # archive's are (`read_archive_method`); anything else under `.mthds/methods/` is no package.
+                if not vendored_dir.is_dir() or vendored_dir.is_symlink() or not is_package_dir_name(vendored_dir.name):
                     continue
                 vendored_label = f"The package '.mthds/methods/{vendored_dir.name}/' of method package '{package.full_address}'"
                 dependency_tree = _read_listed_tree(root=vendored_dir, package_address=vendored_label, label=vendored_label)
                 address = dependency_address_of(tree=dependency_tree, fallback_name=vendored_dir.name, label=vendored_label)
                 add_dependency(dependencies=dependencies, address=address, tree=dependency_tree, label=vendored_label)
-        return RequestMethod(tree=tree, dependencies=dependencies)
+        request_method = RequestMethod(tree=tree, dependencies=dependencies)
+        ensure_method_within_limits(request_method=request_method, label=label)
+        return request_method
     finally:
         shutil.rmtree(staging_dir, ignore_errors=True)
 
 
-def _fetch_package(method_ref: str) -> FetchedMethodPackage:
-    """Parse the reference and fetch its package through the SHA-keyed clone cache.
+@contextmanager
+def _fetched_package(method_ref: str) -> Generator[FetchedMethodPackage, None, None]:
+    """Parse the reference and fetch its package through the SHA-keyed clone cache, its clone pinned in the block.
 
     Every failure mode is a distinct pipelex `MethodRefError` subclass, rendered by the
     global handler as RFC 7807 `problem+json` with the class name as `error_type` and the
     status the API maps for it (`pipelex_api.exception_handlers._ERROR_TYPE_STATUS_OVERRIDES`).
     """
     ref = parse_method_ref(method_ref)
-    package = get_method_clone_cache().get_or_fetch(ref=ref)
-    # The tag and the commit say which version of the package a hosted run executed; the tag is `None` when the
-    # reference named none and the default branch was fetched.
-    log.info(
-        "A method reference was resolved to a package",
-        fields={
-            "method_ref": ref.ref_str,
-            "package_address": package.provenance.address,
-            "fetched_tag": package.provenance.tag,
-            "commit_sha": package.provenance.commit_sha,
-        },
-    )
-    return package
+    with get_method_clone_cache().pinned_package(ref=ref) as package:
+        # The tag and the commit say which version of the package a hosted run executed; the tag is `None` when the
+        # reference named none and the default branch was fetched.
+        log.info(
+            "A method reference was resolved to a package",
+            fields={
+                "method_ref": ref.ref_str,
+                "package_address": package.provenance.address,
+                "fetched_tag": package.provenance.tag,
+                "commit_sha": package.provenance.commit_sha,
+            },
+        )
+        yield package
+
+
+def _keeps_for_bundle_listing(path: str) -> bool:
+    """Whether a package's file is one the tooling read writes: a `.mthds` file, or one the membership rule reads."""
+    name = path.rsplit("/", 1)[-1]
+    return path.endswith(BUNDLE_SUFFIX) or name in _MEMBERSHIP_RULE_NAMES
+
+
+def _read_package_bundles(*, package: FetchedMethodPackage) -> dict[str, bytes]:
+    """The `.mthds` files of the package's tree by tree path, read without staging or hashing the rest of the package.
+
+    Only the `.mthds` files and the files the membership rule reads are written out, so the lister keeps exactly the
+    `.mthds` files the whole tree would keep. The packages the package ships stay out, being under a dot directory.
+    """
+    staging_dir = Path(tempfile.mkdtemp(prefix="pipelex-package-bundles-"))
+    try:
+        _stage_package(package=package, staging_dir=staging_dir, keeps=_keeps_for_bundle_listing)
+        tree = list_package_method_tree(root=staging_dir, package_address=package.full_address)
+        return {tree_path: tree.file_location(tree_path).read_bytes() for tree_path in tree.tree_paths if tree_path.endswith(BUNDLE_SUFFIX)}
+    finally:
+        shutil.rmtree(staging_dir, ignore_errors=True)
 
 
 def fetched_method(method_ref: str) -> FetchedMethod:
@@ -284,8 +325,8 @@ def fetched_method(method_ref: str) -> FetchedMethod:
         MethodTreeLoadError: The standard refused the package's tree (a 422 naming the package by its address).
         ApiError: A tree past this runner's limits, or a shipped package without a manifest (422s).
     """
-    package = _fetch_package(method_ref)
-    request_method = _read_package_method(package=package)
+    with _fetched_package(method_ref) as package:
+        request_method = _read_package_method(package=package)
     provenance = package.provenance.model_copy(update={"tree_digest": request_method.tree.tree.digest})
     return FetchedMethod(request_method=request_method, package=package, provenance=provenance)
 
@@ -306,19 +347,19 @@ def fetch_method_mthds_files(method_ref: str) -> FetchedMthdsFiles:
         MethodTreeLoadError: The standard refused the package's tree.
         ApiError: 422 for a package with no `.mthds` file or one this server cannot accept.
     """
-    fetched = fetched_method(method_ref)
-    tree = fetched.request_method.tree
+    with _fetched_package(method_ref) as package:
+        bundles = _read_package_bundles(package=package)
+    label = f"'{package.full_address}'"
     items: list[MthdsFileItem] = []
-    for tree_path in tree.bundle_paths:
-        data = tree.contents[tree_path]
+    for tree_path, data in bundles.items():
         try:
             content = data.decode("utf-8")
         except UnicodeDecodeError:
-            raise_validation_error(message=f"File '{tree_path}' in method package {fetched.label} is not valid UTF-8.")
+            raise_validation_error(message=f"File '{tree_path}' in method package {label} is not valid UTF-8.")
         if len(data) > MAX_MTHDS_FILE_BYTES:
-            msg = f"File '{tree_path}' in method package {fetched.label} exceeds the {MAX_MTHDS_FILE_BYTES // 1024} KiB per-file limit."
+            msg = f"File '{tree_path}' in method package {label} exceeds the {MAX_MTHDS_FILE_BYTES // 1024} KiB per-file limit."
             raise_validation_error(message=msg)
         items.append(MthdsFileItem(content=content, source=tree_path))
     if not items:
-        raise_validation_error(message=f"Method package {fetched.label} contains no {BUNDLE_SUFFIX} file.", error_type=ErrorType.INVALID_BUNDLE)
-    return FetchedMthdsFiles(files=items, main_pipe=fetched.package.manifest.main_pipe)
+        raise_validation_error(message=f"Method package {label} contains no {BUNDLE_SUFFIX} file.", error_type=ErrorType.INVALID_BUNDLE)
+    return FetchedMthdsFiles(files=items, main_pipe=package.manifest.main_pipe)

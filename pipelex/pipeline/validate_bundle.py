@@ -369,6 +369,13 @@ def _ensure_tree_python_parses(*, tree: MethodTree) -> None:
                     column=exc.offset,
                 )
             )
+        except ValueError as exc:
+            # Python 3.11 refuses a source holding a NUL byte with a ValueError where later versions raise a SyntaxError.
+            items.append(PipelexBundleBlueprintValidationErrorData(source=tree_path, message=f"The Python file '{tree_path}' does not parse: {exc}."))
+        except (RecursionError, MemoryError):
+            # Nesting deep enough to exhaust the parser, which Python's own import refuses the same way.
+            message = f"The Python file '{tree_path}' does not parse: it nests too deeply."
+            items.append(PipelexBundleBlueprintValidationErrorData(source=tree_path, message=message))
     if items:
         raise ValidateBundleError(message=" ".join(item.message for item in items), pipelex_bundle_blueprint_validation_errors=items)
 

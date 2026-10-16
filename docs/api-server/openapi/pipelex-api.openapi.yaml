@@ -85,11 +85,13 @@ paths:
 
         The body is the blob''s bytes and nothing else. A target whose signature does not hold, or that has expired, is a
 
-        403 `BlobUploadNotAuthorized`; a body past `MAX_METHOD_TREE_FILE_KIB` a 422 `MethodTreeTooLarge`; and a body whose
+        403 `BlobUploadNotAuthorized`, as is a query that is not one this runner signs, such as an expiry that is not a
 
-        SHA-256 is not the path''s a 422 `BlobMismatch`. A blob is written once and never changed: uploading bytes the
+        decimal integer; a body past `MAX_METHOD_TREE_FILE_KIB` a 422 `MethodTreeTooLarge`; and a body whose SHA-256 is not
 
-        runner already holds answers 204 and changes nothing.'
+        the path''s a 422 `BlobMismatch`. A blob is never changed: uploading bytes the runner already holds answers 204 and
+
+        changes nothing.'
       operationId: put_blob_v1_blobs__sha256__put
       parameters:
       - name: sha256
@@ -116,7 +118,7 @@ paths:
         required: false
         schema:
           anyOf:
-          - type: integer
+          - type: string
           - type: 'null'
           description: When the target expires, in seconds since the epoch.
           title: Expires
@@ -1505,19 +1507,22 @@ paths:
       description: 'List every blob of the request this runner does not hold, each with a signed upload target (MTHDS Protocol).
 
 
-        A blob it holds is left out, and an empty list means there is nothing to upload. When the request names the tree
+        A blob it holds at the stated size is left out, and an empty list means there is nothing to upload; bytes held
 
-        the blobs make up by its `digest`, and this runner has recorded that tree as held in full, which it does only after
+        under a hash at another size are listed, for the upload to write over. When the request names the tree the blobs
 
-        reading every file of a tree a request sent, the answer is an empty list at once. A hash given twice with different
+        make up by its `digest`, this runner has recorded that tree as held in full, which it does only after reading every
 
-        sizes is a 422 `BlobMismatch`, and a blob or a set of blobs past this runner''s tree limits a 422
+        file of a tree a request sent, and every listed blob is a file of that tree, the answer is an empty list at once.
 
-        `MethodTreeTooLarge`, both refused before anything is uploaded. Each upload target is this runner''s own
+        A hash given twice with different sizes is a 422 `BlobMismatch`, and a blob or a set of blobs past this runner''s
 
-        `PUT /v1/blobs/{sha256}`, its query signed for that hash and the caller''s scope, valid for
+        tree limits a 422 `MethodTreeTooLarge`, both refused before anything is uploaded. Each upload target is this runner''s
+        own
 
-        `BLOB_UPLOAD_URL_TTL_SECONDS`, to send with exactly the headers it names.'
+        `PUT /v1/blobs/{sha256}`, at `PUBLIC_BASE_URL` when the deployment sets it, its query signed for that hash and
+
+        the caller''s scope, valid for `BLOB_UPLOAD_URL_TTL_SECONDS`, to send with exactly the headers it names.'
       operationId: find_missing_blobs_v1_blobs_missing_post
       parameters:
       - name: read_scope

@@ -7,7 +7,6 @@ entries. The blobs live in the runner's blob store (`pipelex_api.blob_store`), u
 id, the scope a run's hash entries are resolved in.
 """
 
-import asyncio
 from typing import Annotated
 
 from fastapi import APIRouter, Query, Request
@@ -15,7 +14,7 @@ from pipelex.system.storage_scope import validate_read_scope
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
 from pipelex_api.blob_store import RunnerBlobStore
-from pipelex_api.blob_upload import signed_upload_query
+from pipelex_api.blob_upload import upload_target_url
 from pipelex_api.error_types import ErrorType
 from pipelex_api.errors import raise_validation_error
 from pipelex_api.json_body import JsonBodyRoute
@@ -106,13 +105,14 @@ async def find_missing_blobs(
 ) -> MissingBlobsResult:
     """List every blob of the request this runner does not hold, each with a signed upload target (MTHDS Protocol).
 
-    A blob it holds is left out, and an empty list means there is nothing to upload. When the request names the tree
-    the blobs make up by its `digest`, and this runner has recorded that tree as held in full, which it does only after
-    reading every file of a tree a request sent, the answer is an empty list at once. A hash given twice with different
-    sizes is a 422 `BlobMismatch`, and a blob or a set of blobs past this runner's tree limits a 422
-    `MethodTreeTooLarge`, both refused before anything is uploaded. Each upload target is this runner's own
-    `PUT /v1/blobs/{sha256}`, its query signed for that hash and the caller's scope, valid for
-    `BLOB_UPLOAD_URL_TTL_SECONDS`, to send with exactly the headers it names.
+    A blob it holds at the stated size is left out, and an empty list means there is nothing to upload; bytes held
+    under a hash at another size are listed, for the upload to write over. When the request names the tree the blobs
+    make up by its `digest`, this runner has recorded that tree as held in full, which it does only after reading every
+    file of a tree a request sent, and every listed blob is a file of that tree, the answer is an empty list at once.
+    A hash given twice with different sizes is a 422 `BlobMismatch`, and a blob or a set of blobs past this runner's
+    tree limits a 422 `MethodTreeTooLarge`, both refused before anything is uploaded. Each upload target is this runner's own
+    `PUT /v1/blobs/{sha256}`, at `PUBLIC_BASE_URL` when the deployment sets it, its query signed for that hash and
+    the caller's scope, valid for `BLOB_UPLOAD_URL_TTL_SECONDS`, to send with exactly the headers it names.
     """
     if read_scope is not None:
         try:
@@ -130,15 +130,14 @@ async def find_missing_blobs(
     )
     scope = resolve_blob_scope(request, read_scope=read_scope)
     blob_store = RunnerBlobStore.make_for_scope(scope=scope)
-    if request_data.digest is not None and await blob_store.holds_tree(tree_digest=request_data.digest):
-        return MissingBlobsResult(missing=[])
-    hashes = list(sizes)
-    held = await asyncio.gather(*(blob_store.holds_blob(sha256=sha256) for sha256 in hashes))
+    if request_data.digest is not None:
+        tree_hashes = await blob_store.tree_hashes(tree_digest=request_data.digest)
+        # The digest answers alone only for blobs that are files of the tree it names, which this runner holds in full.
+        if tree_hashes is not None and tree_hashes.issuperset(sizes):
+            return MissingBlobsResult(missing=[])
     missing: list[MissingBlob] = []
-    for sha256, is_held in zip(hashes, held, strict=True):
-        if is_held:
-            continue
-        url = f"{request.url_for('put_blob', sha256=sha256)}?{signed_upload_query(scope=scope, sha256=sha256)}"
+    for sha256 in await blob_store.missing_blobs(sizes=sizes):
+        url = upload_target_url(request=request, scope=scope, sha256=sha256)
         upload = UploadTarget(method="PUT", url=url, headers={"content-type": _OCTET_STREAM})
         missing.append(MissingBlob(sha256=sha256, size=sizes[sha256], upload=upload))
     return MissingBlobsResult(missing=missing)

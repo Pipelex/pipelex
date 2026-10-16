@@ -63,3 +63,26 @@ class TestMthdsParser:
         assert "'methods/broken.mthds'" in item.message
         assert str(tmp_path) not in item.message
         assert str(tmp_path) not in exc_info.value.message
+
+    @pytest.mark.parametrize(
+        ("content", "line", "column"),
+        [
+            pytest.param(b"\xff", 1, 1, id="first_byte"),
+            pytest.param(b'domain = "x"\ndefinition = "caf\xe9"\n', 2, 18, id="later_line"),
+        ],
+    )
+    def test_a_bundle_file_that_is_not_utf8_is_a_located_parser_error(self, tmp_path: Path, content: bytes, line: int, column: int):
+        """A file of a tree that is not text is the caller's invalid bundle, located at its first byte that does not decode."""
+        bundle_path = tmp_path / "written" / "bad.mthds"
+        bundle_path.parent.mkdir(parents=True)
+        bundle_path.write_bytes(content)
+
+        with pytest.raises(MthdsParserError) as exc_info:
+            MthdsParser.make_pipelex_bundle_blueprint(bundle_path=bundle_path, mthds_source="bad.mthds")
+
+        assert exc_info.value.validation_errors is not None
+        (item,) = exc_info.value.validation_errors
+        assert item.source == "bad.mthds"
+        assert (item.line, item.column) == (line, column)
+        assert "not UTF-8 text" in item.message
+        assert str(tmp_path) not in item.message

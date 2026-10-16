@@ -186,6 +186,41 @@ class GcpStorageProvider(StorageProviderAbstract):
         """
         return await asyncio.to_thread(self._load_head_sync, key, nb_bytes=nb_bytes)
 
+    def _load_size_sync(self, key: str) -> int:
+        """Synchronous implementation of the size read for use with to_thread.
+
+        Raises:
+            StorageFileNotFoundError: If the object does not exist.
+            StorageGcpError: If the GCS operation fails.
+        """
+        bucket = self._get_bucket()
+
+        from google.api_core.exceptions import (  # type: ignore[import-untyped]  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
+            GoogleAPIError,
+        )
+
+        try:
+            # Fetches the object's metadata alone, None when there is no such object.
+            blob = bucket.get_blob(key)
+        except GoogleAPIError as exc:  # pyright: ignore[reportUnknownVariableType]
+            msg = f"Failed to read the size of the GCS object '{key}': {exc}"
+            raise StorageGcpError(msg) from exc
+        if blob is None:
+            msg = f"Object not found in GCS: '{key}'"
+            raise StorageFileNotFoundError(msg)
+        size: int = blob.size
+        return size
+
+    @override
+    async def _load_size(self, key: str) -> int:
+        """The size of a GCS object, read from its metadata instead of its bytes.
+
+        Raises:
+            StorageFileNotFoundError: If the object does not exist.
+            StorageGcpError: If the GCS operation fails.
+        """
+        return await asyncio.to_thread(self._load_size_sync, key)
+
     def _store_sync(self, data: bytes, *, key: str, content_type: str | None) -> None:
         """Synchronous implementation of store for use with to_thread.
 

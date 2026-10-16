@@ -55,7 +55,15 @@ PIPELEX_ENV=dev
 # MAX_METHOD_TREE_FILES=1000          # files in one tree
 # MAX_METHOD_TREE_FILE_KIB=32768      # bytes per file, and per uploaded blob (default 32 MiB)
 # MAX_METHOD_TREE_TOTAL_KIB=65536     # bytes across one tree (default 64 MiB)
+# A method and the dependency trees it sends beside it are also bounded together:
+# MAX_METHOD_DEPENDENCIES=32          # dependency trees in one request
+# MAX_METHOD_REQUEST_TOTAL_KIB=131072 # bytes across the method's trees (default 128 MiB)
 # BLOB_UPLOAD_URL_TTL_SECONDS=3600    # how long an upload target stays valid
+# The address clients reach this API at, which upload targets start with. Set it
+# behind a proxy that terminates TLS or serves the API under a path prefix, since
+# the URL a request arrives at is then not the one a client can upload to. Unset,
+# a target starts with the URL of the request that asked for it.
+# PUBLIC_BASE_URL=https://runner.example.com
 # The key the upload targets are signed with. Unset, each process draws its own,
 # so a deployment serving one API through several instances sets it, the same on
 # every instance. Blobs live in the configured storage under <scope>/blobs/.

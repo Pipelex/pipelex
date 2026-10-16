@@ -141,15 +141,15 @@ async def codegen_mthds(request_data: CodegenRequest) -> JSONResponse:
     with CodeGenerationReport(
         artifact=UsageStatsCodegenArtifact.TYPES, target=usage_stats_codegen_target(target=request_data.target)
     ) as generation_report:
-        return _generate_codegen_response(request_data=request_data, generation_report=generation_report)
+        return await _generate_codegen_response(request_data=request_data, generation_report=generation_report)
 
 
-def _generate_codegen_response(*, request_data: CodegenRequest, generation_report: CodeGenerationReport) -> JSONResponse:
+async def _generate_codegen_response(*, request_data: CodegenRequest, generation_report: CodeGenerationReport) -> JSONResponse:
     """The body of `codegen_mthds`, timed by `generation_report`, which an invalid verdict declares failed."""
     try:
         # `types` is concept-set-wide: no pipe is selected, so the manifest's `main_pipe` beside the crate is unused.
         # A future per-pipe kind takes it from the `ResolvedClosure` and hands it to `resolve_requested_pipe`.
-        crate = resolve_requested_crate(request_data).crate
+        crate = (await resolve_requested_crate(request_data)).crate
     except ValidateBundleError as validate_error:
         generation_report.declare_failed()
         return invalid_crate_report_response(validate_error.to_error_report())

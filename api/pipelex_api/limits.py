@@ -33,6 +33,9 @@ DEFAULT_MAX_RESOURCES_TOTAL_KIB = 10 * 1024  # 10 MiB decoded across a request's
 DEFAULT_MAX_METHOD_TREE_FILES = 1000
 DEFAULT_MAX_METHOD_TREE_TOTAL_KIB = 64 * 1024  # 64 MiB across the files of one tree
 DEFAULT_MAX_METHOD_TREE_FILE_KIB = 32 * 1024  # 32 MiB for one file of a tree, and for one blob uploaded
+# Every tree one request carries together, the method's own and its dependency trees, beside each tree's own limits.
+DEFAULT_MAX_METHOD_DEPENDENCIES = 32  # dependency trees beside the method's own
+DEFAULT_MAX_METHOD_REQUEST_TOTAL_KIB = 128 * 1024  # 128 MiB across the method's tree and its dependency trees
 DEFAULT_BLOB_UPLOAD_URL_TTL_SECONDS = 3600  # how long an upload target `POST /v1/blobs/missing` names stays valid
 DEFAULT_MAX_METHOD_CACHE_CLONES = 64  # cached method-package clones (one per resolved commit SHA)
 DEFAULT_MAX_METHOD_CACHE_TOTAL_KIB = 512 * 1024  # 512 MiB across all cached clones
@@ -59,6 +62,9 @@ MAX_RESOURCES_TOTAL_BYTES = get_positive_int_env(env_var="MAX_RESOURCES_TOTAL_KI
 MAX_METHOD_TREE_FILES = get_positive_int_env(env_var="MAX_METHOD_TREE_FILES", default=DEFAULT_MAX_METHOD_TREE_FILES)
 MAX_METHOD_TREE_TOTAL_BYTES = get_positive_int_env(env_var="MAX_METHOD_TREE_TOTAL_KIB", default=DEFAULT_MAX_METHOD_TREE_TOTAL_KIB) * 1024
 MAX_METHOD_TREE_FILE_BYTES = get_positive_int_env(env_var="MAX_METHOD_TREE_FILE_KIB", default=DEFAULT_MAX_METHOD_TREE_FILE_KIB) * 1024
+
+MAX_METHOD_DEPENDENCIES = get_positive_int_env(env_var="MAX_METHOD_DEPENDENCIES", default=DEFAULT_MAX_METHOD_DEPENDENCIES)
+MAX_METHOD_REQUEST_TOTAL_BYTES = get_positive_int_env(env_var="MAX_METHOD_REQUEST_TOTAL_KIB", default=DEFAULT_MAX_METHOD_REQUEST_TOTAL_KIB) * 1024
 
 BLOB_UPLOAD_URL_TTL_SECONDS = get_positive_int_env(env_var="BLOB_UPLOAD_URL_TTL_SECONDS", default=DEFAULT_BLOB_UPLOAD_URL_TTL_SECONDS)
 

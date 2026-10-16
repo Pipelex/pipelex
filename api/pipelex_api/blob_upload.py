@@ -11,6 +11,11 @@ deployment's authentication on `POST /v1/blobs/missing` holds a target, for one 
 The key is `BLOB_UPLOAD_SIGNING_KEY` when the deployment sets it, which it must when several instances serve one
 deployment, since a target named by one instance is checked by whichever instance receives the upload; otherwise each
 process draws a random key of its own at its first signature.
+
+A target's URL starts with `PUBLIC_BASE_URL` when the deployment sets it, the address its clients reach the API at,
+such as `https://runner.example.com`: behind a proxy that terminates TLS or serves the API under a path prefix, the URL
+the runner received a request at is not the one a client can upload to. Unset, the target starts with the URL of the
+request that asked for it.
 """
 
 import hashlib
@@ -18,11 +23,17 @@ import hmac
 import secrets
 import time
 from functools import cache
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
+from fastapi import Request
 from pipelex.system.environment import get_optional_env
 
+from pipelex_api.error_types import ErrorType
+from pipelex_api.errors import raise_internal_server_error
 from pipelex_api.limits import BLOB_UPLOAD_URL_TTL_SECONDS
+
+PUBLIC_BASE_URL_ENV = "PUBLIC_BASE_URL"
+_UPLOAD_ROUTE_NAME = "put_blob"
 
 SCOPE_PARAM = "scope"
 EXPIRES_PARAM = "expires"
@@ -48,10 +59,44 @@ def signed_upload_query(*, scope: str, sha256: str) -> str:
     return urlencode({SCOPE_PARAM: scope, EXPIRES_PARAM: expires, SIGNATURE_PARAM: _signature(scope=scope, sha256=sha256, expires=expires)})
 
 
-def is_upload_authorized(*, scope: str | None, sha256: str, expires: int | None, signature: str | None) -> bool:
-    """Whether an upload carries a signature this runner made for this hash and scope, still within its expiry."""
+def _public_base_url() -> str | None:
+    """`PUBLIC_BASE_URL` without its trailing slash, or None when unset.
+
+    Raises (as a problem document): a 500 `ServerMisconfigured` for a value that is not an absolute http or https URL
+    without a query or a fragment.
+    """
+    configured = get_optional_env(PUBLIC_BASE_URL_ENV)
+    if not configured:
+        return None
+    parts = urlsplit(configured)
+    if parts.scheme not in {"http", "https"} or not parts.netloc or parts.query or parts.fragment:
+        msg = f"Server configuration error: {PUBLIC_BASE_URL_ENV} must be an absolute http or https URL, such as https://runner.example.com."
+        raise_internal_server_error(message=msg, error_type=ErrorType.SERVER_MISCONFIGURED)
+    return configured.rstrip("/")
+
+
+def upload_target_url(*, request: Request, scope: str, sha256: str) -> str:
+    """The signed URL a sender uploads one blob to: this runner's `PUT /v1/blobs/{sha256}`, at its public address."""
+    query = signed_upload_query(scope=scope, sha256=sha256)
+    base_url = _public_base_url()
+    if base_url is None:
+        return f"{request.url_for(_UPLOAD_ROUTE_NAME, sha256=sha256)}?{query}"
+    return f"{base_url}{request.app.url_path_for(_UPLOAD_ROUTE_NAME, sha256=sha256)}?{query}"
+
+
+def is_upload_authorized(*, scope: str | None, sha256: str, expires: str | None, signature: str | None) -> bool:
+    """Whether an upload carries a signature this runner made for this hash and scope, still within its expiry.
+
+    Every part of the query is the caller's text, read as such: an expiry that is not a decimal integer, or a signature
+    holding characters no signature this runner makes holds, is no valid target, never a failure of the check.
+    """
     if scope is None or expires is None or signature is None:
         return False
-    if expires < int(time.time()):
+    if not expires.isascii() or not expires.isdecimal():
         return False
-    return hmac.compare_digest(_signature(scope=scope, sha256=sha256, expires=expires), signature)
+    expires_at = int(expires)
+    if expires_at < int(time.time()):
+        return False
+    # Compared as bytes: `compare_digest` refuses text holding a character outside ASCII, which a forged signature may.
+    expected = _signature(scope=scope, sha256=sha256, expires=expires_at).encode("ascii")
+    return hmac.compare_digest(expected, signature.encode("utf-8", "surrogatepass"))

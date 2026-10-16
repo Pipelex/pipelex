@@ -794,8 +794,11 @@ async def _request_method_of(*, run_request: RunRequest, body: bytes, blob_store
     request_method: RequestMethod | None
     if run_request.bundle_b64 is not None:
         request_method = await read_archive_method(bundle_b64=run_request.bundle_b64)
-    else:
+    elif run_request.files is not None or run_request.dependencies is not None:
+        # Only a body sending a tree is parsed again, keeping its pairs; an inline run never pays a second parse.
         request_method = await read_request_method(documents=tree_documents_of(body=body), blob_store=blob_store)
+    else:
+        request_method = None
     if request_method is None:
         return None
     request_method = with_resources(request_method=request_method, resources=decode_bundle_resources(resources=run_request.resources))
@@ -996,7 +999,10 @@ async def start(
     # PipeJob before it enqueues, its crate naming each method tree by digest, so the temp dir (a
     # tree's, sent or fetched) is no longer needed once `start` returns — cleanup on context
     # exit is safe for the async path. The worker reads a tree's files through its own method file
-    # store, which the deployment fills, never from this directory.
+    # store, never from this directory: the orchestrator copies every tree the job's crate names
+    # into that store before its `start` returns (`OrchestratorProtocol`), while this process's
+    # library still serves them, and no orchestrator keeping a job running after `start` returned
+    # may rely on this process's store.
     async with _run_source(run_request=run_request, body=body, blob_scope=blob_scope) as source:
         runner = ApiRunner(
             user_id=get_request_user_id(request),

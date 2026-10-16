@@ -75,8 +75,11 @@ class TestMethodCloneCache:
         fetch_spy = mocker.spy(cache, "_package_from_clone")
         clone_spy = mocker.patch("pipelex_api.method_cache.fetch_method_package", wraps=fetch_method_package)
 
-        first = cache.get_or_fetch(ref=_REF, clone_url=clone_url)
-        second = cache.get_or_fetch(ref=_REF, clone_url=clone_url)
+        with cache.pinned_package(ref=_REF, clone_url=clone_url) as first:
+            pass
+
+        with cache.pinned_package(ref=_REF, clone_url=clone_url) as second:
+            pass
 
         assert clone_spy.call_count == 1, "the second request must be served from the cache"
         assert fetch_spy.call_count == 2, "location + bounds re-run on every request"
@@ -91,7 +94,8 @@ class TestMethodCloneCache:
     def test_a_moved_tag_resolves_to_a_fresh_clone(self, origin: tuple[str, Path], tmp_path: Path):
         clone_url, repo = origin
         cache = MethodCloneCache(root_dir=tmp_path / "cache")
-        first = cache.get_or_fetch(ref=_REF, clone_url=clone_url)
+        with cache.pinned_package(ref=_REF, clone_url=clone_url) as first:
+            pass
 
         # Move the tag: a new commit, and v0.1.0 forced onto it. Never cache by tag alone —
         # the same reference must now fetch the NEW commit.
@@ -100,7 +104,8 @@ class TestMethodCloneCache:
         _git("commit", "-m", "move the tag", cwd=repo)
         _git("tag", "-f", "-a", "v0.1.0", "-m", "moved tag", cwd=repo)
 
-        second = cache.get_or_fetch(ref=_REF, clone_url=clone_url)
+        with cache.pinned_package(ref=_REF, clone_url=clone_url) as second:
+            pass
         assert second.commit_sha != first.commit_sha
         assert (tmp_path / "cache" / first.commit_sha).is_dir()
         assert (tmp_path / "cache" / second.commit_sha).is_dir()
@@ -109,7 +114,8 @@ class TestMethodCloneCache:
         clone_url, repo = origin
         mocker.patch("pipelex_api.method_cache.MAX_METHOD_CACHE_CLONES", 1)
         cache = MethodCloneCache(root_dir=tmp_path / "cache")
-        first = cache.get_or_fetch(ref=_REF, clone_url=clone_url)
+        with cache.pinned_package(ref=_REF, clone_url=clone_url) as first:
+            pass
 
         (repo / "methods" / "documents" / "extra.mthds").write_text(VALID_MTHDS.replace('"smoke"', '"extra"'), encoding="utf-8")
         _git("add", "-A", cwd=repo)
@@ -120,7 +126,8 @@ class TestMethodCloneCache:
         os.utime(tmp_path / "cache" / first.commit_sha, (old, old))
 
         second_ref = parse_method_ref("github.com/pipelex/methods/documents@v0.2.0")
-        second = cache.get_or_fetch(ref=second_ref, clone_url=clone_url)
+        with cache.pinned_package(ref=second_ref, clone_url=clone_url) as second:
+            pass
 
         assert not (tmp_path / "cache" / first.commit_sha).exists(), "the oldest entry is evicted past the count bound"
         assert (tmp_path / "cache" / second.commit_sha).is_dir(), "the newest entry always survives"
@@ -129,7 +136,8 @@ class TestMethodCloneCache:
         clone_url, repo = origin
         mocker.patch("pipelex_api.method_cache.MAX_METHOD_CACHE_AGE_SECONDS", 3600)
         cache = MethodCloneCache(root_dir=tmp_path / "cache")
-        first = cache.get_or_fetch(ref=_REF, clone_url=clone_url)
+        with cache.pinned_package(ref=_REF, clone_url=clone_url) as first:
+            pass
         stale = time.time() - 7200
         os.utime(tmp_path / "cache" / first.commit_sha, (stale, stale))
 
@@ -138,10 +146,41 @@ class TestMethodCloneCache:
         _git("commit", "-m", "second version", cwd=repo)
         _git("tag", "-a", "v0.2.0", "-m", "second tag", cwd=repo)
         second_ref = parse_method_ref("github.com/pipelex/methods/documents@v0.2.0")
-        second = cache.get_or_fetch(ref=second_ref, clone_url=clone_url)
+        with cache.pinned_package(ref=second_ref, clone_url=clone_url) as second:
+            pass
 
         assert not (tmp_path / "cache" / first.commit_sha).exists(), "an entry unused past the age bound is evicted"
         assert (tmp_path / "cache" / second.commit_sha).is_dir()
+
+    def test_a_clone_being_read_survives_an_eviction(self, origin: tuple[str, Path], tmp_path: Path, mocker: MockerFixture):
+        """A concurrent request's miss evicts the oldest clone, yet never the one another request is still reading."""
+        clone_url, repo = origin
+        mocker.patch("pipelex_api.method_cache.MAX_METHOD_CACHE_CLONES", 1)
+        cache = MethodCloneCache(root_dir=tmp_path / "cache")
+        (repo / "methods" / "documents" / "extra.mthds").write_text(VALID_MTHDS.replace('"smoke"', '"extra"'), encoding="utf-8")
+        _git("add", "-A", cwd=repo)
+        _git("commit", "-m", "second version", cwd=repo)
+        _git("tag", "-a", "v0.2.0", "-m", "second tag", cwd=repo)
+        second_ref = parse_method_ref("github.com/pipelex/methods/documents@v0.2.0")
+
+        with cache.pinned_package(ref=_REF, clone_url=clone_url) as first:
+            old = time.time() - 120
+            os.utime(first.clone_dir, (old, old))
+            with cache.pinned_package(ref=second_ref, clone_url=clone_url) as second:
+                pass
+            assert first.clone_dir.is_dir(), "a pinned clone is never evicted"
+            assert (first.package_dir / "documents.mthds").read_text(encoding="utf-8") == VALID_MTHDS
+
+        (repo / "methods" / "documents" / "third.mthds").write_text(VALID_MTHDS.replace('"smoke"', '"third"'), encoding="utf-8")
+        _git("add", "-A", cwd=repo)
+        _git("commit", "-m", "third version", cwd=repo)
+        _git("tag", "-a", "v0.3.0", "-m", "third tag", cwd=repo)
+        with cache.pinned_package(ref=parse_method_ref("github.com/pipelex/methods/documents@v0.3.0"), clone_url=clone_url) as third:
+            pass
+
+        assert not first.clone_dir.exists(), "once nothing reads a clone, the bounds evict it again"
+        assert not second.clone_dir.exists()
+        assert third.clone_dir.is_dir()
 
     def test_nonexistent_repository_is_a_fetch_error(self, tmp_path: Path):
         with pytest.raises(MethodFetchError, match="could not reach the repository"):

@@ -42,7 +42,9 @@ class OrchestratorProtocol(Protocol):
     ``read_stored_trees(tree_digests=pipe_job.library_crate.tree_digests(), read_scope=...)``
     (``pipelex.core.method_trees.method_files``) reads each one as a store keeps it, its listing
     under the tree's digest and its files under their hashes, checked. An orchestrator running
-    the job in this process copies nothing.
+    the job in this process, to its end before its ``execute`` returns, copies nothing; one that
+    keeps a job running after its ``start`` returned copies the trees as an out-of-process one
+    does, wherever the job runs, since the library holding them is gone by then.
     """
 
     supports_fire_and_forget: bool
