@@ -14,8 +14,10 @@ from typing import Any
 
 import pytest
 from mthds.protocol.problem.registry import CoreCode
+from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import INTERNAL_ERROR_PLACEHOLDER, DisclosureMode
+from pipelex.config import get_config
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -88,3 +90,26 @@ class TestRenderTimeTemplateRefusals:
             detail=f"Pipe 'summarize' failed: PipeLLM 'summarize': its {prompt_field} cannot render: {_UNKNOWN_FILTER_FAULT}",
             next_step=f"Fix the {prompt_field} of PipeLLM 'summarize': {_UNKNOWN_FILTER_FAULT}",
         )
+
+    async def test_a_broken_deployment_structure_prompt_is_ours_and_withheld(self, mocker: MockerFixture) -> None:
+        """The structure prompt is the deployment's template, rendered in the step: `runtime.unexpected`, a 500 whose message STRICT withholds."""
+        mocker.patch.dict(
+            get_config().inference.llm.generic_templates,
+            {"output_structure_prompt": RenderTimeTemplateTestData.BROKEN_STRUCTURE_PROMPT},
+        )
+
+        error = await _failed_run(
+            pipe_code="read_label",
+            bundle=RenderTimeTemplateTestData.STRUCTURED_LLM_MTHDS,
+            inputs={"note": "To Ada, third floor"},
+            pipe_run_mode=PipeRunMode.DRY,
+        )
+
+        report = error.to_error_report()
+        assert report.code == CoreCode.RUNTIME_UNEXPECTED
+        assert report.error_type == "Jinja2TemplateInvalidError"
+        assert report.to_dict(disclosure_mode=DisclosureMode.STRICT)["message"] == INTERNAL_ERROR_PLACEHOLDER
+        document = report.to_problem_document(disclosure_mode=DisclosureMode.STRICT)
+        assert document["status"] == 500
+        # Neither the deployment's template nor what Jinja2 refused in it reaches the caller.
+        assert RenderTimeTemplateTestData.UNKNOWN_STRUCTURE_FILTER not in json.dumps(document)

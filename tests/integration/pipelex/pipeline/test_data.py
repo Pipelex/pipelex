@@ -627,3 +627,27 @@ output      = "Text"
 """
     # The other prompt field, which renders, beside the one naming the unknown filter.
     PLAIN_PROMPT: ClassVar[str] = 'prompt = "Summarize $topic"'
+
+    # A filter the deployment's structure-prompt template names and its environment lacks, which no method wrote.
+    UNKNOWN_STRUCTURE_FILTER: ClassVar[str] = "frob_the_structure"
+    # The deployment's structure-prompt template, edited to name that filter inside a branch.
+    BROKEN_STRUCTURE_PROMPT: ClassVar[str] = "{% if class_structure_str %}{{ class_structure_str | frob_the_structure }}{% endif %}"
+    # A step with a structured output, whose prompt renders and whose structure prompt is the deployment's template.
+    STRUCTURED_LLM_MTHDS: ClassVar[str] = """
+domain      = "render_time_template_structure"
+description = "Read a parcel label"
+main_pipe   = "read_label"
+
+[concept.ParcelLabel]
+description = "The label on a parcel"
+
+[concept.ParcelLabel.structure]
+recipient = { type = "text", description = "Who the parcel is for" }
+
+[pipe.read_label]
+type        = "PipeLLM"
+description = "Read the label off a note"
+inputs      = { note = "Text" }
+output      = "ParcelLabel"
+prompt      = "Read the label from $note"
+"""

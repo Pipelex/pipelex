@@ -450,6 +450,9 @@ class PipeCondition(PipeController):
                 context=working_memory.generate_context(),
             )
         except Jinja2TemplateInvalidError as exc:
+            if not exc.template_owner.is_method:
+                # One of Pipelex's own templates, reached from the expression's render: ours, kept as it is.
+                raise
             msg = f"PipeCondition '{self.code}': its expression cannot render: {exc.fault}"
             raise (
                 PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)

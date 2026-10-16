@@ -2,6 +2,7 @@ from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.errors.error_code_declaration import ErrorCodeSet
 from pipelex.system.exceptions import ToolError
+from pipelex.tools.jinja2.template_owner import TemplateOwner
 
 
 class Jinja2TemplateSyntaxError(ToolError):
@@ -38,11 +39,15 @@ class Jinja2TemplateInvalidError(Jinja2TemplateRenderError):
 
     error_code = ErrorCodeSet(default=CoreCode.METHOD_TEMPLATE_INVALID, others=(CoreCode.RUNTIME_UNEXPECTED,))
 
-    def __init__(self, message: str, *, fault: str):
+    def __init__(self, message: str, *, fault: str, template_owner: TemplateOwner):
         super().__init__(message)
         # Jinja2's own finding, such as "No filter named 'frob' found.", which names the construct and never the
         # template source: the part of the message a pipe that knows the template's field quotes in its own.
         self.fault = fault
+        # Whose template it is. A pipe rendering a method's template can reach one of Pipelex's own inside the same
+        # render, such as the deployment's structure prompt beside a PipeLLM's prompt: it reports a refusal of its
+        # template only for the method's, and lets Pipelex's own go on as ours.
+        self.template_owner = template_owner
 
 
 class Jinja2TemplateSecurityError(ToolError):

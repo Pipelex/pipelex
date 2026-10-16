@@ -42,6 +42,9 @@ async def render_doc_gen_template(
             is_undefined_strict=True,
         )
     except Jinja2TemplateInvalidError as exc:
+        if not exc.template_owner.is_method:
+            # One of Pipelex's own templates, reached from the method's render: ours, kept as it is.
+            raise
         # The template is the method author's own: the message names the step, the template and what Jinja2 refused.
         msg = f"PipeDocGen '{pipe_code}' could not render its {label}: {exc.fault}"
         raise PipeDocGenRunError(msg).with_error_code(CoreCode.METHOD_TEMPLATE_INVALID).as_caller_fault() from exc

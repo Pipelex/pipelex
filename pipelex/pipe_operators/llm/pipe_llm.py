@@ -334,6 +334,10 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     result_code=pipe_run_params.final_stuff_code,
                 )
             except Jinja2TemplateInvalidError as exc:
+                if not exc.template_owner.is_method:
+                    # One of Pipelex's own templates failed within the step, such as the deployment's structure prompt:
+                    # ours, `runtime.unexpected`, which must not reach the caller as a fault of the method's prompt.
+                    raise
                 raise self._make_invalid_prompt_error(invalid_template_error=exc, pipe_run_params=pipe_run_params) from exc
             except LLMCompletionError as exc:
                 location = self._format_error_location(pipe_run_params=pipe_run_params)
@@ -371,6 +375,10 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     result_code=pipe_run_params.final_stuff_code,
                 )
             except Jinja2TemplateInvalidError as exc:
+                if not exc.template_owner.is_method:
+                    # One of Pipelex's own templates failed within the step, such as the deployment's structure prompt:
+                    # ours, `runtime.unexpected`, which must not reach the caller as a fault of the method's prompt.
+                    raise
                 raise self._make_invalid_prompt_error(invalid_template_error=exc, pipe_run_params=pipe_run_params) from exc
             except LLMCompletionError as exc:
                 location = self._format_error_location(pipe_run_params=pipe_run_params)
@@ -403,7 +411,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         )
 
     def _make_invalid_prompt_error(self, *, invalid_template_error: Jinja2TemplateInvalidError, pipe_run_params: PipeRunParams) -> PipeRunError:
-        """The refusal of a prompt that cannot render as written, naming the pipe, the prompt field and what Jinja2 refused.
+        """The refusal of a method's prompt that cannot render as written, naming the pipe, the prompt field and what Jinja2 refused.
 
         Such a prompt names a filter or a test its environment does not define inside a branch, which only rendering that
         branch finds, since a prompt is parsed at load and not compiled. The render reports what Jinja2 refused, not
