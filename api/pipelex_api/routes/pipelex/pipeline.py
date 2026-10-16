@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 from contextlib import ExitStack, contextmanager
@@ -11,13 +12,16 @@ from fastapi.responses import JSONResponse
 from mthds.protocol.exceptions import PipelineRequestError
 from pipelex.config import get_config, is_pipe_func_sandbox_hosted
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.libraries.method_requirements import ensure_served_method_requirements_met
 from pipelex.methods.structures_check import ensure_no_structured_content_python
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, StorageTarget, WebhookTarget
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipe_run.remote_dispatch import prepare_job_for_remote_dispatch
+from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 from pipelex.reporting.usage_records import apply_tokens_usage_wire_shape
 from pipelex.runtime_bridge.exceptions import MissingBundleValidatorError, MissingOrchestratorError
 from pipelex.runtime_bridge.orchestration_mode import DIRECT_ORCHESTRATION_MODE
@@ -325,6 +329,7 @@ class ApiRunner(PipelexMTHDSProtocol):
         orchestrator = get_orchestrator_registry().get_optional(mode=orchestration_mode)
         if orchestrator is None:
             raise MissingOrchestratorError(mode=orchestration_mode)
+        await self._ensure_served_method_requirements_met()
 
         # Dispatch the run through the mode-selected orchestrator by injecting it as this runner's
         # PipeRun, then delegate to the base execute, which owns the full run lifecycle. The
@@ -407,6 +412,7 @@ class ApiRunner(PipelexMTHDSProtocol):
                 f"async-capable orchestration, and this deployment has none. Use /execute (synchronous) instead."
             )
             raise_bad_request(msg, error_type=ErrorType.START_REQUIRES_ASYNC_ORCHESTRATION)
+        await self._ensure_served_method_requirements_met()
         created_at = get_current_iso_timestamp()
         pipelex_inputs: PipelineInputs | WorkingMemory | None = cast("PipelineInputs | WorkingMemory | None", inputs)
 
@@ -484,6 +490,26 @@ class ApiRunner(PipelexMTHDSProtocol):
             workflow_id=dispatch_ack.workflow_id,
         )
 
+    async def _ensure_served_method_requirements_met(self) -> None:
+        """Refuse the request's method when its requirements.txt is not met, before anything loads or is dispatched.
+
+        This runner's `library_dirs` are the directories it made for the request, holding the method's non-`.mthds`
+        files, which the load reads as a host's library directories: there a requirements refusal is reported as the
+        host's fault, so the caller's own is judged here first, naming no path on this host. A directory that cannot be
+        listed stays the host's fault, as the load reports it. The listing reads and hashes files, so it runs off the
+        event loop.
+
+        Raises:
+            MethodRequirementsFileError: The method's requirements.txt holds a line the standard refuses.
+            MethodRequirementsNotMetError: The PipeFunc environment does not meet the method's requirements.
+            HostLibraryTreeError: A directory of the request could not be listed as a method tree.
+            PipeFuncPackageSetUnstatedError: The deployment states no package set for its PipeFunc sandbox.
+        """
+        if not self.library_dirs:
+            return
+        library_dirs = [Path(library_dir) for library_dir in self.library_dirs]
+        await asyncio.to_thread(ensure_served_method_requirements_met, library_dirs=library_dirs)
+
     async def validate_verdict(
         self,
         *,
@@ -513,8 +539,10 @@ class ApiRunner(PipelexMTHDSProtocol):
         and the `bundle_blueprint` on success — carry a real `source` instead of `None`. The route
         maps a length mismatch to a 422 before we get here; `None` keeps the sourceless behavior.
         `library_dirs` is host context the in-process arm needs; a dispatched arm ignores it (the
-        worker loads its own library). A bundle without a declared `main_pipe` validates fine and
-        simply carries `graph_spec=None` (D2 — no precondition).
+        worker loads its own library), so the requirements.txt of the methods they hold is checked here
+        first, for every arm, and a method whose requirements are not met is an invalid verdict. A
+        bundle without a declared `main_pipe` validates fine and simply carries `graph_spec=None`
+        (D2 — no precondition).
 
         `graph_pipe_code` is the pipe the best-effort graph is drawn from, resolved the way a run
         resolves its entry pipe; `None` keeps the runtime's default, the primary blueprint's
@@ -528,6 +556,14 @@ class ApiRunner(PipelexMTHDSProtocol):
         if validator is None:
             raise MissingBundleValidatorError(mode=orchestration_mode)
         library_dirs = [Path(library_dir) for library_dir in self.library_dirs] if self.library_dirs else None
+        # The method's requirements.txt is judged here, on the runner, which holds the method's files and the package set
+        # its PipeFunc steps run with, before any dispatch: a dispatched validator never reads these directories. A
+        # refusal is the method's invalid verdict, as a run of it is refused before its files load.
+        try:
+            with translate_to_validate_bundle_error():
+                await self._ensure_served_method_requirements_met()
+        except ValidateBundleError as invalid_method:
+            return invalid_method.to_error_report()
         verdict = await validator.validate_bundles(
             mthds_contents=mthds_contents,
             mthds_sources=mthds_sources,

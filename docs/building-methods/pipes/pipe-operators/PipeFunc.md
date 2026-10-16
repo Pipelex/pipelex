@@ -113,6 +113,10 @@ pipelex fix function-names invoicing/ --dry-run
 
 For each `PipeFunc` step whose `function_name` holds no dot, it finds the marked function of the tree that the flat name registered and writes its import path, then drops the argument of every `@pipe_func(name=...)` marker. It imports nothing and keeps every comment and alignment of your files. A flat name that no module of the tree registers, or that two register, is left as it is and reported, and the command exits `1`. See [Fix Commands](../../../tools/cli/fix.md#fix-function-names).
 
+## Declaring the packages your functions need
+
+When your functions import a package beyond Pipelex and the standard library, such as pandas or openpyxl, declare it in a `requirements.txt` at the root of the method's folder, one PEP 508 requirement per line. Pipelex checks it when the method loads and refuses the method, naming each requirement that is not met, rather than letting the function fail at its first import. Locally the check reads the interpreter Pipelex runs in and the refusal gives the `uv pip install` command that fixes it; on a sandbox-hosted deployment it reads the packages the sandbox holds, which are all a PipeFunc gets there. Pipelex never installs anything. The rules of the file are in [Method Trees](../../method-trees.md#python-packages-requirementstxt).
+
 ## Configuration
 
 ### MTHDS Parameters

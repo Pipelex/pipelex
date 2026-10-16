@@ -21,6 +21,7 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 - **Test Profile Configuration** - How to configure which models are used in tests
 - **Dry Run Mock Generation** - How mock objects satisfy field validation constraints
 - **Init CLI Flows** - How `pipelex init` sets up the configuration directory
+- **PipeFunc Requirements** - How a method's `requirements.txt` is checked against the environment its PipeFunc steps run in, and how a deployment states its sandbox's packages
 - **Runtime Bridge & Transport** - The backend-neutral seam that carries a pipe run across process boundaries — boundary DTOs, LibraryCrate propagation, deferred hydration, and per-call isolation
 - **Content Generation Across Boundaries** - How dynamic classes and large payloads cross a worker boundary
 - **Technical Design Decisions** - Why we chose X over Y
@@ -48,6 +49,7 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 - [:material-flask-outline: Dry Run Mock Generation](./dry-run-mock-generation.md){ .md-button }
 - [:material-console: Init CLI Flows](./init-cli-flows.md){ .md-button }
 - [:material-pipe: Pipe Routing & Execution](./pipe-routing-and-execution.md){ .md-button }
+- [:material-package-variant: PipeFunc Requirements](./pipe-func-requirements.md){ .md-button }
 - [:material-alert-circle-outline: Error Model](./error-model.md){ .md-button }
 - [:material-transit-connection-variant: Runtime Bridge & Transport](./runtime-bridge-and-transport.md){ .md-button }
 - [:material-swap-horizontal: Content Generation Across Boundaries](./distributed-content-generation.md){ .md-button }

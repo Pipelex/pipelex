@@ -67,7 +67,7 @@ class {class_name}(StructuredContent):
     total: float
 
 
-@pipe_func(name="make_hosted_refusal_total")
+@pipe_func()
 async def make_hosted_refusal_total(working_memory: WorkingMemory) -> {class_name}:
     return {class_name}(total=1.0)
 
