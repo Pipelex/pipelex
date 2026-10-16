@@ -70,6 +70,7 @@ from pipelex.cogt.model_backends.backend_credentials import (
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config
+from pipelex.core.method_trees.method_file_store import LOCAL_METHOD_FILES
 from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.stuffs.stuff_template_set import STUFF_TEMPLATE_SET
 from pipelex.core.validation import raise_config_setup_error, report_config_refusal
@@ -650,6 +651,15 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         isolated_execution_probe_factory = plugin_registrar.slot_claims.get(HubSlot.ISOLATED_EXECUTION_PROBE)
         if isolated_execution_probe_factory is not None:
             self.runtime_hub.set_isolated_execution_probe(isolated_execution_probe_factory())
+
+        # --- Method file store -----------------------------------------------------------------
+        # Where an activity reads a method file, by its tree's digest: a PipeFunc call's tree, a PipeDocGen step's
+        # template file. Claimed by a host whose activities run apart from the process that listed the run's trees
+        # (a Temporal worker reads the hosted plane's blob store); unclaimed, the local store serves the trees this
+        # process's libraries hold.
+        self.runtime_hub.set_method_file_store(
+            method_file_store=self._resolve_hub_slot(slot=HubSlot.METHOD_FILE_STORE, default=lambda: LOCAL_METHOD_FILES)
+        )
 
     def _resolve_hub_slot(self, *, slot: HubSlot, default: Callable[[], _HubSlotImplT]) -> _HubSlotImplT:
         """Resolve a process-global hub slot: a plugin's claimed thunk if present, else the core default.

@@ -72,6 +72,7 @@ class TestDependencyRefQualification:
         manager = LibraryManager()
         manager._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             library=library,
+            library_id="dependency-test",
             package_address="github.com/org/charts-dep",
             resolved_dep=ResolvedDependency(
                 alias="charts_dep",

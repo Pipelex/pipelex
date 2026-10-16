@@ -15,7 +15,6 @@ from urllib.parse import urlparse
 from mthds.protocol.exceptions import PipelineRequestError
 from mthds.protocol.pipe_output import VariableMultiplicity
 from mthds.protocol.pipeline_inputs import PipelineInputs
-from pipelex.core.bundle_resources.bundle_resource import MAX_LOAD_STAGE_RESOURCES_BYTES
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.methods.fetching import MethodProvenance
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart
@@ -54,9 +53,8 @@ RESOURCES_FIELD_DESCRIPTION = (
     f"By default at most {DEFAULT_MAX_RESOURCES_PER_REQUEST} files, {DEFAULT_MAX_RESOURCE_FILE_KIB} KiB each and "
     f"{DEFAULT_MAX_RESOURCES_TOTAL_KIB} KiB in all, decoded, counting the files a method bundle ships for its steps; a "
     "deployment sets its own with `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. A file "
-    "both sent here and shipped in a method bundle must be the same. The `.html` template files, which travel inline with the "
-    f"method wherever it runs, may total {MAX_LOAD_STAGE_RESOURCES_BYTES // 1024} KiB at most, a fixed bound, or the request "
-    "is refused with a 413 `BundleResourcesTooLargeError`."
+    "both sent here and shipped in a method bundle must be the same. The files make one method tree with the bundle at its "
+    "root, which the run names by its digest: no file's bytes travel with the run, each being read where a step uses it."
 )
 
 

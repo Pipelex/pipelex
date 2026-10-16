@@ -1,14 +1,19 @@
+import re
 import shutil
 import sys
 import tempfile
 from pathlib import Path
 
 import pytest
+from mthds.method_tree.digest import digest_of_contents
+from mthds.method_tree.lister import list_method_tree
 
+from pipelex.core.bundle_resources.exceptions import BundleResourcePathError
+from pipelex.core.method_trees.exceptions import MethodFileUnavailableError
 from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.interpreter_hub import get_library_manager, scoped_current_library
-from pipelex.libraries.exceptions import LibraryError
-from pipelex.libraries.library_crate import SUBMITTED_PYTHON_ROOT_KEY
+from pipelex.libraries.pipe_func_call_files import read_pipe_func_call_files
+from pipelex.mthds_parsing.parser import MthdsParser
 
 HOSTED_DEMO_MTHDS = """\
 domain = "hosted_demo"
@@ -84,12 +89,14 @@ def _write_shadowing_method(*, library_dir: Path) -> None:
 
 
 class TestHostedPipeFuncLoad:
-    """Sandbox-hosted load: the method's files are captured on the crate and NEVER imported in this process,
-    yet the method still loads, its PipeFunc validated from its module's source.
+    """Sandbox-hosted load: the method's files are NEVER imported in this process, yet the method still loads, its PipeFunc
+    validated from its module's source, and its crate names the step's tree by digest, the call reading the tree's files
+    through the method file store.
     """
 
+    @pytest.mark.asyncio
     @pytest.mark.usefixtures("sandbox_hosted_mode")
-    def test_hosted_load_captures_the_tree_files_without_importing(self):
+    async def test_hosted_load_names_the_tree_and_its_calls_read_its_files_through_the_store(self):
         library_manager = get_library_manager()
         # Guard the precondition: the customer module must not already be imported in this process.
         assert "hosted_demo_funcs" not in sys.modules
@@ -113,25 +120,27 @@ class TestHostedPipeFuncLoad:
                     # The customer code was NOT imported in this process.
                     assert "hosted_demo_funcs" not in sys.modules
 
-                    # Every file of the step's tree but its bundles rode along on the crate, ready to travel to a
-                    # sandbox; a file the tree excludes did not.
+                    # The crate names the step's tree by digest and carries none of its files; a call reads every file
+                    # of the tree but its bundles through the method file store, and a file the tree excludes is none.
                     crate = library_manager.get_crate(library_id=library_id)
                     assert crate is not None
-                    (tree_key,) = {tree_bundle_ref.tree_key for tree_bundle_ref in crate.tree_bundles.values()}
-                    assert sorted(crate.pipe_func_files[tree_key]) == ["hosted_demo_funcs.py", "notes/greeting.txt"]
-                    assert crate.pipe_func_files[tree_key]["hosted_demo_funcs.py"] == CUSTOMER_FUNC_PY
-                    # Carrying files leaves the structural fingerprint untouched.
-                    assert crate.fingerprint == crate.compute_fingerprint()
+                    (tree_digest,) = crate.tree_digests()
+                    assert "hello from the sandbox" not in crate.model_dump_json()
+                    call_files = await read_pipe_func_call_files(tree_digest=tree_digest, read_scope=None)
+                    assert sorted(call_files) == ["hosted_demo_funcs.py", "notes/greeting.txt"]
+                    assert call_files["hosted_demo_funcs.py"] == CUSTOMER_FUNC_PY.encode("utf-8")
             finally:
                 library_manager.teardown(library_id=library_id)
 
-            # Side-state is cleaned up on teardown: a fresh crate for the same id is gone.
+            # Side-state is cleaned up on teardown: the crate is gone, and the store no longer serves the library's tree.
             assert library_manager.get_crate(library_id=library_id) is None
+            with pytest.raises(MethodFileUnavailableError):
+                await read_pipe_func_call_files(tree_digest=tree_digest, read_scope=None)
 
     @pytest.mark.usefixtures("sandbox_hosted_mode")
-    def test_hosted_load_rejects_colliding_source_paths(self):
-        """Two library dirs sharing a file path (with different content) must fail loud, not
-        silently overwrite one customer's PipeFunc body — the sandbox writes the files at their paths.
+    def test_two_library_directories_submitting_different_files_at_one_path_beside_content_strings_are_refused(self):
+        """The files beside content strings make one tree, so two library directories' files at one path must fail loud,
+        not silently overwrite one customer's PipeFunc body: the call writes the files at their paths.
         """
         library_manager = get_library_manager()
 
@@ -146,14 +155,51 @@ class TestHostedPipeFuncLoad:
 
             library_id, _ = library_manager.open_library()
             try:
-                with scoped_current_library(library_id=library_id), pytest.raises(LibraryError, match="Duplicate PipeFunc file path"):
+                with scoped_current_library(library_id=library_id):
                     library_manager.load_libraries(library_id=library_id, library_dirs=[dir_a, dir_b])
+                    blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=HOSTED_DEMO_MTHDS)
+                    # The caller's conflict, named by tree path alone, never by the directories it came from.
+                    with pytest.raises(
+                        BundleResourcePathError, match=re.escape("Two different files were submitted under the same path 'hosted_demo_funcs.py'")
+                    ) as exc_info:
+                        library_manager.load_from_blueprints(library_id=library_id, blueprints=[blueprint])
+                    assert tmp_dir not in str(exc_info.value)
+                    # The refusal joined none of the directories' files, so the next load is refused the same way.
+                    with pytest.raises(BundleResourcePathError, match=re.escape("'hosted_demo_funcs.py'")):
+                        library_manager.load_from_blueprints(library_id=library_id, blueprints=[blueprint])
+            finally:
+                library_manager.teardown(library_id=library_id)
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures("sandbox_hosted_mode")
+    async def test_content_strings_name_the_tree_of_the_files_their_library_directory_submits(self):
+        """The directory a server writes a request's files into holds no bundle: its files make the tree the content strings sit at the root of."""
+        library_manager = get_library_manager()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            library_dir = Path(tmp_dir)
+            (library_dir / "hosted_demo_funcs.py").write_text(CUSTOMER_FUNC_PY, encoding="utf-8")
+
+            library_id, _ = library_manager.open_library()
+            try:
+                with scoped_current_library(library_id=library_id):
+                    library_manager.load_libraries(library_id=library_id, library_dirs=[library_dir])
+                    library_manager.load_from_blueprints(
+                        library_id=library_id, blueprints=[MthdsParser.make_pipelex_bundle_blueprint(mthds_content=HOSTED_DEMO_MTHDS)]
+                    )
+                    crate = library_manager.get_crate(library_id=library_id)
+                    assert crate is not None
+                    tree_bundle_ref = crate.tree_bundles["hosted_demo.make_note"]
+                    assert tree_bundle_ref.tree_path is None
+                    assert tree_bundle_ref.tree_digest == digest_of_contents({"hosted_demo_funcs.py": CUSTOMER_FUNC_PY.encode("utf-8")})
+                    call_files = await read_pipe_func_call_files(tree_digest=tree_bundle_ref.tree_digest, read_scope=None)
+                    assert call_files == {"hosted_demo_funcs.py": CUSTOMER_FUNC_PY.encode("utf-8")}
             finally:
                 library_manager.teardown(library_id=library_id)
 
     @pytest.mark.usefixtures("sandbox_hosted_mode")
     def test_two_methods_shipping_different_files_at_one_path_load_side_by_side(self, tmp_path: Path):
-        """Each method's calls carry its own tree's files, so two methods' README.md, requirements.txt and METHODS.toml never clash."""
+        """Each method's calls read its own tree's files, so two methods' README.md, requirements.txt and METHODS.toml never clash."""
         library_manager = get_library_manager()
         _write_method(method_dir=tmp_path / "first", name="first")
         _write_method(method_dir=tmp_path / "second", name="second")
@@ -164,53 +210,31 @@ class TestHostedPipeFuncLoad:
                 library_manager.load_libraries(library_id=library_id, library_dirs=[tmp_path / "first", tmp_path / "second"])
                 crate = library_manager.get_crate(library_id=library_id)
                 assert crate is not None
-                assert SUBMITTED_PYTHON_ROOT_KEY not in crate.pipe_func_files
-                assert len(crate.pipe_func_files) == 2
-                readmes = sorted(str(call_files["README.md"]) for call_files in crate.pipe_func_files.values())
-                assert readmes == ["# The first method\n", "# The second method\n"]
+                assert len(crate.tree_digests()) == 2
+                assert {tree_bundle_ref.tree_path for tree_bundle_ref in crate.tree_bundles.values()} == {"first.mthds", "second.mthds"}
         finally:
             library_manager.teardown(library_id=library_id)
 
     @pytest.mark.usefixtures("sandbox_hosted_mode")
-    def test_the_crate_builds_after_the_directory_its_files_were_read_from_is_removed(self, tmp_path: Path):
+    def test_the_crate_builds_after_the_directory_its_tree_was_listed_from_is_removed(self, tmp_path: Path):
+        """The crate names the tree by its digest alone, so building it reads no file."""
         library_manager = get_library_manager()
         library_dir = tmp_path / "request"
         library_dir.mkdir()
         (library_dir / "make_note.mthds").write_text(HOSTED_DEMO_MTHDS, encoding="utf-8")
         (library_dir / "hosted_demo_funcs.py").write_text(CUSTOMER_FUNC_PY, encoding="utf-8")
-        (library_dir / "notes").mkdir()
-        (library_dir / "notes" / "greeting.txt").write_text("hello", encoding="utf-8")
 
         library_id, _ = library_manager.open_library()
         try:
             with scoped_current_library(library_id=library_id):
                 library_manager.load_libraries(library_id=library_id, library_dirs=[library_dir])
+                tree_digest = list_method_tree(library_dir).digest
                 shutil.rmtree(library_dir)
 
                 crate = library_manager.get_crate(library_id=library_id)
 
                 assert crate is not None
-                (call_files,) = crate.pipe_func_files.values()
-                assert call_files["hosted_demo_funcs.py"] == CUSTOMER_FUNC_PY
-                assert call_files["notes/greeting.txt"] == "hello"
-        finally:
-            library_manager.teardown(library_id=library_id)
-
-    @pytest.mark.usefixtures("sandbox_hosted_mode")
-    def test_a_tree_holding_no_pipe_func_step_is_not_carried(self, tmp_path: Path):
-        library_manager = get_library_manager()
-        library_dir = tmp_path / "no_steps"
-        library_dir.mkdir()
-        (library_dir / "concepts.mthds").write_text('domain = "no_steps"\n\n[concept]\nMemo = "A memo"\n', encoding="utf-8")
-        (library_dir / "helpers.py").write_text("VALUE = 1\n", encoding="utf-8")
-
-        library_id, _ = library_manager.open_library()
-        try:
-            with scoped_current_library(library_id=library_id):
-                library_manager.load_libraries(library_id=library_id, library_dirs=[library_dir])
-                crate = library_manager.get_crate(library_id=library_id)
-                assert crate is not None
-                assert crate.pipe_func_files == {}
+                assert crate.tree_digests() == [tree_digest]
         finally:
             library_manager.teardown(library_id=library_id)
 

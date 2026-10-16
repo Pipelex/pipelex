@@ -1,29 +1,24 @@
-"""The files a sandbox-hosted `PipeFunc` call receives, captured onto the library crate without importing anything.
+"""The files an out-of-process `PipeFunc` call receives: its method tree's, read through the method file store.
 
-A sandbox-hosted deployment never imports a method's Python in its own process: every call to a `PipeFunc` runs in a
-sandbox that receives the files of the step's Python root, every file except the `.mthds` files, at their paths
-(`wip/extra-files/design.md`, "Inside a run"). They are read once, as the library loads, for each method tree holding a
-`PipeFunc` step, and the crate carries them, per root, wherever the run travels, a Temporal workflow included, which may
-read no file itself (`LibraryCrate.pipe_func_files`); a directory the load read them from may be gone by then, such as
-the temporary one a server writes a request's files into.
+A call to a `PipeFunc` that runs out of the process that loaded its method, in a sandbox or in an activity, receives the
+files of the step's tree, every file except the `.mthds` files, at their tree paths (`wip/extra-files/design.md`, "Inside
+a run"). The call names the tree by digest (`PipeFuncExecutionRequest.tree_digest`), and whoever runs it reads the files
+through the method file store under the run's read scope, where IO is allowed, never in a workflow.
 
-The generated `structures` module is the one file left behind: the sandbox generates its own from the crate's concepts,
-with the qualified class names the runtime checks a return type against, and a method's own copy beside it would give
-the sandbox two modules of that name.
+The generated `structures` module is the one file left behind: the process running the call generates its own from the
+crate's concepts, with the qualified class names the runtime checks a return type against, and a method's own copy
+beside it would give it two modules of that name.
 """
 
-from mthds.method_tree.models import MethodTree
-
-from pipelex.core.method_trees.tree_files import TreeFileEntry, read_call_files
+from pipelex.core.method_trees.method_files import read_tree_files
+from pipelex.core.method_trees.tree_files import is_bundle_file
 from pipelex.methods.structures_check import is_generated_structures_module
-from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 
 _PYTHON_SUFFIX = ".py"
-_PIPE_FUNC_TYPE = "PipeFunc"
 
 
 def travels_with_call(*, tree_path: str, data: bytes) -> bool:
-    """Whether a file of a `PipeFunc`'s Python root travels with its calls: every file but a generated `structures` module."""
+    """Whether a file of a `PipeFunc`'s tree travels with its calls: every file but a generated `structures` module."""
     if not tree_path.endswith(_PYTHON_SUFFIX):
         return True
     try:
@@ -33,11 +28,11 @@ def travels_with_call(*, tree_path: str, data: bytes) -> bool:
     return not is_generated_structures_module(source=source)
 
 
-def holds_pipe_func_step(*, blueprint: PipelexBundleBlueprint) -> bool:
-    """Whether a bundle declares a `PipeFunc` step, whose calls carry its tree's files."""
-    return any(pipe_blueprint.type == _PIPE_FUNC_TYPE for pipe_blueprint in (blueprint.pipe or {}).values())
+async def read_pipe_func_call_files(*, tree_digest: str, read_scope: str | None) -> dict[str, bytes]:
+    """The files a call of a `PipeFunc` of the tree `tree_digest` names receives, by tree path, read through the method file store.
 
-
-def tree_pipe_func_files(*, tree: MethodTree) -> dict[str, TreeFileEntry]:
-    """The files every `PipeFunc` call of a method tree listed from this host's disk receives, read from the disk now."""
-    return read_call_files(tree=tree, keeps=travels_with_call)
+    Raises:
+        MethodFileUnavailableError: The store does not hold the tree or one of its files for this run.
+    """
+    files = await read_tree_files(tree_digest=tree_digest, read_scope=read_scope, keeps=lambda tree_path: not is_bundle_file(tree_path=tree_path))
+    return {tree_path: data for tree_path, data in files.items() if travels_with_call(tree_path=tree_path, data=data)}

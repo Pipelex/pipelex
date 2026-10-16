@@ -7,6 +7,13 @@ the worker of the ``doc_gen`` model the assignment names, resolved when the step
 thread, since engines are synchronous; a file its document names, such as an image, it reads back through the
 ``RenderResources`` it is handed, under the run's read scope.
 
+A step printing from a template file names it in its composition by its tree's digest and its tree path, and the
+leaf reads it through the method file store, under the run's read scope: this is the activity, where IO is allowed,
+and the compose stage, which may run in a workflow, reads no file. An HTML template file is then rendered with the
+step's data by the interpreter's template file stage (``pipelex.cogt.doc_gen.template_file_stage``), a dry print
+included, so a value the template reads that does not exist fails the dry run as it fails a live one; an office
+template file is handed to its engine, and at a dry print to its engine's template checker.
+
 Engines run on a thread pool of their own rather than the event loop's default executor, because an engine's
 thread waits while the loop reads a file for it, and that read may itself need a default-executor thread (a
 local file read, a DNS lookup, a cloud storage call). Were the engines on the default executor, as many
@@ -18,7 +25,7 @@ import asyncio
 import contextvars
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 from typing_extensions import override
 
@@ -29,11 +36,14 @@ from pipelex.cogt.content_generation.generated_content_factory import GeneratedC
 from pipelex.cogt.content_generation.read_authorization import authorize_assignment_reads
 from pipelex.cogt.doc_gen.doc_gen_engine import get_doc_gen_inference_model, require_doc_gen_engine_installed
 from pipelex.cogt.doc_gen.doc_gen_worker_factory import DocGenWorkerFactory
+from pipelex.cogt.doc_gen.document_composition import DocumentComposition
 from pipelex.cogt.doc_gen.exceptions import DocGenRenderError
-from pipelex.cogt.doc_gen.render_job import LoadedResource, RenderedDocument, RenderResources
+from pipelex.cogt.doc_gen.render_job import LoadedResource, RenderedDocument, RenderJob, RenderResources
+from pipelex.cogt.doc_gen.template_check import TemplateCheckRequest
 from pipelex.cogt.inference.inference_call_summary import InferenceCallSummary, InferenceOperation
+from pipelex.core.method_trees.method_files import read_method_file
 from pipelex.core.stuffs.document_content import DocumentContent
-from pipelex.runtime_hub import get_report_delegate
+from pipelex.runtime_hub import get_report_delegate, get_template_file_stage
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.tools.uri.uri_bytes import load_bytes_and_mime_type_from_any_uri
 from pipelex.tools.uri.uri_read_scope import authorize_uri_read
@@ -89,10 +99,12 @@ async def render_document_and_store(
     """Print the composed document with its engine, store the file, and return the `DocumentContent` pointing at it.
 
     The read scope is authorized first in either mode, so a dry run, which prints and stores nothing, refuses what
-    a live one would. A live print ends with the event every inference call ends with, as `_print_document` says.
+    a live one would. A dry run reads and checks the template file the step prints from, if any, as `_check_template_file`
+    says. A live print ends with the event every inference call ends with, as `_print_document` says.
 
     Raises:
         UriReadRefusedError: an image the document names is outside the run's read scope.
+        MethodFileUnavailableError: the template file cannot be read through the method file store for this run.
         ModelNotFoundError: the assignment's engine is not a model served here.
         DocGenEngineMissingError: the engine is the built-in one or one of the plugin's and is no longer declared here, or
             no installed plugin registers it.
@@ -100,6 +112,7 @@ async def render_document_and_store(
     """
     if render_assignment.cogt_run_params.run_mode.is_dry:
         authorize_assignment_reads(job_metadata=render_assignment.job_metadata, uri_references=render_assignment.referenced_uris())
+        await _check_template_file(render_assignment=render_assignment)
         return dry_render_document(render_assignment)
     rendered = await _print_document(render_assignment=render_assignment, storage_provider=generated_content_factory.storage_provider)
     composition = render_assignment.composition
@@ -109,6 +122,76 @@ async def render_document_and_store(
         mime_type=composition.format.mime_type,
         filename=composition.filename,
     )
+
+
+class TemplateFileForPrint(NamedTuple):
+    """What the print hands its engine from the step's template file: an HTML one rendered, or an office one's bytes."""
+
+    html: str | None
+    template: bytes | None
+
+
+async def read_template_file(*, render_assignment: RenderDocumentAssignment) -> TemplateFileForPrint:
+    """Read the step's template file through the method file store, and render it when it is an HTML template.
+
+    Raises:
+        MethodFileUnavailableError: the file cannot be read through the method file store for this run.
+        DocGenRenderError: an HTML template file is not UTF-8 text.
+    """
+    composition = render_assignment.composition
+    template_file = composition.template_file
+    if template_file is None:
+        return TemplateFileForPrint(html=None, template=None)
+    data = await read_method_file(file_ref=template_file.file, read_scope=render_assignment.job_metadata.run_metadata.read_scope)
+    if template_file.render_context is None:
+        return TemplateFileForPrint(html=None, template=data)
+    try:
+        template_source = data.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        msg = f"The template file '{template_file.name}' of '{composition.filename}' is not UTF-8 text."
+        raise DocGenRenderError(msg) from exc
+    html = await get_template_file_stage().render_html_template_file(template_file=template_file, template_source=template_source)
+    return TemplateFileForPrint(html=html, template=None)
+
+
+async def _check_template_file(*, render_assignment: RenderDocumentAssignment) -> None:
+    """At a dry print, read the step's template file and check it against the step's mock inputs.
+
+    An HTML template file is rendered with them, so a value it reads that does not exist fails the step. An office one
+    is handed to its engine's template checker, when the engine has one, and the interpreter's template file stage
+    reports what it found: an error fails the step, and a warning joins the validation verdict's warnings, or the log.
+
+    Raises:
+        MethodFileUnavailableError: the file cannot be read through the method file store for this run.
+        PipeDocGenTemplateCheckError: the checker reported errors (raised by the template file stage).
+    """
+    composition = render_assignment.composition
+    template_file = composition.template_file
+    if template_file is None:
+        return
+    read_template = await read_template_file(render_assignment=render_assignment)
+    if read_template.template is None:
+        return
+    inference_model = get_doc_gen_inference_model(
+        model_handle=render_assignment.doc_gen_setting.model,
+        doc_gen_format=composition.format,
+        source=composition.source,
+        pipe_code=render_assignment.job_metadata.pipe_code,
+    )
+    worker = DocGenWorkerFactory.make_doc_gen_worker(inference_model=inference_model, reporting_delegate=get_report_delegate())
+    request = TemplateCheckRequest(
+        format=composition.format,
+        template=read_template.template,
+        template_name=template_file.name,
+        inputs=template_file.input_shapes,
+        data=composition.data,
+    )
+    findings = await asyncio.to_thread(worker.check_template, request=request)
+    get_template_file_stage().report_template_findings(template_file=template_file, findings=findings)
+
+
+def _render_job_of(*, composition: DocumentComposition, read_template: TemplateFileForPrint) -> RenderJob:
+    return composition.make_render_job(html=read_template.html, template=read_template.template)
 
 
 async def _print_document(*, render_assignment: RenderDocumentAssignment, storage_provider: StorageProviderAbstract) -> RenderedDocument:
@@ -123,6 +206,7 @@ async def _print_document(*, render_assignment: RenderDocumentAssignment, storag
 
     Raises:
         UriReadRefusedError: an image the document names is outside the run's read scope.
+        MethodFileUnavailableError: the template file cannot be read through the method file store for this run.
         ModelNotFoundError: the assignment's engine is not a model served here.
         DocGenEngineMissingError: the engine is the built-in one or one of the plugin's and is no longer declared here, or
             no installed plugin registers it.
@@ -155,7 +239,7 @@ async def _print_document(*, render_assignment: RenderDocumentAssignment, storag
         )
         engine_name = inference_model.name
         worker = DocGenWorkerFactory.make_doc_gen_worker(inference_model=inference_model, reporting_delegate=get_report_delegate())
-        render_job = await composition.make_render_job(storage_provider=storage_provider)
+        render_job = _render_job_of(composition=composition, read_template=await read_template_file(render_assignment=render_assignment))
         resources = RunRenderResources(
             storage_provider=storage_provider,
             read_scope=render_assignment.job_metadata.run_metadata.read_scope,

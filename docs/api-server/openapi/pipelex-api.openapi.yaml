@@ -193,8 +193,8 @@ paths:
                     422 `BundleResourceNotNamedError`. By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded,
                     counting the files a method bundle ships for its steps; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
                     `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. A file both sent here and shipped in a method bundle
-                    must be the same. The `.html` template files, which travel inline with the method wherever it runs, may
-                    total 512 KiB at most, a fixed bound, or the request is refused with a 413 `BundleResourcesTooLargeError`.'
+                    must be the same. The files make one method tree with the bundle at its root, which the run names by its
+                    digest: no file''s bytes travel with the run, each being read where a step uses it.'
                 orchestration_mode:
                   anyOf:
                   - type: string
@@ -466,8 +466,8 @@ paths:
                     422 `BundleResourceNotNamedError`. By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded,
                     counting the files a method bundle ships for its steps; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
                     `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. A file both sent here and shipped in a method bundle
-                    must be the same. The `.html` template files, which travel inline with the method wherever it runs, may
-                    total 512 KiB at most, a fixed bound, or the request is refused with a 413 `BundleResourcesTooLargeError`.'
+                    must be the same. The files make one method tree with the bundle at its root, which the run names by its
+                    digest: no file''s bytes travel with the run, each being read where a step uses it.'
                 pipeline_run_id:
                   anyOf:
                   - type: string
@@ -1577,9 +1577,9 @@ components:
             colon. Every file must be named by a step, or the request is refused with a 422 `BundleResourceNotNamedError`.
             By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded, counting the files a method bundle ships
             for its steps; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.
-            A file both sent here and shipped in a method bundle must be the same. The `.html` template files, which travel
-            inline with the method wherever it runs, may total 512 KiB at most, a fixed bound, or the request is refused with
-            a 413 `BundleResourcesTooLargeError`.'
+            A file both sent here and shipped in a method bundle must be the same. The files make one method tree with the
+            bundle at its root, which the run names by its digest: no file''s bytes travel with the run, each being read where
+            a step uses it.'
         kind:
           $ref: '#/components/schemas/CodegenRouteKind'
           description: What to project. `types` projects the crate's concept set into typed models.
@@ -3966,9 +3966,9 @@ components:
             colon. Every file must be named by a step, or the request is refused with a 422 `BundleResourceNotNamedError`.
             By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded, counting the files a method bundle ships
             for its steps; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.
-            A file both sent here and shipped in a method bundle must be the same. The `.html` template files, which travel
-            inline with the method wherever it runs, may total 512 KiB at most, a fixed bound, or the request is refused with
-            a 413 `BundleResourcesTooLargeError`.'
+            A file both sent here and shipped in a method bundle must be the same. The files make one method tree with the
+            bundle at its root, which the run names by its digest: no file''s bytes travel with the run, each being read where
+            a step uses it.'
       type: object
       title: MthdsFilesRequest
       description: 'Shared closure selector for the resolve/codegen routes: inline `files[]` XOR a `method_ref`.
@@ -5045,9 +5045,9 @@ components:
             colon. Every file must be named by a step, or the request is refused with a 422 `BundleResourceNotNamedError`.
             By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded, counting the files a method bundle ships
             for its steps; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.
-            A file both sent here and shipped in a method bundle must be the same. The `.html` template files, which travel
-            inline with the method wherever it runs, may total 512 KiB at most, a fixed bound, or the request is refused with
-            a 413 `BundleResourcesTooLargeError`.'
+            A file both sent here and shipped in a method bundle must be the same. The files make one method tree with the
+            bundle at its root, which the run names by its digest: no file''s bytes travel with the run, each being read where
+            a step uses it.'
         pipe_ref:
           anyOf:
           - type: string
@@ -7729,9 +7729,9 @@ components:
             colon. Every file must be named by a step, or the request is refused with a 422 `BundleResourceNotNamedError`.
             By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded, counting the files a method bundle ships
             for its steps; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.
-            A file both sent here and shipped in a method bundle must be the same. The `.html` template files, which travel
-            inline with the method wherever it runs, may total 512 KiB at most, a fixed bound, or the request is refused with
-            a 413 `BundleResourcesTooLargeError`.'
+            A file both sent here and shipped in a method bundle must be the same. The files make one method tree with the
+            bundle at its root, which the run names by its digest: no file''s bytes travel with the run, each being read where
+            a step uses it.'
         render:
           items:
             type: string

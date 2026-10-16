@@ -20,14 +20,12 @@ from pipelex.config import get_config
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import (
     clear_current_library,
-    does_pipe_run_leave_process,
     get_current_library_id_or_none,
     get_library_manager,
     get_pipe_run,
     get_pipeline_manager,
     set_current_library,
 )
-from pipelex.pipe_run.remote_dispatch import prepare_job_for_remote_dispatch
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
@@ -43,12 +41,12 @@ from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 if TYPE_CHECKING:
     import asyncio
+    from collections.abc import Mapping
 
     from mthds.protocol.pipe_output import VariableMultiplicity
     from mthds.protocol.pipeline_inputs import PipelineInputs
     from mthds.protocol.working_memory import WorkingMemoryAbstract
 
-    from pipelex.core.bundle_resources.bundle_resource import BundleResources
     from pipelex.core.memory.working_memory import WorkingMemory
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
@@ -191,8 +189,8 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         # a label here would put every such run into one shared entity.
         extras: dict[str, str] | None = None,
         execution_config: PipelineExecutionConfig | None = None,
-        # The pipe run to hand each job to instead of the hub's. One that hands the job to an orchestrator outside this
-        # process prepares it with `prepare_job_for_remote_dispatch` first, as the hub's path does here.
+        # The pipe run to hand each job to instead of the hub's, such as one handing it to an orchestrator outside this
+        # process: the job carries no method file's bytes, its crate naming each tree by digest.
         pipe_run: PipeRunProtocol | None = None,
         inputs_base_dir: Path | None = None,
         # Whose `library_dirs` are: the caller's own on a local CLI run, so a refusal while loading
@@ -204,15 +202,15 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         # not, and resolves such a reference through the installed stores and fetch-on-miss only.
         methods_dirs: list[Path] | None = None,
         # The files a caller submits with the contents it runs or validates that their steps read, such as a
-        # PipeDocGen step's `template_file`, keyed by canonical bundle-relative path (`make_bundle_resources`).
-        # A bundle loaded from a directory reads beside itself on disk instead.
-        bundle_resources: BundleResources | None = None,
+        # PipeDocGen step's `template_file`, keyed by canonical bundle-relative path (`canonical_submitted_files`).
+        # A bundle loaded from a directory reads the files of its method tree instead.
+        submitted_files: Mapping[str, bytes] | None = None,
     ):
         self.library_id = library_id
         self.library_dirs = library_dirs
         self.library_dirs_are_callers = library_dirs_are_callers
         self.methods_dirs = methods_dirs
-        self.bundle_resources = bundle_resources
+        self.submitted_files = submitted_files
         self.bundle_uris = bundle_uris
         self.pipe_run_mode = pipe_run_mode
         self.is_mock_usage = is_mock_usage
@@ -360,14 +358,10 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 inputs_base_dir=self.inputs_base_dir,
                 library_dirs_are_callers=self.library_dirs_are_callers,
                 methods_dirs=self.methods_dirs,
-                bundle_resources=self.bundle_resources,
+                submitted_files=self.submitted_files,
                 request_id=request_id,
             )
             effective_pipe_run = self._pipe_run or get_pipe_run()
-            if self._pipe_run is None and does_pipe_run_leave_process():
-                # The hub's pipe run hands the job to the boot orchestrator, outside this process, so the files its
-                # steps read when they run travel by reference. An injected pipe run dispatches the job itself.
-                pipe_job = await prepare_job_for_remote_dispatch(pipe_job=pipe_job)
             with method_source_scope(source=self._method_source(mthds_contents=mthds_contents)):
                 pipe_output = await effective_pipe_run.run(pipe_job, delivery_assignment=delivery_assignment)
         except PipelexError as exc:
@@ -555,7 +549,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             caller_identity=self.caller_identity,
             # The same ownership a run of this runtime reads: the caller's own directories keep their paths.
             library_dirs_are_callers=self.library_dirs_are_callers,
-            bundle_resources=self.bundle_resources,
+            submitted_files=self.submitted_files,
         )
 
     @override

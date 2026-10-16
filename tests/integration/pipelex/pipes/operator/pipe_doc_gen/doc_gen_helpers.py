@@ -13,6 +13,7 @@ from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.config import get_config
+from pipelex.core.method_trees.method_file_store import MethodFileStoreProtocol
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.interpreter_hub import get_current_library, get_library_manager, set_current_library
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
@@ -32,6 +33,7 @@ from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import Pipe
 
 if TYPE_CHECKING:
     from pipelex.libraries.library_crate import LibraryCrate
+    from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 
 # The engines the stubs stand in for: the built-in pdf from the layout, and two of the document generation plugin's,
 # a pdf from HTML and a docx, which the stub plugin declares as the real plugin would.
@@ -160,6 +162,29 @@ async def refusal_report(*, step_fields: str) -> str:
     return str(exc_info.value.to_error_report().model_dump())
 
 
+class RecordingMethodFileStore(MethodFileStoreProtocol):
+    """A method file store serving what another serves, recording the read scope of every read, and refusing all when told to."""
+
+    def __init__(self, *, served_by: MethodFileStoreProtocol) -> None:
+        self._served_by = served_by
+        self.read_scopes: list[str | None] = []
+        self.refuses = False
+
+    @override
+    async def read_tree_listing(self, *, tree_digest: str, read_scope: str | None) -> bytes | None:
+        self.read_scopes.append(read_scope)
+        if self.refuses:
+            return None
+        return await self._served_by.read_tree_listing(tree_digest=tree_digest, read_scope=read_scope)
+
+    @override
+    async def read_blob(self, *, sha256: str, read_scope: str | None) -> bytes | None:
+        self.read_scopes.append(read_scope)
+        if self.refuses:
+            return None
+        return await self._served_by.read_blob(sha256=sha256, read_scope=read_scope)
+
+
 METHOD_MANIFEST = """[package]
 address = "github.com/pipelex-tests/invoice-printer"
 version = "1.0.0"
@@ -184,16 +209,17 @@ def write_bundle(*, directory: Path, step_fields: str, as_method: bool = True) -
 class WorkerLikePipeRun(PipeRunProtocol):
     """Runs a job the way a remote worker does: loads the crate it was handed into a library of its own and runs its own pipe.
 
-    Installed as the hub's pipe run, as a boot orchestrator's plugin installs its own (the `remote_worker` fixture), it
-    receives the job only after the submitter prepared it to leave the process. Its pipe, rebuilt from the crate, finds
-    only a reference to its office template in the library it runs in, and reads the bytes back from the run's storage,
-    as a Temporal activity does. `worker_read_scope`, when given, replaces the run's read scope on the worker.
+    Installed as the hub's pipe run, as a boot orchestrator's plugin installs its own (the `remote_worker` fixture). Its
+    pipe, rebuilt from the crate, which names the step's tree by digest and carries none of its files, reads nothing as it
+    is built, and its print stage reads the template file through the method file store, as a Temporal activity does.
+    `worker_read_scope`, when given, replaces the run's read scope on the worker.
     """
 
     def __init__(self, *, in_process_pipe_run: PipeRunProtocol, worker_read_scope: str | None = None) -> None:
         self._in_process_pipe_run = in_process_pipe_run
         self.worker_read_scope = worker_read_scope
         self.received_crates: list[LibraryCrate] = []
+        self.worker_pipes: list[PipeAbstract] = []
 
     @override
     async def run(self, pipe_job: PipeJob, *, delivery_assignment: DeliveryAssignment | None = None) -> PipeOutput:
@@ -211,6 +237,7 @@ class WorkerLikePipeRun(PipeRunProtocol):
         try:
             library_manager.load_from_crate(library_id=worker_library_id, crate=crate, is_crate_prevalidated=True)
             worker_pipe = library_manager.get_library(library_id=worker_library_id).pipe_library.get_required_pipe(pipe_code=pipe_job.pipe.pipe_ref)
+            self.worker_pipes.append(worker_pipe)
             job_metadata = pipe_job.job_metadata
             if self.worker_read_scope is not None:
                 run_metadata = job_metadata.run_metadata.model_copy(update={"read_scope": self.worker_read_scope})

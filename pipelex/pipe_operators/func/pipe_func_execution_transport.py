@@ -1,6 +1,5 @@
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.interpreter_hub import get_current_library, get_library_manager
-from pipelex.libraries.library_crate import SUBMITTED_PYTHON_ROOT_KEY
 from pipelex.pipe_operators.func.exceptions import PipeFuncTransportError
 from pipelex.pipe_operators.func.pipe_func_execution_dtos import (
     DEFAULT_PIPE_FUNC_TIMEOUT_SECONDS,
@@ -27,7 +26,7 @@ def build_pipe_func_execution_request(
     pipe_run_params: PipeRunParams,
     timeout_seconds: float = DEFAULT_PIPE_FUNC_TIMEOUT_SECONDS,
 ) -> PipeFuncExecutionRequest:
-    """Package one PipeFunc call for out-of-process execution: the current library's crate, the call's files, and the transported inputs.
+    """Package one PipeFunc call for out-of-process execution: the current library's crate, the call's tree, and the transported inputs.
 
     Shared by every out-of-process executor — the in-process sandbox one and the Temporal in-workflow
     one — so the request shape is defined once. Reads the crate from the current library via the
@@ -44,20 +43,15 @@ def build_pipe_func_execution_request(
     library_id = get_current_library()
     crate = get_library_manager().get_crate(library_id=library_id)
     if crate is None:
-        msg = (
-            f"Cannot run PipeFunc '{function_name}' out-of-process: no crate is available for the current library "
-            f"'{library_id}'. The library must be loaded in sandbox-hosted mode so the customer files travel on the crate."
-        )
+        msg = f"Cannot run PipeFunc '{function_name}' out-of-process: no crate is available for the current library '{library_id}'."
         raise PipeFuncTransportError(msg)
 
-    # The call carries its own Python root's files and no other: the files of the method tree its step was read from,
-    # or the files submitted beside the bundles parsed from content strings. The crate travels without them.
+    # The call names its own Python root by digest: the method tree its step was read from, or the tree of the files
+    # submitted beside the bundles parsed from content strings. No file's bytes travel with it.
     tree_bundle_ref = crate.tree_bundles.get(pipe_code)
-    root_key = tree_bundle_ref.tree_key if tree_bundle_ref is not None else SUBMITTED_PYTHON_ROOT_KEY
-    call_files = crate.pipe_func_files.get(root_key, {})
     return PipeFuncExecutionRequest(
-        crate=crate.model_copy(update={"pipe_func_files": {}}),
-        files=dict(call_files),
+        crate=crate,
+        tree_digest=tree_bundle_ref.tree_digest if tree_bundle_ref is not None else None,
         working_memory_raw=working_memory.dump_for_transport(),
         pipe_code=pipe_code,
         function_name=function_name,

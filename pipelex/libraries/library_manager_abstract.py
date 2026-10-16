@@ -1,16 +1,17 @@
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from kajson.class_registry import ClassRegistry
 
-from pipelex.core.bundle_resources.bundle_resource import BundleResources
-from pipelex.core.method_trees.tree_files import TreeFileEntry
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 
 if TYPE_CHECKING:
+    from mthds.method_tree.models import MethodTree
+
     from pipelex.libraries.library import Library
 
 
@@ -100,27 +101,17 @@ class LibraryManagerAbstract(ABC):
         """
 
     @abstractmethod
-    def get_pipe_func_files(self, *, library_id: str, root_key: str) -> dict[str, TreeFileEntry] | None:
-        """The files a library captured for the `PipeFunc` calls of one Python root, or None when it captured none.
-
-        A sandbox-hosted load captures them from the library directories, and a transported crate carries them, so a
-        `PipeFunc`'s validation reads its module there rather than from a disk that may be another host's.
-
-        Args:
-            library_id: The library.
-            root_key: The Python root: a method tree's key, or `SUBMITTED_PYTHON_ROOT_KEY` for bundles parsed from strings.
-        """
-
-    @abstractmethod
-    def add_bundle_resources(self, *, library_id: str, bundle_resources: BundleResources) -> None:
+    def add_submitted_files(self, *, library_id: str, submitted_files: Mapping[str, bytes]) -> None:
         """Hold the files submitted with bundles loaded from content strings, for their pipes to read.
 
-        Called before the bundles load, since a pipe that reads one, such as a `PipeDocGen` step with an HTML
-        `template_file`, reads it while it is built. The library's crate carries them from then on.
+        Called before the bundles load: they are placed at the root of the tree these files make, with the files of the
+        library directories whose own tree holds no bundle, and a pipe naming one, such as a `PipeDocGen` step with a
+        `template_file`, resolves it there as it is built. The crate names that tree by its digest, and the library holds
+        it in the local method file store until it is torn down.
 
         Args:
             library_id: The library the bundles load into
-            bundle_resources: The files, keyed by canonical bundle-relative path
+            submitted_files: The files, keyed by canonical bundle-relative path
         """
 
     @abstractmethod
@@ -144,8 +135,15 @@ class LibraryManagerAbstract(ABC):
         """
 
     @abstractmethod
-    def load_from_crate(self, *, library_id: str, crate: LibraryCrate, is_crate_prevalidated: bool = False) -> list[PipeAbstract]:
-        """Load a LibraryCrate into a live Library.
+    def load_from_crate(
+        self,
+        *,
+        library_id: str,
+        crate: LibraryCrate,
+        is_crate_prevalidated: bool = False,
+        written_pipe_trees: "Mapping[str, MethodTree] | None" = None,
+    ) -> list[PipeAbstract]:
+        """Load a LibraryCrate into a live Library, reading no file but, for its validation, files of trees this process holds.
 
         Note: This method does NOT resolve cross-package address-based dependencies.
         Callers must handle dependency loading before calling this method.
@@ -156,6 +154,10 @@ class LibraryManagerAbstract(ABC):
             is_crate_prevalidated: Skip the library validation that ends the load. Precondition: the crate
                 was built from a library that this same pipelex version loaded and validated (a runner's
                 crate, handed to the worker that executes it). Everything else the load does still happens.
+            written_pipe_trees: The trees this process wrote out for a step to run in, by that step's pipe ref, such
+                as the tree of a `PipeFunc` call written for its function to import: that step is built as a member of
+                the written tree, which holds none of its tree's bundles, while every other step is built as the
+                library crate names it.
         """
 
     @abstractmethod

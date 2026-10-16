@@ -12,14 +12,13 @@ reads a tree listed from this host's disk.
 
 from typing import NamedTuple
 
-from mthds.method_tree.discovery import MANIFEST_NAME
+from mthds.method_tree.discovery import BUNDLE_SUFFIX, MANIFEST_NAME
 from mthds.method_tree.models import MethodTree
 from mthds.package.discovery import read_package_manifest_at
 from mthds.package.exceptions import ManifestError
 from mthds.package.manifest.schema import MethodsManifest
 
 from pipelex.base_exceptions import PipelexUnexpectedError
-from pipelex.libraries.method_trees import tree_bundles_of
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
@@ -148,8 +147,9 @@ def select_method_entry(*, tree: MethodTree) -> MethodEntry:
         raise MethodEntryError(msg)
     method_label = f"at '{tree.directory}'"
     candidates = [
-        EntryCandidate(tree_path=tree_bundle.tree_path, blueprint=MthdsParser.make_pipelex_bundle_blueprint(bundle_path=tree_bundle.location))
-        for tree_bundle in tree_bundles_of(tree=tree)
+        EntryCandidate(tree_path=tree_path, blueprint=MthdsParser.make_pipelex_bundle_blueprint(bundle_path=tree.file_location(tree_path)))
+        for tree_path in tree.tree_paths
+        if tree_path.endswith(BUNDLE_SUFFIX)
     ]
     manifest: MethodsManifest | None = None
     if MANIFEST_NAME in tree.members:

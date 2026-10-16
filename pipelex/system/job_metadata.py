@@ -153,6 +153,13 @@ class RunMetadata(BaseModel):
     # with a single tenant.
     read_scope: str | None
 
+    # The method the run ran, recorded twice over (`wip/extra-files/design.md`, "The tree digest"): the digest of the
+    # method tree its pipe was read from, which names its exact files and changes with any byte of them, and the
+    # fingerprint of the run's library crate, the semantic identity of its concepts and pipes, which changes only with
+    # their meaning. None when the run's pipe belongs to no tree, or when it was built from no crate.
+    method_tree_digest: str | None = None
+    crate_fingerprint: str | None = None
+
     # The API-inbound ``X-Request-ID`` (set by the dispatcher when an external
     # HTTP request enters Pipelex). Rides here so it crosses the Temporal
     # serialization boundary — every activity / workflow can correlate logs and

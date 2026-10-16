@@ -8,10 +8,11 @@ from pipelex.cogt.doc_gen.exceptions import BUILT_IN_DOC_GEN_MODEL
 from pipelex.interpreter_hub import get_interpreter_hub
 from pipelex.plugins.inference_backend_registry import InferenceFamily
 from pipelex.plugins.plugin_model_declarations import PluginModelDeclarations
-from pipelex.runtime_hub import get_inference_backend_registry, get_models_manager, get_runtime_hub
+from pipelex.runtime_hub import get_inference_backend_registry, get_method_file_store, get_models_manager, get_runtime_hub
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import (
+    RecordingMethodFileStore,
     StubEngines,
     WorkerLikePipeRun,
     make_doc_gen_backends,
@@ -43,16 +44,28 @@ def stub_engines() -> Iterator[StubEngines]:
 
 @pytest.fixture
 def remote_worker() -> Iterator[WorkerLikePipeRun]:
-    """Install a worker-like pipe run as the hub's, one that hands each job outside the process, as a boot orchestrator's does."""
+    """Install a worker-like pipe run as the hub's, one that runs each job from its crate alone, as a boot orchestrator's does."""
     interpreter_hub = get_interpreter_hub()
     booted_pipe_run = interpreter_hub.get_required_pipe_run()
-    booted_leaves_process = interpreter_hub.does_pipe_run_leave_process()
     worker = WorkerLikePipeRun(in_process_pipe_run=booted_pipe_run)
-    interpreter_hub.set_pipe_run(worker, leaves_process=True)
+    interpreter_hub.set_pipe_run(worker)
     try:
         yield worker
     finally:
-        interpreter_hub.set_pipe_run(booted_pipe_run, leaves_process=booted_leaves_process)
+        interpreter_hub.set_pipe_run(booted_pipe_run)
+
+
+@pytest.fixture
+def recording_store() -> Iterator[RecordingMethodFileStore]:
+    """Install a method file store that serves what this process's libraries hold and records every read, as the hub's."""
+    runtime_hub = get_runtime_hub()
+    booted_store = get_method_file_store()
+    store = RecordingMethodFileStore(served_by=booted_store)
+    runtime_hub.set_method_file_store(method_file_store=store)
+    try:
+        yield store
+    finally:
+        runtime_hub.set_method_file_store(method_file_store=booted_store)
 
 
 @pytest.fixture

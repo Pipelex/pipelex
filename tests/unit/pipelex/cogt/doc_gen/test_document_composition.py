@@ -1,13 +1,25 @@
-from pathlib import Path
-
 import pytest
 from pydantic import ValidationError
 
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
-from pipelex.cogt.doc_gen.document_composition import DocumentComposition
+from pipelex.cogt.doc_gen.document_composition import ComposedTemplateFile, DocumentComposition, TemplateRenderContext
 from pipelex.cogt.doc_gen.layout_tree import ImageBlock, LayoutDocument, SectionBlock
-from pipelex.core.bundle_resources.bundle_resource import BundleResource
-from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
+from pipelex.core.method_trees.tree_bundle import MethodFileRef
+
+_TREE_DIGEST = "sha256:" + "a" * 64
+
+_OFFICE_TEMPLATE_FILE = ComposedTemplateFile(
+    file=MethodFileRef(tree_digest=_TREE_DIGEST, tree_path="templates/invoice.docx"),
+    name="templates/invoice.docx",
+    pipe_ref="invoicing.print_invoice",
+)
+
+_HTML_TEMPLATE_FILE = ComposedTemplateFile(
+    file=MethodFileRef(tree_digest=_TREE_DIGEST, tree_path="templates/report.html"),
+    name="templates/report.html",
+    pipe_ref="invoicing.print_report",
+    render_context=TemplateRenderContext(crate_fingerprint="", concepts_crate={}, working_memory_raw={}),
+)
 
 
 class TestDocumentComposition:
@@ -48,67 +60,59 @@ class TestDocumentComposition:
         )
         assert composition.referenced_uris() == []
 
-    @pytest.mark.asyncio
-    async def test_the_render_job_carries_the_template_file_s_bytes(self, tmp_path: Path) -> None:
-        template_file = tmp_path / "invoice.docx"
-        template_file.write_bytes(b"docx bytes")
+    def test_the_render_job_carries_what_the_print_stage_read(self) -> None:
         composition = DocumentComposition(
             format=DocGenFormat.DOCX,
             source=DocGenSource.TEMPLATE_FILE,
             filename="invoice.docx",
             title="Invoice",
-            template_path=str(template_file),
-            template_name="invoice.docx",
+            template_file=_OFFICE_TEMPLATE_FILE,
             data={"invoice": {"number": "INV-1"}},
         )
 
-        job = await composition.make_render_job(storage_provider=InMemoryStorageProvider())
+        job = composition.make_render_job(template=b"docx bytes")
 
         assert job.template == b"docx bytes"
-        assert job.template_name == "invoice.docx"
+        assert job.template_name == "templates/invoice.docx"
         assert job.data == {"invoice": {"number": "INV-1"}}
 
-    @pytest.mark.asyncio
-    async def test_a_template_file_submitted_with_its_bundle_is_read_from_its_resource(self) -> None:
-        """Inline, the bytes are the composition's own; stored, they are read back through the run's storage, under its read scope."""
-        storage_provider = InMemoryStorageProvider()
-        inline = BundleResource.make_inline(content=b"docx bytes")
-        uri = await storage_provider.store(b"docx bytes", key="org/run/assets/bundle/digest/invoice.docx")
-        stored = inline.stored_at(uri=uri)
+    def test_an_html_template_file_prints_as_the_html_the_print_stage_rendered(self) -> None:
+        composition = DocumentComposition(
+            format=DocGenFormat.PDF, source=DocGenSource.HTML, filename="report.pdf", title="Report", template_file=_HTML_TEMPLATE_FILE
+        )
 
-        for resource in (inline, stored):
-            composition = DocumentComposition(
-                format=DocGenFormat.DOCX,
-                source=DocGenSource.TEMPLATE_FILE,
-                filename="invoice.docx",
-                title="Invoice",
-                template_resource=resource,
-                template_name="invoice.docx",
-            )
-            job = await composition.make_render_job(storage_provider=storage_provider)
-            assert job.template == b"docx bytes"
+        job = composition.make_render_job(html="<p>INV-1</p>")
 
-        stored_composition = DocumentComposition(
+        assert composition.renders_html_template_file
+        assert job.html == "<p>INV-1</p>"
+        assert job.template is None
+
+    def test_a_template_file_travels_by_its_tree_and_tree_path_never_its_bytes(self) -> None:
+        """The composition crosses a workflow boundary, so it names the file and the print stage reads it."""
+        composition = DocumentComposition(
             format=DocGenFormat.DOCX,
             source=DocGenSource.TEMPLATE_FILE,
             filename="invoice.docx",
             title="Invoice",
-            template_resource=stored,
-            template_name="invoice.docx",
+            template_file=_OFFICE_TEMPLATE_FILE,
         )
-        (uri_reference,) = stored_composition.referenced_uris()
-        assert uri_reference.uri == uri
-        assert uri_reference.position == "the template file 'invoice.docx'"
 
-    def test_a_template_file_read_from_disk_and_from_its_resource_is_refused(self) -> None:
+        restored = DocumentComposition.model_validate_json(composition.model_dump_json())
+
+        assert restored == composition
+        assert restored.template_file is not None
+        assert restored.template_file.file == MethodFileRef(tree_digest=_TREE_DIGEST, tree_path="templates/invoice.docx")
+        assert composition.referenced_uris() == []
+
+    def test_rendered_html_and_a_template_file_to_render_are_refused_together(self) -> None:
         with pytest.raises(ValidationError, match="not both"):
             DocumentComposition(
-                format=DocGenFormat.DOCX,
-                source=DocGenSource.TEMPLATE_FILE,
-                filename="invoice.docx",
-                title="Invoice",
-                template_path="/nowhere/invoice.docx",
-                template_resource=BundleResource.make_inline(content=b"docx bytes"),
+                format=DocGenFormat.PDF,
+                source=DocGenSource.HTML,
+                filename="report.pdf",
+                title="Report",
+                html="<p>Report</p>",
+                template_file=_HTML_TEMPLATE_FILE,
             )
 
     def test_a_composition_without_its_payload_is_refused(self) -> None:
@@ -123,5 +127,5 @@ class TestDocumentComposition:
                 filename="report.pdf",
                 title="Report",
                 html="<p>Report</p>",
-                template_path="/nowhere/report.docx",
+                template_file=_OFFICE_TEMPLATE_FILE,
             )

@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from typing import Callable
 
 import pytest
@@ -5,11 +6,10 @@ from pydantic import ValidationError
 from pytest_mock import MockerFixture
 
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.method_trees.tree_files import TreeFileEntry
+from pipelex.core.method_trees.method_file_store import LOCAL_METHOD_FILES, HeldFile
+from pipelex.core.method_trees.tree_bundle import TreeBundle, TreeBundleRef
 from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.stuffs.list_content import ListContent
-from pipelex.interpreter_hub import get_library_manager
-from pipelex.libraries.library_crate import SUBMITTED_PYTHON_ROOT_KEY
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.func import pipe_func as pipe_func_module
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
@@ -43,17 +43,24 @@ def _make_pipe_func(*, output: str = "native.Text") -> PipeFunc:
     return PipeFactory[PipeFunc].make_from_blueprint(domain_code="hosted_test", pipe_code="hosted_pipe", blueprint=blueprint)
 
 
-def _capture_submitted_files(*, library_id: str, files: dict[str, TreeFileEntry] | None, mocker: MockerFixture) -> None:
-    library_manager = get_library_manager()
-    original = library_manager.get_pipe_func_files
+_HOLDER = "test_pipe_func_hosted_mode"
 
-    def get_pipe_func_files(*, library_id: str, root_key: str) -> dict[str, TreeFileEntry] | None:
-        if root_key == SUBMITTED_PYTHON_ROOT_KEY:
-            return files
-        return original(library_id=library_id, root_key=root_key)
 
-    mocker.patch.object(library_manager, "get_pipe_func_files", side_effect=get_pipe_func_files)
-    assert library_id
+@pytest.fixture
+def submit_files() -> Iterator[Callable[[dict[str, str] | None], PipeFunc]]:
+    """Build the step as the library manager builds one parsed from a content string, with these files submitted beside it."""
+
+    def _submit(files: dict[str, str] | None) -> PipeFunc:
+        pipe_func = _make_pipe_func()
+        if files is not None:
+            tree = LOCAL_METHOD_FILES.hold_files(
+                holder=_HOLDER, files={tree_path: HeldFile.of_bytes(data=source.encode("utf-8")) for tree_path, source in files.items()}
+            )
+            pipe_func.place_in_tree(tree_bundle=TreeBundle(tree=tree, tree_path=None))
+        return pipe_func
+
+    yield _submit
+    LOCAL_METHOD_FILES.release(holder=_HOLDER)
 
 
 class TestPipeFuncHostedMode:
@@ -64,21 +71,35 @@ class TestPipeFuncHostedMode:
             with pytest.raises(ValidationError, match="pipelex fix function-names"):
                 PipeFuncBlueprint(description="A flat name", inputs={}, output="native.Text", function_name="compute_totals")
 
-    def test_hosted_validation_reads_the_submitted_files(self, load_empty_library: Callable[[], str], mocker: MockerFixture):
+    def test_hosted_validation_reads_the_submitted_files(
+        self, load_empty_library: Callable[[], str], submit_files: Callable[[dict[str, str] | None], PipeFunc], mocker: MockerFixture
+    ):
         """In sandbox-hosted mode a step parsed from a string is validated from the files submitted with it, never imported."""
-        library_id = load_empty_library()
+        load_empty_library()
         mocker.patch("pipelex.pipe_operators.func.pipe_func.is_pipe_func_sandbox_hosted", return_value=True)
-        _capture_submitted_files(library_id=library_id, files={"sandbox_funcs/totals.py": _SANDBOX_MODULE}, mocker=mocker)
 
-        _make_pipe_func().validate_output_with_library()
+        submit_files({"sandbox_funcs/totals.py": _SANDBOX_MODULE}).validate_output_with_library()
 
-    def test_a_step_proves_its_function_once_however_often_it_is_validated(self, load_empty_library: Callable[[], str], mocker: MockerFixture):
-        """A dependency package's step is validated as it is built and again with its consumer's library: it reads its module once."""
-        library_id = load_empty_library()
+    def test_a_step_built_from_a_crate_is_not_checked_again(self, load_empty_library: Callable[[], str], mocker: MockerFixture):
+        """Its tree is named by digest only: the process that assembled the crate proved the function, and this one reads nothing."""
+        load_empty_library()
         mocker.patch("pipelex.pipe_operators.func.pipe_func.is_pipe_func_sandbox_hosted", return_value=True)
-        _capture_submitted_files(library_id=library_id, files={"sandbox_funcs/totals.py": _SANDBOX_MODULE}, mocker=mocker)
         locate_spy = mocker.spy(pipe_func_module, "locate_in_files")
         pipe_func = _make_pipe_func()
+        pipe_func.place_in_tree(tree_bundle=TreeBundleRef(tree_digest="sha256:" + "d" * 64, tree_path="main.mthds"))
+
+        pipe_func.validate_output_with_library()
+
+        assert locate_spy.call_count == 0
+
+    def test_a_step_proves_its_function_once_however_often_it_is_validated(
+        self, load_empty_library: Callable[[], str], submit_files: Callable[[dict[str, str] | None], PipeFunc], mocker: MockerFixture
+    ):
+        """A dependency package's step is validated as it is built and again with its consumer's library: it reads its module once."""
+        load_empty_library()
+        mocker.patch("pipelex.pipe_operators.func.pipe_func.is_pipe_func_sandbox_hosted", return_value=True)
+        locate_spy = mocker.spy(pipe_func_module, "locate_in_files")
+        pipe_func = submit_files({"sandbox_funcs/totals.py": _SANDBOX_MODULE})
 
         pipe_func.validate_once_built()
         pipe_func.validate_with_libraries()
@@ -96,18 +117,19 @@ class TestPipeFuncHostedMode:
     )
     def test_hosted_validation_refuses_what_the_submitted_files_cannot_prove(
         self,
-        files: dict[str, TreeFileEntry] | None,
+        files: dict[str, str] | None,
         expected_message: str,
         load_empty_library: Callable[[], str],
+        submit_files: Callable[[dict[str, str] | None], PipeFunc],
         mocker: MockerFixture,
     ):
         """A missing module, an unmarked function or a shadowing module is refused at validation, naming the step."""
-        library_id = load_empty_library()
+        load_empty_library()
         mocker.patch("pipelex.pipe_operators.func.pipe_func.is_pipe_func_sandbox_hosted", return_value=True)
-        _capture_submitted_files(library_id=library_id, files=files, mocker=mocker)
+        pipe_func = submit_files(files)
 
         with pytest.raises(PipeValidationError) as raised:
-            _make_pipe_func().validate_output_with_library()
+            pipe_func.validate_output_with_library()
 
         assert raised.value.error_type == PipeValidationErrorType.PIPE_FUNC_FUNCTION_REFUSED
         assert raised.value.pipe_code == "hosted_pipe"

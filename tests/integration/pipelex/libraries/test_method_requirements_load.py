@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from pytest_mock import MockerFixture
 
+from pipelex.core.method_trees.method_file_store import LOCAL_METHOD_FILES
 from pipelex.core.method_trees.tree_python import TREE_PYTHON_HOLD
 from pipelex.interpreter_hub import get_library_manager, get_required_pipe, scoped_current_library
 from pipelex.libraries.exceptions import MethodRequirementsNotMetError, PipeFuncPackageSetUnstatedError
@@ -176,7 +177,10 @@ class TestMethodRequirementsLoad:
                 assert [pipe.code for pipe in pipes] == ["crunch"]
                 crate = library_manager.get_crate(library_id=library_id)
                 assert crate is not None
-                assert any(f"{_MODULE_NAME}.py" in call_files for call_files in crate.pipe_func_files.values())
+                (tree_digest,) = crate.tree_digests()
+                held_tree = LOCAL_METHOD_FILES.held_tree(tree_digest=tree_digest)
+                assert held_tree is not None
+                assert f"{_MODULE_NAME}.py" in held_tree.tree_paths
         finally:
             library_manager.teardown(library_id=library_id)
 

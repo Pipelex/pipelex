@@ -16,7 +16,6 @@ from pipelex.libraries.method_requirements import ensure_served_method_requireme
 from pipelex.methods.structures_check import ensure_no_structured_content_python
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, StorageTarget, WebhookTarget
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
-from pipelex.pipe_run.remote_dispatch import prepare_job_for_remote_dispatch
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
@@ -24,7 +23,6 @@ from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 from pipelex.reporting.usage_records import apply_tokens_usage_wire_shape
 from pipelex.runtime_bridge.exceptions import MissingBundleValidatorError, MissingOrchestratorError
-from pipelex.runtime_bridge.orchestration_mode import DIRECT_ORCHESTRATION_MODE
 from pipelex.runtime_bridge.primitives.hydration import hydrate_working_memory
 from pipelex.runtime_hub import get_bundle_validator_registry, get_orchestrator_registry
 from pipelex.system.environment import get_required_env
@@ -234,18 +232,6 @@ def _pipe_output_from_run_output(run_output: PipelexPipeRunOutput) -> PipeOutput
     )
 
 
-async def _prepare_job_for_dispatch(*, pipe_job: PipeJob, orchestration_mode: str) -> PipeJob:
-    """The job as the mode's orchestrator receives it: prepared to leave this process for every mode but `direct`.
-
-    The files submitted with a bundle travel in the job's crate. An orchestrator other than the in-process `direct`
-    one, such as Temporal, runs the job outside this process, so the files its steps read only when they run move to
-    the run's storage first, dry runs included (`prepare_job_for_remote_dispatch`). A `direct` run keeps them inline.
-    """
-    if orchestration_mode == DIRECT_ORCHESTRATION_MODE:
-        return pipe_job
-    return await prepare_job_for_remote_dispatch(pipe_job=pipe_job)
-
-
 class _OrchestratorPipeRun(PipeRunProtocol):
     """Adapts a mode-selected orchestrator to the `PipeRunProtocol` the base `execute` drives.
 
@@ -266,8 +252,7 @@ class _OrchestratorPipeRun(PipeRunProtocol):
 
     @override
     async def run(self, pipe_job: PipeJob, *, delivery_assignment: DeliveryAssignment | None = None) -> PipeOutput:
-        dispatched_job = await _prepare_job_for_dispatch(pipe_job=pipe_job, orchestration_mode=self._orchestration_mode)
-        run_output = await self._orchestrator.execute(pipe_job=dispatched_job, delivery_assignment=delivery_assignment)
+        run_output = await self._orchestrator.execute(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
         return _pipe_output_from_run_output(run_output)
 
 
@@ -441,7 +426,7 @@ class ApiRunner(PipelexMTHDSProtocol):
             # The packages the request ships, which the base `execute` threads too.
             methods_dirs=self.methods_dirs,
             # The files submitted with the contents, such as a template file, which the base `execute` threads too.
-            bundle_resources=self.bundle_resources,
+            submitted_files=self.submitted_files,
             pipeline_run_id=pipeline_run_id,
             request_id=request_id,
         )
@@ -480,8 +465,7 @@ class ApiRunner(PipelexMTHDSProtocol):
         # `PipelexPipeRunInput` (which carries no request_id / output_multiplicity /
         # dynamic_output_concept_ref and skips run registration + telemetry). `start` genuinely
         # enqueues the job and returns a `PipelexPipeDispatchAck` (ids only) immediately.
-        dispatched_job = await _prepare_job_for_dispatch(pipe_job=pipe_job, orchestration_mode=orchestration_mode)
-        dispatch_ack = await orchestrator.start(pipe_job=dispatched_job, delivery_assignment=delivery_assignment)
+        dispatch_ack = await orchestrator.start(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
 
         return PipelexRunResultStart(
             pipeline_run_id=resolved_pipeline_run_id,
@@ -574,7 +558,7 @@ class ApiRunner(PipelexMTHDSProtocol):
             caller_identity=self.caller_identity,
             graph_pipe_code=graph_pipe_code,
             # The files submitted with the contents, which the validation's dry run reads, the template check included.
-            bundle_resources=self.bundle_resources,
+            submitted_files=self.submitted_files,
         )
         # The core seam types its valid arm at the protocol-level ValidationReport (a leaf type)
         # to stay import-acyclic in core; every registered validator in fact produces the canonical
@@ -945,7 +929,7 @@ async def execute(request: Request) -> JSONResponse:
             extras=extras.analytics_groups,
             library_dirs=source.library_dirs,
             methods_dirs=source.methods_dirs,
-            bundle_resources=decode_bundle_resources(resources=run_request.resources, bundle_files=source.bundle_files),
+            submitted_files=decode_bundle_resources(resources=run_request.resources, bundle_files=source.bundle_files),
         )
         response = await runner.execute(
             pipe_code=source.pipe_code,
@@ -1027,9 +1011,10 @@ async def start(
     run_request, extras = parsed
     scopes = _resolve_run_scopes(request, extras=extras)
     # The run source is materialized only for the synchronous setup phase: `start` builds the
-    # PipeJob (crate carrying the captured `pipe_func_files`) before it enqueues, so the temp dir
-    # (a bundle's, or a fetched package's) is no longer needed once `start` returns — cleanup on
-    # context exit is safe for the async path.
+    # PipeJob before it enqueues, its crate naming each method tree by digest, so the temp dir (a
+    # bundle's, or a fetched package's) is no longer needed once `start` returns — cleanup on context
+    # exit is safe for the async path. The worker reads a tree's files through its own method file
+    # store, which the deployment fills, never from this directory.
     with _run_source(run_request) as source:
         runner = ApiRunner(
             user_id=get_request_user_id(request),
@@ -1038,7 +1023,7 @@ async def start(
             extras=extras.analytics_groups,
             library_dirs=source.library_dirs,
             methods_dirs=source.methods_dirs,
-            bundle_resources=decode_bundle_resources(resources=run_request.resources, bundle_files=source.bundle_files),
+            submitted_files=decode_bundle_resources(resources=run_request.resources, bundle_files=source.bundle_files),
         )
         start_result = await runner.start(
             pipe_code=source.pipe_code,

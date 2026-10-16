@@ -24,7 +24,6 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 
 import pytest
 
-from pipelex.core.bundle_resources.bundle_resource import make_bundle_resources
 from pipelex.core.pipes.pipe_io_artifacts import PipeIOArtifacts
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.caller_identity import CallerIdentity, get_current_caller_identity
@@ -85,8 +84,8 @@ class TestRunnerValidatePlumbing:
         The protocol validation returns a verdict, so it asks the sweep to collect the dry runs' warnings for it.
         """
         env = self._patch_env(mocker, library_ids=[None, "val-lib"])
-        bundle_resources = make_bundle_resources(files={"templates/invoice.docx": b"template"})
-        runner = PipelexMTHDSProtocol(library_dirs=["dir_alpha", "nested/dir_beta"], library_dirs_are_callers=True, bundle_resources=bundle_resources)
+        submitted_files = {"templates/invoice.docx": b"template"}
+        runner = PipelexMTHDSProtocol(library_dirs=["dir_alpha", "nested/dir_beta"], library_dirs_are_callers=True, submitted_files=submitted_files)
 
         await runner.validate(mthds_contents=["bundle-content"], allow_signatures=True)
 
@@ -97,7 +96,7 @@ class TestRunnerValidatePlumbing:
             allow_signatures=True,
             library_dirs_are_callers=True,
             collect_dry_run_warnings=True,
-            bundle_resources=bundle_resources,
+            submitted_files=submitted_files,
         )
 
     async def test_no_library_dirs_passes_none_and_strict_default(self, mocker: MockerFixture) -> None:
@@ -114,7 +113,7 @@ class TestRunnerValidatePlumbing:
             allow_signatures=False,
             library_dirs_are_callers=False,
             collect_dry_run_warnings=True,
-            bundle_resources=None,
+            submitted_files=None,
         )
 
     async def test_validation_runs_with_the_protocols_caller_in_scope(self, mocker: MockerFixture) -> None:

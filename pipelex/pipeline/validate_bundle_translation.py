@@ -19,7 +19,7 @@ from pydantic import ValidationError
 
 from pipelex.base_exceptions import PipelexError, SecurityError, error_domain_is_input
 from pipelex.config import get_config
-from pipelex.core.bundle_resources.exceptions import BundleResourceNotNamedError, BundleResourcesTooLargeError
+from pipelex.core.bundle_resources.exceptions import BundleResourceNotNamedError, BundleResourcePathError
 from pipelex.core.exceptions import DryRunFailureErrorData, PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
 from pipelex.core.pipes.exceptions import (
     PipeFactoryError,
@@ -98,7 +98,7 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
     no verdict, along with the refusals that must keep their own class: ``PipeNotFoundError`` (its
     dedicated not-found handler), a ``SecurityError`` (never absorbed by a domain handler), a
     ``ValidateBundleError`` already produced (never re-wrapped), and a ``BundleResourceNotNamedError`` or a
-    ``BundleResourcesTooLargeError``, which refuse the files submitted with the bundle rather than the bundle.
+    ``BundleResourcePathError``, which refuse the files submitted with the bundle rather than the bundle.
     """
     try:
         yield
@@ -189,7 +189,7 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
             message=model_choice_error.message,
             pipe_validation_errors=[categorize_pipe_operator_model_choice_error(model_choice_error=model_choice_error)],
         ) from model_choice_error
-    except (ValidateBundleError, SecurityError, BundleResourceNotNamedError, BundleResourcesTooLargeError):
+    except (ValidateBundleError, SecurityError, BundleResourceNotNamedError, BundleResourcePathError):
         # All are PipelexErrors the general arm below would otherwise catch. A verdict already produced
         # (e.g. by a nested load) passes through as it is: re-wrapping it would flatten its items into one.
         # A security refusal is never absorbed into a domain answer, verdict included. A file submitted with

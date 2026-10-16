@@ -4,20 +4,30 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from mthds.method_tree.digest import digest_of_contents
+from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import PipelexError, ValidationErrorCategory
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenSource
 from pipelex.cogt.doc_gen.template_check import TemplateFinding, TemplateFindingSeverity
-from pipelex.core.bundle_resources.bundle_resource import BundleResources, make_bundle_resources
 from pipelex.core.bundle_resources.exceptions import BundleResourceNotNamedError
+from pipelex.core.method_trees.exceptions import MethodFileUnavailableError
+from pipelex.core.method_trees.tree_bundle import TreeBundleRef
 from pipelex.core.stuffs.document_content import DocumentContent
+from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
+from pipelex.pipe_operators.doc_gen.template_file_stage import DocGenTemplateFileStage
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.resolve_bundle import resolve_crate_from_contents
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.storage_scope import DRY_RUN_STORAGE_SCOPE, LOCAL_STORAGE_SCOPE
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import METHOD_MANIFEST, StubEngines, WorkerLikePipeRun, write_bundle
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import (
+    METHOD_MANIFEST,
+    RecordingMethodFileStore,
+    StubEngines,
+    WorkerLikePipeRun,
+    write_bundle,
+)
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 _DOCX_TEMPLATE_STEP = 'format = "docx"\ntemplate_file = "templates/invoice.docx"'
@@ -27,8 +37,8 @@ _DOCX_BYTES = b"PK docx template bytes"
 _ESCAPING_DOCX_STEP = 'format = "docx"\ntemplate_file = "../invoice.docx"'
 
 
-def _docx_resources() -> BundleResources:
-    return make_bundle_resources(files={"./templates/invoice.docx": _DOCX_BYTES})
+def _docx_files() -> dict[str, bytes]:
+    return {"./templates/invoice.docx": _DOCX_BYTES}
 
 
 def _bundle_file_climbing_in_its_method_tree(*, method_dir: Path) -> Path:
@@ -40,29 +50,41 @@ def _bundle_file_climbing_in_its_method_tree(*, method_dir: Path) -> Path:
     return write_bundle(directory=method_dir / "bundles", step_fields='format = "docx"\ntemplate_file = "../templates/invoice.docx"', as_method=False)
 
 
-async def _load_from_content(*, load: str, content: str, resources: BundleResources | None) -> None:
+async def _load_from_content(*, load: str, content: str, submitted_files: dict[str, bytes] | None) -> None:
     """Validate the content, resolve its crate or run it, as the runner's routes do with a bundle sent as a string."""
     match load:
         case "validate":
-            await validate_bundle(mthds_contents=[content], bundle_resources=resources)
+            await validate_bundle(mthds_contents=[content], submitted_files=submitted_files)
         case "resolve":
-            resolve_crate_from_contents(mthds_contents=[content], bundle_resources=resources)
+            resolve_crate_from_contents(mthds_contents=[content], submitted_files=submitted_files)
         case _:
-            await PipelexMTHDSProtocol(bundle_resources=resources).execute(mthds_contents=[content], inputs=PipeDocGenTestData.INVOICE_INPUTS)
+            await PipelexMTHDSProtocol(submitted_files=submitted_files).execute(mthds_contents=[content], inputs=PipeDocGenTestData.INVOICE_INPUTS)
 
 
 @pytest.mark.asyncio(loop_scope="class")
-class TestPipeDocGenBundleResources:
+class TestPipeDocGenSubmittedFiles:
     async def test_a_bundle_validates_with_its_template_file_and_the_check_runs_on_its_bytes(self, stub_engines: StubEngines) -> None:
         """The dry run hands the engine's checker the bytes submitted with the bundle, found by the path the step names."""
         await validate_bundle(
             mthds_contents=[PipeDocGenTestData.bundle(step_fields=_DOCX_TEMPLATE_STEP)],
-            bundle_resources=_docx_resources(),
+            submitted_files=_docx_files(),
         )
 
         (request,) = stub_engines.check_requests
         assert request.template == _DOCX_BYTES
         assert request.template_name == "templates/invoice.docx"
+
+    async def test_a_step_naming_its_template_with_a_repeated_slash_reads_the_file_submitted_under_its_one_spelling(
+        self, stub_engines: StubEngines
+    ) -> None:
+        """Blueprint validation accepts `templates//invoice.docx`, so the step finds the file submitted as `templates/invoice.docx`."""
+        await validate_bundle(
+            mthds_contents=[PipeDocGenTestData.bundle(step_fields='format = "docx"\ntemplate_file = "templates//invoice.docx"')],
+            submitted_files={"templates/invoice.docx": _DOCX_BYTES},
+        )
+
+        (request,) = stub_engines.check_requests
+        assert request.template == _DOCX_BYTES
 
     async def test_the_check_s_errors_on_a_submitted_template_fail_the_validation(self, stub_engines: StubEngines) -> None:
         stub_engines.findings = [TemplateFinding(severity=TemplateFindingSeverity.ERROR, message="The tag {{ invoice.totl }} names no field")]
@@ -70,7 +92,7 @@ class TestPipeDocGenBundleResources:
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(
                 mthds_contents=[PipeDocGenTestData.bundle(step_fields=_DOCX_TEMPLATE_STEP)],
-                bundle_resources=_docx_resources(),
+                submitted_files=_docx_files(),
             )
 
         assert "invoice.totl" in str(exc_info.value.to_error_report().model_dump())
@@ -97,10 +119,10 @@ class TestPipeDocGenBundleResources:
         names the field and never repeats the path, rather than a load refusal saying the file was not supplied.
         """
         content = PipeDocGenTestData.bundle(step_fields=f'format = "docx"\ntemplate_file = "{template_file}"')
-        resources = make_bundle_resources(files={"invoice.docx": _DOCX_BYTES}) if sends_a_file else None
+        submitted_files = {"invoice.docx": _DOCX_BYTES} if sends_a_file else None
 
         with pytest.raises(ValidateBundleError) as exc_info:
-            await _load_from_content(load=load, content=content, resources=resources)
+            await _load_from_content(load=load, content=content, submitted_files=submitted_files)
 
         items = exc_info.value.to_error_report().validation_errors
         assert items is not None
@@ -185,10 +207,10 @@ class TestPipeDocGenBundleResources:
 
     @pytest.mark.usefixtures("stub_engines")
     async def test_a_file_no_step_names_is_refused_as_the_request_s_fault_not_as_a_verdict(self) -> None:
-        resources = make_bundle_resources(files={"templates/invoice.docx": _DOCX_BYTES, "templates/logo.png": b"png"})
+        submitted_files = {"templates/invoice.docx": _DOCX_BYTES, "templates/logo.png": b"png"}
 
         with pytest.raises(BundleResourceNotNamedError) as exc_info:
-            await validate_bundle(mthds_contents=[PipeDocGenTestData.bundle(step_fields=_DOCX_TEMPLATE_STEP)], bundle_resources=resources)
+            await validate_bundle(mthds_contents=[PipeDocGenTestData.bundle(step_fields=_DOCX_TEMPLATE_STEP)], submitted_files=submitted_files)
 
         assert "'templates/logo.png'" in exc_info.value.message
 
@@ -198,13 +220,13 @@ class TestPipeDocGenBundleResources:
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(
                 mthds_contents=[PipeDocGenTestData.bundle(step_fields='format = "pdf"\ntemplate_file = "invoice.html"')],
-                bundle_resources=make_bundle_resources(files={"invoice.html": b"<h1>{{ invoice.numbr }}</h1>"}),
+                submitted_files={"invoice.html": b"<h1>{{ invoice.numbr }}</h1>"},
             )
 
         assert "numbr" in str(exc_info.value.to_error_report().model_dump())
 
     async def test_a_run_prints_with_the_submitted_html_template(self, stub_engines: StubEngines) -> None:
-        await PipelexMTHDSProtocol(bundle_resources=make_bundle_resources(files={"invoice.html": b"<h1>{{ invoice.number }}</h1>"})).execute(
+        await PipelexMTHDSProtocol(submitted_files={"invoice.html": b"<h1>{{ invoice.number }}</h1>"}).execute(
             mthds_contents=[PipeDocGenTestData.bundle(step_fields='format = "pdf"\ntemplate_file = "invoice.html"')],
             inputs=PipeDocGenTestData.INVOICE_INPUTS,
         )
@@ -214,7 +236,7 @@ class TestPipeDocGenBundleResources:
         assert job.html == "<h1>INV-2026-0142</h1>"
 
     async def test_a_run_hands_the_engine_the_submitted_template_file(self, stub_engines: StubEngines) -> None:
-        result = await PipelexMTHDSProtocol(bundle_resources=_docx_resources()).execute(
+        result = await PipelexMTHDSProtocol(submitted_files=_docx_files()).execute(
             mthds_contents=[PipeDocGenTestData.bundle(step_fields=_DOCX_TEMPLATE_STEP)],
             inputs=PipeDocGenTestData.INVOICE_INPUTS,
         )
@@ -229,7 +251,7 @@ class TestPipeDocGenBundleResources:
         assert job.data["invoice"]["number"] == "INV-2026-0142"
 
     async def test_a_dry_run_checks_the_submitted_template_file_and_prints_nothing(self, stub_engines: StubEngines) -> None:
-        result = await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, bundle_resources=_docx_resources()).execute(
+        result = await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, submitted_files=_docx_files()).execute(
             mthds_contents=[PipeDocGenTestData.bundle(step_fields=_DOCX_TEMPLATE_STEP)],
             inputs=PipeDocGenTestData.INVOICE_INPUTS,
         )
@@ -241,51 +263,84 @@ class TestPipeDocGenBundleResources:
         assert request.template == _DOCX_BYTES
         assert stub_engines.engine.jobs == []
 
+    @pytest.mark.parametrize("pipe_run_mode", [pytest.param(PipeRunMode.LIVE, id="live"), pytest.param(PipeRunMode.DRY, id="dry")])
     @pytest.mark.parametrize(
-        ("pipe_run_mode", "storage_scope", "is_stored"),
+        ("step_fields", "submitted_files"),
         [
-            pytest.param(PipeRunMode.LIVE, LOCAL_STORAGE_SCOPE, True, id="live"),
-            pytest.param(PipeRunMode.DRY, LOCAL_STORAGE_SCOPE, True, id="dry"),
-            pytest.param(PipeRunMode.DRY, DRY_RUN_STORAGE_SCOPE, False, id="dry_run_placeholder_scope"),
+            pytest.param(_DOCX_TEMPLATE_STEP, {"templates/invoice.docx": _DOCX_BYTES}, id="office"),
+            pytest.param('format = "pdf"\ntemplate_file = "invoice.html"', {"invoice.html": b"<h1>{{ invoice.number }}</h1>"}, id="html"),
         ],
     )
-    async def test_a_run_handed_to_a_remote_worker_reads_its_template_from_the_run_s_storage(
+    async def test_a_run_handed_to_a_remote_worker_reads_its_template_through_the_method_file_store(
         self,
         stub_engines: StubEngines,
         remote_worker: WorkerLikePipeRun,
+        recording_store: RecordingMethodFileStore,
+        mocker: MockerFixture,
         pipe_run_mode: PipeRunMode,
-        storage_scope: str,
-        is_stored: bool,
+        step_fields: str,
+        submitted_files: dict[str, bytes],
     ) -> None:
-        """The job leaves the process carrying a reference, and the worker's step reads the stored bytes, to print or to check.
+        """The crate names the step's tree by digest and carries none of its files, and the print stage reads the template under the run's read scope.
 
-        A run whose storage scope is the dry-run placeholder stores nothing, so its template travels inline.
+        An HTML template file is rendered there too, a dry print included, with the step's data typed by the run's crate.
         """
-        await PipelexMTHDSProtocol(pipe_run_mode=pipe_run_mode, storage_scope=storage_scope, bundle_resources=_docx_resources()).execute(
-            mthds_contents=[PipeDocGenTestData.bundle(step_fields=_DOCX_TEMPLATE_STEP)],
+        remote_worker.worker_read_scope = "acme/runs"
+        render_spy = mocker.spy(DocGenTemplateFileStage, "render_html_template_file")
+
+        await PipelexMTHDSProtocol(pipe_run_mode=pipe_run_mode, submitted_files=submitted_files).execute(
+            mthds_contents=[PipeDocGenTestData.bundle(step_fields=step_fields)],
             inputs=PipeDocGenTestData.INVOICE_INPUTS,
         )
 
         (received_crate,) = remote_worker.received_crates
-        received = received_crate.bundle_resources["templates/invoice.docx"]
-        assert (received.uri is not None) == is_stored
-        assert received.is_inline != is_stored
-        templates_read = [request.template for request in stub_engines.check_requests] + [job.template for job in stub_engines.engine.jobs]
-        assert templates_read == [_DOCX_BYTES]
+        assert received_crate.tree_bundles["doc_gen_tests.print_invoice"] == TreeBundleRef(
+            tree_digest=digest_of_contents(submitted_files), tree_path=None
+        )
+        assert "invoice.number }}" not in received_crate.model_dump_json()
+        # The worker's step, built from the crate, read no file: its compose stage names the template, and its print reads it.
+        (worker_pipe,) = remote_worker.worker_pipes
+        assert isinstance(worker_pipe, PipeDocGen)
+        assert worker_pipe.template_file_text is None
+        # An HTML template's print receives the stuffs the step's inputs name and the run's concepts, none of its pipes.
+        for render_call in render_spy.call_args_list:
+            render_context = render_call.kwargs["template_file"].render_context
+            assert set(render_context.working_memory_raw["root"]) == {"invoice"}
+            assert render_context.concepts_crate["pipes"] == {}
+            assert "doc_gen_tests.Invoice" in render_context.concepts_crate["concepts"]
+            assert render_context.crate_fingerprint == received_crate.fingerprint
+        assert recording_store.read_scopes
+        assert set(recording_store.read_scopes) == {"acme/runs"}
+        match (pipe_run_mode, step_fields):
+            case (PipeRunMode.LIVE, 'format = "docx"\ntemplate_file = "templates/invoice.docx"'):
+                assert [job.template for job in stub_engines.engine.jobs] == [_DOCX_BYTES]
+                assert render_spy.call_count == 0
+            case (PipeRunMode.DRY, 'format = "docx"\ntemplate_file = "templates/invoice.docx"'):
+                assert [request.template for request in stub_engines.check_requests] == [_DOCX_BYTES]
+                assert stub_engines.engine.jobs == []
+                assert render_spy.call_count == 0
+            case (PipeRunMode.LIVE, _):
+                assert [job.html for job in stub_engines.engine.jobs] == ["<h1>INV-2026-0142</h1>"]
+                assert render_spy.call_count == 1
+            case (PipeRunMode.DRY, _):
+                assert stub_engines.engine.jobs == []
+                assert render_spy.call_count == 1
 
-    async def test_a_worker_reads_no_stored_template_outside_the_run_s_read_scope_even_to_check_it(
-        self, stub_engines: StubEngines, remote_worker: WorkerLikePipeRun
+    async def test_a_template_file_the_store_does_not_serve_fails_the_print_naming_it(
+        self, stub_engines: StubEngines, remote_worker: WorkerLikePipeRun, recording_store: RecordingMethodFileStore
     ) -> None:
-        """The dry run's template check reads a stored template under the run's read scope, as the print stage does."""
-        remote_worker.worker_read_scope = "another-tenant"
+        """A worker whose store serves no file of the step's tree cannot print, and says which file by its tree path, not a host path."""
+        recording_store.refuses = True
 
         with pytest.raises(PipelexError) as exc_info:
-            await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, bundle_resources=_docx_resources()).execute(
+            await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, submitted_files=_docx_files()).execute(
                 mthds_contents=[PipeDocGenTestData.bundle(step_fields=_DOCX_TEMPLATE_STEP)],
                 inputs=PipeDocGenTestData.INVOICE_INPUTS,
             )
 
-        assert "Refused to read the template file 'templates/invoice.docx'" in str(exc_info.value.to_error_report().model_dump())
+        assert remote_worker.received_crates
+        report = str(exc_info.value.to_error_report().model_dump())
+        assert MethodFileUnavailableError.__name__ in report
         assert stub_engines.check_requests == []
 
     @pytest.mark.parametrize(
@@ -358,8 +413,7 @@ class TestPipeDocGenBundleResources:
     ) -> None:
         """A host library's step and a submitted step naming the same template path each read their own file, here and on a worker.
 
-        A worker's library holds the crate's submitted files before it builds any pipe, the host library's included,
-        so the host step must not take the submitted file for its own there either.
+        The crate names each step's tree by digest, so on a worker too each step's print reads the file of its own tree.
         """
         host_dir = tmp_path / "host"
         host_dir.mkdir()
@@ -368,7 +422,7 @@ class TestPipeDocGenBundleResources:
             PipeDocGenTestData.bundle(step_fields=step_fields).replace("doc_gen_tests", "doc_gen_host"), encoding="utf-8"
         )
         (host_dir / "invoice.docx").write_bytes(b"host template")
-        submitted = make_bundle_resources(files={"invoice.docx": b"submitted template"})
+        submitted = {"invoice.docx": b"submitted template"}
         host_inputs: dict[str, Any] = {"invoice": {**PipeDocGenTestData.INVOICE_INPUTS["invoice"], "concept": "doc_gen_host.Invoice"}}
         runs: list[tuple[str, dict[str, Any]]] = [
             ("doc_gen_host.print_invoice", host_inputs),
@@ -379,7 +433,7 @@ class TestPipeDocGenBundleResources:
             request.getfixturevalue("remote_worker")
 
         for pipe_code, inputs in runs:
-            await PipelexMTHDSProtocol(library_dirs=[str(host_dir)], bundle_resources=submitted).execute(
+            await PipelexMTHDSProtocol(library_dirs=[str(host_dir)], submitted_files=submitted).execute(
                 pipe_code=pipe_code,
                 mthds_contents=[PipeDocGenTestData.bundle(step_fields=step_fields)],
                 inputs=inputs,

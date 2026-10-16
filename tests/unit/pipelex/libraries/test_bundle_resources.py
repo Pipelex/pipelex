@@ -1,22 +1,12 @@
-import mimetypes
 import re
 
 import pytest
-from pytest_mock import MockerFixture
 
-from pipelex.core.bundle_resources.bundle_resource import MAX_LOAD_STAGE_RESOURCES_BYTES, BundleResourceReadStage, make_bundle_resources
-from pipelex.core.bundle_resources.exceptions import BundleResourceNotNamedError, BundleResourcesTooLargeError
-from pipelex.libraries.bundle_resources import (
-    BUNDLE_RESOURCES_STORAGE_PREFIX,
-    bundle_resource_reads,
-    check_bundle_resources,
-    relocate_run_resources,
-)
-from pipelex.libraries.library_crate import LibraryCrate
+from pipelex.core.bundle_resources.exceptions import BundleResourceNotNamedError
+from pipelex.libraries.bundle_resources import check_submitted_files, named_bundle_files
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 
 _BUNDLE = """
 domain = "bundle_resources_tests"
@@ -47,140 +37,29 @@ template_file = "summary.html"
 """
 
 
-# A template file whose own name the hosted plane would refuse to serve: a letter outside ASCII and inner dots.
-_UNSAFE_NAME_BUNDLE = """
-domain = "bundle_resources_tests"
-main_pipe = "print_review"
-
-[concept.Review]
-description = "A review"
-
-[pipe.print_review]
-type          = "PipeDocGen"
-description   = "Print the review in Word"
-inputs        = { review = "Review" }
-output        = "Document"
-format        = "docx"
-template_file = "templates/Modèle trimestriel.v2.docx"
-"""
-
-# The hosted platform's grammar for the last segment of a `pipelex-storage://` URI, copied from `_SEGMENT_PATTERN` and
-# `_EXTENSION_PATTERN` in pipelex-server's `shared/src/pipelex_shared/domain/storage/storage_uri.py` (`parse_storage_uri`).
-_HOSTED_STEM_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
-_HOSTED_EXTENSION_PATTERN = re.compile(r"^[A-Za-z0-9]+$")
-
-_DOCX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-
-
 def _blueprint() -> PipelexBundleBlueprint:
     return MthdsParser.make_pipelex_bundle_blueprint(mthds_content=_BUNDLE)
 
 
-class TestBundleResources:
-    def test_each_named_file_is_keyed_by_its_canonical_path_with_when_it_is_read(self) -> None:
-        """An office template is read when its step runs, an HTML template when the method loads."""
-        reads = bundle_resource_reads(pipe_blueprints=(_blueprint().pipe or {}).values())
+class TestSubmittedFiles:
+    def test_each_named_file_is_keyed_by_its_canonical_path(self) -> None:
+        named = named_bundle_files(pipe_blueprints=(_blueprint().pipe or {}).values())
 
-        assert reads == {"templates/report.docx": BundleResourceReadStage.RUN, "summary.html": BundleResourceReadStage.LOAD}
+        assert named == {"templates/report.docx", "summary.html"}
 
     def test_files_the_steps_name_pass_whatever_their_spelling(self) -> None:
-        resources = make_bundle_resources(files={"templates/report.docx": b"docx", "./summary.html": b"<h1></h1>"})
-
-        check_bundle_resources(blueprints=[_blueprint()], bundle_resources=resources)
+        check_submitted_files(blueprints=[_blueprint()], submitted_files={"templates//report.docx": b"docx", "./summary.html": b"<h1></h1>"})
 
     def test_a_file_no_step_names_is_refused_naming_it(self) -> None:
-        resources = make_bundle_resources(files={"templates/report.docx": b"docx", "report.docx": b"docx", "logo.png": b"png"})
+        with pytest.raises(BundleResourceNotNamedError, match=re.escape("'templates/other.docx'")):
+            check_submitted_files(blueprints=[_blueprint()], submitted_files={"templates/other.docx": b"docx"})
 
-        with pytest.raises(BundleResourceNotNamedError) as exc_info:
-            check_bundle_resources(blueprints=[_blueprint()], bundle_resources=resources)
+    def test_no_file_submitted_is_no_refusal(self) -> None:
+        check_submitted_files(blueprints=[_blueprint()], submitted_files={})
 
-        assert "'logo.png', 'report.docx'" in exc_info.value.message
-        assert "templates/report.docx" not in exc_info.value.message
+    def test_a_bundle_in_no_tree_names_none_in_its_crate(self) -> None:
+        """A bundle parsed from a string with no file submitted beside it belongs to no tree."""
+        crate = LibraryCrateFactory.make_from_blueprints(blueprints=[_blueprint()])
 
-    def test_files_read_at_load_over_the_bound_are_refused_naming_them_and_the_limit(self) -> None:
-        """An HTML template travels inline with the method wherever it runs, so its size is bounded when the bundle loads."""
-        resources = make_bundle_resources(files={"summary.html": b"x" * (MAX_LOAD_STAGE_RESOURCES_BYTES + 1)})
-
-        with pytest.raises(BundleResourcesTooLargeError) as exc_info:
-            check_bundle_resources(blueprints=[_blueprint()], bundle_resources=resources)
-
-        assert "('summary.html')" in exc_info.value.message
-        assert f"{MAX_LOAD_STAGE_RESOURCES_BYTES // 1024} KiB limit" in exc_info.value.message
-
-    def test_a_file_read_when_its_step_runs_is_not_bounded_by_the_load_stage_limit(self) -> None:
-        """An office template moves to the run's storage before the run leaves the process, so only the request bounds it."""
-        resources = make_bundle_resources(
-            files={"templates/report.docx": b"x" * (MAX_LOAD_STAGE_RESOURCES_BYTES + 1), "summary.html": b"<h1></h1>"},
-        )
-
-        check_bundle_resources(blueprints=[_blueprint()], bundle_resources=resources)
-
-    @pytest.mark.asyncio
-    async def test_a_file_read_when_its_step_runs_is_stored_and_carried_by_reference(self) -> None:
-        """The office template moves to the run's storage; the HTML template, read at load, stays inline."""
-        storage_provider = InMemoryStorageProvider()
-        resources = make_bundle_resources(files={"templates/report.docx": b"docx bytes", "summary.html": b"<h1></h1>"})
-        crate = LibraryCrateFactory.make_from_blueprints([_blueprint()], bundle_resources=resources)
-
-        relocated = await relocate_run_resources(crate=crate, storage_provider=storage_provider, storage_scope="org/method/run")
-
-        stored = relocated.bundle_resources["templates/report.docx"]
-        assert stored.uri == f"pipelex-storage://org/method/run/{BUNDLE_RESOURCES_STORAGE_PREFIX}/{stored.sha256}/report.docx"
-        assert stored.content_b64 is None
-        assert await stored.read_bytes(storage_provider=storage_provider) == b"docx bytes"
-        assert relocated.bundle_resources["summary.html"].is_inline
-        # The crate the run was built from is left as it was.
-        assert crate.bundle_resources["templates/report.docx"].is_inline
-        assert relocated.fingerprint == crate.fingerprint
-
-    @pytest.mark.asyncio
-    async def test_a_stored_office_template_carries_its_office_content_type(self, mocker: MockerFixture) -> None:
-        """Named in code, so a host whose `mimetypes` table knows no `.docx` does not leave it `binary/octet-stream`."""
-        mocker.patch.object(mimetypes, "guess_type", return_value=(None, None))
-        store_spy = mocker.spy(InMemoryStorageProvider, "store")
-        resources = make_bundle_resources(files={"templates/report.docx": b"docx bytes", "summary.html": b"<h1></h1>"})
-        crate = LibraryCrateFactory.make_from_blueprints([_blueprint()], bundle_resources=resources)
-
-        await relocate_run_resources(crate=crate, storage_provider=InMemoryStorageProvider(), storage_scope="org/method/run")
-
-        assert store_spy.call_count == 1
-        assert store_spy.call_args.kwargs["content_type"] == _DOCX_MIME_TYPE
-
-    @pytest.mark.asyncio
-    async def test_a_template_whose_name_is_not_path_safe_is_stored_under_one_that_is(self) -> None:
-        """The key's last segment is one the hosted plane serves; the step still finds the file by the path it names."""
-        storage_provider = InMemoryStorageProvider()
-        template_path = "templates/Modèle trimestriel.v2.docx"
-        blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=_UNSAFE_NAME_BUNDLE)
-        resources = make_bundle_resources(files={template_path: b"docx bytes"})
-        crate = LibraryCrateFactory.make_from_blueprints([blueprint], bundle_resources=resources)
-
-        relocated = await relocate_run_resources(crate=crate, storage_provider=storage_provider, storage_scope="org/method/run")
-
-        stored = relocated.bundle_resources[template_path]
-        stored_uri = stored.uri
-        assert stored_uri is not None
-        assert stored_uri == f"pipelex-storage://org/method/run/{BUNDLE_RESOURCES_STORAGE_PREFIX}/{stored.sha256}/Modele-trimestriel-v2.docx"
-        stem, extension = stored_uri.rsplit("/", 1)[1].rsplit(".", 1)
-        assert _HOSTED_STEM_PATTERN.match(stem)
-        assert _HOSTED_EXTENSION_PATTERN.match(extension)
-        assert await stored.read_bytes(storage_provider=storage_provider) == b"docx bytes"
-
-    @pytest.mark.asyncio
-    async def test_a_crate_without_resources_is_returned_as_it_is(self) -> None:
-        crate = LibraryCrateFactory.make_from_blueprints([_blueprint()])
-
-        relocated = await relocate_run_resources(crate=crate, storage_provider=InMemoryStorageProvider(), storage_scope="run")
-
-        assert relocated is crate
-
-    def test_resources_round_trip_and_stay_out_of_the_fingerprint(self) -> None:
-        """Like the files a PipeFunc call receives, the files travel with the crate but are not part of its structure."""
-        resources = make_bundle_resources(files={"templates/report.docx": b"docx bytes"})
-        bare = LibraryCrateFactory.make_from_blueprints([_blueprint()])
-        with_resources = LibraryCrateFactory.make_from_blueprints([_blueprint()], bundle_resources=resources)
-
-        restored = LibraryCrate.model_validate_json(with_resources.model_dump_json())
-
-        assert restored.bundle_resources == resources
-        assert bare.fingerprint == with_resources.fingerprint
+        assert crate.tree_bundles == {}
+        assert crate.tree_digests() == []

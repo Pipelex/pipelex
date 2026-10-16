@@ -1,10 +1,13 @@
 from pathlib import Path
 
 import pytest
+from mthds.method_tree.models import MethodTree
+from pytest_mock import MockerFixture
 
 from pipelex.cogt.doc_gen.input_shape import InputShapeKind
 from pipelex.cogt.doc_gen.template_check import TemplateFinding, TemplateFindingSeverity
-from pipelex.core.bundle_resources.bundle_resource import make_bundle_resources
+from pipelex.core.method_trees.method_file_store import LOCAL_METHOD_FILES
+from pipelex.core.method_trees.tree_bundle import MethodFileRef
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import ValidateBundleResult, validate_bundle
@@ -24,7 +27,7 @@ async def _validate_with_html_template_file(*, directory: Path, load: str, templ
         case _:
             return await validate_bundle(
                 mthds_contents=[PipeDocGenTestData.bundle(step_fields=step_fields)],
-                bundle_resources=make_bundle_resources(files={"invoice.html": template_bytes}),
+                submitted_files={"invoice.html": template_bytes},
             )
 
 
@@ -72,7 +75,10 @@ class TestPipeDocGenTemplateFiles:
 
         (pipe,) = result.pipes
         assert isinstance(pipe, PipeDocGen)
-        assert pipe.template == "<h1>{{ invoice.number }}</h1>"
+        assert pipe.template is None
+        assert pipe.template_file_text == "<h1>{{ invoice.number }}</h1>"
+        assert isinstance(pipe.template_file_ref, MethodFileRef)
+        assert pipe.template_file_ref.tree_path == "templates/invoice.html"
 
     @pytest.mark.usefixtures("stub_engines")
     async def test_a_bundle_file_named_alone_reads_no_file_beside_it(self, tmp_path: Path) -> None:
@@ -126,6 +132,26 @@ class TestPipeDocGenTemplateFiles:
         assert "could not read the template file 'invoice.html' as UTF-8 text" in str(exc_info.value.to_error_report().model_dump())
 
     @pytest.mark.usefixtures("stub_engines")
+    async def test_an_html_template_file_changed_after_its_tree_was_listed_is_refused_not_read_from_disk(
+        self, tmp_path: Path, mocker: MockerFixture
+    ) -> None:
+        """The load reads the file as its tree's listing recorded it, or not at all: bytes changed since are never read unchecked."""
+        (tmp_path / "invoice.html").write_bytes(b"<h1>{{ invoice.number }}</h1>")
+        bundle_path = write_bundle(directory=tmp_path, step_fields='format = "pdf"\ntemplate_file = "invoice.html"')
+        hold_tree = LOCAL_METHOD_FILES.hold_tree
+
+        def hold_then_change(*, holder: str, tree: MethodTree) -> None:
+            hold_tree(holder=holder, tree=tree)
+            (tmp_path / "invoice.html").write_bytes(b"<h1>{{ invoice.customer }}</h1>")
+
+        mocker.patch.object(LOCAL_METHOD_FILES, "hold_tree", side_effect=hold_then_change)
+
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_file_path=bundle_path)
+
+        assert "could not read the template file 'invoice.html' as its method tree listed it" in str(exc_info.value.to_error_report().model_dump())
+
+    @pytest.mark.usefixtures("stub_engines")
     @pytest.mark.parametrize("load", ["from_its_directory", "from_content"])
     async def test_an_html_template_file_reads_the_same_whichever_way_its_bundle_loads(self, tmp_path: Path, load: str) -> None:
         """The step holds the file's text as written, its line endings included, read from disk as from the submitted bytes."""
@@ -135,7 +161,7 @@ class TestPipeDocGenTemplateFiles:
 
         (pipe,) = result.pipes
         assert isinstance(pipe, PipeDocGen)
-        assert pipe.template == template_bytes.decode("utf-8")
+        assert pipe.template_file_text == template_bytes.decode("utf-8")
 
     async def test_the_engine_s_checker_findings_fail_the_dry_run(self, tmp_path: Path, stub_engines: StubEngines) -> None:
         """The dry run hands the checker the file's bytes, the inputs' shapes and the mock data, and an error finding fails it."""

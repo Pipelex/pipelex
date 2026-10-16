@@ -32,7 +32,6 @@ from mthds.method_tree.exceptions import MethodTreeRefusedError
 from mthds.method_tree.models import MethodTree
 from mthds.method_tree.python_modules import locate_function
 
-from pipelex.core.method_trees.tree_files import TreeFileEntry, tree_file_bytes
 from pipelex.core.method_trees.tree_python import TREE_PYTHON_HOLD, import_held_tree_module
 from pipelex.pipe_operators.func.exceptions import PipeFuncFunctionError
 from pipelex.pipe_operators.func.function_name import split_function_name
@@ -50,13 +49,13 @@ class PipeFuncModuleSource(NamedTuple):
     source: str
 
 
-def locate_in_tree(*, function_name: str, tree: MethodTree, files: Mapping[str, TreeFileEntry] | None = None) -> PipeFuncModuleSource:
+def locate_in_tree(*, function_name: str, tree: MethodTree, files: Mapping[str, bytes] | None = None) -> PipeFuncModuleSource:
     """Locate the module of a `function_name` among a method tree's files, and read it.
 
     Args:
         function_name: The step's `function_name`.
         tree: The method tree the step's bundle is a member of.
-        files: The tree's files as captured for a call, read in place of the disk when given.
+        files: The tree's files by tree path, read in place of the disk when given.
 
     Raises:
         PipeFuncFunctionError: The tree holds no such module, or holds it twice.
@@ -68,7 +67,7 @@ def locate_in_tree(*, function_name: str, tree: MethodTree, files: Mapping[str, 
         raise PipeFuncFunctionError(str(exc)) from exc
     source_bytes: bytes
     if files is not None and location.module in files:
-        source_bytes = tree_file_bytes(entry=files[location.module])
+        source_bytes = files[location.module]
     else:
         source_bytes = tree.file_location(location.module).read_bytes()
     return PipeFuncModuleSource(
@@ -79,13 +78,13 @@ def locate_in_tree(*, function_name: str, tree: MethodTree, files: Mapping[str, 
     )
 
 
-def locate_in_files(*, function_name: str, files: Mapping[str, TreeFileEntry]) -> PipeFuncModuleSource:
+def locate_in_files(*, function_name: str, files: Mapping[str, bytes]) -> PipeFuncModuleSource:
     """Locate the module of a `function_name` among submitted files keyed by their path from the import root, and read it.
 
     Raises:
         PipeFuncFunctionError: The files hold no such module, or hold it twice.
     """
-    contents = {tree_path: tree_file_bytes(entry=entry) for tree_path, entry in files.items()}
+    contents = dict(files)
     tree = MethodTree(files=tree_files_from_contents(contents), digest=digest_of_contents(contents))
     return locate_in_tree(function_name=function_name, tree=tree, files=files)
 

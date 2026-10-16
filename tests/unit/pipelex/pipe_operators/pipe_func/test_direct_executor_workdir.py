@@ -1,4 +1,6 @@
 import sys
+from collections.abc import Generator
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -8,10 +10,12 @@ from pytest_mock import MockerFixture
 from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.method_trees.method_file_store import LOCAL_METHOD_FILES, HeldFile
+from pipelex.core.method_trees.tree_files import write_call_files
 from pipelex.interpreter_hub import get_library_manager, scoped_current_library, set_current_library
 from pipelex.libraries.library_crate import LibraryCrate
-from pipelex.pipe_operators.func import direct_pipe_func_executor
-from pipelex.pipe_operators.func.direct_pipe_func_executor import DirectPipeFuncExecutor
+from pipelex.libraries.pipe_func_call_files import read_pipe_func_call_files
+from pipelex.pipe_operators.func.direct_pipe_func_executor import TRANSPORTED_LIBRARY_ID, DirectPipeFuncExecutor
 from pipelex.pipe_operators.func.pipe_func_execution_dtos import PipeFuncExecutionRequest, PipeFuncExecutionResponse
 from pipelex.pipe_operators.func.pipe_func_execution_transport import build_pipe_func_execution_request
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
@@ -61,10 +65,25 @@ def _dry_run_params() -> PipeRunParams:
     return PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=10, batch_max_concurrency=None)
 
 
-def _missing_pipe_request(*, files: dict[str, str]) -> PipeFuncExecutionRequest:
+_HOLDER = "test_direct_executor_workdir"
+
+
+@contextmanager
+def _held_call_files(*, files: dict[str, str]) -> Generator[str, None, None]:
+    """Hold a tree of these files in the local method file store, as the library that built a call does, and name it by digest."""
+    tree = LOCAL_METHOD_FILES.hold_files(
+        holder=_HOLDER, files={tree_path: HeldFile.of_bytes(data=source.encode("utf-8")) for tree_path, source in files.items()}
+    )
+    try:
+        yield tree.digest
+    finally:
+        LOCAL_METHOD_FILES.release(holder=_HOLDER)
+
+
+def _missing_pipe_request(*, tree_digest: str) -> PipeFuncExecutionRequest:
     return PipeFuncExecutionRequest(
         crate=LibraryCrate(),
-        files=dict(files),
+        tree_digest=tree_digest,
         working_memory_raw={},
         pipe_code="missing_pipe",
         function_name="missing_funcs.missing_func",
@@ -74,7 +93,7 @@ def _missing_pipe_request(*, files: dict[str, str]) -> PipeFuncExecutionRequest:
 
 
 async def _run_transported(*, request: PipeFuncExecutionRequest, tree_root: Path | None = None) -> PipeFuncExecutionResponse:
-    library_id = direct_pipe_func_executor._TRANSPORTED_LIBRARY_ID  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+    library_id = TRANSPORTED_LIBRARY_ID
     with scoped_current_library(library_id=library_id):
         try:
             if tree_root is None:
@@ -84,8 +103,13 @@ async def _run_transported(*, request: PipeFuncExecutionRequest, tree_root: Path
             get_library_manager().teardown(library_id=library_id)
 
 
-def _greet_request(*, tmp_path: Path) -> PipeFuncExecutionRequest:
-    """The request a sandbox-hosted deployment builds for the greet step of a method folder holding its Python."""
+@contextmanager
+def _greet_request(*, tmp_path: Path) -> Generator[PipeFuncExecutionRequest, None, None]:
+    """The request a sandbox-hosted deployment builds for the greet step of a method folder holding its Python.
+
+    The library that built it stays open while the call runs, as a run's library does: it holds the method's tree, whose
+    files the call reads through the method file store.
+    """
     method_dir = tmp_path / "greet_method"
     (method_dir / "greet_demo_funcs").mkdir(parents=True)
     (method_dir / "greet.mthds").write_text(_GREET_MTHDS, encoding="utf-8")
@@ -101,7 +125,7 @@ def _greet_request(*, tmp_path: Path) -> PipeFuncExecutionRequest:
         set_current_library(library_id=build_library_id)
         try:
             library_manager.load_libraries(library_id=build_library_id, library_dirs=[method_dir])
-            return build_pipe_func_execution_request(
+            yield build_pipe_func_execution_request(
                 job_metadata=_job_metadata(),
                 # Qualified, as PipeFunc sends it: the transported library is keyed by pipe_ref and its lookup is strict.
                 pipe_code="greet_demo.greet",
@@ -123,8 +147,8 @@ class TestDirectExecutorWorkdir:
         workdir.mkdir()
         mocker.patch("tempfile.mkdtemp", return_value=str(workdir))
 
-        with pytest.raises((PipelexError, ValidationError)):
-            await _run_transported(request=_missing_pipe_request(files={"missing_funcs.py": "x = 1\n"}))
+        with _held_call_files(files={"missing_funcs.py": "x = 1\n"}) as tree_digest, pytest.raises((PipelexError, ValidationError)):
+            await _run_transported(request=_missing_pipe_request(tree_digest=tree_digest))
 
         assert not workdir.exists()
 
@@ -135,8 +159,8 @@ class TestDirectExecutorWorkdir:
         workdir.mkdir()
         mocker.patch("tempfile.mkdtemp", return_value=str(workdir))
 
-        with pytest.raises((PipelexError, ValidationError)):
-            await _run_transported(request=_missing_pipe_request(files={"missing_funcs/helpers.py": "x = 1\n"}))
+        with _held_call_files(files={"missing_funcs/helpers.py": "x = 1\n"}) as tree_digest, pytest.raises((PipelexError, ValidationError)):
+            await _run_transported(request=_missing_pipe_request(tree_digest=tree_digest))
 
         stale_entries = [entry for entry in sys.path if Path(entry).is_relative_to(workdir)]
         assert stale_entries == []
@@ -150,8 +174,8 @@ class TestDirectExecutorWorkdir:
         linked_workdir.symlink_to(real_workdir, target_is_directory=True)
         mocker.patch("tempfile.mkdtemp", return_value=str(linked_workdir))
 
-        with pytest.raises((PipelexError, ValidationError)):
-            await _run_transported(request=_missing_pipe_request(files={"missing_funcs/probe.py": "x = 1\n"}))
+        with _held_call_files(files={"missing_funcs/probe.py": "x = 1\n"}) as tree_digest, pytest.raises((PipelexError, ValidationError)):
+            await _run_transported(request=_missing_pipe_request(tree_digest=tree_digest))
 
         stale_entries = [entry for entry in sys.path if Path(entry).is_relative_to(real_workdir) or Path(entry).is_relative_to(linked_workdir)]
         assert stale_entries == []
@@ -160,15 +184,17 @@ class TestDirectExecutorWorkdir:
     async def test_transported_run_imports_by_import_path_and_generates_concept_structures(self, tmp_path: Path):
         """A PipeFunc that imports a sibling module and its output concept's structure runs in the box.
 
-        The call carries every file of the step's tree but the bundles: the function's module and the module it imports
-        travel at their tree paths, and the box regenerates `structures.py` from the crate's concepts, so the method
-        ships no copy of it that could drift from the .mthds.
+        The call names the step's tree by digest and its files are read through the method file store, every one but
+        the bundles: the function's module and the module it imports are written at their tree paths, and the box
+        regenerates `structures.py` from the crate's concepts, so the method ships no copy of it that could drift from
+        the .mthds.
         """
-        request = _greet_request(tmp_path=tmp_path)
-        assert sorted(request.files) == ["greet_demo_funcs/greeting.py", "greet_demo_funcs/wording.py"]
-        assert request.crate.pipe_func_files == {}
+        with _greet_request(tmp_path=tmp_path) as request:
+            assert request.tree_digest is not None
+            call_files = await read_pipe_func_call_files(tree_digest=request.tree_digest, read_scope=None)
+            assert sorted(call_files) == ["greet_demo_funcs/greeting.py", "greet_demo_funcs/wording.py"]
 
-        response = await _run_transported(request=request)
+            response = await _run_transported(request=request)
 
         assert response.function_module == "greet_demo_funcs.greeting"
         assert response.function_qualname == "greet_it"
@@ -177,15 +203,13 @@ class TestDirectExecutorWorkdir:
     @pytest.mark.asyncio
     async def test_transported_run_at_a_root_the_client_filled(self, tmp_path: Path):
         """A sandbox client may unpack the call's files itself and hand the directory over; nothing is written beside them."""
-        request = _greet_request(tmp_path=tmp_path)
         tree_root = (tmp_path / "unpacked").resolve()
-        for tree_path, entry in request.files.items():
-            target = tree_root.joinpath(*tree_path.split("/"))
-            target.parent.mkdir(parents=True, exist_ok=True)
-            assert isinstance(entry, str)
-            target.write_text(entry, encoding="utf-8")
+        tree_root.mkdir()
+        with _greet_request(tmp_path=tmp_path) as request:
+            assert request.tree_digest is not None
+            write_call_files(files=await read_pipe_func_call_files(tree_digest=request.tree_digest, read_scope=None), destination=tree_root)
 
-        response = await _run_transported(request=request.model_copy(update={"files": {}}), tree_root=tree_root)
+            response = await _run_transported(request=request, tree_root=tree_root)
 
         assert response.function_qualname == "greet_it"
         assert (tree_root / "structures.py").is_file()

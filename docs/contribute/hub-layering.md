@@ -40,6 +40,7 @@ There is deliberately **no** `pipelex.hub`. It was deleted rather than kept as a
 | secrets | `get_secrets_provider`, `get_secret` |
 | system registries | `get_class_registry` |
 | storage | `get_storage_provider` |
+| method files | `get_method_file_store`, `get_template_file_stage` |
 | telemetry | `get_telemetry_manager`, `get_otel_tracer` |
 | models | `get_models_manager`, `get_model_deck`, `get_sdk_client_manager` |
 | inference | `get_inference_manager`, `get_llm_worker`, `get_img_gen_worker`, `get_extract_worker` |
@@ -62,7 +63,7 @@ There is deliberately **no** `pipelex.hub`. It was deleted rather than kept as a
 | current-library contextvar | `set_current_library`, `get_current_library`, `get_current_library_id_or_none`, `clear_current_library`, `scoped_current_library` |
 | library dirs | `resolve_library_dirs`, `get_default_library_dirs` |
 | pipe router | `get_pipe_router`, `set_pipe_router`, `teardown_current_pipe_router`, `scoped_pipe_router` |
-| run | `get_pipe_run`, `does_pipe_run_leave_process`, `get_pipeline_manager`, `get_pipeline` |
+| run | `get_pipe_run`, `get_pipeline_manager`, `get_pipeline` |
 | pipe func | `get_pipe_func_executor`, `scoped_pipe_func_executor`, `get_pipe_func_executor_registry`, `get_pipe_func_package_offer_registry` |
 
 Setters follow their getters onto the matching container.
@@ -230,6 +231,10 @@ so `concept.py` cannot import `runtime_hub` at module level. Hosting the accesso
 A run may pin a per-library `ClassRegistry` rather than the process-global Kajson one. Knowing *which* library is current is method-layer knowledge, so the kernel layer holds only a slot: `class_registry_scoping`, defaulting to a resolver that returns `None`. `set_interpreter_hub` installs the real resolver, which means scoping is live exactly when a `InterpreterHub` exists — an invariant a caller cannot forget to wire. The runtime teardown phase (`RuntimeBoot._teardown_runtime`, reached from every `teardown`) calls `class_registry_scoping.reset()` so a torn-down library manager is never reachable through a still-pinned library id. It lives on the kernel half because releasing the slot belongs to whichever teardown runs — on a kernel-only boot nothing installed a resolver and the reset is a no-op.
 
 This is the same shape as `HubSlot.ISOLATED_EXECUTION_PROBE`: a defaulted callable a higher layer replaces at boot, never an unset attribute. A process that only ever builds a `RuntimeHub` therefore degrades to the process-global registry instead of raising. That used to describe only the doctor path and most unit tests; since [the boot split](#where-the-boot-splits) it is a first-class entry point — `RuntimeBoot.make()` installs no `InterpreterHub`, and a test pins that scoping stays at its unscoped default on that boot.
+
+### The print stage's template file stage crosses downward too
+
+A `PipeDocGen` step's print stage is a kernel-layer leaf, and rendering its HTML template file needs the method: the step's data typed by the concepts of the run's crate, and the `PipeCompose` HTML stack. So the kernel layer holds only the seam, `TemplateFileStageProtocol` in `pipelex/cogt/doc_gen/template_file_stage.py`, read through `runtime_hub.get_template_file_stage`, and `Pipelex.setup` installs the interpreter's implementation, `pipelex/pipe_operators/doc_gen/template_file_stage.py`, once the interpreter is up. Unlike the slots above it has no default: a kernel-only boot prints no template file, and asking for the stage there raises, naming why. Teardown releases it. The method file store beside it, `get_method_file_store`, is a kernel-tier slot with a core default, `LOCAL_METHOD_FILES`, that a plugin may claim (`HubSlot.METHOD_FILE_STORE`).
 
 ## Enforcement
 

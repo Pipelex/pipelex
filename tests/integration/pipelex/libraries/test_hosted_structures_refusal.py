@@ -22,6 +22,7 @@ from pipelex.codegen.stamp import apply_stamp
 from pipelex.core.concepts.exceptions import ConceptFactoryError
 from pipelex.interpreter_hub import get_concept_library, get_library_manager, scoped_current_library
 from pipelex.libraries.crate_normalization import normalize_crate
+from pipelex.libraries.pipe_func_call_files import read_pipe_func_call_files
 from pipelex.methods.exceptions import MethodStructuresRefusedError
 
 SENTINEL_LINE = 'open(r"{marker}", "w").write("ran")\n'
@@ -280,7 +281,8 @@ class TestHostedStructuresRefusal:
         assert tmp_path.name not in message
 
     @pytest.mark.usefixtures("sandbox_hosted_mode")
-    def test_generated_structures_module_is_accepted_and_not_shipped(self, tmp_path: Path, load_empty_library: Callable[[], str]):
+    @pytest.mark.asyncio
+    async def test_generated_structures_module_is_accepted_and_not_shipped(self, tmp_path: Path, load_empty_library: Callable[[], str]):
         """The module `pipelex build structures` writes into a bundle copies the method's own MTHDS concepts, so a
         hosted load accepts it as generated. It is never imported here, and it does not travel either: the sandbox
         generates its own from the same concepts, and two `structures` modules there would shadow each other.
@@ -317,9 +319,10 @@ class TestHostedStructuresRefusal:
 
         hosted_crate = library_manager.get_crate(library_id=library_id)
         assert hosted_crate is not None
-        (call_files,) = hosted_crate.pipe_func_files.values()
+        (tree_digest,) = hosted_crate.tree_digests()
+        call_files = await read_pipe_func_call_files(tree_digest=tree_digest, read_scope=None)
         assert "structures/structures.py" not in call_files
-        assert call_files.get("helpers.py") == GREETING_HELPERS_PY
+        assert call_files.get("helpers.py") == GREETING_HELPERS_PY.encode()
         assert not _is_imported(path=generated_file)
 
     @pytest.mark.usefixtures("sandbox_hosted_mode")

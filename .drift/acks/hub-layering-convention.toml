@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:b43388e7c97d4a39aadb375cde0f3431d0e9bce1c15adab9d9d4c61e958a403a"
+digest = "sha256:79d4e68f7ae4755f1a027bc882f105c1985a5ecf291bd888dd3792269162951b"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-16T02:32:28Z"
-rationale = "real-catch: after merging dev, runtime_hub.py drops FuncRegistry, set_func_registry and get_func_registry with the retired registry, and interpreter_hub.py carries dev's PipeFuncPackageOfferRegistry accessors; docs/contribute/hub-layering.md no longer names get_func_registry among the runtime hub's getters and lists get_pipe_func_package_offer_registry in the pipe func row. No import crosses the boundary."
+reviewed_at = "2026-10-16T05:26:39Z"
+rationale = "real-catch: runtime_hub.py gains the method file store and the template file stage, and interpreter_hub.py drops does_pipe_run_leave_process with set_pipe_run's leaves_process; docs/contribute/hub-layering.md now lists get_method_file_store and get_template_file_stage, no longer lists does_pipe_run_leave_process, and says how the template file stage is installed by the interpreter's boot and released at teardown. No import crosses the boundary."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:fda2237457fe0b6830ff2ae8f720698735bec4c3"
-"pipelex/interpreter_hub.py" = "blob:4efc29ca60c42ca0fe0533c402d7bb246b0bb2c2"
-"pipelex/runtime_hub.py" = "blob:87f051f8ab31244ed34c9c5dfc499d5e309edcaf"
+"pipelex/interpreter_hub.py" = "blob:e1a4b941820aeb8affbb6c70b7f81eb29e4cc191"
+"pipelex/runtime_hub.py" = "blob:ca642e419aeac8eee7bd0dba2b5784feb0059e82"

@@ -153,7 +153,7 @@ def resolve_requested_crate(request_data: MthdsFilesRequest) -> ResolvedClosure:
         mthds_contents=[item.content for item in selection.files],
         mthds_sources=[item.source for item in selection.files],
         # The files the closure's steps read, such as a PipeDocGen template file, which the load reads.
-        bundle_resources=decode_bundle_resources(resources=request_data.resources),
+        submitted_files=decode_bundle_resources(resources=request_data.resources),
     )
     return ResolvedClosure(crate=crate, files=selection.files, manifest_main_pipe=selection.manifest_main_pipe)
 

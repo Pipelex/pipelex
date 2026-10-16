@@ -8,14 +8,13 @@ pipe. These tests read the target twice: off the graph the real in-process valid
 off the call a dispatched validator receives.
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pipelex.base_exceptions import ErrorReport, ValidationErrorCategory, ValidationErrorItem
-from pipelex.core.bundle_resources.bundle_resource import BundleResources
 from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
 from pipelex.system.caller_identity import CallerIdentity
 from pytest_mock import MockerFixture
@@ -53,7 +52,7 @@ class _RecordingBundleValidator:
         library_dirs: Sequence[Path] | None,  # noqa: ARG002
         caller_identity: CallerIdentity | None,  # noqa: ARG002
         graph_pipe_code: str | None,
-        bundle_resources: BundleResources | None,  # noqa: ARG002
+        submitted_files: Mapping[str, bytes] | None,  # noqa: ARG002
     ) -> ErrorReport:
         self.graph_pipe_codes.append(graph_pipe_code)
         return ErrorReport(

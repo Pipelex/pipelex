@@ -17,10 +17,8 @@ own page. Classes are grouped by subsystem.
 
 ## Core language
 
-- [`BundleResourceError`](bundle-resource-error.md) — Bundle resource
 - [`BundleResourceNotNamedError`](bundle-resource-not-named-error.md) — Bundle resource not named
 - [`BundleResourcePathError`](bundle-resource-path-error.md) — Bundle resource path
-- [`BundleResourcesTooLargeError`](bundle-resources-too-large-error.md) — Bundle resources too large
 - [`ConceptCodeError`](concept-code-error.md) — Concept code
 - [`ConceptError`](concept-error.md) — Concept error
 - [`ConceptFactoryError`](concept-factory-error.md) — Concept factory
@@ -39,6 +37,7 @@ own page. Classes are grouped by subsystem.
 - [`InputStuffSpecsError`](input-stuff-specs-error.md) — Input stuff specs
 - [`InputStuffSpecsFactoryError`](input-stuff-specs-factory-error.md) — Input stuff specs factory
 - [`ListWhereSingularError`](list-where-singular-error.md) — List where singular
+- [`MethodFileUnavailableError`](method-file-unavailable-error.md) — Method file unavailable
 - [`MultiplicityCountMismatchError`](multiplicity-count-mismatch-error.md) — Multiplicity count mismatch
 - [`NativeConceptDefinitionError`](native-concept-definition-error.md) — Native concept definition
 - [`NullInputError`](null-input-error.md) — Null input
@@ -83,6 +82,7 @@ own page. Classes are grouped by subsystem.
 - [`PipeDocGenFactoryError`](pipe-doc-gen-factory-error.md) — Pipe doc gen factory
 - [`PipeDocGenRunError`](pipe-doc-gen-run-error.md) — Pipe doc gen run
 - [`PipeDocGenTemplateCheckError`](pipe-doc-gen-template-check-error.md) — Pipe doc gen template check
+- [`PipeDocGenTemplateFileUncheckedError`](pipe-doc-gen-template-file-unchecked-error.md) — Pipe doc gen template file unchecked
 - [`PipeDocGenUndefinedValueError`](pipe-doc-gen-undefined-value-error.md) — Pipe doc gen undefined value
 - [`PipeExtractFactoryError`](pipe-extract-factory-error.md) — Pipe extract factory
 - [`PipeFuncExecutionError`](pipe-func-execution-error.md) — Pipe func execution
@@ -120,7 +120,6 @@ own page. Classes are grouped by subsystem.
 
 - [`ConceptLibraryError`](concept-library-error.md) — Concept library
 - [`ConceptLoadingError`](concept-loading-error.md) — Concept loading
-- [`CrateIntegrityError`](crate-integrity-error.md) — Crate integrity error
 - [`CrateNormalizationError`](crate-normalization-error.md) — Crate normalization error
 - [`DomainLibraryError`](domain-library-error.md) — Domain library
 - [`DomainLoadingError`](domain-loading-error.md) — Domain loading
