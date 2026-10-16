@@ -9,6 +9,8 @@ worker's error family, with a human-readable message and a structured
 
 import math
 
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex.cogt.exceptions import (
     CogtError,
     ExtractJobFailureError,
@@ -99,7 +101,9 @@ def _render_detail(metadata: SDKErrorEnvelope, *, classification: Classification
         case UserActionKind.CHECK_CREDENTIALS:
             return "The provider rejected the credentials — check that the API key is valid and correctly configured."
         case UserActionKind.CHANGE_INPUT:
-            if metadata.is_context_window_exceeded:
+            # Worded from the code the classification picked, not from the metadata's wording, so a refusal of another
+            # status, or a parse failure quoting the model's own text, never reads as the context window
+            if classification.error_code is CoreCode.MODEL_CONTEXT_EXCEEDED:
                 return "The prompt exceeds the model's context window — shorten the input, or choose a model with a larger context window."
             if metadata.is_content_policy_violation:
                 return "Content was rejected by the provider's safety filters — revise the prompt."

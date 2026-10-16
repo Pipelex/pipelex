@@ -28,6 +28,7 @@ from pipelex.cogt.inference.error_classification import (
 )
 from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
 from pipelex.cogt.inference.error_render import render_inference_error
+from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.providers.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker
 from tests.helpers.completion_stop import make_text_llm_job
 
@@ -228,6 +229,35 @@ class TestContextWindowRefusals:
         assert rendered.resolve_error_code() == expected_error_code
         assert rendered.user_action is not None
         assert ("context window" in rendered.user_action.detail) is (expected_error_code == CoreCode.MODEL_CONTEXT_EXCEEDED)
+
+    @pytest.mark.parametrize(
+        ("status_code", "sdk_exception_type"),
+        [
+            (422, "UnprocessableEntityError"),
+            (None, "ValidationError"),
+        ],
+    )
+    def test_the_same_words_on_another_answer_never_read_as_the_window(self, status_code: int | None, sdk_exception_type: str) -> None:
+        """Only a 400 is read for the window: the words on a 422, or quoted in a parse failure, keep their own reading."""
+        metadata = ProviderErrorMetadata(
+            provider=ProviderName.OPENAI,
+            sdk_exception_type=sdk_exception_type,
+            message="prompt is too long: 208310 tokens > 200000 maximum",
+            status_code=status_code,
+        )
+
+        classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
+        rendered = render_inference_error(
+            metadata=metadata,
+            classification=classification,
+            family=InferenceErrorFamily.LLM,
+            model_desc="test-model-desc",
+            model_handle="test-model",
+        )
+
+        assert classification.error_code != CoreCode.MODEL_CONTEXT_EXCEEDED
+        assert rendered.user_action is not None
+        assert "context window" not in rendered.user_action.detail
 
     @pytest.mark.asyncio
     async def test_the_worker_reports_the_prompt_over_the_window_as_the_callers_input(self, mocker: MockerFixture) -> None:

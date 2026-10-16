@@ -168,7 +168,8 @@ class ProviderErrorMetadata(BaseModel):
         Reads the structured error code first, ``provider_error_code`` and the code an error body carries
         (OpenAI puts ``context_length_exceeded`` in ``code`` beside a generic ``type``, which the Extract step
         prefers), then the wording each provider gives such a refusal in its rendered message. Only the
-        classifier's 400 arm reads it, so a phrase elsewhere in an answer of another status says nothing.
+        classifier's 400 arm reads it, and the Render step words its next step from the code that arm picks, so a
+        phrase in an answer of another status says nothing.
         """
         if self.provider_error_code in _CONTEXT_WINDOW_ERROR_CODES:
             return True
