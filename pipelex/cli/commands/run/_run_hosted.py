@@ -19,6 +19,7 @@ from rich.markup import escape
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.cli.commands.run._run_core import load_run_inputs
+from pipelex.cli.commands.run._run_output_folder import make_run_output_folder
 from pipelex.cli.error_handlers import handle_validate_bundle_error, print_traceback_if_requested
 from pipelex.hosted.client_factory import make_hosted_client
 from pipelex.hosted.error_rendering import describe_hosted_error
@@ -30,7 +31,6 @@ from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 from pipelex.runtime_hub import get_console
-from pipelex.tools.misc.file_utils import get_incremental_directory_path
 from pipelex.tools.misc.json_utils import save_as_json_to_path
 from pipelex.tools.misc.pretty import pretty_print, pretty_print_md
 
@@ -266,8 +266,7 @@ def execute_hosted_run(
     output_path: Path | None = None
     saved: list[str] = []
     if save_main_stuff or save_working_memory or (graph is not False and results.graph_spec is not None):
-        output_path = get_incremental_directory_path(base_path=Path(output_dir), base_name=f"{output_label}_output")
-        output_path.mkdir(parents=True, exist_ok=True)
+        output_path = make_run_output_folder(output_dir=Path(output_dir), label=output_label)
 
     if output_path is not None and save_main_stuff:
         save_as_json_to_path(object_to_save=results.main_stuff, path=output_path / "main_stuff.json")

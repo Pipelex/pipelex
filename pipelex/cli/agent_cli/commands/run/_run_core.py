@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.cli.agent_cli.commands.run._output_helpers import build_run_output
+from pipelex.cli.commands.run._run_output_folder import RUN_RESULTS_DIR_NAME, make_run_output_folder, run_output_label
 from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.config import get_config
 from pipelex.core.memory.absence import AbsenceRecord
@@ -23,6 +24,8 @@ from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.json_utils import clean_json_dumps
 
 if TYPE_CHECKING:
+    from mthds.method_tree.models import MethodTree
+
     from pipelex.system.configuration.configs import PipelineExecutionConfig
 
 
@@ -52,6 +55,7 @@ async def run_pipeline_core(
     with_memory: bool = False,
     inputs_base_dir: Path | None = None,
     output_dir_override: Path | None = None,
+    method_tree: MethodTree | None = None,
 ) -> dict[str, Any]:
     """Core logic for running a pipeline and returning JSON-serializable output.
 
@@ -69,9 +73,12 @@ async def run_pipeline_core(
             return compact concept JSON only (False, default).
         inputs_base_dir: Directory bare relative file paths in ``inputs`` resolve against (Smart
             Inputs D3) — the inputs file's parent when file-loaded, else ``None``.
-        output_dir_override: Directory to write run outputs (output JSON, graph files) into,
-            overriding the bundle-adjacent default. The caller passes one when the bundle lives
-            in a directory that will not survive the process — a fetched method's ephemeral clone.
+        output_dir_override: Directory the run's output folder (output JSON, graph files) is created under,
+            overriding the default, `results/` beside the bundle. The caller passes one when the bundle lives
+            in a directory that will not survive the process — a fetched method's ephemeral clone — or when a
+            folder run named its pipe and has no entry bundle to write beside.
+        method_tree: The method tree the run reads, when the command listed one: its digest is recorded as
+            ``method_tree_digest`` beside the run's other side effects, on disk and under ``with_memory``.
 
     Returns:
         Dictionary with execution results suitable for JSON serialization.
@@ -141,22 +148,27 @@ async def run_pipeline_core(
         compact_result=compact_result,
     )
 
-    # Determine output directory: an explicit override wins (a fetched method's bundle lives in an
-    # ephemeral clone deleted at process exit, so the caller re-anchors outputs somewhere durable);
-    # otherwise next to the bundle, or mthds-wip/ fallback
-    output_dir: Path
+    # The run writes into a new numbered folder, `<pipe_code>_output_NN/`, under the directory its outputs go to: an
+    # explicit override wins (a fetched method's bundle lives in an ephemeral clone deleted at process exit, so the
+    # caller re-anchors outputs somewhere durable); otherwise `results/` beside the bundle, or under mthds-wip/. The
+    # folder holds a `.gitignore` ignoring everything in it, as `pipelex run`'s does, so a run beside its bundle never
+    # adds a file to the method tree it ran, and the next run reads the same tree, with the same digest.
+    outputs_dir: Path
     if output_dir_override is not None:
-        output_dir = output_dir_override
+        outputs_dir = output_dir_override
     elif bundle_uris and not bundle_uris[0].startswith(("http://", "https://")):
-        output_dir = Path(bundle_uris[0]).parent
+        outputs_dir = Path(bundle_uris[0]).parent / RUN_RESULTS_DIR_NAME
     else:
-        output_dir = Path("mthds-wip")
-    output_dir.mkdir(parents=True, exist_ok=True)
+        outputs_dir = Path("mthds-wip") / RUN_RESULTS_DIR_NAME
+    output_dir = make_run_output_folder(output_dir=outputs_dir, label=run_output_label(pipe_ref=pipe_code))
 
     # Side-effect metadata (file paths) is tracked separately so it never
     # leaks into the compact stdout output.  It is written to the on-disk
     # JSON file and, when with_memory is True, included in the returned dict.
     side_effects: dict[str, Any] = {}
+    # The digest of the method tree the run read names the exact files of the method it ran.
+    if method_tree is not None:
+        side_effects["method_tree_digest"] = method_tree.digest
 
     # Cost report: best-effort structured `cost_report` object in the JSON output (machine-first; no Rich
     # table on stderr like the human CLI). build_cost_summary returns None for runs that did no reportable

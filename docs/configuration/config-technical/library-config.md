@@ -59,7 +59,7 @@ This is the recommended approach for newcomers and simple projects. Pipelex read
 
 When you initialize Pipelex with `Pipelex.make()`, the system:
 
-1. **Scans your project directory** for all `.mthds` files
+1. **Lists the method trees of your library directories** and loads the `.mthds` files they hold
 2. **Discovers Python structure classes** that inherit from `StructuredContent`
 3. **Loads pipeline definitions** including domains, concepts, and pipes
 4. **Registers custom functions** decorated with `@pipe_func()`
@@ -273,23 +273,17 @@ pipe_output = response.pipe_output
 
 5. **Include structure class directories**: Remember that `library_dirs` must contain both `.mthds` files AND Python files defining `StructuredContent` classes.
 
-## Excluded Directories
+## Which Files Are Loaded
 
-To improve performance and avoid loading unnecessary files, Pipelex automatically excludes common directories from discovery:
+A library directory's `.mthds` files are the bundles of its [method trees](../../building-methods/method-trees.md): the directory's own tree, and the tree of each nested package (a folder holding its own `METHODS.toml`) and nested repository (a folder holding `.git`) under it, each loaded as a method of its own whose steps read only its own files. A file the membership rule keeps out is never loaded:
 
-- `.venv`, `venv`, `env`, `virtualenv`, `.virtualenv` - Virtual environments
-- `.git` - Git repository data
-- `__pycache__` - Python bytecode cache
-- `.pytest_cache` - Pytest cache
-- `.mypy_cache` - Mypy type checker cache
-- `.ruff_cache` - Ruff linter cache
-- `node_modules` - Node.js dependencies
-- `.env` - Environment files
-- `results` - Common output directory
+- a hidden file or folder, such as `.venv/`, `.git/` or `.pytest_cache/`;
+- a `__pycache__/` or `node_modules/` folder, or a folder holding a Python virtual environment, such as `venv/`;
+- a file a `.gitignore` of the tree ignores, such as a run's output folder, which holds a `.gitignore` ignoring everything in it.
 
-Files in these directories will not be scanned, even if they contain `.mthds` files or structure classes.
+A library directory whose own tree is empty, one holding nothing but nested packages or repositories, loads the methods nested in it all the same. A nested package or repository that holds no `.mthds` file is skipped before its tree is listed, so a checkout with nothing to load, such as a submodule holding a symbolic link, never refuses the load; one that holds a bundle follows every rule below. A symbolic link inside a library directory's tree refuses the load, naming the link. A directory with more files than `[interpreter.method_tree_limits]` allows is refused before any file is read, with the advice to point at the method's own folder or to raise the limits. The limits are read once per load. When a server loads its own library directories beside the bundles a caller submits, a tree of those directories that cannot be listed is a `HostLibraryTreeError`, a fault of the server's configuration whose message, naming its paths, never reaches the caller; a dependency package's tree that cannot be listed is refused naming the package by its address, never by the directory it was installed into.
 
-The list is the `excluded_dirs` array under `[interpreter.scan]` in `pipelex.toml`, each entry naming a directory; a value that is not an array, such as a single string, fails the boot.
+The structure classes and `@pipe_func()` functions of a library directory are discovered by scanning its Python files, which skips the directories listed in the `excluded_dirs` array under `[interpreter.scan]` in `pipelex.toml` (virtual environments, `.git`, caches, `node_modules`, `results` and the like); a value that is not an array, such as a single string, fails the boot. That list no longer decides which `.mthds` files load.
 
 ## Project Organization
 

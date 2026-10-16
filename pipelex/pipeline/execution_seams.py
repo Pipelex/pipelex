@@ -42,6 +42,7 @@ from pipelex.interpreter_hub import (
 )
 from pipelex.kernel.memory_ops import shape_inputs
 from pipelex.libraries.bundle_resources import check_bundle_resources
+from pipelex.libraries.method_trees import reporting_host_library_tree_faults
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.pipe_job import PipeJob
@@ -139,8 +140,9 @@ def acquire_library(
         if effective_dirs:
             effective_dirs_desc = ", ".join(str(dir_path) for dir_path in effective_dirs)
             log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}): {effective_dirs_desc}")
+            # The caller's directories refuse as their invalid bundle; a host's report a tree it cannot list as its own fault.
             library_dirs_translation: AbstractContextManager[None] = (
-                translate_to_validate_bundle_error() if library_dirs_are_callers else nullcontext()
+                translate_to_validate_bundle_error() if library_dirs_are_callers else reporting_host_library_tree_faults()
             )
             with library_dirs_translation:
                 library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)

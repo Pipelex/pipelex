@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, ForwardRef, Literal, get_args, get_origin
 
 from kajson.class_registry import ClassRegistry
 from kajson.kajson_manager import KajsonManager
+from mthds.method_tree.models import TreeLimits
 from mthds.package.dependency_resolver import ResolvedDependency, determine_exported_pipes, resolve_all_dependencies
 from mthds.package.discovery import find_package_manifest
 from mthds.package.exceptions import DependencyResolveError, ManifestError
@@ -26,6 +27,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
+from pipelex.core.method_trees.building_bundle import building_pipe_of
 from pipelex.core.pipes.exceptions import PipeLoadRefusalError, PipeOperatorModelChoiceError
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -44,8 +46,13 @@ from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
 from pipelex.libraries.library_factory import LibraryFactory
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
-from pipelex.libraries.library_utils import (
-    get_pipelex_mthds_files_from_dirs,
+from pipelex.libraries.method_trees import (
+    LibraryBundleFile,
+    list_library_bundle_files,
+    list_package_method_tree,
+    local_tree_limits,
+    tree_bundle_of_lone_file,
+    tree_bundles_of,
 )
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.libraries.visibility_utils import check_visibility_for_blueprints, make_visibility_checker
@@ -77,6 +84,7 @@ if TYPE_CHECKING:
 
     from pipelex.core.concepts.concept import Concept
     from pipelex.core.domains.domain import Domain
+    from pipelex.core.method_trees.tree_bundle import TreeBundle
 
 MTHDS_METHODS_DIRNAME = ".mthds/methods"
 
@@ -116,21 +124,6 @@ def find_methods_dirs_from_blueprints(blueprints: list[PipelexBundleBlueprint]) 
                 break
             current = parent
     return result
-
-
-def _dependency_bundle_source(*, package_address: str, package_root: Path, mthds_path: Path) -> str:
-    """Name a dependency's bundle by the package's address and the bundle's path inside the package.
-
-    The name is the bundle's ``source``, which rides every item a refusal inside the package gives, the
-    files a duplicate declaration names included, and a verdict is caller-facing: where the host installed
-    the package is the host's own path, which a hosted caller must never read. A bundle found outside the
-    package root, which discovery does not produce, is named by its file name alone rather than by its path.
-    """
-    for candidate_root in (package_root, package_root.resolve()):
-        for candidate_path in (mthds_path, mthds_path.resolve()):
-            if candidate_path.is_relative_to(candidate_root):
-                return f"{package_address}/{candidate_path.relative_to(candidate_root).as_posix()}"
-    return f"{package_address}/{mthds_path.name}"
 
 
 def _parse_dependency_bundle(*, mthds_path: Path, bundle_source: str, package_address: str) -> PipelexBundleBlueprint:
@@ -585,26 +578,28 @@ class LibraryManager(LibraryManagerAbstract):
                 library_dirs = []
 
             all_dirs: list[Path] = []
-            all_mthds_paths: list[Path] = []
             all_dirs.extend(library_dirs)
-            all_mthds_paths.extend(get_pipelex_mthds_files_from_dirs(set(library_dirs)))
+            # Every bundle is read as a member of its method tree: each library directory's tree and the trees nested
+            # in it, then the tree of each file named alone. A file the membership rule keeps out is never read.
+            # This machine's limits are read once for the whole load.
+            tree_limits = local_tree_limits()
+            all_bundle_files: list[LibraryBundleFile] = list_library_bundle_files(library_dirs=library_dirs, limits=tree_limits)
+            for library_file_path in library_file_paths or []:
+                all_bundle_files.append(
+                    LibraryBundleFile(
+                        tree_bundle=tree_bundle_of_lone_file(bundle_file=library_file_path, limits=tree_limits),
+                        path=library_file_path,
+                    )
+                )
 
-            if library_file_paths:
-                all_mthds_paths.extend(library_file_paths)
-
-            # Combine and deduplicate
-            seen_absolute_paths: set[str] = set()
-            valid_mthds_paths: list[Path] = []
-            for mthds_path in all_mthds_paths:
-                try:
-                    absolute_path = str(mthds_path.resolve())
-                except (OSError, RuntimeError):
-                    # For paths that can't be resolved (e.g., in zipped packages), use string representation
-                    absolute_path = str(mthds_path)
-
-                if absolute_path not in seen_absolute_paths:
-                    valid_mthds_paths.append(mthds_path)
-                    seen_absolute_paths.add(absolute_path)
+            # Each file once, as the member of the first tree that holds it.
+            seen_locations: set[Path] = set()
+            bundle_files: list[LibraryBundleFile] = []
+            for bundle_file in all_bundle_files:
+                location = bundle_file.tree_bundle.location
+                if location not in seen_locations:
+                    bundle_files.append(bundle_file)
+                    seen_locations.add(location)
 
             # Import modules and register in global registries
             # Import from user directories
@@ -658,9 +653,9 @@ class LibraryManager(LibraryManagerAbstract):
             # Load MTHDS files into the specific library
             log.verbose(
                 "Loading the MTHDS files into the library",
-                fields={"library_id": library_id, "mthds_paths": [str(mthds_path) for mthds_path in valid_mthds_paths]},
+                fields={"library_id": library_id, "mthds_paths": [str(bundle_file.path) for bundle_file in bundle_files]},
             )
-            return self._load_mthds_files_into_library(library_id=library_id, valid_mthds_paths=valid_mthds_paths)
+            return self._load_mthds_files_into_library(library_id=library_id, bundle_files=bundle_files)
 
     @override
     def is_crate_loaded(self, *, library_id: str, fingerprint: str) -> bool:
@@ -795,6 +790,9 @@ class LibraryManager(LibraryManagerAbstract):
             # signature change across PipeFactory and belongs with the concept-side work.
             qualified_pipes = qualify_crate(crate).pipes
 
+            # The member of its method tree each pipe's bundle was read as, each tree read back once
+            tree_bundles_by_pipe_ref = crate.tree_bundles_by_pipe_ref()
+
             # Load pipes with domain-filtered concept codes
             all_pipes: list[PipeAbstract] = []
             for pipe_ref, pipe_blueprint in qualified_pipes.items():
@@ -808,13 +806,16 @@ class LibraryManager(LibraryManagerAbstract):
                 concept_codes_for_domain = domain_concept_codes.get(domain_code, [])
 
                 source = crate.source_map.get(pipe_ref)
-                # A pipe that reads a file beside its bundle (a PipeDocGen `template_file`) resolves it against the
-                # bundle file the host that assembled the crate read it from, and against nothing else: the pipe's
-                # `source` is overwritten with that file, or cleared, so neither a caller's label (`source_map`) nor a
-                # `source` the bundle's text wrote on the pipe can point the read at a directory on this host.
-                pipe_blueprint = pipe_blueprint.model_copy(update={"source": crate.host_bundle_files.get(pipe_ref)})
-                with _locating_pipe_build_refusals(
-                    pipe_code=pipe_code, domain_code=domain_code, source=source, elaboration=crate.elaboration_metadata.get(pipe_ref)
+                # A pipe that reads a file its bundle names (a PipeDocGen `template_file`) resolves it in the method tree
+                # the host that assembled the crate listed its bundle in, and in nothing else: the pipe's `source` is
+                # cleared, so neither a caller's label (`source_map`) nor a `source` the bundle's text wrote on the pipe
+                # can point the read at a directory on this host. A bundle parsed from a string has no tree.
+                pipe_blueprint = pipe_blueprint.model_copy(update={"source": None})
+                with (
+                    building_pipe_of(tree_bundle=tree_bundles_by_pipe_ref.get(pipe_ref)),
+                    _locating_pipe_build_refusals(
+                        pipe_code=pipe_code, domain_code=domain_code, source=source, elaboration=crate.elaboration_metadata.get(pipe_ref)
+                    ),
                 ):
                     pipe = PipeFactory[PipeAbstract].make_from_blueprint(
                         domain_code=domain_code,
@@ -861,6 +862,18 @@ class LibraryManager(LibraryManagerAbstract):
         # (concept resolution, class-registry access) resolve through the ambient current
         # library, so a load into a non-current library must not read the caller's binding.
         with scoped_current_library(library_id=library_id):
+            # A bundle read from a file on this host that no loader placed in a method tree, such as a bundle file a CLI
+            # names alone, is read as a member of its own file's tree: the steps of every bundle read from this host's
+            # disk read only the files of their tree.
+            unplaced_host_blueprints = [
+                blueprint for blueprint in blueprints if blueprint.tree_bundle is None and blueprint.host_bundle_file is not None
+            ]
+            if unplaced_host_blueprints:
+                tree_limits = local_tree_limits()
+                for blueprint in unplaced_host_blueprints:
+                    if blueprint.host_bundle_file is not None:
+                        blueprint.place_in_tree(tree_bundle=tree_bundle_of_lone_file(bundle_file=blueprint.host_bundle_file, limits=tree_limits))
+
             # Accumulate blueprints for later crate construction via get_crate()
             self._blueprints.setdefault(library_id, []).extend(blueprints)
             self._crate_cache.pop(library_id, None)
@@ -1050,23 +1063,26 @@ class LibraryManager(LibraryManagerAbstract):
     # Private helper methods
     ############################################################
 
-    def _load_mthds_files_into_library(self, *, library_id: str, valid_mthds_paths: list[Path]) -> list[PipeAbstract]:
+    def _load_mthds_files_into_library(self, *, library_id: str, bundle_files: list[LibraryBundleFile]) -> list[PipeAbstract]:
         """Load MTHDS files into a specific library.
 
         This method:
-        1. Parses blueprints from MTHDS files
+        1. Parses blueprints from MTHDS files, each placed in the method tree it was listed in
         2. Finds and loads dependency packages (if manifest has dependencies with local paths)
         3. Loads blueprints into the specified library
 
         Args:
             library_id: The ID of the library to load into
-            valid_mthds_paths: List of MTHDS file paths to load
+            bundle_files: The bundle files to load, each the member of its method tree
         """
+        valid_mthds_paths = [bundle_file.path for bundle_file in bundle_files]
         blueprints: list[PipelexBundleBlueprint] = []
-        for mthds_file_path in valid_mthds_paths:
+        for bundle_file in bundle_files:
+            mthds_file_path = bundle_file.path
             try:
                 blueprint = MthdsParser.make_pipelex_bundle_blueprint(bundle_path=mthds_file_path)
                 blueprint.source = str(mthds_file_path)
+                blueprint.place_in_tree(tree_bundle=bundle_file.tree_bundle)
             except FileNotFoundError as file_not_found_error:
                 msg = f"Could not find MTHDS bundle at '{mthds_file_path}'"
                 raise LibraryLoadingError(msg) from file_not_found_error
@@ -1282,11 +1298,14 @@ class LibraryManager(LibraryManagerAbstract):
 
         library = self.get_library(library_id=library_id)
 
+        # This machine's limits are read once for every package of the manifest.
+        tree_limits = local_tree_limits()
         for resolved_dep in resolved_deps:
             self._load_single_dependency(
                 library=library,
                 resolved_dep=resolved_dep,
                 package_address=resolved_dep.address,
+                tree_limits=tree_limits,
             )
 
         # Wire concept resolver after all deps are loaded so cross-package
@@ -1299,6 +1318,7 @@ class LibraryManager(LibraryManagerAbstract):
         *,
         resolved_dep: ResolvedDependency,
         package_address: str,
+        tree_limits: TreeLimits | None = None,
     ) -> None:
         """Load a single resolved dependency into an isolated child library.
 
@@ -1306,9 +1326,10 @@ class LibraryManager(LibraryManagerAbstract):
         into it, registers it in library.dependency_libraries, and adds aliased
         entries to the main library for backward-compatible cross-package lookups.
 
-        Each bundle's ``source`` is ``<package_address>/<path inside the package>``, never the file's
-        path on the host (see ``_dependency_bundle_source``), so a refusal inside the dependency names it
-        that way on every surface.
+        The bundles are the ``.mthds`` files of the package's method tree, rooted at its own directory, so a file
+        the membership rule keeps out of the package is neither loaded nor read by one of its steps. Each bundle's
+        ``source`` is ``<package_address>/<tree path>``, never the file's path on the host, so a refusal inside the
+        dependency names it that way on every surface.
 
         A bundle of the dependency that does not parse refuses the load (``_parse_dependency_bundle``): a
         package shipped with a request is the caller's own content, and a fetched package's author is owed
@@ -1318,20 +1339,26 @@ class LibraryManager(LibraryManagerAbstract):
             library: The main library to load into
             resolved_dep: The resolved dependency info
             package_address: The dependency's address as a reference names it, without any ``@<tag>``
+            tree_limits: The limits the package's tree is listed under, read from the configuration when not given
 
         Raises:
             MthdsParserError: A bundle of the dependency does not parse, its items named by the bundle's source.
         """
         alias = resolved_dep.alias
 
-        # Parse dependency blueprints
+        # Parse dependency blueprints: the bundles of the package's method tree, rooted at its own directory, so a file
+        # the membership rule keeps out of the package is neither loaded nor read by one of its steps.
         dep_blueprints: list[PipelexBundleBlueprint] = []
-        # Where each bundle is on this host, by its caller-facing source, for the pipes that read a file beside it.
-        bundle_files_by_source: dict[str, Path] = {}
-        for mthds_path in resolved_dep.mthds_files:
-            bundle_source = _dependency_bundle_source(package_address=package_address, package_root=resolved_dep.package_root, mthds_path=mthds_path)
-            blueprint = _parse_dependency_bundle(mthds_path=mthds_path, bundle_source=bundle_source, package_address=package_address)
-            bundle_files_by_source[bundle_source] = mthds_path
+        # Each bundle as the member of the package's tree, by its caller-facing source, for the pipes reading a file it names.
+        tree_bundles_by_source: dict[str, TreeBundle] = {}
+        # Listed under the package's address: a refusal never names the directory it was installed or fetched into.
+        package_tree = list_package_method_tree(root=resolved_dep.package_root, package_address=package_address, limits=tree_limits)
+        for tree_bundle in tree_bundles_of(tree=package_tree):
+            # The package's address and the bundle's tree path: never the host's path to the package.
+            bundle_source = f"{package_address}/{tree_bundle.tree_path}"
+            blueprint = _parse_dependency_bundle(mthds_path=tree_bundle.location, bundle_source=bundle_source, package_address=package_address)
+            blueprint.place_in_tree(tree_bundle=tree_bundle)
+            tree_bundles_by_source[bundle_source] = tree_bundle
             dep_blueprints.append(blueprint)
 
         if not dep_blueprints:
@@ -1433,20 +1460,23 @@ class LibraryManager(LibraryManagerAbstract):
                 if pipe_ref not in loaded_pipe_refs:
                     continue
                 dependency_source = crate.source_map.get(pipe_ref)
-                # A pipe that reads a file beside its bundle (a PipeDocGen `template_file`) finds it from the
-                # bundle's file on this host, which its blueprint carries into the factory and no further. The
-                # package's address stays the source every refusal names, since the host's path is not the caller's.
-                bundle_file = bundle_files_by_source.get(dependency_source) if dependency_source is not None else None
-                # Overwritten either way, so a `source` the package's own text wrote on the pipe never names a directory.
-                pipe_blueprint = pipe_blueprint.model_copy(update={"source": str(bundle_file) if bundle_file is not None else None})
+                # A pipe that reads a file its bundle names (a PipeDocGen `template_file`) resolves it in the package's
+                # tree, from the bundle's tree path there. The package's address stays the source every refusal names,
+                # since the host's path is not the caller's.
+                dependency_tree_bundle = tree_bundles_by_source.get(dependency_source) if dependency_source is not None else None
+                # Cleared, so a `source` the package's own text wrote on the pipe never names a directory.
+                pipe_blueprint = pipe_blueprint.model_copy(update={"source": None})
                 try:
                     # The same location the main load path attaches, so a dependency pipe's refusal
                     # names the dependency's own file.
-                    with _locating_pipe_build_refusals(
-                        pipe_code=pipe_code,
-                        domain_code=domain_code,
-                        source=dependency_source,
-                        elaboration=crate.elaboration_metadata.get(pipe_ref),
+                    with (
+                        building_pipe_of(tree_bundle=dependency_tree_bundle),
+                        _locating_pipe_build_refusals(
+                            pipe_code=pipe_code,
+                            domain_code=domain_code,
+                            source=dependency_source,
+                            elaboration=crate.elaboration_metadata.get(pipe_ref),
+                        ),
                     ):
                         pipe = PipeFactory[PipeAbstract].make_from_blueprint(
                             domain_code=domain_code,

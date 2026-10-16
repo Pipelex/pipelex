@@ -124,3 +124,21 @@ class TestValidateBundleErrorWithholding:
 
         assert raised.value.message == f"Pipe 'print_notice' in '{HOST_LIBRARY_FILE_PLACEHOLDER}' could not read '{HOST_LIBRARY_FILE_PLACEHOLDER}'"
         assert walk_spy.call_count == 1
+
+    def test_a_host_tree_that_cannot_be_listed_while_withholding_never_replaces_the_verdict(self, tmp_path: Path) -> None:
+        """The host's files are still withheld, from every bundle file under its directories, and the verdict stays the verdict."""
+        host_library_file = tmp_path / "harbour_board.mthds"
+        host_library_file.write_text('domain = "harbour_board"\n', encoding="utf-8")
+        hidden_host_file = tmp_path / ".drafts" / "tide_board.mthds"
+        hidden_host_file.parent.mkdir()
+        hidden_host_file.write_text('domain = "tide_board"\n', encoding="utf-8")
+        # A symbolic link is refused by the membership rule, so listing the host's tree fails.
+        (tmp_path / "linked.mthds").symlink_to(host_library_file)
+        message = f"Pipe 'post_notice' in '{host_library_file}' could not be loaded, nor '{hidden_host_file}'"
+
+        with pytest.raises(ValidateBundleError) as raised, withholding_host_library_files(library_dirs=[tmp_path]):
+            raise ValidateBundleError(message=message)
+
+        assert raised.value.message == (
+            f"Pipe 'post_notice' in '{HOST_LIBRARY_FILE_PLACEHOLDER}' could not be loaded, nor '{HOST_LIBRARY_FILE_PLACEHOLDER}'"
+        )

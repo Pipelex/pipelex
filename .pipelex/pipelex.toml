@@ -230,6 +230,17 @@ excluded_dirs = [
 ]
 
 ####################################################################################################
+# Method Tree Limits Config
+####################################################################################################
+
+[interpreter.method_tree_limits]
+# How large a method tree this machine lists when it reads a method: a method's folder, a .mthds file named alone, a
+# library directory or a dependency package. Listing stops before reading any file once a tree passes a limit.
+# Raise them here for a method that needs more.
+max_files = 10000
+max_total_bytes = 1073741824
+
+####################################################################################################
 # Builder Config
 ####################################################################################################
 

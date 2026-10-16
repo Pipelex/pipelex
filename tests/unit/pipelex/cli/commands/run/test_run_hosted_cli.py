@@ -117,7 +117,7 @@ class TestRunHostedCli:
         run_bundle_cmd(path=str(bundle_dir), hosted=True, output_dir=str(output_dir), no_pretty_print=True)
 
         request = _hosted_request(run_hosted=run_hosted)
-        assert request.pipe_code == "summarize"
+        assert request.pipe_code == "probe.summarize"
         assert [mthds_file.content for mthds_file in request.mthds_files or []] == [BUNDLE, LIBRARY_BUNDLE]
         assert request.method_ref is None
         assert request.method_id is None
@@ -263,6 +263,22 @@ class TestRunHostedCli:
 
         request = _hosted_request(run_hosted=run_hosted)
         assert [mthds_file.source for mthds_file in request.mthds_files or []] == [str(bundle_dir / "bundle.mthds"), str(shared_dir / "shared.mthds")]
+
+    def test_a_folder_run_names_its_main_pipe_by_its_domain_when_two_domains_share_its_code(self, run_hosted: AsyncMock, tmp_path: Path) -> None:
+        """The hosted API starts at the pipe the local run would, never at a same-coded pipe of another domain sent with it."""
+        method_dir = tmp_path / "method"
+        method_dir.mkdir()
+        (method_dir / "a_first.mthds").write_text(
+            BUNDLE.replace('domain = "probe"\nmain_pipe = "summarize"', 'domain = "probe_other"'), encoding="utf-8"
+        )
+        (method_dir / "z_entry.mthds").write_text(BUNDLE.replace('domain = "probe"', 'domain = "probe_entry"'), encoding="utf-8")
+        output_dir = tmp_path / "results"
+
+        run_bundle_cmd(path=str(method_dir), hosted=True, output_dir=str(output_dir), no_pretty_print=True)
+
+        request = _hosted_request(run_hosted=run_hosted)
+        assert request.pipe_code == "probe_entry.summarize"
+        assert (output_dir / "summarize_output_01" / "main_stuff.json").is_file()
 
     def test_a_named_text_output_is_saved_as_markdown_too(self, mocker: MockerFixture, bundle_dir: Path, tmp_path: Path) -> None:
         """The working memory names the main output through its `main_stuff` alias when a step named it."""

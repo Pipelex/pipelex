@@ -31,8 +31,9 @@ from pipelex.core.pipes.exceptions import (
 )
 from pipelex.core.validation import report_validation_error
 from pipelex.interpreter_hub import get_library_manager
-from pipelex.libraries.exceptions import LibraryError, LibraryLoadingError
+from pipelex.libraries.exceptions import LibraryError, LibraryLoadingError, MethodTreeLoadError
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
+from pipelex.libraries.method_trees import bundle_files_under
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.handle_pipe_errors import (
@@ -337,7 +338,15 @@ def _host_library_files(*, library_dirs: Sequence[Path]) -> _HostLibraryFiles:
     """
     names: set[str] = set()
     host_texts: list[str] = []
-    for library_file in get_pipelex_mthds_files_from_dirs(set(library_dirs)):
+    library_files: list[Path]
+    try:
+        library_files = get_pipelex_mthds_files_from_dirs(set(library_dirs))
+    except MethodTreeLoadError:
+        # This runs while a verdict is being withheld, and the load listed these trees a moment ago: a listing that
+        # fails now must never take the verdict's place, so every bundle file under the directories is withheld, a
+        # superset of the names the load gave.
+        library_files = bundle_files_under(library_dirs=library_dirs)
+    for library_file in library_files:
         names.add(str(library_file))
         host_text = _bundle_text_or_none(library_file=library_file)
         if host_text is not None:

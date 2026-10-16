@@ -7,7 +7,8 @@ from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice
 from pipelex.cogt.templating.exceptions import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
-from pipelex.core.bundle_resources.bundle_resource import BundleResourceReadStage, resource_path_refusal
+from pipelex.core.bundle_resources.bundle_resource import BundleResourceReadStage
+from pipelex.core.method_trees.file_references import file_reference_form_refusal
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateSyntaxError
@@ -67,12 +68,13 @@ class PipeDocGenBlueprint(PipeBlueprint):
 
     @model_validator(mode="after")
     def validate_template_sources(self) -> Self:
-        # The rule the files submitted with a bundle are keyed by, so a template file can be submitted whatever loads the
-        # bundle. The message never repeats the path: a host library's step would put the host's own path in front of a caller.
+        # The form of a file reference, the one check a blueprint can make before its method tree is at hand: whether the
+        # path names a file, a `..` climbing elsewhere in the tree included, is decided when the bundle loads, in its tree.
+        # The message never repeats the path: a host library's step would put the host's own path in front of a caller.
         if self.template_file is not None:
-            refusal = resource_path_refusal(path=self.template_file)
+            refusal = file_reference_form_refusal(reference=self.template_file)
             if refusal is not None:
-                msg = f"PipeDocGen's 'template_file' is a path relative to the bundle's file, inside its bundle, and this one cannot be: {refusal}."
+                msg = f"PipeDocGen's 'template_file' is a path relative to the bundle's file, in its method, and this one cannot be: {refusal}."
                 raise ValueError(msg)
         if self.template is not None and self.template_file is not None:
             msg = "PipeDocGen cannot have both 'template' and 'template_file': use one or the other."

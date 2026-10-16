@@ -58,6 +58,9 @@ class TestHostedSources:
         _write(path=tmp_path / "lib" / "nested" / "deep.mthds", content="deep")
         _write(path=tmp_path / "lib" / "notes.md", content="not a bundle")
         _write(path=tmp_path / "lib" / ".venv" / "vendored.mthds", content="excluded")
+        # A file the library's method tree keeps out is never sent, as a local load never reads it.
+        _write(path=tmp_path / "lib" / "draft.mthds", content="gitignored")
+        _write(path=tmp_path / "lib" / ".gitignore", content="draft.mthds\n")
         single = _write(path=tmp_path / "single.mthds", content="single")
 
         files = collect_mthds_files(primary=bundle, library_dirs=[str(tmp_path / "lib"), str(single), str(tmp_path / "missing")])

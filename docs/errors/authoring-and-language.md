@@ -116,13 +116,16 @@ own page. Classes are grouped by subsystem.
 
 - [`ConceptLibraryError`](concept-library-error.md) — Concept library
 - [`ConceptLoadingError`](concept-loading-error.md) — Concept loading
+- [`CrateIntegrityError`](crate-integrity-error.md) — Crate integrity error
 - [`CrateNormalizationError`](crate-normalization-error.md) — Crate normalization error
 - [`DomainLibraryError`](domain-library-error.md) — Domain library
 - [`DomainLoadingError`](domain-loading-error.md) — Domain loading
 - [`EntryPipeAmbiguousError`](entry-pipe-ambiguous-error.md) — Entry pipe ambiguous
 - [`EntryPipeNotFoundError`](entry-pipe-not-found-error.md) — Entry pipe not found
+- [`HostLibraryTreeError`](host-library-tree-error.md) — Host library tree
 - [`LibraryError`](library-error.md) — Library error
 - [`LibraryLoadingError`](library-loading-error.md) — Library loading
+- [`MethodTreeLoadError`](method-tree-load-error.md) — Method tree load
 - [`PipeLibraryError`](pipe-library-error.md) — Pipe library
 - [`PipeLoadingError`](pipe-loading-error.md) — Pipe loading
 - [`PipeNotFoundError`](pipe-not-found-error.md) — Pipe not found

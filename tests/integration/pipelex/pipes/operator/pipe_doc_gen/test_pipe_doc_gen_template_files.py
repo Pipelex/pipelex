@@ -8,7 +8,7 @@ from pipelex.core.bundle_resources.bundle_resource import make_bundle_resources
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import ValidateBundleResult, validate_bundle
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import StubEngines, write_bundle
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import METHOD_MANIFEST, StubEngines, write_bundle
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 _DOCX_TEMPLATE_STEP = 'format = "docx"\ntemplate_file = "invoice.docx"'
@@ -34,27 +34,73 @@ class TestPipeDocGenTemplateFiles:
     @pytest.mark.parametrize(
         ("template_file", "expected"),
         [
-            ("invoice.docx", "does not exist"),
-            ("../outside.docx", "it leaves the bundle through a '..' segment"),
-            ("linked.docx", "outside its bundle's directory"),
+            ("invoice.docx", "resolves to 'invoice.docx', which is not a file of the tree."),
+            ("../outside.docx", "climbs above the root of its method tree"),
+            ("ignored.docx", "which is not a file of the tree: it is kept out by a .gitignore pattern"),
+            (".templates/invoice.docx", "which is not a file of the tree: it is kept out by a path segment starting with a dot"),
         ],
-        ids=["missing_file", "outside_the_bundle", "linked_outside_the_bundle"],
+        ids=["missing_file", "outside_the_tree", "gitignored", "hidden"],
     )
-    async def test_a_template_file_is_found_inside_the_bundle_s_directory(self, tmp_path: Path, template_file: str, expected: str) -> None:
-        """A template file must exist beside the bundle, and a path out of the bundle's directory is refused even when the file exists.
-
-        The blueprint refuses a path written out of the bundle, and the load one that leads out of it through a link.
-        """
-        bundle_dir = tmp_path / "bundle"
-        bundle_dir.mkdir()
+    async def test_a_template_file_is_a_file_of_the_bundle_s_method_tree(self, tmp_path: Path, template_file: str, expected: str) -> None:
+        """A template file must be a file of the method's tree: one outside it, or one its membership rule keeps out, is never read."""
+        method_dir = tmp_path / "method"
+        method_dir.mkdir()
         (tmp_path / "outside.docx").write_bytes(b"docx")
-        (bundle_dir / "linked.docx").symlink_to(tmp_path / "outside.docx")
-        bundle_path = write_bundle(directory=bundle_dir, step_fields=f'format = "docx"\ntemplate_file = "{template_file}"')
+        (method_dir / "ignored.docx").write_bytes(b"docx")
+        (method_dir / ".gitignore").write_text("ignored.docx\n", encoding="utf-8")
+        (method_dir / ".templates").mkdir()
+        (method_dir / ".templates" / "invoice.docx").write_bytes(b"docx")
+        bundle_path = write_bundle(directory=method_dir, step_fields=f'format = "docx"\ntemplate_file = "{template_file}"')
 
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(mthds_file_path=bundle_path)
 
         assert expected in str(exc_info.value.to_error_report().model_dump())
+
+    @pytest.mark.usefixtures("stub_engines")
+    async def test_a_template_file_climbs_through_dot_dot_to_another_folder_of_its_tree(self, tmp_path: Path) -> None:
+        """A `..` may climb out of the bundle's folder to a file elsewhere in its method tree, which the step reads."""
+        (tmp_path / "templates").mkdir()
+        (tmp_path / "templates" / "invoice.html").write_text("<h1>{{ invoice.number }}</h1>", encoding="utf-8")
+        (tmp_path / "bundles").mkdir()
+        bundle_path = write_bundle(
+            directory=tmp_path / "bundles", step_fields='format = "pdf"\ntemplate_file = "../templates/invoice.html"', as_method=False
+        )
+        (tmp_path / "METHODS.toml").write_text(METHOD_MANIFEST, encoding="utf-8")
+
+        result = await validate_bundle(mthds_file_path=bundle_path)
+
+        (pipe,) = result.pipes
+        assert isinstance(pipe, PipeDocGen)
+        assert pipe.template == "<h1>{{ invoice.number }}</h1>"
+
+    @pytest.mark.usefixtures("stub_engines")
+    async def test_a_bundle_file_named_alone_reads_no_file_beside_it(self, tmp_path: Path) -> None:
+        """With no METHODS.toml at or above its folder, a bundle named alone is a one-file tree: the file beside it is refused."""
+        (tmp_path / "invoice.docx").write_bytes(b"docx")
+        bundle_path = write_bundle(directory=tmp_path, step_fields=_DOCX_TEMPLATE_STEP, as_method=False)
+
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_file_path=bundle_path)
+
+        report = str(exc_info.value.to_error_report().model_dump())
+        assert "names the template file 'invoice.docx'" in report
+        assert "Run the method's folder instead, or add a METHODS.toml to it." in report
+        assert exc_info.value.to_error_report().error_domain == "input"
+
+    @pytest.mark.usefixtures("stub_engines")
+    async def test_a_symbolic_link_in_the_method_refuses_its_tree(self, tmp_path: Path) -> None:
+        """A tree holds regular files only, so a link anywhere in the method refuses it before any step reads through it."""
+        (tmp_path / "outside.docx").write_bytes(b"docx")
+        method_dir = tmp_path / "method"
+        method_dir.mkdir()
+        (method_dir / "linked.docx").symlink_to(tmp_path / "outside.docx")
+        bundle_path = write_bundle(directory=method_dir, step_fields='format = "docx"\ntemplate_file = "linked.docx"')
+
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_file_path=bundle_path)
+
+        assert "holds a symbolic link, 'linked.docx'" in str(exc_info.value.to_error_report().model_dump())
 
     @pytest.mark.usefixtures("stub_engines")
     async def test_a_template_file_named_by_an_absolute_path_is_refused_without_repeating_it(self, tmp_path: Path) -> None:
@@ -67,7 +113,7 @@ class TestPipeDocGenTemplateFiles:
             await validate_bundle(mthds_file_path=bundle_path)
 
         report = str(exc_info.value.to_error_report().model_dump())
-        assert "a path relative to the bundle's file, inside its bundle, and this one cannot be: it is absolute" in report
+        assert "a path relative to the bundle's file, in its method, and this one cannot be: it is absolute" in report
         assert str(absolute_template) not in report
 
     @pytest.mark.usefixtures("stub_engines")
@@ -111,6 +157,7 @@ class TestPipeDocGenTemplateFiles:
     async def test_an_anything_input_reaches_the_checker_with_an_undeclared_shape(self, tmp_path: Path, stub_engines: StubEngines) -> None:
         """An `Anything` input has no content class to describe, so the checker is told its shape is not declared."""
         (tmp_path / "invoice.docx").write_bytes(b"docx bytes")
+        (tmp_path / "METHODS.toml").write_text(METHOD_MANIFEST, encoding="utf-8")
         bundle_path = tmp_path / "invoice.mthds"
         bundle_path.write_text(
             PipeDocGenTestData.bundle(step_fields=_DOCX_TEMPLATE_STEP).replace(

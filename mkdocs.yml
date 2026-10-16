@@ -262,6 +262,7 @@ plugins:
         - building-methods/pipes/index.md: "Design and Run Methods Overview"
         - building-methods/libraries.md: "Libraries"
         - building-methods/packages.md: "Packages"
+        - building-methods/method-trees.md: "Method Trees"
         - building-methods/pipes/executing-pipelines.md: "Executing Pipelines"
         - building-methods/pipes/running-on-the-hosted-api.md: "Running on the Hosted API from Python"
         - building-methods/pipes/run-modes-and-backends.md: "Run Modes & Backends"

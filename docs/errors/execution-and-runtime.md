@@ -25,6 +25,7 @@ own page. Classes are grouped by subsystem.
 
 ## Pipeline execution
 
+- [`MethodEntryError`](method-entry-error.md) — Method entry
 - [`PipeExecutionError`](pipe-execution-error.md) — Pipe execution
 - [`PipeIOContractError`](pipe-io-contract-error.md) — Pipe IO contract
 - [`PipeStackOverflowError`](pipe-stack-overflow-error.md) — Pipe stack overflow

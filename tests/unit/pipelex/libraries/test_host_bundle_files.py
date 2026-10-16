@@ -1,5 +1,11 @@
 from pathlib import Path
 
+import kajson
+import pytest
+from mthds.method_tree.lister import list_method_tree
+
+from pipelex.core.method_trees.tree_bundle import TreeBundle, TreeBundleRef
+from pipelex.libraries.exceptions import CrateIntegrityError
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
 from pipelex.libraries.library_manager import MTHDS_METHODS_DIRNAME, find_methods_dirs_from_blueprints
@@ -42,23 +48,44 @@ class TestHostBundleFiles:
         assert from_content.host_bundle_file is None
         assert from_content.source == str(bundle_path)
 
-    def test_the_crate_carries_the_host_file_of_its_file_loaded_pipes_only(self, tmp_path: Path) -> None:
-        """A `source` the bundle's text writes on a pipe, or a caller's label, never becomes a file to read beside."""
+    def test_the_crate_carries_the_tree_of_its_file_loaded_pipes_only(self, tmp_path: Path) -> None:
+        """A `source` the bundle's text writes on a pipe, or a caller's label, never becomes a tree to read files from."""
         bundle_path = _write_bundle(directory=tmp_path)
         other_dir = tmp_path / "other"
         other_dir.mkdir()
         content_with_a_written_source = _bundle(domain="host_files_other", pipe_fields=f'source = "{bundle_path}"')
+        from_file = MthdsParser.make_pipelex_bundle_blueprint(bundle_path=bundle_path)
+        tree_bundle = TreeBundle(tree=list_method_tree(tmp_path), tree_path="bundle.mthds")
+        from_file.place_in_tree(tree_bundle=tree_bundle)
+        from_content = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content_with_a_written_source, mthds_source=str(other_dir / "x.mthds"))
 
-        crate = LibraryCrateFactory.make_from_blueprints(
-            blueprints=[
-                MthdsParser.make_pipelex_bundle_blueprint(bundle_path=bundle_path),
-                MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content_with_a_written_source, mthds_source=str(other_dir / "x.mthds")),
-            ]
+        crate = LibraryCrateFactory.make_from_blueprints(blueprints=[from_file, from_content])
+
+        assert crate.tree_bundles == {"host_files_tests.summarize": TreeBundleRef(tree_key=tree_bundle.tree_key, tree_path="bundle.mthds")}
+        assert list(crate.method_trees) == [tree_bundle.tree_key]
+        assert crate.tree_bundles_by_pipe_ref() == {"host_files_tests.summarize": tree_bundle}
+        assert crate.pipes["host_files_other.summarize"].source == str(bundle_path)
+        # The trees travel as text, so the crate crosses any boundary a Temporal payload does, kajson's included.
+        for round_tripped in (LibraryCrate.model_validate_json(crate.model_dump_json()), kajson.loads(kajson.dumps(crate))):
+            assert isinstance(round_tripped, LibraryCrate)
+            assert round_tripped.fingerprint == crate.fingerprint
+            assert round_tripped.tree_bundles_by_pipe_ref() == {"host_files_tests.summarize": tree_bundle}
+        # The trees travel with the crate but are no part of what it is: the fingerprint ignores them.
+        unplaced = LibraryCrateFactory.make_from_blueprints(
+            blueprints=[MthdsParser.make_pipelex_bundle_blueprint(bundle_path=bundle_path), from_content],
+        )
+        assert unplaced.method_trees == {}
+        assert unplaced.fingerprint == crate.fingerprint
+
+    def test_a_crate_naming_a_tree_it_does_not_carry_is_refused(self, tmp_path: Path) -> None:
+        bundle_path = _write_bundle(directory=tmp_path)
+        crate = LibraryCrateFactory.make_from_blueprints(blueprints=[MthdsParser.make_pipelex_bundle_blueprint(bundle_path=bundle_path)])
+        broken = crate.model_copy(
+            update={"tree_bundles": {"host_files_tests.summarize": TreeBundleRef(tree_key="directory:/x:sha256:0", tree_path="bundle.mthds")}}
         )
 
-        assert crate.host_bundle_files == {"host_files_tests.summarize": str(bundle_path)}
-        assert crate.pipes["host_files_other.summarize"].source == str(bundle_path)
-        assert crate.fingerprint == LibraryCrate.model_validate_json(crate.model_dump_json()).fingerprint
+        with pytest.raises(CrateIntegrityError, match="carries no such tree"):
+            broken.tree_bundles_by_pipe_ref()
 
     def test_method_packages_are_searched_above_a_file_read_here_only(self, tmp_path: Path) -> None:
         """Walking up from a caller's label would search this host's directories wherever the caller pointed."""

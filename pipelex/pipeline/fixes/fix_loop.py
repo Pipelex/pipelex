@@ -23,7 +23,7 @@ Two scoping rules bound what gets touched:
 """
 
 import os
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Any, NamedTuple, cast
 
@@ -47,6 +47,7 @@ from pipelex.pipe_machinery.pipe_blueprint import SIGNATURE_ONLY_KEYS
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.fixes.applicability import is_safe_fix_for_load_scope, is_target_in_write_scope
 from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 from pipelex.suggested_fix import DeleteKeyOp, DeleteTableOp, EnsureTableOp, FixOp, MoveKeyOp, RemapValueOp, RenameTableKeyOp, SetKeyOp, SuggestedFix
 from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.toml_utils import load_toml_from_path
@@ -241,8 +242,11 @@ class _FilePipeCodes(NamedTuple):
     codes: set[str]
 
 
-def _pipe_codes_by_file(*, entry_path: Path, effective_dirs: Sequence[Path]) -> dict[Path, _FilePipeCodes]:
+def _pipe_codes_by_file(*, loaded_paths: Iterable[Path]) -> dict[Path, _FilePipeCodes]:
     """Concrete pipe declaration keys (with the declaring domain) of every loaded bundle file.
+
+    ``loaded_paths`` are the files this round's snapshot took, the entry included, so the method's trees are not
+    listed again between the validation and the fixes.
 
     The domain is recorded because the collision scope is **per-domain**: in-body refs resolve
     within their own domain and the library keys pipes by ``domain.code``, so a same-named
@@ -255,8 +259,7 @@ def _pipe_codes_by_file(*, entry_path: Path, effective_dirs: Sequence[Path]) -> 
     file that fails to parse contributes nothing here — its own problems surface through
     validation, not this scan.
     """
-    all_paths: set[Path] = {entry_path}
-    all_paths.update(mthds_path.resolve() for mthds_path in get_pipelex_mthds_files_from_dirs(dirs=set(effective_dirs)))
+    all_paths: set[Path] = {loaded_path.resolve() for loaded_path in loaded_paths}
     codes_by_file: dict[Path, _FilePipeCodes] = {}
     for mthds_path in all_paths:
         try:
@@ -412,7 +415,18 @@ async def fix_bundle_file(
     last_error_items: list[ValidationErrorItem] = []
 
     for _ in range(max_iterations):
-        snapshots_by_source = _snapshot_loaded_sources(entry_source_path=entry_source_path, effective_dirs=effective_dirs)
+        # The snapshot lists the method's trees: one that cannot be listed is the invalid verdict, with nothing to fix.
+        try:
+            with translate_to_validate_bundle_error():
+                snapshots_by_source = _snapshot_loaded_sources(entry_source_path=entry_source_path, effective_dirs=effective_dirs)
+        except ValidateBundleError as exc:
+            return FixBundleResult(
+                is_valid=False,
+                iterations=apply_rounds,
+                fixes_applied=fixes_applied,
+                files_written=files_written,
+                remaining_errors=_validation_error_items(exc),
+            )
         try:
             validation_result = await validate_bundle(
                 mthds_file_path=mthds_file_path,
@@ -463,7 +477,7 @@ async def fix_bundle_file(
             )
 
         if not is_single_file:
-            codes_by_file = _pipe_codes_by_file(entry_path=entry_path, effective_dirs=effective_dirs)
+            codes_by_file = _pipe_codes_by_file(loaded_paths=snapshots_by_source)
             in_scope_fixes, colliding_names = _split_cross_file_collisions(in_scope_fixes, codes_by_file=codes_by_file)
             if not in_scope_fixes:
                 colliding = ", ".join(f"'{name}'" for name in sorted(set(colliding_names)))

@@ -229,9 +229,9 @@ class PipeBlueprint(ABC, BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     source: str | None = None
-    """Not an authoring field. The library manager overwrites it, just before the pipe is built, with the bundle file this
-    host read the pipe's bundle from, or None, so whatever a bundle's text writes here is never read (see
-    `LibraryCrate.host_bundle_files`)."""
+    """Not an authoring field. The library manager clears it just before the pipe is built, so whatever a bundle's text
+    writes here is never read: a step finds a file its bundle names in the bundle's method tree, which the library
+    manager hands the factory (see `LibraryCrate.method_trees` and `building_pipe_of`)."""
     pipe_category: Any = Field(exclude=True)  # Technical field for Union discrimination, not user-facing
     type: Any  # TODO: Find a better way to handle this.
     description: str

@@ -40,9 +40,8 @@ class TestPipeDocGenBlueprint:
             ("unc_template_file", {"format": "docx", "template_file": "\\\\server\\share\\invoice.docx"}, "it holds a backslash"),
             ("posix_unc_template_file", {"format": "docx", "template_file": "//server/share/invoice.docx"}, "it is absolute"),
             ("colon_in_the_name", {"format": "docx", "template_file": "invoice:v2.docx"}, "it holds a colon"),
+            ("url", {"format": "docx", "template_file": "https://example.com/invoice.docx"}, "it is a URL"),
             ("backslash_in_the_name", {"format": "docx", "template_file": "templates\\invoice.docx"}, "it holds a backslash"),
-            ("leaves_the_bundle", {"format": "docx", "template_file": "../invoice.docx"}, "'..' segment"),
-            ("dot_dot_inside_the_bundle", {"format": "docx", "template_file": "templates/../invoice.docx"}, "'..' segment"),
             ("empty_template_file", {"format": "docx", "template_file": " "}, "it is empty"),
         ],
     )
@@ -62,7 +61,13 @@ class TestPipeDocGenBlueprint:
         assert blueprint.template_file == template_file
         assert canonical_resource_path_or_none(path=template_file) is not None
 
-    @pytest.mark.parametrize("template_file", ["/srv/methods/invoice.docx", "C:/srv/methods/invoice.docx", "../srv/methods/invoice.docx"])
+    @pytest.mark.parametrize("template_file", ["../invoice.docx", "templates/../invoice.docx", "../shared/templates/invoice.docx"])
+    def test_a_path_climbing_through_dot_dot_is_left_to_the_method_tree(self, template_file: str) -> None:
+        """A `..` may climb to a file elsewhere in the method's tree, which only the load, holding the tree, can tell."""
+        blueprint = _blueprint(format="docx", template_file=template_file)
+        assert blueprint.template_file == template_file
+
+    @pytest.mark.parametrize("template_file", ["/srv/methods/invoice.docx", "C:/srv/methods/invoice.docx", "srv\\methods\\invoice.docx"])
     def test_the_refusal_of_a_template_file_outside_its_bundle_never_repeats_it(self, template_file: str) -> None:
         """A host library's step would otherwise put the host's own path in front of a caller."""
         with pytest.raises(ValidationError) as exc_info:

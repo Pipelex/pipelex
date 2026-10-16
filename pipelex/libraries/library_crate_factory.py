@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, NamedTuple
 from pipelex.core.bundle_resources.bundle_resource import BundleResources
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
+from pipelex.core.method_trees.tree_bundle import TreeBundleRef
 from pipelex.libraries.collision_messages import duplicate_ref_msg
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.contract_match import contracts_match
@@ -13,6 +14,8 @@ from pipelex.mthds_parsing.pipelex_bundle_blueprint import ElaborationMetadata, 
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 
 if TYPE_CHECKING:
+    from mthds.method_tree.models import MethodTree
+
     from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 
 
@@ -64,13 +67,20 @@ class LibraryCrateFactory:
         pipes: dict[str, PipeBlueprintUnion] = {}
         domains: dict[str, DomainBlueprint] = {}
         source_map: dict[str, str] = {}
-        host_bundle_files: dict[str, str] = {}
+        method_trees: dict[str, MethodTree] = {}
+        tree_bundles: dict[str, TreeBundleRef] = {}
         elaboration_metadata: dict[str, ElaborationMetadata] = {}
 
         for blueprint in blueprints:
             domain_code = blueprint.domain
             source = blueprint.source
-            host_bundle_file = str(blueprint.host_bundle_file) if blueprint.host_bundle_file is not None else None
+            # The member of its method tree the bundle was read as, which a step reading a file the bundle names resolves
+            # it in; None for a bundle parsed from a string.
+            tree_bundle_ref: TreeBundleRef | None = None
+            if blueprint.tree_bundle is not None:
+                tree_key = blueprint.tree_bundle.tree_key
+                method_trees.setdefault(tree_key, blueprint.tree_bundle.tree)
+                tree_bundle_ref = TreeBundleRef(tree_key=tree_key, tree_path=blueprint.tree_bundle.tree_path)
 
             # Domain metadata: order-independent, omission-quiet merge (see merge_domain_metadata_field).
             if domain_code not in domains:
@@ -149,11 +159,11 @@ class LibraryCrateFactory:
                         else:
                             source_map.pop(pipe_ref, None)
                         if winner.blueprint is pipe_blueprint:
-                            # The bundle file a step reads beside follows the winner too.
-                            if host_bundle_file is not None:
-                                host_bundle_files[pipe_ref] = host_bundle_file
+                            # The tree a step resolves the files it names in follows the winner too.
+                            if tree_bundle_ref is not None:
+                                tree_bundles[pipe_ref] = tree_bundle_ref
                             else:
-                                host_bundle_files.pop(pipe_ref, None)
+                                tree_bundles.pop(pipe_ref, None)
                             cls._track_elaboration(
                                 elaboration_metadata=elaboration_metadata, pipe_ref=pipe_ref, elaboration=blueprint.get_elaboration_for(pipe_code)
                             )
@@ -161,8 +171,8 @@ class LibraryCrateFactory:
                     pipes[pipe_ref] = pipe_blueprint
                     if source:
                         source_map[pipe_ref] = source
-                    if host_bundle_file is not None:
-                        host_bundle_files[pipe_ref] = host_bundle_file
+                    if tree_bundle_ref is not None:
+                        tree_bundles[pipe_ref] = tree_bundle_ref
                     cls._track_elaboration(
                         elaboration_metadata=elaboration_metadata, pipe_ref=pipe_ref, elaboration=blueprint.get_elaboration_for(pipe_code)
                     )
@@ -177,7 +187,9 @@ class LibraryCrateFactory:
             pipes=pipes,
             domains=domains,
             source_map=source_map,
-            host_bundle_files=host_bundle_files,
+            # Only the trees a winning declaration was read from: a tree whose every pipe lost a collision travels nowhere.
+            method_trees={tree_key: method_trees[tree_key].model_dump_json() for tree_key in sorted({ref.tree_key for ref in tree_bundles.values()})},
+            tree_bundles=tree_bundles,
             elaboration_metadata=elaboration_metadata,
             python_sources=python_sources or {},
             bundle_resources=dict(bundle_resources) if bundle_resources else {},

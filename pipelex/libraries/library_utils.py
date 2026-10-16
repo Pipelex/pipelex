@@ -4,10 +4,10 @@ from pathlib import Path
 
 from pipelex import log
 from pipelex.config import get_config
-from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
+from pipelex.libraries.method_trees import list_library_bundle_files
+from pipelex.mthds_parsing.helpers import is_pipelex_file
 from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.log.error_fields import error_fields
-from pipelex.tools.misc.file_utils import find_files_in_dir
 
 
 def get_pipelex_mthds_files_from_package() -> list[Path]:
@@ -65,25 +65,13 @@ def get_pipelex_package_dir_for_imports() -> Path | None:
 
 
 def get_pipelex_mthds_files_from_dirs(dirs: set[Path]) -> list[Path]:
-    """Get all valid Pipelex MTHDS files from the given directories."""
-    all_mthds_paths: list[Path] = []
+    """The bundle files a load of these library directories reads, each spelled from its directory as given.
 
-    for dir_path in dirs:
-        if not dir_path.exists():
-            log.debug(f"A directory that does not exist was skipped: {dir_path}")
-            continue
+    The files are the `.mthds` members of each directory's method tree and of the trees nested in it
+    (`pipelex.libraries.method_trees`), so a file the membership rule keeps out, such as one in a run's output folder,
+    is never listed. A directory that does not exist holds none.
 
-        # Find all .mthds files in the directory, excluding problematic directories
-        mthds_files = find_files_in_dir(
-            dir_path=dir_path,
-            pattern=f"*{MTHDS_EXTENSION}",
-            excluded_dirs=list(get_config().interpreter.scan.excluded_dirs),
-        )
-
-        # Filter to only include valid Pipelex files
-        for mthds_file in mthds_files:
-            if is_pipelex_file(mthds_file):
-                all_mthds_paths.append(mthds_file)
-            else:
-                log.debug(f"An MTHDS file that is not a Pipelex file was skipped: {mthds_file}")
-    return all_mthds_paths
+    Raises:
+        MethodTreeLoadError: A tree could not be listed.
+    """
+    return [bundle_file.path for bundle_file in list_library_bundle_files(library_dirs=sorted(dirs))]

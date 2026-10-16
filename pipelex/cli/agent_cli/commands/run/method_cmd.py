@@ -30,6 +30,7 @@ from pipelex.cli.agent_cli.commands.run._run_hosted import (
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs
 from pipelex.cli.commands.run._hosted_sources import resolve_hosted_method_target
 from pipelex.cli.commands.run._inputs_file_loader import resolve_inputs_arg_against_dir
+from pipelex.cli.commands.run._run_output_folder import RUN_RESULTS_DIR_NAME
 from pipelex.cli.method_resolver import method_output_base_dir, resolve_method_target
 from pipelex.hosted.exceptions import HostedRunSourceError
 from pipelex.hosted.hosted_run import HostedRunRequest
@@ -163,10 +164,10 @@ def run_method_cmd(
         agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
 
     # A fetched method's package directory is an ephemeral clone deleted at process exit —
-    # anchor run outputs (output JSON, graph files) in a durable location instead.
+    # anchor run output folders (output JSON, graph files) in a durable location instead.
     output_dir_override: Path | None = None
     if method.provenance is not None:
-        output_dir_override = method_output_base_dir(method=method) / "results"
+        output_dir_override = method_output_base_dir(method=method) / RUN_RESULTS_DIR_NAME
 
     bundle_path: str | None = None
     mthds_content: str | None = None

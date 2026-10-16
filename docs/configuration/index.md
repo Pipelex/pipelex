@@ -70,7 +70,7 @@ The configuration is organized into these main sections. The first three mirror 
 
 1. `[runtime]` - process-scoped infrastructure: storage, secrets, logging, cloud credentials, outbound network posture, reporting, tracing, observation, and the plugin denylist
 2. `[inference]` - the model-calling seam: the model deck, LLM, image generation, extraction, the default templating style, and dry-run mocks
-3. `[interpreter]` - library-scoped method machinery: MTHDS parsing, pipe runs, pipe functions, pipeline execution, source scanning, and the builder
+3. `[interpreter]` - library-scoped method machinery: MTHDS parsing, the limits a method tree is listed under, pipe runs, pipe functions, pipeline execution, source scanning, and the builder
 4. `[run]` - where `pipelex run` and `pipelex-agent run` execute a method by default: on this machine or on the hosted Pipelex API, see [Run Configuration](config-practical/run-config.md)
 5. `[kit]` - settings for the `pipelex-dev` kit tooling
 6. `[usage_stats]` - `enabled = false` turns off Pipelex's anonymous usage statistics for everyone working in the project; it is read from the project's own `.pipelex/pipelex.toml` and from the configuration Pipelex is packaged with, never from `~/.pipelex/`, and `true` has no effect, see [Usage Statistics](../setup/usage-statistics.md)

@@ -31,9 +31,10 @@ _FALLBACK_STORED_STEM = "file"
 def bundle_resource_reads(*, pipe_blueprints: Iterable[PipeBlueprintUnion]) -> dict[str, BundleResourceReadStage]:
     """The bundle files these pipes read, keyed by canonical path, and when each is first read.
 
-    A path no file inside a bundle can have, such as one with a `..` segment, is left out: no submitted file can
-    answer it, and a step's blueprint refuses to name one. A file read at load by one step and at run by another
-    counts as read at load, which is the stricter way to carry it.
+    A path no file submitted with a bundle can have, such as one with a `..` segment, is left out: no submitted file
+    can answer it, and the step that names it is refused when it is built, as naming a file not supplied with its
+    bundle. A file read at load by one step and at run by another counts as read at load, which is the stricter way to
+    carry it.
     """
     reads: dict[str, BundleResourceReadStage] = {}
     for pipe_blueprint in pipe_blueprints:
