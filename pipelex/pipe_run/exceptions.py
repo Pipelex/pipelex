@@ -18,8 +18,9 @@ class AsyncExecutionNotEnabledError(PipelexError):
     Backend-neutral on purpose, because it is the shared contract between the
     runner API — which maps it to an HTTP status (501) — and any async-execution
     backend plugin that raises it: the Temporal plugin today, other async backends
-    (e.g. Mistral Workflows) as support lands. Nothing in this repo raises it. The
-    class name, title, and detail therefore talk about *async execution* as a
+    (e.g. Mistral Workflows) as support lands. In this repo, the local runtime's
+    ``PipelexMTHDSProtocol.start`` raises it, since it runs nothing asynchronously.
+    The class name, title, and detail therefore talk about *async execution* as a
     capability of the deployment, not about any specific backend brand.
 
     Its code is ``runtime.unsupported``: the caller's request is well-formed, and what is missing is a
