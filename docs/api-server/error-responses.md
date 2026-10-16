@@ -213,7 +213,7 @@ https://docs.pipelex.com/latest/errors/<kebab-class-name>/
 
 API-authored errors (`ValidationError`, `BadRequest`, `Unauthenticated`, etc.) follow the same convention with their own slugs.
 
-The per-class pages these URIs named are retired. Errors are moving to the codes of the MTHDS standard and of the Pipelex error registry, whose type URI is the code's page: `https://mthds.ai/errors/<code>` for a core code and `https://docs.pipelex.com/errors/<code>` for a `pipelex.` code, listed on the [Error Codes](../errors/index.md) page. Until a response carries its code, its class-derived `type` resolves to no page.
+The per-class pages these URIs named are retired. Errors are moving to the codes of the MTHDS standard and of the Pipelex error registry, whose type URI is the code's page: `https://mthds.ai/errors/<code>` for a core code and `https://docs.pipelex.com/errors/<code>` for a `pipelex.` code, listed on the [Error Codes](../errors/index.md) page. Until a response carries its code, its class-derived `type` names no page of its own: the documentation site sends such a URL to the Error Codes index.
 
 ## Request correlation
 
