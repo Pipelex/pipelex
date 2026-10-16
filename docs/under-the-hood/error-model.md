@@ -486,7 +486,7 @@ Exception
 └── PipelexError                  base_exceptions.py — error_domain, user_action, to_error_report()
     ├── PipelexConfigError         → error_domain = CONFIG
     ├── PipelexSetupError          → error_domain = CONFIG
-    ├── SecurityError              base_exceptions.py — every security-policy refusal
+    ├── SecurityError              base_exceptions.py — the policy refusals never absorbed into a domain answer
     │   ├── UriReadRefusedError / SsrfBlockedError   → error_domain = INPUT, caller-facing message
     │   ├── UnsafeSchemaError
     │   └── Jinja2TemplateSecurityError              ← the template sandbox's refusal at render time
@@ -504,7 +504,7 @@ Exception
     └── ... (one exceptions.py per package) ...
 ```
 
-`SecurityError` is the one base class of the runtime's policy refusals, wherever they are raised: a read outside the run's scope, an outbound request the SSRF guard blocks, a schema carrying Python code-generation extensions, a template the sandbox refuses. The handlers that turn a refusal of the caller's input into a verdict, the bundle-validation cascade and the library load, let a `SecurityError` through as it is, and a host that treats every refusal alike, a durable-execution plugin marking it non-retryable for instance, names that base class alone.
+`SecurityError` is the base class of the policy refusals that are never absorbed into a domain answer: `UriReadRefusedError` (a read outside the run's scope), `SsrfBlockedError` (an outbound request the SSRF guard blocks), `UnsafeSchemaError` (a schema carrying Python code-generation extensions) and `Jinja2TemplateSecurityError` (a template the sandbox refuses at render time). The handlers that turn a refusal of the caller's input into a verdict, the bundle-validation cascade and the library load, let a `SecurityError` through as it is, and a host that treats this family alike, a durable-execution plugin marking it non-retryable for instance, names that base class. Not every refusal belongs to it: the template sandbox's render-budget refusal, `Jinja2TemplateBudgetError`, is a `ToolError` in the `input` domain, and `TemplateUrlRefusedError` derives from `PipelexError` directly, also in the `input` domain, so each is handled by its domain like any other refusal of the caller's input.
 
 `PipelineExecutionError`'s `RUNTIME` is deliberately a *floor*, applied only when the cause chain surfaced no domain — so a `CONTENT`-categorized inference failure now reaches the HTTP boundary as `INPUT` / 422 through every wrapping layer instead of being flattened to the wrapper's generic 500. Its identity and message are its root fault's (see [Run Failures: the Root Fault, Located](#run-failures-the-root-fault-located)).
 
