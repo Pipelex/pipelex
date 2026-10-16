@@ -186,6 +186,7 @@ class TestProviderErrorMetadata:
                 False,
             ),
             ("a_missing_field", "max_tokens: Field required", None, None, False),
+            ("a_field_too_long", "tools.0.description: tool description input is too long", None, None, False),
             ("a_size_limit", "Request exceeds the maximum size", "request_too_large", None, False),
         ],
     )

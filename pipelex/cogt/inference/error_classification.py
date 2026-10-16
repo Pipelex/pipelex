@@ -272,8 +272,9 @@ _CONTEXT_WINDOW_PATTERNS: tuple[str, ...] = (
     "prompt is too long",
     # Anthropic's when the prompt and the max_tokens requested together pass the window
     "exceed context limit",
-    # Bedrock's ValidationException
-    "input is too long",
+    # Bedrock's ValidationException, in full: a 400 about one field's length, such as a tool description's, may say
+    # "input is too long" of that field alone
+    "input is too long for requested model",
     # Gemini's INVALID_ARGUMENT
     "exceeds the maximum number of tokens allowed",
 )
