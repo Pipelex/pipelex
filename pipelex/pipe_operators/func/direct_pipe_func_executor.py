@@ -18,8 +18,7 @@ from pipelex.core.method_trees.tree_files import write_call_files
 from pipelex.core.method_trees.tree_python import TREE_PYTHON_HOLD
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.interpreter_hub import get_library_manager, get_required_pipe
-from pipelex.kernel.exceptions import FuncOutputTypeError
-from pipelex.kernel.func_ops import call_function
+from pipelex.kernel.func_ops import coerce_function_output, invoke_function
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe_func_call_files import read_pipe_func_call_files
 from pipelex.pipe_operators.func.exceptions import PipeFuncExecutionError, PipeFuncRaisedError
@@ -60,8 +59,8 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
     The function is the step's own: the `PipeFunc` imports it by its import path, under the process's
     hold on its method tree's Python, and checks it (`PipeFunc.bind_function`). What running it *means*
     — async-vs-sync dispatch and the str/list -> StuffContent coercion — is the kernel's
-    ``call_function``, so this executor is what is left once that is factored out: the in-process
-    wiring of the live arm, and the whole transported arm below.
+    (``invoke_function``, then ``coerce_function_output``), so this executor is what is left once
+    that is factored out: the in-process wiring of the live arm, and the whole transported arm below.
     """
 
     @override
@@ -83,15 +82,15 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
         # and output, tells it from a failure of this seam, which keeps its own code.
         function = function_of_call_in_flight(pipe_ref=pipe_code) or resolve_pipe_func(pipe_code=pipe_code).bind_function()
         try:
-            call_result = await call_function(function=function, function_name=function_name, memory=working_memory)
-        except FuncOutputTypeError:
-            # The kernel's coercion refused what the function returned: `pipe.output_invalid`, its own code.
-            raise
+            function_output = await invoke_function(function=function, memory=working_memory)
         except Exception as exc:
             # Case (2), unbounded code: the function is arbitrary user code whose exception surface cannot be
             # enumerated. Whatever it raised is its failure, a coded Pipelex error a helper raised inside it included.
             msg = f"{type(exc).__name__}: {exc}"
             raise PipeFuncRaisedError(msg) from exc
+        # Outside the function's failure: the kernel's coercion refusing what the function returned is the step's
+        # output failing, `FuncOutputTypeError` with `pipe.output_invalid`, whatever shape it refused.
+        call_result = coerce_function_output(function=function, function_output=function_output, function_name=function_name)
         return PipeFuncExecutionResult(
             content=call_result.content,
             function_module=call_result.function_module,

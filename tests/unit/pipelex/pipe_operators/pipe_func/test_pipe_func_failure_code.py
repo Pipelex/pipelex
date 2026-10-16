@@ -12,6 +12,7 @@ from pipelex.core.pipes.exceptions import PipeRunError
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.errors.error_codes import ErrorCode
 from pipelex.interpreter_hub import scoped_pipe_func_executor
+from pipelex.kernel.exceptions import FuncOutputTypeError
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.func.direct_pipe_func_executor import DirectPipeFuncExecutor
 from pipelex.pipe_operators.func.exceptions import PipeFuncExecutionError, PipeFuncRaisedError
@@ -44,6 +45,16 @@ def _raises_a_plain_error(working_memory: WorkingMemory) -> TextContent:
     _ = working_memory
     msg = "the ledger has no line for this parcel"
     raise KeyError(msg)
+
+
+def _returns_a_list_holding_a_dict(working_memory: WorkingMemory) -> list[dict[str, str]]:
+    _ = working_memory
+    return [{"parcel": "7"}]
+
+
+def _returns_a_list_holding_a_number(working_memory: WorkingMemory) -> list[Any]:
+    _ = working_memory
+    return [TextContent(text="line 7"), 7]
 
 
 class _TimedOutExecutor(PipeFuncExecutorProtocol):
@@ -163,3 +174,21 @@ class TestPipeFuncFailureCode:
         failure = await _failure_of(pipe_func=_make_pipe_func(), executor=executor, function=_raises_a_plain_error)
 
         assert failure.to_error_report().code == expected_code
+
+    @pytest.mark.parametrize(
+        "function",
+        [_returns_a_list_holding_a_dict, _returns_a_list_holding_a_number],
+        ids=["list_holding_a_dict", "list_holding_a_number"],
+    )
+    @pytest.mark.asyncio
+    async def test_a_return_shape_the_coercion_refuses_is_the_step_s_output_failing(
+        self, load_empty_library: Callable[[], str], mocker: MockerFixture, function: Callable[..., Any]
+    ) -> None:
+        """The function returned, so what it returned failing the coercion is no failure of the function's, whatever its shape."""
+        load_empty_library()
+        mocker.patch("pipelex.pipe_operators.func.pipe_func.is_pipe_func_sandbox_hosted", return_value=True)
+
+        failure = await _failure_of(pipe_func=_make_pipe_func(), executor=DirectPipeFuncExecutor(), function=function)
+
+        assert failure.to_error_report().code == CoreCode.PIPE_OUTPUT_INVALID
+        assert isinstance(failure.__cause__, FuncOutputTypeError)
