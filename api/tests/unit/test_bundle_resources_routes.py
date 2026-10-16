@@ -11,6 +11,7 @@ records the bytes it reads through the method file store, which is the read the 
 
 import base64
 import io
+import json
 import zipfile
 from collections.abc import Callable, Mapping
 from pathlib import Path
@@ -414,6 +415,29 @@ class TestBundleResourcesRoutes:
         detail = _assert_problem(_build_client().post("/v1/execute", json=body), status=422, error_type="InvalidResourcePath")
 
         assert f"'{_TEMPLATE_PATH}'" in detail
+
+    @pytest.mark.parametrize("sends_the_logo", [True, False])
+    def test_a_file_only_a_template_s_relative_url_names_travels_in_the_method_s_tree(self, mocker: MockerFixture, sends_the_logo: bool) -> None:
+        """No step names the logo, only the template's `<img src>` does: a tree keeps it, and the load's check finds it there.
+
+        Beside inline contents, `resources` still refuses a file no step names, so such a method is sent as a tree.
+        """
+        _stub_the_document_engine(mocker)
+        html_mthds = _INVOICE_MTHDS.replace('format        = "docx"', 'format        = "pdf"').replace(_TEMPLATE_PATH, "templates/invoice.html")
+        files: dict[str, Any] = {
+            "invoicing.mthds": html_mthds,
+            "templates/invoice.html": '<img src="logo.png" alt="Acme"><h1>{{ invoice.number }}</h1>',
+        }
+        if sends_the_logo:
+            files["templates/logo.png"] = {"base64": _b64(b"\x89PNG\r\n\x1a\n a logo")}
+
+        response = _build_client().post("/v1/validate", json={"files": files})
+
+        assert response.status_code == 200, response.text
+        verdict = response.json()
+        assert verdict["is_valid"] is sends_the_logo, response.text
+        if not sends_the_logo:
+            assert "logo.png" in json.dumps(verdict["validation_errors"])
 
     def test_two_bundles_of_a_method_each_read_the_file_beside_them(self, mocker: MockerFixture) -> None:
         """A step names its file from its bundle's own tree path, so two bundles shipping a template each under one relative path both run."""
