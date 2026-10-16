@@ -13,8 +13,8 @@ A registry document is checked in three passes, each run only on a document the 
    parameter its reader may not see, and a reference to a documentation page that does not exist.
    To these, Pipelex adds the rules its own use of the registry needs: the prefix is registered in the
    core registry under the same base URL, every code a sentence names in backticks exists, every
-   parameter name can be a field of the typed Python generated from the registry, and distinct codes
-   generate distinct names in it.
+   parameter name can be a field of the typed Python generated from the registry, distinct codes
+   generate distinct names in it, and every title, description and parameter can be written into it.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ from jsonschema import Draft202012Validator, FormatChecker, ValidationError
 from pydantic import BaseModel
 from pydantic import ValidationError as PydanticValidationError
 
-from pipelex.cli.dev_cli.commands.error_registry.codes_generator import code_member_name, params_class_name
+from pipelex.cli.dev_cli.commands.error_registry.codes_generator import code_member_name, generated_code_errors, params_class_name
 from pipelex.errors.registry.registry_document import ErrorRegistryDocument, RegistryDomain, RegistryEntry
 
 if TYPE_CHECKING:
@@ -282,6 +282,7 @@ def semantic_errors(*, registry: ErrorRegistryDocument, core: ErrorRegistryDocum
         if family not in used_families:
             errors.append(f"{where}: the family {family} is declared but no code belongs to it")
     errors.extend(generated_name_errors(registry=registry, where=where))
+    errors.extend(generated_code_errors(registry=registry, where=where))
     return errors
 
 

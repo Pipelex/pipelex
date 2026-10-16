@@ -75,11 +75,14 @@ def load_registry_source(*, path: Path = REGISTRY_SOURCE_PATH) -> dict[str, Any]
     """The registry's YAML source, as a mapping.
 
     Raises:
-        ErrorRegistryError: When the file does not parse, holds a key twice or is not a mapping.
+        ErrorRegistryError: When the file cannot be read, does not parse, holds a key twice or is not a mapping.
     """
     try:
         with path.open(encoding="utf-8") as stream:
             loaded: Any = yaml.load(stream, Loader=_UniqueKeyLoader)  # ruff: ignore[unsafe-yaml-load] - the loader is a SafeLoader subclass
+    except (OSError, UnicodeDecodeError) as exc:
+        msg = f"{relative_to_repo(path=path)} cannot be read: {exc}"
+        raise ErrorRegistryError(msg) from exc
     except yaml.YAMLError as exc:
         msg = f"{relative_to_repo(path=path)}: {exc}"
         raise ErrorRegistryError(msg) from exc
@@ -91,8 +94,19 @@ def load_registry_source(*, path: Path = REGISTRY_SOURCE_PATH) -> dict[str, Any]
 
 
 def read_pipelex_version(*, pyproject_path: Path = PYPROJECT_PATH) -> str:
-    """Pipelex's version, the `[project].version` of ``pyproject.toml``, which the registry is published under."""
-    project: Any = tomllib.loads(pyproject_path.read_text(encoding="utf-8")).get("project", {})
+    """Pipelex's version, the `[project].version` of ``pyproject.toml``, which the registry is published under.
+
+    Raises:
+        ErrorRegistryError: When ``pyproject.toml`` cannot be read, does not parse or has no version.
+    """
+    try:
+        project: Any = tomllib.loads(pyproject_path.read_text(encoding="utf-8")).get("project", {})
+    except (OSError, UnicodeDecodeError) as exc:
+        msg = f"{relative_to_repo(path=pyproject_path)} cannot be read: {exc}"
+        raise ErrorRegistryError(msg) from exc
+    except tomllib.TOMLDecodeError as exc:
+        msg = f"{relative_to_repo(path=pyproject_path)} is not valid TOML: {exc}"
+        raise ErrorRegistryError(msg) from exc
     version: Any = cast("dict[str, Any]", project).get("version") if isinstance(project, dict) else None
     if not isinstance(version, str):
         msg = f"{relative_to_repo(path=pyproject_path)} has no [project].version"
@@ -140,9 +154,16 @@ def load_composed_document() -> dict[str, Any]:
 
 
 def load_json_file(*, path: Path) -> Any:
-    """A JSON file's content."""
+    """A JSON file's content.
+
+    Raises:
+        ErrorRegistryError: When the file cannot be read or is not valid JSON.
+    """
     try:
         return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError) as exc:
+        msg = f"{relative_to_repo(path=path)} cannot be read: {exc}"
+        raise ErrorRegistryError(msg) from exc
     except json.JSONDecodeError as exc:
         msg = f"{relative_to_repo(path=path)} is not valid JSON: {exc}"
         raise ErrorRegistryError(msg) from exc
@@ -178,9 +199,16 @@ class VendoredRecord(BaseModel):
 
 
 def load_vendored_record(*, path: Path = STANDARD_RECORD_PATH) -> VendoredRecord:
-    """The record of the vendored standard files."""
+    """The record of the vendored standard files.
+
+    Raises:
+        ErrorRegistryError: When the record cannot be read, does not parse or is not such a record.
+    """
     try:
         return VendoredRecord.model_validate(tomllib.loads(path.read_text(encoding="utf-8")))
+    except (OSError, UnicodeDecodeError) as exc:
+        msg = f"{relative_to_repo(path=path)} cannot be read: {exc}"
+        raise ErrorRegistryError(msg) from exc
     except (tomllib.TOMLDecodeError, ValidationError) as exc:
         msg = f"{relative_to_repo(path=path)} is not a valid record of the vendored standard files: {exc}"
         raise ErrorRegistryError(msg) from exc
@@ -194,7 +222,11 @@ def vendored_file_errors(*, record: VendoredRecord, standard_dir: Path = STANDAR
         if not file_path.is_file():
             errors.append(f"{relative_to_repo(path=file_path)} is missing, though {relative_to_repo(path=STANDARD_RECORD_PATH)} records it")
             continue
-        digest = hashlib.sha256(file_path.read_bytes()).hexdigest()
+        try:
+            digest = hashlib.sha256(file_path.read_bytes()).hexdigest()
+        except OSError as exc:
+            errors.append(f"{relative_to_repo(path=file_path)} cannot be read: {exc}")
+            continue
         if digest != vendored_file.sha256:
             errors.append(
                 f"{relative_to_repo(path=file_path)} has the digest {digest}, not the {vendored_file.sha256} that "

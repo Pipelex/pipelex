@@ -307,6 +307,22 @@ class TestErrorRegistryChecks:
                 _add_codes(["pipelex.pipelex"], ["pipelex.pipelex.error"]),
                 "pipelex.pipelex.error: its parameters model would be named PipelexErrorParams, which the generated module already defines",
             ),
+            (
+                _set_member("pipelex.storage.unavailable", "title", "The storage at C:\\data failed"),
+                "pipelex.storage.unavailable: title cannot be written into a docstring as it stands",
+            ),
+            (
+                _add_param("pipelex.storage.unavailable", "name", {"type": "identifier", "description": 'A name, such as "acme"'}),
+                "pipelex.storage.unavailable: params.name.description cannot be written into a docstring as it stands",
+            ),
+            (
+                _add_param(
+                    "pipelex.storage.unavailable",
+                    "kind",
+                    {"type": "enum", "values": [f"a_rather_long_value_{index}" for index in range(8)], "description": "A kind."},
+                ),
+                "pipelex.storage.unavailable: the field of the parameter kind runs past 150 characters",
+            ),
         ],
     )
     def test_a_rule_beyond_the_schema_is_enforced(

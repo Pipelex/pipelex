@@ -72,7 +72,19 @@ def load_core_registry() -> ErrorRegistryDocument:
 
 
 def source_errors() -> tuple[CheckedRegistry | None, list[str]]:
-    """The faults of the registry's source and of the standard's vendored files, or the checked registry when there are none."""
+    """The faults of the registry's source and of the standard's vendored files, or the checked registry when there are none.
+
+    A file that cannot be read or parsed, such as a source that is not valid YAML or holds a key twice, a core
+    snapshot that is not valid JSON, or a ``pyproject.toml`` version the registry cannot be published under,
+    is reported as a fault like any other, never raised.
+    """
+    try:
+        return _checked_source()
+    except ErrorRegistryError as exc:
+        return None, [str(exc)]
+
+
+def _checked_source() -> tuple[CheckedRegistry | None, list[str]]:
     errors = vendored_file_errors(record=load_vendored_record())
     if errors:
         return None, errors

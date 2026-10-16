@@ -23,7 +23,7 @@ Regenerate them all after changing the source:
 make generate-error-registry   # alias: make ger
 ```
 
-The generator refuses to write anything from a source with a fault, and prints the faults. To check without writing, which is what the test suite does as well:
+The generator refuses to write anything from a source with a fault, and prints the faults. A file that does not load is such a fault, printed like the others: a source that is not valid YAML, holds a key twice or writes a version, a vendored file that cannot be read or parsed, and a `pyproject.toml` version the registry cannot be published under. To check without writing, which is what the test suite does as well:
 
 ```bash
 make check-error-registry      # alias: make cer
@@ -64,7 +64,8 @@ To these, Pipelex adds the rules its own use of the registry needs:
 - the core registry registers the `pipelex` prefix under the base URL the pages are published at, `https://docs.pipelex.com/errors`;
 - every code a sentence names in backticks exists: a core code such as `provider.credential_refused` in the core registry, a `pipelex.` code in this one;
 - every parameter name can be a field of the generated parameters model, so it is neither a Python keyword nor an attribute of a pydantic model;
-- distinct codes generate distinct names in the typed Python: the generated names drop the prefix and join the segments, so `pipelex.run_job.failed` and `pipelex.run.job_failed` would both be `RUN_JOB_FAILED` and `RunJobFailedParams`, and the check refuses such a pair rather than let one model replace the other.
+- distinct codes generate distinct names in the typed Python: the generated names drop the prefix and join the segments, so `pipelex.run_job.failed` and `pipelex.run.job_failed` would both be `RUN_JOB_FAILED` and `RunJobFailedParams`, and the check refuses such a pair rather than let one model replace the other;
+- every title and parameter description can be written into a docstring of the typed Python, so none holds a backslash or a closing quote, and every parameter's field fits on one line of the formatter's length.
 
 ## The standard's vendored files
 

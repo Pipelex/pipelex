@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import typer
 
+from pipelex.cli.dev_cli.commands.error_registry.exceptions import ErrorRegistryError
 from pipelex.cli.dev_cli.commands.error_registry.registry_outputs import (
     check_error_registry,
     render_outputs,
@@ -72,7 +73,11 @@ def write_error_type_redirects_cmd(*, site_root: Path, quiet: bool = False) -> N
     if checked is None:
         _print_faults(heading="The error registry is invalid, so no redirect was written:", errors=errors)
         raise typer.Exit(1)
-    report = write_type_redirects(site_root=site_root, base_url=checked.registry.base_url)
+    try:
+        report = write_type_redirects(site_root=site_root, base_url=checked.registry.base_url)
+    except ErrorRegistryError as exc:
+        _print_faults(heading="The published site cannot take the redirects, so none was written:", errors=[str(exc)])
+        raise typer.Exit(1) from exc
     console.print(
         f"Error type redirects: {len(report.written)} written, {len(report.unchanged)} unchanged, {len(report.removed)} removed",
         markup=False,

@@ -128,11 +128,40 @@ def _field_line(*, param_name: str, param: RegistryParam, imports: _Imports) -> 
     return f"    {param_name}: {annotation}"
 
 
+_DOCSTRING_FAULT = "cannot be written into a docstring as it stands: it holds a backslash or a closing quote"
+
+
+def _breaks_a_docstring(*, text: str) -> bool:
+    """Whether a text would change or end the docstring it is written into: a backslash, or a closing quote."""
+    return "\\" in text or '"""' in text or text.endswith('"')
+
+
 def _docstring_text(*, text: str, where: str) -> str:
-    if "\\" in text or '"""' in text or text.endswith('"'):
-        msg = f"{where} cannot be written into a docstring as it stands: it holds a backslash or a closing quote"
+    if _breaks_a_docstring(text=text):
+        msg = f"{where} {_DOCSTRING_FAULT}"
         raise ErrorRegistryError(msg)
     return text
+
+
+def generated_code_errors(*, registry: ErrorRegistryDocument, where: str) -> list[str]:
+    """The titles, descriptions and parameters the generated Python cannot hold as they stand.
+
+    A code's title and each parameter's description go into a docstring, where a backslash or a closing
+    quote would change or end it, and each parameter's field is one line, which must stay within the line
+    length the formatter keeps. The generator refuses either, so the checks report them first, as faults of
+    the source, rather than leave the generator to stop on the first one.
+    """
+    errors: list[str] = []
+    for entry in registry.codes:
+        here = f"{where}: {entry.code}"
+        if _breaks_a_docstring(text=entry.title):
+            errors.append(f"{here}: title {_DOCSTRING_FAULT}")
+        for param_name, param in entry.params.items():
+            if _breaks_a_docstring(text=param.description):
+                errors.append(f"{here}: params.{param_name}.description {_DOCSTRING_FAULT}")
+            if len(_field_line(param_name=param_name, param=param, imports=_Imports())) > _LINE_LENGTH:
+                errors.append(f"{here}: the field of the parameter {param_name} runs past {_LINE_LENGTH} characters")
+    return errors
 
 
 def _params_class(*, registry: ErrorRegistryDocument, entry: RegistryEntry, imports: _Imports) -> list[str]:
