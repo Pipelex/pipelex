@@ -311,6 +311,16 @@ def classify_inference_error(metadata: SDKErrorEnvelope, *, family: InferenceErr
             error_code=CoreCode.PROVIDER_RATE_LIMITED,
         )
 
+    if status_code == 408:
+        # The provider answered that it gave up waiting. Nothing in the caller's input or the deployment caused it,
+        # and the provider said so itself, which is not the lost answer `provider.outcome_unknown` covers: the call
+        # is repeated, a billed image call included.
+        return ClassificationResult(
+            category=InferenceErrorCategory.TRANSIENT,
+            user_action_kind=UserActionKind.WAIT_AND_RETRY,
+            error_code=CoreCode.PROVIDER_TIMEOUT,
+        )
+
     if status_code == 402:
         return ClassificationResult(
             category=InferenceErrorCategory.CAPACITY,
@@ -364,8 +374,6 @@ def classify_inference_error(metadata: SDKErrorEnvelope, *, family: InferenceErr
             case 413:
                 # Anthropic's ``request_too_large``: the request the caller's material made is over the provider's limit.
                 error_code = CoreCode.INPUT_TOO_LARGE
-            case 408:
-                error_code = CoreCode.PROVIDER_TIMEOUT
             case _:
                 error_code = CoreCode.RUNTIME_UNEXPECTED
         return ClassificationResult(
