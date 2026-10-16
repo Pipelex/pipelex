@@ -8,7 +8,7 @@ Not every code↔doc relationship deserves a review contract. This repo distingu
 
 | Tier | Mechanism | Judgment needed |
 |---|---|---|
-| **Derived** | Regenerate and diff: `check-config-sync`, `check-mthds-schema`, `generate-error-pages`, `generate-error-identity` | None — the output is a pure function of its sources |
+| **Derived** | Regenerate and diff: `check-config-sync`, `check-mthds-schema`, `check-error-registry`, `generate-error-identity` | None — the output is a pure function of its sources |
 | **Linkage** | Referential integrity of declared cross-references (the spec ↔ verifying-test back-link pair) | None — links either resolve or they don't |
 | **Review** | Drift contracts: "this changed → that must be looked at, and the look recorded" | Yes — someone must judge whether the target still holds |
 

@@ -92,9 +92,9 @@ For the hosted API, the Daytona sandbox plugin registers the offer for its `dayt
 
 | Error | Domain | When |
 | --- | --- | --- |
-| [`MethodRequirementsFileError`](../errors/method-requirements-file-error.md) | `input` | The file holds a line the standard refuses, naming each, or is not UTF-8 text. |
-| [`MethodRequirementsNotMetError`](../errors/method-requirements-not-met-error.md) | `input` | The environment does not meet a requirement, naming each and why. |
-| [`HostLibraryRequirementsError`](../errors/host-library-requirements-error.md) | `config` | A method of a host's own library directories, loaded beside a caller's bundles, is refused for its requirements. |
-| [`PipeFuncPackageSetUnstatedError`](../errors/pipe-func-package-set-unstated-error.md) | `config` | A sandbox-hosted deployment states no package set for its execution mode. |
+| `MethodRequirementsFileError` | `input` | The file holds a line the standard refuses, naming each, or is not UTF-8 text. |
+| `MethodRequirementsNotMetError` | `input` | The environment does not meet a requirement, naming each and why. |
+| `HostLibraryRequirementsError` | `config` | A method of a host's own library directories, loaded beside a caller's bundles, is refused for its requirements. |
+| `PipeFuncPackageSetUnstatedError` | `config` | A sandbox-hosted deployment states no package set for its execution mode. |
 
 The first two are `LibraryLoadingError`s carrying one blueprint validation item per line, whose `source` is the file's path in the tree and whose `line` is the line's number, so a validation reports them as an invalid verdict located on the line. They are deliberately not `MethodTreeLoadError`s, which a server reports as its own fault around the library directories it loads.

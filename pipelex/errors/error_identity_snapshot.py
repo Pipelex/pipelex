@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
-from pipelex.errors.error_pages_generator import iter_pipelex_error_subclasses
+from pipelex.errors.error_class_discovery import iter_pipelex_error_subclasses
 
 # Column separator. Space-padded so the fields stay legible in a raw diff, and
 # absent from every class name / type URI so a naive split round-trips.

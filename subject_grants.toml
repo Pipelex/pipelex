@@ -3036,57 +3036,9 @@ rationale = "Verb-object: renders the stuff data; options stay keyword."
 param = "stuff"
 rationale = "Verb-object: renders the stuff; options stay keyword."
 
-["pipelex/errors/error_pages_generator.py::_group_by_subsystem"]
-param = "classes"
-rationale = "Verb-object: groups the error classes; single operand."
-
-["pipelex/errors/error_pages_generator.py::_humanize_subsystem"]
-param = "key"
-rationale = "Transforms the subsystem key into a human heading; single operand."
-
-["pipelex/errors/error_pages_generator.py::_is_production_subclass"]
+["pipelex/errors/error_class_discovery.py::_is_production_subclass"]
 param = "cls"
 rationale = "Predicate on the error class; single operand."
-
-["pipelex/errors/error_pages_generator.py::_parent_link"]
-param = "cls"
-rationale = "Derivation from the error class ('the parent link of cls'); single operand."
-
-["pipelex/errors/error_pages_generator.py::_remove_orphans"]
-param = "output_dir"
-rationale = "Verb-object: prunes the output dir; expected stems and report stay keyword."
-
-["pipelex/errors/error_pages_generator.py::_resolve_class_level_domain"]
-param = "cls"
-rationale = "Derivation from the error class; single operand."
-
-["pipelex/errors/error_pages_generator.py::_resolve_class_level_user_action"]
-param = "cls"
-rationale = "Derivation from the error class; single operand."
-
-["pipelex/errors/error_pages_generator.py::_short_docstring"]
-param = "cls"
-rationale = "Derivation from the error class; single operand."
-
-["pipelex/errors/error_pages_generator.py::_subsystem_key"]
-param = "cls"
-rationale = "Derivation from the error class; single operand."
-
-["pipelex/errors/error_pages_generator.py::has_authored_marker"]
-param = "content"
-rationale = "Predicate on the page content; single operand."
-
-["pipelex/errors/error_pages_generator.py::page_slug"]
-param = "cls"
-rationale = "Derivation from the error class ('the page slug of cls'); single operand."
-
-["pipelex/errors/error_pages_generator.py::render_error_page"]
-param = "cls"
-rationale = "Verb-object: renders the page for the error class; single operand."
-
-["pipelex/errors/error_pages_generator.py::render_index_page"]
-param = "by_subsystem"
-rationale = "Verb-object: renders the index from the subsystem grouping; single operand."
 
 ["pipelex/fix_ops/applier.py::_as_tomlkit_value"]
 param = "value"

@@ -1,0 +1,28 @@
+# The MTHDS standard's files that Pipelex's error registry is checked against, copied verbatim from the
+# standard's repository and never edited here.
+#
+# - `mthds-error-registry.schema.json` is the JSON Schema of the registry format, which an extension
+#   owner's registry follows as the core registry does.
+# - `mthds-error-registry.json` is the snapshot of the core registry. The checks read it to confirm that
+#   the `pipelex` prefix is registered with the base URL Pipelex's pages are served under, and that every
+#   core code an entry's documentation names exists. Nothing at run time reads this copy: it is an
+#   input of the checks alone.
+#
+# To refresh them, copy both files from the standard release they belong to, at the tag `v<version>` or
+# from its release assets, then update the commit, the version and each file's digest below. A test
+# fails when a file no longer has the digest recorded here.
+
+[source]
+repository = "https://github.com/mthds-ai/mthds"
+# The standard's branch that introduces the error registry, before its release.
+ref = "feature/Core-error-registry"
+commit = "d5dadecf63eac58734d0021d36974a4462def15a"
+standard_version = "7.1.0"
+
+[files."mthds-error-registry.schema.json"]
+path = "docs/spec/openapi/mthds-error-registry.schema.json"
+sha256 = "2923af37db081788fdfaf43d8d0e24a39e68be3ebd43f75ef64a04f87480e723"
+
+[files."mthds-error-registry.json"]
+path = "docs/spec/openapi/mthds-error-registry.json"
+sha256 = "4992e6bd8a30eb97016bb68620487b589f639ec08a860bfb8ce6b5b952169eb8"

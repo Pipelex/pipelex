@@ -660,15 +660,15 @@ class PipelexError(Exception):
 
     @classmethod
     def type_uri(cls) -> str:
-        """Return the per-class documentation URI for this error class.
+        """Return the class-derived URI for this error class.
 
         Used as the RFC 7807 ``type`` field on every ``ErrorReport``. Auto-derived
         as ``<URLs.error_docs_base>/<kebab-class-name>/`` unless a subclass sets
-        :attr:`_declared_type_uri` directly in its own body. The trailing slash
-        matches the canonical form MkDocs (with the default
-        ``use_directory_urls: true``) and mike's ``/latest/`` alias serve at —
-        clients dereferencing the URI hit the docs page directly without a 301
-        round-trip.
+        :attr:`_declared_type_uri` directly in its own body. The per-class pages
+        this URI named are retired: an error's documentation is now the page of
+        its code in the MTHDS core registry or the Pipelex error registry
+        (``pipelex/errors/registry/``), and the docs site's ``404.html`` sends a
+        retired class URI to the error codes' index.
 
         Pure function: the base URI is the :data:`pipelex.urls.URLs.error_docs_base`
         constant, so this is safe to call before Pipelex bootstrap and inside
@@ -677,8 +677,7 @@ class PipelexError(Exception):
         Footgun: ``pascal_case_to_kebab`` is case-folding — acronym-casing
         variants of an existing class name collide (``LLMError`` and ``LlmError``
         both kebab to ``llm-error``). ``test_pipelex_error_type_uri_uniqueness``
-        catches this at CI time, and ``generate_error_pages`` raises loudly at
-        docs-generation time. Pick one casing per acronym in the codebase.
+        catches this at CI time. Pick one casing per acronym in the codebase.
         """
         declared = cls.__dict__.get("_declared_type_uri")
         if isinstance(declared, str):

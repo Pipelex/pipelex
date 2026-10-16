@@ -21,7 +21,7 @@ The value above is the default.
 
 With `is_fetch_ssrf_guard_enabled = true`, every download of a value's URL is checked when the connection opens, on the first request and on every redirect hop to a new host. The host is resolved, and the connection is refused when the name is `localhost` or a cloud metadata alias, or when any address it resolves to is not globally routable: private networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), loopback, link-local (including the `169.254.169.254` metadata endpoint), carrier-grade NAT, multicast, reserved and unspecified addresses, in IPv4 and IPv6. Pipelex then connects to the address it checked, so a DNS record that changes between the check and the connection cannot slip through.
 
-A refusal raises [`SsrfBlockedError`](../../errors/ssrf-blocked-error.md) and fails the pipe that needed the bytes. It is not treated as a failed download: where Pipelex would otherwise keep a generated image's remote URL after a download error, a refused URL fails the pipe instead. The error message names the host that was requested and never the address it resolved to.
+A refusal raises `SsrfBlockedError` and fails the pipe that needed the bytes. It is not treated as a failed download: where Pipelex would otherwise keep a generated image's remote URL after a download error, a refused URL fails the pipe instead. The error message names the host that was requested and never the address it resolved to.
 
 A URL passed to a provider as a URL, for a model that fetches images itself, is not downloaded by Pipelex and is not checked by this guard.
 

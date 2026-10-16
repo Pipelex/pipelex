@@ -1,0 +1,1016 @@
+# The Pipelex error registry.
+#
+# One entry per Pipelex code: a code under the `pipelex` extension prefix, which the MTHDS core
+# registry registers to Pipelex. A Pipelex code names a situation the core codes leave to an
+# implementation: billing, organizations, the hosted catalog, Pipelex's storage, its own
+# configuration and plugins, and the components it ships, such as its document engines and the
+# Daytona sandbox. Each entry declares every member its code needs, in the MTHDS registry format,
+# and the format's JSON Schema refuses an entry with a member missing.
+#
+# This file is the single source. `make generate-error-registry` (`ger`, `pipelex-dev generate-error-registry`)
+# writes from it the JSON snapshot beside it, pipelex-error-registry.json, stamped with Pipelex's
+# version and never edited by hand; the typed Python of the codes and their parameters,
+# pipelex_codes.py; and one documentation page per code under docs/errors/pipelex/, served at the
+# URL the code's type names. The test suite checks all of it. docs/contribute/error-registry.md
+# describes the workflow.
+#
+# The registry carries no version of its own: its snapshot takes Pipelex's version, from
+# pyproject.toml, so a release publishes the registry under its own number.
+#
+# Strings are double-quoted, and "no" and "yes" must be, since YAML would otherwise read them as
+# booleans. A template names a parameter as {name}.
+
+prefix: pipelex
+base_url: "https://docs.pipelex.com/errors"
+
+families:
+  - {family: pipelex.billing, description: "Credit and subscriptions: what an organization's plan and balance allow."}
+  - {family: pipelex.org, description: "Organizations, their members, their API keys and their promo codes."}
+  - {family: pipelex.catalog, description: "Saved methods in an organization's catalog."}
+  - {family: pipelex.run, description: "Pipelex's extensions to runs."}
+  - {family: pipelex.storage, description: "Pipelex's storage addresses and uploads."}
+  - {family: pipelex.security, description: "Pipelex's own refusals made for safety, each recorded as a security event."}
+  - {family: pipelex.config, description: "The runtime's own configuration."}
+  - {family: pipelex.plugin, description: "The plugins installed in the runtime."}
+  - {family: pipelex.deployment, description: "The policies of a runner deployment."}
+  - {family: pipelex.docgen, description: "The document engines that print a PipeDocGen step's documents."}
+  - {family: pipelex.sandbox, description: "The Daytona sandbox that runs a method's own code."}
+  - {family: pipelex.codegen, description: "Code generated from a method."}
+  - {family: pipelex.connector, description: "The toolsets a method's connectors offer a model."}
+  - {family: pipelex.erasure, description: "The erasure of runs and methods."}
+  - {family: pipelex.webhook, description: "The webhooks a caller registers to hear about its runs."}
+
+codes:
+
+  # --- pipelex.billing. -------------------------------------------------------------------
+
+  - code: pipelex.billing.plan_limit
+    title: "The account's plan does not allow this"
+    domain: account
+    retry: "no"
+    raised_as: problem
+    status: 409
+    detail: "The account's plan allows at most {value} for '{limit}', and the account already holds that many."
+    steps:
+      actor: {kind: check_account, detail: "Check the account's plan, then free some of '{limit}' or move to a plan that allows more."}
+      other: {kind: contact_owner, detail: "Ask the account's owner to move to a plan that allows more than {value} for '{limit}'."}
+    params:
+      limit: {type: identifier, description: "What the plan caps, such as the account's API keys."}
+      value: {type: integer, description: "The most the account's plan allows."}
+    meaning: "The account's plan caps a resource, such as its API keys, and the account already holds as many as the plan allows."
+    what_to_do: "Remove something the limit counts, such as an API key no longer in use, or move the account to a plan with a higher limit."
+
+  - code: pipelex.billing.credit_exhausted
+    title: "The organization is out of credit"
+    domain: account
+    retry: "no"
+    raised_as: problem
+    status: 402
+    detail: "The organization has no credit left, so the operation was refused."
+    steps:
+      actor: {kind: check_account, detail: "Add credit to the organization, or move it to a plan that includes more, then try again."}
+      other: {kind: contact_owner, detail: "Ask the account's owner to add credit to the organization."}
+    params: {}
+    meaning: "The organization's credit is spent. The platform refuses a run before queueing it, and a model call made once the credit has run out is refused as well."
+    what_to_do: "Add credit to the organization, or move it to a plan that includes more, then start the run again."
+
+  - code: pipelex.billing.subscription_conflict
+    title: "The subscription's state does not allow this"
+    domain: account
+    retry: "no"
+    raised_as: problem
+    status: 409
+    detail: "This billing action is not possible while the organization's subscription is '{subscription}'."
+    steps:
+      actor: {kind: check_account, detail: "Check the organization's subscription, then take the billing action its state allows."}
+      other: {kind: contact_owner, detail: "Ask the account's owner to check the organization's subscription."}
+    params:
+      subscription: {type: enum, values: [none, active], description: "The organization's subscription: it has none, or it has an active one."}
+    meaning: "A billing action needs an active subscription and the organization has none, or forbids one and the organization already has one."
+    what_to_do: "Read the organization's subscription in its billing settings, then subscribe first, or manage the subscription it already has."
+
+  - code: pipelex.billing.plan_refused
+    title: "The plan's rules refuse this change"
+    domain: input
+    retry: "no"
+    raised_as: problem
+    status: 409
+    detail: "The rules of the organization's plan refuse this change (reason: {reason})."
+    steps:
+      actor: {kind: change_input, detail: "Request a change the organization's plan allows, then send the request again."}
+      other: {kind: change_input, detail: "Pass this to the caller, whose plan change the plan's rules refuse."}
+    params:
+      reason: {type: enum, values: [enterprise_is_paid_only, plan_not_editable, plan_not_enterprise], description: "Why the change is refused: an enterprise plan is only ever paid, the plan cannot be edited, or the change applies only to an enterprise plan and this one is not."}
+    meaning: "An administrator's change to an organization's plan that the plan's kind does not allow."
+    what_to_do: "Read `params.reason`, then choose another plan, or make the change on a plan that allows it."
+
+  # --- pipelex.org. -----------------------------------------------------------------------
+
+  - code: pipelex.org.required
+    title: "An organization is required"
+    domain: account
+    retry: "no"
+    raised_as: problem
+    status: 403
+    detail: "This operation acts on an organization, and the request acts for none."
+    steps:
+      actor: {kind: check_account, detail: "Act for an organization, by joining or creating one, then send the request again."}
+      other: {kind: contact_owner, detail: "Ask the account's owner to add you to an organization."}
+    params: {}
+    meaning: "The caller acts for no organization, and the route acts on an organization's resources."
+    what_to_do: "Sign in to an organization, or use an API key that belongs to one, then send the request again."
+
+  - code: pipelex.org.mismatch
+    title: "The reference belongs to another organization"
+    domain: input
+    retry: "no"
+    raised_as: problem
+    status: 403
+    detail: "The request's {reference} belongs to an organization other than the caller's."
+    steps:
+      actor: {kind: change_input, detail: "Use a {reference} of the organization the request acts for, then send the request again."}
+      other: {kind: change_input, detail: "Pass this to the caller, whose {reference} belongs to another organization."}
+    params:
+      reference: {type: enum, values: [organization_id, storage_uri], description: "The kind of reference that names another organization: an organization's id or a storage address."}
+    meaning: "A well-formed reference names an organization other than the one the caller acts for."
+    what_to_do: "Check which organization the request acts for, and use a reference that belongs to it."
+
+  - code: pipelex.org.not_found
+    title: "The organization's resource does not exist"
+    domain: input
+    retry: "no"
+    raised_as: problem
+    status: 404
+    detail: "The {resource} the request names does not exist."
+    steps:
+      actor: {kind: change_input, detail: "Name a {resource} that exists, then send the request again."}
+      other: {kind: change_input, detail: "Pass this to the caller, whose request names a {resource} that does not exist."}
+    params:
+      resource: {type: enum, values: [organization, member, invitation, api_key, user, promo_code, promo_redemption, flag_target], description: "The kind of resource the request names."}
+    meaning: "The organization, member, invitation, API key, user or promo record the request names does not exist."
+    what_to_do: "Check the identifier the request gives, and list what the organization holds to find the right one."
+
+  - code: pipelex.org.not_manageable
+    title: "The resource cannot be changed this way in its state"
+    domain: input
+    retry: "no"
+    raised_as: problem
+    status: 409
+    detail: "The resource cannot be changed this way in its current state (reason: {reason})."
+    steps:
+      actor: {kind: change_input, detail: "Change the resource another way, or bring it into a state that allows this change first."}
+      other: {kind: change_input, detail: "Pass this to the caller, whose change the resource's state does not allow."}
+    params:
+      reason: {type: identifier, description: "What about the resource's state refuses the change."}
+    meaning: "The resource's state refuses the change: a personal or an internal organization, the last administrator of an organization, a subject with no directory identity, or a promo code's cap set below the redemptions it already has."
+    what_to_do: "Read `params.reason`, then change the request, for instance by naming another administrator before removing the last one."
+
+  - code: pipelex.org.already_exists
+    title: "The organization's resource already exists"
+    domain: input
+    retry: "no"
+    raised_as: problem
+    status: 409
+    detail: "The {resource} the request would create already exists."
+    steps:
+      actor: {kind: change_input, detail: "Use the {resource} that exists, or choose another, then send the request again."}
+      other: {kind: change_input, detail: "Pass this to the caller, whose {resource} already exists."}
+    params:
+      resource: {type: enum, values: [member, invitation, promo_code, api_key_label], description: "The kind of resource that already exists."}
+    meaning: "A member, an invitation, a promo code and an API key's name are each unique, and the one the request gives is taken."
+    what_to_do: "Use the one that exists, or choose another name, code or address."
+
+  - code: pipelex.org.promo_invalid
+    title: "The promo code cannot be redeemed"
+    domain: input
+    retry: "no"
+    raised_as: problem
+    status: 422
+    detail: "The promo code cannot be redeemed."
+    steps:
+      actor: {kind: change_input, detail: "Check the promo code, then redeem one that is valid."}
+      other: {kind: change_input, detail: "Pass this to the caller, whose promo code cannot be redeemed."}
+    params: {}
+    meaning: "The promo code is not one this organization can redeem. The reason is withheld on purpose, so that a code cannot be guessed by trying."
+    what_to_do: "Check the promo code as it was given to you, and ask whoever gave it for one that is valid."
+
+  - code: pipelex.org.promo_credit_pending
+    title: "The promo credit is pending"
+    domain: runtime
+    retry: "no"
+    raised_as: problem
+    status: 502
+    detail: "The promo code was redeemed, and its credit has not been applied yet."
+    steps:
+      actor: {kind: wait, detail: "Wait for the credit to reach the organization, without redeeming the code again."}
+      other: {kind: wait, detail: "Wait for the credit to reach the organization, without redeeming the code again."}
+    params: {}
+    meaning: "The redemption is recorded, but applying its credit failed. A repair sweep applies it later, so redeeming the code again is neither needed nor possible."
+    what_to_do: "Wait, then check the organization's credit. If the credit has not arrived after a day, report it to whoever runs the runtime."
+
+  # --- pipelex.catalog. -------------------------------------------------------------------
+
+  - code: pipelex.catalog.not_found
+    title: "The saved method does not exist"
+    domain: input
+    retry: "no"
+    raised_as: problem
+    status: 404
+    detail: "The organization's catalog holds no {resource} matching the request for the method '{method_id}'."
+    steps:
+      actor: {kind: change_input, detail: "List the organization's catalog to find the {resource}, then send the request again with one that exists."}
+      other: {kind: change_input, detail: "Pass this to the caller, whose request names a {resource} the catalog does not hold."}
+    params:
+      resource: {type: enum, values: [method, version, example], description: "What the request names: a saved method, one of its versions, or one of its examples."}
+      method_id: {type: identifier, description: "The catalog id of the method the request names."}
+      version: {type: integer, optional: true, description: "The version the request names, when what it names is a version."}
+    meaning: "No saved method, version or example matches the request in the catalog of the organization the request acts for."
+    what_to_do: "List the catalog's methods and their versions, and use an identifier that exists. A catalog id is read in the organization the request acts for, so check that it is the right one."
+
+  - code: pipelex.catalog.not_published
+    title: "The saved method has no published version"
+    domain: input
+    retry: "no"
+    raised_as: problem
+    status: 409
+    detail: "The method '{method_id}' has no published version."
+    steps:
+      actor: {kind: change_input, detail: "Publish a version of the method '{method_id}', or name its draft as '{method_id}@draft', then send the request again."}
+      other: {kind: change_input, detail: "Pass this to the caller, who names the latest published version of the method '{method_id}', which has none."}
+    params:
+      method_id: {type: identifier, description: "The catalog id of the method."}
+    meaning: "A bare catalog id names the method's latest published version, and the method has only a draft."
+    what_to_do: "Publish the method, or name its draft with the `@draft` suffix."
+
+  - code: pipelex.catalog.being_deleted
+    title: "The saved method is being deleted"
+    domain: input
+    retry: "no"
+    raised_as: problem
+    status: 409
+    detail: "The method '{method_id}' is being deleted."
+    steps:
+      actor: {kind: change_input, detail: "Use another method, since the method '{method_id}' is being deleted."}
+      other: {kind: change_input, detail: "Pass this to the caller, whose request names the method '{method_id}', which is being deleted."}
+    params:
+      method_id: {type: identifier, description: "The catalog id of the method."}
+    meaning: "The method's deletion is in flight, so it can no longer be run, changed or published."
+    what_to_do: "Use another method, or save the method again under a new id if it is still wanted."
+
+  - code: pipelex.catalog.deletion_failed
+    title: "The saved method's deletion failed"
+    domain: runtime
+    retry: "yes"
+    raised_as: problem
+    status: 503
+    detail: "The deletion of the method '{method_id}' did not complete."
+    steps:
+      actor: {kind: retry, detail: "Delete the method '{method_id}' again."}
+      other: {kind: retry, detail: "Delete the method '{method_id}' again."}
+    params:
+      method_id: {type: identifier, description: "The catalog id of the method."}
+    meaning: "A step of the method's deletion failed. Deleting the method again resumes its deletion."
+    what_to_do: "Send the delete again. If it keeps failing, report it to whoever runs the runtime."
+
+  - code: pipelex.catalog.update_conflict
+    title: "The saved method changed since it was read"
+    domain: input
+    retry: "no"
+    raised_as: problem
+    status: 409
+    detail: "The method '{method_id}' changed after it was read, so the update was not applied."
+    steps:
+      actor: {kind: refresh, detail: "Read the method '{method_id}' again, then apply the change to its current content."}
+      other: {kind: refresh, detail: "Read the method '{method_id}' again, then apply the change to its current content."}
+    params:
+      method_id: {type: identifier, description: "The catalog id of the method."}
+    meaning: "Another write changed the method or its draft between the read the update started from and the update itself, so the update stopped rather than overwrite that change."
+    what_to_do: "Read the method again, apply the change to what it holds now, and send the update again."
+
+  - code: pipelex.catalog.selector_invalid
+    title: "The catalog selector is malformed"
+    domain: input
+    retry: "no"
+    raised_as: problem
+    status: 422
+    detail: "The catalog selector cannot be parsed (reason: {reason})."
+    steps:
+      actor: {kind: change_input, detail: "Write the selector as a catalog id, alone or followed by '@' and a version number or 'draft', then send the request again."}
+      other: {kind: change_input, detail: "Pass this to the caller, whose catalog selector cannot be parsed."}
+    params:
+      reason: {type: enum, values: [malformed_method_id, malformed_version_suffix, suffix_on_linkage], description: "What is wrong: the catalog id itself, the suffix after its '@', or a suffix where the request runs the source it sends and names no version."}
+    meaning: "A method selector names a saved method by its catalog id, `mt_` and its characters, and may add `@3` for one version or `@draft` for the draft. This one breaks that grammar."
+    what_to_do: "Read `params.reason`, then correct the selector: a catalog id as the catalog returned it, with a version number that has no leading zero or the word `draft` after the `@`."
+
+  - code: pipelex.catalog.link_conflict
+    title: "The directory is linked to another method"
+    domain: input
+    retry: "no"
+    raised_as: client
+    detail: "The method link of the directory '{path}' stops this save to the method '{method_id}'."
+    steps:
+      actor: {kind: change_input, detail: "Save the directory to the method its link names, or save these files from a directory of their own."}
+      other: {kind: change_input, detail: "Pass this to the caller, whose directory '{path}' is linked in a way that stops this save."}
+    params:
+      method_id: {type: identifier, description: "The catalog id of the method the save targets."}
+      path: {type: caller_text, description: "The local directory whose link stops the save."}
+    meaning: "A local directory records, in its method link, which saved method its files belong to. The link names another method than the one the save targets, cannot be read, or records a sync that did not finish, so the client refuses to save over a draft that is not this directory's."
+    what_to_do: "Check which method the directory is linked to, then save to that method or move the files to a directory of their own. Repair or remove a link that cannot be read."
+
+  # --- pipelex.run. -----------------------------------------------------------------------
+
+  - code: pipelex.run.already_exists
+    title: "A run with this id already exists"
+    domain: input
+    retry: "no"
+    raised_as: problem
+    status: 409
+    detail: "A run with the id '{pipeline_run_id}' already exists."
+    steps:
+      actor: {kind: change_input, detail: "Start the run with another id, or with none so that the runner assigns one."}
+      other: {kind: change_input, detail: "Pass this to the caller, who chose the run id '{pipeline_run_id}', which is already taken."}
+    params:
+      pipeline_run_id: {type: identifier, description: "The run id the caller chose."}
+    meaning: "The caller chose the run's id, which Pipelex allows as an extension of the protocol, whose run id is always the runner's, and a run already holds that id."
+    what_to_do: "Start the run with a new id, or with none so that the runner assigns it. To see the run that holds the id, read it by that id."
+
+  # --- pipelex.storage. -------------------------------------------------------------------
+
+  - code: pipelex.storage.uri_invalid
+    title: "The storage address is malformed"
+    domain: input
+    retry: "no"
+    raised_as: problem
+    status: 422
+    detail: "A storage address in the request cannot be parsed."
+    steps:
+      actor: {kind: change_input, detail: "Send the storage address exactly as storage returned it, then send the request again."}
+      other: {kind: change_input, detail: "Pass this to the caller, whose request holds a storage address that cannot be parsed."}
+    params: {}
+    meaning: "A `pipelex-storage://` address does not parse, or the storage provider refuses it as a key."
+    what_to_do: "Use the storage address exactly as an upload or a run's results returned it, without editing it."
+    see:
+      - {title: "Cloud Storage", href: "features/cloud-storage.md"}
+
+  - code: pipelex.storage.not_found
+    title: "A stored file is gone"
+    domain: runtime
+    retry: "no"
+    raised_as: problem
+    status: 500
+    detail: "A file the runtime stored is no longer in its {scheme} storage."
+    steps:
+      actor: {kind: report, detail: "Report this to whoever runs the runtime."}
+      other: {kind: report, detail: "Report this to whoever runs the runtime."}
+    params:
+      scheme: {type: enum, values: [local, s3, gcs, memory], description: "The kind of storage that no longer holds the file."}
+    meaning: "A file the run wrote, or that the runtime handed out, is no longer in storage. A caller's own reference to something that does not exist is `input.reference_not_found` instead."
+    what_to_do: "Report the problem to whoever runs the runtime, with the run's `pipeline_run_id` when it has one."
+
+  - code: pipelex.storage.unavailable
+    title: "Storage is unavailable"
+    domain: runtime
+    retry: "yes"
+    raised_as: problem
+    status: 503
+    detail: "The {scheme} storage failed a read or a write."
+    steps:
+      actor: {kind: retry, detail: "Send the request again after a while."}
+      other: {kind: wait, detail: "Wait, then send the request again."}
+    params:
+      scheme: {type: enum, values: [local, s3, gcs, memory], description: "The kind of storage that failed."}
+    meaning: "The storage backend failed a read or a write, which may succeed later."
+    what_to_do: "Send the request again after `retry_after` seconds when the problem gives it. If storage keeps failing, report it to whoever runs the runtime."
+
+  - code: pipelex.storage.not_configured
+    title: "This deployment serves no storage for that address"
+    domain: operator
+    retry: "no"
+    raised_as: problem
+    status: 500
+    detail: "This deployment serves no storage for the scheme '{scheme}'."
+    steps:
+      actor: {kind: fix_configuration, detail: "Configure a storage for the scheme '{scheme}' on this deployment, then restart the runtime."}
+      other: {kind: report, detail: "Report this to whoever runs the runtime."}
+    params:
+      scheme: {type: identifier, description: "The scheme of the storage address."}
+    meaning: "A storage address names a scheme for which this deployment configures no bucket."
+    what_to_do: "If you run the runtime, configure the storage for the scheme. Otherwise, report the problem to whoever runs it."
+    see:
+      - {title: "Storage Provider Plugins", href: "under-the-hood/storage-provider-plugins.md"}
+
+  - code: pipelex.storage.grant_unusable
+    title: "The upload grant is spent or expired"
+    domain: runtime
+    retry: "yes"
+    raised_as: problem
+    status: 403
+    detail: "The upload grant has expired, or has already written its file."
+    steps:
+      actor: {kind: retry, detail: "Ask for a new upload grant, then upload the file with it."}
+      other: {kind: retry, detail: "Ask for a new upload grant, then upload the file with it."}
+    params: {}
+    meaning: "An upload grant writes one file, once, before it expires. This one has expired or has already written its file, and a new grant succeeds."
+    what_to_do: "Request a new upload grant, and upload the file with it."
+
+  - code: pipelex.storage.grant_mismatch
+    title: "The upload differs from its grant"
+    domain: runtime
+    retry: "no"
+    raised_as: problem
+    status: 403
+    detail: "The upload differs from what its grant signed, so storage refused it."
+    steps:
+      actor: {kind: report, detail: "Report this to whoever runs the runtime."}
+      other: {kind: report, detail: "Report this to whoever runs the runtime."}
+    params: {}
+    meaning: "The upload's size, type, metadata or headers differ from what the grant signed. A client that uploads with the grant exactly as it was handed out never meets this."
+    what_to_do: "Report the problem to whoever runs the runtime. If you wrote the client that uploads, send the headers the grant lists, unchanged."
+
+  - code: pipelex.storage.upload_refused
+    title: "Storage refused the upload"
+    domain: runtime
+    retry: "no"
+    raised_as: problem
+    status: 403
+    detail: "Storage refused the upload with the status {status}."
+    steps:
+      actor: {kind: report, detail: "Report this to whoever runs the runtime."}
+      other: {kind: report, detail: "Report this to whoever runs the runtime."}
+    params:
+      status: {type: integer, description: "The HTTP status storage answered the upload with."}
+    meaning: "Storage refused an upload for a reason it does not name."
+    what_to_do: "Report the problem to whoever runs the runtime, with the status storage answered."
+
+  # --- pipelex.security. ------------------------------------------------------------------
+
+  - code: pipelex.security.reserved_key
+    title: "The request carries a reserved key"
+    domain: input
+    retry: "no"
+    raised_as: problem
+    status: 422
+    detail: "The request carries object keys that Pipelex's decoder reserves for its own markers."
+    steps:
+      actor: {kind: change_input, detail: "Rename or remove the reserved keys in the request, then send it again."}
+      other: {kind: change_input, detail: "Pass this to the caller, whose request carries reserved keys."}
+    params:
+      keys: {type: list, items: {type: identifier}, description: "The reserved keys the request carries."}
+    meaning: "An object in the request holds a key that Pipelex's decoder would read as a class marker, such as `__class__`, `__module__` or a key starting with `__kajson`. The request is refused, and the refusal is recorded as a security event."
+    what_to_do: "Rename or remove each key `params.keys` lists. No input of a method needs one."
+
+  - code: pipelex.security.result_outside_scope
+    title: "A result location lies outside the run"
+    domain: runtime
+    retry: "no"
+    raised_as: problem
+    status: 500
+    detail: "A result location lies outside the run's storage scope, so the runtime refused it."
+    steps:
+      actor: {kind: report, detail: "Report this to whoever runs the runtime."}
+      other: {kind: report, detail: "Report this to whoever runs the runtime."}
+    params: {}
+    meaning: "A result location that a step reported, or that storage holds, lies outside the run's own storage scope. The runtime refuses it, and records the refusal as a security event."
+    what_to_do: "Report the problem to whoever runs the runtime, with the run's `pipeline_run_id`."
+
+  # --- pipelex.config. --------------------------------------------------------------------
+
+  - code: pipelex.config.invalid
+    title: "The runtime's configuration is invalid"
+    domain: operator
+    retry: "no"
+    raised_as: problem
+    status: 500
+    detail: "The runtime's configuration is invalid, so it cannot serve this request."
+    steps:
+      actor: {kind: fix_configuration, detail: "Correct the setting '{setting}' in the file '{file}' of the {surface} configuration, then restart the runtime."}
+      other: {kind: report, detail: "Report this to whoever runs the runtime."}
+    params:
+      surface: {type: identifier, operator_only: true, description: "The part of the configuration at fault, such as the backends, the model deck, the routing, the plugins, the storage, the telemetry, the log sinks, the libraries or the API server's settings."}
+      file: {type: identifier, operator_only: true, description: "The configuration file that holds the setting."}
+      setting: {type: identifier, operator_only: true, description: "The setting that does not validate."}
+    meaning: "A configuration file or setting parsed, but does not validate."
+    what_to_do: "If you run the runtime, read its logs for the file and the setting, and correct them; `pipelex doctor` checks the configuration. Otherwise, report the problem to whoever runs it."
+    see:
+      - {title: "Configuration", href: "configuration/index.md"}
+      - {title: "Doctor Command", href: "tools/cli/doctor.md"}
+
+  - code: pipelex.config.syntax
+    title: "A configuration file does not parse"
+    domain: operator
+    retry: "no"
+    raised_as: problem
+    status: 500
+    detail: "A configuration file of the runtime does not parse."
+    steps:
+      actor: {kind: fix_configuration, detail: "Fix the TOML of the file '{file}' of the {surface} configuration at line {line}, column {column}, then restart the runtime."}
+      other: {kind: report, detail: "Report this to whoever runs the runtime."}
+    params:
+      surface: {type: identifier, operator_only: true, description: "The part of the configuration the file belongs to."}
+      file: {type: identifier, operator_only: true, description: "The file that does not parse."}
+      line: {type: integer, operator_only: true, description: "The line of the first fault."}
+      column: {type: integer, operator_only: true, description: "The column of the first fault."}
+    meaning: "A configuration file is not valid TOML."
+    what_to_do: "If you run the runtime, open the file its logs name at the line and column given, and fix the syntax. Otherwise, report the problem to whoever runs it."
+    see:
+      - {title: "Configuration", href: "configuration/index.md"}
+
+  - code: pipelex.config.file_missing
+    title: "A configuration file is missing"
+    domain: operator
+    retry: "no"
+    raised_as: problem
+    status: 500
+    detail: "A configuration file the runtime needs is missing."
+    steps:
+      actor: {kind: fix_configuration, detail: "Create or restore the file '{file}' of the {surface} configuration, then restart the runtime."}
+      other: {kind: report, detail: "Report this to whoever runs the runtime."}
+    params:
+      surface: {type: identifier, operator_only: true, description: "The part of the configuration the file belongs to."}
+      file: {type: identifier, operator_only: true, description: "The file that is missing."}
+    meaning: "A configuration file, or a key file, that the runtime needs is absent or cannot be loaded."
+    what_to_do: "If you run the runtime, restore the file its logs name, or write the default configuration with `pipelex init`. Otherwise, report the problem to whoever runs it."
+    see:
+      - {title: "Init Commands", href: "tools/cli/init.md"}
+
+  - code: pipelex.config.variable_missing
+    title: "A configuration variable is not set"
+    domain: operator
+    retry: "no"
+    raised_as: problem
+    status: 500
+    detail: "A variable the runtime's configuration refers to is not set."
+    steps:
+      actor: {kind: fix_configuration, detail: "Set the {source} variable '{variable}', then restart the runtime."}
+      other: {kind: report, detail: "Report this to whoever runs the runtime."}
+    params:
+      variable: {type: identifier, operator_only: true, description: "The variable that is not set."}
+      source: {type: enum, values: [env, secret], operator_only: true, description: "Where the configuration reads the variable from: the environment or a secret."}
+    meaning: "An environment variable or a secret that the configuration refers to did not resolve."
+    what_to_do: "If you run the runtime, set the variable in its environment or in its secrets provider. Otherwise, report the problem to whoever runs it."
+    see:
+      - {title: "Secrets Provider Plugins", href: "under-the-hood/secrets-provider-plugins.md"}
+
+  - code: pipelex.config.credential_missing
+    title: "An inference backend has no credential"
+    domain: operator
+    retry: "no"
+    raised_as: problem
+    status: 500
+    detail: "An inference backend of the runtime has no credential."
+    steps:
+      actor: {kind: check_credentials, detail: "Set the credential '{variable}' of the backend '{backend}', then restart the runtime."}
+      other: {kind: report, detail: "Report this to whoever runs the runtime."}
+    params:
+      backend: {type: identifier, operator_only: true, description: "The inference backend that lacks its credential."}
+      variable: {type: identifier, operator_only: true, description: "The variable or the file that should hold the credential."}
+    meaning: "A key or a credential file that an inference backend needs is absent."
+    what_to_do: "If you run the runtime, set the backend's key in its environment or its secrets, or disable the backend. Otherwise, report the problem to whoever runs it."
+    see:
+      - {title: "Inference Backend Plugins", href: "under-the-hood/inference-backend-plugins.md"}
+
+  - code: pipelex.config.credential_refused
+    title: "A service refused the configured credential"
+    domain: operator
+    retry: "no"
+    raised_as: problem
+    status: 500
+    detail: "A service the runtime depends on refused the credential it is configured with."
+    steps:
+      actor: {kind: check_credentials, detail: "Check the credential the {surface} configuration holds for the service '{service}'."}
+      other: {kind: report, detail: "Report this to whoever runs the runtime."}
+    params:
+      surface: {type: enum, values: [log_sink, storage], operator_only: true, description: "The part of the configuration that holds the credential."}
+      service: {type: identifier, operator_only: true, description: "The service that refused it."}
+    meaning: "A service that is not an inference provider, such as a log sink or a storage, refused the deployment's credential. An inference provider refusing its key is `provider.credential_refused` instead."
+    what_to_do: "If you run the runtime, renew or correct the credential. Otherwise, report the problem to whoever runs it."
+
+  - code: pipelex.config.dependency_missing
+    title: "An optional dependency is not installed"
+    domain: operator
+    retry: "no"
+    raised_as: problem
+    status: 500
+    detail: "An optional dependency that the runtime's configuration needs is not installed."
+    steps:
+      actor: {kind: fix_configuration, detail: "Install '{dependency}', which the extra '{extra}' provides, then restart the runtime."}
+      other: {kind: report, detail: "Report this to whoever runs the runtime."}
+    params:
+      dependency: {type: identifier, operator_only: true, description: "The package, the SDK or the program that is missing."}
+      extra: {type: identifier, operator_only: true, description: "The Pipelex extra that provides it."}
+    meaning: "A Python extra, an SDK or a program such as `plxt` that the configuration needs is not installed."
+    what_to_do: "If you run the runtime, install Pipelex with the extra its logs name. Otherwise, report the problem to whoever runs it."
+
+  # --- pipelex.plugin. --------------------------------------------------------------------
+
+  - code: pipelex.plugin.not_found
+    title: "No plugin provides the configured choice"
+    domain: operator
+    retry: "no"
+    raised_as: problem
+    status: 500
+    detail: "No installed plugin provides a choice the runtime's configuration makes."
+    steps:
+      actor: {kind: fix_configuration, detail: "Install a plugin that provides '{value}' for the setting '{setting}', or choose a value an installed plugin provides."}
+      other: {kind: report, detail: "Report this to whoever runs the runtime."}
+    params:
+      setting: {type: identifier, operator_only: true, description: "The setting that makes the choice."}
+      value: {type: identifier, operator_only: true, description: "The choice no installed plugin provides."}
+      available: {type: list, items: {type: identifier}, operator_only: true, description: "The choices the installed plugins provide."}
+    meaning: "A setting names a storage, a secrets provider, a log sink, an execution mode, an orchestrator or a validator that no installed plugin registers."
+    what_to_do: "If you run the runtime, install the plugin that provides the choice, or choose one of those its logs list as available. Otherwise, report the problem to whoever runs it."
+    see:
+      - {title: "Inference Backend Plugins", href: "under-the-hood/inference-backend-plugins.md"}
+
+  - code: pipelex.plugin.broken
+    title: "A plugin failed to load"
+    domain: operator
+    retry: "no"
+    raised_as: problem
+    status: 500
+    detail: "An installed plugin failed to load."
+    steps:
+      actor: {kind: fix_configuration, detail: "Fix or uninstall the plugin '{plugin}' ({reason}), then restart the runtime."}
+      other: {kind: report, detail: "Report this to whoever runs the runtime."}
+    params:
+      plugin: {type: identifier, operator_only: true, description: "The plugin that failed."}
+      reason: {type: identifier, operator_only: true, description: "What failed: its loading, its registration, or a rule its package breaks."}
+    meaning: "An installed plugin raised while it was loading or registering, or breaks the rules a plugin's package follows."
+    what_to_do: "If you run the runtime, read its logs for the plugin, then upgrade, fix or uninstall it. Otherwise, report the problem to whoever runs it."
+    see:
+      - {title: "Inference Backend Plugins", href: "under-the-hood/inference-backend-plugins.md"}
+
+  - code: pipelex.plugin.conflict
+    title: "Two plugins claim the same slot"
+    domain: operator
+    retry: "no"
+    raised_as: problem
+    status: 500
+    detail: "Two installed plugins claim the same slot."
+    steps:
+      actor: {kind: fix_configuration, detail: "Uninstall '{plugin}' or '{other_plugin}', which both claim '{slot}', then restart the runtime."}
+      other: {kind: report, detail: "Report this to whoever runs the runtime."}
+    params:
+      plugin: {type: identifier, operator_only: true, description: "One of the two plugins."}
+      other_plugin: {type: identifier, operator_only: true, description: "The other plugin."}
+      slot: {type: identifier, operator_only: true, description: "The name or the process-wide slot both claim."}
+    meaning: "Two installed plugins register the same name, or claim the same process-wide slot."
+    what_to_do: "If you run the runtime, keep only one of the two plugins. Otherwise, report the problem to whoever runs it."
+    see:
+      - {title: "Inference Backend Plugins", href: "under-the-hood/inference-backend-plugins.md"}
+
+  - code: pipelex.plugin.api_mismatch
+    title: "A plugin targets another plugin API"
+    domain: operator
+    retry: "no"
+    raised_as: problem
+    status: 500
+    detail: "An installed plugin targets a plugin API this runtime does not support."
+    steps:
+      actor: {kind: upgrade, detail: "Upgrade the plugin '{plugin}', built for the plugin API {targets_api}, or Pipelex, which supports the plugin API {supported_api}."}
+      other: {kind: report, detail: "Report this to whoever runs the runtime."}
+    params:
+      plugin: {type: identifier, operator_only: true, description: "The plugin."}
+      targets_api: {type: integer, operator_only: true, description: "The plugin API version the plugin was built for."}
+      supported_api: {type: integer, operator_only: true, description: "The plugin API version this runtime supports."}
+    meaning: "An installed plugin was built for another version of the plugin contract than the one this runtime implements."
+    what_to_do: "If you run the runtime, upgrade the plugin or Pipelex so that both target the same plugin API. Otherwise, report the problem to whoever runs it."
+    see:
+      - {title: "Inference Backend Plugins", href: "under-the-hood/inference-backend-plugins.md"}
+
+  # --- pipelex.deployment. ----------------------------------------------------------------
+
+  - code: pipelex.deployment.orchestration_override_forbidden
+    title: "This deployment does not allow choosing the orchestration mode"
+    domain: input
+    retry: "no"
+    raised_as: problem
+    status: 422
+    detail: "This deployment does not let a request choose its orchestration mode, and this one asks for '{requested_mode}'."
+    steps:
+      actor: {kind: change_input, detail: "Send the request without choosing an orchestration mode."}
+      other: {kind: change_input, detail: "Pass this to the caller, whose request chooses an orchestration mode this deployment fixes."}
+    params:
+      requested_mode: {type: identifier, description: "The orchestration mode the request asks for."}
+    meaning: "The deployment's policy fixes the orchestration mode, so a request may not choose one."
+    what_to_do: "Leave the orchestration mode out of the request, and let the deployment run it in its own mode."
+    see:
+      - {title: "Orchestrator Plugins", href: "under-the-hood/orchestrator-plugins.md"}
+
+  - code: pipelex.deployment.custom_code_requires_sandbox
+    title: "Custom code needs a sandbox-hosted deployment"
+    domain: operator
+    retry: "no"
+    raised_as: problem
+    status: 501
+    detail: "The method ships Python code in its {origin}, and this deployment runs none outside the Daytona sandbox."
+    steps:
+      actor: {kind: fix_configuration, detail: "Configure the Daytona sandbox on this deployment, so that it can run the method's own code."}
+      other: {kind: report, detail: "Report this to whoever runs the runtime."}
+    params:
+      origin: {type: enum, values: [bundle, package], description: "Where the method ships its code: in its bundle or in its package."}
+    meaning: "The method ships Python code of its own, and this deployment runs a method's own code only inside the Daytona sandbox, which it does not have."
+    what_to_do: "If you run the runtime, configure the Daytona sandbox for custom code. Otherwise, run the method on a runtime that allows its code, or ask its owner for a version without Python."
+    see:
+      - {title: "PipeFunc Requirements", href: "under-the-hood/pipe-func-requirements.md"}
+
+  - code: pipelex.deployment.python_structures_refused
+    title: "Python structure classes are not allowed here"
+    domain: method
+    retry: "no"
+    raised_as: problem
+    status: 422
+    detail: "The method declares structures as Python classes, which this runner does not import."
+    steps:
+      actor: {kind: change_method, detail: "Declare the structures as concepts in the method in place of Python classes, then run it again."}
+      other: {kind: contact_owner, detail: "Ask the method's owner to declare its structures as concepts in the method."}
+    params:
+      files: {type: list, items: {type: identifier}, description: "The method's files that declare structures as Python classes."}
+    meaning: "The method declares its structures as Python classes, which no hosted runner imports. Concepts declared in the method itself replace them."
+    what_to_do: "Rewrite each structure the files in `params.files` declare as a concept with its fields in the method, then run it again."
+    see:
+      - {title: "Python StructuredContent Classes", href: "building-methods/concepts/python-classes.md"}
+
+  - code: pipelex.deployment.token_claims_invalid
+    title: "The token's claims cannot be used"
+    domain: operator
+    retry: "no"
+    raised_as: problem
+    status: 500
+    detail: "The request's verified token carries claims this runner cannot use."
+    steps:
+      actor: {kind: fix_configuration, detail: "Correct the claim '{claim}' ({reason}) that the token issuer writes, then send the request again."}
+      other: {kind: report, detail: "Report this to whoever runs the runtime."}
+    params:
+      claim: {type: identifier, operator_only: true, description: "The claim at fault."}
+      reason: {type: enum, values: [missing, unsafe, reserved], operator_only: true, description: "What is wrong with the claim: it is missing, unsafe as an identifier, or reserved."}
+    meaning: "A verified token carries a user id the runner cannot use, so the token's issuer is misconfigured."
+    what_to_do: "If you run the runtime, correct the claims its token issuer writes. Otherwise, report the problem to whoever runs it."
+    see:
+      - {title: "API Server Configuration", href: "api-server/configuration.md"}
+
+  # --- pipelex.docgen. --------------------------------------------------------------------
+
+  - code: pipelex.docgen.engine_unavailable
+    title: "No document engine prints this here"
+    domain: operator
+    retry: "no"
+    raised_as: problem
+    status: 501
+    detail: "No document engine prints the format '{format}' in this runtime."
+    steps:
+      actor: {kind: fix_configuration, detail: "Install or enable the engine '{engine}' ({gap}), then restart the runtime."}
+      other: {kind: report, detail: "Report this to whoever runs the runtime."}
+    params:
+      engine: {type: identifier, operator_only: true, description: "The document engine the step needs."}
+      format: {type: enum, values: [pdf, xlsx, docx, pptx], description: "The format the step prints."}
+      gap: {type: identifier, operator_only: true, description: "What is missing: the engine, a system library it needs, its declaration or its enablement."}
+    meaning: "The engine that prints a PipeDocGen step's format, or a system library it needs, is not installed, declared or enabled in this runtime."
+    what_to_do: "If you run the runtime, install and enable the engine. Otherwise, report the problem to whoever runs it."
+    see:
+      - {title: "Document Engine Plugins", href: "under-the-hood/document-engine-plugins.md"}
+
+  - code: pipelex.docgen.template_invalid
+    title: "The document template cannot be used"
+    domain: method
+    retry: "no"
+    raised_as: problem
+    status: 422
+    detail: "The document template '{template}' cannot be used (reason: {reason}): {finding}"
+    steps:
+      actor: {kind: change_method, detail: "Fix the template '{template}', then run the method again."}
+      other: {kind: contact_owner, detail: "Ask the method's owner to fix the template '{template}'."}
+    params:
+      template: {type: identifier, description: "The template."}
+      reason: {type: enum, values: [unreadable, does_not_fit, check_failed, value_unsupported], description: "Why it cannot be used: it is not a readable file of its format, it does not fit the step's inputs, it fails the engine's check, or it maps a value no cell can take."}
+      finding: {type: caller_text, description: "What the engine found, about the method's own template."}
+    meaning: "A PipeDocGen step's template cannot be used to print its document."
+    what_to_do: "Read `params.finding`, then fix the template, or the inputs the step maps into it."
+    see:
+      - {title: "Document Engine Plugins", href: "under-the-hood/document-engine-plugins.md"}
+
+  - code: pipelex.docgen.resource_refused
+    title: "The document names a file it may not read"
+    domain: method
+    retry: "no"
+    raised_as: problem
+    status: 422
+    detail: "The document names a file the print engine may not read (reason: {reason})."
+    steps:
+      actor: {kind: change_method, detail: "Name the file by an absolute https URL or embed it, then run the method again."}
+      other: {kind: contact_owner, detail: "Ask the method's owner to fix the file its document names."}
+    params:
+      reason: {type: enum, values: [relative_url, plain_http_url, undecodable_data_url, unknown_font], description: "Why the file was refused: a relative URL, a plain http URL, a data URL that does not decode, or a font the engine does not know."}
+    meaning: "The print engine's fetcher refused a resource the document names, by policy. A plain `http://` URL breaks a transport rule rather than a security one, so its refusal records no security event."
+    what_to_do: "Use an absolute `https://` URL, embed the file as a data URL that decodes, or use a font the engine provides."
+    see:
+      - {title: "Document Engine Plugins", href: "under-the-hood/document-engine-plugins.md"}
+
+  - code: pipelex.docgen.content_unprintable
+    title: "The document's content cannot be printed"
+    domain: input
+    retry: "no"
+    raised_as: problem
+    status: 422
+    detail: "The run's data holds something the print engine cannot lay out (reason: {reason}, in '{element}')."
+    steps:
+      actor: {kind: change_input, detail: "Change the input that fills '{element}', then run the method again."}
+      other: {kind: change_input, detail: "Pass this to the caller, whose inputs hold something the document cannot print."}
+    params:
+      reason: {type: enum, values: [too_tall_for_page, image_unreadable, image_too_large, image_empty, html_too_large], description: "What cannot be printed: an element taller than a page, an image that cannot be read, is too large or is empty, or HTML past its size limit."}
+      element: {type: identifier, description: "The element of the document that holds it."}
+    meaning: "The run's data holds something the print engine cannot lay out or decode."
+    what_to_do: "Read `params.reason`, then shorten, resize or replace the content, and run the method again."
+
+  - code: pipelex.docgen.print_timeout
+    title: "Printing the document took too long"
+    domain: runtime
+    retry: "yes"
+    raised_as: problem
+    status: 504
+    detail: "Printing the document ran past its limit of {limit} seconds and was stopped."
+    steps:
+      actor: {kind: retry, detail: "Run the method again, since the print may finish within its limit."}
+      other: {kind: retry, detail: "Run the method again, since the print may finish within its limit."}
+    params:
+      limit: {type: seconds, description: "The time the print was allowed."}
+    meaning: "The print, or a resource it read, ran past its limit and was stopped."
+    what_to_do: "Run the method again. If the print keeps running past its limit, make the document lighter, or report it to whoever runs the runtime."
+
+  - code: pipelex.docgen.template_warning
+    title: "The document template may be faulty"
+    domain: method
+    retry: "no"
+    raised_as: warning
+    detail: "The document template '{template}' may be faulty: {finding}"
+    steps:
+      actor: {kind: change_method, detail: "Check the template '{template}', and fix it if the finding is right."}
+      other: {kind: contact_owner, detail: "Ask the method's owner to check the template '{template}'."}
+    params:
+      template: {type: identifier, description: "The template."}
+      finding: {type: caller_text, description: "What the check found, about the method's own template."}
+    meaning: "An advisory: the check of a PipeDocGen step's template found a likely fault, which does not stop the method from validating."
+    what_to_do: "Read `params.finding`, check the template, and fix it if the finding is right."
+    see:
+      - {title: "Document Engine Plugins", href: "under-the-hood/document-engine-plugins.md"}
+
+  # --- pipelex.sandbox. -------------------------------------------------------------------
+
+  - code: pipelex.sandbox.unavailable
+    title: "The Daytona sandbox could not be started"
+    domain: runtime
+    retry: "yes"
+    raised_as: problem
+    status: 503
+    detail: "The sandbox that runs the method's code could not be started (backend: {backend}), so the code never ran."
+    steps:
+      actor: {kind: retry, detail: "Run the method again after a while."}
+      other: {kind: retry, detail: "Run the method again after a while."}
+    params:
+      backend: {type: enum, values: [daytona, subprocess], description: "What could not be started: a Daytona sandbox, or the local subprocess that stands in for it."}
+    meaning: "A Daytona sandbox, or the local subprocess that stands in for it, could not be provisioned or reached. The method's own code never ran, so running the method again is safe."
+    what_to_do: "Run the method again after a while. If the Daytona sandbox keeps failing, report it to whoever runs the runtime."
+    see:
+      - {title: "PipeFunc Requirements", href: "under-the-hood/pipe-func-requirements.md"}
+
+  # --- pipelex.codegen. -------------------------------------------------------------------
+
+  - code: pipelex.codegen.output_conflict
+    title: "Codegen will not write there"
+    domain: input
+    retry: "no"
+    raised_as: problem
+    status: 409
+    detail: "Codegen will not write to '{path}' (reason: {reason})."
+    steps:
+      actor: {kind: change_input, detail: "Generate into a directory codegen owns, or move what sits at '{path}' out of the way."}
+      other: {kind: change_input, detail: "Pass this to the caller, whose codegen target '{path}' holds something codegen will not overwrite."}
+    params:
+      path: {type: identifier, description: "The path codegen would write."}
+      reason: {type: enum, values: [unowned_file, escapes_root, not_a_file, symlink], description: "Why codegen will not write there: a file it does not own sits there, the path lies outside the output root, is not a file, or is a symbolic link."}
+    meaning: "A file codegen does not own sits at the target, or the target lies outside the output root, is not a file, or is a symbolic link."
+    what_to_do: "Point codegen at a directory of its own, or remove what sits at the path, then generate again."
+    see:
+      - {title: "Codegen Projections", href: "under-the-hood/codegen-projections.md"}
+
+  - code: pipelex.codegen.lock_invalid
+    title: "The codegen lock is unreadable"
+    domain: input
+    retry: "no"
+    raised_as: problem
+    status: 422
+    detail: "The codegen lock '{file}' cannot be read."
+    steps:
+      actor: {kind: change_input, detail: "Restore the lock '{file}' from version control, or generate the code again to rewrite it."}
+      other: {kind: change_input, detail: "Pass this to the caller, whose codegen lock '{file}' cannot be read."}
+    params:
+      file: {type: identifier, description: "The lock file."}
+    meaning: "The `codegen.lock` file is malformed, or records a tree that is not safe to write."
+    what_to_do: "Restore the lock from version control, or generate the code again, which rewrites it."
+    see:
+      - {title: "Codegen Projections", href: "under-the-hood/codegen-projections.md"}
+
+  - code: pipelex.codegen.lock_unsupported
+    title: "The codegen lock needs a newer Pipelex"
+    domain: operator
+    retry: "no"
+    raised_as: problem
+    status: 500
+    detail: "The codegen lock was written in the format version {lock_version}, which this Pipelex does not read."
+    steps:
+      actor: {kind: upgrade, detail: "Upgrade Pipelex to a version that reads the codegen lock format {lock_version}."}
+      other: {kind: report, detail: "Report this to whoever runs the runtime."}
+    params:
+      lock_version: {type: integer, description: "The format version the lock was written in."}
+    meaning: "The lock was written by a newer Pipelex, in a format this runtime does not read."
+    what_to_do: "If you run the runtime, upgrade Pipelex. Otherwise, report the problem to whoever runs it."
+    see:
+      - {title: "Codegen Projections", href: "under-the-hood/codegen-projections.md"}
+
+  - code: pipelex.codegen.lock_not_found
+    title: "No codegen lock in this directory"
+    domain: input
+    retry: "no"
+    raised_as: problem
+    status: 404
+    detail: "The directory '{path}' holds no codegen lock."
+    steps:
+      actor: {kind: change_input, detail: "Check the directory codegen wrote, or generate the code into '{path}' first."}
+      other: {kind: change_input, detail: "Pass this to the caller, whose directory '{path}' holds no codegen lock."}
+    params:
+      path: {type: identifier, description: "The directory checked."}
+    meaning: "The directory checked has no `codegen.lock`, so it holds no code generated from a method."
+    what_to_do: "Run the check on the directory codegen wrote, or generate the code first."
+    see:
+      - {title: "Codegen Projections", href: "under-the-hood/codegen-projections.md"}
+
+  - code: pipelex.codegen.drifted
+    title: "The generated code has drifted from its method"
+    domain: input
+    retry: "no"
+    raised_as: problem
+    status: 409
+    detail: "The generated code no longer matches its method."
+    steps:
+      actor: {kind: change_input, detail: "Generate the code again from the method, then check it again."}
+      other: {kind: change_input, detail: "Pass this to the caller, whose generated code no longer matches its method."}
+    params:
+      artifacts: {type: list, items: {type: identifier}, description: "The generated artifacts that no longer match."}
+    meaning: "The artifacts the check read no longer match the method they were generated from."
+    what_to_do: "Generate the code again from the current method, and commit what it writes."
+    see:
+      - {title: "Codegen Projections", href: "under-the-hood/codegen-projections.md"}
+
+  # --- pipelex.connector. -----------------------------------------------------------------
+
+  - code: pipelex.connector.tool_not_in_toolset
+    title: "The tool is not in the connector's toolset"
+    domain: method
+    retry: "no"
+    raised_as: problem
+    status: 422
+    detail: "A model asked for the tool '{tool}', which the method's toolset does not hold."
+    steps:
+      actor: {kind: change_method, detail: "Add the tool '{tool}' to the method's toolset, or steer the prompt away from it, then run the method again."}
+      other: {kind: contact_owner, detail: "Ask the method's owner to add the tool '{tool}' to its toolset."}
+    params:
+      tool: {type: identifier, description: "The tool the model asked for."}
+      available: {type: list, items: {type: identifier}, description: "The tools the toolset holds."}
+    meaning: "A model called a tool that the method's connector toolset does not hold, so the runtime refused the call."
+    what_to_do: "Compare the tool with those `params.available` lists, then add it to the toolset or steer the prompt away from it."
+
+  # --- pipelex.erasure. -------------------------------------------------------------------
+
+  - code: pipelex.erasure.incomplete
+    title: "The erasure left data behind"
+    domain: runtime
+    retry: "yes"
+    raised_as: problem
+    status: 503
+    detail: "The erasure of the {resource} '{id}' did not complete, and some of its data remains."
+    steps:
+      actor: {kind: retry, detail: "Request the erasure of the {resource} '{id}' again."}
+      other: {kind: report, detail: "Report this to whoever runs the runtime."}
+    params:
+      resource: {type: enum, values: [run, method, method_version, workflow], description: "What was being erased: a run, a method, a method's version or a workflow's history."}
+      id: {type: identifier, description: "The id of what was being erased."}
+    meaning: "A purge of a run, a method, a method's version or a workflow's history did not complete, so part of its data remains. Requesting the erasure again resumes it."
+    what_to_do: "Request the erasure again. If it keeps failing, report it to whoever runs the runtime, since data that should be gone remains."
+
+  # --- pipelex.webhook. -------------------------------------------------------------------
+
+  - code: pipelex.webhook.delivery_failed
+    title: "A webhook was not delivered"
+    domain: input
+    retry: "yes"
+    raised_as: problem
+    status: 502
+    detail: "The webhook was not delivered to its receiver (reason: {reason})."
+    steps:
+      actor: {kind: change_input, detail: "Check that the webhook's receiver is reachable and answers with a success status."}
+      other: {kind: change_input, detail: "Pass this to the caller, whose webhook receiver refused the delivery or could not be reached."}
+    params:
+      reason: {type: enum, values: [http_status, unreachable], description: "Why the delivery failed: the receiver answered with an error status, or could not be reached."}
+      receiver_status: {type: integer, optional: true, description: "The HTTP status the receiver answered with, when it answered."}
+    meaning: "A caller's webhook receiver answered with an error status, or could not be reached. The failure is recorded on the delivery, never on the run, and the platform repeats the delivery on its own."
+    what_to_do: "Fix the receiver so that it answers with a `2xx` status. The platform repeats the delivery, so nothing needs to be sent again."
