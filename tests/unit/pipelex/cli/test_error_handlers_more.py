@@ -23,7 +23,7 @@ from pipelex.cli.error_handlers import (
     handle_telemetry_config_validation_error,
     handle_validate_bundle_error,
 )
-from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
+from pipelex.cogt.exceptions import ModelDeckPresetValidationError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.exceptions import DryRunFailureErrorData, PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
@@ -94,8 +94,8 @@ class TestErrorHandlersExtended:
         assert "first line" in output
         assert "second line" in output
 
-    def _make_deck_preset_error(self, enabled_backends: set[str] | None) -> ModelDeckPresetValidatonError:
-        return ModelDeckPresetValidatonError(
+    def _make_deck_preset_error(self, enabled_backends: set[str] | None) -> ModelDeckPresetValidationError:
+        return ModelDeckPresetValidationError(
             message="preset references unavailable model",
             model_type=ModelType.LLM,
             preset_id="default_text",

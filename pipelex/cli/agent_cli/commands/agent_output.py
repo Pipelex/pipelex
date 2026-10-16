@@ -93,7 +93,7 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     "ModelChoiceNotFoundError": _UNKNOWN_MODEL_HINT,
     "PipeOperatorModelChoiceError": _UNKNOWN_MODEL_HINT,
     "PipeOperatorModelAvailabilityError": "Run 'pipelex-agent doctor' to check available models and verify API keys",
-    "ModelDeckPresetValidatonError": (
+    "ModelDeckPresetValidationError": (
         "Run 'pipelex-agent doctor' to check model configuration. "
         "Update the preset model, configure it in an enabled backend, or enable a supporting backend"
     ),

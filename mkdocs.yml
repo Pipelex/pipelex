@@ -415,7 +415,7 @@ plugins:
         'errors/mistral-worker-configuration-error.md': 'errors/pipelex/config/invalid.md'
         'errors/model-choice-not-found-error.md': 'https://mthds.ai/errors/model.unknown'
         'errors/model-deck-not-found-error.md': 'errors/pipelex/config/invalid.md'
-        'errors/model-deck-preset-validaton-error.md': 'errors/pipelex/config/invalid.md'
+        'errors/model-deck-preset-validaton-error.md': 'errors/index.md'
         'errors/model-deck-validation-error.md': 'errors/pipelex/config/invalid.md'
         'errors/model-deck-validaton-error.md': 'errors/index.md'
         'errors/model-listing-unsupported-error.md': 'https://mthds.ai/errors/runtime.unsupported'

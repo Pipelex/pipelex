@@ -381,7 +381,7 @@ class ModelDeckValidationError(CogtError):
     error_category = InferenceErrorCategory.CONFIGURATION
 
 
-class ModelDeckPresetValidatonError(ModelDeckValidationError):
+class ModelDeckPresetValidationError(ModelDeckValidationError):
     """A deck preset names a model this deployment does not serve, refused when the deck is validated at boot."""
 
     error_code = PipelexErrorCode.CONFIG_INVALID

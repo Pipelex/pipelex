@@ -226,7 +226,7 @@ MockUsageOnLiveRunError | request.invalid
 ModelChoiceNotFoundError | one of model.unknown, model.capability_unsupported
 ModelDeckChoiceUnresolvedError | one of pipelex.config.invalid, model.unavailable
 ModelDeckNotFoundError | pipelex.config.invalid
-ModelDeckPresetValidatonError | pipelex.config.invalid
+ModelDeckPresetValidationError | pipelex.config.invalid
 ModelDeckValidationError | pipelex.config.invalid
 ModelListingUnsupportedError | runtime.unsupported
 ModelManagerError | pipelex.config.invalid

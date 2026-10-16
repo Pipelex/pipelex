@@ -18,7 +18,7 @@ from pipelex.cogt.exceptions import (
     LLMHandleNotFoundError,
     ModelChoiceNotFoundError,
     ModelDeckChoiceUnresolvedError,
-    ModelDeckPresetValidatonError,
+    ModelDeckPresetValidationError,
     ModelNotFoundError,
     ModelWaterfallError,
     SearchHandleNotFoundError,
@@ -958,7 +958,7 @@ class ModelDeck(ConfigModel):
             match self.model_deck_config.missing_presets_reaction:
                 case ProblemReaction.RAISE:
                     msg = f"Failed to validate all LLM presets: {exc}"
-                    raise ModelDeckPresetValidatonError(
+                    raise ModelDeckPresetValidationError(
                         message=msg,
                         model_type=ModelType.LLM,
                         preset_id=exc.preset_id,
@@ -975,7 +975,7 @@ class ModelDeck(ConfigModel):
             match self.model_deck_config.missing_presets_reaction:
                 case ProblemReaction.RAISE:
                     msg = f"Failed to validate all ImgGen presets: {exc}"
-                    raise ModelDeckPresetValidatonError(
+                    raise ModelDeckPresetValidationError(
                         message=msg,
                         model_type=ModelType.IMG_GEN,
                         preset_id=exc.preset_id,
@@ -991,7 +991,7 @@ class ModelDeck(ConfigModel):
             match self.model_deck_config.missing_presets_reaction:
                 case ProblemReaction.RAISE:
                     msg = f"Failed to validate all Extract presets: {exc}"
-                    raise ModelDeckPresetValidatonError(
+                    raise ModelDeckPresetValidationError(
                         message=msg,
                         model_type=ModelType.TEXT_EXTRACTOR,
                         preset_id=exc.preset_id,
@@ -1007,7 +1007,7 @@ class ModelDeck(ConfigModel):
             match self.model_deck_config.missing_presets_reaction:
                 case ProblemReaction.RAISE:
                     msg = f"Failed to validate all Search presets: {exc}"
-                    raise ModelDeckPresetValidatonError(
+                    raise ModelDeckPresetValidationError(
                         message=msg,
                         model_type=ModelType.SEARCH,
                         preset_id=exc.preset_id,
@@ -1023,7 +1023,7 @@ class ModelDeck(ConfigModel):
             match self.model_deck_config.missing_presets_reaction:
                 case ProblemReaction.RAISE:
                     msg = f"Failed to validate all DocGen presets: {exc}"
-                    raise ModelDeckPresetValidatonError(
+                    raise ModelDeckPresetValidationError(
                         message=msg,
                         model_type=ModelType.DOC_GEN,
                         preset_id=exc.preset_id,
@@ -1039,7 +1039,7 @@ class ModelDeck(ConfigModel):
             match self.model_deck_config.missing_presets_reaction:
                 case ProblemReaction.RAISE:
                     msg = f"Failed to validate all Judgment presets: {exc}"
-                    raise ModelDeckPresetValidatonError(
+                    raise ModelDeckPresetValidationError(
                         message=msg,
                         model_type=ModelType.JUDGMENT,
                         preset_id=exc.preset_id,
