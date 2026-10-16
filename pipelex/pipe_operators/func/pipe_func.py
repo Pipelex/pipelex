@@ -10,7 +10,6 @@ from pydantic import PrivateAttr, field_validator
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.base_exceptions import PipelexError
 from pipelex.config import is_pipe_func_sandbox_hosted
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -364,15 +363,13 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             )
             # Not classified as the caller's fault: the function's own exception text can carry
             # whatever the process holds (a path, a setting, a secret), so it stays redacted under
-            # STRICT disclosure. A Pipelex error keeps its own code: the in-process executor's mark of
-            # what the function raised is `pipe.function_raised` whatever the function raised, and a
-            # failure of the seam (a timeout, a sandbox that cannot run the call) is the seam's. Any other
-            # exception comes from an out-of-process executor, reporting the function's failure that way.
-            if isinstance(exc, PipelexError):
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).with_error_code(
-                CoreCode.PIPE_FUNCTION_RAISED
-            ) from exc
+            # STRICT disclosure. The wrapper takes its cause's code. What the function raised reads
+            # `pipe.function_raised` only because an executor marked it so: the in-process executor
+            # raises it as `PipeFuncRaisedError`, and an out-of-process one must report a coded Pipelex
+            # error the same way. A failure of the seam (a timeout, a sandbox that cannot run the call)
+            # keeps its own code, and an exception that is not a Pipelex error proves nothing about the
+            # function, such as a transport error, so it reads `runtime.unexpected`.
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
 
         the_content = execution_result.content
 

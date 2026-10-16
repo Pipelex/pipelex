@@ -68,6 +68,28 @@ class _TimedOutExecutor(PipeFuncExecutorProtocol):
         raise NotImplementedError(msg)
 
 
+class _TransportFailingExecutor(PipeFuncExecutorProtocol):
+    """An out-of-process executor whose transport failed with an exception that is not a Pipelex error."""
+
+    @override
+    async def run_pipe_func(
+        self,
+        *,
+        job_metadata: JobMetadata,
+        pipe_code: str,
+        function_name: str,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+    ) -> PipeFuncExecutionResult:
+        msg = "The connection to the sandbox was reset"
+        raise ConnectionResetError(msg)
+
+    @override
+    async def run_pipe_func_transported(self, *, request: PipeFuncExecutionRequest) -> PipeFuncExecutionResponse:
+        msg = "Not used by this test"
+        raise NotImplementedError(msg)
+
+
 def _make_pipe_func() -> PipeFunc:
     blueprint = PipeFuncBlueprint(
         description="Read the parcel's line in the ledger",
@@ -120,8 +142,11 @@ class TestPipeFuncFailureCode:
 
     @pytest.mark.parametrize(
         ("executor", "expected_code"),
-        [(_TimedOutExecutor(), CoreCode.PIPE_FUNCTION_TIMED_OUT)],
-        ids=["timed_out"],
+        [
+            (_TimedOutExecutor(), CoreCode.PIPE_FUNCTION_TIMED_OUT),
+            (_TransportFailingExecutor(), CoreCode.RUNTIME_UNEXPECTED),
+        ],
+        ids=["timed_out", "foreign_transport_failure"],
     )
     @pytest.mark.asyncio
     async def test_a_failure_of_the_executor_keeps_its_own_code(
@@ -131,6 +156,7 @@ class TestPipeFuncFailureCode:
         executor: PipeFuncExecutorProtocol,
         expected_code: ErrorCode,
     ) -> None:
+        """A failure of the seam is not the function's, and an exception no executor marked proves nothing about the function."""
         load_empty_library()
         mocker.patch("pipelex.pipe_operators.func.pipe_func.is_pipe_func_sandbox_hosted", return_value=True)
 

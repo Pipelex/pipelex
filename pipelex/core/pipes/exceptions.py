@@ -81,7 +81,6 @@ class PipeRunError(PipelexError):
         fallback=CoreCode.RUNTIME_UNEXPECTED,
         others=(
             CoreCode.MODEL_OUTPUT_SCHEMA_MISMATCH,
-            CoreCode.PIPE_FUNCTION_RAISED,
             CoreCode.PIPE_CONDITION_UNMATCHED,
             CoreCode.PIPE_CONDITION_REFUSED,
             CoreCode.PIPE_INPUT_UNRESOLVED,
