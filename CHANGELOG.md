@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`crate_fingerprint` on the run answers**: the API server's `POST /v1/start` acknowledgement and `POST /v1/execute` result, `PipelexRunResultStart` and `PipelexRunResultExecute`, carry the fingerprint of the library crate the run's method was loaded into, so a host records it on its run beside the digest of the method tree that ran; it is `null` for a run built from no crate.
+- **`StorageProviderAbstract.store_if_absent`**: a storage provider creates an object only when its key holds none and answers whether it did, never replacing an object already there, and checks the bytes against `checksum_sha256_hex` before writing, raising the new `StorageChecksumMismatchError` on a mismatch. S3 makes the condition with `If-None-Match: *` and sends the SHA-256 as `x-amz-checksum-sha256` for S3 to check, GCS uploads on generation 0, and the local provider hard-links a temporary file to the key; a provider that does not override `_store_if_absent`, such as an external storage plugin, looks the key up and then stores.
+
+### Changed
+
+- **The API server's blob store writes create-only (Breaking)**: every blob and tree listing the server writes is created only when its key is free, with its SHA-256 as its checksum, so a bucket refusing unconditional writes under `blobs/` and `trees/` refuses none of them. A blob held at another size than the bytes uploaded under its hash is no longer written over: the upload is a `500` `BlobStoreCorrupted` that leaves the object for the deployment's operator to remove, and the local storage's folder must sit on a filesystem that supports hard links.
+
+### Fixed
+
+- **`POST /v1/validate` without a `read_scope` stores nothing**: a validation of a `files` map records its tree in the blob store only under the `read_scope` its request carries, where it used to record the tree's blobs and listing under the caller's own id, a prefix no host lists or erases; hash entries still resolve in the caller's own scope.
+
 ## [v0.87.0] - 2026-10-16
 
 ### Highlights

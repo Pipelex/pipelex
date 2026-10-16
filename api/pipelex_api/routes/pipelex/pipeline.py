@@ -489,6 +489,8 @@ class ApiRunner(PipelexMTHDSProtocol):
             created_at=created_at,
             state=RunState.STARTED,
             workflow_id=dispatch_ack.workflow_id,
+            # The crate the job was built from, which a host records beside the run's tree digest.
+            crate_fingerprint=pipe_job.job_metadata.run_metadata.crate_fingerprint,
         )
 
     async def _ensure_served_method_requirements_met(self) -> None:

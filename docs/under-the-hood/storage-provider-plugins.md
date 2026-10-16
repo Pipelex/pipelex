@@ -147,7 +147,7 @@ The duplicate detection is the same fail-loud `_add` helper the inference/orches
 
 A third-party storage plugin is a distribution that:
 
-1. implements a `StorageProviderAbstract` subclass — the three hooks `_load_with_metadata`, `_store`, and `public_url` — deferring any SDK import into those methods (import-light); `_store` publishes the bytes whole or not at all, never leaving an object cut short under its key, and a provider that can read a byte range or an object's size without its bytes also overrides `_load_head` and `_load_size`, whose defaults load the whole object;
+1. implements a `StorageProviderAbstract` subclass — the three hooks `_load_with_metadata`, `_store`, and `public_url` — deferring any SDK import into those methods (import-light); `_store` publishes the bytes whole or not at all, never leaving an object cut short under its key, and a provider that can read a byte range or an object's size without its bytes also overrides `_load_head` and `_load_size`, whose defaults load the whole object, and one that can create an object only when its key is free also overrides `_store_if_absent` (see [Create-only writes](#create-only-writes));
 2. defines a plugin class (`name`, `targets_api`, `register`) whose `register` calls `add_storage_provider(method="<token>", factory=...)` — and nothing else;
 3. advertises itself under the `pipelex.plugins.kernel` entry-point group — a storage provider is kernel-layer, and the group is how a plugin declares that (see [Inference Backend Plugins](inference-backend-plugins.md#shipping-it-as-an-out-of-tree-plugin) for what each group means and what happens if you pick the wrong one; the pre-split `pipelex.plugins` group is retired and now fails startup):
 
@@ -160,6 +160,12 @@ azure_storage = "pipelex_storage_azure.plugin:AzureStoragePlugin"
 Installing the distribution makes the method selectable (`runtime.storage.method = "azure"`); uninstalling removes it. No core change, no central registration list — *presence* is the source of truth. A discovered plugin can be quarantined without uninstalling via the `runtime.plugins.disabled` denylist (matched against the entry-point name *before* load, so a broken install can still be disabled to recover startup — see [Inference Backend Plugins](inference-backend-plugins.md) for the shared discovery/denylist machinery).
 
 Use `pipelex plugins list` to see every discovered plugin, the entry-point group it was found under, what each contributed, and its denylist state. The **Group** column is the first thing to read when a plugin is missing: a built-in shows `—`, and an external plugin that resolved to the wrong layer shows it there.
+
+### Create-only writes
+
+`store_if_absent(data=…, key=…, content_type=…, checksum_sha256_hex=…)` creates an object only when its key holds none, and answers whether this call created it: an object already there is never replaced, and the answer is then `False`. With a checksum, the bytes are checked against it before anything is written, a mismatch raising `StorageChecksumMismatchError`, and the provider sends it on when its storage can check it. The API server's blob store writes every blob and tree listing this way, so a bucket refusing unconditional writes under those prefixes refuses none of them.
+
+Each built-in provider makes the condition atomic in its storage: S3 sends `If-None-Match: *` with the SHA-256 as `x-amz-checksum-sha256` and reads a `412` as the key held, and a `409` from a conditional write in flight as held once the object is found; GCS uploads on generation 0; the local provider writes a temporary file and hard-links it to the key, which fails when the name is taken; the in-memory one checks its dict. A provider that does not override `_store_if_absent`, such as an external plugin written before it existed, keeps working through the default, which looks the key up with `_load_size` and then calls `_store`, so two writers racing on one free key may both write, which a caller keying objects by their content can live with since both write the same bytes, but which a storage refusing unconditional writes would refuse.
 
 ### A provider is not the tenant boundary
 

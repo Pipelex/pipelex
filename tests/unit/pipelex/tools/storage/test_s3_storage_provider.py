@@ -1,3 +1,5 @@
+import base64
+import hashlib
 from typing import Any
 
 import pytest
@@ -5,7 +7,7 @@ from botocore.exceptions import BotoCoreError, ClientError, EndpointConnectionEr
 from pytest_mock import MockerFixture
 
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidKeyError, StorageS3Error
-from pipelex.tools.storage.s3_storage_provider import S3StorageProvider
+from pipelex.tools.storage.s3_storage_provider import S3StorageProvider, checksum_sha256_header_value
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
 
 # Test constants
@@ -542,3 +544,98 @@ class TestS3StorageProvider:
         mock_aiobotocore["client"].head_object = mocker.AsyncMock(side_effect=EndpointConnectionError(endpoint_url="https://s3.example.com"))
         with pytest.raises(StorageS3Error):
             await s3_provider_no_signed_urls.load_size(uri=f"{PIPELEX_STORAGE_SCHEME}test/file.pdf")
+
+    async def test_store_if_absent_sends_the_condition_and_the_checksum(
+        self,
+        s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aiobotocore: dict[str, Any],
+    ) -> None:
+        """`If-None-Match: *` makes S3 refuse to replace an object, and the SHA-256 makes it refuse other bytes."""
+        data = b"blob bytes"
+        sha256 = hashlib.sha256(data).hexdigest()
+
+        created = await s3_provider_no_signed_urls.store_if_absent(
+            data=data, key="scope/blobs/one", content_type="application/octet-stream", checksum_sha256_hex=sha256
+        )
+
+        assert created is True
+        mock_aiobotocore["client"].put_object.assert_called_once_with(
+            Bucket=S3_TEST_BUCKET,
+            Key="scope/blobs/one",
+            Body=data,
+            IfNoneMatch="*",
+            ContentType="application/octet-stream",
+            ChecksumSHA256=base64.b64encode(hashlib.sha256(data).digest()).decode("ascii"),
+        )
+
+    async def test_store_if_absent_without_a_checksum_sends_none(
+        self,
+        s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aiobotocore: dict[str, Any],
+    ) -> None:
+        assert await s3_provider_no_signed_urls.store_if_absent(data=b"bytes", key="scope/blobs/one") is True
+
+        mock_aiobotocore["client"].put_object.assert_called_once_with(Bucket=S3_TEST_BUCKET, Key="scope/blobs/one", Body=b"bytes", IfNoneMatch="*")
+
+    @pytest.mark.parametrize("error_code", ["412", "PreconditionFailed"])
+    async def test_store_if_absent_over_a_held_object_is_no_error(
+        self,
+        mocker: MockerFixture,
+        s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aiobotocore: dict[str, Any],
+        error_code: str,
+    ) -> None:
+        held = ClientError({"Error": {"Code": error_code, "Message": "At least one of the pre-conditions you specified did not hold"}}, "PutObject")
+        mock_aiobotocore["client"].put_object = mocker.AsyncMock(side_effect=held)
+
+        assert await s3_provider_no_signed_urls.store_if_absent(data=b"bytes", key="scope/blobs/one") is False
+
+    async def test_store_if_absent_racing_another_conditional_write_is_held_once_it_landed(
+        self,
+        mocker: MockerFixture,
+        s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aiobotocore: dict[str, Any],
+    ) -> None:
+        """A `409` means another conditional write to the key was in flight: the object it created counts as held."""
+        conflict = ClientError({"Error": {"Code": "ConditionalRequestConflict", "Message": "Conflict"}}, "PutObject")
+        mock_aiobotocore["client"].put_object = mocker.AsyncMock(side_effect=conflict)
+        mock_aiobotocore["client"].head_object = mocker.AsyncMock(return_value={"ContentLength": 5})
+
+        assert await s3_provider_no_signed_urls.store_if_absent(data=b"bytes", key="scope/blobs/one") is False
+        mock_aiobotocore["client"].head_object.assert_called_once_with(Bucket=S3_TEST_BUCKET, Key="scope/blobs/one")
+
+    async def test_store_if_absent_racing_a_write_that_left_nothing_is_an_error(
+        self,
+        mocker: MockerFixture,
+        s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aiobotocore: dict[str, Any],
+    ) -> None:
+        conflict = ClientError({"Error": {"Code": "409", "Message": "Conflict"}}, "PutObject")
+        mock_aiobotocore["client"].put_object = mocker.AsyncMock(side_effect=conflict)
+        missing = ClientError({"Error": {"Code": "404", "Message": "Not Found"}}, "HeadObject")
+        mock_aiobotocore["client"].head_object = mocker.AsyncMock(side_effect=missing)
+
+        with pytest.raises(StorageS3Error, match="ConditionalRequestConflict"):
+            await s3_provider_no_signed_urls.store_if_absent(data=b"bytes", key="scope/blobs/one")
+
+    async def test_store_if_absent_maps_other_errors(
+        self,
+        mocker: MockerFixture,
+        s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aiobotocore: dict[str, Any],
+    ) -> None:
+        refused = ClientError({"Error": {"Code": "AccessDenied", "Message": "Access Denied"}}, "PutObject")
+        mock_aiobotocore["client"].put_object = mocker.AsyncMock(side_effect=refused)
+        with pytest.raises(StorageS3Error, match="AccessDenied"):
+            await s3_provider_no_signed_urls.store_if_absent(data=b"bytes", key="scope/blobs/one")
+
+        mock_aiobotocore["client"].put_object = mocker.AsyncMock(side_effect=NoCredentialsError())
+        with pytest.raises(StorageS3Error, match="NoCredentialsError"):
+            await s3_provider_no_signed_urls.store_if_absent(data=b"bytes", key="scope/blobs/one")
+
+    async def test_checksum_header_value_is_the_raw_digest_in_base64(self) -> None:
+        data = b"blob bytes"
+
+        assert checksum_sha256_header_value(sha256_hex=hashlib.sha256(data).hexdigest()) == base64.b64encode(hashlib.sha256(data).digest()).decode(
+            "ascii"
+        )

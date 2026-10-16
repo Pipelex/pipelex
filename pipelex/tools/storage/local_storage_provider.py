@@ -125,6 +125,23 @@ class LocalStorageProvider(StorageProviderAbstract):
             raise StorageLocalError(msg)
         return stat_result.st_size
 
+    @staticmethod
+    def _temporary_path_beside(*, file_path: Path) -> Path:
+        return file_path.with_name(f".{file_path.name}.{uuid4().hex}.tmp")
+
+    @staticmethod
+    async def _write_temporary(*, temporary_path: Path, data: bytes) -> None:
+        """Write the bytes to a temporary file beside their target, creating its folders, and flush them to disk.
+
+        Raises:
+            OSError: If the filesystem write fails.
+        """
+        temporary_path.parent.mkdir(parents=True, exist_ok=True)
+        async with aiofiles.open(temporary_path, "wb") as file_handle:  # pyright: ignore[reportUnknownMemberType]
+            await file_handle.write(data)
+            await file_handle.flush()
+            os.fsync(file_handle.fileno())
+
     @override
     async def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
         """Store bytes to a file, published whole or not at all.
@@ -144,16 +161,10 @@ class LocalStorageProvider(StorageProviderAbstract):
             StorageLocalError: If the filesystem write fails (e.g. disk full, permission denied).
         """
         file_path = self._validate_key(key)
-        temporary_path = file_path.with_name(f".{file_path.name}.{uuid4().hex}.tmp")
+        temporary_path = self._temporary_path_beside(file_path=file_path)
 
         try:
-            # Create parent directories if they don't exist
-            file_path.parent.mkdir(parents=True, exist_ok=True)
-
-            async with aiofiles.open(temporary_path, "wb") as file_handle:  # pyright: ignore[reportUnknownMemberType]
-                await file_handle.write(data)
-                await file_handle.flush()
-                os.fsync(file_handle.fileno())
+            await self._write_temporary(temporary_path=temporary_path, data=data)
             temporary_path.replace(file_path)
         except OSError as exc:
             msg = f"Failed to write file '{key}': {exc}"
@@ -162,6 +173,46 @@ class LocalStorageProvider(StorageProviderAbstract):
             # Gone once renamed; a write that failed leaves it behind, and removing it is best effort.
             with contextlib.suppress(OSError):
                 temporary_path.unlink(missing_ok=True)
+
+    @override
+    async def _store_if_absent(self, *, data: bytes, key: str, content_type: str | None, checksum_sha256_hex: str | None) -> bool:
+        """Create a file unless one exists at the key, published whole or not at all, and never over another.
+
+        The bytes are written to a temporary file beside the target and flushed to disk, as `_store` writes them, then
+        hard-linked to the target, which the filesystem creates only when the name is free, atomically: of two writers
+        of one key, exactly one creates it, and neither replaces a file already there. A reader never sees a file cut
+        short. The temporary file is removed either way.
+
+        Args:
+            data: The bytes to store, already checked against their checksum.
+            key: Storage key (relative path, without scheme prefix).
+            content_type: Ignored for local storage.
+            checksum_sha256_hex: Checked before this call; a file has no checksum of its own to send it to.
+
+        Returns:
+            True when this call created the file, False when the key already held one.
+
+        Raises:
+            StorageInvalidUriError: If the key is invalid.
+            StorageLocalError: If the filesystem write fails, including on a filesystem that cannot make a hard link.
+        """
+        file_path = self._validate_key(key)
+        temporary_path = self._temporary_path_beside(file_path=file_path)
+
+        try:
+            await self._write_temporary(temporary_path=temporary_path, data=data)
+            file_path.hardlink_to(temporary_path)
+        except FileExistsError:
+            return False
+        except OSError as exc:
+            msg = f"Failed to create file '{key}': {exc}"
+            raise StorageLocalError(msg) from exc
+        finally:
+            # The target is its own link once created, and a write that failed leaves the temporary file behind:
+            # removing it is best effort.
+            with contextlib.suppress(OSError):
+                temporary_path.unlink(missing_ok=True)
+        return True
 
     @override
     async def public_url(self, uri: str) -> str:

@@ -1,8 +1,9 @@
 """The runner's blob store over a storage provider: what it looks up by size, what it reads, and how many at once.
 
 The storage here counts its calls and the ones in flight, so these pin what the routes cannot show: a blob held at
-another size than an entry states is never read, reads and lookups run a bounded number at a time, a short object is
-written over by the next upload, and a tree whose listing is held is recorded without a lookup per file.
+another size than an entry states is never read, reads and lookups run a bounded number at a time, every write is
+create-only with its checksum, a short object is never written over, and a tree whose listing is held is recorded
+without a lookup per file.
 """
 
 import asyncio
@@ -12,6 +13,7 @@ import pytest
 from mthds.method_tree.digest import digest_of_contents, sha256_hex, tree_files_from_contents, tree_listing
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract, StoredData
+from pytest_mock import MockerFixture
 from typing_extensions import override
 
 from pipelex_api.blob_store import MAX_CONCURRENT_BLOB_LOOKUPS, MAX_CONCURRENT_BLOB_TRANSFERS, RunnerBlobStore
@@ -28,6 +30,8 @@ class _CountingStorage(StorageProviderAbstract):
         self.objects: dict[str, bytes] = {}
         self.loaded_keys: list[str] = []
         self.sized_keys: list[str] = []
+        self.created: list[tuple[str, str | None]] = []
+        self.unconditional_keys: list[str] = []
         self.most_loads_at_once = 0
         self.most_lookups_at_once = 0
         self._loads_in_flight = 0
@@ -64,7 +68,16 @@ class _CountingStorage(StorageProviderAbstract):
 
     @override
     async def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
+        self.unconditional_keys.append(key)
         self.objects[key] = data
+
+    @override
+    async def _store_if_absent(self, *, data: bytes, key: str, content_type: str | None, checksum_sha256_hex: str | None) -> bool:
+        if key in self.objects:
+            return False
+        self.created.append((key, checksum_sha256_hex))
+        self.objects[key] = data
+        return True
 
     @override
     async def public_url(self, uri: str) -> str | None:
@@ -146,18 +159,56 @@ class TestRunnerBlobStore:
         assert storage.most_lookups_at_once == MAX_CONCURRENT_BLOB_LOOKUPS
         assert storage.most_loads_at_once == MAX_CONCURRENT_BLOB_TRANSFERS
 
-    async def test_a_short_object_is_not_held_and_the_next_upload_writes_it_over(self) -> None:
-        """A storage that does not publish writes whole may leave a blob cut short: it is asked for again, then repaired."""
+    async def test_a_short_object_is_asked_for_and_its_upload_is_a_server_fault_that_writes_nothing(self) -> None:
+        """A blob cut short is damaged storage, which no write repairs: nothing writes over a blob, so its operator must."""
         storage = _CountingStorage()
         blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage)
         data = b"the whole blob, of which a failed write kept only a part"
         storage.objects[_blob_key(data)] = data[:10]
 
         assert await blob_store.missing_blobs(sizes={sha256_hex(data): len(data)}) == [sha256_hex(data)]
-        await blob_store.store_blob(data=data)
+        with pytest.raises(ApiError) as exc_info:
+            await blob_store.store_blob(data=data)
 
+        assert exc_info.value.status_code == 500
+        assert _problem_of(exc_info)["error_type"] == "BlobStoreCorrupted"
+        assert storage.objects[_blob_key(data)] == data[:10]
+        assert storage.created == []
+        assert storage.unconditional_keys == []
+
+    async def test_blobs_and_listings_are_created_only_with_their_checksums(self) -> None:
+        """Every write names its SHA-256, the blob's hash or the listing's digest, and none is unconditional."""
+        storage = _CountingStorage()
+        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage)
+        contents = {"main.mthds": b"domain = 'a'", "notes.txt": b"some notes"}
+        request_tree = RequestTree.make_from_contents(contents=contents)
+
+        await blob_store.record_tree(tree=request_tree.tree, contents=request_tree.contents)
+        await blob_store.store_blob(data=contents["notes.txt"])
+
+        digest_hex = digest_of_contents(contents).removeprefix("sha256:")
+        assert sorted(storage.created) == sorted(
+            [(_blob_key(data), sha256_hex(data)) for data in contents.values()] + [(f"{_SCOPE}/trees/{digest_hex}", digest_hex)]
+        )
+        assert storage.unconditional_keys == []
+
+    async def test_a_blob_another_writer_created_meanwhile_is_held(self, mocker: MockerFixture) -> None:
+        """The lookup found nothing, then the create found the key taken: the same bytes are held, and that is no error."""
+        storage = _CountingStorage()
+        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage)
+        data = b"bytes two writers send at once"
+
+        async def _absent_then_created(key: str) -> int:
+            # The lookup misses, and the other writer's object lands before this writer's create.
+            storage.objects[key] = data
+            msg = f"File not found: '{key}'"
+            raise StorageFileNotFoundError(msg)
+
+        mocker.patch.object(storage, "_load_size", side_effect=_absent_then_created)
+
+        assert await blob_store.store_blob(data=data) == sha256_hex(data)
+        assert storage.created == []
         assert storage.objects[_blob_key(data)] == data
-        assert await blob_store.missing_blobs(sizes={sha256_hex(data): len(data)}) == []
 
     async def test_a_tree_whose_listing_is_held_is_recorded_without_a_lookup_per_file(self) -> None:
         storage = _CountingStorage()

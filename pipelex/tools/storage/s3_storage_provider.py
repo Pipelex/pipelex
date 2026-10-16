@@ -1,3 +1,4 @@
+import base64
 import importlib.util
 from typing import Any
 from urllib.parse import quote
@@ -10,6 +11,20 @@ from pipelex.tools.storage.exceptions import (
     StorageS3Error,
 )
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract, StoredData
+
+# What S3 answers a conditional write whose condition fails: `412` when the key holds an object (`If-None-Match: *`),
+# `409 ConditionalRequestConflict` when another conditional write to the same key is in flight.
+_PRECONDITION_FAILED_CODES = frozenset({"412", "PreconditionFailed"})
+_CONDITIONAL_CONFLICT_CODES = frozenset({"409", "ConditionalRequestConflict"})
+
+
+def checksum_sha256_header_value(*, sha256_hex: str) -> str:
+    """The `x-amz-checksum-sha256` value of bytes whose SHA-256 is `sha256_hex`: the raw digest in base64.
+
+    Raises:
+        ValueError: `sha256_hex` is not hexadecimal.
+    """
+    return base64.b64encode(bytes.fromhex(sha256_hex)).decode("ascii")
 
 
 class S3StorageProvider(StorageProviderAbstract):
@@ -265,6 +280,74 @@ class S3StorageProvider(StorageProviderAbstract):
             except BotoCoreError as exc:
                 msg = f"S3 backend error for key '{key}': {type(exc).__name__}"
                 raise StorageS3Error(msg) from exc
+
+    @override
+    async def _store_if_absent(self, *, data: bytes, key: str, content_type: str | None, checksum_sha256_hex: str | None) -> bool:
+        """Create an S3 object unless one exists at the key, with S3 checking the condition and the checksum.
+
+        The PUT carries `If-None-Match: *`, so S3 writes it only when the key holds no object and answers `412`
+        otherwise, which is the key already held. With a checksum, it carries the SHA-256 as `x-amz-checksum-sha256`,
+        and S3 refuses a body whose hash differs, so the object holds exactly the bytes the checksum names. A `409`
+        means another conditional write to the key is in flight: the key is looked up once that request is refused,
+        and the object found there, which that other write created, counts as held.
+
+        Args:
+            data: The bytes to store, already checked against their checksum.
+            key: Storage key (without scheme prefix).
+            content_type: Optional MIME type for the object.
+            checksum_sha256_hex: The SHA-256 of `data` in lowercase hexadecimal, sent for S3 to check, or None.
+
+        Returns:
+            True when this call created the object, False when the key already held one.
+
+        Raises:
+            StorageS3Error: If the S3 operation fails (any other ClientError, a `409` whose key still holds nothing, or a
+                BotoCoreError).
+        """
+        from botocore.exceptions import (  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
+            BotoCoreError,
+            ClientError,
+        )
+
+        session = self._get_session()
+        client_config = self._get_client_config()
+
+        conditional_conflict: ClientError | None = None
+        async with session.create_client(**client_config) as client:
+            try:
+                put_params: dict[str, Any] = {
+                    "Bucket": self._bucket_name,
+                    "Key": key,
+                    "Body": data,
+                    "IfNoneMatch": "*",
+                }
+                if content_type:
+                    put_params["ContentType"] = content_type
+                if checksum_sha256_hex is not None:
+                    put_params["ChecksumSHA256"] = checksum_sha256_header_value(sha256_hex=checksum_sha256_hex)
+                await client.put_object(**put_params)
+            except client.exceptions.NoSuchBucket as exc:
+                msg = f"Bucket not found in S3: '{self._bucket_name}'"
+                raise StorageS3Error(msg) from exc
+            except ClientError as exc:
+                error_code = (exc.response.get("Error") or {}).get("Code", "Unknown")
+                if error_code in _PRECONDITION_FAILED_CODES:
+                    return False
+                if error_code not in _CONDITIONAL_CONFLICT_CODES:
+                    msg = f"S3 ClientError ({error_code}) for key '{key}'"
+                    raise StorageS3Error(msg) from exc
+                conditional_conflict = exc
+            except BotoCoreError as exc:
+                msg = f"S3 backend error for key '{key}': {type(exc).__name__}"
+                raise StorageS3Error(msg) from exc
+        if conditional_conflict is None:
+            return True
+        try:
+            await self._load_size(key)
+        except StorageFileNotFoundError:
+            msg = f"S3 ClientError (ConditionalRequestConflict) for key '{key}', which still holds no object"
+            raise StorageS3Error(msg) from conditional_conflict
+        return False
 
     def _make_public_url(self, key: str) -> str:
         """Build an unsigned public URL for an S3 object, on the same host and path a signed one would name.

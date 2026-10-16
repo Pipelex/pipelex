@@ -17,18 +17,27 @@ full, and never by an upload: `PUT /v1/blobs/{sha256}` writes under `blobs/` alo
 be a well-formed listing proves nothing. A listing present means the whole tree is present, which lets
 `POST /v1/blobs/missing` answer a tree's digest with one lookup.
 
+Every write is create-only and checksummed, as the hosted platform writes the same keys: a blob or a listing is created
+only when its key holds nothing (`If-None-Match: *` on S3, generation 0 on GCS, a hard link on the local filesystem),
+so nothing written there is ever replaced, and with its SHA-256 as its checksum, which S3 checks against the body it
+receives. A key already holding an object is the object already held, never an error. The checksum of a blob is its
+hash, and that of a listing the hexadecimal part of its tree's digest, which is the listing's own hash, so every object
+under `blobs/<hex>` or `trees/<hex>` holds bytes whose SHA-256 is that `<hex>`, and a bucket refusing every
+unconditional write under those prefixes refuses none of this runner's.
+
 Every object under `blobs/<sha256>` holds, whole, the bytes whose SHA-256 is that hash: the key is the hash this runner
 computes from the bytes it writes, the runner's own `PUT /v1/blobs/{sha256}` writes only bytes it checked against the
-path's hash, and every built-in storage provider publishes a write whole or not at all (the local one through a
-temporary file renamed onto the key). So an object's stored size, read from its metadata without reading its bytes, is
-the size of that hash's bytes, and nothing deletes or rewrites a blob. A listing, written once each of its files was
-held at its size, therefore stays true.
+path's hash, and every built-in storage provider publishes a write whole or not at all. So an object's stored size,
+read from its metadata without reading its bytes, is the size of that hash's bytes, and nothing deletes or rewrites a
+blob. A listing, written once each of its files was held at its size, therefore stays true.
 
 From this the blob store answers without reading what it does not need:
 
 - `POST /v1/blobs/missing` lists a hash this runner does not hold at the size the sender states, an object held at
-  another size included, which only a storage that does not publish writes whole could leave short, and which the
-  upload then writes over.
+  another size included. The upload then tells the two cases apart, holding the bytes: bytes of the size held are the
+  ones held, and nothing is written, while bytes of another size mean the object held is damaged, which only a storage
+  that does not publish writes whole could leave, a 500 `BlobStoreCorrupted`, since nothing writes over a blob and its
+  operator must remove the object.
 - A run looks up each hash's stored size first. A hash held at another size than an entry states is a 422
   `BlobMismatch`, never `MissingBlobs`, since uploading those bytes again would change nothing: the entry is wrong.
   Only a blob held at the size its entries state is read, so the bytes read are bounded by the sizes the request
@@ -101,10 +110,6 @@ class RunnerBlobStore:
         except StorageFileNotFoundError:
             return None
 
-    async def holds_blob(self, *, sha256: str, size: int) -> bool:
-        """Whether the bytes whose SHA-256 is `sha256` are held at `size`, an object of another size being no blob."""
-        return await self.stored_size(sha256=sha256) == size
-
     async def stored_sizes(self, *, sha256s: Iterable[str]) -> dict[str, int | None]:
         """Each hash's stored size, None for a hash not held, looked up a bounded number at a time."""
         hashes = list(sha256s)
@@ -138,14 +143,27 @@ class RunnerBlobStore:
         return InMemoryBlobStore(blobs)
 
     async def store_blob(self, *, data: bytes) -> str:
-        """Hold `data` under its SHA-256, writing it unless it is held at its size already, and return the hash.
+        """Hold `data` under its SHA-256, creating the blob unless it is held already, and return the hash.
 
-        An object under the hash at another size, which only a storage that does not publish writes whole could leave,
-        is written over.
+        The blob is looked up first, so bytes already held are not sent again, then created only if its key is still
+        free, with its hash as its checksum: a writer that created it meanwhile wrote the same bytes, and the key
+        holding an object is the blob held.
+
+        Raises (as a problem document): a 500 `BlobStoreCorrupted` when an object of another size is held under the
+        hash, which only damaged storage could hold and which this runner never writes over.
         """
         sha256 = sha256_hex(data)
-        if not await self.holds_blob(sha256=sha256, size=len(data)):
-            await self._storage.store(data, key=self._blob_key(sha256=sha256), content_type=_BLOB_CONTENT_TYPE)
+        held_size = await self.stored_size(sha256=sha256)
+        if held_size is None:
+            await self._storage.store_if_absent(
+                data=data, key=self._blob_key(sha256=sha256), content_type=_BLOB_CONTENT_TYPE, checksum_sha256_hex=sha256
+            )
+        elif held_size != len(data):
+            msg = (
+                f"This runner's blob store holds {held_size} bytes under {sha256}, whose bytes are {len(data)} long: its "
+                "storage is damaged, and its operator must remove that object for the blob to be uploaded again."
+            )
+            raise_internal_server_error(message=msg, error_type=ErrorType.BLOB_STORE_CORRUPTED)
         return sha256
 
     async def holds_tree(self, *, tree_digest: str) -> bool:
@@ -173,7 +191,9 @@ class RunnerBlobStore:
         """Hold every file of a tree read in full, then its listing, so a later request can send it by hash.
 
         The listing is written last, once every file it names is held, so a listing present always means its whole
-        tree is, and a tree whose listing is held already is left as it is, without a lookup per file.
+        tree is, and a tree whose listing is held already is left as it is, without a lookup per file. The listing is
+        created only if its key is free, with the hexadecimal part of the tree's digest as its checksum, which is the
+        listing's own hash: a listing held already, whoever wrote it, is the same bytes.
 
         Args:
             tree: The tree, as a map of file entries made it.
@@ -182,7 +202,12 @@ class RunnerBlobStore:
         if await self.holds_tree(tree_digest=tree.digest):
             return
         await gather_bounded([partial(self.store_blob, data=data) for data in contents.values()], max_concurrency=MAX_CONCURRENT_BLOB_TRANSFERS)
-        await self._storage.store(tree_listing(tree.files), key=self._tree_key(tree_digest=tree.digest), content_type=_LISTING_CONTENT_TYPE)
+        await self._storage.store_if_absent(
+            data=tree_listing(tree.files),
+            key=self._tree_key(tree_digest=tree.digest),
+            content_type=_LISTING_CONTENT_TYPE,
+            checksum_sha256_hex=tree.digest.removeprefix(DIGEST_PREFIX),
+        )
 
     async def missing_blobs(self, *, sizes: Mapping[str, int]) -> list[str]:
         """The hashes of `sizes` not held at their size, in the mapping's order."""
