@@ -26,29 +26,29 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.execution_seams import prepare_pipe_job
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.registries.func_registry import func_registry
+from pipelex.system.registries.func_registry import pipe_func
 from tests.integration.pipelex.fixtures.pipe_job_helpers import make_mode_guarded_run_params
 
 _DOMAIN_CODE = "test_optionals_seq"
 
 
+@pipe_func()
 def optionals_seq_echo_source(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text=f"a:{working_memory.get_stuff_as_str(name='source')}")
 
 
+@pipe_func()
 def optionals_seq_echo_a_out(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text=f"b:{working_memory.get_stuff_as_str(name='a_out')}")
 
 
+@pipe_func()
 def optionals_seq_sink(working_memory: WorkingMemory) -> TextContent:
     topic = working_memory.get_stuff_as_str(name="topic")
     b_out_stuff = working_memory.get_optional_stuff(name="b_out")
     if b_out_stuff is None:
         return TextContent(text=f"report about {topic} (no analysis available)")
     return TextContent(text=f"report about {topic}: {b_out_stuff.as_text.text}")
-
-
-_TEST_FUNCS = [optionals_seq_echo_source, optionals_seq_echo_a_out, optionals_seq_sink]
 
 
 def _make_live_run_params() -> PipeRunParams:
@@ -68,7 +68,7 @@ def _build_lift_sequence() -> PipeSequence:
             description="Consumes the maybe-absent source (plain input): lifted when source is absent",
             inputs={"source": "Text"},
             output="Text",
-            function_name="optionals_seq_echo_source",
+            function_name=f"{__name__}.optionals_seq_echo_source",
         ),
     )
     step_b = PipeFactory[PipeFunc].make_from_blueprint(
@@ -78,7 +78,7 @@ def _build_lift_sequence() -> PipeSequence:
             description="Consumes step A's output (plain input): lifted in chain",
             inputs={"a_out": "Text"},
             output="Text",
-            function_name="optionals_seq_echo_a_out",
+            function_name=f"{__name__}.optionals_seq_echo_a_out",
         ),
     )
     sink_c = PipeFactory[PipeFunc].make_from_blueprint(
@@ -88,7 +88,7 @@ def _build_lift_sequence() -> PipeSequence:
             description="Absorbing sink: declares b_out optional and handles both arms",
             inputs={"topic": "Text", "b_out": "Text?"},
             output="Text",
-            function_name="optionals_seq_sink",
+            function_name=f"{__name__}.optionals_seq_sink",
         ),
     )
     pipe_library = get_pipe_library()
@@ -117,17 +117,6 @@ def _build_lift_sequence() -> PipeSequence:
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestLiftSequence:
-    @classmethod
-    def setup_class(cls):
-        for func in _TEST_FUNCS:
-            func_registry.register_function(func)
-
-    @classmethod
-    def teardown_class(cls):
-        for func in _TEST_FUNCS:
-            if func_registry.has_function(func.__name__):
-                func_registry.unregister_function_by_name(func.__name__)
-
     async def test_sequence_lifts_steps_and_sinks_absence(self, job_metadata: JobMetadata, load_empty_library: Callable[[], str]):
         """With source absent (recorded), steps A and B skip with chained provenance and the
         absorbing sink C still delivers the sequence's main output.
@@ -184,7 +173,7 @@ class TestLiftSequence:
                 description="Consumes the maybe-absent source (plain input): lifted when source is absent",
                 inputs={"source": "Text"},
                 output="Text",
-                function_name="optionals_seq_echo_source",
+                function_name=f"{__name__}.optionals_seq_echo_source",
             ),
         )
         working_memory = WorkingMemoryFactory.make_from_single_stuff(

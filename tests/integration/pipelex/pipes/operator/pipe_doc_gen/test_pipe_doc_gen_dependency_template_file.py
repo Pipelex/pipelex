@@ -38,7 +38,7 @@ class TestPipeDocGenDependencyTemplateFile:
         library = LibraryFactory.make_empty()
         mocker.patch.object(get_library_manager(), "get_current_library", return_value=library)
         LibraryManager()._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
-            library=library, package_address=_PACKAGE_ADDRESS, resolved_dep=resolved_dep
+            library=library, library_id="dependency-test", package_address=_PACKAGE_ADDRESS, resolved_dep=resolved_dep
         )
         return library
 
@@ -48,7 +48,7 @@ class TestPipeDocGenDependencyTemplateFile:
 
         pipe = library.dependency_libraries["invoicing"].pipe_library.get_required_pipe(pipe_code="doc_gen_tests.print_invoice")
         assert isinstance(pipe, PipeDocGen)
-        assert pipe.template == _TEMPLATE
+        assert pipe.template_file_text == _TEMPLATE
 
     def test_a_dependency_s_missing_template_file_is_refused_without_the_host_path(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """The refusal is located at the package's address and names the template file as the method does, never where the host installed it."""
@@ -58,5 +58,16 @@ class TestPipeDocGenDependencyTemplateFile:
         refusal = exc_info.value
         assert refusal.source == f"{_PACKAGE_ADDRESS}/invoice/invoice.mthds"
         report = str(refusal.to_error_report().model_dump())
-        assert "'invoice.html', which does not exist beside its bundle" in report
+        assert (
+            "The file reference 'invoice.html' in 'invoice/invoice.mthds' resolves to 'invoice/invoice.html', which is not a file of the tree."
+            in report
+        )
         assert str(tmp_path) not in report
+
+    def test_a_dependency_s_step_reads_no_file_its_package_keeps_out(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """A file the package's own .gitignore keeps out of its tree is invisible to its steps, though it lies beside the bundle."""
+        (tmp_path / ".gitignore").write_text("*.html\n", encoding="utf-8")
+        with pytest.raises(PipeLoadRefusalError) as exc_info:
+            self._load_dependency(mocker=mocker, package_root=tmp_path, template=_TEMPLATE)
+
+        assert "it is kept out by a .gitignore pattern" in str(exc_info.value.to_error_report().model_dump())

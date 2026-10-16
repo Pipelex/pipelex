@@ -319,3 +319,30 @@ class TestGcpStorageProvider:
 
         with pytest.raises(StorageFileNotFoundError, match=r"missing/file\.pdf"):
             await gcp_provider_no_signed_urls.load_head(uri=f"{PIPELEX_STORAGE_SCHEME}missing/file.pdf", nb_bytes=8192)
+
+    async def test_load_size_reads_the_object_s_metadata(
+        self,
+        mocker: MockerFixture,
+        gcp_provider_no_signed_urls: GcpStorageProvider,
+        mock_gcp_storage: dict[str, Any],
+    ) -> None:
+        """A size read fetches the object's metadata alone, never its bytes."""
+        held = mocker.MagicMock()
+        held.size = 4096
+        mock_gcp_storage["bucket"].get_blob.return_value = held
+
+        size = await gcp_provider_no_signed_urls.load_size(uri=f"{PIPELEX_STORAGE_SCHEME}test/file.pdf")
+
+        assert size == 4096
+        mock_gcp_storage["bucket"].get_blob.assert_called_once_with("test/file.pdf")
+        mock_gcp_storage["blob"].download_as_bytes.assert_not_called()
+
+    async def test_load_size_of_a_missing_object_raises_not_found(
+        self,
+        gcp_provider_no_signed_urls: GcpStorageProvider,
+        mock_gcp_storage: dict[str, Any],
+    ) -> None:
+        mock_gcp_storage["bucket"].get_blob.return_value = None
+
+        with pytest.raises(StorageFileNotFoundError, match=r"missing/file\.pdf"):
+            await gcp_provider_no_signed_urls.load_size(uri=f"{PIPELEX_STORAGE_SCHEME}missing/file.pdf")

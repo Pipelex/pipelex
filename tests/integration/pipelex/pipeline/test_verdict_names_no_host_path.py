@@ -24,15 +24,15 @@ from typing import Any, NamedTuple
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.base_exceptions import DisclosureMode, PipelexError, ValidationErrorItem
+from pipelex.base_exceptions import DisclosureMode, ErrorDomain, PipelexError, ValidationErrorItem
 from pipelex.config import get_config
+from pipelex.libraries.exceptions import HostLibraryTreeError
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.pipeline.validate_bundle_translation import HOST_LIBRARY_FILE_PLACEHOLDER
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.registries.func_registry import func_registry
 from pipelex.validation_error_types import PipeValidationErrorType
 
 _DEPENDENCY_ADDRESS = "github.com/acme-tests/harbour-methods/tides"
@@ -147,19 +147,29 @@ prompt      = "Write a short notice for the harbour board from these tide times:
 """
 
 
-# Two host library files registering a PipeFunc under the same name: the registry refuses the second, naming
-# both by the module names it imported them under, which it spells from their absolute paths.
-_HOST_PIPE_FUNC_NAME = "format_harbour_tide_board_for_host_path_test"
+# A host library bundle whose PipeFunc's tree holds a module named like a standard-library module: the
+# refusal names the module, the tree file and the bundle, never the tree's directory on the host.
+_HOST_PIPE_FUNC_BUNDLE = """
+domain      = "harbour_board"
+description = "Format notices for the harbour board"
 
-_HOST_PIPE_FUNC_MODULE = f"""
+[pipe.format_board_notice]
+type          = "PipeFunc"
+description   = "Format the notice for the harbour board"
+inputs        = { notice = "Text" }
+output        = "Text"
+function_name = "board_formatting.format_board_notice"
+"""
+
+_HOST_PIPE_FUNC_MODULE = """
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.system.registries.func_registry import pipe_func
 
 
 @pipe_func()
-async def {_HOST_PIPE_FUNC_NAME}(working_memory: WorkingMemory) -> TextContent:
-    return TextContent(text="{{flavor}}")
+async def format_board_notice(working_memory: WorkingMemory) -> TextContent:
+    return TextContent(text="board")
 """
 
 
@@ -294,6 +304,54 @@ class TestVerdictNamesNoHostPath:
         assert f"'{_DEPENDENCY_ADDRESS}/notices/tide_notices_copy.mthds'" in item.message, surface.description
         _assert_names_no_host_path(payload=_strict_payload(verdict), tmp_path=tmp_path)
 
+    @pytest.mark.parametrize("surface", _SURFACES, ids=[surface.surface_id for surface in _SURFACES])
+    async def test_a_dependency_s_tree_refusal_names_the_package_by_its_address(
+        self, surface: _Surface, installed_methods_dir: Path, tmp_path: Path
+    ) -> None:
+        package_dir = _install_dependency(methods_dir=installed_methods_dir, bundles={"notices/tide_notices.mthds": _DEPENDENCY_NOTICE_BUNDLE})
+        # The membership rule refuses a symbolic link, so the package's tree cannot be listed.
+        (package_dir / "notices" / "linked_notices.mthds").symlink_to(package_dir / "notices" / "tide_notices.mthds")
+
+        verdict = await _verdict_on(surface=surface, caller_bundle=_CALLER_BUNDLE, tmp_path=tmp_path)
+
+        assert "github.com/acme-tests/harbour-methods" in verdict.message, surface.description
+        assert "notices/linked_notices.mthds" in verdict.message, surface.description
+        assert "max_files" not in verdict.message, "no advice about this host's limits reaches the caller"
+        _assert_names_no_host_path(payload=_strict_payload(verdict), tmp_path=tmp_path)
+
+    @pytest.mark.parametrize(
+        "surface",
+        [surface for surface in _SURFACES if surface.surface_id.endswith("_beside_host_library")],
+        ids=lambda surface: surface.surface_id,
+    )
+    async def test_a_host_library_tree_that_cannot_be_listed_is_the_host_s_fault(self, surface: _Surface, tmp_path: Path) -> None:
+        """Beside submitted content, the host's own directories are no input of the caller's: no verdict, and no host path."""
+        host_library_dir = _valid_host_library(tmp_path=tmp_path)
+        (host_library_dir / "linked_board.mthds").symlink_to(host_library_dir / "harbour_board.mthds")
+
+        with pytest.raises(HostLibraryTreeError) as raised:
+            await _load_on(surface=surface, caller_bundle=_VALID_CALLER_BUNDLE, tmp_path=tmp_path)
+
+        report = raised.value.to_error_report()
+        assert report.error_domain == ErrorDomain.CONFIG
+        assert report.caller_facing_message is False
+        _assert_names_no_host_path(payload=report.to_dict(disclosure_mode=DisclosureMode.STRICT), tmp_path=tmp_path)
+
+    async def test_a_callers_library_tree_that_cannot_be_listed_is_their_verdict(self, tmp_path: Path) -> None:
+        library_dir = _valid_host_library(tmp_path=tmp_path)
+        (library_dir / "linked_board.mthds").symlink_to(library_dir / "harbour_board.mthds")
+        runtime = PipelexMTHDSProtocol(
+            library_dirs=[str(library_dir)],
+            library_dirs_are_callers=True,
+            pipe_run_mode=PipeRunMode.DRY,
+            execution_config=_execution_config(),
+        )
+
+        with pytest.raises(ValidateBundleError) as raised:
+            await runtime.validate([_VALID_CALLER_BUNDLE])
+
+        assert "linked_board.mthds" in raised.value.message
+
     async def test_a_host_library_item_carries_no_source_on_submitted_content(self, tmp_path: Path) -> None:
         host_library_dir = tmp_path / "host" / "library"
         _write(path=host_library_dir / "harbour_board.mthds", content=_MISSPELLED_CONCEPT_LIBRARY_BUNDLE)
@@ -335,6 +393,21 @@ class TestVerdictNamesNoHostPath:
         assert item.message.count(HOST_LIBRARY_FILE_PLACEHOLDER) >= 2
         _assert_names_no_host_path(payload=_strict_payload(raised.value), tmp_path=tmp_path)
 
+    async def test_a_host_library_pipe_func_refusal_names_no_host_path(self, tmp_path: Path) -> None:
+        host_library_dir = tmp_path / "host" / "library"
+        _write(path=host_library_dir / "harbour_board.mthds", content=_HOST_PIPE_FUNC_BUNDLE)
+        _write(path=host_library_dir / "board_formatting.py", content=_HOST_PIPE_FUNC_MODULE)
+        _write(path=host_library_dir / "json.py", content="SHADOW = True\n")
+
+        with pytest.raises(ValidateBundleError) as raised:
+            await validate_bundle(mthds_contents=[_VALID_CALLER_BUNDLE], library_dirs=[host_library_dir])
+
+        items = raised.value.to_error_report().validation_errors or []
+        refused_items = [item for item in items if item.error_type == PipeValidationErrorType.PIPE_FUNC_FUNCTION_REFUSED]
+        assert refused_items, f"expected a pipe_func_function_refused item, got {items!r}"
+        assert "standard-library module 'json'" in refused_items[0].message
+        _assert_names_no_host_path(payload=_strict_payload(raised.value), tmp_path=tmp_path)
+
     async def test_a_run_answers_a_host_library_refusal_without_a_host_path(self, tmp_path: Path) -> None:
         host_library_dir = tmp_path / "host" / "library"
         _write(path=host_library_dir / "harbour_board.mthds", content=_MISSPELLED_CONCEPT_LIBRARY_BUNDLE)
@@ -359,26 +432,6 @@ class TestVerdictNamesNoHostPath:
         concept_items = [item for item in items if item.error_type == PipeValidationErrorType.UNRESOLVED_CONCEPT]
         assert concept_items, f"expected an unresolved_concept item, got {items!r}"
         assert all(item.source == str(library_file) for item in concept_items)
-
-    async def test_a_host_library_pipe_func_collision_names_no_host_module(self, tmp_path: Path) -> None:
-        host_library_dir = tmp_path / "host" / "library"
-        _write(path=host_library_dir / "board_formatting.py", content=_HOST_PIPE_FUNC_MODULE.format(flavor="board"))
-        _write(path=host_library_dir / "notice_formatting.py", content=_HOST_PIPE_FUNC_MODULE.format(flavor="notice"))
-
-        try:
-            with pytest.raises(ValidateBundleError) as raised:
-                await validate_bundle(mthds_contents=[_VALID_CALLER_BUNDLE], library_dirs=[host_library_dir])
-        finally:
-            if func_registry.has_function(_HOST_PIPE_FUNC_NAME):
-                func_registry.unregister_function_by_name(_HOST_PIPE_FUNC_NAME)
-
-        (item,) = raised.value.to_error_report().validation_errors or []
-        assert _HOST_PIPE_FUNC_NAME in item.message
-        assert item.message.count(HOST_LIBRARY_FILE_PLACEHOLDER) == 2
-        strict_payload = _strict_payload(raised.value)
-        _assert_names_no_host_path(payload=strict_payload, tmp_path=tmp_path)
-        # The module names are the host paths spelled with underscores.
-        assert "host_library_board_formatting" not in json.dumps(strict_payload)
 
     @pytest.mark.parametrize("library_dirs_are_callers", [False, True], ids=["hosts_library", "callers_library"])
     async def test_a_runtime_validates_content_against_the_library_it_is_told_is_whose(self, library_dirs_are_callers: bool, tmp_path: Path) -> None:

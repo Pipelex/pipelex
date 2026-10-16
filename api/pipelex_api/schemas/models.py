@@ -15,7 +15,6 @@ from urllib.parse import urlparse
 from mthds.protocol.exceptions import PipelineRequestError
 from mthds.protocol.pipe_output import VariableMultiplicity
 from mthds.protocol.pipeline_inputs import PipelineInputs
-from pipelex.core.bundle_resources.bundle_resource import MAX_LOAD_STAGE_RESOURCES_BYTES
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.methods.fetching import MethodProvenance
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart
@@ -45,18 +44,59 @@ def _ensure_mthds_file_within_bytes_limit(content: str) -> None:
         raise ValueError(msg)
 
 
+class Base64FileEntry(BaseModel):
+    """A file entry carrying the file's bytes in canonical padded standard Base64."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    base64: str = Field(description="The file's bytes in canonical padded standard Base64.")
+
+
+class HashFileEntry(BaseModel):
+    """A file entry naming, by their SHA-256 and their size, bytes the receiver already holds in its blob store."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$", description="The SHA-256 of the file's bytes, in lowercase hexadecimal.")
+    size: int = Field(ge=0, description="The file's size in bytes, an integer written with no fraction or exponent.")
+
+
+FileEntry = str | Base64FileEntry | HashFileEntry
+"""One file of a method tree as it travels: its UTF-8 text, its bytes in Base64, or the hash of bytes the receiver holds."""
+
+FILES_FIELD_DESCRIPTION = (
+    "The method as a map of file entries, the MTHDS standard's form of a method tree that travels: each key is a tree "
+    "path (relative, forward slashes, in Unicode NFC, no `.` or `..` segment, no segment starting with a dot), and each "
+    'value is the file\'s UTF-8 text, `{"base64": ...}` holding its bytes, or `{"sha256": ..., "size": ...}` '
+    "naming bytes this runner already holds (uploaded with `POST /v1/blobs/missing` then `PUT /v1/blobs/{sha256}`). The "
+    "map is read from the request's JSON text: a key given twice, a key the membership rule keeps out of every tree "
+    "(`.mthds/` included), colliding keys and a malformed entry are a 422 `InvalidMethodFiles` whose `tree_refusal` names "
+    "the code and the paths, and hash entries the runner does not hold are one 422 `MissingBlobs` whose `missing_blobs` "
+    "lists every such hash. Its `.mthds` files are the method's bundles and every other file is one a step may read, "
+    "such as a `PipeDocGen` template or a `PipeFunc` module. With no `pipe_code`, the run starts at the `main_pipe` of the "
+    "`METHODS.toml` at the tree's root, or else at the one `main_pipe` its bundles declare. Custom `.py` is only honored "
+    "on a sandbox-hosted deployment."
+)
+
+DEPENDENCIES_FIELD_DESCRIPTION = (
+    "PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the method packages the method calls by address that this "
+    'runner cannot fetch, such as one an author has not published, as `{"<address>": <map of file entries>}`: each '
+    "value is a tree of its own, read as `files` is, with a `METHODS.toml` at its root declaring the address it is keyed "
+    "by. They are searched before the runner's installed copies, for this request alone. Accompanies `files`."
+)
+
 RESOURCES_FIELD_DESCRIPTION = (
     "The files submitted with the bundle that its steps read, such as a PipeDocGen step's `template_file` (an "
     "`.xlsx`, `.docx`, `.pptx` or `.html` template): a JSON object mapping each file's bundle-relative path, exactly "
-    "as the step names it, to the file's bytes in standard base64. Every bundle of the request is read as sitting in "
-    "one directory. A path must be relative and written with forward slashes, with no `..` segment, backslash or "
-    "colon. Every file must be named by a step, or the request is refused with a 422 `BundleResourceNotNamedError`. "
+    "as the step names it, to the file's bytes in standard base64. A path must be relative and written with forward "
+    "slashes, with no `..` segment, backslash or colon. Beside inline `mthds_contents`, every bundle of the request is "
+    "read as sitting in one directory, and every file must be named by a step, or the request is refused with a 422 "
+    "`BundleResourceNotNamedError`. Beside a method tree, `files` or `bundle_b64`, each file joins the tree at its path "
+    "from the tree's root, where a file the tree already holds must have the same bytes. "
     f"By default at most {DEFAULT_MAX_RESOURCES_PER_REQUEST} files, {DEFAULT_MAX_RESOURCE_FILE_KIB} KiB each and "
-    f"{DEFAULT_MAX_RESOURCES_TOTAL_KIB} KiB in all, decoded, counting the files a method bundle ships for its steps; a "
-    "deployment sets its own with `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. A file "
-    "both sent here and shipped in a method bundle must be the same. The `.html` template files, which travel inline with the "
-    f"method wherever it runs, may total {MAX_LOAD_STAGE_RESOURCES_BYTES // 1024} KiB at most, a fixed bound, or the request "
-    "is refused with a 413 `BundleResourcesTooLargeError`."
+    f"{DEFAULT_MAX_RESOURCES_TOTAL_KIB} KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`, "
+    "`MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The files make one method tree with the bundles, which the run "
+    "names by its digest: no file's bytes travel with the run, each being read where a step uses it."
 )
 
 
@@ -88,23 +128,24 @@ class RunRequest(BaseModel):
         output_name: Name of the output slot to write to.
         output_multiplicity: Output multiplicity setting.
         dynamic_output_concept_ref: Override for the dynamic output concept ref.
-        bundle_b64: PIPELEX-API EXTENSION — base64-encoded zip of the whole method
-            bundle (`.mthds` + `.py` + `structures/*.py` + `requirements.txt`). Lets a
-            caller ship custom PipeFunc Python alongside the method; materialized into a
-            temporary library directory before the run. The method packages the bundle
-            calls by address may travel with it under `.mthds/methods/<name>/`, each with
-            its `METHODS.toml`, and are searched before the runner's installed copies.
-            Mutually exclusive with `files`.
-        files: PIPELEX-API EXTENSION — the bundle as a `{relative_path: text}` map (the
-            unzipped equivalent of `bundle_b64`). Mutually exclusive with `bundle_b64`.
+        bundle_b64: PIPELEX-API EXTENSION — base64-encoded zip of the method's folder, read
+            as a map of its entries, so its names are judged by the method tree's rule as the
+            keys of `files` are. The method packages it calls by address may travel with it
+            under `.mthds/methods/<name>/`, each with its `METHODS.toml`, and are searched
+            before the runner's installed copies. Mutually exclusive with `files`.
+        files: The method as a map of file entries, the MTHDS standard's method tree: each
+            value its text, its bytes in Base64, or the hash of bytes the runner holds. Read
+            from the request's raw JSON text, never from this field, which only documents it.
+        dependencies: PIPELEX-API EXTENSION — the method packages the method calls by address
+            that the runner cannot fetch, each a map of file entries keyed by its address.
         method_ref: PIPELEX-API EXTENSION — run a published method by address instead of
             inline source. Resolved by THIS runner (git fetch at the tag, package located
-            by manifest identity); mutually exclusive with `mthds_contents` and with a
-            method bundle. `pipe_code` may accompany it to override the manifest's
-            `main_pipe`.
+            by manifest identity, its tree read from the commit's git objects); mutually
+            exclusive with `mthds_contents` and with a method sent as a tree. `pipe_code`
+            may accompany it to override the manifest's `main_pipe`.
         resources: The files the submitted bundle's steps read, such as a PipeDocGen
             step's `template_file`, as `{bundle_relative_path: base64}`. Accompanies inline
-            `mthds_contents` or a method bundle, never a `method_ref`.
+            `mthds_contents` or a method sent as a tree, which they join, never a `method_ref`.
     """
 
     model_config = ConfigDict(extra="allow")
@@ -118,21 +159,17 @@ class RunRequest(BaseModel):
     bundle_b64: str | None = Field(
         default=None,
         description=(
-            "PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — base64-encoded zip of the whole "
-            "method bundle (`.mthds` + `.py` + `structures/*.py` + `requirements.txt`), materialized into a "
-            "temporary library directory before the run so custom PipeFunc Python travels with the method. "
-            "The method packages the bundle calls by address may travel with it under `.mthds/methods/<name>/`, "
-            "each with its `METHODS.toml`; they are searched before the runner's installed copies, for this run alone. "
+            "PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — base64-encoded zip of the method's folder, read as a "
+            "map of its entries, so the archive's names are judged by the method tree's rule as the keys of `files` are. "
+            "The method packages it calls by address may travel with it under `.mthds/methods/<name>/`, each with its "
+            "`METHODS.toml`; they are searched before the runner's installed copies, for this run alone. "
             "Mutually exclusive with `files`. Custom `.py` is only honored on a sandbox-hosted deployment."
         ),
     )
-    files: dict[str, str] | None = Field(
-        default=None,
-        description=(
-            "PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the method bundle as a "
-            "`{relative_path: text}` map (the unzipped equivalent of `bundle_b64`). Mutually exclusive with `bundle_b64`."
-        ),
-    )
+    # Documents the wire only: the map is read from the request's raw JSON text (`pipelex_api.method_tree_request`),
+    # since a key given twice or a size written `13.0` is visible there alone, so the value is never validated here.
+    files: Annotated[dict[str, FileEntry] | None, SkipValidation] = Field(default=None, description=FILES_FIELD_DESCRIPTION)
+    dependencies: Annotated[dict[str, dict[str, FileEntry]] | None, SkipValidation] = Field(default=None, description=DEPENDENCIES_FIELD_DESCRIPTION)
     method_ref: str | None = Field(
         default=None,
         min_length=1,
@@ -187,6 +224,10 @@ class RunRequest(BaseModel):
             if not values.get("mthds_contents") and not values.get("mthds_content") and not has_bundle:
                 msg = "resources accompany the bundle whose steps read them: send them with mthds_contents or a method bundle."
                 raise PipelineRequestError(msg)
+        # `dependencies` are the packages the method sent in `files` calls, so they accompany that tree.
+        if values.get("dependencies") is not None and values.get("files") is None:
+            msg = "dependencies accompany the method's own files: send the method's tree in files, and its dependencies beside it."
+            raise PipelineRequestError(msg)
         if values.get("pipe_code") is None and not values.get("mthds_contents") and not has_bundle and not has_method_ref:
             msg = (
                 "pipe_code and mthds_contents cannot both be empty. Either: both are provided, or if there are no mthds_contents, "
@@ -262,6 +303,7 @@ class RunRequest(BaseModel):
             dynamic_output_concept_ref=request_body.get("dynamic_output_concept_ref"),
             bundle_b64=request_body.get("bundle_b64"),
             files=request_body.get("files"),
+            dependencies=request_body.get("dependencies"),
             method_ref=request_body.get("method_ref"),
             resources=request_body.get("resources"),
         )
@@ -646,7 +688,7 @@ so the static crate routes do not accept it."""
 
 
 class MthdsContentsRequest(BaseModel):
-    """The `POST /validate` request envelope: `mthds_contents` XOR `method_ref`, plus the sweep's `allow_signatures`.
+    """The `POST /validate` request envelope: one of `mthds_contents`, `files` and `method_ref`, plus the sweep's `allow_signatures`.
 
     This is the flat-list envelope. `/validate` uses it through this class (its `ValidateRequest`
     subclass adds a parallel `mthds_sources` for per-file source labels), and the run routes
@@ -664,8 +706,17 @@ class MthdsContentsRequest(BaseModel):
         default=None,
         min_length=1,
         max_length=MAX_MTHDS_FILES_PER_REQUEST,
-        description="MTHDS contents to load (always an array, even for a single file). Exactly one of `mthds_contents` / `method_ref`.",
+        description="MTHDS contents to load (always an array, even for a single file). Exactly one of `mthds_contents` / `files` / `method_ref`.",
     )
+    # Documents the wire only: the route reads the map from the request's raw JSON text, never from this field.
+    files: Annotated[dict[str, FileEntry] | None, SkipValidation] = Field(
+        default=None,
+        description=(
+            f"{FILES_FIELD_DESCRIPTION} The whole tree is validated, its Python included, by syntax. "
+            "Exactly one of `mthds_contents` / `files` / `method_ref`."
+        ),
+    )
+    dependencies: Annotated[dict[str, dict[str, FileEntry]] | None, SkipValidation] = Field(default=None, description=DEPENDENCIES_FIELD_DESCRIPTION)
     method_ref: str | None = Field(
         default=None,
         min_length=1,
@@ -673,8 +724,8 @@ class MthdsContentsRequest(BaseModel):
         description=(
             "PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — validate a published method by reference "
             "instead of inline contents. Address form: `github.com/<owner>/<repo>[/<selector>][@<tag>]`, resolved by "
-            "THIS runner through the same fetch path as a `method_ref` run; the package's `.mthds` files feed the "
-            "validation with their real relative paths as per-file sources. Exactly one of `mthds_contents` / "
+            "THIS runner through the same fetch path as a `method_ref` run; the package's tree, read from its commit, is "
+            "validated as a `files` tree is. Exactly one of `mthds_contents` / `files` / "
             "`method_ref`. A resolution failure (fetch, package location, the custom-Python policy) is a non-2xx "
             "`problem+json` — never an `is_valid: false` verdict, which is reserved for actual MTHDS content."
         ),
@@ -692,7 +743,11 @@ class MthdsContentsRequest(BaseModel):
     def _exactly_one_content_selector(self) -> Self:
         # Strict XOR (the addressing design's tooling-route rule): a stateless diagnostic call
         # has no linkage slot, so a second selector could only be ignored — refuse it instead.
-        if (self.mthds_contents is None) == (self.method_ref is None):
-            msg = "provide exactly one of `mthds_contents` or `method_ref`"
+        selectors = [self.mthds_contents, self.files, self.method_ref]
+        if sum(selector is not None for selector in selectors) != 1:
+            msg = "provide exactly one of `mthds_contents`, `files` or `method_ref`"
+            raise ValueError(msg)
+        if self.dependencies is not None and self.files is None:
+            msg = "`dependencies` accompany the method's own `files`"
             raise ValueError(msg)
         return self

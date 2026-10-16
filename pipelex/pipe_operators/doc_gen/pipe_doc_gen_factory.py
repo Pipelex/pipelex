@@ -1,11 +1,15 @@
-from collections.abc import Callable
-from pathlib import Path
 from typing import Any
 
+from mthds.method_tree.exceptions import MethodTreeRefusedError
+from mthds.method_tree.references import is_file_reference
+from mthds.method_tree.vocabulary import ReferenceContext
 from typing_extensions import override
 
-from pipelex.core.bundle_resources.bundle_resource import BundleResource
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.method_trees.building_bundle import get_building_tree_bundle
+from pipelex.core.method_trees.file_references import reference_refusal_reason, resolve_bundle_file_reference, resolve_crate_file_reference
+from pipelex.core.method_trees.method_file_store import LOCAL_METHOD_FILES
+from pipelex.core.method_trees.tree_bundle import MethodFileRef, TreeBundle, TreeBundleRef
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.interpreter_hub import get_concept_library, get_native_concept
@@ -13,24 +17,8 @@ from pipelex.pipe_machinery.pipe_factory import PipeFactoryProtocol
 from pipelex.pipe_operators.doc_gen.exceptions import PipeDocGenFactoryError
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen_blueprint import PipeDocGenBlueprint, template_required_roots
-from pipelex.pipe_operators.doc_gen.template_file_resource import bundle_resource_of_template_file
+from pipelex.pipe_operators.doc_gen.template_asset_check import find_template_asset_refusal, literal_template_urls
 from pipelex.tools.jinja2.template_category import TemplateCategory
-
-
-def bundle_dir_of_source(source: str | None) -> Path | None:
-    """The directory of the bundle file a pipe was loaded from, or None for a bundle loaded from a string.
-
-    The library manager sets a pipe blueprint's `source` to the bundle file this host read the bundle from just before
-    the pipe is built, and clears it otherwise (`LibraryCrate.host_bundle_files`), so the label a caller sends with
-    content strings, or a `source` the bundle's own text writes, never reaches here: a content-string load has no
-    directory, and nothing beside it is read from this host's disk.
-    """
-    if source is None or "://" in source:
-        return None
-    source_path = Path(source)
-    if not source_path.is_file():
-        return None
-    return source_path.resolve().parent
 
 
 class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
@@ -56,28 +44,52 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
             )
             raise PipeDocGenFactoryError(msg)
 
-        template = blueprint.template
-        template_path: str | None = None
+        template_file_ref: MethodFileRef | None = None
+        template_bundle_ref: TreeBundleRef | None = None
+        template_tree_is_one_file = False
+        template_file_text: str | None = None
+        if blueprint.template is not None:
+            template_bundle_ref, template_tree_is_one_file = cls._inline_template_tree(pipe_code=pipe_code, template=blueprint.template)
         if blueprint.template_file is not None:
-            bundle_dir = bundle_dir_of_source(blueprint.source)
-            read_template_bytes: Callable[[], bytes]
-            if bundle_dir is None:
-                # A bundle loaded from content strings reads only the files submitted with it, never this host's disk. An
-                # office template is read from them when the step prints, so the pipe keeps only its name, and the run
-                # carries the file in its crate.
-                read_template_bytes = cls._submitted_template_file(pipe_code=pipe_code, template_file=blueprint.template_file).inline_bytes
-            else:
-                # A bundle this host read from a file finds its template file beside it, and never among submitted files.
-                resolved_path = cls._resolve_template_file(pipe_code=pipe_code, template_file=blueprint.template_file, bundle_dir=bundle_dir)
-                read_template_bytes = resolved_path.read_bytes
-                if not blueprint.format.is_template_html:
-                    template_path = str(resolved_path)
-            if blueprint.format.is_template_html:
-                # An HTML template is read and checked now, from disk as from the submitted bytes, as written.
-                template = cls._html_template_file_text(pipe_code=pipe_code, template_file=blueprint.template_file, read_bytes=read_template_bytes)
-                cls._check_html_template_file(pipe_code=pipe_code, template=template, inputs=inputs, template_file=blueprint.template_file)
+            template_file = blueprint.template_file
+            match get_building_tree_bundle():
+                case TreeBundle() as tree_bundle:
+                    # A bundle this process holds finds its template file in its method tree: read from this host's disk
+                    # as a member of the tree, or parsed from a content string at the root of the tree of the files
+                    # submitted with it.
+                    resolved_tree_path = cls._resolve_template_file(pipe_code=pipe_code, template_file=template_file, tree_bundle=tree_bundle)
+                    template_file_ref = MethodFileRef(tree_digest=tree_bundle.digest, tree_path=resolved_tree_path)
+                    if blueprint.format.is_template_html:
+                        # An HTML template file is read and checked now, as written, for the method's load; the print
+                        # stage reads it again, where the step prints.
+                        template_file_text = cls._html_template_file_text(
+                            pipe_code=pipe_code,
+                            template_file=template_file,
+                            data=cls._read_tree_file(tree_bundle=tree_bundle, tree_path=resolved_tree_path),
+                        )
+                        cls._check_html_template_file(pipe_code=pipe_code, template=template_file_text, inputs=inputs, template_file=template_file)
+                        cls._check_template_assets(
+                            pipe_code=pipe_code,
+                            template=template_file_text,
+                            template_label=f"the template file '{resolved_tree_path}'",
+                            holder=resolved_tree_path,
+                            tree_bundle=tree_bundle,
+                        )
+                case TreeBundleRef() as tree_bundle_ref:
+                    # A step built from a crate reads nothing: the crate names its tree by digest, and the host that
+                    # assembled it resolved the reference in the tree and checked the file. The print stage reads it.
+                    try:
+                        resolved_tree_path = resolve_crate_file_reference(reference=template_file, tree_bundle_ref=tree_bundle_ref)
+                    except MethodTreeRefusedError as exc:
+                        msg = (
+                            f"PipeDocGen '{pipe_code}' names the template file '{template_file}', which its method tree cannot give it. {exc.message}"
+                        )
+                        raise PipeDocGenFactoryError(msg) from exc
+                    template_file_ref = MethodFileRef(tree_digest=tree_bundle_ref.tree_digest, tree_path=resolved_tree_path)
+                case None:
+                    raise PipeDocGenFactoryError(cls._unsubmitted_template_file_message(pipe_code=pipe_code, template_file=template_file))
 
-        return PipeDocGen(
+        pipe_doc_gen = PipeDocGen(
             domain_code=domain_code,
             code=pipe_code,
             description=description,
@@ -85,48 +97,123 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
             output=output,
             doc_gen_format=blueprint.format,
             doc_gen_choice=blueprint.model,
-            template=template,
+            template=blueprint.template,
             template_file=blueprint.template_file,
-            template_path=template_path,
+            template_file_ref=template_file_ref,
+            template_bundle_ref=template_bundle_ref,
+            template_tree_is_one_file=template_tree_is_one_file,
             filename=blueprint.filename,
+        )
+        if template_file_text is not None:
+            pipe_doc_gen.hold_template_file_text(template_file_text=template_file_text)
+        return pipe_doc_gen
+
+    @classmethod
+    def _inline_template_tree(cls, *, pipe_code: str, template: str) -> tuple[TreeBundleRef | None, bool]:
+        """The bundle of an inline template, as its method tree names it, which its relative URLs resolve against.
+
+        Returns the bundle's reference, None for bundles parsed from content strings with no file submitted beside them,
+        and whether its tree is the one-file tree of a bundle named alone. The URLs the template writes as they are are
+        checked now in a tree this process holds, and refused in none, where a relative URL names no file; the rest are
+        the rendered HTML's, resolved in the tree when the print's engine asks for each.
+
+        Raises:
+            PipeDocGenFactoryError: A literal relative URL of the template names no image, stylesheet or font of its tree.
+        """
+        match get_building_tree_bundle():
+            case TreeBundle() as tree_bundle:
+                cls._check_template_assets(
+                    pipe_code=pipe_code,
+                    template=template,
+                    template_label=f"the inline template of PipeDocGen '{pipe_code}'",
+                    holder=tree_bundle.tree_path,
+                    tree_bundle=tree_bundle,
+                )
+                return tree_bundle.make_ref(), tree_bundle.tree.is_one_file
+            case TreeBundleRef() as tree_bundle_ref:
+                return tree_bundle_ref, False
+            case None:
+                for url in literal_template_urls(template=template):
+                    if is_file_reference(url, context=ReferenceContext.URL):
+                        msg = (
+                            f"PipeDocGen '{pipe_code}' names '{url}' by a relative URL in its inline template, but its bundle was "
+                            "loaded from a string with no file sent beside it, so it belongs to no method tree and a relative URL "
+                            "names no file. Load the method from its folder, or name the file by an https:// or a data: URL."
+                        )
+                        raise PipeDocGenFactoryError(msg)
+                return None, False
+
+    @classmethod
+    def _check_template_assets(cls, *, pipe_code: str, template: str, template_label: str, holder: str | None, tree_bundle: TreeBundle) -> None:
+        """Check that each literal relative URL of an HTML template names an image, a stylesheet or a font of its tree.
+
+        Raises:
+            PipeDocGenFactoryError: One names no such file; the message names the URL, where it is written and why.
+        """
+        refusal = find_template_asset_refusal(
+            template=template,
+            template_label=template_label,
+            holder=holder,
+            tree=tree_bundle.tree,
+            read_file=lambda tree_path: cls._read_tree_file(tree_bundle=tree_bundle, tree_path=tree_path),
+        )
+        if refusal is None:
+            return
+        msg = f"PipeDocGen '{pipe_code}' names '{refusal.reference}' in {refusal.holder_label}, which its method cannot give it. {refusal.reason}"
+        raise PipeDocGenFactoryError(msg)
+
+    @classmethod
+    def _resolve_template_file(cls, *, pipe_code: str, template_file: str, tree_bundle: TreeBundle) -> str:
+        """The tree path of the template file, resolved in the bundle's method tree.
+
+        The file is the tree's file the reference names, resolved against the bundle's tree path, `..` included as long
+        as it stays in the tree, by a lookup in the tree's set of tree paths: a file the membership rule keeps out of the
+        tree, or any file outside it, is refused, and its path is never opened. Bundles parsed from content strings
+        resolve it from the root of the tree of the files submitted with them. The messages name the template file as
+        the method does and files by their tree paths, never the host's path to them: the bundle a refusal is located
+        in already says which one, and a dependency's install path is not the caller's to read.
+        """
+        try:
+            return resolve_bundle_file_reference(reference=template_file, tree_bundle=tree_bundle)
+        except MethodTreeRefusedError as exc:
+            if tree_bundle.tree_path is None:
+                msg = cls._unsubmitted_template_file_message(pipe_code=pipe_code, template_file=template_file)
+                raise PipeDocGenFactoryError(msg) from exc
+            reason = reference_refusal_reason(refusal_error=exc, tree_bundle=tree_bundle)
+            msg = f"PipeDocGen '{pipe_code}' names the template file '{template_file}', which its method tree cannot give it. {reason}"
+            raise PipeDocGenFactoryError(msg) from exc
+
+    @staticmethod
+    def _unsubmitted_template_file_message(*, pipe_code: str, template_file: str) -> str:
+        return (
+            f"PipeDocGen '{pipe_code}' names the template file '{template_file}', which was not supplied with its "
+            "bundle. A bundle loaded from content strings has no directory to find the file in, so the file must be "
+            f"submitted with it, keyed by the same path, '{template_file}'. A bundle loaded from a folder "
+            "finds it in its method tree."
         )
 
     @classmethod
-    def _resolve_template_file(cls, *, pipe_code: str, template_file: str, bundle_dir: Path) -> Path:
-        """The template file's path, beside the bundle and inside its directory, checked to exist.
+    def _read_tree_file(cls, *, tree_bundle: TreeBundle, tree_path: str) -> bytes | None:
+        """The bytes of a file of the bundle's tree, as a library of this process holds the tree, checked against its hash.
 
-        The messages name the template file as the method does and never the host's path to it: the bundle a
-        refusal is located in already says which one, and a dependency's install path is not the caller's to read.
+        A tree a step is built in is always held: the library holds every tree it loads before it builds a pipe of one.
+        None when the file's bytes are no longer the ones the tree's listing recorded, such as a file edited, removed or
+        swapped for a link since: nothing is read from the disk past the hash check.
         """
-        resolved_path = (bundle_dir / template_file).resolve()
-        if not resolved_path.is_relative_to(bundle_dir):
-            msg = f"PipeDocGen '{pipe_code}' names the template file '{template_file}', which is outside its bundle's directory."
-            raise PipeDocGenFactoryError(msg)
-        if not resolved_path.is_file():
-            msg = f"PipeDocGen '{pipe_code}' names the template file '{template_file}', which does not exist beside its bundle."
-            raise PipeDocGenFactoryError(msg)
-        return resolved_path
+        return LOCAL_METHOD_FILES.read_held_file(tree_digest=tree_bundle.tree.digest, tree_path=tree_path)
 
     @classmethod
-    def _submitted_template_file(cls, *, pipe_code: str, template_file: str) -> BundleResource:
-        """The template file submitted with a bundle loaded from content strings, which the current library holds."""
-        resource = bundle_resource_of_template_file(template_file=template_file)
-        if resource is None:
+    def _html_template_file_text(cls, *, pipe_code: str, template_file: str, data: bytes | None) -> str:
+        """An HTML template file's text, decoded from its bytes as written, line endings included."""
+        if data is None:
             msg = (
-                f"PipeDocGen '{pipe_code}' names the template file '{template_file}', which was not supplied with its "
-                "bundle. A bundle loaded from content strings has no directory to find the file in, so the file must be "
-                f"submitted with it, keyed by the same path, '{template_file}'. A bundle loaded from a directory "
-                "finds it beside its file."
+                f"PipeDocGen '{pipe_code}' could not read the template file '{template_file}' as its method tree listed it: "
+                "the file changed or went missing since the tree was listed."
             )
             raise PipeDocGenFactoryError(msg)
-        return resource
-
-    @classmethod
-    def _html_template_file_text(cls, *, pipe_code: str, template_file: str, read_bytes: Callable[[], bytes]) -> str:
-        """An HTML template file's text, decoded from its bytes as written, line endings included."""
         try:
-            return read_bytes().decode("utf-8")
-        except (OSError, UnicodeError) as exc:
+            return data.decode("utf-8")
+        except UnicodeError as exc:
             msg = f"PipeDocGen '{pipe_code}' could not read the template file '{template_file}' as UTF-8 text."
             raise PipeDocGenFactoryError(msg) from exc
 

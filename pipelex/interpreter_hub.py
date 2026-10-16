@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
     from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
     from pipelex.plugins.pipe_func_executor_registry import PipeFuncExecutorRegistry
+    from pipelex.plugins.pipe_func_package_offer_registry import PipeFuncPackageOfferRegistry
 
 
 class InterpreterHub:
@@ -61,9 +62,9 @@ class InterpreterHub:
         # run
         self._pipe_router: PipeRouterProtocol | None = None
         self._pipe_run: PipeRunProtocol | None = None
-        self._pipe_run_leaves_process = False
         self._pipe_func_executor: PipeFuncExecutorProtocol | None = None
         self._pipe_func_executor_registry: PipeFuncExecutorRegistry | None = None
+        self._pipe_func_package_offer_registry: PipeFuncPackageOfferRegistry | None = None
         # pipeline
         self._pipeline_manager: PipelineManagerAbstract | None = None
 
@@ -108,20 +109,18 @@ class InterpreterHub:
     def set_pipe_router(self, pipe_router: "PipeRouterProtocol"):
         self._pipe_router = pipe_router
 
-    def set_pipe_run(self, pipe_run: "PipeRunProtocol", *, leaves_process: bool) -> None:
-        """Set the pipe run a run uses when its caller injects none, and say whether it runs the job in this process.
-
-        `leaves_process` is true for the pipe run a boot orchestrator's plugin claimed, which hands each job to that
-        orchestrator, such as Temporal, outside this process, and false for core's own, which runs it here.
-        """
+    def set_pipe_run(self, pipe_run: "PipeRunProtocol") -> None:
+        """Set the pipe run a run uses when its caller injects none."""
         self._pipe_run = pipe_run
-        self._pipe_run_leaves_process = leaves_process
 
     def set_pipe_func_executor(self, pipe_func_executor: PipeFuncExecutorProtocol):
         self._pipe_func_executor = pipe_func_executor
 
     def set_pipe_func_executor_registry(self, pipe_func_executor_registry: "PipeFuncExecutorRegistry"):
         self._pipe_func_executor_registry = pipe_func_executor_registry
+
+    def set_pipe_func_package_offer_registry(self, *, pipe_func_package_offer_registry: "PipeFuncPackageOfferRegistry"):
+        self._pipe_func_package_offer_registry = pipe_func_package_offer_registry
 
     def set_pipeline_manager(self, pipeline_manager: PipelineManagerAbstract):
         self._pipeline_manager = pipeline_manager
@@ -181,10 +180,6 @@ class InterpreterHub:
             raise RuntimeError(msg)
         return self._pipe_run
 
-    def does_pipe_run_leave_process(self) -> bool:
-        """Whether the pipe run `get_required_pipe_run` returns hands each job to an orchestrator outside this process."""
-        return self._pipe_run_leaves_process
-
     def get_required_pipe_func_executor(self) -> PipeFuncExecutorProtocol:
         if self._pipe_func_executor is None:
             msg = "PipeFuncExecutor is not initialized"
@@ -196,6 +191,12 @@ class InterpreterHub:
             msg = "PipeFuncExecutorRegistry is not initialized"
             raise RuntimeError(msg)
         return self._pipe_func_executor_registry
+
+    def get_pipe_func_package_offer_registry(self) -> "PipeFuncPackageOfferRegistry":
+        if self._pipe_func_package_offer_registry is None:
+            msg = "PipeFuncPackageOfferRegistry is not initialized"
+            raise RuntimeError(msg)
+        return self._pipe_func_package_offer_registry
 
     def get_required_pipeline_manager(self) -> PipelineManagerAbstract:
         if self._pipeline_manager is None:
@@ -495,15 +496,15 @@ def get_pipe_func_executor_registry() -> "PipeFuncExecutorRegistry":
     return get_interpreter_hub().get_pipe_func_executor_registry()
 
 
+def get_pipe_func_package_offer_registry() -> "PipeFuncPackageOfferRegistry":
+    return get_interpreter_hub().get_pipe_func_package_offer_registry()
+
+
 # run
 
 
 def get_pipe_run() -> "PipeRunProtocol":
     return get_interpreter_hub().get_required_pipe_run()
-
-
-def does_pipe_run_leave_process() -> bool:
-    return get_interpreter_hub().does_pipe_run_leave_process()
 
 
 def get_pipeline_manager() -> PipelineManagerAbstract:

@@ -20,6 +20,7 @@ from pipelex.plugins.exceptions import (
     DuplicateModelListerError,
     DuplicateOrchestratorError,
     DuplicatePipeFuncExecutorError,
+    DuplicatePipeFuncPackageOfferError,
     DuplicateSecretsProviderError,
     DuplicateServiceErrorCodeError,
     DuplicateStorageProviderError,
@@ -32,6 +33,7 @@ from pipelex.plugins.log_sink_registry import LogSinkFactoryFn
 from pipelex.plugins.model_lister_registry import ListModelsFn
 from pipelex.plugins.orchestrator_registry import OrchestratorProtocol
 from pipelex.plugins.pipe_func_executor_registry import PipeFuncExecutorFactoryFn
+from pipelex.plugins.pipe_func_package_offer_registry import PipeFuncPackageOfferFactoryFn
 from pipelex.plugins.plugin_group import PluginGroup
 from pipelex.plugins.plugin_model_declarations import PluginDocGenDefault, PluginInternalModel, PluginModelDeclarations
 from pipelex.plugins.secrets_provider_registry import SecretsProviderFactoryFn
@@ -86,6 +88,7 @@ class HubSlot(StrEnum):
     PIPE_RUN = "pipe_run"
     TASK_MANAGER = "task_manager"
     ISOLATED_EXECUTION_PROBE = "isolated_execution_probe"
+    METHOD_FILE_STORE = "method_file_store"
 
     @property
     def is_interpreter_layer(self) -> bool:
@@ -95,7 +98,7 @@ class HubSlot(StrEnum):
         runs the kernel boot and not the interpreter tail, so it can never apply an interpreter
         claim — which is exactly what a kernel-group plugin must not be able to reach.
 
-        For the five slots that hand a value back to core, the returned type corroborates the
+        For the slots that hand a value back to core, the returned type corroborates the
         classification — the interpreter ones yield a ``Pipe``-aware object, the kernel ones do not.
         ``TASK_MANAGER`` is why that reading cannot govern on its own: its thunk is invoked for its
         side effects and its return is *discarded*, so there is no handed-back object to classify.
@@ -108,7 +111,7 @@ class HubSlot(StrEnum):
         match self:
             case HubSlot.PIPE_FUNC_EXECUTOR | HubSlot.PIPE_ROUTER | HubSlot.PIPE_RUN:
                 return True
-            case HubSlot.CONTENT_GENERATOR | HubSlot.TASK_MANAGER | HubSlot.ISOLATED_EXECUTION_PROBE:
+            case HubSlot.CONTENT_GENERATOR | HubSlot.TASK_MANAGER | HubSlot.ISOLATED_EXECUTION_PROBE | HubSlot.METHOD_FILE_STORE:
                 return False
 
 
@@ -175,6 +178,7 @@ class PluginRegistrar:
         self.secrets_providers: dict[str, SecretsProviderFactoryFn] = {}
         self.log_sinks: dict[str, LogSinkFactoryFn] = {}
         self.pipe_func_executors: dict[str, PipeFuncExecutorFactoryFn] = {}
+        self.pipe_func_package_offers: dict[str, PipeFuncPackageOfferFactoryFn] = {}
         # Plain data, read once by ``make_model_declarations`` for the model manager to merge at boot.
         # Keyed by the model's name and its model type as written, since a handle names one model per model type.
         self.internal_models: dict[tuple[str, str], dict[str, Any]] = {}
@@ -195,6 +199,7 @@ class PluginRegistrar:
         self._secrets_provider_sources: dict[str, str] = {}
         self._log_sink_sources: dict[str, str] = {}
         self._pipe_func_executor_sources: dict[str, str] = {}
+        self._pipe_func_package_offer_sources: dict[str, str] = {}
         self._internal_model_sources: dict[tuple[str, str], str] = {}
         self._doc_gen_default_sources: dict[tuple[DocGenFormat, DocGenSource], str] = {}
         self._service_error_code_sources: dict[str, str] = {}
@@ -446,6 +451,28 @@ class PluginRegistrar:
             ),
         )
 
+    def add_pipe_func_package_offer(self, *, mode: str, factory: PipeFuncPackageOfferFactoryFn) -> None:
+        """State the Python packages a PipeFunc step finds in one execution mode, keyed by the same ``mode`` token as its executor.
+
+        A method's ``requirements.txt`` is checked when it loads against the packages its PipeFunc steps will run
+        with. In ``direct`` mode those are this interpreter's own; in any other mode they are the sandbox's, which this
+        process cannot read, so the plugin contributing that mode's executor states them here (e.g. our Daytona plugin,
+        from the lock of the Daytona sandbox snapshot). ``factory`` is called with the pipe_func config each time a
+        method declaring requirements loads, never here, and answers ``None`` when it cannot state the offer; a mode
+        with no offer, or a ``None`` answer, meets no requirement. Fail-loud on a duplicate mode, naming both plugins.
+        """
+        self._require_interpreter_layer(capability=f"pipe_func package offer {mode}")
+        self._add(
+            store=self.pipe_func_package_offers,
+            sources=self._pipe_func_package_offer_sources,
+            key=mode,
+            value=factory,
+            contribution=f"pipe_func package offer {mode}",
+            on_duplicate=lambda first_plugin, second_plugin: DuplicatePipeFuncPackageOfferError(
+                mode=mode, first_plugin=first_plugin, second_plugin=second_plugin
+            ),
+        )
+
     def add_http_error_mapper(self, *, exc_type_provider: HttpErrorTypeProviderFn, to_error_report: HttpErrorMapperFn) -> None:
         """Contribute a mapping from a transport/runtime exception to a structured ``ErrorReport``.
 
@@ -485,6 +512,14 @@ class PluginRegistrar:
 
     def claim_isolated_execution_probe(self, factory: Callable[[], Any]) -> None:
         self._claim(slot=HubSlot.ISOLATED_EXECUTION_PROBE, factory=factory)
+
+    def claim_method_file_store(self, factory: Callable[[], Any]) -> None:
+        """Claim where activities read method files, by their tree's digest: the factory returns a `MethodFileStoreProtocol`.
+
+        Claimed by a host whose activities run apart from the process that listed a run's method trees, such as a
+        Temporal worker reading the hosted plane's blob store; unclaimed, a process reads the trees its own libraries hold.
+        """
+        self._claim(slot=HubSlot.METHOD_FILE_STORE, factory=factory)
 
     def add_teardown(self, callback: Callable[[], None]) -> None:
         self.teardown_callbacks.append(callback)

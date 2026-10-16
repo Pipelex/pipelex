@@ -323,7 +323,7 @@ app.add_typer(
 app.add_typer(
     fix_app,
     name="fix",
-    help="Apply deterministic safe fixes to a bundle (.mthds) and re-validate until valid",
+    help="Apply deterministic safe fixes to a bundle (.mthds) and re-validate until valid, or migrate a method's function names",
 )
 app.command(name="resolve", help="Resolve a bundle closure into the normalized library crate (JSON or TOML) on stdout")(resolve_cmd)
 app.add_typer(codegen_app, name="codegen", help="Project the resolved crate into typed, runnable artifacts (types, inputs) and check for drift")

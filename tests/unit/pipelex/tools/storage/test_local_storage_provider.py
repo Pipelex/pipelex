@@ -222,3 +222,35 @@ class TestLocalStorageProvider:
             await provider.load(uri=f"{PIPELEX_STORAGE_SCHEME}{key}")
 
         assert key in str(exc_info.value)
+
+    @pytest.mark.parametrize("held_before", [None, b"the bytes held before"])
+    async def test_a_write_cut_short_leaves_the_key_as_it_was(self, tmp_path: Path, mocker: MockerFixture, held_before: bytes | None) -> None:
+        """A write that fails midway, as on a full disk, publishes nothing: the key holds what it held, and no temporary file stays."""
+        provider = LocalStorageProvider(root_path=tmp_path)
+        key = "blobs/one.bin"
+        if held_before is not None:
+            await provider.store(data=held_before, key=key)
+        real_replace = mocker.patch.object(Path, "replace", autospec=True, side_effect=OSError(28, "No space left on device"))
+
+        with pytest.raises(StorageLocalError, match="No space left on device"):
+            await provider.store(data=b"x" * 10_000, key=key)
+
+        real_replace.assert_called_once()
+        if held_before is None:
+            assert not (tmp_path / key).exists()
+        else:
+            assert (tmp_path / key).read_bytes() == held_before
+        assert sorted(path.name for path in (tmp_path / "blobs").iterdir()) == ([] if held_before is None else ["one.bin"])
+
+    async def test_a_write_retried_after_a_failure_lands_whole(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        provider = LocalStorageProvider(root_path=tmp_path)
+        key = "blobs/one.bin"
+        mocker.patch("pipelex.tools.storage.local_storage_provider.os.fsync", side_effect=OSError(5, "Input/output error"))
+        with pytest.raises(StorageLocalError):
+            await provider.store(data=b"payload", key=key)
+        mocker.stopall()
+
+        await provider.store(data=b"payload", key=key)
+
+        assert (tmp_path / key).read_bytes() == b"payload"
+        assert [path.name for path in (tmp_path / "blobs").iterdir()] == ["one.bin"]

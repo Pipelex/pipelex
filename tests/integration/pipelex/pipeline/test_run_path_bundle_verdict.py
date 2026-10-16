@@ -90,8 +90,8 @@ prompt       = "A painted wooden harbour board announcing the tide times"
 aspect_ratio = "7:3"
 """
 
-# A check that fires inside a pipe's pydantic validator while the pipe is built: the function a
-# PipeFunc names is not registered.
+# A check that fires inside a pipe's pydantic validator while the bundle is read: the function a
+# PipeFunc names is a flat name, the key of the retired function registry, not an import path.
 _MODEL_VALIDATOR_FAULT_BUNDLE = """
 domain        = "harbour_notices"
 description   = "Format notices for the harbour board"

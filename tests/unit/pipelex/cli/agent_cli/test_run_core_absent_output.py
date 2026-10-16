@@ -58,7 +58,7 @@ class TestAgentRunCoreAbsentOutput:
         assert result["reason"] == "condition 'gate' evaluated to continue"
 
         # The on-disk output mirrors the envelope.
-        disk_payload = json.loads((tmp_path / "mthds-wip" / "live_run.json").read_text(encoding="utf-8"))
+        disk_payload = json.loads((tmp_path / "mthds-wip" / "results" / "gate_output_01" / "live_run.json").read_text(encoding="utf-8"))
         assert disk_payload["absent"] is True
 
     def test_absent_main_output_with_memory_renders_markdown_absence_doc(

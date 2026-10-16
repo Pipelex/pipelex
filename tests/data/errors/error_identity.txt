@@ -24,10 +24,8 @@ BindingPathUnresolvedError | Binding path unresolved | https://docs.pipelex.com/
 BindingStepRunError | Binding step run | https://docs.pipelex.com/latest/errors/binding-step-run-error/
 BrokenPluginError | Broken plugin | https://docs.pipelex.com/latest/errors/broken-plugin-error/
 BundleElaboratorError | Bundle elaborator | https://docs.pipelex.com/latest/errors/bundle-elaborator-error/
-BundleResourceError | Bundle resource | https://docs.pipelex.com/latest/errors/bundle-resource-error/
 BundleResourceNotNamedError | Bundle resource not named | https://docs.pipelex.com/latest/errors/bundle-resource-not-named-error/
 BundleResourcePathError | Bundle resource path | https://docs.pipelex.com/latest/errors/bundle-resource-path-error/
-BundleResourcesTooLargeError | Bundle resources too large | https://docs.pipelex.com/latest/errors/bundle-resources-too-large-error/
 CodegenError | Codegen error | https://docs.pipelex.com/latest/errors/codegen-error/
 CodegenLockError | Codegen lock error | https://docs.pipelex.com/latest/errors/codegen-lock-error/
 CodegenStampError | Codegen stamp error | https://docs.pipelex.com/latest/errors/codegen-stamp-error/
@@ -83,6 +81,7 @@ DuplicateLogSinkError | Duplicate log sink | https://docs.pipelex.com/latest/err
 DuplicateModelListerError | Duplicate model lister | https://docs.pipelex.com/latest/errors/duplicate-model-lister-error/
 DuplicateOrchestratorError | Duplicate orchestrator | https://docs.pipelex.com/latest/errors/duplicate-orchestrator-error/
 DuplicatePipeFuncExecutorError | Duplicate pipe func executor | https://docs.pipelex.com/latest/errors/duplicate-pipe-func-executor-error/
+DuplicatePipeFuncPackageOfferError | Duplicate pipe func package offer | https://docs.pipelex.com/latest/errors/duplicate-pipe-func-package-offer-error/
 DuplicateSecretsProviderError | Duplicate secrets provider | https://docs.pipelex.com/latest/errors/duplicate-secrets-provider-error/
 DuplicateServiceErrorCodeError | Duplicate service error code | https://docs.pipelex.com/latest/errors/duplicate-service-error-code-error/
 DuplicateStorageProviderError | Duplicate storage provider | https://docs.pipelex.com/latest/errors/duplicate-storage-provider-error/
@@ -107,13 +106,15 @@ FileTypeError | File type | https://docs.pipelex.com/latest/errors/file-type-err
 FixTransactionError | Fix transaction | https://docs.pipelex.com/latest/errors/fix-transaction-error/
 FixWriteConflictError | Fix write conflict | https://docs.pipelex.com/latest/errors/fix-write-conflict-error/
 FormerReleaseConfigError | Configuration left by a former release | https://docs.pipelex.com/latest/errors/former-release-config-error/
-FuncRegistryError | Func registry | https://docs.pipelex.com/latest/errors/func-registry-error/
+FunctionNamesMigrationError | Function names migration error | https://docs.pipelex.com/latest/errors/function-names-migration-error/
 GcpLogSinkCredentialsError | Log sink credentials missing or refused | https://docs.pipelex.com/latest/errors/gcp-log-sink-credentials-error/
 GeneratedImageError | Generated image | https://docs.pipelex.com/latest/errors/generated-image-error/
 GoogleImgGenWorkerError | Google img gen worker | https://docs.pipelex.com/latest/errors/google-img-gen-worker-error/
 GoogleLLMWorkerError | Google LLM worker | https://docs.pipelex.com/latest/errors/google-llm-worker-error/
 GraphSpecError | Graph spec | https://docs.pipelex.com/latest/errors/graph-spec-error/
 GraphSpecValidationError | Graph spec validation | https://docs.pipelex.com/latest/errors/graph-spec-validation-error/
+HostLibraryRequirementsError | Host library requirements | https://docs.pipelex.com/latest/errors/host-library-requirements-error/
+HostLibraryTreeError | Host library tree | https://docs.pipelex.com/latest/errors/host-library-tree-error/
 HostedBaseUrlError | Hosted base url | https://docs.pipelex.com/latest/errors/hosted-base-url-error/
 HostedLocalFileUploadUnavailableError | Hosted local file upload unavailable | https://docs.pipelex.com/latest/errors/hosted-local-file-upload-unavailable-error/
 HostedMethodInvalidError | Hosted method invalid | https://docs.pipelex.com/latest/errors/hosted-method-invalid-error/
@@ -183,8 +184,10 @@ LogSinkHeaderValueError | Log sink header value holds a line break | https://doc
 LogSinkVariableError | Log sink variable did not resolve | https://docs.pipelex.com/latest/errors/log-sink-variable-error/
 MarkdownFormattingBudgetError | Markdown formatting budget exceeded | https://docs.pipelex.com/latest/errors/markdown-formatting-budget-error/
 MethodDependencyFetchError | Method dependency fetch | https://docs.pipelex.com/latest/errors/method-dependency-fetch-error/
+MethodEntryError | Method entry | https://docs.pipelex.com/latest/errors/method-entry-error/
 MethodFetchDisabledError | Method fetch disabled | https://docs.pipelex.com/latest/errors/method-fetch-disabled-error/
 MethodFetchError | Method fetch | https://docs.pipelex.com/latest/errors/method-fetch-error/
+MethodFileUnavailableError | Method file unavailable | https://docs.pipelex.com/latest/errors/method-file-unavailable-error/
 MethodInstallError | Method install | https://docs.pipelex.com/latest/errors/method-install-error/
 MethodPackageAmbiguityError | Method package ambiguity | https://docs.pipelex.com/latest/errors/method-package-ambiguity-error/
 MethodPackageNotFoundError | Method package not found | https://docs.pipelex.com/latest/errors/method-package-not-found-error/
@@ -192,7 +195,11 @@ MethodPackageSymlinkError | Method package symlink | https://docs.pipelex.com/la
 MethodPackageTooLargeError | Method package too large | https://docs.pipelex.com/latest/errors/method-package-too-large-error/
 MethodRefError | Method reference error | https://docs.pipelex.com/latest/errors/method-ref-error/
 MethodRefParseError | Method ref parse | https://docs.pipelex.com/latest/errors/method-ref-parse-error/
+MethodRequirementsError | Method requirements | https://docs.pipelex.com/latest/errors/method-requirements-error/
+MethodRequirementsFileError | Method requirements file | https://docs.pipelex.com/latest/errors/method-requirements-file-error/
+MethodRequirementsNotMetError | Method requirements not met | https://docs.pipelex.com/latest/errors/method-requirements-not-met-error/
 MethodStructuresRefusedError | Method structures refused | https://docs.pipelex.com/latest/errors/method-structures-refused-error/
+MethodTreeLoadError | Method tree load | https://docs.pipelex.com/latest/errors/method-tree-load-error/
 MigrationError | Migration error | https://docs.pipelex.com/latest/errors/migration-error/
 MigrationGoldenError | Migration golden error | https://docs.pipelex.com/latest/errors/migration-golden-error/
 MigrationLedgerError | Migration ledger error | https://docs.pipelex.com/latest/errors/migration-ledger-error/
@@ -234,11 +241,14 @@ PipeControllerOutputConceptMismatchError | Pipe controller output concept mismat
 PipeDocGenFactoryError | Pipe doc gen factory | https://docs.pipelex.com/latest/errors/pipe-doc-gen-factory-error/
 PipeDocGenRunError | Pipe doc gen run | https://docs.pipelex.com/latest/errors/pipe-doc-gen-run-error/
 PipeDocGenTemplateCheckError | Pipe doc gen template check | https://docs.pipelex.com/latest/errors/pipe-doc-gen-template-check-error/
+PipeDocGenTemplateFileUncheckedError | Pipe doc gen template file unchecked | https://docs.pipelex.com/latest/errors/pipe-doc-gen-template-file-unchecked-error/
 PipeDocGenUndefinedValueError | Pipe doc gen undefined value | https://docs.pipelex.com/latest/errors/pipe-doc-gen-undefined-value-error/
 PipeExecutionError | Pipe execution | https://docs.pipelex.com/latest/errors/pipe-execution-error/
 PipeExtractFactoryError | Pipe extract factory | https://docs.pipelex.com/latest/errors/pipe-extract-factory-error/
 PipeFactoryError | Pipe factory | https://docs.pipelex.com/latest/errors/pipe-factory-error/
 PipeFuncExecutionError | Pipe func execution | https://docs.pipelex.com/latest/errors/pipe-func-execution-error/
+PipeFuncFunctionError | Pipe func function | https://docs.pipelex.com/latest/errors/pipe-func-function-error/
+PipeFuncPackageSetUnstatedError | Pipe func package set unstated | https://docs.pipelex.com/latest/errors/pipe-func-package-set-unstated-error/
 PipeFuncTransportError | Pipe func transport | https://docs.pipelex.com/latest/errors/pipe-func-transport-error/
 PipeIOContractError | Pipe IO contract | https://docs.pipelex.com/latest/errors/pipe-io-contract-error/
 PipeImgGenFactoryError | Pipe img gen factory | https://docs.pipelex.com/latest/errors/pipe-img-gen-factory-error/
@@ -337,10 +347,14 @@ StuffSpecFactoryError | Stuff spec factory | https://docs.pipelex.com/latest/err
 TelemetryConfigError | Telemetry config | https://docs.pipelex.com/latest/errors/telemetry-config-error/
 TelemetryConfigValidationError | Telemetry config validation | https://docs.pipelex.com/latest/errors/telemetry-config-validation-error/
 TemplateSigilSyntaxError | Template sigil syntax | https://docs.pipelex.com/latest/errors/template-sigil-syntax-error/
+TemplateUrlRefusedError | Relative URL refused | https://docs.pipelex.com/latest/errors/template-url-refused-error/
 TomlError | TOML parse error | https://docs.pipelex.com/latest/errors/toml-error/
 ToolError | Tool error | https://docs.pipelex.com/latest/errors/tool-error/
 TraceEventModeError | Trace event mode | https://docs.pipelex.com/latest/errors/trace-event-mode-error/
 TracebackMessageError | Traceback message | https://docs.pipelex.com/latest/errors/traceback-message-error/
+TreeModuleShadowingError | Tree module shadowing | https://docs.pipelex.com/latest/errors/tree-module-shadowing-error/
+TreePythonError | Tree python | https://docs.pipelex.com/latest/errors/tree-python-error/
+TreePythonHeldError | Tree python held | https://docs.pipelex.com/latest/errors/tree-python-held-error/
 TypesafeError | Typesafe | https://docs.pipelex.com/latest/errors/typesafe-error/
 TypesafeJudgmentResponseError | Typesafe judgment response | https://docs.pipelex.com/latest/errors/typesafe-judgment-response-error/
 TypesafeQuestionUnsupportedError | Typesafe question unsupported | https://docs.pipelex.com/latest/errors/typesafe-question-unsupported-error/

@@ -15,6 +15,7 @@ are the single translation point for everything the API does not author
 itself.
 """
 
+from collections.abc import Mapping
 from typing import Any, NoReturn
 
 from pipelex.base_exceptions import ErrorDomain
@@ -49,6 +50,7 @@ def _raise_api_error(
     status: int,
     error_domain: ErrorDomain,
     headers: dict[str, str] | None = None,
+    members: Mapping[str, Any] | None = None,
 ) -> NoReturn:
     """Build the RFC 7807 document and raise `ApiError`.
 
@@ -67,12 +69,24 @@ def _raise_api_error(
         request_id=None,
         error_domain=error_domain,
     )
+    if members:
+        # Extension members of RFC 7807 (section 3.2), such as `missing_blobs`: data a client acts on, beside the prose.
+        document.update(members)
     raise ApiError(status_code=status, document=document, headers=headers)
 
 
 def raise_validation_error(message: str, error_type: ErrorType = ErrorType.VALIDATION_ERROR) -> NoReturn:
     """Raise a 422 RFC 7807 problem response for invalid caller input."""
     _raise_api_error(error_type=error_type, message=message, status=422, error_domain=ErrorDomain.INPUT)
+
+
+def raise_validation_problem(*, message: str, error_type: ErrorType, members: Mapping[str, Any]) -> NoReturn:
+    """Raise a 422 RFC 7807 problem response for invalid caller input, carrying extension members a client acts on.
+
+    The members join the document beside `detail`, such as the `missing_blobs` a sender uploads before it sends the
+    request again, or the `tree_refusal` naming the standard's refusal code and the paths it names.
+    """
+    _raise_api_error(error_type=error_type, message=message, status=422, error_domain=ErrorDomain.INPUT, members=members)
 
 
 def raise_bad_request(message: str, error_type: ErrorType = ErrorType.BAD_REQUEST) -> NoReturn:

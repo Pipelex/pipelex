@@ -141,7 +141,7 @@ async def pipe_io(request_data: PipeIORequest) -> JSONResponse:
       `application/problem+json` via the global handlers.
     """
     try:
-        resolved = resolve_requested_crate(request_data)
+        resolved = await resolve_requested_crate(request_data)
     except ValidateBundleError as validate_error:
         return invalid_crate_report_response(validate_error.to_error_report())
     try:

@@ -167,6 +167,12 @@ PROBLEM_404_METHOD_PACKAGE: dict[str, Any] = _problem(
     "requested address by manifest identity. The message lists the packages the repository does contain.",
 )
 
+PROBLEM_403_BLOB_UPLOAD: dict[str, Any] = _problem(
+    "`BlobUploadNotAuthorized` — the upload does not carry the signed query an upload target of `POST /v1/blobs/missing` "
+    "names, its signature does not hold for this hash and scope, or it has expired. Ask `POST /v1/blobs/missing` again "
+    "for a fresh target.",
+)
+
 PROBLEM_501_METHOD_REF: dict[str, Any] = _problem(
     "`MethodRefNotSupported` — the request selected its closure by a **registry-form** `method_ref` (not a "
     "`github.com/...` address), and no server-side method registry resolves those yet. Use an address-form reference "

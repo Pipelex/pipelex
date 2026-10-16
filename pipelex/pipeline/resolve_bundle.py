@@ -12,15 +12,16 @@ no dry-run sweep, matching `pipelex resolve` — the crate is emitted from a loa
 validated** library (D6), and runnability is `validate`'s vocabulary, not resolution's.
 """
 
+from collections.abc import Mapping
 from typing import Sequence
 
 from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
 
 from pipelex.base_exceptions import PipelexUnexpectedError
-from pipelex.core.bundle_resources.bundle_resource import BundleResources
+from pipelex.core.method_trees.file_references import BundleFileOrigin
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
-from pipelex.libraries.bundle_resources import check_bundle_resources
+from pipelex.libraries.bundle_resources import check_submitted_files
 from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
@@ -33,7 +34,7 @@ def resolve_crate_from_contents(
     *,
     mthds_contents: list[str],
     mthds_sources: Sequence[str | None] | None = None,
-    bundle_resources: BundleResources | None = None,
+    submitted_files: Mapping[str, bytes] | None = None,
 ) -> LibraryCrate:
     """Assemble, validate, and normalize a library crate from in-memory MTHDS contents.
 
@@ -49,9 +50,9 @@ def resolve_crate_from_contents(
             onto each blueprint so diagnostics carry a real ``source``; a ``None`` entry leaves
             that content source-less. Must match ``mthds_contents`` in length when provided — a
             mismatch is a host-wiring bug.
-        bundle_resources: The files submitted with the contents that their steps read, such as a ``PipeDocGen``
-            step's ``template_file``, keyed by canonical bundle-relative path. The load reads them; the normalized
-            crate, a standard artifact, does not carry them.
+        submitted_files: The files submitted with the contents that their steps read, such as a ``PipeDocGen``
+            step's ``template_file``, keyed by canonical bundle-relative path. The load resolves the steps' references
+            among them; the normalized crate, a standard artifact, carries neither them nor their tree.
 
     Returns:
         The normalized library crate (fully qualified, natives materialized, fingerprint set).
@@ -78,14 +79,15 @@ def resolve_crate_from_contents(
         set_current_library(library_id=library_id)
         content_sources: list[str | None] = list(mthds_sources) if mthds_sources is not None else [None] * len(mthds_contents)
         with translate_to_validate_bundle_error():
+            # Contents belong to no method tree: their steps read only the files submitted with them.
             blueprints = [
-                MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content, mthds_source=source)
+                MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content, mthds_source=source, file_origin=BundleFileOrigin.SUBMITTED_FILES)
                 for content, source in zip(mthds_contents, content_sources, strict=True)
             ]
             _reject_address_based_dependencies(blueprints=blueprints)
-            if bundle_resources:
-                check_bundle_resources(blueprints=blueprints, bundle_resources=bundle_resources)
-                library_manager.add_bundle_resources(library_id=library_id, bundle_resources=bundle_resources)
+            if submitted_files:
+                check_submitted_files(blueprints=blueprints, submitted_files=submitted_files)
+                library_manager.add_submitted_files(library_id=library_id, submitted_files=submitted_files)
             # load_from_blueprints ends in load_from_crate, whose last step is
             # library.validate_library() — so a crate read after it satisfies the D6
             # "built only from a valid library" contract.

@@ -1,4 +1,7 @@
+import contextlib
+import os
 from pathlib import Path
+from uuid import uuid4
 
 import aiofiles
 from typing_extensions import override
@@ -100,8 +103,36 @@ class LocalStorageProvider(StorageProviderAbstract):
         return StoredData(data=data, mime_type=mime_type)
 
     @override
+    async def _load_size(self, key: str) -> int:
+        """The size of a file, read from its metadata without opening it.
+
+        Raises:
+            StorageFileNotFoundError: If the file does not exist.
+            StorageInvalidUriError: If the key is invalid.
+            StorageLocalError: If the key names something that is not a file, or the filesystem cannot stat it.
+        """
+        file_path = self._validate_key(key)
+        try:
+            stat_result = file_path.stat()
+        except FileNotFoundError as exc:
+            msg = f"File not found: '{key}'"
+            raise StorageFileNotFoundError(msg) from exc
+        except OSError as exc:
+            msg = f"Failed to read the size of file '{key}': {exc}"
+            raise StorageLocalError(msg) from exc
+        if not file_path.is_file():
+            msg = f"Failed to read the size of '{key}': it is not a file"
+            raise StorageLocalError(msg)
+        return stat_result.st_size
+
+    @override
     async def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
-        """Store bytes to a file.
+        """Store bytes to a file, published whole or not at all.
+
+        The bytes are written to a temporary file beside the target, flushed to disk, then renamed onto the target,
+        which is atomic within one filesystem: a reader, or a process checking whether the key exists, never sees a
+        file a full disk or a killed process cut short. Two writers of one key each write their own temporary file,
+        and the last rename wins whole.
 
         Args:
             data: The bytes to store.
@@ -113,16 +144,24 @@ class LocalStorageProvider(StorageProviderAbstract):
             StorageLocalError: If the filesystem write fails (e.g. disk full, permission denied).
         """
         file_path = self._validate_key(key)
+        temporary_path = file_path.with_name(f".{file_path.name}.{uuid4().hex}.tmp")
 
         try:
             # Create parent directories if they don't exist
             file_path.parent.mkdir(parents=True, exist_ok=True)
 
-            async with aiofiles.open(file_path, "wb") as file_handle:  # pyright: ignore[reportUnknownMemberType]
+            async with aiofiles.open(temporary_path, "wb") as file_handle:  # pyright: ignore[reportUnknownMemberType]
                 await file_handle.write(data)
+                await file_handle.flush()
+                os.fsync(file_handle.fileno())
+            temporary_path.replace(file_path)
         except OSError as exc:
             msg = f"Failed to write file '{key}': {exc}"
             raise StorageLocalError(msg) from exc
+        finally:
+            # Gone once renamed; a write that failed leaves it behind, and removing it is best effort.
+            with contextlib.suppress(OSError):
+                temporary_path.unlink(missing_ok=True)
 
     @override
     async def public_url(self, uri: str) -> str:

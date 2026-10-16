@@ -37,7 +37,7 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.runtime_hub import get_class_registry
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.registries.func_registry import func_registry
+from pipelex.system.registries.func_registry import pipe_func
 from tests.integration.pipelex.fixtures.pipe_job_helpers import make_mode_guarded_run_params
 
 _DOMAIN_CODE = "test_optionals_par"
@@ -57,15 +57,14 @@ class ParAbsStrictReport(StructuredContent):
     found_result: TextContent = Field(description="Result of the maybe-lifted branch")
 
 
+@pipe_func()
 def optionals_par_echo_source(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text=f"found:{working_memory.get_stuff_as_str(name='source')}")
 
 
+@pipe_func()
 def optionals_par_echo_topic(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text=f"base:{working_memory.get_stuff_as_str(name='topic')}")
-
-
-_TEST_FUNCS = [optionals_par_echo_source, optionals_par_echo_topic]
 
 
 def _make_live_run_params() -> PipeRunParams:
@@ -86,7 +85,7 @@ def _build_parallel(*, output_ref: str, structure_class_names: list[str], add_ea
             description="Consumes the maybe-absent source (plain input): lifted when source is absent",
             inputs={"source": "Text"},
             output="Text",
-            function_name="optionals_par_echo_source",
+            function_name=f"{__name__}.optionals_par_echo_source",
         ),
     )
     branch_base = PipeFactory[PipeFunc].make_from_blueprint(
@@ -96,7 +95,7 @@ def _build_parallel(*, output_ref: str, structure_class_names: list[str], add_ea
             description="Consumes the always-present topic",
             inputs={"topic": "Text"},
             output="Text",
-            function_name="optionals_par_echo_topic",
+            function_name=f"{__name__}.optionals_par_echo_topic",
         ),
     )
     pipe_library = get_pipe_library()
@@ -148,16 +147,8 @@ def _make_absent_source_memory() -> WorkingMemory:
 class TestPipeParallelAbsence:
     @classmethod
     def setup_class(cls):
-        for func in _TEST_FUNCS:
-            func_registry.register_function(func)
         get_class_registry().register_class(ParAbsReport)
         get_class_registry().register_class(ParAbsStrictReport)
-
-    @classmethod
-    def teardown_class(cls):
-        for func in _TEST_FUNCS:
-            if func_registry.has_function(func.__name__):
-                func_registry.unregister_function_by_name(func.__name__)
 
     async def test_composite_output_omits_absent_component_with_ledger_note(self, job_metadata: JobMetadata, load_empty_library: Callable[[], str]):
         """Composite output: the absent component is omitted; a ledger note keeps observability."""

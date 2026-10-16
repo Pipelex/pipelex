@@ -16,12 +16,24 @@ if TYPE_CHECKING:
 
 BUNDLE_CMD_MODULE = "pipelex.cli.commands.run.bundle_cmd"
 
+_BUNDLE = """
+domain = "auto_inputs_tests"
+main_pipe = "summarize"
+
+[pipe.summarize]
+type        = "PipeLLM"
+description = "Summarize the text"
+inputs      = { text = "Text" }
+output      = "Text"
+prompt      = "Summarize $text"
+"""
+
 
 class TestBundleCmdAutoInputs:
     @pytest.fixture
     def bundle_dir(self, tmp_path: Path) -> Path:
-        """A pipeline directory holding a default bundle file (contents never parsed: execute_run is mocked)."""
-        (tmp_path / "bundle.mthds").write_text("# bundle\n", encoding="utf-8")
+        """A method's folder holding one bundle declaring its main pipe (execute_run is mocked, so nothing runs)."""
+        (tmp_path / "bundle.mthds").write_text(_BUNDLE, encoding="utf-8")
         return tmp_path
 
     def test_auto_detects_inputs_toml(self, mocker: MockerFixture, bundle_dir: Path) -> None:

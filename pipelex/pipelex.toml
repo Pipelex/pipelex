@@ -475,6 +475,19 @@ excluded_dirs = [
   "results",
 ]
 
+####################################################################################################
+# Method tree limits — how large a method tree a local load lists
+####################################################################################################
+
+[interpreter.method_tree_limits]
+# A local run, validation or load reads every method from its method tree: a method's folder, a .mthds file named
+# alone, a library directory, a dependency package. Listing a tree stops before reading any file once the tree
+# passes one of these limits, so a directory handed over by mistake, such as a home directory, is refused in moments
+# rather than read in full. They are this machine's own, not the hosted plane's: raise them in your project's
+# .pipelex/pipelex.toml for a method that needs more. max_file_bytes, the size of one file, is not checked unless set.
+max_files = 10000
+max_total_bytes = 1073741824
+
 [interpreter.builder]
 fix_loop_max_attempts = 10
 default_output_dir = "."

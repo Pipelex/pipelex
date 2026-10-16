@@ -1,8 +1,11 @@
+import ast
 import asyncio
+from collections.abc import Mapping
 from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
 from typing import Sequence
 
+from mthds.method_tree.models import MethodTree
 from pydantic import BaseModel
 
 # TypedDict from typing_extensions, not typing: pydantic rejects typing.TypedDict as a model
@@ -11,7 +14,8 @@ from typing_extensions import TypedDict
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexUnexpectedError
-from pipelex.core.bundle_resources.bundle_resource import BundleResources
+from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
+from pipelex.core.method_trees.file_references import BundleFileOrigin
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.interpreter_hub import (
     clear_current_library,
@@ -20,8 +24,9 @@ from pipelex.interpreter_hub import (
     resolve_library_dirs,
     set_current_library,
 )
-from pipelex.libraries.bundle_resources import check_bundle_resources
+from pipelex.libraries.bundle_resources import check_submitted_files
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
+from pipelex.libraries.method_trees import list_local_method_tree, reporting_host_library_tree_faults
 from pipelex.libraries.pipe.exceptions import EntryPipeNotFoundError
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
@@ -30,6 +35,8 @@ from pipelex.pipeline.bundle_validator import BundleValidator, DryRunOutput, Dry
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error, withholding_host_library_files
 from pipelex.system.caller_identity import CallerIdentity
+
+PYTHON_SUFFIX = ".py"
 
 
 class ValidateBundleResult(BaseModel):
@@ -126,15 +133,22 @@ async def validate_bundle(
     caller_identity: CallerIdentity | None = None,
     library_dirs_are_callers: bool = False,
     collect_dry_run_warnings: bool = False,
-    bundle_resources: BundleResources | None = None,
+    submitted_files: Mapping[str, bytes] | None = None,
+    method_dir: Path | None = None,
+    methods_dirs: Sequence[Path] | None = None,
 ) -> ValidateBundleResult:
-    """Load one bundle into a fresh library and dry-run its pipes.
+    """Load one bundle, or one method's tree, into a fresh library and dry-run its pipes.
 
-    ``bundle_resources`` are the files submitted with ``mthds_contents`` that their steps read, such as a
+    Exactly one of ``mthds_file_path``, ``mthds_contents`` and ``method_dir`` names what is validated.
+    ``method_dir`` is the directory of a method's tree, the caller's own, such as the tree a host wrote out for a
+    request: every bundle of the tree is loaded as a member of it and dry-run, every refusal is the caller's verdict and
+    names the tree's files as the tree does, and ``methods_dirs``, laid out like ``.mthds/methods/``, hold the packages
+    the caller ships with it, searched first for an address-based reference. No other library directory loads beside it.
+
+    ``submitted_files`` are the files submitted with ``mthds_contents`` that their steps read, such as a
     ``PipeDocGen`` step's ``template_file``, keyed by canonical bundle-relative path (see
-    ``make_bundle_resources``). A file none of the submitted steps names is refused with a
-    ``BundleResourceNotNamedError``, and files read at load that total more than ``MAX_LOAD_STAGE_RESOURCES_BYTES`` with
-    a ``BundleResourcesTooLargeError``, neither a verdict. A bundle file reads beside itself on disk and takes none.
+    ``canonical_submitted_files``). A file none of the submitted steps names is refused with a
+    ``BundleResourceNotNamedError``, not a verdict. A bundle file reads the files of its method tree and takes none.
 
     ``caller_identity`` is who asked for the validation, when the host knows it; the dry-run
     sweep is attributed to that caller (see ``BundleValidator.validate_pipes``). ``None``
@@ -155,6 +169,7 @@ async def validate_bundle(
         [
             mthds_contents is not None,
             mthds_file_path is not None,
+            method_dir is not None,
         ]
     )
     if provided_params == 0:
@@ -162,10 +177,16 @@ async def validate_bundle(
         # input. It is not a content verdict the end user can fix → PipelexUnexpectedError (→ 500,
         # redacted under STRICT), matching the mthds_sources-mismatch guard below — never a
         # ValidateBundleError, which would 200/422 a host-wiring bug as if the bundle were invalid.
-        msg = "At least one of mthds_contents or mthds_file_path must be provided to validate_bundle"
+        msg = "One of mthds_contents, mthds_file_path or method_dir must be provided to validate_bundle"
         raise PipelexUnexpectedError(msg)
     if provided_params > 1:
-        msg = "Only one of mthds_contents or mthds_file_path can be provided to validate_bundle, not both"
+        msg = "Only one of mthds_contents, mthds_file_path or method_dir can be provided to validate_bundle"
+        raise PipelexUnexpectedError(msg)
+    if method_dir is not None and library_dirs is not None:
+        msg = "A method's tree validates alone: no library directory loads beside method_dir"
+        raise PipelexUnexpectedError(msg)
+    if methods_dirs is not None and method_dir is None:
+        msg = "methods_dirs accompany method_dir, the method whose packages they hold"
         raise PipelexUnexpectedError(msg)
     if mthds_contents is not None and not mthds_contents:
         # An EMPTY list is not None, so it passes the provided-params check above — without this
@@ -184,8 +205,8 @@ async def validate_bundle(
         msg = "mthds_sources, when provided, must be a per-item source list matching mthds_contents in length"
         raise PipelexUnexpectedError(msg)
 
-    if bundle_resources and mthds_contents is None:
-        msg = "bundle_resources accompany mthds_contents: a bundle file reads the files beside it on disk"
+    if submitted_files and mthds_contents is None:
+        msg = "submitted_files accompany mthds_contents: a bundle file reads the files of its method tree"
         raise PipelexUnexpectedError(msg)
 
     library_manager = get_library_manager()
@@ -195,6 +216,20 @@ async def validate_bundle(
     try:
         set_current_library(library_id=library_id)
 
+        if method_dir is not None:
+            await asyncio.sleep(0)  # Yield to event loop (keeps function async-compatible)
+            result = await _validate_method_dir(
+                method_dir=method_dir,
+                methods_dirs=methods_dirs,
+                library_id=library_id,
+                allow_signatures=allow_signatures,
+                dry_run_pipe_codes=dry_run_pipe_codes,
+                caller_identity=caller_identity,
+                collect_dry_run_warnings=collect_dry_run_warnings,
+            )
+            success = True
+            return result
+
         # Load libraries from resolved directories before loading the bundle
         effective_dirs, source_label = resolve_library_dirs(library_dirs)
 
@@ -203,33 +238,41 @@ async def validate_bundle(
         # Beside submitted content, a host's library directories are withheld from the verdict: their files are paths
         # on the host. The caller's own directories, and every directory of a bundle file, keep their paths.
         host_library_withholding: AbstractContextManager[None]
+        # A host's library directories whose trees cannot be listed are the host's fault, never the caller's verdict.
+        host_library_tree_faults: AbstractContextManager[None]
         if mthds_contents is not None and not library_dirs_are_callers:
             host_library_withholding = withholding_host_library_files(
                 library_dirs=effective_dirs,
                 caller_sources=[source for source in mthds_sources or [] if source is not None],
                 caller_contents=mthds_contents,
             )
+            host_library_tree_faults = reporting_host_library_tree_faults()
         else:
             host_library_withholding = nullcontext()
+            host_library_tree_faults = nullcontext()
         await asyncio.sleep(0)  # Yield to event loop (keeps function async-compatible)
         with host_library_withholding, translate_to_validate_bundle_error():
             if effective_dirs:
                 log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}) for validation")
-                library_manager.load_libraries(
-                    library_id=library_id,
-                    library_dirs=effective_dirs,
-                )
+                with host_library_tree_faults:
+                    library_manager.load_libraries(
+                        library_id=library_id,
+                        library_dirs=effective_dirs,
+                    )
             else:
                 log.verbose(f"No library directories to load ({source_label})")
             if mthds_contents is not None:
                 content_sources: list[str | None] = list(mthds_sources) if mthds_sources is not None else [None] * len(mthds_contents)
+                # Contents belong to no method tree: their steps read only the files submitted with them.
                 loaded_blueprints = [
-                    MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content, mthds_source=source)
+                    MthdsParser.make_pipelex_bundle_blueprint(
+                        mthds_content=content, mthds_source=source, file_origin=BundleFileOrigin.SUBMITTED_FILES
+                    )
                     for content, source in zip(mthds_contents, content_sources, strict=True)
                 ]
-                if bundle_resources:
-                    check_bundle_resources(blueprints=loaded_blueprints, bundle_resources=bundle_resources)
-                    library_manager.add_bundle_resources(library_id=library_id, bundle_resources=bundle_resources)
+                if submitted_files:
+                    check_submitted_files(blueprints=loaded_blueprints, submitted_files=submitted_files)
+                    library_manager.add_submitted_files(library_id=library_id, submitted_files=submitted_files)
                 loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
                 dry_run_results = await BundleValidator().validate_pipes(
                     pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes=dry_run_pipe_codes),
@@ -297,8 +340,91 @@ async def validate_bundle(
             library_manager.teardown(library_id=library_id)
 
 
+def _ensure_tree_python_parses(*, tree: MethodTree) -> None:
+    """Refuse a method tree holding a Python file that does not parse, naming each such file by its tree path.
+
+    Validation covers the whole tree, its Python included, by syntax alone: no module is imported, so a file no step
+    calls is checked too, and a `PipeFunc`'s own module is then held to the static check of its function.
+
+    Raises:
+        ValidateBundleError: One item per Python file that is not UTF-8 text or does not parse, located on its line.
+    """
+    items: list[PipelexBundleBlueprintValidationErrorData] = []
+    for tree_path in tree.tree_paths:
+        if not tree_path.endswith(PYTHON_SUFFIX):
+            continue
+        try:
+            source = tree.file_location(tree_path).read_bytes().decode("utf-8")
+        except UnicodeDecodeError:
+            items.append(PipelexBundleBlueprintValidationErrorData(source=tree_path, message=f"The Python file '{tree_path}' is not UTF-8 text."))
+            continue
+        try:
+            ast.parse(source, filename=tree_path)
+        except SyntaxError as exc:
+            items.append(
+                PipelexBundleBlueprintValidationErrorData(
+                    source=tree_path,
+                    message=f"The Python file '{tree_path}' does not parse: {exc.msg} (line {exc.lineno}).",
+                    line=exc.lineno,
+                    column=exc.offset,
+                )
+            )
+        except ValueError as exc:
+            # Python 3.11 refuses a source holding a NUL byte with a ValueError where later versions raise a SyntaxError.
+            items.append(PipelexBundleBlueprintValidationErrorData(source=tree_path, message=f"The Python file '{tree_path}' does not parse: {exc}."))
+        except (RecursionError, MemoryError):
+            # Nesting deep enough to exhaust the parser, which Python's own import refuses the same way.
+            message = f"The Python file '{tree_path}' does not parse: it nests too deeply."
+            items.append(PipelexBundleBlueprintValidationErrorData(source=tree_path, message=message))
+    if items:
+        raise ValidateBundleError(message=" ".join(item.message for item in items), pipelex_bundle_blueprint_validation_errors=items)
+
+
+async def _validate_method_dir(
+    *,
+    method_dir: Path,
+    methods_dirs: Sequence[Path] | None,
+    library_id: str,
+    allow_signatures: bool,
+    dry_run_pipe_codes: list[str] | None,
+    caller_identity: CallerIdentity | None,
+    collect_dry_run_warnings: bool,
+) -> ValidateBundleResult:
+    """Load the tree of a caller's method into the open library and dry-run its pipes (see ``validate_bundle``)."""
+    library_manager = get_library_manager()
+    library = library_manager.get_library(library_id=library_id)
+    with translate_to_validate_bundle_error():
+        _ensure_tree_python_parses(tree=list_local_method_tree(handed_over=method_dir))
+        loaded_pipes = library_manager.load_libraries(
+            library_id=library_id,
+            library_dirs=[method_dir],
+            methods_dirs=list(methods_dirs) if methods_dirs is not None else None,
+        )
+        blueprints = library_manager.get_accumulated_blueprints(library_id)
+        if not blueprints:
+            msg = "The method holds no .mthds bundle, so it has nothing to validate."
+            raise ValidateBundleError(message=msg)
+        dry_run_results = await BundleValidator().validate_pipes(
+            pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes=dry_run_pipe_codes),
+            library_id=library_id,
+            allow_signatures=allow_signatures,
+            caller_identity=caller_identity,
+            # The caller's own method: every failure names its file, by its path in the tree.
+            source_pipe_refs=None,
+            collect_dry_run_warnings=collect_dry_run_warnings,
+        )
+    return ValidateBundleResult(
+        blueprints=blueprints,
+        pipes=loaded_pipes,
+        dry_run_result=dry_run_results,
+        pending_signatures=build_pending_signatures(library.pipe_library.get_pipes_dict()),
+    )
+
+
 async def validate_bundles_from_directory(directory: Path, *, allow_signatures: bool = False) -> ValidateBundleResult:
-    mthds_files = get_pipelex_mthds_files_from_dirs(dirs={directory})
+    # A directory whose tree cannot be listed is the invalid verdict, as a bundle of it that does not load is.
+    with translate_to_validate_bundle_error():
+        mthds_files = get_pipelex_mthds_files_from_dirs(dirs={directory})
     all_blueprints: list[PipelexBundleBlueprint] = []
 
     library_manager = get_library_manager()

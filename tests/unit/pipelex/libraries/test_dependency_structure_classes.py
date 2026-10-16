@@ -107,6 +107,7 @@ class TestDependencyStructureClasses:
             with scoped_current_library(library_id=library_id):
                 library_manager._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
                     library=library,
+                    library_id=library_id,
                     resolved_dep=_make_resolved_dep(tmp_path=tmp_path, mthds_content=DEP_NOTES_MTHDS),
                     package_address=DEP_ADDRESS,
                 )
@@ -133,6 +134,7 @@ class TestDependencyStructureClasses:
             with scoped_current_library(library_id=library_id), pytest.raises(LibraryLoadingError, match=cycle_refusal):
                 library_manager._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
                     library=library,
+                    library_id=library_id,
                     resolved_dep=_make_resolved_dep(tmp_path=tmp_path, mthds_content=DEP_CYCLIC_NOTES_MTHDS),
                     package_address=DEP_ADDRESS,
                 )
@@ -147,6 +149,7 @@ class TestDependencyStructureClasses:
             with scoped_current_library(library_id=library_id):
                 library_manager._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
                     library=library,
+                    library_id=library_id,
                     resolved_dep=_make_resolved_dep(tmp_path=tmp_path, mthds_content=DEP_WITH_ITS_OWN_DEPENDENCY_MTHDS),
                     package_address=DEP_ADDRESS,
                 )

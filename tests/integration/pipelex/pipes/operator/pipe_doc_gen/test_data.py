@@ -79,6 +79,13 @@ output      = "doc_gen_tests.InvoicePdf"
 steps       = [{ pipe = "doc_gen_tests.print_invoice", result = "invoice_pdf" }]
 """
 
+    # The domain of the same bundle loaded beside the test bundle, so the two declare no pipe or concept twice.
+    OTHER_DOMAIN: ClassVar[str] = "doc_gen_other"
+
     @classmethod
     def bundle(cls, *, step_fields: str) -> str:
         return cls.BUNDLE_MTHDS.replace(cls.STEP_SLOT, step_fields)
+
+    @classmethod
+    def bundle_in_the_other_domain(cls, *, step_fields: str) -> str:
+        return cls.bundle(step_fields=step_fields).replace("doc_gen_tests", cls.OTHER_DOMAIN)

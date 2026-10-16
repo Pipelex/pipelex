@@ -520,6 +520,16 @@ class PipeAbstract(ABC, BaseModel):
     def validate_output_static(self):
         pass
 
+    def validate_once_built(self) -> None:
+        """Refuse what makes this pipe unusable that it can tell as soon as it is built, before the library around it is complete.
+
+        A dependency package's pipe refused here counts as one its package could not build, so it refuses only a
+        reference to it, as a pipe whose construction failed does. Nothing by default: a `PipeFunc` locates its function.
+
+        Raises:
+            PipeValidationError: The pipe is unusable.
+        """
+
     def _scan_input_presence(self, *, working_memory: WorkingMemory) -> InputPresenceScan:
         """Apply the runtime trichotomy (D3) to this pipe's needed inputs.
 

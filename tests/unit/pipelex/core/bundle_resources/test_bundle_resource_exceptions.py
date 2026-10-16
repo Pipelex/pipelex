@@ -1,15 +1,11 @@
 import pytest
 
 from pipelex.base_exceptions import DisclosureMode, ErrorDomain, PipelexError
-from pipelex.core.bundle_resources.exceptions import (
-    BundleResourceNotNamedError,
-    BundleResourcePathError,
-    BundleResourcesTooLargeError,
-)
+from pipelex.core.bundle_resources.exceptions import BundleResourceNotNamedError, BundleResourcePathError
 
 
 class TestBundleResourceExceptions:
-    @pytest.mark.parametrize("error_class", [BundleResourceNotNamedError, BundleResourcesTooLargeError, BundleResourcePathError])
+    @pytest.mark.parametrize("error_class", [BundleResourceNotNamedError, BundleResourcePathError])
     def test_a_refusal_of_the_files_sent_says_running_it_again_cannot_succeed(self, error_class: type[PipelexError]) -> None:
         """Deterministic refusals of what the caller sent, so their problem documents carry `retryable: false`."""
         report = error_class("The files sent are refused.").to_error_report()

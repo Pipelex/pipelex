@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:8ad6535ebd13f9a08da05c84f082e11f9dec80718a9666d9bcaba5c3c4a55747"
+digest = "sha256:79d4e68f7ae4755f1a027bc882f105c1985a5ecf291bd888dd3792269162951b"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-15T23:18:44Z"
-rationale = "clean-pass: runtime_hub.py changes only the scoped_event_log docstring, which now says usage events honour the override too; no symbol moves between the hubs, no import crosses the boundary, and the tracing row of the partition table already names scoped_event_log and get_event_log_override."
+reviewed_at = "2026-10-16T05:26:39Z"
+rationale = "real-catch: runtime_hub.py gains the method file store and the template file stage, and interpreter_hub.py drops does_pipe_run_leave_process with set_pipe_run's leaves_process; docs/contribute/hub-layering.md now lists get_method_file_store and get_template_file_stage, no longer lists does_pipe_run_leave_process, and says how the template file stage is installed by the interpreter's boot and released at teardown. No import crosses the boundary."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:fda2237457fe0b6830ff2ae8f720698735bec4c3"
-"pipelex/interpreter_hub.py" = "blob:023f8452daf76dde409afc7c0966b149b11edabb"
-"pipelex/runtime_hub.py" = "blob:2af9f62d93b2005daa55a7c61e0390601e430c00"
+"pipelex/interpreter_hub.py" = "blob:e1a4b941820aeb8affbb6c70b7f81eb29e4cc191"
+"pipelex/runtime_hub.py" = "blob:ca642e419aeac8eee7bd0dba2b5784feb0059e82"

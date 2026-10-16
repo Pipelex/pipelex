@@ -55,6 +55,6 @@ See [PipeCompose reference](../building-methods/pipes/pipe-operators/PipeCompose
 
 ## PipeFunc
 
-Execute custom Python functions within pipelines. Functions are auto-discovered via the `@pipe_func()` decorator and receive the current working memory as their input. Use PipeFunc when you need logic that goes beyond what declarative operators provide.
+Execute custom Python functions within pipelines. A step names its function by its import path in the method's folder, the function carries the `@pipe_func()` marker, and it receives the current working memory as its input. Use PipeFunc when you need logic that goes beyond what declarative operators provide.
 
 See [PipeFunc reference](../building-methods/pipes/pipe-operators/PipeFunc.md).

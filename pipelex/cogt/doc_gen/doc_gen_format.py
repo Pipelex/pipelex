@@ -108,6 +108,15 @@ class DocGenSource(StrEnum):
             case DocGenSource.TEMPLATE_FILE:
                 return "from a template file"
 
+    @property
+    def is_html(self) -> bool:
+        """Whether the engine prints composed HTML, whose relative URLs name files of its template's method tree."""
+        match self:
+            case DocGenSource.HTML:
+                return True
+            case DocGenSource.LAYOUT | DocGenSource.TEMPLATE_FILE:
+                return False
+
     @classmethod
     def for_step(cls, *, doc_gen_format: DocGenFormat, has_template: bool) -> "DocGenSource":
         """The source a step's format and template make: no template is the layout, a template is HTML for a PDF and a file otherwise."""

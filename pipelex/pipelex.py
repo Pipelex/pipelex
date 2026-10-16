@@ -4,7 +4,7 @@
 interpreter half of the boot: it subclasses :class:`pipelex.runtime_boot.RuntimeBoot` — importing it
 downward, which the interpreter layer may do — and appends the constructions that only a process
 which will actually load and run a method needs: the ``InterpreterHub``, the composed plugin
-manifests, the ``PipeFuncExecutorRegistry`` and its executor, the ``LibraryManager``, the
+manifests, the ``PipeFuncExecutorRegistry`` and its executor, the ``PipeFuncPackageOfferRegistry``, the ``LibraryManager``, the
 ``PipelineManager``, the pipe-kind class registrations, the ``PipeRouter`` and the ``PipeRun``.
 
 Inheritance rather than composition is deliberate: every attribute address is preserved
@@ -34,6 +34,7 @@ from pipelex.libraries.library_manager import LibraryManager
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.observer.observer_protocol import ObserverProtocol
 from pipelex.pipe_machinery.registry_models import PipeRegistryModels
+from pipelex.pipe_operators.doc_gen.template_file_stage import DocGenTemplateFileStage
 from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutorProtocol
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
@@ -41,6 +42,7 @@ from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipeline.pipeline_manager import PipelineManager
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
 from pipelex.plugins.pipe_func_executor_registry import PipeFuncExecutorRegistry
+from pipelex.plugins.pipe_func_package_offer_registry import PipeFuncPackageOfferRegistry
 from pipelex.plugins.registrar import HubSlot
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.runtime_boot import PACKAGE_VERSION, RuntimeBoot
@@ -141,6 +143,11 @@ class Pipelex(RuntimeBoot):
 
         pipe_func_executor_registry = PipeFuncExecutorRegistry(plugin_registrar.pipe_func_executors)
         self.interpreter_hub.set_pipe_func_executor_registry(pipe_func_executor_registry)
+        # The packages each out-of-process mode offers a PipeFunc, which a method's requirements.txt is checked against
+        # when it loads; `direct` needs no entry, its packages being this interpreter's own.
+        self.interpreter_hub.set_pipe_func_package_offer_registry(
+            pipe_func_package_offer_registry=PipeFuncPackageOfferRegistry(plugin_registrar.pipe_func_package_offers)
+        )
 
         # Injection precedence: explicit setup() param > plugin slot-claim thunk > config-selected
         # registry factory. The PipeFunc execution axis is orthogonal to orchestration: a Temporal
@@ -176,6 +183,12 @@ class Pipelex(RuntimeBoot):
         self.interpreter_hub.set_pipeline_manager(pipeline_manager=self.pipeline_manager)
         self.pipeline_manager.setup()
 
+        # --- Template file stage ---------------------------------------------------------------
+        # The print stage of a PipeDocGen step reads its template file through the method file store, then needs the
+        # loaded method for what it does with it: rendering an HTML one with the step's data, reporting what the
+        # engine's check of an office one found. A kernel-only boot installs none, and prints no template file.
+        self.runtime_hub.set_template_file_stage(template_file_stage=DocGenTemplateFileStage())
+
         # Two manifests, one registry: core's value model (registered by the runtime setup above) and
         # the pipe kinds. They are disjoint by construction and pinned as such by
         # tests/unit/pipelex/test_registry_models_split.py, so the two calls landing in different
@@ -197,12 +210,11 @@ class Pipelex(RuntimeBoot):
 
         # --- Pipe Run --------------------------------------------------------------------------
         # No explicit param for pipe_run: plugin slot-claim thunk > core default. A boot orchestrator's pipe run hands
-        # each job to that orchestrator, outside this process, which is what decides how the job's files travel
-        # (`prepare_job_for_remote_dispatch`); core's runs it here.
+        # each job to that orchestrator, outside this process; the job carries no method file's bytes either way, its
+        # crate naming each tree by digest, so nothing about the job changes with where it runs.
 
         self.interpreter_hub.set_pipe_run(
-            self._resolve_hub_slot(slot=HubSlot.PIPE_RUN, default=lambda: PipeRun(pipe_router=self.interpreter_hub.get_required_pipe_router())),
-            leaves_process=self._is_hub_slot_claimed(slot=HubSlot.PIPE_RUN),
+            self._resolve_hub_slot(slot=HubSlot.PIPE_RUN, default=lambda: PipeRun(pipe_router=self.interpreter_hub.get_required_pipe_router()))
         )
 
     @override

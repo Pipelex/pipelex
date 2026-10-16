@@ -7,7 +7,6 @@ from pydantic import BaseModel, Field, PrivateAttr
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexUnexpectedError
-from pipelex.core.bundle_resources.bundle_resource import BundleResources
 from pipelex.core.exceptions import PipesAndConceptValidationErrorData
 from pipelex.core.qualified_ref import QualifiedRef, QualifiedRefError
 from pipelex.libraries.concept.concept_library import ConceptLibrary
@@ -124,10 +123,6 @@ class Library(BaseModel):
     pipe_library: PipeLibrary
     loaded_mthds_paths: list[Path] = Field(default_factory=empty_list_factory_of(Path))
     dependency_libraries: dict[str, "Library"] = Field(default_factory=dict)
-    bundle_resources: BundleResources = Field(default_factory=dict)
-    """The files submitted with the bundles this library loaded from content strings, keyed by canonical path, for
-    their pipes to read: a `PipeDocGen` step of such a bundle reads its `template_file` here and nowhere else, while a
-    step of a bundle this host read from a file reads beside it on disk."""
     _class_registry: ClassRegistry | None = PrivateAttr(default=None)
 
     def get_class_registry(self) -> ClassRegistry | None:
@@ -135,22 +130,6 @@ class Library(BaseModel):
 
     def set_class_registry(self, class_registry: ClassRegistry) -> None:
         self._class_registry = class_registry
-
-    def add_bundle_resources(self, *, bundle_resources: BundleResources) -> None:
-        """Hold the files submitted with a bundle, for its pipes to read.
-
-        A file the library already holds under the same path is kept when the new one has the same bytes.
-
-        Raises:
-            LibraryError: a file the library already holds under the same path has different bytes.
-        """
-        for path, resource in bundle_resources.items():
-            held = self.bundle_resources.get(path)
-            if held is None:
-                self.bundle_resources[path] = resource
-            elif held.sha256 != resource.sha256:
-                msg = f"Two different files were submitted under the same path '{path}' for one library."
-                raise LibraryError(msg)
 
     def get_domain_library(self) -> DomainLibrary:
         return self.domain_library
@@ -202,7 +181,6 @@ class Library(BaseModel):
         self.concept_library.teardown()
         self.domain_library.teardown()
         self.loaded_mthds_paths = []
-        self.bundle_resources = {}
         # Drop this library's dynamically generated structure classes with the library itself.
         # The registry object would be garbage anyway once the manager forgets the Library, but
         # a caller holding its own reference must not keep resolving a torn-down library's classes.

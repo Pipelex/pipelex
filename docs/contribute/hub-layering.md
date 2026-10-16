@@ -38,8 +38,9 @@ There is deliberately **no** `pipelex.hub`. It was deleted rather than kept as a
 | config | `get_required_config`, `get_optional_config` |
 | console | `get_console` |
 | secrets | `get_secrets_provider`, `get_secret` |
-| system registries | `get_class_registry`, `get_func_registry` |
+| system registries | `get_class_registry` |
 | storage | `get_storage_provider` |
+| method files | `get_method_file_store`, `get_template_file_stage` |
 | telemetry | `get_telemetry_manager`, `get_otel_tracer` |
 | models | `get_models_manager`, `get_model_deck`, `get_sdk_client_manager` |
 | inference | `get_inference_manager`, `get_llm_worker`, `get_img_gen_worker`, `get_extract_worker` |
@@ -62,8 +63,8 @@ There is deliberately **no** `pipelex.hub`. It was deleted rather than kept as a
 | current-library contextvar | `set_current_library`, `get_current_library`, `get_current_library_id_or_none`, `clear_current_library`, `scoped_current_library` |
 | library dirs | `resolve_library_dirs`, `get_default_library_dirs` |
 | pipe router | `get_pipe_router`, `set_pipe_router`, `teardown_current_pipe_router`, `scoped_pipe_router` |
-| run | `get_pipe_run`, `does_pipe_run_leave_process`, `get_pipeline_manager`, `get_pipeline` |
-| pipe func | `get_pipe_func_executor`, `scoped_pipe_func_executor`, `get_pipe_func_executor_registry` |
+| run | `get_pipe_run`, `get_pipeline_manager`, `get_pipeline` |
+| pipe func | `get_pipe_func_executor`, `scoped_pipe_func_executor`, `get_pipe_func_executor_registry`, `get_pipe_func_package_offer_registry` |
 
 Setters follow their getters onto the matching container.
 
@@ -164,7 +165,7 @@ The second split *is* the layer boundary, and the same rule of thumb divides it.
 
 External plugins are unaffected by the mechanism/adapter split: they import `pipelex.plugins.contract` and `pipelex.plugins.registrar`, both of which stayed put. They are, however, affected by the *layer* split — they are discovered through the two `pipelex.plugins.kernel` / `pipelex.plugins.interpreter` entry-point groups, which are group identifiers rather than module paths, and a plugin declares its layer by choosing one. (Careful: `pipelex.plugins` is also the name of the kernel-layer *package* holding the mechanism, and that is the sense every other mention of it on this page carries — the declared-package list, the transitive-breach worked example, the closure-test entry points. A package name and an entry-point group are unrelated things that happen to share a spelling. The single pre-split group of that name is retired and now fails startup.)
 
-The registrar's slots are *ports* and they stay kernel-layer — `OrchestratorProtocol`, `BundleValidatorProtocol` and `PipeFuncExecutorFactoryFn` all live under `plugins/*_registry.py`. Only the *adapters* are interpreter-layer. That is ordinary ports-and-adapters, and it is what the layer rule's own remedy text prescribes: have the interpreter layer install it downward at boot. Where each derived registry is *installed* still follows the hub partition rather than the port's home: `RuntimeBoot.setup` puts the orchestrator, bundle-validator, backend, lister, storage and secrets registries and the service error vocabulary on the `RuntimeHub`, and `Pipelex.setup` puts the `PipeFuncExecutorRegistry` on the `InterpreterHub` — the one placement flagged [above](#which-hub-does-a-new-symbol-belong-to). Since [the boot split](#where-the-boot-splits) the two installs sit in the two halves that match their hubs, so the partition is now visible in the code rather than only in this sentence.
+The registrar's slots are *ports* and they stay kernel-layer — `OrchestratorProtocol`, `BundleValidatorProtocol` and `PipeFuncExecutorFactoryFn` all live under `plugins/*_registry.py`. Only the *adapters* are interpreter-layer. That is ordinary ports-and-adapters, and it is what the layer rule's own remedy text prescribes: have the interpreter layer install it downward at boot. Where each derived registry is *installed* still follows the hub partition rather than the port's home: `RuntimeBoot.setup` puts the orchestrator, bundle-validator, backend, lister, storage and secrets registries and the service error vocabulary on the `RuntimeHub`, and `Pipelex.setup` puts the `PipeFuncExecutorRegistry` on the `InterpreterHub` — the one placement flagged [above](#which-hub-does-a-new-symbol-belong-to) — with the `PipeFuncPackageOfferRegistry` beside it, whose offers the library load reads to check a method's `requirements.txt` in a sandbox execution mode. Since [the boot split](#where-the-boot-splits) the two installs sit in the two halves that match their hubs, so the partition is now visible in the code rather than only in this sentence.
 
 Composition happens where welding is legal. `pipelex/providers/builtins.py` exports `KERNEL_BUILTIN_PLUGINS`; `pipelex/interpreter_plugins/builtins.py` imports that half — downward, which the interpreter layer may do — and exports the composed `BUILTIN_PLUGINS` and `CORE_UNCONDITIONAL_PLUGIN_NAMES`. Both are **parameters** of `build_registrar`, never module globals it imports, so `plugins/discovery.py` stays kernel-layer: `pipelex.py` (the interpreter boot) and the `pipelex plugins list` diagnostic pass the composed lists in, while `runtime_boot.py` defaults to the kernel half alone. Exactly one place still answers "what are the built-in plugins" — it just lives in the layer permitted to say it.
 
@@ -230,6 +231,10 @@ so `concept.py` cannot import `runtime_hub` at module level. Hosting the accesso
 A run may pin a per-library `ClassRegistry` rather than the process-global Kajson one. Knowing *which* library is current is method-layer knowledge, so the kernel layer holds only a slot: `class_registry_scoping`, defaulting to a resolver that returns `None`. `set_interpreter_hub` installs the real resolver, which means scoping is live exactly when a `InterpreterHub` exists — an invariant a caller cannot forget to wire. The runtime teardown phase (`RuntimeBoot._teardown_runtime`, reached from every `teardown`) calls `class_registry_scoping.reset()` so a torn-down library manager is never reachable through a still-pinned library id. It lives on the kernel half because releasing the slot belongs to whichever teardown runs — on a kernel-only boot nothing installed a resolver and the reset is a no-op.
 
 This is the same shape as `HubSlot.ISOLATED_EXECUTION_PROBE`: a defaulted callable a higher layer replaces at boot, never an unset attribute. A process that only ever builds a `RuntimeHub` therefore degrades to the process-global registry instead of raising. That used to describe only the doctor path and most unit tests; since [the boot split](#where-the-boot-splits) it is a first-class entry point — `RuntimeBoot.make()` installs no `InterpreterHub`, and a test pins that scoping stays at its unscoped default on that boot.
+
+### The print stage's template file stage crosses downward too
+
+A `PipeDocGen` step's print stage is a kernel-layer leaf, and rendering its HTML template file needs the method: the step's data typed by the concepts of the run's crate, and the `PipeCompose` HTML stack. So the kernel layer holds only the seam, `TemplateFileStageProtocol` in `pipelex/cogt/doc_gen/template_file_stage.py`, read through `runtime_hub.get_template_file_stage`, and `Pipelex.setup` installs the interpreter's implementation, `pipelex/pipe_operators/doc_gen/template_file_stage.py`, once the interpreter is up. Unlike the slots above it has no default: a kernel-only boot prints no template file, and asking for the stage there raises, naming why. Teardown releases it. The method file store beside it, `get_method_file_store`, is a kernel-tier slot with a core default, `LOCAL_METHOD_FILES`, that a plugin may claim (`HubSlot.METHOD_FILE_STORE`).
 
 ## Enforcement
 

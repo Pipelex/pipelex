@@ -25,14 +25,27 @@ class PipeFuncExecutionRequest(BaseModel):
     The generic transport primitive for out-of-process PipeFunc execution — sibling to the
     runtime-bridge serialization, carrying only open pipelex types. A backend (a sandbox box, a local
     subprocess) runs it and returns a ``PipeFuncExecutionResponse``; a host runtime (a Temporal
-    activity) forwards it across its boundary. Carries the crate (which includes ``python_sources`` —
-    the customer's .py to register wherever it runs), the transported working memory (the function's
-    inputs), and the identity of the pipe/function to run. Deliberately carries NO secrets.
+    activity) forwards it across its boundary. Carries the crate (the method, naming its trees by digest and
+    carrying none of their files), the digest of the called step's tree (``tree_digest``), the transported
+    working memory (the function's inputs), and the identity of the pipe/function to run. Deliberately
+    carries NO secrets, and no file's bytes: whoever runs the call reads the tree's files through the method
+    file store, where IO is allowed, never in a workflow.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     crate: LibraryCrate
+    tree_digest: str | None = Field(
+        default=None,
+        description=(
+            "The digest of the method tree the called step belongs to, whose files, every one but its .mthds files, are "
+            "written at the call's import root before the function is imported, so it imports its sibling modules and "
+            "reads a file beside its module as it does locally. For a step parsed from a content string, the tree of the "
+            "files submitted beside it; None when none was. The process that runs the call reads them through the method "
+            "file store under the run's read scope (`read_pipe_func_call_files`); a sandbox client reads them there and "
+            "hands the sandbox the directory it unpacked them into."
+        ),
+    )
     working_memory_raw: dict[str, Any]
     pipe_code: str
     function_name: str

@@ -17,10 +17,8 @@ own page. Classes are grouped by subsystem.
 
 ## Core language
 
-- [`BundleResourceError`](bundle-resource-error.md) — Bundle resource
 - [`BundleResourceNotNamedError`](bundle-resource-not-named-error.md) — Bundle resource not named
 - [`BundleResourcePathError`](bundle-resource-path-error.md) — Bundle resource path
-- [`BundleResourcesTooLargeError`](bundle-resources-too-large-error.md) — Bundle resources too large
 - [`ConceptCodeError`](concept-code-error.md) — Concept code
 - [`ConceptError`](concept-error.md) — Concept error
 - [`ConceptFactoryError`](concept-factory-error.md) — Concept factory
@@ -39,6 +37,7 @@ own page. Classes are grouped by subsystem.
 - [`InputStuffSpecsError`](input-stuff-specs-error.md) — Input stuff specs
 - [`InputStuffSpecsFactoryError`](input-stuff-specs-factory-error.md) — Input stuff specs factory
 - [`ListWhereSingularError`](list-where-singular-error.md) — List where singular
+- [`MethodFileUnavailableError`](method-file-unavailable-error.md) — Method file unavailable
 - [`MultiplicityCountMismatchError`](multiplicity-count-mismatch-error.md) — Multiplicity count mismatch
 - [`NativeConceptDefinitionError`](native-concept-definition-error.md) — Native concept definition
 - [`NullInputError`](null-input-error.md) — Null input
@@ -61,6 +60,9 @@ own page. Classes are grouped by subsystem.
 - [`StuffFactoryError`](stuff-factory-error.md) — Stuff factory
 - [`StuffSpecError`](stuff-spec-error.md) — Stuff spec
 - [`StuffSpecFactoryError`](stuff-spec-factory-error.md) — Stuff spec factory
+- [`TreeModuleShadowingError`](tree-module-shadowing-error.md) — Tree module shadowing
+- [`TreePythonError`](tree-python-error.md) — Tree python
+- [`TreePythonHeldError`](tree-python-held-error.md) — Tree python held
 - [`UnknownInputNameError`](unknown-input-name-error.md) — Unknown input name
 - [`WorkingMemoryConsistencyError`](working-memory-consistency-error.md) — Working memory consistency
 - [`WorkingMemoryError`](working-memory-error.md) — Working memory
@@ -80,9 +82,11 @@ own page. Classes are grouped by subsystem.
 - [`PipeDocGenFactoryError`](pipe-doc-gen-factory-error.md) — Pipe doc gen factory
 - [`PipeDocGenRunError`](pipe-doc-gen-run-error.md) — Pipe doc gen run
 - [`PipeDocGenTemplateCheckError`](pipe-doc-gen-template-check-error.md) — Pipe doc gen template check
+- [`PipeDocGenTemplateFileUncheckedError`](pipe-doc-gen-template-file-unchecked-error.md) — Pipe doc gen template file unchecked
 - [`PipeDocGenUndefinedValueError`](pipe-doc-gen-undefined-value-error.md) — Pipe doc gen undefined value
 - [`PipeExtractFactoryError`](pipe-extract-factory-error.md) — Pipe extract factory
 - [`PipeFuncExecutionError`](pipe-func-execution-error.md) — Pipe func execution
+- [`PipeFuncFunctionError`](pipe-func-function-error.md) — Pipe func function
 - [`PipeFuncTransportError`](pipe-func-transport-error.md) — Pipe func transport
 - [`PipeImgGenFactoryError`](pipe-img-gen-factory-error.md) — Pipe img gen factory
 - [`PipeImgGenRunError`](pipe-img-gen-run-error.md) — Pipe img gen run
@@ -121,8 +125,15 @@ own page. Classes are grouped by subsystem.
 - [`DomainLoadingError`](domain-loading-error.md) — Domain loading
 - [`EntryPipeAmbiguousError`](entry-pipe-ambiguous-error.md) — Entry pipe ambiguous
 - [`EntryPipeNotFoundError`](entry-pipe-not-found-error.md) — Entry pipe not found
+- [`HostLibraryRequirementsError`](host-library-requirements-error.md) — Host library requirements
+- [`HostLibraryTreeError`](host-library-tree-error.md) — Host library tree
 - [`LibraryError`](library-error.md) — Library error
 - [`LibraryLoadingError`](library-loading-error.md) — Library loading
+- [`MethodRequirementsError`](method-requirements-error.md) — Method requirements
+- [`MethodRequirementsFileError`](method-requirements-file-error.md) — Method requirements file
+- [`MethodRequirementsNotMetError`](method-requirements-not-met-error.md) — Method requirements not met
+- [`MethodTreeLoadError`](method-tree-load-error.md) — Method tree load
+- [`PipeFuncPackageSetUnstatedError`](pipe-func-package-set-unstated-error.md) — Pipe func package set unstated
 - [`PipeLibraryError`](pipe-library-error.md) — Pipe library
 - [`PipeLoadingError`](pipe-loading-error.md) — Pipe loading
 - [`PipeNotFoundError`](pipe-not-found-error.md) — Pipe not found

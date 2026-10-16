@@ -1,5 +1,7 @@
 from enum import StrEnum
 
+from mthds.method_tree.vocabulary import TreeRefusalCode
+
 from pipelex.base_exceptions import ErrorDomain, PipelexError
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource, doc_gen_choice_key
 
@@ -144,3 +146,32 @@ class MarkdownFormattingBudgetError(PipelexError):
     error_domain = ErrorDomain.INPUT
     _authors_caller_facing_message = True
     _declared_title = "Markdown formatting budget exceeded"
+
+
+class TemplateUrlRefusedError(PipelexError):
+    """A relative URL of an HTML document names no image, stylesheet or font of its template's method tree, so the print reads nothing.
+
+    A relative URL in a `PipeDocGen` step's HTML template, or in a stylesheet of the method tree the template links, names
+    a file of the template's method tree, resolved by the MTHDS standard's rules for a relative URL and looked up in the
+    tree's listing (`pipelex.cogt.doc_gen.method_file_urls`), never on a disk. The print refuses it when the standard does:
+    it is malformed, it is not a tree path, it climbs above the tree's root, or the tree holds no file where it resolves,
+    a directory and a file the tree's membership rule keeps out included. It also refuses a file of the tree that is not
+    an image, a stylesheet or a font, such as the method's Python, bundles, manifest or data, since a URL may come from a
+    run's input and a document can carry what it reads; a URL of a method file in a document with no HTML; and any
+    relative URL of a template that belongs to no method tree, such as an inline template of a bundle loaded from a
+    content string with no file submitted beside it. `refusal_code` is the standard's code for the refusal, and None for
+    these last three, which the standard does not name. A URL the template writes as it is is checked when the method
+    loads, so this is raised for one the run's input supplied.
+
+    `RenderResources.load` raises it, and an engine lets it pass, as it lets the read scope's refusal pass. The method's
+    author or the run's caller fixes it, so it is an input error, and its message names only the method's own files, by
+    their tree paths, and where the URL sat in the document, so it is kept for the caller.
+    """
+
+    error_domain = ErrorDomain.INPUT
+    _authors_caller_facing_message = True
+    _declared_title = "Relative URL refused"
+
+    def __init__(self, message: str, *, refusal_code: TreeRefusalCode | None):
+        super().__init__(message)
+        self.refusal_code = refusal_code

@@ -31,6 +31,20 @@ class OrchestratorProtocol(Protocol):
     cannot do genuine async, rather than silently running blocking and acking. An
     orchestrator with ``supports_fire_and_forget = False`` implements ``start`` by
     raising — the gate keeps it unreachable.
+
+    The method files a job reads travel by reference: its ``library_crate`` names each method
+    tree by its digest and carries none of its files, which this process's libraries hold for
+    the request (``LOCAL_METHOD_FILES``), served from the bytes a request submitted or from the
+    directory a tree was listed from, which may be a temporary directory the runner deletes. An
+    orchestrator that runs the job out of process, on a worker reading another store, copies
+    every tree the job's crate names into that store before its ``execute`` or ``start``
+    returns, since the runner may drop the library and the files as soon as it does:
+    ``read_stored_trees(tree_digests=pipe_job.library_crate.tree_digests(), read_scope=...)``
+    (``pipelex.core.method_trees.method_files``) reads each one as a store keeps it, its listing
+    under the tree's digest and its files under their hashes, checked. An orchestrator running
+    the job in this process, to its end before its ``execute`` returns, copies nothing; one that
+    keeps a job running after its ``start`` returned copies the trees as an out-of-process one
+    does, wherever the job runs, since the library holding them is gone by then.
     """
 
     supports_fire_and_forget: bool

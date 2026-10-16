@@ -35,13 +35,15 @@ _OPERATION_KEYS = frozenset({"get", "put", "post", "delete", "options", "head", 
 # rejections (422), and the server-fault floor (500).
 COMMON_STATUSES = (401, 413, 422, 500)
 
-# `GET /v1/version` is the public protocol handshake: `pipelex_api.main` mounts it OUTSIDE the composite
-# router (and outside the auth dependency), so it inherits none of the shared responses.
-PUBLIC_PATHS = ("/v1/version",)
+# `GET /v1/version` is the public protocol handshake, and `PUT /v1/blobs/{sha256}` the upload target a signed
+# query authorizes: `pipelex_api.main` mounts both OUTSIDE the composite router (and outside the auth
+# dependency), so they inherit none of the shared responses.
+PUBLIC_PATHS = ("/v1/version", "/v1/blobs/{sha256}")
 
 # The MTHDS Protocol operations — and nothing else — carry `x-mthds-protocol: true`. This is the
-# standard's five-operation surface (`execute`, `start`, `validate`, `models`, `version`; see the
-# normative `mthds/docs/spec/openapi/mthds-protocol.openapi.yaml`), NOT everything this server
+# standard's surface (`execute`, `start`, `validate`, `models`, `version`, and the blob routes a runner
+# keeping a blob store serves; see the normative `mthds/docs/spec/openapi/mthds-protocol.openapi.yaml`),
+# NOT everything this server
 # serves. `/resolve` and `/codegen` are deliberately absent: they are Pipelex API extensions. The
 # crate `/resolve` emits is standard-owned (the MTHDS Library Crate Format), but the route serving
 # it is ours, and the standard specifies no type projection at all.
@@ -51,6 +53,8 @@ MTHDS_PROTOCOL_OPERATIONS = {
     ("/v1/validate", "post"),
     ("/v1/models", "get"),
     ("/v1/version", "get"),
+    ("/v1/blobs/missing", "post"),
+    ("/v1/blobs/{sha256}", "put"),
 }
 
 # The extra statuses each route can produce on top of COMMON_STATUSES.

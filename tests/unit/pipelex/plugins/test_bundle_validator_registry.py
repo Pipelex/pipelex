@@ -19,11 +19,10 @@ from pipelex.plugins.registrar import PluginOrigin, PluginRegistrar
 from pipelex.runtime_bridge.orchestration_mode import DIRECT_ORCHESTRATION_MODE
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
     from pathlib import Path
 
     from pipelex.base_exceptions import ErrorReport
-    from pipelex.core.bundle_resources.bundle_resource import BundleResources
     from pipelex.pipeline.validation_report import PipelexValidationReport
     from pipelex.system.caller_identity import CallerIdentity
     from pipelex.system.configuration.configs import PipelexConfig
@@ -35,13 +34,15 @@ class _FakeBundleValidator:
     async def validate_bundles(
         self,
         *,
-        mthds_contents: list[str],
+        mthds_contents: list[str] | None,
         mthds_sources: list[str] | None,
         allow_signatures: bool,
         library_dirs: Sequence[Path] | None,
         caller_identity: CallerIdentity | None,
         graph_pipe_code: str | None,
-        bundle_resources: BundleResources | None,
+        submitted_files: Mapping[str, bytes] | None,
+        method_dir: Path | None,
+        methods_dirs: Sequence[Path] | None,
     ) -> PipelexValidationReport | ErrorReport:
         raise NotImplementedError
 

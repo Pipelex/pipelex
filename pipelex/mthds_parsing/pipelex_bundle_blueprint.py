@@ -11,6 +11,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import is_concept_code_valid
 from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
+from pipelex.core.method_trees.tree_bundle import TreeBundle
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.mthds_parsing.exceptions import InvalidPipeCodeSyntaxError, NativeConceptRedeclarationError
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
@@ -127,18 +128,35 @@ class PipelexBundleBlueprint(BaseModel):
     # The file on this host the bundle was read from, set by the parser when it reads one and by a loader that reads a
     # bundle's file itself. Never serialized, and never taken from `source`: `source` is a label, which a caller sends
     # with content strings (`mthds_sources`) and the bundle's own text can write, so it names no directory to read.
-    # This is what lets a step read a file beside its bundle, such as a PipeDocGen `template_file`, and lets an
-    # address-based reference find a `.mthds/methods/` directory above it; a bundle parsed from a string has none.
+    # It lets an address-based reference find a `.mthds/methods/` directory above the bundle, and it is what the
+    # library manager lists the bundle's method tree from when no loader placed the bundle in one.
     _host_bundle_file: Path | None = PrivateAttr(default=None)
+    # The bundle as a member of its method tree, set by the loader that listed the tree. A step reads a file the bundle
+    # names, such as a PipeDocGen `template_file`, only by resolving it in this tree. A bundle parsed from a string sits at
+    # the root of the tree of the files submitted with it, with no tree path, and has no tree when none was submitted.
+    _tree_bundle: TreeBundle | None = PrivateAttr(default=None)
 
     @property
     def host_bundle_file(self) -> Path | None:
         """The file on this host the bundle was read from, or None for a bundle parsed from a string."""
+        if self._tree_bundle is not None and self._tree_bundle.tree_path is not None:
+            return self._tree_bundle.location
         return self._host_bundle_file
 
+    @property
+    def tree_bundle(self) -> TreeBundle | None:
+        """The bundle as a member of its method tree, or None for a bundle not placed in one."""
+        return self._tree_bundle
+
     def mark_read_from_host_file(self, *, bundle_file: Path) -> None:
-        """Record that this host read the bundle from `bundle_file`, which its steps may read beside."""
+        """Record that this host read the bundle from `bundle_file`, whose method tree the load lists."""
         self._host_bundle_file = bundle_file
+
+    def place_in_tree(self, *, tree_bundle: TreeBundle) -> None:
+        """Record the bundle as `tree_bundle`: the member of the method tree a loader listed it in, or a bundle parsed from a
+        string at the root of the tree of the files submitted with it.
+        """
+        self._tree_bundle = tree_bundle
 
     @field_validator("domain", mode="before")
     @classmethod

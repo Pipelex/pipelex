@@ -39,6 +39,7 @@ from pipelex.cogt.inference.inference_manager_protocol import InferenceManagerPr
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
+from pipelex.core.method_trees.method_file_store import LOCAL_METHOD_FILES, MethodFileStoreProtocol
 from pipelex.plugins.sdk_client_manager import SdkClientManager
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.configuration.config_loader import config_manager
@@ -46,7 +47,6 @@ from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.console_target import ConsoleTarget
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.class_registry_access import get_class_registry as _get_active_class_registry
-from pipelex.system.registries.func_registry import FuncRegistry
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
@@ -61,6 +61,7 @@ if TYPE_CHECKING:
     # Rich is the `cli` extra: the console is built when it is first asked for, never at import or at boot.
     from rich.console import Console
 
+    from pipelex.cogt.doc_gen.template_file_stage import TemplateFileStageProtocol
     from pipelex.cogt.inference.service_error_vocabulary import ServiceErrorVocabulary
     from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
     from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
@@ -111,8 +112,12 @@ class RuntimeHub:
         self._console_print_stream: TextIO | None = None
         self._secrets_provider: SecretsProviderAbstract | None = None
         self._storage_provider: StorageProviderAbstract | None = None
+        # Where an activity reads a method file, by its tree's digest: the local store unless a plugin claims
+        # HubSlot.METHOD_FILE_STORE for a host whose activities run apart from the process that listed the trees.
+        self._method_file_store: MethodFileStoreProtocol = LOCAL_METHOD_FILES
+        # What the print stage of a PipeDocGen step needs a loaded method for, installed by the interpreter's boot.
+        self._template_file_stage: TemplateFileStageProtocol | None = None
         self._telemetry_manager: TelemetryManagerAbstract | None = None
-        self._func_registry: FuncRegistry | None = None
         # cogt
         self._models_manager: ModelManagerAbstract | None = None
         self._sdk_client_manager: SdkClientManager | None = None
@@ -226,6 +231,8 @@ class RuntimeHub:
         self._config = None
         self._is_dry_run_forced = False
         self._boot_orchestrator = None
+        self._method_file_store = LOCAL_METHOD_FILES
+        self._template_file_stage = None
         self._isolated_execution_probe = _never_in_isolated_execution
         if self._pretty_print_mode_before_boot is not None:
             PrettyPrinter.mode = self._pretty_print_mode_before_boot
@@ -267,6 +274,12 @@ class RuntimeHub:
 
     def set_storage_provider(self, storage_provider: StorageProviderAbstract | None):
         self._storage_provider = storage_provider
+
+    def set_method_file_store(self, *, method_file_store: MethodFileStoreProtocol) -> None:
+        self._method_file_store = method_file_store
+
+    def set_template_file_stage(self, *, template_file_stage: "TemplateFileStageProtocol | None") -> None:
+        self._template_file_stage = template_file_stage
 
     def set_telemetry_manager(self, telemetry_manager: TelemetryManagerAbstract):
         self._telemetry_manager = telemetry_manager
@@ -323,9 +336,6 @@ class RuntimeHub:
 
     def set_isolated_execution_probe(self, probe: Callable[[], bool]) -> None:
         self._isolated_execution_probe = probe
-
-    def set_func_registry(self, func_registry: FuncRegistry):
-        self._func_registry = func_registry
 
     ############################################################
     # Getters
@@ -384,17 +394,20 @@ class RuntimeHub:
             raise RuntimeError(msg)
         return self._storage_provider
 
+    def get_method_file_store(self) -> MethodFileStoreProtocol:
+        return self._method_file_store
+
+    def get_template_file_stage(self) -> "TemplateFileStageProtocol":
+        if self._template_file_stage is None:
+            msg = "The template file stage is not installed: a process booted with the kernel layer alone prints no template file"
+            raise RuntimeError(msg)
+        return self._template_file_stage
+
     def get_telemetry_manager(self) -> TelemetryManagerAbstract:
         if self._telemetry_manager is None:
             msg = "TelemetryManager is not initialized"
             raise RuntimeError(msg)
         return self._telemetry_manager
-
-    def get_func_registry(self) -> FuncRegistry:
-        if self._func_registry is None:
-            msg = "FuncRegistry is not initialized"
-            raise RuntimeError(msg)
-        return self._func_registry
 
     # cogt
 
@@ -505,6 +518,16 @@ def get_storage_provider() -> StorageProviderAbstract:
     return get_runtime_hub().get_storage_provider()
 
 
+def get_method_file_store() -> MethodFileStoreProtocol:
+    """The store activities read method files through, by their tree's digest (`pipelex.core.method_trees.method_files`)."""
+    return get_runtime_hub().get_method_file_store()
+
+
+def get_template_file_stage() -> "TemplateFileStageProtocol":
+    """What the print stage of a `PipeDocGen` step needs a loaded method for, as the interpreter installed it."""
+    return get_runtime_hub().get_template_file_stage()
+
+
 def get_class_registry() -> ClassRegistryAbstract:
     """Return the active class registry, respecting per-workflow library scoping.
 
@@ -516,10 +539,6 @@ def get_class_registry() -> ClassRegistryAbstract:
     accessor without a cycle. This is the public entry point; prefer it.
     """
     return _get_active_class_registry()
-
-
-def get_func_registry() -> FuncRegistry:
-    return get_runtime_hub().get_func_registry()
 
 
 def get_telemetry_manager() -> TelemetryManagerAbstract:

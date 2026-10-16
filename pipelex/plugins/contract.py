@@ -54,7 +54,27 @@ if TYPE_CHECKING:
 # the media type its source gives it, where it returned the bytes alone. An engine written against v5 would receive
 # the model where it expects bytes and fail in the middle of a print, with a ``TypeError`` raised deep inside its
 # rendering library; the bump turns that into a discovery-time mismatch naming the plugin.
-PLUGIN_API_VERSION: int = 6
+#
+# v7 changed what a run hands an orchestration plugin, now that a run's library crate names each method tree by its
+# digest and carries no file's bytes. A bundle validator's ``validate_bundles`` receives ``submitted_files``, a mapping
+# from the path a step names to the file's bytes, where it received ``bundle_resources``, and ``method_dir`` and
+# ``methods_dirs``, a method's tree and its dependency trees written out on the host, in place of ``mthds_contents``,
+# which may now be ``None``; a PipeFunc executor's
+# transported request names its tree by ``tree_digest`` where it carried the call's ``files``, and the transported
+# entrypoint takes the directory the call's files were unpacked into as a required argument; and an orchestrator that
+# runs a job out of process copies the trees the job's crate names before its ``execute`` or ``start`` returns
+# (``OrchestratorProtocol``). A validator or an executor written against v6 would be called with a keyword it does not
+# accept, or read a field that is gone, on its first call; the bump turns that into a discovery-time mismatch naming
+# the plugin. ``claim_method_file_store``, the hub slot an activity reads method files through by their tree's digest
+# (``MethodFileStoreProtocol`` in ``pipelex.core.method_trees.method_file_store``), joined the menu with it.
+#
+# Relative URLs in an HTML document joined the document engine contract under v7 without a bump, as additions: the
+# render job's ``base_url``, under ``METHOD_FILE_URL_PREFIX`` (``render_job``, with ``is_method_file_url`` to test a URL
+# against it), which an engine joins a relative URL of the document to; the method-file arm of
+# ``RenderResources.load``, which reads an image, a stylesheet or a font joined under the prefix from the document's
+# method tree; and the error that arm raises for a URL naming no such file (``TemplateUrlRefusedError``), which an engine
+# lets pass as it came. An engine written before them ignores ``base_url`` and keeps refusing a relative URL, as it did.
+PLUGIN_API_VERSION: int = 7
 
 
 @runtime_checkable

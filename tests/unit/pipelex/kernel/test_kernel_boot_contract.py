@@ -120,7 +120,6 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     from pipelex.runtime_boot import RuntimeBoot
     from pipelex.system.pipe_run_mode import PipeRunMode
     from pipelex.system.registries.class_registry_access import get_class_registry
-    from pipelex.system.registries.func_registry import func_registry
     from pipelex.system.runtime import IntegrationMode
     from pipelex.tools.jinja2.template_category import TemplateCategory
     from pipelex.tools.log.log_context import get_log_context
@@ -413,27 +412,24 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
         fail(f"run_compose_template rendered {compose_result.rendered_text!r}, not the template it was given")
     check_stored(compose_result, "run_compose_template", TextContent)
 
-    # Registered here rather than imported, because the func path's whole point is that the function is
-    # the caller's: a kernel-only process has no library to have registered one for it.
-    FUNCTION_NAME = "kernel_boot_contract_function"
-    FUNCTION_TEXT = "produced by a registered function"
+    # Defined here and handed over, because the func path's whole point is that the function is the
+    # caller's: a kernel-only process has no library to have imported one for it.
+    FUNCTION_TEXT = "produced by the caller's function"
 
     def produce_text(working_memory: WorkingMemory) -> TextContent:
         return TextContent(text=FUNCTION_TEXT)
 
-    func_registry.register_function(produce_text, name=FUNCTION_NAME)
-
     func_result = asyncio.run(
         run_func(
             memory=WorkingMemoryFactory.make_empty(),
-            function_name=FUNCTION_NAME,
+            function=produce_text,
             concept=text_concept,
             result_name="called",
         )
     )
 
     if not isinstance(func_result.content, TextContent) or func_result.content.text != FUNCTION_TEXT:
-        fail("run_func did not return what the registered function produced")
+        fail("run_func did not return what the function it was handed produced")
     check_stored(func_result, "run_func", TextContent)
 
     # Swept last, so a function-local interpreter import taken during any of the calls is caught too.

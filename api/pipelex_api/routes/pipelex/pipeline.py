@@ -1,26 +1,27 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
-from contextlib import ExitStack, contextmanager
-from pathlib import Path, PurePosixPath
+from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, cast
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from mthds.protocol.exceptions import PipelineRequestError
-from pipelex.config import get_config, is_pipe_func_sandbox_hosted
+from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.methods.structures_check import ensure_no_structured_content_python
+from pipelex.libraries.method_requirements import ensure_served_method_requirements_met
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, StorageTarget, WebhookTarget
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
-from pipelex.pipe_run.remote_dispatch import prepare_job_for_remote_dispatch
+from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 from pipelex.reporting.usage_records import apply_tokens_usage_wire_shape
 from pipelex.runtime_bridge.exceptions import MissingBundleValidatorError, MissingOrchestratorError
-from pipelex.runtime_bridge.orchestration_mode import DIRECT_ORCHESTRATION_MODE
 from pipelex.runtime_bridge.primitives.hydration import hydrate_working_memory
 from pipelex.runtime_hub import get_bundle_validator_registry, get_orchestrator_registry
 from pipelex.system.environment import get_required_env
@@ -29,19 +30,25 @@ from pydantic import ValidationError
 from typing_extensions import override
 
 from pipelex_api.api_config import get_api_config, resolve_orchestration_mode
-from pipelex_api.bundle import (
-    ParsedBundle,
-    VendoredMethodPackage,
-    materialize_parsed,
-    materialized_methods_dir,
-    parse_bundle,
-    partition_bundle_entries,
-)
-from pipelex_api.bundle_resources import decode_bundle_resources, files_its_steps_read
+from pipelex_api.blob_store import RunnerBlobStore
+from pipelex_api.bundle_resources import decode_bundle_resources
 from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import raise_bad_request, raise_forbidden, raise_validation_error
+from pipelex_api.errors import raise_bad_request, raise_validation_error
 from pipelex_api.json_body import decode_json_body
-from pipelex_api.method_source import fetched_method_source
+from pipelex_api.method_source import fetched_method
+from pipelex_api.method_tree_request import (
+    REQUEST_METHOD_LABEL,
+    RequestMethod,
+    ensure_method_holds_a_bundle,
+    ensure_python_allowed,
+    read_archive_method,
+    read_request_method,
+    record_request_method,
+    select_tree_entry,
+    tree_documents_of,
+    with_resources,
+    written_method,
+)
 from pipelex_api.middleware import request_id_of
 from pipelex_api.openapi_responses import (
     PROBLEM_400_START_REQUIRES_ASYNC,
@@ -62,7 +69,7 @@ from pipelex_api.schemas.models import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import AsyncGenerator
 
     from mthds.protocol.pipe_output import VariableMultiplicity
     from mthds.protocol.pipeline_inputs import PipelineInputs
@@ -143,6 +150,16 @@ def _resolve_read_scope(request: Request, *, requested: str | None) -> str | Non
         return requested
     user: RequestUser | None = getattr(request.state, "user", None)
     return user.user_id if user else None
+
+
+def resolve_blob_scope(request: Request, *, read_scope: str | None) -> str:
+    """The scope of the blob store a request's hash entries resolve in: its read scope, else the caller's own id.
+
+    The same scope a run reads under, so a hash entry resolves only in the caller's own blobs, never across tenants:
+    a multi-tenant host sends the organization it serves as the read scope, and a deployment that identifies no caller
+    is one tenant, `single-tenant`.
+    """
+    return read_scope or get_request_user_id(request)
 
 
 class _RunScopes(NamedTuple):
@@ -230,18 +247,6 @@ def _pipe_output_from_run_output(run_output: PipelexPipeRunOutput) -> PipeOutput
     )
 
 
-async def _prepare_job_for_dispatch(*, pipe_job: PipeJob, orchestration_mode: str) -> PipeJob:
-    """The job as the mode's orchestrator receives it: prepared to leave this process for every mode but `direct`.
-
-    The files submitted with a bundle travel in the job's crate. An orchestrator other than the in-process `direct`
-    one, such as Temporal, runs the job outside this process, so the files its steps read only when they run move to
-    the run's storage first, dry runs included (`prepare_job_for_remote_dispatch`). A `direct` run keeps them inline.
-    """
-    if orchestration_mode == DIRECT_ORCHESTRATION_MODE:
-        return pipe_job
-    return await prepare_job_for_remote_dispatch(pipe_job=pipe_job)
-
-
 class _OrchestratorPipeRun(PipeRunProtocol):
     """Adapts a mode-selected orchestrator to the `PipeRunProtocol` the base `execute` drives.
 
@@ -262,8 +267,7 @@ class _OrchestratorPipeRun(PipeRunProtocol):
 
     @override
     async def run(self, pipe_job: PipeJob, *, delivery_assignment: DeliveryAssignment | None = None) -> PipeOutput:
-        dispatched_job = await _prepare_job_for_dispatch(pipe_job=pipe_job, orchestration_mode=self._orchestration_mode)
-        run_output = await self._orchestrator.execute(pipe_job=dispatched_job, delivery_assignment=delivery_assignment)
+        run_output = await self._orchestrator.execute(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
         return _pipe_output_from_run_output(run_output)
 
 
@@ -325,6 +329,7 @@ class ApiRunner(PipelexMTHDSProtocol):
         orchestrator = get_orchestrator_registry().get_optional(mode=orchestration_mode)
         if orchestrator is None:
             raise MissingOrchestratorError(mode=orchestration_mode)
+        await self._ensure_served_method_requirements_met()
 
         # Dispatch the run through the mode-selected orchestrator by injecting it as this runner's
         # PipeRun, then delegate to the base execute, which owns the full run lifecycle. The
@@ -407,6 +412,7 @@ class ApiRunner(PipelexMTHDSProtocol):
                 f"async-capable orchestration, and this deployment has none. Use /execute (synchronous) instead."
             )
             raise_bad_request(msg, error_type=ErrorType.START_REQUIRES_ASYNC_ORCHESTRATION)
+        await self._ensure_served_method_requirements_met()
         created_at = get_current_iso_timestamp()
         pipelex_inputs: PipelineInputs | WorkingMemory | None = cast("PipelineInputs | WorkingMemory | None", inputs)
 
@@ -417,6 +423,8 @@ class ApiRunner(PipelexMTHDSProtocol):
             execution_config=execution_config,
             library_id=self.library_id,
             library_dirs=self.library_dirs,
+            # A method the request carries as a tree is the caller's, as the base `execute` threads it too.
+            library_dirs_are_callers=self.library_dirs_are_callers,
             pipe_code=pipe_code,
             mthds_contents=mthds_contents,
             bundle_uris=self.bundle_uris,
@@ -435,7 +443,7 @@ class ApiRunner(PipelexMTHDSProtocol):
             # The packages the request ships, which the base `execute` threads too.
             methods_dirs=self.methods_dirs,
             # The files submitted with the contents, such as a template file, which the base `execute` threads too.
-            bundle_resources=self.bundle_resources,
+            submitted_files=self.submitted_files,
             pipeline_run_id=pipeline_run_id,
             request_id=request_id,
         )
@@ -474,8 +482,7 @@ class ApiRunner(PipelexMTHDSProtocol):
         # `PipelexPipeRunInput` (which carries no request_id / output_multiplicity /
         # dynamic_output_concept_ref and skips run registration + telemetry). `start` genuinely
         # enqueues the job and returns a `PipelexPipeDispatchAck` (ids only) immediately.
-        dispatched_job = await _prepare_job_for_dispatch(pipe_job=pipe_job, orchestration_mode=orchestration_mode)
-        dispatch_ack = await orchestrator.start(pipe_job=dispatched_job, delivery_assignment=delivery_assignment)
+        dispatch_ack = await orchestrator.start(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
 
         return PipelexRunResultStart(
             pipeline_run_id=resolved_pipeline_run_id,
@@ -484,14 +491,34 @@ class ApiRunner(PipelexMTHDSProtocol):
             workflow_id=dispatch_ack.workflow_id,
         )
 
+    async def _ensure_served_method_requirements_met(self) -> None:
+        """Refuse the request's method when its requirements.txt is not met, before anything loads or is dispatched.
+
+        This runner's `library_dirs` are the directories it wrote the request's method tree into, the caller's own,
+        whose load reports a requirements refusal as the caller's too; judging it here first refuses the run before
+        any library opens or any run is registered, naming no path on this host. The tree is held as written, so its
+        listing is the tree the request sent. The listing reads and hashes files, so it runs off the event loop.
+
+        Raises:
+            MethodRequirementsFileError: The method's requirements.txt holds a line the standard refuses.
+            MethodRequirementsNotMetError: The PipeFunc environment does not meet the method's requirements.
+            HostLibraryTreeError: A directory of the request could not be listed as a method tree.
+            PipeFuncPackageSetUnstatedError: The deployment states no package set for its PipeFunc sandbox.
+        """
+        if not self.library_dirs:
+            return
+        library_dirs = [Path(library_dir) for library_dir in self.library_dirs]
+        await asyncio.to_thread(ensure_served_method_requirements_met, library_dirs=library_dirs)
+
     async def validate_verdict(
         self,
         *,
-        mthds_contents: list[str],
+        mthds_contents: list[str] | None,
         mthds_sources: list[str] | None,
         allow_signatures: bool,
         requested_orchestration_mode: str | None,
         graph_pipe_code: str | None,
+        method_dir: Path | None = None,
     ) -> PipelexValidationReport | ErrorReport:
         """Validate MTHDS bundles, returning the verdict as a value (the route maps it to a 200).
 
@@ -513,13 +540,19 @@ class ApiRunner(PipelexMTHDSProtocol):
         and the `bundle_blueprint` on success — carry a real `source` instead of `None`. The route
         maps a length mismatch to a 422 before we get here; `None` keeps the sourceless behavior.
         `library_dirs` is host context the in-process arm needs; a dispatched arm ignores it (the
-        worker loads its own library). A bundle without a declared `main_pipe` validates fine and
-        simply carries `graph_spec=None` (D2 — no precondition).
+        worker loads its own library), so the requirements.txt of the methods they hold is checked here
+        first, for every arm, and a method whose requirements are not met is an invalid verdict. A
+        bundle without a declared `main_pipe` validates fine and simply carries `graph_spec=None`
+        (D2 — no precondition).
 
         `graph_pipe_code` is the pipe the best-effort graph is drawn from, resolved the way a run
         resolves its entry pipe; `None` keeps the runtime's default, the primary blueprint's
-        `main_pipe`. The route passes a fetched package manifest's `main_pipe`, so the graph shows
-        the pipe a selector-less run by that address executes.
+        `main_pipe`. The route passes the entry pipe of a method tree, so the graph shows the pipe a
+        selector-less run of that method executes.
+
+        `method_dir` is the directory a method tree the request carries was written as, by `files` or
+        fetched by `method_ref`: the validation loads it whole, with this runner's `methods_dirs`, in
+        place of `mthds_contents`, which is then None, and its refusals are the method's verdict.
         """
         # Resolve the effective mode FIRST — a per-request override the deployment policy forbids
         # is refused (403) here, before any validator dispatch / library load. Mirrors start().
@@ -528,17 +561,28 @@ class ApiRunner(PipelexMTHDSProtocol):
         if validator is None:
             raise MissingBundleValidatorError(mode=orchestration_mode)
         library_dirs = [Path(library_dir) for library_dir in self.library_dirs] if self.library_dirs else None
+        # The method's requirements.txt is judged here, on the runner, which holds the method's files and the package set
+        # its PipeFunc steps run with, before any dispatch: a dispatched validator never reads these directories. A
+        # refusal is the method's invalid verdict, as a run of it is refused before its files load.
+        try:
+            with translate_to_validate_bundle_error():
+                await self._ensure_served_method_requirements_met()
+        except ValidateBundleError as invalid_method:
+            return invalid_method.to_error_report()
         verdict = await validator.validate_bundles(
             mthds_contents=mthds_contents,
             mthds_sources=mthds_sources,
             allow_signatures=allow_signatures,
-            library_dirs=library_dirs,
+            # A method directory is the whole method: no library directory loads beside it.
+            library_dirs=None if method_dir is not None else library_dirs,
+            method_dir=method_dir,
+            methods_dirs=self.methods_dirs if method_dir is not None else None,
             # A validation is not a run, but its dry runs and its `pipe_dry_run` event are still
             # done for the caller this runner was built for — the user and groups a run would state.
             caller_identity=self.caller_identity,
             graph_pipe_code=graph_pipe_code,
             # The files submitted with the contents, which the validation's dry run reads, the template check included.
-            bundle_resources=self.bundle_resources,
+            submitted_files=self.submitted_files,
         )
         # The core seam types its valid arm at the protocol-level ValidationReport (a leaf type)
         # to stay import-acyclic in core; every registered validator in fact produces the canonical
@@ -681,7 +725,16 @@ def _coerce_correlation_field(value: Any) -> str | None:
     return value[:_MAX_CORRELATION_FIELD_LEN]
 
 
-async def _parse_request(request: Request) -> tuple[RunRequest, PipelineApiExtras]:
+class _ParsedRunRequest(NamedTuple):
+    """A run request's body as the routes read it: the typed request, its extras, and its raw bytes."""
+
+    run_request: RunRequest
+    extras: PipelineApiExtras
+    body: bytes
+    """The raw body, which a method sent as `files` is read from, keeping what only the JSON text holds."""
+
+
+async def _parse_request(request: Request) -> _ParsedRunRequest:
     """Parse and validate the request body.
 
     Splits the body into:
@@ -714,103 +767,7 @@ async def _parse_request(request: Request) -> tuple[RunRequest, PipelineApiExtra
         # mistakes, not server faults, so they map to a 422 rather than
         # escaping to the generic-500 fallback.
         raise_validation_error(message=str(exc))
-    return run_request, extras
-
-
-class _BundleRunSource(NamedTuple):
-    """What a request's run source resolves to, before the routes add its entry pipe and provenance."""
-
-    mthds_contents: list[str] | None
-    library_dirs: list[str] | None
-    methods_dirs: list[Path] | None
-    bundle_files: dict[str, bytes]
-    """The files a method bundle ships beside its `.mthds` files that their steps read, keyed by the path a step names."""
-
-
-def _ensure_vendored_packages_hold_no_structures(*, methods_dir: Path, packages: tuple[VendoredMethodPackage, ...]) -> None:
-    """Refuse a shipped package whose Python declares a structure class, as a fetched package is on this deployment.
-
-    The library load refuses the bundle's own structure classes, but never reads a shipped package's Python, which is
-    not in a library directory. Each package is named by the address its manifest declares, and each file by its path
-    inside the package, never by the temporary directory.
-    """
-    for package in packages:
-        if any(relpath.suffix == ".py" for relpath, _ in package.entries):
-            ensure_no_structured_content_python(package_dir=methods_dir / package.name, package_address=package.full_address)
-
-
-@contextmanager
-def _bundle_run_source(run_request: RunRequest) -> Generator[_BundleRunSource, None, None]:
-    """Resolve a run's `(mthds_contents, library_dirs, methods_dirs)` from the request.
-
-    A method bundle KEEPS the proven run path rather than replacing it: its own `.mthds`
-    text travels as `mthds_contents` — so `main_pipe` resolves exactly as it does for a
-    plain (non-bundle) run — and its other files (custom PipeFunc `.py`,
-    `requirements.txt`) are materialized into a temp `library_dirs` entry, where the
-    load path reads them without importing them. This mirrors "a normal run, plus the Python", instead of
-    handing the engine a bare directory with no `mthds_contents` (which never resolves
-    `main_pipe`, since that is only derived from `mthds_contents`).
-
-    The method packages the bundle ships under `.mthds/methods/<name>/` belong to neither:
-    every file of theirs is written into a temp directory of its own, as `<tmp>/<name>/…`,
-    which the engine searches first for an address-based reference and never writes, so a
-    shipped package wins over an installed copy and ends with the request. The other `.mthds`
-    paths are refused with a `422` naming the entry (`partition_bundle_entries`), and so are two
-    shipped packages declaring the same address and a bundle whose only `.mthds` files are shipped ones.
-
-    No bundle → yields the request's own `mthds_contents` and no directory (the classic path,
-    unchanged). Each temp dir is created only when it has files, and cleaned up on exit.
-
-    Security gate (decision 5): a bundle that ships custom Python (`.py`), in a shipped package
-    or not, is only honored on a sandbox-hosted deployment, where the load path reads the bundle's
-    own source without importing it and refuses, with a 403 `MethodStructuresRefusedError`, a
-    bundle whose Python declares a structure class; PipeFunc source is captured for the sandbox.
-    A shipped package's Python is checked the same way, as a fetched package's is, and never runs.
-    On a non-hosted deployment, running that code would import it in-process — refused with a 403
-    rather than executing untrusted code.
-    """
-    if run_request.bundle_b64 is None and run_request.files is None:
-        yield _BundleRunSource(mthds_contents=run_request.mthds_contents, library_dirs=None, methods_dirs=None, bundle_files={})
-        return
-    # Parse + guard in memory FIRST, then apply the sandbox-hosted gate BEFORE any disk write —
-    # a bundle destined for a 403 on a non-hosted deployment never touches the filesystem.
-    parsed = parse_bundle(bundle_b64=run_request.bundle_b64, files=run_request.files)
-    if parsed.has_python_sources and not is_pipe_func_sandbox_hosted():
-        msg = "This bundle ships custom Python (.py); running it requires a sandbox-hosted deployment."
-        raise_forbidden(message=msg, error_type=ErrorType.CUSTOM_CODE_REQUIRES_SANDBOX)
-    # Split: the bundle's own `.mthds` text → `mthds_contents` (the proven main_pipe path); its other files
-    # (`.py`, `requirements.txt`) → a temp `library_dirs` entry the load path source-captures; the packages it
-    # ships → a temp methods directory.
-    partition = partition_bundle_entries(parsed.entries)
-    mthds_entries: list[tuple[PurePosixPath, str]] = []
-    for relpath, content in partition.mthds_entries:
-        try:
-            mthds_entries.append((relpath, content.decode("utf-8")))
-        except UnicodeDecodeError:
-            raise_validation_error(message=f"Bundle .mthds file '{relpath}' is not valid UTF-8.", error_type=ErrorType.INVALID_BUNDLE)
-    mthds_contents = [content for _, content in mthds_entries]
-    if not mthds_contents:
-        msg = "Method bundle contains no .mthds file."
-        if partition.vendored_packages:
-            msg = (
-                "Method bundle contains no .mthds file of its own: the files under '.mthds/methods/<name>/' are the method "
-                "packages it ships, and the bundle's own .mthds files go outside '.mthds/'."
-            )
-        raise_validation_error(message=msg, error_type=ErrorType.INVALID_BUNDLE)
-    # The `.mthds` files load as content strings, so a template file shipped beside one travels with it as a resource.
-    bundle_files = files_its_steps_read(mthds_entries=mthds_entries, other_entries=partition.library_entries)
-    with ExitStack() as stack:
-        library_dirs: list[str] | None = None
-        if partition.library_entries:
-            library_bundle = stack.enter_context(materialize_parsed(ParsedBundle(entries=partition.library_entries)))
-            library_dirs = [str(library_bundle.directory)]
-        methods_dirs: list[Path] | None = None
-        if partition.vendored_packages:
-            methods_dir = stack.enter_context(materialized_methods_dir(partition.vendored_packages))
-            if is_pipe_func_sandbox_hosted():
-                _ensure_vendored_packages_hold_no_structures(methods_dir=methods_dir, packages=partition.vendored_packages)
-            methods_dirs = [methods_dir]
-        yield _BundleRunSource(mthds_contents=mthds_contents, library_dirs=library_dirs, methods_dirs=methods_dirs, bundle_files=bundle_files)
+    return _ParsedRunRequest(run_request=run_request, extras=extras, body=body)
 
 
 class _ResolvedRunSource(NamedTuple):
@@ -818,45 +775,90 @@ class _ResolvedRunSource(NamedTuple):
 
     mthds_contents: list[str] | None
     library_dirs: list[str] | None
+    library_dirs_are_callers: bool
+    """Whether `library_dirs` hold the caller's own method, so a refusal while loading them is the caller's (a 422)."""
     methods_dirs: list[Path] | None
     pipe_code: str | None
     method_provenance: MethodProvenance | None
-    bundle_files: dict[str, bytes]
-    """The files a method bundle ships that its steps read, which join the request's `resources`."""
+    submitted_files: dict[str, bytes] | None
+    """The files `resources` sends beside `mthds_contents`; beside a method tree they join the tree instead."""
 
 
-@contextmanager
-def _run_source(run_request: RunRequest) -> Generator[_ResolvedRunSource, None, None]:
-    """Resolve the request's run source: a `method_ref` fetch, a bundle, or the inline contents.
+async def _request_method_of(*, run_request: RunRequest, body: bytes, blob_store: RunnerBlobStore) -> RequestMethod | None:
+    """The method a run request carries as a tree, `files` or `bundle_b64`, read in full, or None when it carries none.
 
-    A `method_ref` resolves through `pipelex_api.method_source.fetched_method_source` (fetch → locate →
-    execution-locus gate → materialize) into exactly the shape a bundle produces — `.mthds` text
-    as `mthds_contents`, non-`.mthds` files in a temp `library_dirs` entry, the packages the package
-    ships under its own `.mthds/methods/` in a temp `methods_dirs` entry — so the engine runs
-    the same proven path. The entry pipe defaults to the fetched manifest's `main_pipe`; a
-    request `pipe_code` overrides it. Provenance `(address, tag, commit_sha)` rides back so the
-    routes can put it on the response. The other two forms delegate to `_bundle_run_source`,
-    unchanged.
+    The files `resources` sends join the tree. Every tree is recorded in the blob store once the Python gate passed.
     """
+    if run_request.bundle_b64 is not None and run_request.files is not None:
+        raise_validation_error(message="Provide either bundle_b64 or files, not both", error_type=ErrorType.INVALID_BUNDLE)
+    request_method: RequestMethod | None
+    if run_request.bundle_b64 is not None:
+        request_method = await read_archive_method(bundle_b64=run_request.bundle_b64)
+    elif run_request.files is not None or run_request.dependencies is not None:
+        # Only a body sending a tree is parsed again, keeping its pairs; an inline run never pays a second parse.
+        request_method = await read_request_method(documents=tree_documents_of(body=body), blob_store=blob_store)
+    else:
+        request_method = None
+    if request_method is None:
+        return None
+    request_method = with_resources(request_method=request_method, resources=decode_bundle_resources(resources=run_request.resources))
+    ensure_method_holds_a_bundle(request_method=request_method, label="This method")
+    ensure_python_allowed(request_method=request_method, label="This method")
+    await record_request_method(request_method=request_method, blob_store=blob_store)
+    return request_method
+
+
+@asynccontextmanager
+async def _run_source(*, run_request: RunRequest, body: bytes, blob_scope: str) -> AsyncGenerator[_ResolvedRunSource, None]:
+    """Resolve the request's run source: a method tree (`files`, `bundle_b64` or a `method_ref`), or the inline contents.
+
+    A method tree is written into a temporary directory and held as written, then handed to the runner as its one
+    library directory, the caller's own, with the dependency trees it carries as `methods_dirs`: the load reads the
+    tree whole, its `.mthds` files as the method's bundles and every other file as one a step may read, such as a
+    `PipeDocGen` template or a `PipeFunc` module, and names each by its tree path. A refusal while loading it is the
+    caller's invalid method, a 422. With no `pipe_code`, the run starts at the protocol's entry pipe
+    (`select_tree_entry`): the `main_pipe` of the manifest at the tree's root, else the one `main_pipe` its bundles
+    declare. A `method_ref` is fetched and read from its commit's git objects (`pipelex_api.method_source`), its
+    provenance riding back so the routes can put it on the response. The directory is removed when the run returns.
+
+    Inline `mthds_contents` keep their path: the contents load as strings, and the files `resources` sends travel as
+    the runtime's `submitted_files`.
+
+    Security gate: a method shipping custom Python (`.py`) is only honored on a sandbox-hosted deployment, refused with
+    a 403 before anything is written (`ensure_python_allowed`).
+    """
+    method_provenance: MethodProvenance | None = None
+    method_label = REQUEST_METHOD_LABEL
     if run_request.method_ref is not None:
-        with fetched_method_source(run_request.method_ref) as fetched:
-            yield _ResolvedRunSource(
-                mthds_contents=fetched.mthds_contents,
-                library_dirs=fetched.library_dirs,
-                methods_dirs=fetched.methods_dirs,
-                pipe_code=run_request.pipe_code or fetched.main_pipe,
-                method_provenance=fetched.provenance,
-                bundle_files={},
-            )
-        return
-    with _bundle_run_source(run_request) as bundle_source:
+        fetched = await asyncio.to_thread(fetched_method, run_request.method_ref)
+        request_method: RequestMethod | None = fetched.request_method
+        ensure_method_holds_a_bundle(request_method=fetched.request_method, label=f"Method package {fetched.label}")
+        ensure_python_allowed(request_method=fetched.request_method, label=f"Method package {fetched.label}")
+        method_provenance = fetched.provenance
+        method_label = fetched.label
+    else:
+        request_method = await _request_method_of(run_request=run_request, body=body, blob_store=RunnerBlobStore.make_for_scope(scope=blob_scope))
+    if request_method is None:
         yield _ResolvedRunSource(
-            mthds_contents=bundle_source.mthds_contents,
-            library_dirs=bundle_source.library_dirs,
-            methods_dirs=bundle_source.methods_dirs,
+            mthds_contents=run_request.mthds_contents,
+            library_dirs=None,
+            library_dirs_are_callers=False,
+            methods_dirs=None,
             pipe_code=run_request.pipe_code,
             method_provenance=None,
-            bundle_files=bundle_source.bundle_files,
+            submitted_files=decode_bundle_resources(resources=run_request.resources),
+        )
+        return
+    pipe_code = run_request.pipe_code or select_tree_entry(tree=request_method.tree, method_label=method_label).pipe_ref
+    with written_method(request_method=request_method) as written:
+        yield _ResolvedRunSource(
+            mthds_contents=None,
+            library_dirs=[str(written.method_dir)],
+            library_dirs_are_callers=True,
+            methods_dirs=written.methods_dirs,
+            pipe_code=pipe_code,
+            method_provenance=method_provenance,
+            submitted_files=None,
         )
 
 
@@ -899,17 +901,19 @@ async def execute(request: Request) -> JSONResponse:
     failures propagate untouched: the global `PipelexError` handler in `pipelex_api.exception_handlers`
     turns them into an RFC 7807 problem response.
     """
-    run_request, extras = await _parse_request(request)
+    run_request, extras, body = await _parse_request(request)
     scopes = _resolve_run_scopes(request, extras=extras)
-    with _run_source(run_request) as source:
+    blob_scope = resolve_blob_scope(request, read_scope=scopes.read_scope)
+    async with _run_source(run_request=run_request, body=body, blob_scope=blob_scope) as source:
         runner = ApiRunner(
             user_id=get_request_user_id(request),
             storage_scope=scopes.storage_scope,
             read_scope=scopes.read_scope,
             extras=extras.analytics_groups,
             library_dirs=source.library_dirs,
+            library_dirs_are_callers=source.library_dirs_are_callers,
             methods_dirs=source.methods_dirs,
-            bundle_resources=decode_bundle_resources(resources=run_request.resources, bundle_files=source.bundle_files),
+            submitted_files=source.submitted_files,
         )
         response = await runner.execute(
             pipe_code=source.pipe_code,
@@ -969,7 +973,7 @@ async def execute(request: Request) -> JSONResponse:
 )
 async def start(
     request: Request,
-    parsed: Annotated[tuple[RunRequest, PipelineApiExtras], Depends(_parse_request)],
+    parsed: Annotated[_ParsedRunRequest, Depends(_parse_request)],
 ) -> PipelexApiStartResponse:
     """Start a method run and return its pipeline_run_id with a 202 ack (MTHDS Protocol `POST /start`).
 
@@ -988,21 +992,27 @@ async def start(
     (`StartRequiresAsyncOrchestration`) — use `/execute` — rather than silently blocking and acking.
     The completion callback (`callback_urls` / storage delivery) fires on the async path.
     """
-    run_request, extras = parsed
+    run_request, extras, body = parsed
     scopes = _resolve_run_scopes(request, extras=extras)
-    # The run source is materialized only for the synchronous setup phase: `start` builds the
-    # PipeJob (crate carrying the captured `python_sources`) before it enqueues, so the temp dir
-    # (a bundle's, or a fetched package's) is no longer needed once `start` returns — cleanup on
-    # context exit is safe for the async path.
-    with _run_source(run_request) as source:
+    blob_scope = resolve_blob_scope(request, read_scope=scopes.read_scope)
+    # The run source is written out only for the synchronous setup phase: `start` builds the
+    # PipeJob before it enqueues, its crate naming each method tree by digest, so the temp dir (a
+    # tree's, sent or fetched) is no longer needed once `start` returns — cleanup on context
+    # exit is safe for the async path. The worker reads a tree's files through its own method file
+    # store, never from this directory: the orchestrator copies every tree the job's crate names
+    # into that store before its `start` returns (`OrchestratorProtocol`), while this process's
+    # library still serves them, and no orchestrator keeping a job running after `start` returned
+    # may rely on this process's store.
+    async with _run_source(run_request=run_request, body=body, blob_scope=blob_scope) as source:
         runner = ApiRunner(
             user_id=get_request_user_id(request),
             storage_scope=scopes.storage_scope,
             read_scope=scopes.read_scope,
             extras=extras.analytics_groups,
             library_dirs=source.library_dirs,
+            library_dirs_are_callers=source.library_dirs_are_callers,
             methods_dirs=source.methods_dirs,
-            bundle_resources=decode_bundle_resources(resources=run_request.resources, bundle_files=source.bundle_files),
+            submitted_files=source.submitted_files,
         )
         start_result = await runner.start(
             pipe_code=source.pipe_code,

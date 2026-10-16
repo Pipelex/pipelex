@@ -18,11 +18,10 @@ from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
     from pathlib import Path
 
     from pipelex.base_exceptions import ErrorReport
-    from pipelex.core.bundle_resources.bundle_resource import BundleResources
     from pipelex.pipeline.validation_report import PipelexValidationReport
     from pipelex.system.caller_identity import CallerIdentity
 
@@ -39,13 +38,15 @@ class DirectBundleValidator:
     async def validate_bundles(
         self,
         *,
-        mthds_contents: list[str],
+        mthds_contents: list[str] | None,
         mthds_sources: list[str] | None,
         allow_signatures: bool,
         library_dirs: Sequence[Path] | None,
         caller_identity: CallerIdentity | None,
         graph_pipe_code: str | None,
-        bundle_resources: BundleResources | None,
+        submitted_files: Mapping[str, bytes] | None,
+        method_dir: Path | None,
+        methods_dirs: Sequence[Path] | None,
     ) -> PipelexValidationReport | ErrorReport:
         try:
             return await validate_bundles_in_process(
@@ -56,7 +57,9 @@ class DirectBundleValidator:
                 graph_pipe_code=graph_pipe_code,
                 log_context="API validate",
                 caller_identity=caller_identity,
-                bundle_resources=bundle_resources,
+                submitted_files=submitted_files,
+                method_dir=method_dir,
+                methods_dirs=methods_dirs,
             )
         except ValidateBundleError as exc:
             # An invalid bundle is a produced verdict, not a fault: surface its structured

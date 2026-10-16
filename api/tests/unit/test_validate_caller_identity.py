@@ -12,7 +12,7 @@ The user comes from `request.state.user`, which the auth layer sets; a tiny midd
 for it here. The groups come from the body and are refused at the wire exactly as on a run.
 """
 
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +20,6 @@ import pytest
 from fastapi import FastAPI, Request, Response
 from fastapi.testclient import TestClient
 from pipelex.base_exceptions import ErrorReport, ValidationErrorCategory, ValidationErrorItem
-from pipelex.core.bundle_resources.bundle_resource import BundleResources
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
 from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
 from pipelex.system.caller_identity import CallerIdentity
@@ -59,13 +58,15 @@ class _RecordingBundleValidator:
     async def validate_bundles(
         self,
         *,
-        mthds_contents: list[str],  # noqa: ARG002
+        mthds_contents: list[str] | None,  # noqa: ARG002
         mthds_sources: list[str] | None,  # noqa: ARG002
         allow_signatures: bool,  # noqa: ARG002
         library_dirs: Sequence[Path] | None,  # noqa: ARG002
         caller_identity: CallerIdentity | None,
         graph_pipe_code: str | None,  # noqa: ARG002
-        bundle_resources: BundleResources | None,  # noqa: ARG002
+        submitted_files: Mapping[str, bytes] | None,  # noqa: ARG002
+        method_dir: Path | None,  # noqa: ARG002
+        methods_dirs: Sequence[Path] | None,  # noqa: ARG002
     ) -> ErrorReport:
         self.caller_identities.append(caller_identity)
         return ErrorReport(

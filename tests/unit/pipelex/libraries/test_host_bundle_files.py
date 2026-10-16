@@ -1,5 +1,9 @@
 from pathlib import Path
 
+import kajson
+from mthds.method_tree.lister import list_method_tree
+
+from pipelex.core.method_trees.tree_bundle import TreeBundle, TreeBundleRef
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
 from pipelex.libraries.library_manager import MTHDS_METHODS_DIRNAME, find_methods_dirs_from_blueprints
@@ -42,23 +46,35 @@ class TestHostBundleFiles:
         assert from_content.host_bundle_file is None
         assert from_content.source == str(bundle_path)
 
-    def test_the_crate_carries_the_host_file_of_its_file_loaded_pipes_only(self, tmp_path: Path) -> None:
-        """A `source` the bundle's text writes on a pipe, or a caller's label, never becomes a file to read beside."""
+    def test_the_crate_names_the_tree_of_its_file_loaded_pipes_only(self, tmp_path: Path) -> None:
+        """A `source` the bundle's text writes on a pipe, or a caller's label, never becomes a tree to read files from."""
         bundle_path = _write_bundle(directory=tmp_path)
         other_dir = tmp_path / "other"
         other_dir.mkdir()
         content_with_a_written_source = _bundle(domain="host_files_other", pipe_fields=f'source = "{bundle_path}"')
+        from_file = MthdsParser.make_pipelex_bundle_blueprint(bundle_path=bundle_path)
+        tree_bundle = TreeBundle(tree=list_method_tree(tmp_path), tree_path="bundle.mthds")
+        from_file.place_in_tree(tree_bundle=tree_bundle)
+        from_content = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content_with_a_written_source, mthds_source=str(other_dir / "x.mthds"))
 
-        crate = LibraryCrateFactory.make_from_blueprints(
-            blueprints=[
-                MthdsParser.make_pipelex_bundle_blueprint(bundle_path=bundle_path),
-                MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content_with_a_written_source, mthds_source=str(other_dir / "x.mthds")),
-            ]
-        )
+        crate = LibraryCrateFactory.make_from_blueprints(blueprints=[from_file, from_content])
 
-        assert crate.host_bundle_files == {"host_files_tests.summarize": str(bundle_path)}
+        assert crate.tree_bundles == {"host_files_tests.summarize": TreeBundleRef(tree_digest=tree_bundle.tree.digest, tree_path="bundle.mthds")}
+        assert crate.tree_digests() == [tree_bundle.tree.digest]
         assert crate.pipes["host_files_other.summarize"].source == str(bundle_path)
-        assert crate.fingerprint == LibraryCrate.model_validate_json(crate.model_dump_json()).fingerprint
+        # The crate names the tree by digest, so it crosses any boundary a Temporal payload does, kajson's included, and
+        # carries no path of this host.
+        for round_tripped in (LibraryCrate.model_validate_json(crate.model_dump_json()), kajson.loads(kajson.dumps(crate))):
+            assert isinstance(round_tripped, LibraryCrate)
+            assert round_tripped.fingerprint == crate.fingerprint
+            assert round_tripped.tree_bundles == crate.tree_bundles
+        assert str(tmp_path) not in crate.model_dump_json(include={"tree_bundles"})
+        # The trees a crate names are no part of what it is: the fingerprint ignores them.
+        unplaced = LibraryCrateFactory.make_from_blueprints(
+            blueprints=[MthdsParser.make_pipelex_bundle_blueprint(bundle_path=bundle_path), from_content],
+        )
+        assert unplaced.tree_bundles == {}
+        assert unplaced.fingerprint == crate.fingerprint
 
     def test_method_packages_are_searched_above_a_file_read_here_only(self, tmp_path: Path) -> None:
         """Walking up from a caller's label would search this host's directories wherever the caller pointed."""

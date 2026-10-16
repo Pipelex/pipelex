@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import functools
 from pathlib import Path
-from typing import Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
 
@@ -29,16 +29,20 @@ from pipelex.cli.agent_cli.commands.run._run_hosted import (
 )
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs
 from pipelex.cli.commands.run._hosted_sources import collect_mthds_files, hosted_library_dirs
+from pipelex.cli.commands.run._method_folder import list_bundle_file_tree, resolve_method_folder_run
+from pipelex.cli.commands.run._run_output_folder import RUN_RESULTS_DIR_NAME
 from pipelex.hosted.exceptions import HostedRunSourceError
 from pipelex.hosted.hosted_run import HostedRunRequest
 from pipelex.hosted.run_config import RunExecution  # ruff: ignore[typing-only-first-party-import] - typer reads the --runner annotation at runtime
-from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
+from pipelex.mthds_parsing.helpers import is_pipelex_file
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.default_file_names import DEFAULT_BUNDLE_FILE_NAME
 from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
+
+if TYPE_CHECKING:
+    from mthds.method_tree.models import MethodTree
 
 
 def run_bundle_cmd(
@@ -123,23 +127,27 @@ def run_bundle_cmd(
     auto_inputs_dir: Path | None = None
     target_path = Path(path)
 
+    # The method tree the run reads, whose digest the run records: the folder's, or the bundle file's own.
+    method_tree: MethodTree | None = None
+    # Where a folder run that named its pipe writes its output folders: `results/` in the folder, which has no entry
+    # bundle to write beside.
+    output_dir_override: Path | None = None
+    # The pipe a hosted run names: `--pipe`, else the main pipe the local run starts at, qualified by its domain, so the
+    # hosted API starts at the same pipe when two domains of the files it is sent define the same code.
+    hosted_pipe_code: str | None = pipe
     if target_path.is_dir():
-        # Directory mode: auto-detect bundle, inputs, and library dir
-        bundle_file = target_path / DEFAULT_BUNDLE_FILE_NAME
-        if bundle_file.is_file():
-            bundle_path = str(bundle_file)
+        # Directory mode: the method rooted at or above the folder, started where the protocol's rule says
+        try:
+            folder_run = resolve_method_folder_run(directory=target_path, pipe_override=pipe)
+        except ValidateBundleError as exc:
+            agent_error(exc.message, error_type="ValidateBundleError", cause=exc)
+        method_tree = folder_run.tree
+        pipe_code = folder_run.pipe_code
+        if folder_run.entry is not None and folder_run.entry_bundle_file is not None:
+            bundle_path = str(folder_run.entry_bundle_file)
+            hosted_pipe_code = folder_run.entry.pipe_ref
         else:
-            mthds_files = list(target_path.glob(f"*{MTHDS_EXTENSION}"))
-            if len(mthds_files) == 0:
-                agent_error(f"No .mthds bundle file found in directory '{path}'", error_type="FileNotFoundError")
-            if len(mthds_files) > 1:
-                mthds_names = ", ".join(mthds_file.name for mthds_file in mthds_files)
-                agent_error(
-                    f"Multiple .mthds files found in '{path}' ({mthds_names}) and no '{DEFAULT_BUNDLE_FILE_NAME}'. "
-                    f"Pass the .mthds file directly instead.",
-                    error_type="ArgumentError",
-                )
-            bundle_path = str(mthds_files[0])
+            output_dir_override = target_path / RUN_RESULTS_DIR_NAME
 
         # Hand the directory to parse_cli_inputs as the lowest-priority inputs source: it probes
         # for inputs.json / inputs.toml (and applies the ambiguity rule) only after --inputs and
@@ -155,6 +163,10 @@ def run_bundle_cmd(
 
     elif is_pipelex_file(target_path):
         bundle_path = path
+        try:
+            method_tree = list_bundle_file_tree(bundle_file=target_path)
+        except ValidateBundleError as exc:
+            agent_error(exc.message, error_type="ValidateBundleError", cause=exc)
     else:
         agent_error(
             f"'{path}' is not a .mthds file or directory. Use 'run pipe <code>' for pipe codes, or 'run bundle <path>' for .mthds files/directories.",
@@ -167,6 +179,7 @@ def run_bundle_cmd(
         try:
             mthds_content = Path(bundle_path).read_text(encoding="utf-8")
             if not pipe_code:
+                # A bundle file named alone starts at its own main_pipe.
                 # A bundle that does not parse is the invalid verdict, with the items `validate` gives,
                 # as it is when the run refuses it while loading.
                 with translate_to_validate_bundle_error():
@@ -178,6 +191,7 @@ def run_bundle_cmd(
                         error_type="BundleError",
                     )
                 pipe_code = main_pipe_code
+                hosted_pipe_code = main_pipe_code
         except FileNotFoundError as exc:
             agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc)
         except (OSError, UnicodeDecodeError) as exc:
@@ -194,12 +208,14 @@ def run_bundle_cmd(
         refuse_local_only_flags(dry_run=dry_run, mock_inputs=mock_inputs)
         # The bundle goes first, then the rest of the library a local run would load with it: -L, else PIPELEXPATH.
         try:
-            bundle_files = collect_mthds_files(primary=Path(bundle_path), library_dirs=hosted_library_dirs(library_dirs=library_dir))
+            bundle_files = collect_mthds_files(
+                primary=Path(bundle_path) if bundle_path else None, library_dirs=hosted_library_dirs(library_dirs=library_dir)
+            )
         except HostedRunSourceError as exc:
             agent_error(exc.message, error_type=type(exc).__name__, cause=exc)
         request = HostedRunRequest(
             mthds_files=bundle_files,
-            pipe_code=pipe_code,
+            pipe_code=hosted_pipe_code,
             inputs=pipeline_inputs,
             inputs_base_dir=parsed_inputs.inputs_base_dir,
         )
@@ -222,6 +238,8 @@ def run_bundle_cmd(
                 costs=costs,
                 with_memory=with_memory,
                 inputs_base_dir=parsed_inputs.inputs_base_dir,
+                output_dir_override=output_dir_override,
+                method_tree=method_tree,
             )
         )
         agent_success_formatted(

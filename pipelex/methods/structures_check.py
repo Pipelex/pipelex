@@ -185,7 +185,7 @@ def scan_structured_content_sources(*, sources: Mapping[str, str]) -> list[Struc
     `python-structures` projection, left as generated, is not a violation (`is_generated_structures_module`).
 
     Args:
-        sources: POSIX relative path to source text, as `FuncRegistryUtils.read_py_sources` returns it.
+        sources: POSIX relative path to source text, as the sandbox-hosted loader captures it.
 
     Returns:
         One violation per offending source, ordered by relative path.

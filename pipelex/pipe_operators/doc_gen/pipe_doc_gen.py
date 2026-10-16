@@ -1,53 +1,45 @@
-import asyncio
-from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
-from jinja2.exceptions import UndefinedError
-from pydantic import Field
+from pydantic import Field, PrivateAttr
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
-from pipelex.cogt.content_generation.read_authorization import authorize_assignment_reads
 from pipelex.cogt.doc_gen.doc_gen_engine import require_doc_gen_engine_declared, resolve_doc_gen_setting
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice, DocGenSetting
-from pipelex.cogt.doc_gen.doc_gen_worker_factory import DocGenWorkerFactory
-from pipelex.cogt.doc_gen.document_composition import DocumentComposition
+from pipelex.cogt.doc_gen.document_composition import ComposedTemplateFile, DocumentComposition, TemplateRenderContext
 from pipelex.cogt.doc_gen.input_shape import InputShape, shape_of_input
 from pipelex.cogt.doc_gen.layout_builder import build_layout_document, humanize
+from pipelex.cogt.doc_gen.method_file_urls import RelativeUrlBase
 from pipelex.cogt.doc_gen.plain_data import plain_data
-from pipelex.cogt.doc_gen.template_check import TemplateCheckRequest, TemplateFinding
-from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck_check import check_doc_gen_choice_with_deck
 from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
-from pipelex.cogt.templating.template_rendering import render_template
-from pipelex.core.bundle_resources.bundle_resource import BundleResource
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.method_trees.tree_bundle import MethodFileRef, TreeBundleRef
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.interpreter_hub import get_current_library, get_library_manager
 from pipelex.kernel.compose_ops import build_compose_context
 from pipelex.kernel.memory_ops import store_result
 from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
-from pipelex.pipe_operators.doc_gen.exceptions import PipeDocGenRunError, PipeDocGenTemplateCheckError, PipeDocGenUndefinedValueError
+from pipelex.pipe_operators.doc_gen.doc_gen_rendering import render_doc_gen_template
+from pipelex.pipe_operators.doc_gen.exceptions import PipeDocGenRunError, PipeDocGenTemplateFileUncheckedError
 from pipelex.pipe_operators.doc_gen.template_field_check import check_template_field_paths
-from pipelex.pipe_operators.doc_gen.template_file_resource import bundle_resource_of_template_file
 from pipelex.pipe_operators.pipe_operator import PipeOperator
-from pipelex.pipe_run.dry_run_warning_collector import report_dry_run_warning
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.runtime_hub import get_class_registry, get_content_generator, get_model_deck, get_report_delegate, get_storage_provider
+from pipelex.runtime_hub import get_class_registry, get_content_generator
 from pipelex.system.job_metadata import JobMetadata
-from pipelex.tools.jinja2.exceptions import Jinja2TemplateRenderError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.tools.storage.storage_file_name import path_safe_file_name
 from pipelex.tools.templating.templating_style import TemplatingStyle
-from pipelex.tools.uri.uri_read_scope import UriReference
-from pipelex.validation_error_types import TemplateCheckErrorType
+
+if TYPE_CHECKING:
+    from pipelex.core.stuffs.stuff import Stuff
 
 
 class PipeDocGenOutput(PipeOutput):
@@ -57,23 +49,66 @@ class PipeDocGenOutput(PipeOutput):
 class PipeDocGen(PipeOperator[PipeDocGenOutput]):
     """Turn the step's inputs into a stored document file, in two stages. It calls no AI model.
 
-    The **compose stage** is pure: it builds the layout tree of the inputs, or renders the HTML template, or
-    gathers the inputs as plain data for a template file, and it renders the filename, every template with a
-    strict undefined so a missing field fails rather than printing as empty text. The **print stage** is the
-    content generator's `make_rendered_document`: the step's engine prints the composition, and the bytes are
-    stored through the run's storage provider as a `DocumentContent`. The engine is a `doc_gen` model, the one the
-    step names or the model deck's default for its format and source, checked when the method loads. A dry run
-    composes for real, which checks the templates against mock inputs, runs the engine's template checker on a
-    template file, and prints and stores nothing.
+    The **compose stage** is pure, and reads no file: it builds the layout tree of the inputs, or renders the inline
+    HTML template, or names the template file, a file of the step's method tree, with what the print stage needs to
+    use it, and it renders the filename, every template with a strict undefined so a missing field fails rather than
+    printing as empty text. The **print stage** is the content generator's `make_rendered_document`, an activity on a
+    hosted plane: it reads the template file through the method file store, renders an HTML one with the step's data,
+    the step's engine prints the composition, and the bytes are stored through the run's storage provider as a
+    `DocumentContent`. The engine is a `doc_gen` model, the one the step names or the model deck's default for its
+    format and source, checked when the method loads. A dry run composes for real, which checks the templates against
+    mock inputs; its print reads and renders the template file and runs the engine's template checker on an office
+    one, and prints and stores nothing.
+
+    A relative URL in an HTML template, such as the `src` of a logo beside it, names a file of the template's method
+    tree, resolved against the template file, or against the bundle of an inline template: the composition says where
+    the template sits in its tree, and the print stage reads each file the engine asks for from the tree.
     """
 
     type: Literal["PipeDocGen"] = "PipeDocGen"
     doc_gen_format: DocGenFormat = Field(strict=False)
     doc_gen_choice: DocGenModelChoice | None = Field(default=None, description="The engine the step names, or None for the deck's default")
-    template: str | None = Field(default=None, description="The HTML template of a pdf step, inline or read from its template file")
+    template: str | None = Field(default=None, description="The inline HTML template of a pdf step")
     template_file: str | None = Field(default=None, description="The template file as the method names it")
-    template_path: str | None = Field(default=None, description="The resolved path of an office template file, which its engine fills")
+    template_file_ref: MethodFileRef | None = Field(
+        default=None, description="The template file as a file of the step's method tree, which the print stage reads"
+    )
+    template_bundle_ref: TreeBundleRef | None = Field(
+        default=None,
+        description=(
+            "The bundle of the inline HTML template, as its method tree names it, which the template's relative URLs resolve "
+            "against; None when the bundle belongs to no method tree, or the step has no inline template"
+        ),
+    )
+    template_tree_is_one_file: bool = Field(
+        default=False,
+        description="Whether the inline template's bundle was named alone, so its method tree holds no file beside it",
+    )
     filename: str | None = None
+
+    # The text of an HTML template file, read when the step was built in a method tree this process holds, for the checks
+    # of the method's load: a bundle's, or a crate's whose load validates it where a library holds its tree. None for a
+    # step built from a crate by digest alone, which reads no file, and which a validation refuses rather than pass
+    # unchecked (`validate_inputs_with_library`).
+    _template_file_text: str | None = PrivateAttr(default=None)
+
+    def hold_template_file_text(self, *, template_file_text: str) -> None:
+        """Keep the text of the step's HTML template file, read at load, for the load's checks."""
+        self._template_file_text = template_file_text
+
+    @property
+    def template_file_text(self) -> str | None:
+        """The text of the step's HTML template file as the load read and checked it, or None when the load read none."""
+        return self._template_file_text
+
+    @property
+    def _checked_html_template(self) -> tuple[str, str] | None:
+        """The HTML template the load checks, with how a message names it: the inline one, or the file's text when read."""
+        if self.template is not None:
+            return self.template, "template"
+        if self._template_file_text is not None:
+            return self._template_file_text, f"template file '{self.template_file}'"
+        return None
 
     @property
     def source(self) -> DocGenSource:
@@ -86,7 +121,9 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
     @override
     def required_variables(self) -> set[str]:
         roots: set[str] = set()
-        for template_source, category in ((self.template, TemplateCategory.HTML), (self.filename, TemplateCategory.BASIC)):
+        checked_html_template = self._checked_html_template
+        html_template = checked_html_template[0] if checked_html_template is not None else None
+        for template_source, category in ((html_template, TemplateCategory.HTML), (self.filename, TemplateCategory.BASIC)):
             if template_source is None:
                 continue
             for path in detect_jinja2_required_variables(template_category=category, template_source=rewrite_template_sigils(template_source)):
@@ -116,14 +153,16 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
 
         # The same template lints as PipeCompose: no private names, and every reference to a declared-optional input
         # guarded. The filename gets both too, since it renders as strictly as the template does.
-        if self.template is not None:
+        checked_html_template = self._checked_html_template
+        if checked_html_template is not None:
+            html_template, html_template_label = checked_html_template
             lint_authored_template(
                 pipe_code=self.code,
                 domain_code=self.domain_code,
                 inputs=self.inputs,
-                template_source=self.template,
+                template_source=html_template,
                 template_category=TemplateCategory.HTML,
-                template_label=f"template file '{self.template_file}'" if self.template_file is not None else "template",
+                template_label=html_template_label,
             )
         if self.filename is not None:
             lint_authored_template(
@@ -137,13 +176,25 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
 
     @override
     def validate_inputs_with_library(self):
+        # A step built from a crate by digest alone holds no text of its HTML template file, so no check of it ran: the
+        # validation refuses rather than reach a verdict the template could contradict. A load that skips validation,
+        # such as a worker's load of the crate a validated library made, never gets here.
+        if self.template_file is not None and self.doc_gen_format.is_template_html and self._template_file_text is None:
+            msg = (
+                f"PipeDocGen '{self.code}' prints from the HTML template file '{self.template_file}', which this validation "
+                "cannot check: the step was built from a library crate, which names its method tree by digest and carries "
+                "none of its files, and no library of this process holds that tree. Validate the method where its files are."
+            )
+            raise PipeDocGenTemplateFileUncheckedError(msg)
         # Every field a template reads exists on its input's concept, which is known once the library is loaded.
-        if self.template is not None:
+        checked_html_template = self._checked_html_template
+        if checked_html_template is not None:
+            html_template, html_template_label = checked_html_template
             check_template_field_paths(
                 pipe_code=self.code,
-                template_source=self.template,
+                template_source=html_template,
                 template_category=TemplateCategory.HTML,
-                label=f"template file '{self.template_file}'" if self.template_file is not None else "template",
+                label=html_template_label,
                 inputs=self.inputs,
             )
         if self.filename is not None:
@@ -185,30 +236,18 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
     async def _render(
         self, *, template: str, category: TemplateCategory, context: dict[str, Any], label: str, templating_style: TemplatingStyle | None = None
     ) -> str:
-        try:
-            return await render_template(
-                template=template,
-                category=category,
-                context=context,
-                templating_style=templating_style,
-                is_undefined_strict=True,
-            )
-        except Jinja2TemplateRenderError as exc:
-            undefined_error = exc.__cause__
-            if isinstance(undefined_error, UndefinedError):
-                # Raised from Jinja's own error rather than from the tools-layer wrapper, whose message quotes the
-                # template and is not caller-facing, so that this is the root fault a verdict or a run report names.
-                msg = (
-                    f"PipeDocGen '{self.code}' could not render its {label}: {undefined_error.message}. "
-                    "Every value a document's template reads must exist: check the name against the input's concept, "
-                    "or test an optional value first with {% if ... %}."
-                )
-                raise PipeDocGenUndefinedValueError(msg) from undefined_error
-            msg = f"PipeDocGen '{self.code}' could not render its {label}: {exc}"
-            raise PipeDocGenRunError(msg) from exc
+        return await render_doc_gen_template(
+            pipe_code=self.code, template=template, category=category, context=context, label=label, templating_style=templating_style
+        )
 
     async def compose(self, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams) -> DocumentComposition:
-        """The pure half of the step: everything the print stage needs, and nothing printed yet."""
+        """The pure half of the step: everything the print stage needs, and nothing printed yet.
+
+        It reads no file, so it runs where the step runs, in a workflow on a hosted plane. An inline HTML template is
+        rendered here, its text being the bundle's own; a template file is named by its tree's digest and its tree path,
+        for the print stage to read it: an HTML one with the step's data and the run's crate, which the print stage
+        renders it with, an office one with the step's data as plain data and the shapes of its inputs.
+        """
         context = build_compose_context(memory=working_memory, runtime_params=pipe_run_params.params)
         rendered_filename = self.code
         if self.filename is not None:
@@ -235,68 +274,107 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
                     layout=build_layout_document(title=title, named_contents=named_contents),
                 )
             case DocGenSource.HTML:
-                if self.template is None:
-                    msg = f"PipeDocGen '{self.code}' composes from HTML but has no HTML template."
-                    raise PipeDocGenRunError(msg)
-                html = await self._render(
-                    template=self.template,
-                    category=TemplateCategory.HTML,
-                    context=context,
-                    label="template",
-                    templating_style=resolve_templating_style(authored=None),
+                if self.template is not None:
+                    html = await self._render(
+                        template=self.template,
+                        category=TemplateCategory.HTML,
+                        context=context,
+                        label="template",
+                        templating_style=resolve_templating_style(authored=None),
+                    )
+                    return DocumentComposition(
+                        format=self.doc_gen_format,
+                        source=source,
+                        filename=filename,
+                        title=title,
+                        html=html,
+                        url_base=self._inline_template_url_base(),
+                    )
+                template_file = self._composed_template_file(
+                    render_context=self._render_context(working_memory=working_memory, pipe_run_params=pipe_run_params)
                 )
-                return DocumentComposition(format=self.doc_gen_format, source=source, filename=filename, title=title, html=html)
+                return DocumentComposition(
+                    format=self.doc_gen_format,
+                    source=source,
+                    filename=filename,
+                    title=title,
+                    template_file=template_file,
+                    url_base=RelativeUrlBase(
+                        tree_digest=template_file.file.tree_digest,
+                        holder=template_file.file.tree_path,
+                        template_label=f"the template file '{template_file.file.tree_path}'",
+                    ),
+                )
             case DocGenSource.TEMPLATE_FILE:
                 return DocumentComposition(
                     format=self.doc_gen_format,
                     source=source,
                     filename=filename,
                     title=title,
-                    template_path=self.template_path,
-                    template_resource=self._template_resource(),
-                    template_name=self.template_file,
+                    template_file=self._composed_template_file(input_shapes=self._input_shapes()),
                     data={name: plain_data(content) for name, content in named_contents},
                 )
 
-    def _template_resource(self) -> BundleResource | None:
-        """The office template submitted with the bundle, or None when the step reads it beside its bundle on disk.
-
-        Looked up when the step composes, in the library the step runs in: the submitter's own, or the one a remote
-        worker loaded from the run's crate, whose copy may be a reference to the run's storage.
-        """
-        if self.template_path is not None or self.template_file is None:
+    def _inline_template_url_base(self) -> RelativeUrlBase | None:
+        """Where the inline template's relative URLs resolve: against its bundle, in the bundle's method tree, when it has one."""
+        bundle_ref = self.template_bundle_ref
+        if bundle_ref is None:
             return None
-        resource = bundle_resource_of_template_file(template_file=self.template_file)
-        if resource is None:
-            msg = f"PipeDocGen '{self.code}' names the template file '{self.template_file}', which the library it runs in does not hold."
-            raise PipeDocGenRunError(msg)
-        return resource
+        if bundle_ref.tree_path is None:
+            template_label = f"the inline template of PipeDocGen '{self.code}', in bundles loaded from content strings"
+        else:
+            template_label = f"the inline template of PipeDocGen '{self.code}', in '{bundle_ref.tree_path}'"
+        return RelativeUrlBase(
+            tree_digest=bundle_ref.tree_digest,
+            holder=bundle_ref.tree_path,
+            template_label=template_label,
+            is_one_file_tree=self.template_tree_is_one_file,
+        )
 
-    async def _read_template_file(self, *, job_metadata: JobMetadata) -> bytes:
-        """The office template's bytes, from beside the bundle on disk or from the files submitted with it.
-
-        A submitted file the run stored before it left the process is read back under the run's read scope, as the
-        print stage reads it.
+    def _composed_template_file(
+        self, *, render_context: TemplateRenderContext | None = None, input_shapes: dict[str, InputShape] | None = None
+    ) -> ComposedTemplateFile:
+        """The step's template file as its print stage reads it.
 
         Raises:
-            UriReadRefusedError: the stored file lies outside the run's read scope.
+            PipeDocGenRunError: The step names no template file in its method tree.
         """
-        if self.template_path is not None:
-            return Path(self.template_path).read_bytes()
-        resource = self._template_resource()
-        if resource is None:
-            msg = f"PipeDocGen '{self.code}' has no template file to read."
+        if self.template_file is None or self.template_file_ref is None:
+            msg = f"PipeDocGen '{self.code}' prints from a template file but names none in its method tree."
             raise PipeDocGenRunError(msg)
-        if resource.uri is not None:
-            authorize_assignment_reads(
-                job_metadata=job_metadata,
-                uri_references=[UriReference(uri=resource.uri, position=f"the template file '{self.template_file}'")],
-            )
-        return await resource.read_bytes(storage_provider=get_storage_provider())
+        return ComposedTemplateFile(
+            file=self.template_file_ref,
+            name=self.template_file,
+            pipe_ref=self.pipe_ref,
+            render_context=render_context,
+            input_shapes=input_shapes or {},
+        )
 
-    ####################################################################################################################
-    # Template file check, at the dry run
-    ####################################################################################################################
+    def _render_context(self, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams) -> TemplateRenderContext:
+        """What the print stage renders the step's HTML template file with, wherever it runs.
+
+        Only the stuffs the step's inputs name travel, under those names: the load checked that the template reads no other
+        variable but the run's params. The run's crate travels as its concepts and domains alone, which type them.
+
+        Raises:
+            PipeDocGenRunError: The library the step runs in has no crate.
+        """
+        library_id = get_current_library()
+        crate = get_library_manager().get_crate(library_id=library_id)
+        if crate is None:
+            msg = f"PipeDocGen '{self.code}' cannot name its template file's data: the library it runs in has no crate."
+            raise PipeDocGenRunError(msg)
+        input_stuffs: dict[str, Stuff] = {}
+        for input_name in self.inputs.variables:
+            stuff = working_memory.get_optional_stuff(input_name)
+            if stuff is not None:
+                input_stuffs[input_name] = stuff
+        return TemplateRenderContext(
+            crate_fingerprint=crate.fingerprint,
+            concepts_crate=crate.concepts_only().model_dump(mode="json"),
+            working_memory_raw=WorkingMemory(root=input_stuffs).dump_for_transport(),
+            runtime_params=dict(pipe_run_params.params),
+        )
 
     def _input_shapes(self) -> dict[str, InputShape]:
         shapes: dict[str, InputShape] = {}
@@ -306,63 +384,6 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
                 content_class = get_class_registry().get_required_subclass(name=stuff_spec.concept.structure_class_name, base_class=StuffContent)
             shapes[input_name] = shape_of_input(content_class=content_class, is_list=stuff_spec.is_multiple())
         return shapes
-
-    async def check_template_file(self, *, job_metadata: JobMetadata, working_memory: WorkingMemory) -> None:
-        """Run the engine's template checker on the step's template file, when its engine has one.
-
-        The inputs in memory are the dry run's mocks, so the checker can fill the template in memory with them.
-        A warning finding is reported to the validation sweep, which puts it in the verdict's `warnings`, or logged
-        when no sweep collects this dry run's warnings.
-
-        Raises:
-            PipeDocGenTemplateCheckError: the checker reported errors.
-            UriReadRefusedError: the template file was stored outside the run's read scope.
-        """
-        # Only an office template file is the engine's to check; an HTML one was checked against the inputs at load.
-        if self.template is not None or self.template_file is None:
-            return
-        doc_gen_setting = self.resolve_engine()
-        inference_model = get_model_deck().get_required_inference_model(model_handle=doc_gen_setting.model, model_type=ModelType.DOC_GEN)
-        worker = DocGenWorkerFactory.make_doc_gen_worker(inference_model=inference_model, reporting_delegate=get_report_delegate())
-        request = TemplateCheckRequest(
-            format=self.doc_gen_format,
-            template=await self._read_template_file(job_metadata=job_metadata),
-            template_name=self.template_file,
-            inputs=self._input_shapes(),
-            data={name: plain_data(content) for name, content in self._named_contents(working_memory)},
-        )
-        findings = await asyncio.to_thread(worker.check_template, request=request)
-        errors = [finding for finding in findings if finding.severity.is_error]
-        for finding in findings:
-            if not finding.severity.is_error:
-                self._report_template_warning(finding=finding, template_file=self.template_file)
-        if errors:
-            listed = "\n".join(f"- {finding.message}" + (f" ({finding.location})" if finding.location else "") for finding in errors)
-            msg = f"PipeDocGen '{self.code}': the template file '{self.template_file}' does not fit the step's inputs:\n{listed}"
-            raise PipeDocGenTemplateCheckError(msg)
-
-    def _report_template_warning(self, *, finding: TemplateFinding, template_file: str) -> None:
-        """Report a warning of the template check as an advisory item, located at this step, its file and the place in it.
-
-        An engine that answers an empty location names no place, so the item's `template_location` is left unset.
-        """
-        location = finding.location or None
-        location_suffix = f" ({location})" if location is not None else ""
-        warning = ValidationErrorItem(
-            category=ValidationErrorCategory.DRY_RUN,
-            error_type=TemplateCheckErrorType.TEMPLATE_CHECK_WARNING,
-            pipe_code=self.code,
-            domain_code=self.domain_code,
-            template_file=template_file,
-            template_location=location,
-            message=f"PipeDocGen '{self.code}', template file '{template_file}': {finding.message}{location_suffix}",
-        )
-        if report_dry_run_warning(warning=warning):
-            return
-        finding_fields: dict[str, str] = {"pipe_code": self.code, "template_file": template_file, "finding_message": finding.message}
-        if location is not None:
-            finding_fields["finding_location"] = location
-        log.warning("The template check of a PipeDocGen found a warning in its template file", fields=finding_fields)
 
     ####################################################################################################################
     # Runs
@@ -429,9 +450,8 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         output_name: str | None = None,
     ) -> PipeDocGenOutput:
         # The live path with the dry mode riding into the leaf: the compose stage runs for real against the mock
-        # inputs, which checks the templates, and the leaf prints and stores nothing. The template file's checker
-        # runs first, since only a dry run has inputs to fill it with and nothing to spend.
-        await self.check_template_file(job_metadata=job_metadata, working_memory=working_memory)
+        # inputs, which checks the inline templates, and the leaf reads and checks the template file, rendering an HTML
+        # one and handing an office one to its engine's checker, and prints and stores nothing.
         return await self._live_run_operator_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,

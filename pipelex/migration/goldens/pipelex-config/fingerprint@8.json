@@ -527,6 +527,37 @@
       "default": 10,
       "open_node": false
     },
+    "interpreter.method_tree_limits": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "interpreter.method_tree_limits.max_file_bytes": {
+      "value_type": "int",
+      "required": false,
+      "open_node": false,
+      "constraints": {
+        "ge": 0
+      }
+    },
+    "interpreter.method_tree_limits.max_files": {
+      "value_type": "int",
+      "required": false,
+      "default": 10000,
+      "open_node": false,
+      "constraints": {
+        "ge": 1
+      }
+    },
+    "interpreter.method_tree_limits.max_total_bytes": {
+      "value_type": "int",
+      "required": false,
+      "default": 1073741824,
+      "open_node": false,
+      "constraints": {
+        "ge": 0
+      }
+    },
     "interpreter.methods": {
       "value_type": "table",
       "required": true,

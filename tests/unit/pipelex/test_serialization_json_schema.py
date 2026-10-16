@@ -40,12 +40,10 @@ WRAP_SERIALIZER_MODELS = [
     ConstructBlueprint,
 ]
 
-# `FuncRegistry` holds live callables, which have no JSON Schema at all — pydantic refuses to build
-# one. Pinned by name rather than skipped silently: a model that newly stops being describable drops
+# The models pydantic refuses to describe at all, such as one holding live callables: none today.
+# Pinned by name rather than skipped silently: a model that newly stops being describable drops
 # out of the sweep, and this is what makes that visible instead of quietly shrinking the guard.
-MODELS_WITHOUT_A_JSON_SCHEMA = {
-    "pipelex.system.registries.func_registry.FuncRegistry",
-}
+MODELS_WITHOUT_A_JSON_SCHEMA: set[str] = set()
 
 REMEDY = (
     "Drop the return annotation from the model's `@model_serializer` — pydantic turns it into the "

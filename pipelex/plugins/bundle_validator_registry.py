@@ -33,10 +33,8 @@ from pipelex.runtime_bridge.orchestration_mode import OrchestrationMode
 from pipelex.system.caller_identity import CallerIdentity
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
     from pathlib import Path
-
-    from pipelex.core.bundle_resources.bundle_resource import BundleResources
 
 # The verdict a validator returns: valid arm = the protocol validation report (at runtime
 # always the canonical PipelexValidationReport subtype), invalid arm = the structured
@@ -76,25 +74,36 @@ class BundleValidatorProtocol(Protocol):
     does not resolve degrades the graph to ``None``, like any other graph-arm failure, and
     never changes the verdict.
 
-    ``bundle_resources`` are the files submitted with ``mthds_contents`` that their steps read,
+    ``submitted_files`` are the files submitted with ``mthds_contents`` that their steps read,
     such as a ``PipeDocGen`` step's ``template_file``, keyed by canonical bundle-relative path,
-    each carrying its bytes inline. The validation loads the bundles with them and its dry run
-    reads them, the template check included. It is required for the same reason as
-    ``caller_identity``, with ``None`` meaning none were submitted: a validator that dropped them
-    would refuse a valid bundle for a missing file. A worker-dispatched arm carries them to its
-    worker, by reference to storage rather than inline when they are large.
+    with their bytes. The validation loads the bundles with them and its dry run reads them, the
+    template check included. It is required for the same reason as ``caller_identity``, with
+    ``None`` meaning none were submitted: a validator that dropped them would refuse a valid bundle
+    for a missing file. A worker-dispatched arm hands them to its worker through the method file
+    store, the crate naming their tree by digest.
+
+    ``method_dir`` names the caller's method as a tree in place of ``mthds_contents``, which is then
+    ``None``: the directory of a tree the host wrote out on its own disk, such as a request's map of
+    file entries or a fetched package, held as written (``pipelex.libraries.written_trees``). Every
+    bundle of the tree is validated, its Python included, and every refusal is the caller's verdict,
+    naming the tree's files by their tree paths. ``methods_dirs``, laid out like ``.mthds/methods/``,
+    hold the dependency trees the caller ships with it. Both are required for the same reason as
+    ``caller_identity``, ``None`` meaning the method came as contents. A worker-dispatched arm reads
+    the tree's files on the host, where it is called, and hands them to its worker as trees.
     """
 
     async def validate_bundles(
         self,
         *,
-        mthds_contents: list[str],
+        mthds_contents: list[str] | None,
         mthds_sources: list[str] | None,
         allow_signatures: bool,
         library_dirs: "Sequence[Path] | None",
         caller_identity: CallerIdentity | None,
         graph_pipe_code: str | None,
-        bundle_resources: "BundleResources | None",
+        submitted_files: "Mapping[str, bytes] | None",
+        method_dir: "Path | None",
+        methods_dirs: "Sequence[Path] | None",
     ) -> BundleValidationVerdict: ...
 
 

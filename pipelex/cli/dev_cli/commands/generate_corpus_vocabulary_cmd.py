@@ -134,11 +134,11 @@ _FEATURE_TAGS: dict[str, str] = {
 # code leaves the registry breaks this module at import instead of rotting in the generated file.
 _PIPE_TYPE_EXCLUSIONS: dict[PipeType, str] = {
     PipeType.PIPE_FUNC: (
-        "A PipeFunc names a Python function that is resolved against the runtime's function registry "
-        "at validation time, so an entry declaring one fails with \"Function '<name>' not found in "
-        'registry" in every consumer that has not registered that exact function. A corpus entry has '
-        "to validate everywhere, and the cross-language consumers cannot register a Python function at "
-        "all, so no portable focused entry exists. Exercise PipeFunc in a consumer's own fixtures."
+        "A PipeFunc names a Python function by its import path in the method tree, and validation "
+        "locates that module among the tree's files and reads it, so an entry declaring one is refused "
+        "wherever its Python module does not travel with it. A corpus entry is a bundle that has to "
+        "validate everywhere, and the cross-language consumers do not read Python at all, so no portable "
+        "focused entry exists. Exercise PipeFunc in a consumer's own fixtures."
     ),
 }
 
@@ -176,6 +176,12 @@ _ERROR_TYPE_EXCLUSIONS: dict[ValidationErrorType, str] = {
         "A focused entry is one self-contained bundle validated where nothing is installed, and an "
         "address-based reference to a package that is not installed fails as `unresolved_package_dependency` instead. "
         "Revisit if an entry can ever carry the packages it depends on."
+    ),
+    PipeValidationErrorType.PIPE_FUNC_FUNCTION_REFUSED: (
+        "It refuses a PipeFunc step whose function its method tree does not hold or cannot be proven, so only a PipeFunc "
+        "step produces it, and the PipeFunc operator is excluded: a focused entry is one bundle that has to validate "
+        "everywhere, and its Python module would have to travel with it to consumers that do not read Python. "
+        "Exercise it in a consumer's own fixtures, beside the operator."
     ),
     PipeValidationErrorType.LLM_SETTING_REFUSED_BY_MODEL: (
         "It refuses a model setting the model it resolves to refuses, such as reasoning on a model that does not "

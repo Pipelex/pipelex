@@ -22,7 +22,7 @@ from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipeline import file_input_consumers as file_input_consumers_module
 from pipelex.pipeline.file_input_consumers import FileConsumerKind, FileInputConsumer, collect_file_input_consumers
 from pipelex.runtime_hub import get_model_deck
-from pipelex.system.registries.func_registry import func_registry
+from pipelex.system.registries.func_registry import pipe_func
 
 PDF_ONLY_MODEL = "pypdfium2-extract-pdf"
 DOCLING_MODEL = "docling-extract-text"
@@ -46,6 +46,7 @@ model = "{DOCLING_MODEL}"
 """
 
 
+@pipe_func()
 def file_consumers_replace_transcript(working_memory: WorkingMemory) -> DocumentContent:
     return DocumentContent(url=working_memory.get_stuff_as_document(name="transcript").url)
 
@@ -67,13 +68,6 @@ def _summary(consumers: list[FileInputConsumer]) -> list[tuple[str, str, bool]]:
 
 
 class TestFileInputConsumers:
-    @pytest.fixture(autouse=True)
-    def register_funcs(self):
-        func_registry.register_function(file_consumers_replace_transcript)
-        yield
-        if func_registry.has_function(file_consumers_replace_transcript.__name__):
-            func_registry.unregister_function_by_name(file_consumers_replace_transcript.__name__)
-
     def test_a_sequence_step_consumes_the_input(self, load_empty_library: Callable[[], str]):
         pipes = """
 [pipe.main]
@@ -110,7 +104,7 @@ type = "PipeFunc"
 description = "Replace the transcript with another document"
 inputs = { transcript = "Document" }
 output = "Document"
-function_name = "file_consumers_replace_transcript"
+function_name = "tests.integration.pipelex.pipeline.test_file_input_consumers.file_consumers_replace_transcript"
 """
         consumers = _consumers(load_empty_library=load_empty_library, domain="fic_overwrite", pipes=pipes)
 
@@ -176,7 +170,7 @@ type = "PipeFunc"
 description = "Replace the transcript with another document"
 inputs = {{ transcript = "Document" }}
 output = "Document"
-function_name = "file_consumers_replace_transcript"
+function_name = "tests.integration.pipelex.pipeline.test_file_input_consumers.file_consumers_replace_transcript"
 """
         consumers = _consumers(load_empty_library=load_empty_library, domain=domain, pipes=pipes)
 
@@ -386,7 +380,7 @@ type = "PipeFunc"
 description = "Replace the transcript with another document"
 inputs = { transcript = "Document" }
 output = "Document"
-function_name = "file_consumers_replace_transcript"
+function_name = "tests.integration.pipelex.pipeline.test_file_input_consumers.file_consumers_replace_transcript"
 
 [pipe.compose_note]
 type = "PipeCompose"
@@ -525,7 +519,7 @@ type = "PipeFunc"
 description = "Make a new document from the transcript"
 inputs = { transcript = "Document" }
 output = "Document"
-function_name = "file_consumers_replace_transcript"
+function_name = "tests.integration.pipelex.pipeline.test_file_input_consumers.file_consumers_replace_transcript"
 
 [pipe.summarize_fresh_document]
 type = "PipeLLM"

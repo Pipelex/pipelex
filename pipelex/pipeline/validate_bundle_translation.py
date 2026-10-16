@@ -19,7 +19,7 @@ from pydantic import ValidationError
 
 from pipelex.base_exceptions import PipelexError, SecurityError, error_domain_is_input
 from pipelex.config import get_config
-from pipelex.core.bundle_resources.exceptions import BundleResourceNotNamedError, BundleResourcesTooLargeError
+from pipelex.core.bundle_resources.exceptions import BundleResourceNotNamedError, BundleResourcePathError
 from pipelex.core.exceptions import DryRunFailureErrorData, PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
 from pipelex.core.pipes.exceptions import (
     PipeFactoryError,
@@ -31,8 +31,9 @@ from pipelex.core.pipes.exceptions import (
 )
 from pipelex.core.validation import report_validation_error
 from pipelex.interpreter_hub import get_library_manager
-from pipelex.libraries.exceptions import LibraryError, LibraryLoadingError
+from pipelex.libraries.exceptions import LibraryError, LibraryLoadingError, MethodTreeLoadError
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
+from pipelex.libraries.method_trees import bundle_files_under
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.handle_pipe_errors import (
@@ -43,7 +44,6 @@ from pipelex.mthds_parsing.handle_pipe_errors import (
 )
 from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.system.registries.exceptions import FuncRegistryError
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.typing.module_inspector import convert_file_path_to_module_path
 
@@ -98,7 +98,7 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
     no verdict, along with the refusals that must keep their own class: ``PipeNotFoundError`` (its
     dedicated not-found handler), a ``SecurityError`` (never absorbed by a domain handler), a
     ``ValidateBundleError`` already produced (never re-wrapped), and a ``BundleResourceNotNamedError`` or a
-    ``BundleResourcesTooLargeError``, which refuse the files submitted with the bundle rather than the bundle.
+    ``BundleResourcePathError``, which refuse the files submitted with the bundle rather than the bundle.
     """
     try:
         yield
@@ -161,13 +161,6 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
             pipelex_bundle_blueprint_validation_errors=blueprint_validation_errors,
             pipe_validation_errors=pipe_concept_validation_errors,
         ) from library_error
-    except FuncRegistryError as func_registry_error:
-        # A duplicate @pipe_func name across the scanned library dirs. Raised while loading the
-        # library, so it lands here rather than on the PipeFunc field validator's ValueError path.
-        # It is caller-fixable input (rename one with @pipe_func(name=...)), so it must produce a
-        # verdict — `is_valid: false` — not the "no verdict could be produced" exit 2 / 5xx an
-        # untranslated error would give.
-        raise ValidateBundleError(message=func_registry_error.message) from func_registry_error
     except PipeRunError as pipe_run_error:
         # A pipe run failing outside the sweep's per-pipe classification: one dry-run item on its pipe,
         # whose text follows the disclosure rule, since the verdict carries it past STRICT disclosure.
@@ -196,7 +189,7 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
             message=model_choice_error.message,
             pipe_validation_errors=[categorize_pipe_operator_model_choice_error(model_choice_error=model_choice_error)],
         ) from model_choice_error
-    except (ValidateBundleError, SecurityError, BundleResourceNotNamedError, BundleResourcesTooLargeError):
+    except (ValidateBundleError, SecurityError, BundleResourceNotNamedError, BundleResourcePathError):
         # All are PipelexErrors the general arm below would otherwise catch. A verdict already produced
         # (e.g. by a nested load) passes through as it is: re-wrapping it would flatten its items into one.
         # A security refusal is never absorbed into a domain answer, verdict included. A file submitted with
@@ -337,7 +330,15 @@ def _host_library_files(*, library_dirs: Sequence[Path]) -> _HostLibraryFiles:
     """
     names: set[str] = set()
     host_texts: list[str] = []
-    for library_file in get_pipelex_mthds_files_from_dirs(set(library_dirs)):
+    library_files: list[Path]
+    try:
+        library_files = get_pipelex_mthds_files_from_dirs(set(library_dirs))
+    except MethodTreeLoadError:
+        # This runs while a verdict is being withheld, and the load listed these trees a moment ago: a listing that
+        # fails now must never take the verdict's place, so every bundle file under the directories is withheld, a
+        # superset of the names the load gave.
+        library_files = bundle_files_under(library_dirs=library_dirs)
+    for library_file in library_files:
         names.add(str(library_file))
         host_text = _bundle_text_or_none(library_file=library_file)
         if host_text is not None:

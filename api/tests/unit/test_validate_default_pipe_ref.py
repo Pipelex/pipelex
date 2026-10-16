@@ -3,9 +3,10 @@
 The canonical `PipelexValidationReport` is manifest-blind: its `bundle_blueprint` is the batch's
 primary blueprint, so a package whose `METHODS.toml` names an entry pipe the closure would not
 default to validates with a report from which a consumer can only derive the WRONG entry pipe, or
-none. These tests pin the route's own field, which applies the run routes' precedence — the fetched
-manifest's `main_pipe`, else the closure's primary blueprint — so a by-address consumer projects a
-signature for the pipe `/execute` actually defaults to.
+none. These tests pin the route's own field, which applies the run routes' rule — for a method
+tree, the MTHDS protocol's entry rule (the manifest's `main_pipe`, else the one `main_pipe` its
+bundles declare); for inline contents, the closure's primary blueprint — so a by-address consumer
+projects a signature for the pipe `/execute` actually defaults to.
 """
 
 from collections.abc import Callable
@@ -105,12 +106,16 @@ class TestValidateDefaultPipeRef:
         assert response.status_code == 200, response.text
         assert response.json()["default_pipe_ref"] == "smoke.echo"
 
-    def test_a_manifest_without_main_pipe_falls_back_to_the_closures_declaration(self, install_method_package: Callable[..., Path]):
+    def test_a_manifest_without_main_pipe_reports_null(self, install_method_package: Callable[..., Path]):
+        # The protocol's entry rule: a method whose manifest declares no `main_pipe` has no pipe to start at, whatever
+        # its bundles declare, so a selector-less run is refused and the field says nothing.
         install_method_package(files={"documents.mthds": VALID_MTHDS}, manifest_toml=STUB_METHOD_MANIFEST_NO_MAIN_PIPE)
         client = _build_client()
         response = client.post("/v1/validate", json={"method_ref": _METHOD_REF})
         assert response.status_code == 200, response.text
-        assert response.json()["default_pipe_ref"] == "smoke.echo"
+        body = response.json()
+        assert body["is_valid"] is True
+        assert body["default_pipe_ref"] is None
 
     def test_a_manifest_naming_a_pipe_the_closure_lacks_reports_null(self, install_method_package: Callable[..., Path]):
         # The manifest names `shout`; the package's closure holds only `smoke.echo`. A selector-less
@@ -124,13 +129,13 @@ class TestValidateDefaultPipeRef:
         assert body["is_valid"] is True
         assert body["default_pipe_ref"] is None
 
-    def test_an_ambiguous_manifest_bare_code_reports_null(self, install_method_package: Callable[..., Path]):
-        # The manifest names `echo`, declared by both `smoke` and `twin`. The engine's entry lookup
-        # raises on an ambiguous bare code rather than picking a winner, so the field says nothing.
+    def test_a_manifest_bare_code_two_domains_declare_resolves_in_the_domain_exporting_it(self, install_method_package: Callable[..., Path]):
+        # The manifest names `echo`, declared by both `smoke` and `twin`, and exports it from `smoke` alone: the domain
+        # exporting the entry pipe says which bundle defines it, so the run starts at `smoke.echo`.
         install_method_package(files={"smoke.mthds": VALID_MTHDS, "twin.mthds": COLLIDING_ECHO_LIST_MTHDS})
         client = _build_client()
         response = client.post("/v1/validate", json={"method_ref": _METHOD_REF})
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is True
-        assert body["default_pipe_ref"] is None
+        assert body["default_pipe_ref"] == "smoke.echo"

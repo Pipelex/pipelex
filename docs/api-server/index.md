@@ -19,7 +19,7 @@ MTHDS Protocol  ⊂  Pipelex API (this server)  ⊂  Pipelex hosted API
 (the standard)     (protocol + extensions)       (+ durable runs, catalog, account)
 ```
 
-- **MTHDS Protocol** — five routes: `POST /execute`, `POST /start`, `POST /validate`, `GET /models`, `GET /version`. Tagged `x-mthds-protocol: true` in the [committed OpenAPI artifact](openapi/pipelex-api.openapi.yaml), and **only** those five — the flag is how a conformance suite or a third-party runner extracts the portable subset.
+- **MTHDS Protocol** — the routes `POST /execute`, `POST /start`, `POST /validate`, `GET /models`, `GET /version`, and the blob routes `POST /blobs/missing` and `PUT /blobs/{sha256}`, which the protocol makes optional and this server serves, declaring `blob_store: true` on `/version`. Tagged `x-mthds-protocol: true` in the [committed OpenAPI artifact](openapi/pipelex-api.openapi.yaml), and **only** those — the flag is how a conformance suite or a third-party runner extracts the portable subset.
 - **Pipelex API (this server)** — the protocol verbatim, plus the Pipelex extensions: resolve and codegen (`/resolve`, `/codegen`), pipe I/O (`/pipe-io`), the model reference check (`/models/check`), and editor tooling (`/lint`, `/format`). `/upload` and `/resolve-storage-url` were non-contract convenience routes and have been **removed** — see [Storage Transport](storage-transport.md) for where they went and why.
 - **Pipelex hosted API** (`api.pipelex.com/v1`) — everything here, same shapes, plus durable runs, the method catalog, and account management.
 
@@ -142,13 +142,15 @@ Every failure is an RFC 7807 `application/problem+json` problem document — see
 
 - `GET /` — Service identity banner (no auth required)
 - `GET /health` — Health check (no auth required)
-- `GET /v1/version` — MTHDS Protocol version handshake (no auth required): `{protocol_version, implementation, implementation_version, runtime_version}`. Replaces the former `/pipelex_version` and `/api_version` routes.
+- `GET /v1/version` — MTHDS Protocol version handshake (no auth required): `{protocol_version, implementation, implementation_version, runtime_version, blob_store}`. Replaces the former `/pipelex_version` and `/api_version` routes.
 
 ### Pipe Run
 Execute pipelines with flexible input formats, either synchronously or asynchronously.
 
 - `POST /v1/execute` — Run a pipeline and wait for completion (200 + full result)
 - `POST /v1/start` — Start a pipeline execution without waiting (202 + `StartAck`)
+- `POST /v1/blobs/missing` — Which of a method's files, by hash, this runner lacks, each with a signed upload target
+- `PUT /v1/blobs/{sha256}` — Upload one blob to its signed target (no bearer token: the signature authorizes it)
 
 [Learn more →](pipe-run.md)
 

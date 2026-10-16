@@ -3948,6 +3948,10 @@ rationale = "Predicate on the file path; single operand."
 param = "bundle_path"
 rationale = "Factory from source: parses the bundle at the path; options stay keyword."
 
+["pipelex/mthds_parsing/parser.py::_decode_error_position"]
+param = "exc"
+rationale = "Reads the position out of the one exception it is handed; single operand."
+
 ["pipelex/mthds_parsing/pipelex_bundle_blueprint.py::PipelexBundleBlueprint._collect_local_refs_from_concept"]
 param = "concept_code"
 rationale = "Verb-object: collects refs from the concept named; context stays keyword."
@@ -4223,10 +4227,6 @@ rationale = "Reads the step's inputs out of one working memory."
 ["pipelex/pipe_operators/doc_gen/pipe_doc_gen.py::PipeDocGen._title"]
 param = "named_contents"
 rationale = "Derives the document's title from its one mapping of named contents."
-
-["pipelex/pipe_operators/doc_gen/pipe_doc_gen_factory.py::bundle_dir_of_source"]
-param = "source"
-rationale = "Resolves the bundle directory of one source."
 
 ["pipelex/pipe_operators/doc_gen/template_field_check.py::_describe_fields"]
 param = "model_class"
@@ -4703,6 +4703,10 @@ rationale = "Registers the factory callable as the sole operand."
 ["pipelex/plugins/registrar.py::PluginRegistrar.claim_isolated_execution_probe"]
 param = "factory"
 rationale = "Registers the factory callable as the sole operand."
+
+["pipelex/plugins/registrar.py::PluginRegistrar.claim_method_file_store"]
+param = "factory"
+rationale = "Registers the factory callable as the sole operand, as every other hub slot claim does."
 
 ["pipelex/plugins/registrar.py::PluginRegistrar.claim_pipe_func_executor"]
 param = "factory"
@@ -5236,10 +5240,6 @@ rationale = "Hub setter: installs the print target; single self-labelling operan
 param = "content_generator"
 rationale = "Hub setter: installs the content generator; single self-labelling operand."
 
-["pipelex/runtime_hub.py::RuntimeHub.set_func_registry"]
-param = "func_registry"
-rationale = "Hub setter: installs the func registry; single self-labelling operand."
-
 ["pipelex/runtime_hub.py::RuntimeHub.set_inference_backend_registry"]
 param = "inference_backend_registry"
 rationale = "Hub setter: installs the inference backend registry; single self-labelling operand."
@@ -5384,93 +5384,9 @@ rationale = "Verb-object: registers classes in the file; options stay keyword."
 param = "folder_path"
 rationale = "Verb-object: registers classes under the folder path; options stay keyword."
 
-["pipelex/system/registries/func_registry.py::FuncRegistry.check_function_eligibility"]
-param = "func"
-rationale = "Verb-object: checks the function; single operand."
-
-["pipelex/system/registries/func_registry.py::FuncRegistry.get_function"]
-param = "name"
-rationale = "Registry getter keyed by the function name; single operand."
-
-["pipelex/system/registries/func_registry.py::FuncRegistry.get_ineligible_function_info"]
-param = "name"
-rationale = "Registry getter keyed by the function name; single operand."
-
-["pipelex/system/registries/func_registry.py::FuncRegistry.get_required_function"]
-param = "name"
-rationale = "Registry getter keyed by the function name; single operand."
-
-["pipelex/system/registries/func_registry.py::FuncRegistry.get_required_function_with_signature"]
-param = "name"
-rationale = "Registry getter keyed by the function name; single operand."
-
-["pipelex/system/registries/func_registry.py::FuncRegistry.has_function"]
-param = "name"
-rationale = "Predicate on the function named; single operand."
-
-["pipelex/system/registries/func_registry.py::FuncRegistry.is_eligible_function"]
-param = "func"
-rationale = "Predicate on the function; single operand."
-
-["pipelex/system/registries/func_registry.py::FuncRegistry.is_marked_pipe_func"]
-param = "func"
-rationale = "Predicate on the function; single operand."
-
-["pipelex/system/registries/func_registry.py::FuncRegistry.register_function"]
-param = "func"
-rationale = "Verb-object: registers the function; options stay keyword."
-
-["pipelex/system/registries/func_registry.py::FuncRegistry.register_functions"]
-param = "functions"
-rationale = "Verb-object: registers the functions; options stay keyword."
-
-["pipelex/system/registries/func_registry.py::FuncRegistry.register_functions_dict"]
-param = "functions"
-rationale = "Verb-object: registers the functions mapping; single operand."
-
-["pipelex/system/registries/func_registry.py::FuncRegistry.register_ineligible_function"]
-param = "func"
-rationale = "Verb-object: records the function; reason stays keyword."
-
-["pipelex/system/registries/func_registry.py::FuncRegistry.unregister_function"]
-param = "func"
-rationale = "Verb-object: unregisters the function; single operand."
-
-["pipelex/system/registries/func_registry.py::FuncRegistry.unregister_function_by_name"]
-param = "name"
-rationale = "Verb-object: the name of the function being unregistered; single operand."
-
-["pipelex/system/registries/func_registry.py::pipe_func"]
-param = "name"
-rationale = "Decorator factory: the registration name, idiomatically positional at decoration sites."
-
 ["pipelex/system/registries/func_registry.py::pipe_func.decorator"]
 param = "func"
 rationale = "Positional Callable protocol: decorator applied to the function by @ syntax."
-
-["pipelex/system/registries/func_registry_utils.py::FuncRegistryUtils._find_functions_in_module"]
-param = "module"
-rationale = "Verb-object: scans the module; single operand."
-
-["pipelex/system/registries/func_registry_utils.py::FuncRegistryUtils._get_function_registration_name"]
-param = "func"
-rationale = "Derivation from the function; single operand."
-
-["pipelex/system/registries/func_registry_utils.py::FuncRegistryUtils._register_funcs_in_file"]
-param = "file_path"
-rationale = "Verb-object: registers funcs in the file; options stay keyword."
-
-["pipelex/system/registries/func_registry_utils.py::FuncRegistryUtils.read_py_sources"]
-param = "folder_path"
-rationale = "Folder reader: captures py sources under the folder; single self-labelling operand, consistent with register_funcs_in_folder."
-
-["pipelex/system/registries/func_registry_utils.py::FuncRegistryUtils.register_funcs_in_folder"]
-param = "folder_path"
-rationale = "Verb-object: registers funcs under the folder path; options stay keyword."
-
-["pipelex/system/registries/func_registry_utils.py::FuncRegistryUtils.register_pipe_funcs_from_package"]
-param = "package_name"
-rationale = "Verb-object: registers funcs from the named package; single operand."
 
 ["pipelex/system/registries/singleton.py::MetaSingleton.clear_subclass_instances"]
 param = "base_cls"
@@ -6612,6 +6528,10 @@ rationale = "Keyed accessor by the key; single operand."
 param = "key"
 rationale = "Keyed accessor by the storage key, called positionally through asyncio.to_thread."
 
+["pipelex/tools/storage/gcp_storage_provider.py::GcpStorageProvider._load_size_sync"]
+param = "key"
+rationale = "Keyed accessor by the storage key, called positionally through asyncio.to_thread."
+
 ["pipelex/tools/storage/gcp_storage_provider.py::GcpStorageProvider._load_with_metadata_sync"]
 param = "key"
 rationale = "Parses/reads the key; single operand."
@@ -6640,6 +6560,10 @@ rationale = "Keyed accessor by the key; single operand."
 param = "key"
 rationale = "Keyed accessor by the storage key; single operand."
 
+["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract._load_size"]
+param = "key"
+rationale = "Keyed accessor by the storage key; single operand, as _load_head."
+
 ["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract._load_with_metadata"]
 param = "key"
 rationale = "Parses/reads the key; single operand."
@@ -6659,6 +6583,10 @@ rationale = "Keyed accessor by the uri; single operand."
 ["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract.load_head"]
 param = "uri"
 rationale = "Keyed accessor by the uri; single operand."
+
+["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract.load_size"]
+param = "uri"
+rationale = "Keyed accessor by the uri; single operand, as load_head."
 
 ["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract.load_with_metadata"]
 param = "uri"
@@ -6756,19 +6684,11 @@ rationale = "Extracts/derives from the file_path; single operand."
 param = "module"
 rationale = "Extracts/derives from the module; single operand."
 
-["pipelex/tools/typing/module_inspector.py::find_decorated_function_names_in_file"]
-param = "file_path"
-rationale = "Extracts/derives from the file_path; single operand."
-
 ["pipelex/tools/typing/module_inspector.py::import_module_from_file"]
 param = "file_path"
 rationale = "Inspects the file_path; single operand."
 
 ["pipelex/tools/typing/module_inspector.py::import_module_from_file_if_has_classes"]
-param = "file_path"
-rationale = "Inspects the file_path; single operand."
-
-["pipelex/tools/typing/module_inspector.py::import_module_from_file_if_has_decorated_functions"]
 param = "file_path"
 rationale = "Inspects the file_path; single operand."
 
