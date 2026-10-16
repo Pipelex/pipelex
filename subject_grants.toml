@@ -3044,7 +3044,7 @@ rationale = "Verb-object: groups the error classes; single operand."
 param = "key"
 rationale = "Transforms the subsystem key into a human heading; single operand."
 
-["pipelex/errors/error_pages_generator.py::_is_production_subclass"]
+["pipelex/errors/error_class_discovery.py::_is_production_subclass"]
 param = "cls"
 rationale = "Predicate on the error class; single operand."
 

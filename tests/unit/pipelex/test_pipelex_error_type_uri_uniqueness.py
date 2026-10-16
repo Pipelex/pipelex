@@ -11,7 +11,7 @@ not do is point at a page that does not exist, which the second case checks.
 
 from pathlib import Path
 
-from pipelex.errors.error_pages_generator import iter_pipelex_error_subclasses
+from pipelex.errors.error_class_discovery import iter_pipelex_error_subclasses
 from pipelex.urls import URLs
 
 _TESTS_ROOT = next(parent for parent in Path(__file__).resolve().parents if parent.name == "tests")

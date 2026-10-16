@@ -12,7 +12,7 @@ import pytest
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.exceptions import RoutingProfileBlueprintValueError
-from pipelex.errors.error_pages_generator import iter_pipelex_error_subclasses
+from pipelex.errors.error_class_discovery import iter_pipelex_error_subclasses
 from pipelex.pipe_operators.compose.exceptions import ConstructFieldBlueprintValueError
 
 

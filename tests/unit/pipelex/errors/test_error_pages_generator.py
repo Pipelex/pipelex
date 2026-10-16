@@ -10,16 +10,15 @@ import pytest
 from pipelex.base_exceptions import PipelexError
 from pipelex.core.bundle_resources.exceptions import BundleResourceNotNamedError
 from pipelex.core.method_trees.exceptions import MethodFileUnavailableError
+from pipelex.errors.error_class_discovery import iter_pipelex_error_subclasses
 from pipelex.errors.error_pages_generator import (
     _MACRO_SECTIONS,  # pyright: ignore[reportPrivateUsage]
     AUTHORED_MARKER,
     GENERATED_MARKER,
     INDEX_STEM,
     ErrorPagesReport,
-    _force_load_all_error_modules,  # pyright: ignore[reportPrivateUsage]
     generate_error_pages,
     has_authored_marker,
-    iter_pipelex_error_subclasses,
     page_slug,
     render_error_page,
 )
@@ -204,50 +203,3 @@ class TestErrorPagesGenerator:
         assert unmarked_page not in report.removed
         assert unmarked_page not in report.preserved
         assert unmarked_page.read_text(encoding="utf-8") == unmarked_body
-
-    def test_force_load_walk_continues_past_first_failure(self, mocker: MockerFixture) -> None:
-        """Every per-module import failure is aggregated — the walk must NOT abort on the first one.
-
-        Pins the multi-failure aggregation contract: the existing
-        ``test_force_load_aggregates_non_import_error_failures`` only asserts
-        the first module's name appears in the message, so a regression that
-        re-raises on the first failure (instead of accumulating) would still
-        pass. This test asserts at least two distinct dotted module names
-        appear in the raised ``RuntimeError.args[0]``.
-        """
-        _force_load_all_error_modules.cache_clear()
-        try:
-            mocker.patch(
-                "pipelex.errors.error_pages_generator.importlib.import_module",
-                side_effect=NameError("boom"),
-            )
-            with pytest.raises(RuntimeError) as exc_info:
-                _force_load_all_error_modules()
-            message = str(exc_info.value)
-            distinct_module_names = {line.strip(" -").split(":", 1)[0] for line in message.splitlines() if line.strip().startswith("- ")}
-            assert len(distinct_module_names) >= 2, (
-                f"expected at least 2 distinct walked dotted module names in the aggregated RuntimeError; "
-                f"saw {len(distinct_module_names)}: {sorted(distinct_module_names)}"
-            )
-        finally:
-            _force_load_all_error_modules.cache_clear()
-
-    def test_force_load_aggregates_non_import_error_failures(self, mocker: MockerFixture) -> None:
-        """A `NameError` (or any non-ImportError) raised during module init is aggregated, not propagated raw.
-
-        Regression for greptile review: if a `*_exceptions.py` has a typo at module scope, its
-        import raises `NameError` — not `ImportError`. The walk must still finish for every other
-        module and surface the broken module's dotted name in the final `RuntimeError`.
-        """
-        _force_load_all_error_modules.cache_clear()
-        try:
-            mocker.patch(
-                "pipelex.errors.error_pages_generator.importlib.import_module",
-                side_effect=NameError("boom"),
-            )
-            with pytest.raises(RuntimeError, match="boom") as exc_info:
-                _force_load_all_error_modules()
-            message = str(exc_info.value)
-            assert "pipelex.base_exceptions" in message, "RuntimeError should list at least one walked dotted module"
-        finally:
-            _force_load_all_error_modules.cache_clear()
