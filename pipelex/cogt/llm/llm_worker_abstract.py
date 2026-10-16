@@ -10,12 +10,12 @@ from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, S
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import CogtError, LLMCapabilityError, LLMCompletionRefusedError, LLMCompletionTruncatedError
+from pipelex.cogt.exceptions import CogtError, CompletionTruncationLimit, LLMCapabilityError, LLMCompletionRefusedError, LLMCompletionTruncatedError
 from pipelex.cogt.inference.inference_call_summary import InferenceCallSummary, InferenceOperation
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.inference.prompt_file_checks import check_prompt_documents_are_read, check_prompt_images_are_images
-from pipelex.cogt.llm.completion_stop import CompletionStopOutcome, classify_stop_reason, raise_for_completion_stop
+from pipelex.cogt.llm.completion_stop import CompletionStopOutcome, classify_stop_reason, raise_for_completion_stop, read_incomplete_output
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.usage.token_category import TokenCategory
@@ -509,6 +509,32 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             pipe_code=llm_job.job_metadata.pipe_code,
             max_tokens=max_tokens,
             output_tokens=output_tokens,
+        )
+
+    def _incomplete_output_error(self, *, llm_job: LLMJob, last_completion: Any, max_tokens: int | None) -> LLMCompletionTruncatedError:
+        """The error for a structured output instructor found cut at its output limit, for the worker to raise.
+
+        instructor reads the stop value of every structured answer it parses, and raises its `IncompleteOutputException`
+        for one cut at the request's output limit, `length` or `max_tokens`, which its re-asks never retry. A worker
+        whose structuring mode can raise it catches it and raises this instead, from it, so the structured output reads
+        `model.output_truncated`, as a text cut at the same limit does, rather than an exception no one classified.
+
+        Args:
+            llm_job: The job whose output it was: its pipe is named by the error.
+            last_completion: The cut answer instructor's exception carries, whose stop value and output tokens are named.
+            max_tokens: The output limit the request sent, None when it sent none.
+
+        Returns:
+            The truncation at the output limit, naming the provider's stop value as the answer carries it.
+        """
+        incomplete_output = read_incomplete_output(last_completion=last_completion)
+        return LLMCompletionTruncatedError(
+            model_handle=self.inference_model.name,
+            stop_reason=incomplete_output.stop_reason or "unknown",
+            truncation_limit=CompletionTruncationLimit.MAX_TOKENS,
+            pipe_code=llm_job.job_metadata.pipe_code,
+            max_tokens=max_tokens,
+            output_tokens=incomplete_output.output_tokens,
         )
 
     def _check_can_perform_job(self, llm_job: LLMJob):

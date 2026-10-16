@@ -16,13 +16,17 @@ OpenAI-compatible servers send none. Two signals say on their own that the text 
 with them: a Responses API answer whose status is `incomplete` is never normal, an unknown or missing reason being
 taken as a truncation, and a Gemini answer with no candidate whose prompt feedback names a block reason is a refusal.
 
-The classifier only turns a stop that was silently a success into an error. Structured generation is not read
-here: its stops are the structuring library's business, and its configured re-asks are left as they are.
+The classifier only turns a stop that was silently a success into an error. Structured generation's stops are read
+by the structuring library, instructor, whose configured re-asks are left as they are: it raises its
+`IncompleteOutputException` for a structured answer cut at its output limit, carrying that answer, and
+`read_incomplete_output` reads the answer's stop value and output tokens, so that the worker raises the same
+truncation a text cut at its limit raises.
 """
 
 from collections.abc import Mapping
 from enum import StrEnum
 from types import MappingProxyType
+from typing import Any, NamedTuple
 
 from pipelex import log
 from pipelex.cogt.exceptions import CompletionTruncationLimit, LLMCompletionRefusedError, LLMCompletionTruncatedError
@@ -257,6 +261,52 @@ def classify_prompt_block_reason(*, block_reason: str, model_handle: str) -> Com
         )
         return _REFUSED
     return outcome
+
+
+class IncompleteOutput(NamedTuple):
+    """What a structured answer instructor found cut at its output limit says about the cut."""
+
+    # The provider's stop value, None when the answer carries none where instructor reads it
+    stop_reason: str | None
+    # The output tokens the provider counted, None when the answer carries no count
+    output_tokens: int | None
+
+
+def read_incomplete_output(*, last_completion: Any) -> IncompleteOutput:
+    """Read the stop value and the output tokens of the answer instructor's `IncompleteOutputException` carries.
+
+    instructor raises that exception, as its `last_completion`, for an OpenAI-shaped completion whose first choice
+    finished on `length`, Mistral's included, for such a choice by itself, and for an Anthropic message that stopped
+    on `max_tokens`. The answer's type depends on the SDK and on the structuring mode, so it is read where instructor
+    reads it, attribute by attribute: an Anthropic message's `stop_reason`, a choice's `finish_reason`, else the first
+    choice's, and the `usage` its type carries, `output_tokens` for Anthropic and `completion_tokens` for the others.
+
+    Args:
+        last_completion: The answer instructor found cut, as it carries it.
+
+    Returns:
+        The answer's stop value and output tokens, each None when the answer does not carry it.
+    """
+    stop_reason = _read_stop_value(source=last_completion, attribute="stop_reason") or _read_stop_value(
+        source=last_completion, attribute="finish_reason"
+    )
+    if stop_reason is None:
+        choices: Any = getattr(last_completion, "choices", None)
+        if isinstance(choices, list) and choices:
+            stop_reason = _read_stop_value(source=choices[0], attribute="finish_reason")
+    usage: Any = getattr(last_completion, "usage", None)
+    output_tokens: int | None = None
+    for usage_attribute in ("output_tokens", "completion_tokens"):
+        count: Any = getattr(usage, usage_attribute, None)
+        if isinstance(count, int):
+            output_tokens = count
+            break
+    return IncompleteOutput(stop_reason=stop_reason, output_tokens=output_tokens)
+
+
+def _read_stop_value(*, source: Any, attribute: str) -> str | None:
+    value: Any = getattr(source, attribute, None)
+    return value if isinstance(value, str) else None
 
 
 def raise_for_completion_stop(

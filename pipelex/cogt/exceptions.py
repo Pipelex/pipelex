@@ -536,7 +536,8 @@ class LLMCompletionError(CogtError):
 
     The Render step constructs it with the code its classification picked, and a worker raising it directly chooses
     one: ``provider.response_invalid`` for an answer with no usable text, ``runtime.unexpected`` for a structured
-    generation that failed with no cause to read. A worker wrapping a coded error in it takes that error's code.
+    generation that failed with no cause to read. A worker wrapping a coded error in it takes that error's code. A
+    text or a structured output cut short or refused is one of its subclasses, which carries its own code.
     """
 
     error_code: ClassVar[ErrorCodeDeclaration] = _inference_failure_declaration(fallback=CoreCode.RUNTIME_UNEXPECTED)
@@ -555,7 +556,8 @@ class LLMCompletionTruncatedError(LLMCompletionError):
     """A text completion stopped before the model finished it: it hit its output limit, or its context window.
 
     A worker raises it when its provider's stop signal says the text was cut (see
-    `pipelex.cogt.llm.completion_stop`), instead of handing back the partial or empty text as a result. It
+    `pipelex.cogt.llm.completion_stop`), instead of handing back the partial or empty text as a result, and when
+    instructor reports a structured output cut at its output limit with its `IncompleteOutputException`. It
     is not retryable: the same request stops at the same limit. Its code follows the limit hit:
     ``model.output_truncated`` at the output limit, the method's token cap, and ``model.context_exceeded`` at the
     context window, which the inputs filled. Which remedy applies depends on the limit hit, carried as

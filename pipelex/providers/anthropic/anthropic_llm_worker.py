@@ -491,7 +491,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         sends_temperature = self.inference_model.accepts_temperature and not thinking_params.suppress_temperature
 
         # Deferred import: avoid pulling heavy SDK at module-load time
-        from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]
+        from instructor.core import IncompleteOutputException, InstructorRetryException  # ruff: ignore[import-outside-top-level]
 
         try:
             result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
@@ -539,6 +539,12 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                 ),
             ).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
             raise self._with_note(error=fallback_error, note=lowered_max_tokens_note, failure=None) from instructor_exc
+        except IncompleteOutputException as incomplete_exc:
+            # instructor found the answer stopped at `max_tokens`, which a lowered limit can explain
+            truncated_error = self._incomplete_output_error(
+                llm_job=llm_job, last_completion=incomplete_exc.last_completion, max_tokens=effective_max_tokens
+            )
+            raise self._with_note(error=truncated_error, note=lowered_max_tokens_note, failure=incomplete_exc) from incomplete_exc
         except (APIStatusError, APIConnectionError) as sdk_exc:
             metadata = extract_anthropic_metadata(sdk_exc)
             classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)

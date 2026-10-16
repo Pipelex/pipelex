@@ -212,7 +212,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
         self._log_reasoning_sent(api_name="OpenAI Chat Completions", settings={"reasoning_effort": openai_reasoning_effort})
         messages = await self.openai_completions_factory.make_simple_messages(llm_job=llm_job)
         # Deferred import: avoid pulling heavy SDK at module-load time
-        from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]
+        from instructor.core import IncompleteOutputException, InstructorRetryException  # ruff: ignore[import-outside-top-level]
 
         extra_headers, extra_body = self.openai_completions_factory.make_extras(
             inference_model=self.inference_model, inference_job=llm_job, output_desc=schema.__name__
@@ -255,6 +255,11 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
             raise LLMCompletionError(msg, error_category=InferenceErrorCategory.UNKNOWN).with_error_code(
                 CoreCode.RUNTIME_UNEXPECTED
             ) from instructor_exc
+        except IncompleteOutputException as incomplete_exc:
+            # instructor found the answer's first choice finished on `length`
+            raise self._incomplete_output_error(
+                llm_job=llm_job, last_completion=incomplete_exc.last_completion, max_tokens=job_params.max_tokens
+            ) from incomplete_exc
         except (openai.APIStatusError, openai.APIConnectionError) as sdk_exc:
             metadata = extract_openai_metadata(sdk_exc)
             classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
