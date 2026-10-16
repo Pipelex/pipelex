@@ -1,8 +1,9 @@
 """The generator of ``pipelex/errors/registry/pipelex_codes.py``: the Pipelex codes and their typed parameters.
 
 For each code of the registry the module holds a member of ``PipelexErrorCode`` and a frozen,
-closed pydantic model of its parameters, so that whoever raises a code builds its parameters with
-the types the registry declares and none it does not:
+closed and strict pydantic model of its parameters, so that whoever raises a code builds its parameters
+with the types the registry declares and none it does not, a value of another type being refused
+rather than coerced:
 
 - ``identifier`` and ``caller_text`` are ``str``, ``integer`` is ``int``;
 - ``seconds`` is a ``float`` and ``bytes`` an ``int``, neither ever negative;
@@ -189,7 +190,11 @@ def render_pipelex_codes(*, registry: ErrorRegistryDocument) -> str:
             "",
             "",
             "class PipelexErrorParams(BaseModel):",
-            '    """The parameters of a Pipelex code: the base of each code\'s own model, closed and frozen.',
+            '    """The parameters of a Pipelex code: the base of each code\'s own model, closed, frozen and strict.',
+            "",
+            "    Strict, so that a value of another type is refused rather than coerced: a line given as ``\"3\"`` or",
+            "    ``True`` is refused rather than read as an integer. An integer is still accepted where a number of",
+            "    seconds is declared.",
             "",
             "    Attributes:",
             "        code: The code whose parameters the model holds.",
@@ -197,7 +202,7 @@ def render_pipelex_codes(*, registry: ErrorRegistryDocument) -> str:
             "            implementation leaves out of every problem it answers to a caller.",
             '    """',
             "",
-            '    model_config = ConfigDict(extra="forbid", frozen=True)',
+            '    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)',
             "",
             "    code: ClassVar[PipelexErrorCode]",
             "    operator_only_params: ClassVar[frozenset[str]] = frozenset()",

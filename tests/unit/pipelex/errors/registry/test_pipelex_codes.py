@@ -50,6 +50,9 @@ class TestPipelexCodes:
             ("a value outside the enum", WebhookDeliveryFailedParams, {"reason": "timeout"}),
             ("a negative number of seconds", DocgenPrintTimeoutParams, {"limit": -1.0}),
             ("a list item of the wrong type", SecurityReservedKeyParams, {"keys": [{"name": "__class__"}]}),
+            ("an integer given as a string", ConfigSyntaxParams, {"surface": "backends", "file": "backends.toml", "line": "3", "column": 1}),
+            ("an integer given as a boolean", ConfigSyntaxParams, {"surface": "backends", "file": "backends.toml", "line": True, "column": 1}),
+            ("a number of seconds given as a string", DocgenPrintTimeoutParams, {"limit": "30"}),
         ],
     )
     def test_a_parameters_model_refuses_what_the_registry_does_not_declare(self, topic: str, model: Any, values: dict[str, Any]) -> None:

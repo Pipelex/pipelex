@@ -77,7 +77,11 @@ class PipelexErrorCode(StrEnum):
 
 
 class PipelexErrorParams(BaseModel):
-    """The parameters of a Pipelex code: the base of each code's own model, closed and frozen.
+    """The parameters of a Pipelex code: the base of each code's own model, closed, frozen and strict.
+
+    Strict, so that a value of another type is refused rather than coerced: a line given as ``"3"`` or
+    ``True`` is refused rather than read as an integer. An integer is still accepted where a number of
+    seconds is declared.
 
     Attributes:
         code: The code whose parameters the model holds.
@@ -85,7 +89,7 @@ class PipelexErrorParams(BaseModel):
             implementation leaves out of every problem it answers to a caller.
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
     code: ClassVar[PipelexErrorCode]
     operator_only_params: ClassVar[frozenset[str]] = frozenset()

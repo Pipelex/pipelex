@@ -49,7 +49,7 @@ assert params.code == PipelexErrorCode.CONFIG_VARIABLE_MISSING
 assert params.operator_only_params == frozenset({"variable", "source"})
 ```
 
-An `identifier` or a `caller_text` is a `str`, an `integer` an `int`, a `seconds` a `float` and a `bytes` an `int`, neither ever negative, a `sha256` a lowercase hexadecimal `str`, an `enum` the `Literal` of its values, and a `list` a `list` of its items' type, each item constrained as a parameter of that type is, so a list of `bytes` refuses a negative item. An optional parameter is its type or `None`. `operator_only_params` names the parameters that only whoever runs the runtime may read, which an implementation leaves out of every problem it answers to a caller.
+An `identifier` or a `caller_text` is a `str`, an `integer` an `int`, a `seconds` a `float` and a `bytes` an `int`, neither ever negative, a `sha256` a lowercase hexadecimal `str`, an `enum` the `Literal` of its values, and a `list` a `list` of its items' type, each item constrained as a parameter of that type is, so a list of `bytes` refuses a negative item. An optional parameter is its type or `None`. The models are strict, so a value of another type is refused rather than coerced: a line given as `"3"` or `True` is refused, while an integer is accepted where a number of seconds is declared. `operator_only_params` names the parameters that only whoever runs the runtime may read, which an implementation leaves out of every problem it answers to a caller.
 
 ## The checks
 
