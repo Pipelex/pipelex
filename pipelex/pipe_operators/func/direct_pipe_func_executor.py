@@ -127,7 +127,7 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
 
         # The call's Python is held for the transported library until the run ends, and unloaded before its directory
         # is removed.
-        TREE_PYTHON_HOLD.acquire(tree=tree, holder=_TRANSPORTED_LIBRARY_ID)
+        TREE_PYTHON_HOLD.acquire(tree=tree, holder=_TRANSPORTED_LIBRARY_ID, label=f"the method tree of the call to '{request.pipe_code}'")
         try:
             return await self._run_transported(request=request, crate=self._crate_rooted_at(request=request, tree_json=tree.model_dump_json()))
         finally:

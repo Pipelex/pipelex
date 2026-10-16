@@ -126,10 +126,11 @@ def check_pipe_func_definition(*, module_source: PipeFuncModuleSource) -> None:
         raise PipeFuncFunctionError(violation)
 
 
-def bind_tree_function(*, function_name: str, tree: MethodTree, holder: str) -> Callable[..., Any]:
+def bind_tree_function(*, function_name: str, tree: MethodTree, holder: str, tree_label: str) -> Callable[..., Any]:
     """Import a method tree's function under the process's hold on the tree's Python, and check it.
 
-    The hold is taken for `holder`, the library of the run, and released when that library is torn down.
+    The hold is taken for `holder`, the library of the run, and released when that library is torn down. Messages name
+    the tree by `tree_label`.
 
     Raises:
         PipeFuncFunctionError: The static form is not proven, or the imported function does not follow the
@@ -139,7 +140,7 @@ def bind_tree_function(*, function_name: str, tree: MethodTree, holder: str) -> 
     """
     module_source = locate_in_tree(function_name=function_name, tree=tree)
     check_pipe_func_definition(module_source=module_source)
-    identity = TREE_PYTHON_HOLD.acquire(tree=tree, holder=holder)
+    identity = TREE_PYTHON_HOLD.acquire(tree=tree, holder=holder, label=tree_label)
     module = import_held_tree_module(identity=identity, module_name=module_source.module_name)
     return checked_pipe_func(module=module, module_source=module_source)
 

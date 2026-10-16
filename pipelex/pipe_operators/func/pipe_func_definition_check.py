@@ -10,6 +10,7 @@ calling convention, which needs the annotations resolved, is checked once the mo
 """
 
 import ast
+from functools import lru_cache
 
 from pipelex.pipe_operators.func.function_name import FUNCTION_NAMES_MIGRATION_COMMAND
 from pipelex.system.registries.func_registry import PIPE_FUNC_MARKER_MODULE, PIPE_FUNC_MARKER_NAME
@@ -17,6 +18,18 @@ from pipelex.system.registries.func_registry import PIPE_FUNC_MARKER_MODULE, PIP
 _MARKER_PARENT_MODULE, _, _MARKER_MODULE_LEAF = PIPE_FUNC_MARKER_MODULE.rpartition(".")
 _MARKER_SPELLING = f"@{PIPE_FUNC_MARKER_NAME}()"
 _COMPOUND_STATEMENTS = (ast.If, ast.Try, ast.TryStar, ast.With, ast.AsyncWith, ast.For, ast.AsyncFor, ast.While, ast.Match)
+# The modules parsed lately: the steps calling functions of one module, and every validation of a method loaded again,
+# read the same source, which is parsed once. A syntax tree here is only read, never changed.
+_PARSED_MODULES_KEPT = 64
+
+
+@lru_cache(maxsize=_PARSED_MODULES_KEPT)
+def _parsed_module(*, source: str, module_label: str) -> ast.Module | str:
+    """The module's syntax tree, or the message refusing a source that does not parse."""
+    try:
+        return ast.parse(source, filename=module_label)
+    except SyntaxError as exc:
+        return f"The module {module_label} does not parse as Python: {exc.msg} (line {exc.lineno})."
 
 
 def pipe_func_definition_violation(*, source: str, function: str, module_label: str) -> str | None:
@@ -30,10 +43,9 @@ def pipe_func_definition_violation(*, source: str, function: str, module_label: 
     Returns:
         None when the form is proven, else a refusal message naming the module and the function.
     """
-    try:
-        module = ast.parse(source, filename=module_label)
-    except SyntaxError as exc:
-        return f"The module {module_label} does not parse as Python: {exc.msg} (line {exc.lineno})."
+    module = _parsed_module(source=source, module_label=module_label)
+    if isinstance(module, str):
+        return module
 
     definitions: list[ast.FunctionDef | ast.AsyncFunctionDef] = []
     for statement in module.body:

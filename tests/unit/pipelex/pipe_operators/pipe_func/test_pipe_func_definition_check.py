@@ -1,4 +1,7 @@
+import ast
+
 import pytest
+from pytest_mock import MockerFixture
 
 from pipelex.pipe_operators.func.pipe_func_definition_check import pipe_func_definition_violation
 
@@ -63,3 +66,12 @@ class TestPipeFuncDefinitionCheck:
         assert violation is not None
         assert expected_message in violation
         assert "funcs/totals.py" in violation
+
+    def test_a_module_is_parsed_once_for_every_function_checked_in_it(self, mocker: MockerFixture) -> None:
+        source = f"{_HEADER}@pipe_func()\ndef parsed_once_first{_BODY}\n\n@pipe_func()\ndef parsed_once_second{_BODY}"
+        parse_spy = mocker.spy(ast, "parse")
+
+        for function in ("parsed_once_first", "parsed_once_second", "parsed_once_first"):
+            assert pipe_func_definition_violation(source=source, function=function, module_label="funcs/parsed_once.py") is None
+
+        assert parse_spy.call_count == 1

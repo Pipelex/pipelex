@@ -11,6 +11,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.interpreter_hub import get_library_manager
 from pipelex.libraries.library_crate import SUBMITTED_PYTHON_ROOT_KEY
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
+from pipelex.pipe_operators.func import pipe_func as pipe_func_module
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
@@ -70,6 +71,19 @@ class TestPipeFuncHostedMode:
         _capture_submitted_files(library_id=library_id, files={"sandbox_funcs/totals.py": _SANDBOX_MODULE}, mocker=mocker)
 
         _make_pipe_func().validate_output_with_library()
+
+    def test_a_step_proves_its_function_once_however_often_it_is_validated(self, load_empty_library: Callable[[], str], mocker: MockerFixture):
+        """A dependency package's step is validated as it is built and again with its consumer's library: it reads its module once."""
+        library_id = load_empty_library()
+        mocker.patch("pipelex.pipe_operators.func.pipe_func.is_pipe_func_sandbox_hosted", return_value=True)
+        _capture_submitted_files(library_id=library_id, files={"sandbox_funcs/totals.py": _SANDBOX_MODULE}, mocker=mocker)
+        locate_spy = mocker.spy(pipe_func_module, "locate_in_files")
+        pipe_func = _make_pipe_func()
+
+        pipe_func.validate_once_built()
+        pipe_func.validate_with_libraries()
+
+        assert locate_spy.call_count == 1
 
     @pytest.mark.parametrize(
         ("files", "expected_message"),

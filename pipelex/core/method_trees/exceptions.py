@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from pipelex.base_exceptions import ErrorDomain, PipelexError
 
 
@@ -33,9 +31,10 @@ class TreeModuleExcludedError(ImportError):
     """An import reached a file under a held method tree's root that the tree's membership rule keeps out of the tree.
 
     Raised by the import guard from inside Python's import machinery, which expects an `ImportError`. The message
-    names the file and the rule that excluded it.
+    names the file by its tree path and the rule that excluded it, never the tree's root, which is a path on this host.
     """
 
-    def __init__(self, message: str, *, module_name: str, file_path: Path):
-        super().__init__(message, name=module_name, path=str(file_path))
+    def __init__(self, message: str, *, module_name: str, tree_path: str):
+        super().__init__(message, name=module_name)
         self.message = message
+        self.tree_path = tree_path

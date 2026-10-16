@@ -478,42 +478,66 @@ def bundle_files_under(*, library_dirs: Iterable[Path]) -> list[Path]:
     return list(dict.fromkeys(bundle_files))
 
 
-def library_dir_call_files(*, library_dir: Path, limits: TreeLimits | None = None) -> dict[str, bytes]:
-    """The files of a library directory's own method tree that lie in the directory, other than its bundles.
+def _spelling_prefix(*, tree_root: Path, library_dir: Path) -> tuple[str, str] | None:
+    """How a tree path is spelled from a library directory, as `(stripped, added)` prefixes, or None when they share nothing.
 
-    These are the files a sandbox-hosted deployment sends with a `PipeFunc` call of a bundle parsed from a content
-    string, keyed by their path from the library directory, which is where such a bundle's import paths start. The
-    membership rule decides what the tree holds, so a `.gitignore`d file or a virtual environment never travels. A
-    directory that does not exist, or whose own tree is empty, holds none.
-
-    Args:
-        library_dir: The library directory.
-        limits: The limits to list the tree under, read from the configuration when not given.
-
-    Raises:
-        MethodTreeLoadError: The tree could not be listed.
+    A tree rooted at the directory spells its paths as they are; one nested in it adds the tree's folder; one rooted above
+    it, at a `METHODS.toml`, strips the directory's folder from the paths lying in it.
     """
-    if not library_dir.exists():
-        return {}
-    try:
-        tree = list_method_tree(library_dir, limits=limits or local_tree_limits())
-    except MethodTreeRefusedError as exc:
-        if _is_empty_tree(refusal_error=exc):
-            return {}
-        raise MethodTreeLoadError(exc.message) from exc
-    except TreeLimitError as exc:
-        msg = f"{exc.message} {LIMITS_ADVICE}"
-        raise MethodTreeLoadError(msg) from exc
-    except TreeSourceError as exc:
-        raise MethodTreeLoadError(exc.message) from exc
+    if tree_root == library_dir:
+        return ("", "")
+    if tree_root.is_relative_to(library_dir):
+        return ("", f"{nfc(tree_root.relative_to(library_dir).as_posix())}/")
+    if library_dir.is_relative_to(tree_root):
+        return (f"{nfc(library_dir.relative_to(tree_root).as_posix())}/", "")
+    return None
+
+
+def tree_python_sources(*, tree: MethodTree, library_dir: Path | None) -> dict[str, str]:
+    """The text of every Python file of a tree listed from this host's disk, keyed by its path from the library directory.
+
+    A file outside the library directory, or of a tree that no library directory holds, such as the tree of a bundle file
+    named alone, is keyed by its tree path: the key names the file to a caller, never by a path of this host. These are
+    the sources a sandbox-hosted load scans for structure classes without importing them, so a file that is not UTF-8
+    text is read with replacement characters.
+    """
     if tree.directory is None:
         return {}
-    resolved_dir = library_dir.resolve()
-    tree_root = tree.directory.resolve()
-    prefix = "" if resolved_dir == tree_root else f"{nfc(resolved_dir.relative_to(tree_root).as_posix())}/"
+    spelling = _spelling_prefix(tree_root=tree.directory.resolve(), library_dir=library_dir.resolve()) if library_dir is not None else None
+    sources: dict[str, str] = {}
+    for tree_path in tree.tree_paths:
+        if not tree_path.endswith(".py"):
+            continue
+        key = tree_path
+        if spelling is not None and tree_path.startswith(spelling[0]):
+            key = f"{spelling[1]}{tree_path.removeprefix(spelling[0])}"
+        sources[key] = tree.file_location(tree_path).read_bytes().decode("utf-8", errors="replace")
+    return sources
+
+
+def submitted_python_files(*, library_tree: LibraryTree) -> dict[str, bytes]:
+    """The files a library directory submits beside bundles parsed from content strings, keyed by their path from it.
+
+    A directory whose own tree holds no bundle, such as the directory a server writes a request's Python into beside the
+    request's bundles, is where those bundles' import paths start, so its files other than bundles travel with each call
+    of their `PipeFunc` steps. A tree holding a bundle submits nothing: its steps' calls carry their own tree's files, so a
+    directory's files never travel twice, and two such directories never share one import root. Neither does a tree
+    nested in a library directory. The membership rule decides what the tree holds, so a `.gitignore`d file or a virtual
+    environment never travels.
+
+    Args:
+        library_tree: A tree the library directory holds, as `list_library_dir_trees` listed it.
+    """
+    tree = library_tree.tree
+    if tree.directory is None or any(tree_path.endswith(BUNDLE_SUFFIX) for tree_path in tree.tree_paths):
+        return {}
+    spelling = _spelling_prefix(tree_root=tree.directory.resolve(), library_dir=library_tree.library_dir.resolve())
+    if spelling is None or spelling[1]:
+        # Not the directory's own tree: one nested in it.
+        return {}
+    stripped_prefix = spelling[0]
     files: dict[str, bytes] = {}
     for tree_path in tree.tree_paths:
-        if not tree_path.startswith(prefix) or tree_path.endswith(BUNDLE_SUFFIX):
-            continue
-        files[tree_path.removeprefix(prefix)] = tree.file_location(tree_path).read_bytes()
+        if tree_path.startswith(stripped_prefix):
+            files[tree_path.removeprefix(stripped_prefix)] = tree.file_location(tree_path).read_bytes()
     return files

@@ -14,7 +14,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.method_trees.exceptions import TreePythonError
 from pipelex.core.method_trees.tree_bundle import TreeBundle
-from pipelex.core.method_trees.tree_python import check_tree_module_names, top_level_module_names
+from pipelex.core.method_trees.tree_python import check_tree_module_names, top_level_module_names, tree_label_holding
 from pipelex.core.pipes.exceptions import PipeRunError, PipeValidationError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, TypedNamedStuffSpec
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -68,6 +68,9 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
     _tree_bundle: TreeBundle | None = PrivateAttr(default=None)
     # The function once imported and checked, with the holder its import was made for.
     _bound_function: tuple[str, Callable[..., Any]] | None = PrivateAttr(default=None)
+    # Whether validation located the function and proved its form, which a dependency package's step, validated as it is
+    # built and again with its consumer's library, then need not do twice.
+    _is_function_proven: bool = PrivateAttr(default=False)
 
     @override
     def required_variables(self) -> set[str]:
@@ -110,7 +113,9 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
 
     @override
     def validate_output_with_library(self):
-        """Locate the function's module and prove the function's form from its source, without running Python."""
+        """Locate the function's module and prove the function's form from its source, without running Python, once."""
+        if self._is_function_proven:
+            return
         try:
             self._check_function_statically()
         except (PipeFuncFunctionError, TreePythonError) as exc:
@@ -122,6 +127,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
                 pipe_code=self.code,
                 field_name="function_name",
             ) from exc
+        self._is_function_proven = True
 
     @override
     def validate_once_built(self) -> None:
@@ -131,11 +137,15 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
     def _check_function_statically(self) -> None:
         """Locate the module where the step's import root puts it, prove the function's form, and check the tree's module names.
 
+        A sandbox-hosted deployment imports the function in a sandbox, whose packages are not this process's, so there
+        a module name is checked against the standard library only.
+
         Raises:
             PipeFuncFunctionError: The module is not found, or the form is not proven.
             TreeModuleShadowingError: A top-level module of the tree, or of the submitted Python, would shadow another.
         """
         library_id = get_current_library_id_or_none()
+        imports_in_this_process = not is_pipe_func_sandbox_hosted()
         tree_bundle = self._tree_bundle
         module_source: PipeFuncModuleSource
         if tree_bundle is not None:
@@ -155,10 +165,11 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             check_tree_module_names(
                 top_level_modules=top_level_module_names(tree_paths=captured.keys() if captured is not None else tree.members),
                 # Named by the bundle it holds, never by its directory, which is a path on this host.
-                tree_label=f"the method tree holding {tree_bundle.tree_path}",
+                tree_label=tree_label_holding(tree_path=tree_bundle.tree_path),
                 root=tree.directory.resolve() if on_disk and tree.directory is not None else None,
+                checks_this_process=imports_in_this_process,
             )
-        elif is_pipe_func_sandbox_hosted():
+        elif not imports_in_this_process:
             submitted = (
                 get_library_manager().get_pipe_func_files(library_id=library_id, root_key=SUBMITTED_PYTHON_ROOT_KEY)
                 if library_id is not None
@@ -170,6 +181,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
                 top_level_modules=top_level_module_names(tree_paths=(submitted or {}).keys()),
                 tree_label="the Python submitted with the method",
                 root=None,
+                checks_this_process=False,
             )
         else:
             module_source = locate_on_import_path(function_name=self.function_name)
@@ -191,7 +203,12 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             return bound[1]
         function: Callable[..., Any]
         if self._tree_bundle is not None:
-            function = bind_tree_function(function_name=self.function_name, tree=self._tree_bundle.tree, holder=holder)
+            function = bind_tree_function(
+                function_name=self.function_name,
+                tree=self._tree_bundle.tree,
+                holder=holder,
+                tree_label=tree_label_holding(tree_path=self._tree_bundle.tree_path),
+            )
         else:
             function = bind_import_path_function(function_name=self.function_name)
         self._check_return_type(function=function)

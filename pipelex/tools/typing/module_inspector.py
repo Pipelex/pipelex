@@ -7,6 +7,10 @@ from typing import Any
 
 from pipelex.tools.typing.exceptions import ModuleFileError
 
+#: The directories `import_module_from_file` put on `sys.path`, each once, so that whoever unloads the modules of a
+#: directory, such as the process's hold on a method tree's Python, takes the entries introduced beneath it off again.
+_inserted_module_dirs: list[str] = []
+
 
 def import_module_from_file(file_path: Path) -> Any:
     """Imports a module from a file path.
@@ -58,11 +62,27 @@ def import_module_from_file(file_path: Path) -> Any:
     module_dir = str(file_path.resolve().parent)
     if module_dir not in sys.path:
         sys.path.insert(0, module_dir)
+        if module_dir not in _inserted_module_dirs:
+            _inserted_module_dirs.append(module_dir)
 
     # Execute the module
     spec.loader.exec_module(module)
 
     return module
+
+
+def drop_module_dirs_inserted_under(*, directory: Path) -> None:
+    """Take off `sys.path` every entry `import_module_from_file` put there for a file at or beneath `directory`.
+
+    Args:
+        directory: A resolved directory, such as the root of a method tree whose modules are being unloaded.
+    """
+    for module_dir in list(_inserted_module_dirs):
+        if not Path(module_dir).is_relative_to(directory):
+            continue
+        _inserted_module_dirs.remove(module_dir)
+        if module_dir in sys.path:
+            sys.path.remove(module_dir)
 
 
 def convert_file_path_to_module_path(file_path: Path) -> str:

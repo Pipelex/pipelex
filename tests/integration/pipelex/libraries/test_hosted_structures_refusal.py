@@ -22,7 +22,6 @@ from pipelex.codegen.stamp import apply_stamp
 from pipelex.core.concepts.exceptions import ConceptFactoryError
 from pipelex.interpreter_hub import get_concept_library, get_library_manager, scoped_current_library
 from pipelex.libraries.crate_normalization import normalize_crate
-from pipelex.libraries.library_crate import SUBMITTED_PYTHON_ROOT_KEY
 from pipelex.methods.exceptions import MethodStructuresRefusedError
 
 SENTINEL_LINE = 'open(r"{marker}", "w").write("ran")\n'
@@ -91,6 +90,28 @@ description = "A receipt"
 
 [concept.Receipt.structure]
 total = { type = "number", description = "The total", required = true }
+"""
+
+GREETING_MTHDS = """\
+domain = "hosted_greeting"
+description = "A step calling a helper of the method's tree"
+
+[pipe.greet]
+type = "PipeFunc"
+description = "Greet"
+output = "Text"
+function_name = "helpers.greet"
+"""
+
+GREETING_HELPERS_PY = """\
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.text_content import TextContent
+from pipelex.system.registries.func_registry import pipe_func
+
+
+@pipe_func()
+async def greet(working_memory: WorkingMemory) -> TextContent:
+    return TextContent(text="hello")
 """
 
 CLASS_BACKED_MTHDS = """\
@@ -202,6 +223,28 @@ class TestHostedStructuresRefusal:
         assert not _is_imported(path=py_file)
 
     @pytest.mark.usefixtures("sandbox_hosted_mode")
+    def test_a_structure_file_of_a_nested_repository_is_refused(self, tmp_path: Path, load_empty_library: Callable[[], str]):
+        """A repository nested in a library directory is a tree of its own, whose bundles load too, so its Python is scanned."""
+        library_dir = tmp_path / "library"
+        nested_dir = library_dir / "checkouts" / "invoicing"
+        (nested_dir / ".git").mkdir(parents=True)
+        (nested_dir / "invoice.mthds").write_text('domain = "nested_refusal"\n', encoding="utf-8")
+        (library_dir / "top.mthds").write_text('domain = "nested_refusal_top"\n', encoding="utf-8")
+        marker = tmp_path / "sentinel.ran"
+        structure_file = nested_dir / "models" / "invoice.py"
+        _write_structure_file(path=structure_file, template=STRUCTURE_FILE_PY, class_name="HostedRefusalNestedInvoice", marker=marker)
+
+        library_id = load_empty_library()
+        with pytest.raises(MethodStructuresRefusedError) as exc_info:
+            get_library_manager().load_libraries(library_id=library_id, library_dirs=[library_dir])
+
+        message = str(exc_info.value)
+        assert "checkouts/invoicing/models/invoice.py defines HostedRefusalNestedInvoice" in message
+        assert str(tmp_path.resolve()) not in message
+        assert not marker.exists()
+        assert not _is_imported(path=structure_file)
+
+    @pytest.mark.usefixtures("sandbox_hosted_mode")
     def test_one_refusal_lists_every_directory(self, tmp_path: Path, load_empty_library: Callable[[], str]):
         dir_a = tmp_path / "a"
         dir_b = tmp_path / "b"
@@ -266,17 +309,17 @@ class TestHostedStructuresRefusal:
         generated_file = library_dir / "structures" / "structures.py"
         generated_source = generated_file.read_text(encoding="utf-8")
         assert "(StructuredContent)" in generated_source
-        helper_source = "GREETING = 'hello'\n"
-        (library_dir / "helpers.py").write_text(helper_source, encoding="utf-8")
+        (library_dir / "helpers.py").write_text(GREETING_HELPERS_PY, encoding="utf-8")
+        (library_dir / "greet.mthds").write_text(GREETING_MTHDS, encoding="utf-8")
 
         library_id = load_empty_library()
         library_manager.load_libraries(library_id=library_id, library_dirs=[library_dir])
 
         hosted_crate = library_manager.get_crate(library_id=library_id)
         assert hosted_crate is not None
-        submitted_files = hosted_crate.pipe_func_files[SUBMITTED_PYTHON_ROOT_KEY]
-        assert "structures/structures.py" not in submitted_files
-        assert submitted_files.get("helpers.py") == helper_source
+        (call_files,) = hosted_crate.pipe_func_files.values()
+        assert "structures/structures.py" not in call_files
+        assert call_files.get("helpers.py") == GREETING_HELPERS_PY
         assert not _is_imported(path=generated_file)
 
     @pytest.mark.usefixtures("sandbox_hosted_mode")
