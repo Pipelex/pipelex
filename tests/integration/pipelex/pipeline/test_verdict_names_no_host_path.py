@@ -23,11 +23,11 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 import pytest
-from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import DisclosureMode, ErrorDomain, PipelexError, ValidationErrorItem
 from pipelex.config import get_config
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.libraries.exceptions import HostLibraryTreeError
 from pipelex.pipeline.exceptions import HostLibraryLoadRefusalError, ValidateBundleError
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
@@ -376,7 +376,7 @@ class TestVerdictNamesNoHostPath:
             await validate_bundle(mthds_contents=[_VALID_CALLER_BUNDLE], library_dirs=[host_library_dir])
 
         report = raised.value.to_error_report()
-        assert report.code == CoreCode.RUNTIME_MISCONFIGURED
+        assert report.code == PipelexErrorCode.CONFIG_INVALID
         assert report.error_domain != ErrorDomain.INPUT
         strict_payload = report.to_dict(disclosure_mode=DisclosureMode.STRICT)
         assert "validation_errors" not in strict_payload

@@ -23,10 +23,10 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 import pytest
-from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import DisclosureMode
 from pipelex.config import get_config
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.libraries.exceptions import LibraryError
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipeline.exceptions import HostLibraryLoadRefusalError, PipeExecutionError, ValidateBundleError
@@ -234,4 +234,4 @@ class TestRunPathBundleVerdict:
             await _run_setup(library_dirs=[str(tmp_path)], pipe_code="write_tide_notice")
 
         assert isinstance(raised.value.__cause__, LibraryError)
-        assert raised.value.to_error_report().code == CoreCode.RUNTIME_MISCONFIGURED
+        assert raised.value.to_error_report().code == PipelexErrorCode.CONFIG_INVALID

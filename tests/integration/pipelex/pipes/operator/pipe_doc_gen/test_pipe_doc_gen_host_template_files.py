@@ -3,10 +3,10 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import DisclosureMode
 from pipelex.cogt.doc_gen.template_check import TemplateFinding, TemplateFindingSeverity
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.pipeline.exceptions import HostLibraryLoadRefusalError, ValidateBundleError
 from pipelex.pipeline.validate_bundle_translation import HOST_LIBRARY_FILE_PLACEHOLDER
@@ -43,7 +43,7 @@ async def _host_fault_strict_payload(*, mthds_content: str, host_dir: Path) -> s
     with pytest.raises(HostLibraryLoadRefusalError) as exc_info:
         await validate_bundles_in_process(mthds_contents=[mthds_content], library_dirs=[host_dir])
     report = exc_info.value.to_error_report()
-    assert report.code == CoreCode.RUNTIME_MISCONFIGURED
+    assert report.code == PipelexErrorCode.CONFIG_INVALID
     return json.dumps(report.to_dict(disclosure_mode=DisclosureMode.STRICT))
 
 
