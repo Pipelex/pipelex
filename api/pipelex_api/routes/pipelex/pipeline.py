@@ -991,7 +991,7 @@ async def start(
     run_request, extras = parsed
     scopes = _resolve_run_scopes(request, extras=extras)
     # The run source is materialized only for the synchronous setup phase: `start` builds the
-    # PipeJob (crate carrying the captured `python_sources`) before it enqueues, so the temp dir
+    # PipeJob (crate carrying the captured `pipe_func_files`) before it enqueues, so the temp dir
     # (a bundle's, or a fetched package's) is no longer needed once `start` returns — cleanup on
     # context exit is safe for the async path.
     with _run_source(run_request) as source:

@@ -22,11 +22,12 @@ from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExec
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.registries.func_registry import func_registry
+from pipelex.system.registries.func_registry import pipe_func
 
 
+@pipe_func()
 def transported_ref_probe_func(working_memory: WorkingMemory) -> TextContent:  # ruff: ignore[unused-function-argument]  # pyright: ignore[reportUnusedParameter]
-    """Registered in the test so the PipeFunc validators accept the blueprint in local mode."""
+    """The function the step names by its import path, this test module's own."""
     return TextContent(text="probe")
 
 
@@ -38,12 +39,11 @@ class TestPipeFuncTransportedRef:
         mocker: MockerFixture,
     ):
         load_empty_library()
-        func_registry.register_function(transported_ref_probe_func, name="transported_ref_probe_func")
         blueprint = PipeFuncBlueprint(
             description="Producer-side pin: the executor must receive the qualified ref.",
             inputs={},
             output="native.Text",
-            function_name="transported_ref_probe_func",
+            function_name=f"{__name__}.transported_ref_probe_func",
         )
         the_pipe_func = PipeFactory[PipeFunc].make_from_blueprint(
             domain_code="func_probe_domain",

@@ -22,28 +22,28 @@ from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
-from pipelex.system.registries.func_registry import func_registry
+from pipelex.system.registries.func_registry import pipe_func
 from pipelex.validation_error_types import PipeValidationErrorType
 
 _DOMAIN_CODE = "test_optionals_taint_seq"
 
 
+@pipe_func()
 def optionals_taint_echo_source(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text=f"a:{working_memory.get_stuff_as_str(name='source')}")
 
 
+@pipe_func()
 def optionals_taint_echo_a_out(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text=f"b:{working_memory.get_stuff_as_str(name='a_out')}")
 
 
+@pipe_func()
 def optionals_taint_sink(working_memory: WorkingMemory) -> TextContent:
     b_out_stuff = working_memory.get_optional_stuff(name="b_out")
     if b_out_stuff is None:
         return TextContent(text="no analysis")
     return TextContent(text=f"analysis: {b_out_stuff.as_text.text}")
-
-
-_TEST_FUNCS = [optionals_taint_echo_source, optionals_taint_echo_a_out, optionals_taint_sink]
 
 
 def _register_step_pipes(*, source_input_ref: str = "Text") -> None:
@@ -55,7 +55,7 @@ def _register_step_pipes(*, source_input_ref: str = "Text") -> None:
             description="Consumes source",
             inputs={"source": source_input_ref},
             output="Text",
-            function_name="optionals_taint_echo_source",
+            function_name=f"{__name__}.optionals_taint_echo_source",
         ),
     )
     step_b = PipeFactory[PipeFunc].make_from_blueprint(
@@ -65,7 +65,7 @@ def _register_step_pipes(*, source_input_ref: str = "Text") -> None:
             description="Consumes step A's output",
             inputs={"a_out": "Text"},
             output="Text",
-            function_name="optionals_taint_echo_a_out",
+            function_name=f"{__name__}.optionals_taint_echo_a_out",
         ),
     )
     sink_c = PipeFactory[PipeFunc].make_from_blueprint(
@@ -75,7 +75,7 @@ def _register_step_pipes(*, source_input_ref: str = "Text") -> None:
             description="Absorbing sink: declares b_out optional",
             inputs={"b_out": "Text?"},
             output="Text",
-            function_name="optionals_taint_sink",
+            function_name=f"{__name__}.optionals_taint_sink",
         ),
     )
     pipe_library = get_pipe_library()
@@ -99,17 +99,6 @@ def _build_sequence(*, output_ref: str, steps: list[SubPipeBlueprint], inputs: d
 
 
 class TestSequenceTaintValidation:
-    @classmethod
-    def setup_class(cls):
-        for func in _TEST_FUNCS:
-            func_registry.register_function(func)
-
-    @classmethod
-    def teardown_class(cls):
-        for func in _TEST_FUNCS:
-            if func_registry.has_function(func.__name__):
-                func_registry.unregister_function_by_name(func.__name__)
-
     def test_taint_reaching_plain_sequence_output_is_rejected(self, load_empty_library: Callable[[], str]):
         """Optional sequence input feeds a lift chain that ends the sequence: plain output → error
         naming the source, the tainted variable, and the three fixes.
@@ -270,7 +259,7 @@ class TestSequenceTaintValidation:
                 description="Per-item finder that may find nothing",
                 inputs={"item": "Text"},
                 output="Text?",
-                function_name="optionals_taint_echo_source",
+                function_name=f"{__name__}.optionals_taint_echo_source",
             ),
         )
         list_sink = PipeFactory[PipeFunc].make_from_blueprint(
@@ -280,7 +269,7 @@ class TestSequenceTaintValidation:
                 description="Consumes the compacted list — a guaranteed slot",
                 inputs={"found_items": "Text[]"},
                 output="Text",
-                function_name="optionals_taint_sink",
+                function_name=f"{__name__}.optionals_taint_sink",
             ),
         )
         pipe_library = get_pipe_library()
@@ -309,7 +298,7 @@ class TestSequenceTaintValidation:
                 description="Guaranteed branch",
                 inputs={"topic": "Text"},
                 output="Text",
-                function_name="optionals_taint_echo_source",
+                function_name=f"{__name__}.optionals_taint_echo_source",
             ),
         )
         get_pipe_library().add_new_pipe(pipe=branch_base)

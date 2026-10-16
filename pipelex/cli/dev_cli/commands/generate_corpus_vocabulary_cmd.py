@@ -134,11 +134,11 @@ _FEATURE_TAGS: dict[str, str] = {
 # code leaves the registry breaks this module at import instead of rotting in the generated file.
 _PIPE_TYPE_EXCLUSIONS: dict[PipeType, str] = {
     PipeType.PIPE_FUNC: (
-        "A PipeFunc names a Python function that is resolved against the runtime's function registry "
-        "at validation time, so an entry declaring one fails with \"Function '<name>' not found in "
-        'registry" in every consumer that has not registered that exact function. A corpus entry has '
-        "to validate everywhere, and the cross-language consumers cannot register a Python function at "
-        "all, so no portable focused entry exists. Exercise PipeFunc in a consumer's own fixtures."
+        "A PipeFunc names a Python function by its import path in the method tree, and validation "
+        "locates that module among the tree's files and reads it, so an entry declaring one is refused "
+        "wherever its Python module does not travel with it. A corpus entry is a bundle that has to "
+        "validate everywhere, and the cross-language consumers do not read Python at all, so no portable "
+        "focused entry exists. Exercise PipeFunc in a consumer's own fixtures."
     ),
 }
 

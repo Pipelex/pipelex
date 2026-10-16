@@ -46,7 +46,6 @@ from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.console_target import ConsoleTarget
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.class_registry_access import get_class_registry as _get_active_class_registry
-from pipelex.system.registries.func_registry import FuncRegistry
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
@@ -112,7 +111,6 @@ class RuntimeHub:
         self._secrets_provider: SecretsProviderAbstract | None = None
         self._storage_provider: StorageProviderAbstract | None = None
         self._telemetry_manager: TelemetryManagerAbstract | None = None
-        self._func_registry: FuncRegistry | None = None
         # cogt
         self._models_manager: ModelManagerAbstract | None = None
         self._sdk_client_manager: SdkClientManager | None = None
@@ -324,9 +322,6 @@ class RuntimeHub:
     def set_isolated_execution_probe(self, probe: Callable[[], bool]) -> None:
         self._isolated_execution_probe = probe
 
-    def set_func_registry(self, func_registry: FuncRegistry):
-        self._func_registry = func_registry
-
     ############################################################
     # Getters
     ############################################################
@@ -389,12 +384,6 @@ class RuntimeHub:
             msg = "TelemetryManager is not initialized"
             raise RuntimeError(msg)
         return self._telemetry_manager
-
-    def get_func_registry(self) -> FuncRegistry:
-        if self._func_registry is None:
-            msg = "FuncRegistry is not initialized"
-            raise RuntimeError(msg)
-        return self._func_registry
 
     # cogt
 
@@ -516,10 +505,6 @@ def get_class_registry() -> ClassRegistryAbstract:
     accessor without a cycle. This is the public entry point; prefer it.
     """
     return _get_active_class_registry()
-
-
-def get_func_registry() -> FuncRegistry:
-    return get_runtime_hub().get_func_registry()
 
 
 def get_telemetry_manager() -> TelemetryManagerAbstract:

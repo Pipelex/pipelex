@@ -28,7 +28,9 @@ from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
 from pipelex.core.method_trees.building_bundle import building_pipe_of
-from pipelex.core.pipes.exceptions import PipeLoadRefusalError, PipeOperatorModelChoiceError
+from pipelex.core.method_trees.tree_files import TreeFileEntry, encode_tree_file
+from pipelex.core.method_trees.tree_python import TREE_PYTHON_HOLD
+from pipelex.core.pipes.exceptions import PipeLoadRefusalError, PipeOperatorModelChoiceError, PipeValidationError
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.validation import report_validation_error
@@ -42,12 +44,13 @@ from pipelex.libraries.exceptions import (
     LibraryLoadingError,
 )
 from pipelex.libraries.library import Library
-from pipelex.libraries.library_crate import LibraryCrate
+from pipelex.libraries.library_crate import SUBMITTED_PYTHON_ROOT_KEY, LibraryCrate
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
 from pipelex.libraries.library_factory import LibraryFactory
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.method_trees import (
     LibraryBundleFile,
+    library_dir_call_files,
     list_library_bundle_files,
     list_package_method_tree,
     local_tree_limits,
@@ -55,10 +58,11 @@ from pipelex.libraries.method_trees import (
     tree_bundles_of,
 )
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
+from pipelex.libraries.pipe_func_call_files import travels_with_call, with_tree_pipe_func_files
 from pipelex.libraries.visibility_utils import check_visibility_for_blueprints, make_visibility_checker
 from pipelex.methods.exceptions import MethodDependencyFetchError, MethodFetchDisabledError
 from pipelex.methods.fetch_on_miss import find_vendored_method, resolve_address_based_method
-from pipelex.methods.structures_check import ensure_no_structured_content_in_library_sources, is_generated_structures_module
+from pipelex.methods.structures_check import ensure_no_structured_content_in_library_sources
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.handle_pipe_errors import categorize_pipe_validation_error
 from pipelex.mthds_parsing.parser import MthdsParser
@@ -73,7 +77,6 @@ from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.runtime_hub import get_class_registry
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
-from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pipelex.tools.misc.semver import SemVerError, parse_constraint, parse_version, version_satisfies
@@ -328,11 +331,11 @@ class LibraryManager(LibraryManagerAbstract):
         self._blueprints: dict[str, list[PipelexBundleBlueprint]] = {}  # library_id -> accumulated blueprints
         self._crate_cache: dict[str, LibraryCrate] = {}  # library_id -> cached crate from get_crate()
         self._loaded_fingerprints: dict[str, set[str]] = {}  # library_id -> set of loaded crate fingerprints
-        # library_id -> {relpath: source}. Customer Python source captured (without importing) in
-        # sandbox-hosted load mode, threaded into get_crate() so the crate can carry it to a sandbox.
-        # Empty in local/direct mode. Per-library side-state because get_crate() rebuilds from
-        # blueprints only and cannot see the original .py text otherwise.
-        self._library_sources: dict[str, dict[str, str]] = {}
+        # library_id -> Python root -> {tree path: file entry}. The files a sandbox-hosted PipeFunc call receives,
+        # captured (without importing) from the library directories in sandbox-hosted load mode, or held from a
+        # transported crate, threaded into get_crate() so the crate carries them to a sandbox, and read by a
+        # PipeFunc's validation in place of a disk that is another host's. Empty in local/direct mode.
+        self._pipe_func_files: dict[str, dict[str, dict[str, TreeFileEntry]]] = {}
 
     ############################################################
     # Manager lifecycle
@@ -368,7 +371,9 @@ class LibraryManager(LibraryManagerAbstract):
             self._blueprints.pop(library_id, None)
             self._crate_cache.pop(library_id, None)
             self._loaded_fingerprints.pop(library_id, None)
-            self._library_sources.pop(library_id, None)
+            self._pipe_func_files.pop(library_id, None)
+            # The library's runs are over: its hold on a method tree's Python, if a PipeFunc step took one, is released.
+            TREE_PYTHON_HOLD.release(holder=library_id)
         return True
 
     @override
@@ -390,7 +395,8 @@ class LibraryManager(LibraryManagerAbstract):
         self._blueprints = {}
         self._crate_cache = {}
         self._loaded_fingerprints = {}
-        self._library_sources = {}
+        self._pipe_func_files = {}
+        TREE_PYTHON_HOLD.release_all()
         with ExitStack() as teardown_stack:
             for library in libraries:
                 teardown_stack.callback(library.teardown)
@@ -539,11 +545,19 @@ class LibraryManager(LibraryManagerAbstract):
         library = self._libraries.get(library_id)
         crate = LibraryCrateFactory.make_from_blueprints(
             blueprints=accumulated,
-            python_sources=self._library_sources.get(library_id),
+            pipe_func_files=self._pipe_func_files.get(library_id),
             bundle_resources=library.bundle_resources if library is not None else None,
         )
+        if is_pipe_func_sandbox_hosted():
+            # Each call of a PipeFunc read from a method tree receives the tree's files in the sandbox, so the crate
+            # carries them from the disk of the host that listed the tree.
+            crate = with_tree_pipe_func_files(crate=crate)
         self._crate_cache[library_id] = crate
         return crate
+
+    @override
+    def get_pipe_func_files(self, *, library_id: str, root_key: str) -> dict[str, TreeFileEntry] | None:
+        return self._pipe_func_files.get(library_id, {}).get(root_key)
 
     @override
     def add_bundle_resources(self, *, library_id: str, bundle_resources: BundleResources) -> None:
@@ -606,43 +620,48 @@ class LibraryManager(LibraryManagerAbstract):
             if is_pipe_func_sandbox_hosted():
                 # Sandbox-hosted mode imports no Python from a library directory, whatever its origin (an
                 # inline bundle, a stored method, a host directory): importing a file runs its module-level
-                # code in this process. Every .py is captured as source text instead, to travel to the
-                # sandbox, where it is imported and executed. A structure class cannot travel that way: it
-                # would have to be imported here to back a concept, so the load is refused, naming each file
-                # and class, before any source is kept. The refusal is a static scan, which a dynamically
-                # built class escapes; such a file then travels as source and still never executes here.
-                sources_by_dir = {library_dir: FuncRegistryUtils.read_py_sources(folder_path=library_dir) for library_dir in all_dirs}
+                # code in this process. Every file but the bundles is captured instead, to travel to the
+                # sandbox with each call of a PipeFunc parsed from a content string, whose import paths start
+                # at the library directory. A structure class cannot travel that way: it would have to be
+                # imported here to back a concept, so the load is refused, naming each file and class, before
+                # any file is kept. The refusal is a static scan, which a dynamically built class escapes; such a
+                # file then travels as source and still never executes here.
+                files_by_dir = {library_dir: library_dir_call_files(library_dir=library_dir, limits=tree_limits) for library_dir in all_dirs}
+                sources_by_dir = {
+                    library_dir: {relpath: data.decode("utf-8", errors="replace") for relpath, data in dir_files.items() if relpath.endswith(".py")}
+                    for library_dir, dir_files in files_by_dir.items()
+                }
                 ensure_no_structured_content_in_library_sources(sources_by_dir=sources_by_dir)
-                # Accumulate across dirs, but fail loud on a relpath collision: the sandbox writes
-                # sources flat by relpath, so two dirs sharing a path would otherwise silently clobber one
-                # customer's code and run the wrong PipeFunc body.
-                captured_sources = self._library_sources.setdefault(library_id, {})
-                for dir_sources in sources_by_dir.values():
-                    for relpath, source in dir_sources.items():
-                        if is_generated_structures_module(source=source):
+                # Accumulate across dirs, but fail loud on a path collision: the sandbox writes the files at
+                # their paths, so two dirs sharing a path would otherwise silently clobber one customer's file
+                # and run the wrong PipeFunc body.
+                captured_files = self._pipe_func_files.setdefault(library_id, {}).setdefault(SUBMITTED_PYTHON_ROOT_KEY, {})
+                for dir_files in files_by_dir.values():
+                    for relpath, data in dir_files.items():
+                        if not travels_with_call(tree_path=relpath, data=data):
                             # The refusal accepted it as a copy of the method's own concepts, and the sandbox
                             # generates its own from those concepts, qualified. Shipping this one too would give
                             # the sandbox two `structures` modules, and a PipeFunc's import would reach either.
                             continue
-                        if relpath in captured_sources and captured_sources[relpath] != source:
+                        entry = encode_tree_file(data=data)
+                        if relpath in captured_files and captured_files[relpath] != entry:
                             msg = (
-                                f"Duplicate PipeFunc source path '{relpath}' across library dirs while loading library "
-                                f"'{library_id}'. Sandbox sources are keyed by relative path, so two dirs sharing a path "
+                                f"Duplicate PipeFunc file path '{relpath}' across library dirs while loading library "
+                                f"'{library_id}'. A sandbox receives the files at their paths, so two dirs sharing a path "
                                 f"would clobber each other — give them distinct relative paths."
                             )
                             raise LibraryError(msg)
-                        captured_sources[relpath] = source
+                        captured_files[relpath] = entry
             else:
                 for library_dir in all_dirs:
                     # Only import files that contain StructuredContent subclasses (uses AST pre-check), so
                     # concepts declared as `structure = "ClassName"` resolve that class from the registry.
+                    # A PipeFunc's function is not imported here: its step imports it by its import path when
+                    # it first runs.
                     ClassRegistryUtils.import_modules_in_folder(
                         folder_path=library_dir,
                         base_class_names=[StructuredContent.__name__],
                     )
-                    # Import files that contain @pipe_func decorated functions (uses AST pre-check) and
-                    # register them in the process-global func_registry.
-                    FuncRegistryUtils.register_funcs_in_folder(folder_path=library_dir)
 
             # Auto-discover and register all StructuredContent classes from sys.modules
             num_registered = ClassRegistryUtils.auto_register_all_subclasses(
@@ -725,7 +744,7 @@ class LibraryManager(LibraryManagerAbstract):
         with scoped_current_library(library_id=library_id):
             # Cache the crate for a DIRECT crate-load (the transported-crate path used by the Temporal
             # workflow, which never populates _blueprints). This lets get_crate() hand the crate — with
-            # its python_sources — to the sandbox executor. The blueprint-derived path (load_libraries ->
+            # its pipe_func_files — to the sandbox executor. The blueprint-derived path (load_libraries ->
             # load_from_blueprints) leaves _blueprints populated and rebuilds from it instead, so it must
             # NOT be shadowed by a cached crate here.
             if library_id not in self._blueprints:
@@ -735,6 +754,13 @@ class LibraryManager(LibraryManagerAbstract):
             # since a pipe reading one, such as a PipeDocGen step with an HTML template file, reads it as it is built.
             if crate.bundle_resources:
                 self.get_library(library_id=library_id).add_bundle_resources(bundle_resources=crate.bundle_resources)
+
+            # The files a transported crate carries for its PipeFunc calls, held before the pipes are validated: a
+            # PipeFunc's validation reads its module from them, the trees' directories being the host's that listed them.
+            if crate.pipe_func_files:
+                held_files = self._pipe_func_files.setdefault(library_id, {})
+                for root_key, root_files in crate.pipe_func_files.items():
+                    held_files.setdefault(root_key, dict(root_files))
 
             # Fingerprint idempotency: skip if this crate was already loaded into this library
             fingerprint = crate.fingerprint
@@ -1484,6 +1510,9 @@ class LibraryManager(LibraryManagerAbstract):
                             blueprint=pipe_blueprint,
                             concept_codes_from_the_same_domain=domain_concept_codes.get(domain_code, []),
                         )
+                    # What the pipe can tell is broken once built, such as a PipeFunc whose function the package does
+                    # not hold, makes it a pipe the package could not build, refusing only a reference to it.
+                    pipe.validate_once_built()
                     child_library.pipe_library.add_new_pipe(pipe=pipe)
                 except ValidationError as exc:
                     log.warning(
@@ -1491,6 +1520,12 @@ class LibraryManager(LibraryManagerAbstract):
                         fields={"dependency_alias": alias, "pipe_code": pipe_code, **error_fields(exc=exc)},
                     )
                     unbuilt_pipe_reasons[pipe_ref] = "; ".join(str(error["msg"]) for error in exc.errors()) or str(exc)
+                except PipeValidationError as exc:
+                    log.warning(
+                        "A pipe of a dependency could not be loaded",
+                        fields={"dependency_alias": alias, "pipe_code": pipe_code, **error_fields(exc=exc)},
+                    )
+                    unbuilt_pipe_reasons[pipe_ref] = str(exc)
         finally:
             # Remove temporary concept entries from main library
             library.concept_library.remove_concepts_by_concept_refs(concept_refs=temp_concept_refs)

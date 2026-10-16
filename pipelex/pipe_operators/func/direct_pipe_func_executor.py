@@ -1,62 +1,63 @@
 import asyncio
 import shutil
-import sys
 import tempfile
 from pathlib import Path
 
+from mthds.method_tree.exceptions import MethodTreeRefusedError, TreeSourceError
+from mthds.method_tree.written_tree import read_written_tree
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.codegen.emitters.python_structures import emit_python_structures
 from pipelex.codegen.resolved_concepts import resolve_concepts_from_crate
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.core.method_trees.exceptions import TreePythonError
+from pipelex.core.method_trees.tree_files import write_call_files
+from pipelex.core.method_trees.tree_python import TREE_PYTHON_HOLD
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.interpreter_hub import get_library_manager
-from pipelex.kernel.func_ops import call_registered_function
+from pipelex.interpreter_hub import get_library_manager, get_required_pipe
+from pipelex.kernel.func_ops import call_function
+from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_operators.func.exceptions import PipeFuncExecutionError
+from pipelex.pipe_operators.func.pipe_func import PipeFunc
+from pipelex.pipe_operators.func.pipe_func_call_context import function_of_call_in_flight
 from pipelex.pipe_operators.func.pipe_func_execution_dtos import PipeFuncExecutionRequest, PipeFuncExecutionResponse
 from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutionResult, PipeFuncExecutorProtocol
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.runtime_bridge.primitives.rehydration import rehydrate_library_and_memory
 from pipelex.system.job_metadata import JobMetadata
-from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
-from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
 
 # The library id the transported run rebuilds under. Internal to one process (a fresh sandbox box or a
 # one-shot subprocess), so a fixed id is safe — there is no other library to collide with.
 _TRANSPORTED_LIBRARY_ID = "pipe_func_transported_lib"
 
 
-def bundle_import_dirs(*, workdir: Path) -> list[Path]:
-    """The directories a materialized bundle's modules import from, in `sys.path` search order.
+def resolve_pipe_func(*, pipe_code: str) -> PipeFunc:
+    """The `PipeFunc` step of the current library a call names.
 
-    The bundle root comes first and the subdirectories holding a `.py` file follow in sorted order, so a
-    module name that two of them share resolves to the same file in every process. In particular, the
-    `structures` module generated at the root wins over any `structures.py` a subdirectory ships.
-
-    Args:
-        workdir: The directory the bundle's sources were materialized into.
-
-    Returns:
-        The root followed by its source subdirectories, each listed once.
+    Raises:
+        PipeFuncExecutionError: The step the call names is not a `PipeFunc`.
     """
-    subdirs = {py_file.parent for py_file in workdir.rglob("*.py")} - {workdir}
-    return [workdir, *sorted(subdirs)]
+    pipe = get_required_pipe(pipe_code=pipe_code)
+    if not isinstance(pipe, PipeFunc):
+        msg = f"The pipe '{pipe_code}' a PipeFunc call names is a {pipe.type}, not a PipeFunc."
+        raise PipeFuncExecutionError(msg)
+    return pipe
 
 
 class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
-    """The ``direct`` execution mode: resolve the function from the process-global registry and run it here.
+    """The ``direct`` execution mode: import the step's function in this process and run it here.
 
     The free, in-process, trusted mode core owns (mirrors ``DirectOrchestrator`` on the orchestration
-    axis). It is used for local runs and inside a sandbox box (where the real function IS registered);
-    a sandbox-dispatching executor from the out-of-tree plugin runs it out-of-process instead when
+    axis). It is used for local runs and inside a sandbox box, where the call's files were written to
+    disk; a sandbox-dispatching executor from the out-of-tree plugin runs it out-of-process instead when
     ``execution_mode`` names a sandbox backend.
 
-    What running a function *means* — the registry lookup, async-vs-sync dispatch, and the
-    str/list -> StuffContent coercion — is the kernel's ``call_registered_function``, so this executor
-    is what is left once that is factored out: the in-process wiring of the live arm, and the whole
-    transported arm below.
+    The function is the step's own: the `PipeFunc` imports it by its import path, under the process's
+    hold on its method tree's Python, and checks it (`PipeFunc.bind_function`). What running it *means*
+    — async-vs-sync dispatch and the str/list -> StuffContent coercion — is the kernel's
+    ``call_function``, so this executor is what is left once that is factored out: the in-process
+    wiring of the live arm, and the whole transported arm below.
     """
 
     @override
@@ -70,12 +71,14 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
         pipe_run_params: PipeRunParams,
     ) -> PipeFuncExecutionResult:
         log.verbose(f"Running PipeFunc in-process with function '{function_name}'")
-        # The call itself — registry lookup, async/sync dispatch, return coercion — is the kernel's,
-        # so an out-of-process executor and this one share one definition of what running a function
-        # means. Nothing is caught here: the function is arbitrary user code whose failure surface is
-        # not enumerable, and the operator wraps this call to decorate the failure with the pipe's
-        # inputs/output for a diagnostic PipeRunError.
-        call_result = await call_registered_function(function_name=function_name, memory=working_memory)
+        # The step imported and checked its function before the run (its `_validate_before_run`), and names it for its
+        # call in flight; a call that names none, the transported run's, finds the step in the current library, which
+        # binds it once. The call itself — async/sync dispatch, return coercion — is the kernel's, so an out-of-process
+        # executor and this one share one definition of what running a function means. Nothing is caught here: the
+        # function is arbitrary user code whose failure surface is not enumerable, and the operator wraps this call to
+        # decorate the failure with the pipe's inputs/output for a diagnostic PipeRunError.
+        function = function_of_call_in_flight(pipe_ref=pipe_code) or resolve_pipe_func(pipe_code=pipe_code).bind_function()
+        call_result = await call_function(function=function, function_name=function_name, memory=working_memory)
         return PipeFuncExecutionResult(
             content=call_result.content,
             function_module=call_result.function_module,
@@ -84,7 +87,7 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
 
     @override
     async def run_pipe_func_transported(self, *, request: PipeFuncExecutionRequest) -> PipeFuncExecutionResponse:
-        """Register the customer's real code from the crate, rebuild the library + memory, run the one PipeFunc, transport the output.
+        """Write the call's files, rebuild the library + memory, run the one PipeFunc, transport the output.
 
         The far-from-caller half of out-of-process execution, and the single source of truth for it: a
         sandbox box runs exactly this (its entrypoint is a thin shell over this call), and it pulls in
@@ -92,78 +95,107 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
         runner/worker, it deliberately imports and executes customer code, because it runs INSIDE the
         isolation boundary. The output rides back wrapped in a working memory so it round-trips with its
         concept (and thus its dynamic-class identity), rebound against the receiver's registry.
+
+        The call's files are written into a fresh temporary directory, removed on every path.
         """
-        # Resolved, because importing a file puts its resolved directory on sys.path: under a symlinked
-        # temp dir (`/var` is `/private/var` on macOS) those entries would jump ahead of the bundle's
-        # import order and escape the prune below.
-        workdir = Path(tempfile.mkdtemp(prefix="pipelex_pipe_func_")).resolve()
+        # Resolved, so the root the hold puts on sys.path is the one the import system reports for its modules
+        # (`/var` is `/private/var` on macOS).
+        tree_root = Path(tempfile.mkdtemp(prefix="pipelex_pipe_func_")).resolve()
         try:
-            return await self._run_transported_from_workdir(request=request, workdir=workdir)
+            return await self.run_pipe_func_transported_at(request=request, tree_root=tree_root)
         finally:
-            # The imported modules live on in memory; the materialized sources are only needed during
-            # import, so the workdir is removed on every path (success, timeout, failure). The sys.path
-            # entries inserted for that import are pruned too — the mkdtemp path is unique, so removing
-            # exactly the entries under this workdir is safe even with concurrent transported runs
-            # (unlike a snapshot/restore of the whole list).
-            sys.path[:] = [entry for entry in sys.path if not Path(entry).is_relative_to(workdir)]
-            shutil.rmtree(workdir, ignore_errors=True)
+            shutil.rmtree(tree_root, ignore_errors=True)
 
-    async def _run_transported_from_workdir(self, *, request: PipeFuncExecutionRequest, workdir: Path) -> PipeFuncExecutionResponse:
-        for relpath, source in request.crate.python_sources.items():
-            target = workdir / relpath
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(source, encoding="utf-8")
+    async def run_pipe_func_transported_at(self, *, request: PipeFuncExecutionRequest, tree_root: Path) -> PipeFuncExecutionResponse:
+        """Run a transported call with its Python root at `tree_root`, a directory the caller may have filled already.
 
-        # Generate the method's concept structure classes from the crate — the .mthds is the single
-        # source of truth for them (`resolve_concepts_from_crate` reads the crate's ConceptBlueprints,
-        # `emit_python_structures` projects a `structures.py`). So a PipeFunc can
-        # `from structures import <domain>__<Concept>` without the method having to STORE or transport a
-        # hand-written copy that could drift from the .mthds. A file the method actually shipped at the
-        # same path wins (already materialized above) — never clobber customer source.
-        #
-        # Force domain-qualified class names (`atlas_devis__PricedQuote`): the runtime ALWAYS qualifies a
-        # concept's structure class (`concept.structure_class_name`), and that is the exact name a
-        # PipeFunc's return-type validation checks against — so the generated classes must match the
-        # runtime spelling, not the emitter's default collision-only qualification (which would emit a
-        # bare `PricedQuote` the validator rejects).
-        resolved_library = resolve_concepts_from_crate(request.crate)
+        A sandbox client may unpack the call's tree into the sandbox itself, such as from one archive per call, and hand
+        the directory over; the files the request carries are written there too, at their tree paths. The directory is
+        the call's import root: it goes first on `sys.path` under the process's hold on its Python, and the function is
+        imported from it under its real import path.
+
+        Raises:
+            PipeFuncExecutionError: The call's files cannot be read back as a tree, or the function runs past its timeout.
+        """
+        write_call_files(files=request.files, destination=tree_root)
+        self._write_generated_structures(crate=request.crate, tree_root=tree_root)
+        try:
+            tree = read_written_tree(tree_root)
+        except (MethodTreeRefusedError, TreeSourceError) as exc:
+            msg = f"The files of the PipeFunc call for pipe '{request.pipe_code}' cannot be read back as a method tree: {exc}"
+            raise PipeFuncExecutionError(msg) from exc
+
+        # The call's Python is held for the transported library until the run ends, and unloaded before its directory
+        # is removed.
+        TREE_PYTHON_HOLD.acquire(tree=tree, holder=_TRANSPORTED_LIBRARY_ID)
+        try:
+            return await self._run_transported(request=request, crate=self._crate_rooted_at(request=request, tree_json=tree.model_dump_json()))
+        finally:
+            TREE_PYTHON_HOLD.release(holder=_TRANSPORTED_LIBRARY_ID)
+            TREE_PYTHON_HOLD.unload_if_unheld()
+
+    @staticmethod
+    def _write_generated_structures(*, crate: LibraryCrate, tree_root: Path) -> None:
+        """Generate the method's concept structure classes from the crate as the `structures` module, unless the call shipped one.
+
+        The .mthds is the single source of truth for them (`resolve_concepts_from_crate` reads the crate's
+        ConceptBlueprints, `emit_python_structures` projects a `structures.py`), so a PipeFunc can
+        `from structures import <domain>__<Concept>` without the method having to store or transport a
+        hand-written copy that could drift from the .mthds. A file the method actually shipped at the
+        same path wins — never clobber customer source.
+
+        Domain-qualified class names are forced (`atlas_devis__PricedQuote`): the runtime ALWAYS qualifies a
+        concept's structure class (`concept.structure_class_name`), and that is the exact name a
+        PipeFunc's return-type validation checks against.
+        """
+        resolved_library = resolve_concepts_from_crate(crate)
         qualified_library = resolved_library.model_copy(
             update={"concepts": [concept.model_copy(update={"needs_qualification": True}) for concept in resolved_library.concepts]}
         )
         for emitted in emit_python_structures(qualified_library):
-            generated_target = workdir / emitted.filename
+            generated_target = tree_root / emitted.filename
             if generated_target.exists():
                 log.verbose(f"The structures file '{emitted.filename}' the method shipped was kept over the generated one")
                 continue
             generated_target.parent.mkdir(parents=True, exist_ok=True)
             generated_target.write_text(emitted.content, encoding="utf-8")
 
-        # Put the bundle's directories on sys.path so a PipeFunc (or structure class) can import a sibling
-        # file from the same bundle. This is only reached in-box (transported path): the crate is
-        # re-materialized into a throwaway workdir that is NOT on sys.path, and each module is imported by
-        # file path (spec_from_file_location), which does NOT add its directory to sys.path either — so a
-        # top-level `from helpers import ...` between sibling files raises ModuleNotFoundError, the module
-        # never finishes importing, and its @pipe_func never registers. A local direct run does not hit
-        # this: its funcs were registered at boot from the real on-disk project already on sys.path. Add
-        # workdir (resolves `from funcs.helpers import ...`) and every subdirectory holding a .py file
-        # (resolves the sibling-relative `from helpers import ...`); the caller's finally prunes these
-        # entries once the import phase is over, so they never outlive the run.
-        sys.path[0:0] = [str(source_dir) for source_dir in bundle_import_dirs(workdir=workdir)]
+    @staticmethod
+    def _crate_rooted_at(*, request: PipeFuncExecutionRequest, tree_json: str) -> LibraryCrate:
+        """The request's crate with the called step's method tree replaced by the tree written here.
 
-        # Register the customer's structure classes and @pipe_func functions from their real source,
-        # before rehydration seeds a per-run registry from the global one and before the function lookup.
-        ClassRegistryUtils.import_modules_in_folder(folder_path=workdir, base_class_names=[StructuredContent.__name__])
-        ClassRegistryUtils.auto_register_all_subclasses(base_class=StructuredContent)
-        FuncRegistryUtils.register_funcs_in_folder(folder_path=workdir)
+        A step read from a tree resolves its function, and any file its tree's other steps name, in that tree, which the
+        crate carries as the host that assembled it listed it; here the tree is the call's files as written in this
+        process. A step parsed from a content string has no tree, and imports from this process's import path, which
+        the hold starts with the call's root.
+        """
+        crate = request.crate
+        tree_bundle_ref = crate.tree_bundles.get(request.pipe_code)
+        if tree_bundle_ref is None:
+            return crate
+        method_trees = dict(crate.method_trees)
+        method_trees[tree_bundle_ref.tree_key] = tree_json
+        return crate.model_copy(update={"method_trees": method_trees})
 
+    async def _run_transported(self, *, request: PipeFuncExecutionRequest, crate: LibraryCrate) -> PipeFuncExecutionResponse:
+        # The crate was validated where it was assembled; its other steps may name files of trees this process never
+        # receives, so it is loaded as it is, and the one step called checks its function as it binds it.
         working_memory = rehydrate_library_and_memory(
             library_id=_TRANSPORTED_LIBRARY_ID,
-            crate=request.crate,
+            crate=crate,
             working_memory_raw=request.working_memory_raw,
+            is_crate_prevalidated=True,
         )
         if working_memory is None:
             msg = f"Transported rehydration produced no working memory for pipe '{request.pipe_code}'"
             raise PipeFuncExecutionError(msg)
+
+        pipe_func = resolve_pipe_func(pipe_code=request.pipe_code)
+        try:
+            pipe_func.bind_function()
+        except TreePythonError as exc:
+            msg = f"PipeFunc '{request.pipe_code}' cannot call its function '{request.function_name}': {exc.message}"
+            raise PipeFuncExecutionError(msg) from exc
 
         # Runaway-code guard: time out the PipeFunc if it runs past the request's (plan-dependent)
         # deadline. Best-effort in-process — a blocking sync function keeps its worker thread; the

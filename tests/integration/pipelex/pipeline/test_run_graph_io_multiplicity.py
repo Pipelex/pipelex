@@ -24,7 +24,7 @@ from pipelex.graph.graphspec import GraphSpec, IOSpec, NodeSpec, NodeStatus
 from pipelex.pipeline.dry_run_pipeline import dry_run_pipeline
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.runtime_hub import scoped_event_log
-from pipelex.system.registries.func_registry import func_registry
+from pipelex.system.registries.func_registry import pipe_func
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 
 _DRY_BUNDLE = '''
@@ -146,7 +146,7 @@ type = "PipeFunc"
 description = "A plural output: lifted to an empty list"
 inputs = { source = "Text" }
 output = "Text[]"
-function_name = "io_multiplicity_find_many"
+function_name = "tests.integration.pipelex.pipeline.test_run_graph_io_multiplicity.io_multiplicity_find_many"
 
 [pipe.branch_out]
 type = "PipeParallel"
@@ -164,41 +164,41 @@ type = "PipeFunc"
 description = "A singular branch"
 inputs = { source = "Text" }
 output = "Text"
-function_name = "io_multiplicity_find_one"
+function_name = "tests.integration.pipelex.pipeline.test_run_graph_io_multiplicity.io_multiplicity_find_one"
 
 [pipe.find_many_again]
 type = "PipeFunc"
 description = "A plural branch"
 inputs = { source = "Text" }
 output = "Text[]"
-function_name = "io_multiplicity_find_many"
+function_name = "tests.integration.pipelex.pipeline.test_run_graph_io_multiplicity.io_multiplicity_find_many"
 
 [pipe.count_findings]
 type = "PipeFunc"
 description = "Consumes the lifted lists"
 inputs = { findings = "Text[]", many_out = "Text[]", one_out = "Text?" }
 output = "Text"
-function_name = "io_multiplicity_count_findings"
+function_name = "tests.integration.pipelex.pipeline.test_run_graph_io_multiplicity.io_multiplicity_count_findings"
 """
 
 
+@pipe_func()
 def io_multiplicity_find_many(working_memory: WorkingMemory) -> ListContent[TextContent]:
     return ListContent[TextContent](items=[TextContent(text=f"found:{working_memory.get_stuff_as_str(name='source')}")])
 
 
+@pipe_func()
 def io_multiplicity_find_one(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text=f"found:{working_memory.get_stuff_as_str(name='source')}")
 
 
+@pipe_func()
 def io_multiplicity_count_findings(working_memory: WorkingMemory) -> TextContent:
     findings = working_memory.get_stuff(name="findings").content
     many_out = working_memory.get_stuff(name="many_out").content
     assert isinstance(findings, ListContent)
     assert isinstance(many_out, ListContent)
     return TextContent(text=f"{findings.nb_items} findings, {many_out.nb_items} more")
-
-
-_TEST_FUNCS = [io_multiplicity_find_many, io_multiplicity_find_one, io_multiplicity_count_findings]
 
 
 def _io_items(graph: GraphSpec) -> list[tuple[NodeSpec, IOSpec]]:
@@ -237,17 +237,6 @@ def _in_process_graph(teardown_spy: Any) -> GraphSpec:
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestRunGraphIoMultiplicity:
-    @classmethod
-    def setup_class(cls):
-        for func in _TEST_FUNCS:
-            func_registry.register_function(func)
-
-    @classmethod
-    def teardown_class(cls):
-        for func in _TEST_FUNCS:
-            if func_registry.has_function(func.__name__):
-                func_registry.unregister_function_by_name(func.__name__)
-
     async def test_dry_run_marks_every_list(self, mocker: MockerFixture) -> None:
         teardown_spy = mocker.spy(GraphTracer, "teardown")
 

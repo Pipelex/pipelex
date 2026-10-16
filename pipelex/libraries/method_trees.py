@@ -435,3 +435,44 @@ def bundle_files_under(*, library_dirs: Iterable[Path]) -> list[Path]:
             except OSError:
                 continue
     return list(dict.fromkeys(bundle_files))
+
+
+def library_dir_call_files(*, library_dir: Path, limits: TreeLimits | None = None) -> dict[str, bytes]:
+    """The files of a library directory's own method tree that lie in the directory, other than its bundles.
+
+    These are the files a sandbox-hosted deployment sends with a `PipeFunc` call of a bundle parsed from a content
+    string, keyed by their path from the library directory, which is where such a bundle's import paths start. The
+    membership rule decides what the tree holds, so a `.gitignore`d file or a virtual environment never travels. A
+    directory that does not exist, or whose own tree is empty, holds none.
+
+    Args:
+        library_dir: The library directory.
+        limits: The limits to list the tree under, read from the configuration when not given.
+
+    Raises:
+        MethodTreeLoadError: The tree could not be listed.
+    """
+    if not library_dir.exists():
+        return {}
+    try:
+        tree = list_method_tree(library_dir, limits=limits or local_tree_limits())
+    except MethodTreeRefusedError as exc:
+        if _is_empty_tree(refusal_error=exc):
+            return {}
+        raise MethodTreeLoadError(exc.message) from exc
+    except TreeLimitError as exc:
+        msg = f"{exc.message} {LIMITS_ADVICE}"
+        raise MethodTreeLoadError(msg) from exc
+    except TreeSourceError as exc:
+        raise MethodTreeLoadError(exc.message) from exc
+    if tree.directory is None:
+        return {}
+    resolved_dir = library_dir.resolve()
+    tree_root = tree.directory.resolve()
+    prefix = "" if resolved_dir == tree_root else f"{nfc(resolved_dir.relative_to(tree_root).as_posix())}/"
+    files: dict[str, bytes] = {}
+    for tree_path in tree.tree_paths:
+        if not tree_path.startswith(prefix) or tree_path.endswith(BUNDLE_SUFFIX):
+            continue
+        files[tree_path.removeprefix(prefix)] = tree.file_location(tree_path).read_bytes()
+    return files

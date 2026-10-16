@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from kajson.class_registry import ClassRegistry
 
 from pipelex.core.bundle_resources.bundle_resource import BundleResources
+from pipelex.core.method_trees.tree_files import TreeFileEntry
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
@@ -96,6 +97,18 @@ class LibraryManagerAbstract(ABC):
 
         Returns:
             A LibraryCrate built from all accumulated blueprints, or None
+        """
+
+    @abstractmethod
+    def get_pipe_func_files(self, *, library_id: str, root_key: str) -> dict[str, TreeFileEntry] | None:
+        """The files a library captured for the `PipeFunc` calls of one Python root, or None when it captured none.
+
+        A sandbox-hosted load captures them from the library directories, and a transported crate carries them, so a
+        `PipeFunc`'s validation reads its module there rather than from a disk that may be another host's.
+
+        Args:
+            library_id: The library.
+            root_key: The Python root: a method tree's key, or `SUBMITTED_PYTHON_ROOT_KEY` for bundles parsed from strings.
         """
 
     @abstractmethod

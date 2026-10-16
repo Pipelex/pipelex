@@ -1,5 +1,5 @@
-"""PipeFunc implementations for the guarded-condition bundle, auto-registered at library load via
-the @pipe_func decorator (FuncRegistryUtils.register_funcs_in_folder).
+"""PipeFunc implementations for the guarded-condition bundle, which names each by its import path from this folder,
+such as `guarded_condition_funcs.<function>`.
 """
 
 from pipelex.core.memory.working_memory import WorkingMemory

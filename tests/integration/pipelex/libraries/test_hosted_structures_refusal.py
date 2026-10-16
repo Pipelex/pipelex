@@ -22,6 +22,7 @@ from pipelex.codegen.stamp import apply_stamp
 from pipelex.core.concepts.exceptions import ConceptFactoryError
 from pipelex.interpreter_hub import get_concept_library, get_library_manager, scoped_current_library
 from pipelex.libraries.crate_normalization import normalize_crate
+from pipelex.libraries.library_crate import SUBMITTED_PYTHON_ROOT_KEY
 from pipelex.methods.exceptions import MethodStructuresRefusedError
 
 SENTINEL_LINE = 'open(r"{marker}", "w").write("ran")\n'
@@ -273,8 +274,9 @@ class TestHostedStructuresRefusal:
 
         hosted_crate = library_manager.get_crate(library_id=library_id)
         assert hosted_crate is not None
-        assert "structures/structures.py" not in hosted_crate.python_sources
-        assert hosted_crate.python_sources.get("helpers.py") == helper_source
+        submitted_files = hosted_crate.pipe_func_files[SUBMITTED_PYTHON_ROOT_KEY]
+        assert "structures/structures.py" not in submitted_files
+        assert submitted_files.get("helpers.py") == helper_source
         assert not _is_imported(path=generated_file)
 
     @pytest.mark.usefixtures("sandbox_hosted_mode")

@@ -4,6 +4,7 @@ from pipelex.core.bundle_resources.bundle_resource import BundleResources
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.method_trees.tree_bundle import TreeBundleRef
+from pipelex.core.method_trees.tree_files import TreeFileEntry
 from pipelex.libraries.collision_messages import duplicate_ref_msg
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.contract_match import contracts_match
@@ -38,7 +39,7 @@ class LibraryCrateFactory:
         cls,
         blueprints: list[PipelexBundleBlueprint],
         *,
-        python_sources: dict[str, str] | None = None,
+        pipe_func_files: dict[str, dict[str, TreeFileEntry]] | None = None,
         bundle_resources: BundleResources | None = None,
     ) -> LibraryCrate:
         """Build a LibraryCrate from parsed bundle blueprints.
@@ -54,11 +55,11 @@ class LibraryCrateFactory:
 
         Args:
             blueprints: List of parsed MTHDS bundle blueprints
-            python_sources: Optional relpath -> Python source text captured (without importing) in
-                sandbox-hosted load mode. Attached verbatim to the crate; intentionally NOT folded
+            pipe_func_files: Optional Python root -> the files a PipeFunc call of that root receives, captured (without
+                importing) in sandbox-hosted load mode. Attached verbatim to the crate; intentionally NOT folded
                 into the fingerprint (the fingerprint represents library structure for dedupe).
             bundle_resources: Optional canonical path -> file submitted with a bundle loaded from content strings.
-                Attached verbatim to the crate and, like ``python_sources``, NOT folded into the fingerprint.
+                Attached verbatim to the crate and, like ``pipe_func_files``, NOT folded into the fingerprint.
 
         Returns:
             A LibraryCrate with all content merged and fingerprinted
@@ -191,7 +192,7 @@ class LibraryCrateFactory:
             method_trees={tree_key: method_trees[tree_key].model_dump_json() for tree_key in sorted({ref.tree_key for ref in tree_bundles.values()})},
             tree_bundles=tree_bundles,
             elaboration_metadata=elaboration_metadata,
-            python_sources=python_sources or {},
+            pipe_func_files={root_key: dict(files) for root_key, files in (pipe_func_files or {}).items()},
             bundle_resources=dict(bundle_resources) if bundle_resources else {},
             fingerprint=fingerprint,
         )

@@ -61,6 +61,9 @@ own page. Classes are grouped by subsystem.
 - [`StuffFactoryError`](stuff-factory-error.md) — Stuff factory
 - [`StuffSpecError`](stuff-spec-error.md) — Stuff spec
 - [`StuffSpecFactoryError`](stuff-spec-factory-error.md) — Stuff spec factory
+- [`TreeModuleShadowingError`](tree-module-shadowing-error.md) — Tree module shadowing
+- [`TreePythonError`](tree-python-error.md) — Tree python
+- [`TreePythonHeldError`](tree-python-held-error.md) — Tree python held
 - [`UnknownInputNameError`](unknown-input-name-error.md) — Unknown input name
 - [`WorkingMemoryConsistencyError`](working-memory-consistency-error.md) — Working memory consistency
 - [`WorkingMemoryError`](working-memory-error.md) — Working memory
@@ -83,6 +86,7 @@ own page. Classes are grouped by subsystem.
 - [`PipeDocGenUndefinedValueError`](pipe-doc-gen-undefined-value-error.md) — Pipe doc gen undefined value
 - [`PipeExtractFactoryError`](pipe-extract-factory-error.md) — Pipe extract factory
 - [`PipeFuncExecutionError`](pipe-func-execution-error.md) — Pipe func execution
+- [`PipeFuncFunctionError`](pipe-func-function-error.md) — Pipe func function
 - [`PipeFuncTransportError`](pipe-func-transport-error.md) — Pipe func transport
 - [`PipeImgGenFactoryError`](pipe-img-gen-factory-error.md) — Pipe img gen factory
 - [`PipeImgGenRunError`](pipe-img-gen-run-error.md) — Pipe img gen run

@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import Callable
 
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -20,7 +19,7 @@ from pipelex.system.registries.func_registry import pipe_func
 
 
 # Test function for PipeFunc bracket notation test
-@pipe_func(name="process_function")
+@pipe_func()
 def process_function(working_memory: WorkingMemory) -> ListContent[TextContent]:
     """Test function that processes items and returns a list."""
     items = working_memory.get_stuff_as_list(name="two_texts", item_type=TextContent).items
@@ -111,14 +110,14 @@ class TestBracketNotationInOperators:
         assert pipe.output.concept.code == "Image"
         assert pipe.output_multiplicity == 3
 
-    def test_pipe_func_with_bracket_input_and_output(self, load_test_library: Callable[[list[Path]], None]):
-        load_test_library([Path(Path(__file__).parent)])
+    def test_pipe_func_with_bracket_input_and_output(self, load_empty_library: Callable[[], None]):
+        load_empty_library()
 
         blueprint = PipeFuncBlueprint(
             description="Process items",
             inputs={"two_texts": f"{NativeConceptCode.TEXT}[2]"},
             output=f"{NativeConceptCode.TEXT}[]",
-            function_name="process_function",
+            function_name=f"{__name__}.process_function",
         )
 
         pipe = PipeFactory[PipeFunc].make_from_blueprint(

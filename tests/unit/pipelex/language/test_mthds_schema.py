@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 # minimal schema-valid values. Keyed by the `type` discriminator value. Used to
 # build a minimal table that validates against exactly one oneOf arm.
 _PIPE_KIND_EXTRA_FIELDS: dict[str, dict[str, Any]] = {
-    "PipeFunc": {"function_name": "do_it"},
+    "PipeFunc": {"function_name": "funcs.do_it"},
     "PipeImgGen": {"prompt": "draw a cat"},
     "PipeCompose": {},
     "PipeLLM": {},
@@ -250,7 +250,7 @@ class TestMthdsSchemaGeneration:
             # shared by PipeLLM/PipeImgGen and `function_name` uniquely looks like PipeFunc, but with
             # no `type` neither matches any arm.
             pytest.param({"description": "looks like an impl", "output": "Text", "prompt": "do it"}, id="stray-prompt"),
-            pytest.param({"description": "looks like PipeFunc", "output": "Text", "function_name": "do_it"}, id="stray-function-name"),
+            pytest.param({"description": "looks like PipeFunc", "output": "Text", "function_name": "funcs.do_it"}, id="stray-function-name"),
         ],
     )
     def test_typeless_table_with_stray_field_is_rejected(self, schema: dict[str, Any], table: dict[str, Any]) -> None:

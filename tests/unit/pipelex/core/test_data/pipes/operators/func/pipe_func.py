@@ -13,7 +13,7 @@ ProcessedData = "Processed data concept"
 type = "PipeFunc"
 description = "Process data with function"
 output = "ProcessedData"
-function_name = "process_data_function"
+function_name = "data_funcs.process_data_function"
 """,
     PipelexBundleBlueprint(
         domain="test_pipes",
@@ -24,7 +24,7 @@ function_name = "process_data_function"
                 type="PipeFunc",
                 description="Process data with function",
                 output="ProcessedData",
-                function_name="process_data_function",
+                function_name="data_funcs.process_data_function",
             ),
         },
     ),
