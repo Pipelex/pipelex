@@ -14,7 +14,7 @@ Most of the list is enforced by the type checker: the matches over the family en
 
 2. **The family enums, together.** `InferenceFamily` in `pipelex/plugins/inference_backend_registry.py`, `ModelType` in `pipelex/cogt/model_backends/model_type.py`, `InferenceErrorFamily` in `pipelex/cogt/inference/error_render.py` with an entry in both its failure-class and not-found-class tables, and `ModelCategory` in `pipelex/cogt/models/model_listing.py`, which is what `pipelex-agent models` and `check-model` list from.
 
-3. **The error classes** in `pipelex/cogt/exceptions.py`: a job failure, a model-not-found (subclassing `ModelNotFoundError`) and a handle-not-found. Then regenerate the error pages and the identity snapshot (`make gep`, `make gei`); the snapshot test fails until you do.
+3. **The error classes** in `pipelex/cogt/exceptions.py`: a job failure, a model-not-found (subclassing `ModelNotFoundError`) and a handle-not-found. Then regenerate the identity snapshot (`make gei`); the snapshot test fails until you do. A code the family's errors need beyond those the error registry already declares is added to `pipelex/errors/registry/pipelex-error-registry.yaml`, followed by `make ger` to regenerate its outputs and `make cer` to check them ([The Error Registry](error-registry.md)).
 
 4. **The job identity** in `pipelex/system/job_metadata.py`: a `JobCategory` member, a `UnitJobId` member and its display arm.
 
