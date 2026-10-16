@@ -45,6 +45,7 @@ own page. Classes are grouped by subsystem.
 - [`RemoteFileFetchError`](remote-file-fetch-error.md) — Remote file could not be fetched
 - [`SecretNotFoundError`](secret-not-found-error.md) — Secret not found
 - [`SsrfBlockedError`](ssrf-blocked-error.md) — Outbound request blocked (SSRF guard)
+- [`StorageChecksumMismatchError`](storage-checksum-mismatch-error.md) — Storage checksum mismatch
 - [`StorageConfigError`](storage-config-error.md) — Storage config
 - [`StorageError`](storage-error.md) — Storage error
 - [`StorageFileNotFoundError`](storage-file-not-found-error.md) — Storage file not found
