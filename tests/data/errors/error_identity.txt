@@ -291,7 +291,7 @@ PipelexConfigError | one of pipelex.config.invalid, pipelex.config.syntax, pipel
 PipelexError | abstract
 PipelexRequestError | one of request.invalid, request.unsupported
 PipelexRuntimeBridgeError | abstract
-PipelexSetupError | inherits cause, else runtime.misconfigured; or chosen: runtime.unexpected, pipelex.config.file_missing, pipelex.config.invalid, pipelex.config.syntax, pipelex.config.variable_missing
+PipelexSetupError | inherits cause, else runtime.misconfigured; or chosen: runtime.unexpected, pipelex.config.file_missing, pipelex.config.invalid, pipelex.config.syntax
 PipelexUnexpectedError | runtime.unexpected
 PipelineExecutionError | inherits cause, else runtime.unexpected
 PipelineInputContentError | inherits cause, else pipelex.storage.uri_invalid; or chosen: input.reference_not_found, input.file_unreadable

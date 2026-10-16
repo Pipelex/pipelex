@@ -900,7 +900,6 @@ class PipelexSetupError(PipelexError):
             PipelexErrorCode.CONFIG_FILE_MISSING,
             PipelexErrorCode.CONFIG_INVALID,
             PipelexErrorCode.CONFIG_SYNTAX,
-            PipelexErrorCode.CONFIG_VARIABLE_MISSING,
         ),
     )
 

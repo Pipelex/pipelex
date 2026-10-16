@@ -553,7 +553,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 # A person at either CLI can run on the hosted Pipelex API instead; a server's operator cannot.
                 suggest_hosted_runs=integration_mode.is_pipelex_command_line,
             )
-            raise PipelexSetupError(error_msg).with_error_code(PipelexErrorCode.CONFIG_VARIABLE_MISSING) from credentials_exc
+            # The credential error's own code says why it failed: a credential this process does not hold, a
+            # placeholder no secrets provider reads, or a process booted without inference. The boot adds only its message.
+            raise PipelexSetupError(error_msg) from credentials_exc
 
         # --- Plugin-derived registries --------------------------------------------------------
         # The plugin registrar was built earlier, with the boot-orchestrator gate checked and the
