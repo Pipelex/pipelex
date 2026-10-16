@@ -2,8 +2,10 @@
 
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.system.registries.func_registry import pipe_func
 
 
+@pipe_func()
 def wrap_lines(working_memory: WorkingMemory) -> TextContent:
     """Wraps each line of source code text with HTML span tags.
 

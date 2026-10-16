@@ -1,5 +1,6 @@
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.interpreter_hub import get_current_library, get_library_manager
+from pipelex.libraries.library_crate import SUBMITTED_PYTHON_ROOT_KEY
 from pipelex.pipe_operators.func.exceptions import PipeFuncTransportError
 from pipelex.pipe_operators.func.pipe_func_execution_dtos import (
     DEFAULT_PIPE_FUNC_TIMEOUT_SECONDS,
@@ -26,7 +27,7 @@ def build_pipe_func_execution_request(
     pipe_run_params: PipeRunParams,
     timeout_seconds: float = DEFAULT_PIPE_FUNC_TIMEOUT_SECONDS,
 ) -> PipeFuncExecutionRequest:
-    """Package one PipeFunc call for out-of-process execution: the current library's crate (with sources) + the transported inputs.
+    """Package one PipeFunc call for out-of-process execution: the current library's crate, the call's files, and the transported inputs.
 
     Shared by every out-of-process executor — the in-process sandbox one and the Temporal in-workflow
     one — so the request shape is defined once. Reads the crate from the current library via the
@@ -45,12 +46,18 @@ def build_pipe_func_execution_request(
     if crate is None:
         msg = (
             f"Cannot run PipeFunc '{function_name}' out-of-process: no crate is available for the current library "
-            f"'{library_id}'. The library must be loaded in sandbox-hosted mode so the customer sources travel on the crate."
+            f"'{library_id}'. The library must be loaded in sandbox-hosted mode so the customer files travel on the crate."
         )
         raise PipeFuncTransportError(msg)
 
+    # The call carries its own Python root's files and no other: the files of the method tree its step was read from,
+    # or the files submitted beside the bundles parsed from content strings. The crate travels without them.
+    tree_bundle_ref = crate.tree_bundles.get(pipe_code)
+    root_key = tree_bundle_ref.tree_key if tree_bundle_ref is not None else SUBMITTED_PYTHON_ROOT_KEY
+    call_files = crate.pipe_func_files.get(root_key, {})
     return PipeFuncExecutionRequest(
-        crate=crate,
+        crate=crate.model_copy(update={"pipe_func_files": {}}),
+        files=dict(call_files),
         working_memory_raw=working_memory.dump_for_transport(),
         pipe_code=pipe_code,
         function_name=function_name,

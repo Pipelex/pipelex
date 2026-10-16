@@ -22,17 +22,15 @@ from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeCond
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
-from pipelex.system.registries.func_registry import func_registry
+from pipelex.system.registries.func_registry import pipe_func
 from pipelex.validation_error_types import PipeValidationErrorType
 
 _DOMAIN_CODE = "test_optionals_cond"
 
 
+@pipe_func()
 def optionals_cond_echo_topic(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text=f"echo:{working_memory.get_stuff_as_str(name='topic')}")
-
-
-_TEST_FUNCS = [optionals_cond_echo_topic]
 
 
 def _make_condition(*, output_ref: str, outcomes: dict[str, str], default_outcome: str) -> PipeCondition:
@@ -58,24 +56,13 @@ def _register_target_pipe(*, pipe_code: str, output_ref: str) -> None:
             description="Mapped target pipe",
             inputs={"topic": "Text"},
             output=output_ref,
-            function_name="optionals_cond_echo_topic",
+            function_name=f"{__name__}.optionals_cond_echo_topic",
         ),
     )
     get_pipe_library().add_new_pipe(pipe=target)
 
 
 class TestConditionOptionalOutputValidation:
-    @classmethod
-    def setup_class(cls):
-        for func in _TEST_FUNCS:
-            func_registry.register_function(func)
-
-    @classmethod
-    def teardown_class(cls):
-        for func in _TEST_FUNCS:
-            if func_registry.has_function(func.__name__):
-                func_registry.unregister_function_by_name(func.__name__)
-
     # ---- OPTIONAL_OUTPUT_REQUIRED (static, at pipe construction) ----
 
     def test_continue_outcome_with_plain_output_is_rejected(self, load_empty_library: Callable[[], str]):

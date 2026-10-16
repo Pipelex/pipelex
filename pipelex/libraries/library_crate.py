@@ -8,8 +8,13 @@ from pipelex.core.bundle_resources.bundle_resource import BundleResources
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.method_trees.tree_bundle import TreeBundle, TreeBundleRef
+from pipelex.core.method_trees.tree_files import TreeFileEntry
 from pipelex.libraries.exceptions import CrateIntegrityError
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import ElaborationMetadata, PipeBlueprintUnion
+
+#: The Python root of the steps whose bundles were parsed from content strings, which have no method tree: the files of
+#: the library directories loaded beside them, as a sandbox-hosted deployment captures them.
+SUBMITTED_PYTHON_ROOT_KEY = "submitted"
 
 
 class LibraryCrate(BaseModel):
@@ -44,14 +49,17 @@ class LibraryCrate(BaseModel):
     ``preliminary_text`` PipeLLM), so a refusal raised while building a helper is reported on the pipe
     and the field the author wrote. Like ``source_map``, it is excluded from the fingerprint."""
 
-    python_sources: dict[str, str] = Field(default_factory=dict)
-    """relpath (within the library dir) -> Python source text, captured WITHOUT importing.
+    pipe_func_files: dict[str, dict[str, TreeFileEntry]] = Field(default_factory=dict)
+    """Python root -> the files a `PipeFunc` call of that root receives, by tree path, captured WITHOUT importing.
 
-    Carries the customer's PipeFunc and structure-class .py source alongside the method so it can
-    travel to a sandbox and be registered + executed there. Populated only in sandbox-hosted load
-    mode; empty for local/direct loads. Deliberately EXCLUDED from the fingerprint (see
-    compute_fingerprint_from_content): the fingerprint represents library structure for dedupe, and
-    folding source into it would break the structural-idempotency contract in load_from_crate.
+    A root is the key of a method tree (`tree_key_of`) for a step whose bundle was read from a tree, holding every file
+    of that tree except its `.mthds` files, or `SUBMITTED_PYTHON_ROOT_KEY` for the steps of bundles parsed from content
+    strings, holding the files of the library directories loaded beside them, keyed by their path there. Each file is a
+    file entry of the standard: its text, or `{"base64": ...}`. A call carries its own root's files to the sandbox that
+    imports and runs the function (`PipeFuncExecutionRequest.files`). Populated only in sandbox-hosted load mode;
+    empty for local/direct loads, which import from the disk. Deliberately EXCLUDED from the fingerprint (see
+    compute_fingerprint_from_content): the fingerprint represents library structure for dedupe, and folding files into
+    it would break the structural-idempotency contract in load_from_crate.
     """
 
     bundle_resources: BundleResources = Field(default_factory=dict)
@@ -61,7 +69,7 @@ class LibraryCrate(BaseModel):
     crate is loaded again, a Temporal workflow included: a file read when the method loads travels inline, and one
     read only when its step runs may travel by reference to the run's storage (see `relocate_run_resources`).
     Empty for a library loaded from directories, whose steps read beside their files on disk. Like
-    `python_sources`, it is transport-only: EXCLUDED from the fingerprint and from the normalized crate.
+    `pipe_func_files`, it is transport-only: EXCLUDED from the fingerprint and from the normalized crate.
     """
 
     method_trees: dict[str, str] = Field(default_factory=dict)
@@ -72,7 +80,7 @@ class LibraryCrate(BaseModel):
     A pipe reads a file its bundle names, such as a PipeDocGen `template_file`, only by resolving it in its bundle's
     tree (`tree_bundles`), never through `source_map`: a source is a label, which a caller sends with content strings
     and a bundle's own text can write, so a pipe loaded from content strings has no tree and reads only the files
-    submitted with it (`bundle_resources`). Transport-only, like `python_sources`: EXCLUDED from the fingerprint and
+    submitted with it (`bundle_resources`). Transport-only, like `pipe_func_files`: EXCLUDED from the fingerprint and
     from the normalized crate, so a host path never reaches a caller through `/resolve`.
     """
 

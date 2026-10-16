@@ -175,7 +175,7 @@ class TestBundleResources:
         assert relocated is crate
 
     def test_resources_round_trip_and_stay_out_of_the_fingerprint(self) -> None:
-        """Like python_sources, the files travel with the crate but are not part of its structure."""
+        """Like the files a PipeFunc call receives, the files travel with the crate but are not part of its structure."""
         resources = make_bundle_resources(files={"templates/report.docx": b"docx bytes"})
         bare = LibraryCrateFactory.make_from_blueprints([_blueprint()])
         with_resources = LibraryCrateFactory.make_from_blueprints([_blueprint()], bundle_resources=resources)

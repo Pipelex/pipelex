@@ -418,17 +418,19 @@ Pipelex loads your pipelines in a specific order to ensure dependencies are reso
 - Links pipes with their respective domains
 - Resolves input/output concept references
 
-### 5. Function Registration
+### 5. PipeFunc Functions
 
-- Discovers functions decorated with `@pipe_func()`
-- Registers them in the function registry
-- Makes them available for `PipeFunc` operators
+- Locates the module each `PipeFunc` step names by its import path in the step's method tree
+- Proves from the module's source, without importing it, that the function is a top-level function carrying the `@pipe_func()` marker
+- Imports nothing: a module is imported when a step naming one of its functions first runs
 
-## Custom Function Registration
+## Custom Functions
 
-For custom functions used in `PipeFunc` operators, add the `@pipe_func()` decorator:
+A `PipeFunc` step names its function by its import path from the root of the method tree, and the function carries the `@pipe_func()` marker, which takes no argument:
 
 ```python
+# funcs/processing.py, in the method's folder
+
 from pipelex.system.registries.func_registry import pipe_func
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.text_content import TextContent
@@ -436,20 +438,12 @@ from pipelex.core.stuffs.text_content import TextContent
 
 @pipe_func()
 async def my_custom_function(working_memory: WorkingMemory) -> TextContent:
-    """
-    This function is automatically discovered and registered.
-    """
     input_data = working_memory.get_stuff("input_name")
     # Process data
     return TextContent(text=f"Processed: {input_data.content.text}")
-
-
-# Optional: specify a custom name
-@pipe_func(name="custom_processor")
-async def another_function(working_memory: WorkingMemory) -> TextContent:
-    # Implementation
-    pass
 ```
+
+The step then reads `function_name = "funcs.processing.my_custom_function"`. See [PipeFunc](../../building-methods/pipes/pipe-operators/PipeFunc.md) for the rules, and `pipelex fix function-names` to migrate a method still naming its functions by flat names.
 
 ## Validation
 
@@ -489,11 +483,12 @@ pipelex show pipe YOUR_PIPE_CODE
 
 ### 3. Custom Functions
 
-- Always use the `@pipe_func()` decorator
+- Always use the `@pipe_func()` marker, and name each function in the `.mthds` file by its import path from the method's folder
+- Keep the functions' modules inside the method's folder, so they travel with the method
 - Use descriptive function names
 - Document function parameters and return types
 - Keep functions focused and testable
-- **Keep modules clean**: Avoid module-level code that executes on import (Pipelex imports modules during auto-discovery)
+- **Keep modules clean**: A module's top-level code runs when a step naming one of its functions first runs
 
 ### 4. Validation
 

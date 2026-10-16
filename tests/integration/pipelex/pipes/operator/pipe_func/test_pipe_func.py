@@ -16,24 +16,11 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.registries.func_registry import func_registry
-from tests.cases.source_code import wrap_lines
 
 
 @pytest.mark.dry_runnable
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeFunc:
-    @classmethod
-    def setup_class(cls):
-        """Register test functions before running tests."""
-        func_registry.register_function(wrap_lines)
-
-    @classmethod
-    def teardown_class(cls):
-        """Clean up registered functions after tests."""
-        if func_registry.has_function("wrap_lines"):
-            func_registry.unregister_function_by_name("wrap_lines")
-
     async def test_wrap_lines_pipe_func(
         self,
         job_metadata: JobMetadata,
@@ -62,7 +49,7 @@ if __name__ == "__main__":
         # Create the PipeFunc job
         pipe_func_blueprint = PipeFuncBlueprint(
             description="Function pipe for wrapping lines",
-            function_name="wrap_lines",
+            function_name="tests.cases.source_code.wrap_lines",
             output=NativeConceptCode.TEXT,
         )
 

@@ -11,6 +11,7 @@ def rehydrate_library_and_memory(
     library_id: str,
     crate: LibraryCrate,
     working_memory_raw: dict[str, Any] | None,
+    is_crate_prevalidated: bool = False,
 ) -> WorkingMemory | None:
     """Open a fresh library from a transported crate and hydrate a transported working memory.
 
@@ -29,13 +30,17 @@ def rehydrate_library_and_memory(
     2. ``load_from_crate`` — rebuilds domains/concepts/pipes and registers the dynamic classes.
     3. Hydrate the working memory (needs step 2 to have registered the classes it references).
 
+    ``is_crate_prevalidated`` skips the pipes' validation, for a crate the sender validated where it was assembled,
+    such as the one a `PipeFunc` call carries to a sandbox, whose other steps may name files of trees the sandbox
+    never receives.
+
     Returns the hydrated WorkingMemory, or None when there was nothing to hydrate.
     """
     library_manager = get_library_manager()
     library_manager.open_fresh_library(library_id=library_id)
     set_current_library(library_id=library_id)
 
-    library_manager.load_from_crate(library_id=library_id, crate=crate)
+    library_manager.load_from_crate(library_id=library_id, crate=crate, is_crate_prevalidated=is_crate_prevalidated)
 
     if working_memory_raw is None:
         return None

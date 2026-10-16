@@ -27,7 +27,7 @@ type = "PipeFunc"
 description = "e"
 inputs = { text = "Text" }
 output = "Text"
-function_name = "echo"
+function_name = "pipe_func.echo"
 """
 _PIPE_FUNC_PY = "def echo(working_memory):\n    return 'hi'\n"
 

@@ -32,6 +32,10 @@ The tree's `.gitignore` files are what keeps a run's outputs out of the method: 
 
 A file a bundle names, such as a [`PipeDocGen`](pipes/pipe-operators/PipeDocGen.md) step's `template_file`, is a path relative to the bundle's file, written with forward slashes, and it is resolved in the bundle's tree: joined to the bundle's own place in the tree, a `..` may climb out of the bundle's folder to a file elsewhere in the tree, and the result must be a file of the tree. So a bundle in `bundles/` can name `../templates/invoice.docx`, while a path climbing above the tree's root, an absolute path, a file a `.gitignore` keeps out and a file of a nested package are all refused, each refusal naming the files by their paths in the tree. Pipelex looks the path up among the tree's files and never opens a path a bundle wrote.
 
+## Python modules
+
+A [`PipeFunc`](pipes/pipe-operators/PipeFunc.md) step names its function by its import path from the root of the tree, such as `funcs.totals.compute_totals` for the function `compute_totals` of `funcs/totals.py`, and its module is found among the tree's files. A run imports the tree's modules with the root first on the import path, refuses the import of a file the membership rule keeps out, such as a `.gitignore`d module, and writes no `__pycache__` into the tree. On a sandbox-hosted deployment, every file of the tree except its `.mthds` files travels with each call of the step.
+
 ## Library directories
 
 A library directory, such as a `-L` directory or one of `PIPELEXPATH`, is a place methods are found rather than one method. Pipelex loads its tree, then the tree of each nested package and nested repository under it, each as a method of its own whose steps read only its own files, so every method in the directory loads. A `.mthds` file kept out by the membership rule, a hidden one, a gitignored one or one inside a virtual environment, is not loaded.

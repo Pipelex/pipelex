@@ -21,10 +21,11 @@ from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipeline.execution_seams import prepare_pipe_job
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.registries.func_registry import func_registry
+from pipelex.system.registries.func_registry import pipe_func
 from tests.integration.pipelex.fixtures.pipe_job_helpers import make_mode_guarded_run_params
 
 
+@pipe_func()
 def optionals_method_report(working_memory: WorkingMemory) -> TextContent:
     topic = working_memory.get_stuff_as_str(name="topic")
     source_stuff = working_memory.get_optional_stuff(name="source")
@@ -41,22 +42,13 @@ def _make_method_pipe() -> PipeFunc:
             description="Method with a required topic and an optional source",
             inputs={"topic": "Text", "source": "Text?"},
             output="Text",
-            function_name="optionals_method_report",
+            function_name=f"{__name__}.optionals_method_report",
         ),
     )
 
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestOptionalMethodInputs:
-    @classmethod
-    def setup_class(cls):
-        func_registry.register_function(optionals_method_report)
-
-    @classmethod
-    def teardown_class(cls):
-        if func_registry.has_function("optionals_method_report"):
-            func_registry.unregister_function_by_name("optionals_method_report")
-
     async def test_omitted_optional_input_records_not_provided(self, load_empty_library: Callable[[], str]):
         """prepare_pipe_job seeds a not-provided absence record for each omitted `?` input."""
         library_id = load_empty_library()

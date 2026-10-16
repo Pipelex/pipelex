@@ -29,28 +29,28 @@ from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.registries.func_registry import func_registry
+from pipelex.system.registries.func_registry import pipe_func
 from tests.integration.pipelex.fixtures.pipe_job_helpers import make_mode_guarded_run_params
 
 _DOMAIN_CODE = "test_optionals_companion"
 
 
+@pipe_func()
 def optionals_comp_find(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text=f"found:{working_memory.get_stuff_as_str(name='source')}")
 
 
+@pipe_func()
 def optionals_comp_find_many(working_memory: WorkingMemory) -> ListContent[TextContent]:
     return ListContent[TextContent](items=[TextContent(text=f"item:{working_memory.get_stuff_as_str(name='source')}")])
 
 
+@pipe_func()
 def optionals_comp_sink(working_memory: WorkingMemory) -> TextContent:
     a_out_stuff = working_memory.get_optional_stuff(name="a_out")
     if a_out_stuff is None:
         return TextContent(text="no findings")
     return TextContent(text=f"findings: {a_out_stuff.as_text.text}")
-
-
-_TEST_FUNCS = [optionals_comp_find, optionals_comp_find_many, optionals_comp_sink]
 
 
 def _make_live_run_params() -> PipeRunParams:
@@ -69,7 +69,7 @@ def _build_sequence_with_liftable_parallel() -> PipeSequence:
             description="Singular branch over source",
             inputs={"source": "Text"},
             output="Text",
-            function_name="optionals_comp_find",
+            function_name=f"{__name__}.optionals_comp_find",
         ),
     )
     branch_plural = PipeFactory[PipeFunc].make_from_blueprint(
@@ -79,7 +79,7 @@ def _build_sequence_with_liftable_parallel() -> PipeSequence:
             description="Plural branch over source",
             inputs={"source": "Text"},
             output="Text[]",
-            function_name="optionals_comp_find_many",
+            function_name=f"{__name__}.optionals_comp_find_many",
         ),
     )
     sink = PipeFactory[PipeFunc].make_from_blueprint(
@@ -89,7 +89,7 @@ def _build_sequence_with_liftable_parallel() -> PipeSequence:
             description="Absorbs the singular branch slot",
             inputs={"a_out": "Text?"},
             output="Text",
-            function_name="optionals_comp_sink",
+            function_name=f"{__name__}.optionals_comp_sink",
         ),
     )
     parallel = PipeFactory[PipeParallel].make_from_blueprint(
@@ -127,17 +127,6 @@ def _build_sequence_with_liftable_parallel() -> PipeSequence:
 
 
 class TestLiftedParallelCompanionSlots:
-    @classmethod
-    def setup_class(cls):
-        for func in _TEST_FUNCS:
-            func_registry.register_function(func)
-
-    @classmethod
-    def teardown_class(cls):
-        for func in _TEST_FUNCS:
-            if func_registry.has_function(func.__name__):
-                func_registry.unregister_function_by_name(func.__name__)
-
     @pytest.mark.asyncio(loop_scope="class")
     async def test_lifted_parallel_resolves_branch_slots(self, job_metadata: JobMetadata, load_empty_library: Callable[[], str]):
         """Static validation blesses the flow AND the runtime resolves every branch slot on lift:

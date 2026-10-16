@@ -23,7 +23,7 @@ There is no `--log-level` flag: `pipelex-agent` is machine-consumed, so logging 
 
 ## Commands Overview
 
-The agent CLI mirrors the main CLI's subcommand structure for `run`, `validate`, and `inputs`, each with `pipe`, `bundle`, and `method` subcommands. It also provides `fix bundle` for deterministic in-place repairs.
+The agent CLI mirrors the main CLI's subcommand structure for `run`, `validate`, and `inputs`, each with `pipe`, `bundle`, and `method` subcommands. It also provides `fix bundle` for deterministic in-place repairs, and `fix function-names` to migrate a method's `PipeFunc` function names.
 
 ### Run
 
@@ -119,6 +119,14 @@ pipelex-agent fix bundle <PATH> [OPTIONS]
 - `--error-format` - Error output format: `markdown` or `json` (defaults to `--format`'s value)
 
 The result reports `iterations`, `fixes_applied`, `files_written`, and any `remaining_errors`. A fully valid result exits 0; a completed fix attempt that remains invalid exits 1; argument, setup, or unexpected failures exit 2.
+
+Rewrite a method's flat `PipeFunc` function names as import paths from its folder, the migration of the retired function registry (see [PipeFunc](../../building-methods/pipes/pipe-operators/PipeFunc.md#migrating-flat-function-names)):
+
+```bash
+pipelex-agent fix function-names <PATH> [--dry-run] [--format markdown|json] [--error-format markdown|json]
+```
+
+The result reports `directory`, `is_dry_run`, `changed_files`, the `rewrites` it made (each with its `bundle`, `pipe_code`, the `flat_name` and the `import_path`), the `marker_removals` (each `@pipe_func(name=...)` marker whose argument it dropped), the `unresolved` flat names it left, each with the `reason` and, when several modules register the name, their import paths in `candidates`, and the `unresolved_markers` whose argument it left in place, each with its `module`, `function`, `registered_name` and `reason`: a marker registering a name some step still holds unresolved, or one whose name is not a string literal. Branch on `is_complete`, which is true when no flat name and no marker was left unresolved. Nothing is imported and Pipelex does not boot. The command exits 1 when a flat name or a marker was left, and 2 when the folder cannot be listed as a method tree or a file cannot be read or written.
 
 ### Inputs
 

@@ -97,7 +97,6 @@ from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.configuration.config_surface import INFERENCE_BACKEND_CONFIG_SURFACE_ID, PIPELEX_CONFIG_SURFACE_ID
 from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.registries.class_registry_access import class_registry_scoping
-from pipelex.system.registries.func_registry import FuncRegistry, func_registry
 from pipelex.system.registries.singleton import MetaSingleton
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.system.telemetry.observer_telemetry import ObserverTelemetry
@@ -263,7 +262,6 @@ class RuntimeBoot(metaclass=MetaSingleton):
 
         # tools
         self.class_registry: ClassRegistryAbstract | None = None
-        self.func_registry: FuncRegistry | None = None
         # plugins — the registrar is built in setup() (build_registrar); held for the slot-claim /
         # CLI-command / teardown apply-points. Declared here so teardown() can guard on it.
         self._plugin_registrar: PluginRegistrar | None = None
@@ -464,8 +462,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         KajsonManager.teardown()
         self.kajson_manager = KajsonManager(class_registry=self.class_registry)
 
-        self.func_registry = func_registry or FuncRegistry()
-        self.runtime_hub.set_func_registry(func_registry=self.func_registry)
         self.runtime_hub.set_secrets_provider(secrets_provider=secrets_provider)
         # Storage is selected from the config-driven StorageProviderRegistry, built from the plugin
         # registrar (constructed above, just before the secrets provider). Its resolution and hub-set
@@ -727,7 +723,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
         What a raising step *does* still skip is the releases that follow it in the ``try`` — the ones
         before it have already run. That set is now only the *dangling* half: an SDK client left open, a
-        reporting buffer unflushed, the previous boot's ``func_registry`` entries carried forward.
+        reporting buffer unflushed.
         Everything that would instead **poison** the next boot moved into the ``finally``, so the two
         release paths guarantee the same set. Closing the dangling half means collapsing this path and
         ``_release_after_failed_boot`` into one list.
@@ -745,7 +741,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             # tools
             if self.class_registry:
                 self.class_registry.teardown()
-            func_registry.teardown()
 
             log.verbose(f"The {PACKAGE_NAME} {PACKAGE_VERSION} runtime was torn down, except its config and logs")
         finally:
@@ -808,7 +803,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         would otherwise *poison the next boot* is here — the hub config and its boot-scoped flags, the class-registry scoping, the
         ``KajsonManager``, the template registries, the telemetry singleton and the ``MetaSingleton``
         registration. What is deliberately absent is ``sdk_client_manager``, ``reporting_delegate``,
-        ``func_registry``, ``inference_manager`` and ``class_registry``. The first three leave resources
+        ``inference_manager`` and ``class_registry``. The first two leave resources
         dangling rather than corrupting the next boot; the last two are the very attributes a partial
         ``setup()`` may not have assigned, which is the reason this path exists at all. Adding any of
         them here would widen a second hand-maintained copy of the teardown list that is bound to

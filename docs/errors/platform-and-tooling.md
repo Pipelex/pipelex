@@ -71,7 +71,6 @@ own page. Classes are grouped by subsystem.
 - [`CredentialsError`](credentials-error.md) — Missing or invalid credentials
 - [`EnvVarNotFoundError`](env-var-not-found-error.md) — Environment variable not set
 - [`FatalError`](fatal-error.md) — Fatal error
-- [`FuncRegistryError`](func-registry-error.md) — Func registry
 - [`InvocationPathError`](invocation-path-error.md) — Invocation path not derivable
 - [`JobMetadataError`](job-metadata-error.md) — Job metadata
 - [`LangfuseCredentialsError`](langfuse-credentials-error.md) — Langfuse credentials
@@ -131,6 +130,7 @@ own page. Classes are grouped by subsystem.
 ## Migration
 
 - [`FormerReleaseConfigError`](former-release-config-error.md) — Configuration left by a former release
+- [`FunctionNamesMigrationError`](function-names-migration-error.md) — Function names migration error
 - [`MigrationError`](migration-error.md) — Migration error
 - [`MigrationGoldenError`](migration-golden-error.md) — Migration golden error
 - [`MigrationLedgerError`](migration-ledger-error.md) — Migration ledger error

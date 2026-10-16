@@ -22,7 +22,7 @@ from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.runtime_hub import get_class_registry
-from pipelex.system.registries.func_registry import func_registry
+from pipelex.system.registries.func_registry import pipe_func
 from pipelex.validation_error_types import PipeValidationErrorType
 
 _DOMAIN_CODE = "test_optionals_par_static"
@@ -42,15 +42,14 @@ class ParTaintStrictReport(StructuredContent):
     found_result: TextContent = Field(description="Result of the maybe-absent branch")
 
 
+@pipe_func()
 def optionals_par_static_find(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text=f"found:{working_memory.get_stuff_as_str(name='source')}")
 
 
+@pipe_func()
 def optionals_par_static_base(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text=f"base:{working_memory.get_stuff_as_str(name='topic')}")
-
-
-_TEST_FUNCS = [optionals_par_static_find, optionals_par_static_base]
 
 
 def _register_branch_pipes(*, find_output_ref: str = "Text") -> None:
@@ -61,7 +60,7 @@ def _register_branch_pipes(*, find_output_ref: str = "Text") -> None:
             description="Consumes source plain: liftable when the parallel's source is optional",
             inputs={"source": "Text"},
             output=find_output_ref,
-            function_name="optionals_par_static_find",
+            function_name=f"{__name__}.optionals_par_static_find",
         ),
     )
     branch_base = PipeFactory[PipeFunc].make_from_blueprint(
@@ -71,7 +70,7 @@ def _register_branch_pipes(*, find_output_ref: str = "Text") -> None:
             description="Consumes the always-present topic",
             inputs={"topic": "Text"},
             output="Text",
-            function_name="optionals_par_static_base",
+            function_name=f"{__name__}.optionals_par_static_base",
         ),
     )
     pipe_library = get_pipe_library()
@@ -111,16 +110,8 @@ def _build_parallel(*, output_ref: str, structure_class_names: list[str], inputs
 class TestParallelOptionalCombineValidation:
     @classmethod
     def setup_class(cls):
-        for func in _TEST_FUNCS:
-            func_registry.register_function(func)
         get_class_registry().register_class(ParTaintReport)
         get_class_registry().register_class(ParTaintStrictReport)
-
-    @classmethod
-    def teardown_class(cls):
-        for func in _TEST_FUNCS:
-            if func_registry.has_function(func.__name__):
-                func_registry.unregister_function_by_name(func.__name__)
 
     def test_required_field_fed_by_liftable_branch_is_rejected(self, load_empty_library: Callable[[], str]):
         """The parallel's `?` input makes the find branch liftable, and 'found_result' is required."""

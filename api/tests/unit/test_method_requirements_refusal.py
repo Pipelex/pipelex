@@ -60,7 +60,7 @@ type = "PipeFunc"
 description = "Crunch numbers in caller code"
 inputs = { data = "Text" }
 output = "Text"
-function_name = "crunch"
+function_name = "funcs.pipe_func.crunch"
 """
 
 _PIPE_FUNC_PY = """\
@@ -69,7 +69,7 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.system.registries.func_registry import pipe_func
 
 
-@pipe_func(name="crunch")
+@pipe_func()
 async def crunch(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text="crunched")
 """

@@ -117,7 +117,7 @@ type = "PipeFunc"
 description = "Condense the reading of a filing"
 inputs = { reading = "Text" }
 output = "Text"
-function_name = "invocation_paths_condense_filing"
+function_name = "tests.integration.pipelex.pipeline.invocation_paths.invocation_paths_helpers.invocation_paths_condense_filing"
 
 [pipe.assemble_report]
 type = "PipeCompose"

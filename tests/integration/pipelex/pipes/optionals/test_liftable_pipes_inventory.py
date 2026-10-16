@@ -19,29 +19,30 @@ from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipeline.controller_taint import collect_controller_taint_analyses
 from pipelex.pipeline.liftable_pipes import build_liftable_pipes
 from pipelex.pipeline.validation_report import PipelexValidationReport
-from pipelex.system.registries.func_registry import func_registry
+from pipelex.system.registries.func_registry import pipe_func
 
 _DOMAIN_CODE = "test_optionals_inventory"
 
 
+@pipe_func()
 def optionals_inv_echo_source(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text=f"a:{working_memory.get_stuff_as_str(name='source')}")
 
 
+@pipe_func()
 def optionals_inv_echo_a_out(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text=f"b:{working_memory.get_stuff_as_str(name='a_out')}")
 
 
+@pipe_func()
 def optionals_inv_sink(working_memory: WorkingMemory) -> TextContent:
     b_out_stuff = working_memory.get_optional_stuff(name="b_out")
     return TextContent(text="ok" if b_out_stuff is None else b_out_stuff.as_text.text)
 
 
+@pipe_func()
 def optionals_inv_echo_topic(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text=f"base:{working_memory.get_stuff_as_str(name='topic')}")
-
-
-_TEST_FUNCS = [optionals_inv_echo_source, optionals_inv_echo_a_out, optionals_inv_sink, optionals_inv_echo_topic]
 
 
 def _build_lift_chain_pipes() -> list[str]:
@@ -53,7 +54,7 @@ def _build_lift_chain_pipes() -> list[str]:
             description="Liftable when source is absent",
             inputs={"source": "Text"},
             output="Text",
-            function_name="optionals_inv_echo_source",
+            function_name=f"{__name__}.optionals_inv_echo_source",
         ),
     )
     step_b = PipeFactory[PipeFunc].make_from_blueprint(
@@ -63,7 +64,7 @@ def _build_lift_chain_pipes() -> list[str]:
             description="Liftable in chain",
             inputs={"a_out": "Text"},
             output="Text",
-            function_name="optionals_inv_echo_a_out",
+            function_name=f"{__name__}.optionals_inv_echo_a_out",
         ),
     )
     sink_c = PipeFactory[PipeFunc].make_from_blueprint(
@@ -73,7 +74,7 @@ def _build_lift_chain_pipes() -> list[str]:
             description="Absorbing sink",
             inputs={"b_out": "Text?"},
             output="Text",
-            function_name="optionals_inv_sink",
+            function_name=f"{__name__}.optionals_inv_sink",
         ),
     )
     pipe_library = get_pipe_library()
@@ -98,17 +99,6 @@ def _build_lift_chain_pipes() -> list[str]:
 
 
 class TestLiftablePipesInventory:
-    @classmethod
-    def setup_class(cls):
-        for func in _TEST_FUNCS:
-            func_registry.register_function(func)
-
-    @classmethod
-    def teardown_class(cls):
-        for func in _TEST_FUNCS:
-            if func_registry.has_function(func.__name__):
-                func_registry.unregister_function_by_name(func.__name__)
-
     def test_sequence_lift_chain_is_inventoried(self, load_empty_library: Callable[[], str]):
         load_empty_library()
         pipe_codes = _build_lift_chain_pipes()
@@ -136,7 +126,7 @@ class TestLiftablePipesInventory:
                 description="Liftable branch",
                 inputs={"source": "Text"},
                 output="Text",
-                function_name="optionals_inv_echo_source",
+                function_name=f"{__name__}.optionals_inv_echo_source",
             ),
         )
         branch_base = PipeFactory[PipeFunc].make_from_blueprint(
@@ -146,7 +136,7 @@ class TestLiftablePipesInventory:
                 description="Guaranteed branch",
                 inputs={"topic": "Text"},
                 output="Text",
-                function_name="optionals_inv_echo_topic",
+                function_name=f"{__name__}.optionals_inv_echo_topic",
             ),
         )
         pipe_library = get_pipe_library()

@@ -15,6 +15,7 @@ from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.runtime_hub import get_event_log_override
 from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.registries.func_registry import pipe_func
 
 if TYPE_CHECKING:
     from pipelex.system.trace_context import TraceContext
@@ -23,6 +24,7 @@ if TYPE_CHECKING:
 _IS_LOST_ATTEMPT: ContextVar[bool] = ContextVar("invocation_paths_is_lost_attempt", default=False)
 
 
+@pipe_func()
 def invocation_paths_condense_filing(working_memory: WorkingMemory) -> TextContent:
     reading = working_memory.get_stuff_as_str(name="reading")
     if _IS_LOST_ATTEMPT.get():

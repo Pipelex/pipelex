@@ -26,16 +26,18 @@ from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.registries.func_registry import func_registry
+from pipelex.system.registries.func_registry import pipe_func
 from tests.integration.pipelex.fixtures.pipe_job_helpers import make_mode_guarded_run_params
 from tests.unit.pipelex.graph.conftest import make_trace_context
 
 
+@pipe_func()
 def optionals_echo_source(working_memory: WorkingMemory) -> TextContent:
     source_text = working_memory.get_stuff_as_str(name="source")
     return TextContent(text=f"echo:{source_text}")
 
 
+@pipe_func()
 def optionals_absorbing_sink(working_memory: WorkingMemory) -> TextContent:
     source_stuff = working_memory.get_optional_stuff(name="source")
     if source_stuff is None:
@@ -43,15 +45,13 @@ def optionals_absorbing_sink(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text=f"report:{source_stuff.as_text.text}")
 
 
+@pipe_func()
 def optionals_list_from_source(working_memory: WorkingMemory) -> ListContent[TextContent]:
     source_text = working_memory.get_stuff_as_str(name="source")
     return ListContent[TextContent](items=[TextContent(text=source_text)])
 
 
-_TEST_FUNCS = [optionals_echo_source, optionals_absorbing_sink, optionals_list_from_source]
-
-
-def _make_pipe_func(pipe_code: str, *, source_ref: str, function_name: str = "optionals_echo_source", output: str = "Text") -> PipeFunc:
+def _make_pipe_func(pipe_code: str, *, source_ref: str, function_name: str = f"{__name__}.optionals_echo_source", output: str = "Text") -> PipeFunc:
     blueprint = PipeFuncBlueprint(
         description=f"Optionals trichotomy test pipe {pipe_code}",
         inputs={"source": source_ref},
@@ -88,17 +88,6 @@ def _make_live_run_params() -> PipeRunParams:
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestLiftSkipTrichotomy:
-    @classmethod
-    def setup_class(cls):
-        for func in _TEST_FUNCS:
-            func_registry.register_function(func)
-
-    @classmethod
-    def teardown_class(cls):
-        for func in _TEST_FUNCS:
-            if func_registry.has_function(func.__name__):
-                func_registry.unregister_function_by_name(func.__name__)
-
     async def test_plain_input_absent_with_record_lifts_pipe(self, job_metadata: JobMetadata, load_empty_library: Callable[[], str]):
         """A plain input fed a recorded absence skips the pipe and records a chained skipped-absence."""
         load_empty_library()
@@ -137,7 +126,7 @@ class TestLiftSkipTrichotomy:
             description="Second chained consumer",
             inputs={"echoed": "Text"},
             output="Text",
-            function_name="optionals_absorbing_sink",
+            function_name=f"{__name__}.optionals_absorbing_sink",
         )
         pipe_second = PipeFactory[PipeFunc].make_from_blueprint(
             domain_code="test_optionals",
@@ -171,7 +160,7 @@ class TestLiftSkipTrichotomy:
     async def test_optional_input_absent_runs_pipe(self, job_metadata: JobMetadata, load_empty_library: Callable[[], str]):
         """A `?` input absorbs absence: the pipe runs and the taint terminates."""
         load_empty_library()
-        pipe = _make_pipe_func("opt_absorber", source_ref="Text?", function_name="optionals_absorbing_sink")
+        pipe = _make_pipe_func("opt_absorber", source_ref="Text?", function_name=f"{__name__}.optionals_absorbing_sink")
         working_memory = WorkingMemoryFactory.make_empty()
         working_memory.record_absence(_make_seeded_absence())
 
@@ -250,7 +239,7 @@ class TestLiftSkipTrichotomy:
         pipe = _make_pipe_func(
             "opt_plural_consumer",
             source_ref="Text",
-            function_name="optionals_list_from_source",
+            function_name=f"{__name__}.optionals_list_from_source",
             output="Text[]",
         )
         working_memory = WorkingMemoryFactory.make_empty()

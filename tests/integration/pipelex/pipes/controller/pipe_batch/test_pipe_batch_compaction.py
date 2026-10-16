@@ -29,17 +29,15 @@ from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.registries.func_registry import func_registry
+from pipelex.system.registries.func_registry import pipe_func
 from tests.integration.pipelex.fixtures.pipe_job_helpers import make_mode_guarded_run_params
 
 _DOMAIN_CODE = "test_optionals_batch"
 
 
+@pipe_func()
 def optionals_batch_shout_item(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text=working_memory.get_stuff_as_str(name="item").upper())
-
-
-_TEST_FUNCS = [optionals_batch_shout_item]
 
 
 def _make_live_run_params() -> PipeRunParams:
@@ -61,7 +59,7 @@ def _build_compacting_batch() -> PipeBatch:
             description="Uppercase the batch item",
             inputs={"item": "Text"},
             output="Text",
-            function_name="optionals_batch_shout_item",
+            function_name=f"{__name__}.optionals_batch_shout_item",
         ),
     )
     gate_pipe = PipeFactory[PipeCondition].make_from_blueprint(
@@ -98,17 +96,6 @@ def _build_compacting_batch() -> PipeBatch:
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeBatchCompaction:
-    @classmethod
-    def setup_class(cls):
-        for func in _TEST_FUNCS:
-            func_registry.register_function(func)
-
-    @classmethod
-    def teardown_class(cls):
-        for func in _TEST_FUNCS:
-            if func_registry.has_function(func.__name__):
-                func_registry.unregister_function_by_name(func.__name__)
-
     async def test_absent_branch_results_are_dropped(self, job_metadata: JobMetadata, load_empty_library: Callable[[], str]):
         """Mixed items: rejected items resolve absent (continue) and are dropped from the list."""
         load_empty_library()

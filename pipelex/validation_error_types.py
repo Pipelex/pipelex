@@ -132,6 +132,12 @@ class PipeValidationErrorType(StrEnum):
     # model type and the deck's close matches, so the author can pick one.
     UNKNOWN_MODEL = "unknown_model"
 
+    # A PipeFunc whose function_name names no function the step may call: the module is not in the method tree, the
+    # function is not a top-level def or async def of it decorated with @pipe_func(), or a top-level module of the
+    # tree shares its name with a standard-library module or one importable outside the tree. Detected when the pipe
+    # is validated against the library, from the module's syntax tree, without running Python.
+    PIPE_FUNC_FUNCTION_REFUSED = "pipe_func_function_refused"
+
     # Generic fallback for unexpected validation errors
     UNKNOWN_VALIDATION_ERROR = "unknown_validation_error"
 
@@ -171,6 +177,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.UNRESOLVED_PACKAGE_DEPENDENCY
                 | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
                 | PipeValidationErrorType.UNKNOWN_MODEL
+                | PipeValidationErrorType.PIPE_FUNC_FUNCTION_REFUSED
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
                 return False
@@ -208,6 +215,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.UNRESOLVED_PACKAGE_DEPENDENCY
                 | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
                 | PipeValidationErrorType.UNKNOWN_MODEL
+                | PipeValidationErrorType.PIPE_FUNC_FUNCTION_REFUSED
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
                 return False
@@ -252,6 +260,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.UNRESOLVED_PACKAGE_DEPENDENCY
                 | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
                 | PipeValidationErrorType.UNKNOWN_MODEL
+                | PipeValidationErrorType.PIPE_FUNC_FUNCTION_REFUSED
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
                 return False
@@ -290,6 +299,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.UNRESOLVED_PACKAGE_DEPENDENCY
                 | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
                 | PipeValidationErrorType.UNKNOWN_MODEL
+                | PipeValidationErrorType.PIPE_FUNC_FUNCTION_REFUSED
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
                 return False
@@ -333,6 +343,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.UNRESOLVED_PACKAGE_DEPENDENCY
                 | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
                 | PipeValidationErrorType.UNKNOWN_MODEL
+                | PipeValidationErrorType.PIPE_FUNC_FUNCTION_REFUSED
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
                 return False
@@ -376,6 +387,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.UNRESOLVED_PACKAGE_DEPENDENCY
                 | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
                 | PipeValidationErrorType.UNKNOWN_MODEL
+                | PipeValidationErrorType.PIPE_FUNC_FUNCTION_REFUSED
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
                 return False
@@ -414,6 +426,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
                 | PipeValidationErrorType.UNRESOLVED_PACKAGE_DEPENDENCY
                 | PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.PIPE_FUNC_FUNCTION_REFUSED
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
             ):
                 return False

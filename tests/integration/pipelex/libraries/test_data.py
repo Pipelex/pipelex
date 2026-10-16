@@ -162,12 +162,12 @@ prompt      = "Orphan: $data"
         f'steps       = [{{ pipe = "{DEP_ALIAS}->helper", result = "helped" }}]',
     )
 
-    #: The same package with `helper` a PipeFunc naming a function no registry holds, so it fails to build.
+    #: The same package with `helper` a PipeFunc naming a function of a module its package does not hold, so it fails to build.
     DEP_BUNDLE_WITH_AN_UNBUILDABLE_HELPER: ClassVar[str] = DEP_BUNDLE.replace(
         'type        = "PipeLLM"\ndescription = "DEPENDENCY helper"\ninputs      = { data = "Text" }\n'
         'output      = "Text"\nprompt      = "DEPENDENCY helper: $data"',
         'type          = "PipeFunc"\ndescription   = "DEPENDENCY helper"\ninputs        = { data = "Text" }\n'
-        'output        = "Text"\nfunction_name = "no_such_function_anywhere"',
+        'output        = "Text"\nfunction_name = "probe_funcs.no_such_function_anywhere"',
     )
 
     #: A consumer whose sequence calls the package's entry.
@@ -334,7 +334,7 @@ type          = "PipeFunc"
 description   = "The exported x, which fails to build"
 inputs        = { data = "Text" }
 output        = "Text"
-function_name = "no_such_function_anywhere"
+function_name = "probe_funcs.no_such_function_anywhere"
 
 [pipe.entry]
 type        = "PipeSequence"

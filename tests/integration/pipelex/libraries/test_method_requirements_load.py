@@ -1,19 +1,23 @@
+import sys
 from pathlib import Path
 
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.interpreter_hub import get_library_manager, scoped_current_library
+from pipelex.core.method_trees.tree_python import TREE_PYTHON_HOLD
+from pipelex.interpreter_hub import get_library_manager, get_required_pipe, scoped_current_library
 from pipelex.libraries.exceptions import MethodRequirementsNotMetError, PipeFuncPackageSetUnstatedError
 from pipelex.mthds_parsing.parser import MthdsParser
+from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.plugins.pipe_func_package_offer_registry import PipeFuncPackageOffer, PipeFuncPackageOfferFactoryFn, PipeFuncPackageOfferRegistry
 from pipelex.system.configuration.pipe_func_config import PipeFuncConfig
-from pipelex.system.registries.func_registry import func_registry
 from tests.integration.pipelex.libraries.installed_packages import isolate_installed_methods, vendor_probe
 from tests.integration.pipelex.libraries.test_data import ProbePackageTestData
 
 _ABSENT_PACKAGE = "pipelex-requirements-test-absent"
 _FUNCTION_NAME = "requirements_test_crunch"
+# The module of the method's function: distinctive, since a tree's top-level module is imported under its own name.
+_MODULE_NAME = "requirements_load_funcs"
 _OFFER = PipeFuncPackageOffer(
     environment="the Daytona sandbox snapshot 'pipelex-base-test'",
     distributions={"pandas": "2.2.3", "openpyxl": "3.1.5"},
@@ -25,15 +29,12 @@ _MTHDS = f"""\
 domain = "requirements_load"
 main_pipe = "crunch"
 
-[concept]
-Note = "A note produced by the method's own code"
-
 [pipe.crunch]
 type = "PipeFunc"
 description = "Crunch numbers in the method's own code"
 inputs = {{}}
-output = "Note"
-function_name = "{_FUNCTION_NAME}"
+output = "Text"
+function_name = "{_MODULE_NAME}.{_FUNCTION_NAME}"
 """
 
 
@@ -49,7 +50,7 @@ from pipelex.system.registries.func_registry import pipe_func
 Path({str(sentinel)!r}).write_text("imported", encoding="utf-8")
 
 
-@pipe_func(name="{_FUNCTION_NAME}")
+@pipe_func()
 async def {_FUNCTION_NAME}(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text="crunched")
 """
@@ -58,7 +59,7 @@ async def {_FUNCTION_NAME}(working_memory: WorkingMemory) -> TextContent:
 def _method(*, directory: Path, requirements: str, sentinel: Path) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "main.mthds").write_text(_MTHDS, encoding="utf-8")
-    (directory / "funcs.py").write_text(_funcs_py(sentinel=sentinel), encoding="utf-8")
+    (directory / f"{_MODULE_NAME}.py").write_text(_funcs_py(sentinel=sentinel), encoding="utf-8")
     (directory / "requirements.txt").write_text(requirements, encoding="utf-8")
     return directory
 
@@ -89,7 +90,31 @@ class TestMethodRequirementsLoad:
         assert f"line 2 '{_ABSENT_PACKAGE}>=1'" in exc_info.value.message
         assert "uv pip install --python" in exc_info.value.message
         assert not sentinel.exists(), "the method's Python was imported before its requirements were checked"
-        assert func_registry.get_function(_FUNCTION_NAME) is None
+        assert _MODULE_NAME not in sys.modules
+
+    def test_locally_a_met_requirement_loads_the_method_and_its_python_is_imported_only_when_its_step_binds(self, tmp_path: Path) -> None:
+        """The check comes first, the load imports none of the method's Python, and the step's first bind imports its module."""
+        sentinel = tmp_path / "funcs-module-ran"
+        library_dir = _method(directory=tmp_path / "method", requirements="pydantic>=2\n", sentinel=sentinel)
+        library_manager = get_library_manager()
+        library_id, _ = library_manager.open_library()
+        try:
+            with scoped_current_library(library_id=library_id):
+                pipes = library_manager.load_libraries(library_id=library_id, library_dirs=[library_dir])
+                assert [pipe.code for pipe in pipes] == ["crunch"]
+                assert not sentinel.exists(), "the load imported the method's Python"
+                assert _MODULE_NAME not in sys.modules
+
+                pipe_func = get_required_pipe(pipe_code="requirements_load.crunch")
+                assert isinstance(pipe_func, PipeFunc)
+                function = pipe_func.bind_function()
+                assert function.__module__ == _MODULE_NAME
+                assert sentinel.read_text(encoding="utf-8") == "imported"
+        finally:
+            library_manager.teardown(library_id=library_id)
+            TREE_PYTHON_HOLD.unload_if_unheld()
+
+        assert _MODULE_NAME not in sys.modules
 
     def test_a_bundle_file_named_alone_loads_under_its_trees_requirements_on_every_load(self, tmp_path: Path) -> None:
         """A retry of the same blueprint, placed in its tree by the refused load, is refused again rather than taken as judged."""
@@ -114,7 +139,7 @@ class TestMethodRequirementsLoad:
         methods_dir = vendor_probe(methods_dir=tmp_path / "request-methods")
         package_dir = methods_dir / ProbePackageTestData.METHOD_NAME
         sentinel = tmp_path / "funcs-module-ran"
-        (package_dir / "funcs.py").write_text(_funcs_py(sentinel=sentinel), encoding="utf-8")
+        (package_dir / f"{_MODULE_NAME}.py").write_text(_funcs_py(sentinel=sentinel), encoding="utf-8")
         (package_dir / "requirements.txt").write_text(f"pydantic>=2\n{_ABSENT_PACKAGE}>=1\n", encoding="utf-8")
         blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=ProbePackageTestData.CONSUMER_BUNDLE)
         library_manager = get_library_manager()
@@ -151,7 +176,7 @@ class TestMethodRequirementsLoad:
                 assert [pipe.code for pipe in pipes] == ["crunch"]
                 crate = library_manager.get_crate(library_id=library_id)
                 assert crate is not None
-                assert "funcs.py" in crate.python_sources
+                assert any(f"{_MODULE_NAME}.py" in call_files for call_files in crate.pipe_func_files.values())
         finally:
             library_manager.teardown(library_id=library_id)
 
