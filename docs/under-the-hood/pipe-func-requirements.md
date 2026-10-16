@@ -11,9 +11,13 @@ A method declares the Python packages its own Python imports in a `requirements.
 
 A method tree is checked when it holds a `requirements.txt` at its root and a `.py` file anywhere in it. Python is the proxy for "has code that could import a package" rather than "has a PipeFunc pipe", because a server receives a method's Python apart from its bundles: the runner loads a bundle's `.py` files from a directory it makes for the request, while the `.mthds` files arrive as content, so the directory holding the Python holds no pipe to judge it by.
 
-The check runs in the library load, `LibraryManager.load_libraries` and `LibraryManager.load_from_blueprints` (for a bundle file named alone, whose tree is listed there), after every tree of the load is listed and before any of their Python is imported or captured, and before any pipe is built. It is `ensure_method_requirements_met` in `pipelex/libraries/method_requirements.py`. Each tree is judged once per load, and the environment is resolved only once a tree declares a requirement to judge, so a load declaring none never reads it.
+The check is `pipelex/libraries/method_requirements.py`, and a load runs it at three places, each before any Python of the tree is imported or captured and before any of its pipes is built:
 
-A requirement whose marker is false in the environment is not needed there and is skipped. One is met when the environment holds a distribution of its name, compared normalized, at a version its specifier contains, pre-releases included, and when, for each extra it names, the requirements the distribution's metadata declares under that extra are met in turn.
+- `LibraryManager.load_libraries` checks every tree of its library directories, and the tree of each bundle file it is handed, once all of them are listed.
+- `LibraryManager.load_from_blueprints` checks the tree of every bundle read from this host's disk, on every load: a blueprint an earlier load placed in its tree, a refused one included, is judged again rather than taken as judged.
+- A dependency package, one a bundle calls by its address, is checked as soon as its tree is listed, before any of its bundles loads.
+
+A requirement whose marker is false in the environment is not needed there and is skipped. One is met when the environment holds a distribution of its name, compared normalized, at a version its specifier contains, pre-releases included, and when, for each extra it names, the requirements the distribution's metadata declares under that extra are met in turn. A marker that cannot be evaluated, such as one comparing as versions a value that is not one (which releases of `packaging` before 22 refuse), refuses its requirement rather than the load.
 
 ## The environment the check reads
 
@@ -24,14 +28,27 @@ A requirement whose marker is false in the environment is not needed there and i
 | `direct` | `InterpreterPackageEnvironment` | The distributions installed in the interpreter Pipelex runs in, through `importlib.metadata`, and this interpreter's own marker environment. Extras are followed through each distribution's `Requires-Dist`. |
 | any other mode | `OfferedPackageEnvironment` | The package set the plugin providing the mode states for its sandbox, and nothing else. A marker variable the offer does not state cannot be judged, and a requirement with extras cannot be followed, so both are refused rather than judged against this process's own values. |
 
-Locally the refusal names the method's folder, each requirement and why, and gives the `uv pip install --python <this interpreter>` command that installs them. On a sandbox-hosted deployment it names no path of the host, since the method's files lie in a directory the server made for the request.
+In the `direct` mode, a method's Python is imported into the process that loads it, which is the process the check judges. A distributed orchestrator, such as our Temporal plugin, never carries a `direct`-mode method's Python to its worker: the library crate carries Python sources only in a sandbox mode, where they are captured rather than imported. A worker in the `direct` mode therefore runs only the functions its own deployment installed, whose packages are that deployment's to install, and the API server refuses a caller's Python outright unless it is sandbox-hosted (`403 CustomCodeRequiresSandbox`). So no worker needs to repeat the check.
+
+## How a refusal names the method
+
+The file is always named by its path in the method's tree, `requirements.txt`, on every item of a refusal. Paths on the host, the method's root and this interpreter's executable, are named only where the refusal may name them:
+
+- **A check inside a load names them**, since its refusal belongs either to the caller's own disk, as on a local run, or to the host, around a server's own library directories, where `reporting_host_library_tree_faults` turns it into the host's fault and withholds it from the caller. Locally, the refusal therefore names the method's folder, each requirement and why, and the `uv pip install --python <this interpreter>` command that installs them.
+- **A dependency package is named by its address**, as its bundles are, and its file by `<address>/requirements.txt`, never by the directory it was installed or fetched into.
+- **A server checking a caller's method it holds in a directory of its own names no path on the host at all** (`ensure_served_method_requirements_met`): the method is "the method", the interpreter is "the Python interpreter Pipelex runs in", and the install command names no interpreter path.
+
+## A host's own library directories
+
+A server loads its own library directories (`PIPELEXPATH`, the instance defaults, installed libraries) beside a caller's bundles. A method of those directories whose requirements are not met is the deployment's fault, not the caller's: around such a load, `reporting_host_library_tree_faults` turns the refusal into a `HostLibraryRequirementsError`, a `config`-domain error answered with a `500` whose message, naming paths on the host, never reaches the caller under STRICT disclosure, as it turns a tree it cannot list into a `HostLibraryTreeError`.
 
 ## Where the check runs on a sandbox-hosted deployment
 
-**On the runner, never on the worker or in the sandbox.** The runner is the process that holds the method's files and loads them, and the place a refusal reaches the caller before anything is dispatched:
+**On the runner, never on the worker or in the sandbox.** The runner is the process that holds the method's files, and the place a refusal reaches the caller before anything is dispatched. The runner loads the directory it makes for a request's files as one of its own library directories, where a refusal is the host's fault, so it judges the caller's method first, through `ensure_served_method_requirements_met`, run off the event loop since it lists and hashes the method's files:
 
-- **A run** (`/execute`, `/start`) with a `files` or `bundle_b64` bundle, or by `method_ref`, loads the method's non-`.mthds` files as a library directory on the runner, through `acquire_library`, so the check refuses the method there, as a `422` naming each requirement, before any dispatch.
-- **A validation by `method_ref`** (`/validate`) is dispatched whole to a validator that never reads the method's Python, a Temporal worker for instance, so `ApiRunner.validate_verdict` checks the fetched package's library directory first, through `ensure_library_dirs_requirements_met`, and returns a refusal as the invalid verdict, one item per line. Inline `mthds_contents` carry no Python and are not checked.
+- **A run** (`/execute`, `/start`) with a `files` or `bundle_b64` bundle, or by `method_ref`, is refused there as a `422` naming each requirement, before the method's files load and before any dispatch.
+- **A validation by `method_ref`** (`/validate`) is dispatched whole to a validator that never reads the method's Python, a Temporal worker for instance, so `ApiRunner.validate_verdict` returns a refusal as the invalid verdict, one item per line, before the validator is reached. Inline `mthds_contents` carry no Python and are not checked.
+- **A directory of the request that cannot be listed** stays the host's fault, a `500` `HostLibraryTreeError`, as the load reports it.
 - **The worker** loads the library crate the runner built, which carries the method's Python sources but not its `requirements.txt`, so it never checks anything, and needs to know nothing of the sandbox's packages.
 
 ## The seam: stating the sandbox's packages
@@ -62,7 +79,7 @@ class ExampleSandboxPlugin:
 
 - **`PipeFuncPackageOffer`** (`pipelex/plugins/pipe_func_package_offer_registry.py`) is closed, frozen plain data: `environment`, the place as a refusal names it to the method's author; `distributions`, each distribution's name with its exact installed version, the names compared normalized; and `marker_environment`, the PEP 508 marker values of the sandbox's interpreter. A variable left out of `marker_environment`, such as `python_full_version` when the image pins only its minor version, makes every requirement whose marker reads it refused.
 - **The factory** receives the `PipeFuncConfig` and is called each time a method declaring requirements loads, never at registration, so it may read the plugin's own configuration and should cache what it computes. It answers `None` when it cannot state the offer.
-- **It fails closed.** A mode with no registered offer, or whose factory answers `None`, meets no requirement: a method declaring one is refused with `PipeFuncPackageSetUnstatedError`, a `config`-domain fault of the deployment whose message is not caller-facing, rather than loading and failing inside the sandbox at its first import. A method declaring none still loads.
+- **It fails closed.** A mode with no registered offer, or whose factory answers `None`, meets no requirement: a method declaring one is refused with `PipeFuncPackageSetUnstatedError`, a `config`-domain fault of the deployment whose message is not caller-facing, rather than loading and failing inside the sandbox at its first import. Its message says which of the two happened: no plugin registers an offer for the mode, or the registered one could not state the packages, whose remedy is in the plugin's configuration. A method declaring none still loads.
 - **It is interpreter-layer**, like `add_pipe_func_executor`: a plugin published under `pipelex.plugins.kernel` that calls it is refused with `PluginLayerViolationError`. A second plugin stating the same mode is refused with `DuplicatePipeFuncPackageOfferError`, naming both.
 
 `Pipelex.setup` builds the `PipeFuncPackageOfferRegistry` from the registrar beside the `PipeFuncExecutorRegistry` and puts it on the `InterpreterHub` (`get_pipe_func_package_offer_registry`).
@@ -77,6 +94,7 @@ For the hosted API, the Daytona sandbox plugin registers the offer for its `dayt
 | --- | --- | --- |
 | [`MethodRequirementsFileError`](../errors/method-requirements-file-error.md) | `input` | The file holds a line the standard refuses, naming each, or is not UTF-8 text. |
 | [`MethodRequirementsNotMetError`](../errors/method-requirements-not-met-error.md) | `input` | The environment does not meet a requirement, naming each and why. |
+| [`HostLibraryRequirementsError`](../errors/host-library-requirements-error.md) | `config` | A method of a host's own library directories, loaded beside a caller's bundles, is refused for its requirements. |
 | [`PipeFuncPackageSetUnstatedError`](../errors/pipe-func-package-set-unstated-error.md) | `config` | A sandbox-hosted deployment states no package set for its execution mode. |
 
-The first two are `LibraryLoadingError`s carrying one blueprint validation item per line, whose `source` is the file (its path locally, `requirements.txt` on a sandbox-hosted deployment) and whose `line` is the line's number, so a validation reports them as an invalid verdict located on the line. They are deliberately not `MethodTreeLoadError`s, which a server reports as its own fault around the library directories it loads, since the directory a server loads a caller's Python from is one of those.
+The first two are `LibraryLoadingError`s carrying one blueprint validation item per line, whose `source` is the file's path in the tree and whose `line` is the line's number, so a validation reports them as an invalid verdict located on the line. They are deliberately not `MethodTreeLoadError`s, which a server reports as its own fault around the library directories it loads.

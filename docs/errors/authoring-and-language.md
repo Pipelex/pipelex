@@ -122,6 +122,7 @@ own page. Classes are grouped by subsystem.
 - [`DomainLoadingError`](domain-loading-error.md) — Domain loading
 - [`EntryPipeAmbiguousError`](entry-pipe-ambiguous-error.md) — Entry pipe ambiguous
 - [`EntryPipeNotFoundError`](entry-pipe-not-found-error.md) — Entry pipe not found
+- [`HostLibraryRequirementsError`](host-library-requirements-error.md) — Host library requirements
 - [`HostLibraryTreeError`](host-library-tree-error.md) — Host library tree
 - [`LibraryError`](library-error.md) — Library error
 - [`LibraryLoadingError`](library-loading-error.md) — Library loading

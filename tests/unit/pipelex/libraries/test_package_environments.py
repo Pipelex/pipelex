@@ -27,7 +27,7 @@ class TestPackageEnvironments:
         registry = mocker.patch(f"{_MODULE}.get_pipe_func_package_offer_registry")
         mocker.patch(f"{_MODULE}.is_pipe_func_sandbox_hosted", return_value=False)
 
-        environment = resolve_pipe_func_package_environment()
+        environment = resolve_pipe_func_package_environment(names_host_paths=True)
 
         assert isinstance(environment, InterpreterPackageEnvironment)
         registry.assert_not_called()
@@ -36,7 +36,7 @@ class TestPackageEnvironments:
         factory = mocker.Mock(return_value=MethodRequirementsTestData.sandbox_offer())
         pipe_func_config = _sandbox_hosted(mocker, offers={"daytona": factory})
 
-        environment = resolve_pipe_func_package_environment()
+        environment = resolve_pipe_func_package_environment(names_host_paths=True)
 
         assert isinstance(environment, OfferedPackageEnvironment)
         factory.assert_called_once_with(pipe_func_config)
@@ -45,19 +45,29 @@ class TestPackageEnvironments:
         assert environment.version_of(distribution_name="polars") is None
         assert environment.dependencies_of(distribution_name="pandas") is None
 
-    @pytest.mark.parametrize("topic", ["no plugin states the mode's packages", "the plugin cannot state them"])
-    def test_a_sandbox_mode_without_a_stated_package_set_fails_closed(self, mocker: MockerFixture, topic: str) -> None:
+    @pytest.mark.parametrize(
+        ("topic", "offer_registered", "remedy"),
+        [
+            ("no plugin registers the mode's packages", False, "must register its package offer with PluginRegistrar.add_pipe_func_package_offer"),
+            ("the registered plugin cannot state them", True, "Check the plugin's configuration"),
+        ],
+    )
+    def test_a_sandbox_mode_without_a_stated_package_set_fails_closed_naming_its_remedy(
+        self, mocker: MockerFixture, topic: str, offer_registered: bool, remedy: str
+    ) -> None:
         """No requirement can be judged, so a method declaring one is refused, as the deployment's fault rather than the method's."""
 
         def unstated(_config: object) -> PipeFuncPackageOffer | None:
             return None
 
-        offers: dict[str, PipeFuncPackageOfferFactoryFn] = {"elsewhere": unstated} if topic.startswith("no plugin") else {"daytona": unstated}
+        offers: dict[str, PipeFuncPackageOfferFactoryFn] = {"daytona": unstated} if offer_registered else {"elsewhere": unstated}
         _sandbox_hosted(mocker, offers=offers)
 
         with pytest.raises(PipeFuncPackageSetUnstatedError) as exc_info:
-            resolve_pipe_func_package_environment()
+            resolve_pipe_func_package_environment(names_host_paths=True)
 
         assert exc_info.value.execution_mode == "daytona"
-        assert "add_pipe_func_package_offer" in exc_info.value.message
+        assert exc_info.value.offer_registered is offer_registered, topic
+        assert remedy in exc_info.value.message, topic
+        assert ("registers a package offer that could not state" in exc_info.value.message) is offer_registered, topic
         assert exc_info.value.to_error_report().error_domain == ErrorDomain.CONFIG

@@ -46,7 +46,7 @@ from mthds.method_tree.vocabulary import ExclusionRule, TreeRefusalCode
 from pipelex import log
 from pipelex.core.method_trees.tree_bundle import TreeBundle
 from pipelex.hosted.execution import get_or_load_pipelex_config
-from pipelex.libraries.exceptions import HostLibraryTreeError, MethodTreeLoadError
+from pipelex.libraries.exceptions import HostLibraryRequirementsError, HostLibraryTreeError, MethodRequirementsError, MethodTreeLoadError
 
 LIMITS_ADVICE = (
     "Hand over the method's own folder rather than a directory above it, or raise the limits of "
@@ -121,20 +121,25 @@ def list_package_method_tree(*, root: Path, package_address: str, limits: TreeLi
 
 @contextmanager
 def reporting_host_library_tree_faults() -> Generator[None, None, None]:
-    """Report a method tree of this host's own library directories that cannot be listed as the host's fault.
+    """Report a method tree of this host's own library directories that cannot be listed, or whose requirements refuse it, as the host's fault.
 
     Around a load of library directories that are not the caller's, such as the ones a server loads beside a request's
-    bundles, a `MethodTreeLoadError` leaves as a `HostLibraryTreeError`, which is a configuration fault and whose
-    message, naming paths on the host, never reaches the caller.
+    bundles, a `MethodTreeLoadError` leaves as a `HostLibraryTreeError`, and a `MethodRequirementsError` as a
+    `HostLibraryRequirementsError`: both are configuration faults, whose messages, naming paths on the host, never reach
+    the caller.
 
     Raises:
         HostLibraryTreeError: A tree of the directories could not be listed.
+        HostLibraryRequirementsError: A method of the directories declares requirements its PipeFunc environment refuses.
     """
     try:
         yield
     except MethodTreeLoadError as exc:
         msg = f"A library directory of this host cannot be read as a method tree: {exc.message}"
         raise HostLibraryTreeError(msg) from exc
+    except MethodRequirementsError as exc:
+        msg = f"A library directory of this host holds a method whose requirements.txt refuses it: {exc.message}"
+        raise HostLibraryRequirementsError(msg) from exc
 
 
 def tree_bundles_of(*, tree: MethodTree) -> list[TreeBundle]:

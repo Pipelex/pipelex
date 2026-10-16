@@ -1,11 +1,14 @@
 """A sandbox-hosted deployment refuses a method whose requirements.txt its PipeFunc sandbox does not meet, naming the packages.
 
 The package set is what the plugin providing the execution mode states; here a stub registered for the neutral
-`sandbox` mode. A run is refused while the method's files load on the runner, before any dispatch, and a validation by
+`sandbox` mode. A run is refused on the runner before the method's files load, before any dispatch, and a validation by
 address is refused on the runner as an invalid verdict, before the validator is reached, since a dispatched validator
-never reads the method's Python.
+never reads the method's Python. A method of the runner's own library directories whose requirements are not met is
+the deployment's fault, never the caller's.
 """
 
+import asyncio
+import sys
 from collections.abc import Callable, Generator, Sequence
 from pathlib import Path
 
@@ -15,6 +18,8 @@ from fastapi.testclient import TestClient
 from pipelex.base_exceptions import DisclosureMode, ErrorReport
 from pipelex.config import get_config
 from pipelex.core.bundle_resources.bundle_resource import BundleResources
+from pipelex.interpreter_hub import get_interpreter_hub
+from pipelex.libraries.exceptions import MethodRequirementsNotMetError
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
@@ -32,6 +37,19 @@ from tests.unit._constants import STUB_METHOD_ADDRESS
 
 _PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
 _SANDBOX_ENVIRONMENT = "the Daytona sandbox snapshot 'pipelex-base-test'"
+_ABSENT_PACKAGE = "pipelex-requirements-test-absent"
+
+_PLAIN_MTHDS = """\
+domain = "plain_demo"
+main_pipe = "echo"
+
+[pipe.echo]
+type = "PipeCompose"
+description = "Echo the data"
+inputs = { data = "Text" }
+output = "Text"
+template = "$data"
+"""
 
 _PIPE_FUNC_MTHDS = """\
 domain = "crunch_demo"
@@ -132,8 +150,8 @@ def _build_client(mocker: MockerFixture, *, orchestrator: _RecordingOrchestrator
     return TestClient(app)
 
 
-@pytest.mark.usefixtures("sandbox_hosted_mode")
 class TestMethodRequirementsRefusal:
+    @pytest.mark.usefixtures("sandbox_hosted_mode")
     def test_a_run_whose_requirements_the_sandbox_does_not_meet_is_refused_before_dispatch(self, mocker: MockerFixture) -> None:
         orchestrator = _RecordingOrchestrator()
         client = _build_client(mocker, orchestrator=orchestrator, validator=_UnreachableValidator())
@@ -151,6 +169,7 @@ class TestMethodRequirementsRefusal:
         assert "rooted at" not in body["detail"]
         assert orchestrator.dispatches == []
 
+    @pytest.mark.usefixtures("sandbox_hosted_mode")
     def test_a_run_whose_requirements_the_sandbox_meets_dispatches(self, mocker: MockerFixture) -> None:
         orchestrator = _RecordingOrchestrator()
         client = _build_client(mocker, orchestrator=orchestrator, validator=_UnreachableValidator())
@@ -161,6 +180,7 @@ class TestMethodRequirementsRefusal:
         assert response.status_code in {200, 202}, response.text
         assert orchestrator.dispatches == ["crunch"]
 
+    @pytest.mark.usefixtures("sandbox_hosted_mode")
     def test_a_refused_requirements_line_refuses_the_run(self, mocker: MockerFixture) -> None:
         orchestrator = _RecordingOrchestrator()
         client = _build_client(mocker, orchestrator=orchestrator, validator=_UnreachableValidator())
@@ -174,6 +194,7 @@ class TestMethodRequirementsRefusal:
         assert "line 1 '-r base.txt'" in body["detail"]
         assert orchestrator.dispatches == []
 
+    @pytest.mark.usefixtures("sandbox_hosted_mode")
     def test_a_validation_by_address_is_an_invalid_verdict_located_on_the_requirement(
         self, mocker: MockerFixture, install_method_package: Callable[..., Path]
     ) -> None:
@@ -191,3 +212,51 @@ class TestMethodRequirementsRefusal:
         assert item["line"] == 1
         assert "pandas 2.2.3 is there" in item["message"]
         assert validator.calls == 0
+
+    @pytest.mark.usefixtures("sandbox_hosted_mode")
+    def test_a_validation_checks_the_method_off_the_event_loop(self, mocker: MockerFixture, install_method_package: Callable[..., Path]) -> None:
+        """The check lists and hashes the method's files, so it runs in a worker thread, never on the loop serving requests."""
+        threads_holding_a_loop: list[bool] = []
+
+        def refuse_after_noting_the_thread(*, library_dirs: Sequence[Path]) -> None:  # noqa: ARG001
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                threads_holding_a_loop.append(False)
+            else:
+                threads_holding_a_loop.append(True)
+            msg = "The method needs Python packages."
+            raise MethodRequirementsNotMetError(msg, items=[])
+
+        mocker.patch(f"{_PIPELINE_NS}.ensure_served_method_requirements_met", side_effect=refuse_after_noting_the_thread)
+        validator = _UnreachableValidator()
+        client = _build_client(mocker, orchestrator=_RecordingOrchestrator(), validator=validator)
+        install_method_package(files={"main.mthds": _PIPE_FUNC_MTHDS, "funcs/pipe_func.py": _PIPE_FUNC_PY, "requirements.txt": "pandas>=3\n"})
+
+        response = client.post("/v1/validate", json={"method_ref": f"{STUB_METHOD_ADDRESS}@v0.1.0"})
+
+        assert response.status_code == 200, response.text
+        assert response.json()["is_valid"] is False
+        assert threads_holding_a_loop == [False]
+        assert validator.calls == 0
+
+    def test_a_host_library_whose_requirements_are_not_met_is_the_deployments_fault(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """In the direct mode, a method of the runner's own library directories is judged against its interpreter, and its refusal is withheld."""
+        host_library = tmp_path / "host-library"
+        (host_library / "funcs").mkdir(parents=True)
+        (host_library / "host.mthds").write_text('domain = "host_demo"\n', encoding="utf-8")
+        (host_library / "funcs" / "helpers.py").write_text("VALUE = 1\n", encoding="utf-8")
+        (host_library / "requirements.txt").write_text(f"{_ABSENT_PACKAGE}>=1\n", encoding="utf-8")
+        mocker.patch.object(get_interpreter_hub(), "get_default_library_dirs", return_value=[host_library])
+        orchestrator = _RecordingOrchestrator()
+        client = _build_client(mocker, orchestrator=orchestrator, validator=_UnreachableValidator())
+
+        response = client.post("/v1/start", json={"mthds_contents": [_PLAIN_MTHDS], "inputs": {"data": "hello"}})
+
+        assert response.status_code == 500, response.text
+        body = response.json()
+        assert body["error_type"] == "HostLibraryRequirementsError"
+        assert body["error_domain"] == "config"
+        for host_detail in (str(tmp_path), sys.executable, _ABSENT_PACKAGE):
+            assert host_detail not in response.text, host_detail
+        assert orchestrator.dispatches == []

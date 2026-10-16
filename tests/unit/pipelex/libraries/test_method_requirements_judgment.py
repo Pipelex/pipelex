@@ -3,6 +3,8 @@ import sys
 from importlib.metadata import PackageNotFoundError
 
 import pytest
+from packaging.markers import Marker
+from packaging.version import InvalidVersion
 from pytest_mock import MockerFixture
 
 from pipelex.libraries.method_requirements import marker_variables_of, parse_requirements_text, unmet_requirements
@@ -72,7 +74,9 @@ class TestMethodRequirementsJudgment:
 
     def test_this_interpreter_meets_what_it_holds(self) -> None:
         """Read for real: pipelex's own dependencies are installed here, and a package no index holds is not."""
-        reasons = _unmet_reasons(text="pydantic>=2\nPyYAML\npipelex-requirements-test-absent>=1\n", environment=InterpreterPackageEnvironment())
+        reasons = _unmet_reasons(
+            text="pydantic>=2\nPyYAML\npipelex-requirements-test-absent>=1\n", environment=InterpreterPackageEnvironment(names_host_paths=True)
+        )
 
         assert reasons == ["pipelex-requirements-test-absent is missing"]
 
@@ -87,7 +91,7 @@ class TestMethodRequirementsJudgment:
             },
         )
 
-        reasons = _unmet_reasons(text="fastlib[speed]>=1\nfastlib[other]\n", environment=InterpreterPackageEnvironment())
+        reasons = _unmet_reasons(text="fastlib[speed]>=1\nfastlib[other]\n", environment=InterpreterPackageEnvironment(names_host_paths=True))
 
         assert reasons == [
             "the extra 'speed' of fastlib needs 'turbo>=2; extra == \"speed\"', and turbo 1.5 is there",
@@ -97,21 +101,41 @@ class TestMethodRequirementsJudgment:
     def test_extras_naming_each_other_are_followed_once(self, mocker: MockerFixture) -> None:
         _install(mocker, installed={"loopy": ("2.0", ['loopy[beta]; extra == "alpha"', 'loopy[alpha]; extra == "beta"'])})
 
-        assert _unmet_reasons(text="loopy[alpha]\n", environment=InterpreterPackageEnvironment()) == []
+        assert _unmet_reasons(text="loopy[alpha]\n", environment=InterpreterPackageEnvironment(names_host_paths=True)) == []
 
     def test_an_installed_version_no_specifier_compares_is_not_met(self, mocker: MockerFixture) -> None:
         _install(mocker, installed={"oddball": ("not-a-version", [])})
 
-        (reason,) = _unmet_reasons(text="oddball>=1\n", environment=InterpreterPackageEnvironment())
+        (reason,) = _unmet_reasons(text="oddball>=1\n", environment=InterpreterPackageEnvironment(names_host_paths=True))
 
         assert reason == "oddball not-a-version is there, a version no specifier can be compared with"
 
     def test_each_environment_advises_its_own_remedy(self) -> None:
         """Locally the advice is the uv command for this interpreter; on a sandbox-hosted deployment it is the offer's limits."""
-        local_advice = InterpreterPackageEnvironment().advice(requirement_texts=["pandas>=2.2", 'tzdata; python_version >= "3.12"'])
+        local_advice = InterpreterPackageEnvironment(names_host_paths=True).advice(
+            requirement_texts=["pandas>=2.2", 'tzdata; python_version >= "3.12"']
+        )
         sandbox_advice = OfferedPackageEnvironment(offer=MethodRequirementsTestData.sandbox_offer()).advice(requirement_texts=["pandas>=3"])
 
         assert f"uv pip install --python {shlex.quote(sys.executable)} 'pandas>=2.2' 'tzdata; python_version >= \"3.12\"'" in local_advice
         assert "never installs" in local_advice
         assert MethodRequirementsTestData.SANDBOX_ENVIRONMENT in sandbox_advice
         assert "uv" not in sandbox_advice
+
+    def test_this_interpreter_is_named_by_its_path_only_where_host_paths_may_be_named(self) -> None:
+        environment = InterpreterPackageEnvironment(names_host_paths=False)
+
+        advice = environment.advice(requirement_texts=["pandas>=2.2"])
+
+        assert sys.executable not in environment.description
+        assert sys.executable not in advice
+        assert environment.description == "the Python interpreter Pipelex runs in"
+        assert "uv pip install 'pandas>=2.2'" in advice
+
+    def test_a_marker_comparing_a_value_that_is_not_a_version_refuses_the_requirement(self, mocker: MockerFixture) -> None:
+        """Releases of packaging before 22 raise InvalidVersion where later ones compare as strings; the requirement is refused, not the load."""
+        mocker.patch.object(Marker, "evaluate", side_effect=InvalidVersion("Invalid version: '5.15.0-generic'"))
+
+        (reason,) = _unmet_reasons(text='pandas; platform_release >= "5"\n', environment=InterpreterPackageEnvironment(names_host_paths=True))
+
+        assert reason == "its marker cannot be evaluated: Invalid version: '5.15.0-generic'"

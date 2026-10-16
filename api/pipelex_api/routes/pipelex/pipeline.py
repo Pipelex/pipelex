@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 from contextlib import ExitStack, contextmanager
@@ -11,7 +12,7 @@ from fastapi.responses import JSONResponse
 from mthds.protocol.exceptions import PipelineRequestError
 from pipelex.config import get_config, is_pipe_func_sandbox_hosted
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.libraries.method_requirements import ensure_library_dirs_requirements_met
+from pipelex.libraries.method_requirements import ensure_served_method_requirements_met
 from pipelex.methods.structures_check import ensure_no_structured_content_python
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, StorageTarget, WebhookTarget
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
@@ -328,6 +329,7 @@ class ApiRunner(PipelexMTHDSProtocol):
         orchestrator = get_orchestrator_registry().get_optional(mode=orchestration_mode)
         if orchestrator is None:
             raise MissingOrchestratorError(mode=orchestration_mode)
+        await self._ensure_served_method_requirements_met()
 
         # Dispatch the run through the mode-selected orchestrator by injecting it as this runner's
         # PipeRun, then delegate to the base execute, which owns the full run lifecycle. The
@@ -410,6 +412,7 @@ class ApiRunner(PipelexMTHDSProtocol):
                 f"async-capable orchestration, and this deployment has none. Use /execute (synchronous) instead."
             )
             raise_bad_request(msg, error_type=ErrorType.START_REQUIRES_ASYNC_ORCHESTRATION)
+        await self._ensure_served_method_requirements_met()
         created_at = get_current_iso_timestamp()
         pipelex_inputs: PipelineInputs | WorkingMemory | None = cast("PipelineInputs | WorkingMemory | None", inputs)
 
@@ -487,6 +490,26 @@ class ApiRunner(PipelexMTHDSProtocol):
             workflow_id=dispatch_ack.workflow_id,
         )
 
+    async def _ensure_served_method_requirements_met(self) -> None:
+        """Refuse the request's method when its requirements.txt is not met, before anything loads or is dispatched.
+
+        This runner's `library_dirs` are the directories it made for the request, holding the method's non-`.mthds`
+        files, which the load reads as a host's library directories: there a requirements refusal is reported as the
+        host's fault, so the caller's own is judged here first, naming no path on this host. A directory that cannot be
+        listed stays the host's fault, as the load reports it. The listing reads and hashes files, so it runs off the
+        event loop.
+
+        Raises:
+            MethodRequirementsFileError: The method's requirements.txt holds a line the standard refuses.
+            MethodRequirementsNotMetError: The PipeFunc environment does not meet the method's requirements.
+            HostLibraryTreeError: A directory of the request could not be listed as a method tree.
+            PipeFuncPackageSetUnstatedError: The deployment states no package set for its PipeFunc sandbox.
+        """
+        if not self.library_dirs:
+            return
+        library_dirs = [Path(library_dir) for library_dir in self.library_dirs]
+        await asyncio.to_thread(ensure_served_method_requirements_met, library_dirs=library_dirs)
+
     async def validate_verdict(
         self,
         *,
@@ -533,15 +556,14 @@ class ApiRunner(PipelexMTHDSProtocol):
         if validator is None:
             raise MissingBundleValidatorError(mode=orchestration_mode)
         library_dirs = [Path(library_dir) for library_dir in self.library_dirs] if self.library_dirs else None
-        if library_dirs:
-            # The method's requirements.txt is judged here, on the runner, which holds the method's files and the package
-            # set its PipeFunc steps run with, before any dispatch: a dispatched validator never reads these directories.
-            # A refusal is the method's invalid verdict, as a run of it is refused when its files load.
-            try:
-                with translate_to_validate_bundle_error():
-                    ensure_library_dirs_requirements_met(library_dirs=library_dirs)
-            except ValidateBundleError as invalid_method:
-                return invalid_method.to_error_report()
+        # The method's requirements.txt is judged here, on the runner, which holds the method's files and the package set
+        # its PipeFunc steps run with, before any dispatch: a dispatched validator never reads these directories. A
+        # refusal is the method's invalid verdict, as a run of it is refused before its files load.
+        try:
+            with translate_to_validate_bundle_error():
+                await self._ensure_served_method_requirements_met()
+        except ValidateBundleError as invalid_method:
+            return invalid_method.to_error_report()
         verdict = await validator.validate_bundles(
             mthds_contents=mthds_contents,
             mthds_sources=mthds_sources,

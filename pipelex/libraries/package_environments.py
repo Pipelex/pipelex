@@ -8,6 +8,9 @@ Where a PipeFunc runs decides what its requirements are checked against:
   whole offer. The plugin providing the mode states them (`pipelex/plugins/pipe_func_package_offer_registry.py`), and
   the check reads that statement alone: a marker variable it does not state cannot be judged, and an extra's needs,
   which it does not state, cannot be followed. A mode with no statement fails closed.
+
+How an environment names itself in a refusal depends on who reads it: this interpreter is named by its path on the
+host, and its advice gives the exact install command, only where the refusal may name paths on the host.
 """
 
 import shlex
@@ -53,16 +56,23 @@ class PythonPackageEnvironment(Protocol):
 
 
 class InterpreterPackageEnvironment(PythonPackageEnvironment):
-    """This interpreter, where a PipeFunc runs in the `direct` execution mode: its installed distributions, read as needed."""
+    """This interpreter, where a PipeFunc runs in the `direct` execution mode: its installed distributions, read as needed.
 
-    def __init__(self) -> None:
+    Its path on the host is named, in its description and in the install command its advice gives, only when
+    `names_host_paths` says the refusal may name paths on the host.
+    """
+
+    def __init__(self, *, names_host_paths: bool) -> None:
         self._executable = sys.executable
+        self._names_host_paths = names_host_paths
         self._marker_environment: dict[str, str] = {variable: str(value) for variable, value in default_environment().items()}
 
     @property
     @override
     def description(self) -> str:
-        return f"this Python interpreter ({self._executable})"
+        if self._names_host_paths:
+            return f"this Python interpreter ({self._executable})"
+        return "the Python interpreter Pipelex runs in"
 
     @property
     @override
@@ -86,8 +96,13 @@ class InterpreterPackageEnvironment(PythonPackageEnvironment):
     @override
     def advice(self, *, requirement_texts: list[str]) -> str:
         quoted = " ".join(shlex.quote(requirement_text) for requirement_text in requirement_texts)
+        if self._names_host_paths:
+            return (
+                f"Install them into this interpreter with: uv pip install --python {shlex.quote(self._executable)} {quoted}. "
+                "Pipelex never installs a method's requirements itself."
+            )
         return (
-            f"Install them into this interpreter with: uv pip install --python {shlex.quote(self._executable)} {quoted}. "
+            f"Install them into the Python interpreter Pipelex runs in, for instance with: uv pip install {quoted}. "
             "Pipelex never installs a method's requirements itself."
         )
 
@@ -125,20 +140,24 @@ class OfferedPackageEnvironment(PythonPackageEnvironment):
         )
 
 
-def resolve_pipe_func_package_environment() -> PythonPackageEnvironment:
+def resolve_pipe_func_package_environment(*, names_host_paths: bool) -> PythonPackageEnvironment:
     """The environment this process's PipeFunc steps run in, as its execution mode decides.
+
+    Args:
+        names_host_paths: Whether a refusal naming the environment may name paths on this host, such as this
+            interpreter's.
 
     Raises:
         PipeFuncPackageSetUnstatedError: The mode runs PipeFunc steps out of this process and no plugin states, or the
             stating plugin could not state, the packages found there.
     """
     if not is_pipe_func_sandbox_hosted():
-        return InterpreterPackageEnvironment()
+        return InterpreterPackageEnvironment(names_host_paths=names_host_paths)
     execution_mode = get_pipe_func_execution_mode()
     offer_factory = get_pipe_func_package_offer_registry().get_optional(mode=execution_mode)
     if offer_factory is None:
-        raise PipeFuncPackageSetUnstatedError(execution_mode=execution_mode)
+        raise PipeFuncPackageSetUnstatedError(execution_mode=execution_mode, offer_registered=False)
     offer = offer_factory(get_config().interpreter.pipe_func)
     if offer is None:
-        raise PipeFuncPackageSetUnstatedError(execution_mode=execution_mode)
+        raise PipeFuncPackageSetUnstatedError(execution_mode=execution_mode, offer_registered=True)
     return OfferedPackageEnvironment(offer=offer)

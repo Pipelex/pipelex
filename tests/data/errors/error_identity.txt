@@ -116,6 +116,7 @@ GoogleImgGenWorkerError | Google img gen worker | https://docs.pipelex.com/lates
 GoogleLLMWorkerError | Google LLM worker | https://docs.pipelex.com/latest/errors/google-llm-worker-error/
 GraphSpecError | Graph spec | https://docs.pipelex.com/latest/errors/graph-spec-error/
 GraphSpecValidationError | Graph spec validation | https://docs.pipelex.com/latest/errors/graph-spec-validation-error/
+HostLibraryRequirementsError | Host library requirements | https://docs.pipelex.com/latest/errors/host-library-requirements-error/
 HostLibraryTreeError | Host library tree | https://docs.pipelex.com/latest/errors/host-library-tree-error/
 HostedBaseUrlError | Hosted base url | https://docs.pipelex.com/latest/errors/hosted-base-url-error/
 HostedLocalFileUploadUnavailableError | Hosted local file upload unavailable | https://docs.pipelex.com/latest/errors/hosted-local-file-upload-unavailable-error/

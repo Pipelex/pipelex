@@ -17,6 +17,12 @@ never installs anything:
 - A requirement whose marker is false in that environment is not needed there and is not checked. One is met when the
   environment holds a distribution of its name at a version its specifier contains, pre-releases included, and, for
   each extra it names, when what the extra needs is met in turn.
+
+A refusal names the file by its path in the method's tree, and names paths on this host, the method's root and this
+interpreter, only where it may: a check inside a load does, since its refusal is either the caller's own disk's or,
+around a host's own library directories, the host's fault, which `reporting_host_library_tree_faults` withholds from
+the caller. A dependency package is named by its address, and a server checking a caller's method it holds in a
+directory of its own names no path on the host at all (`ensure_served_method_requirements_met`).
 """
 
 import re
@@ -30,17 +36,16 @@ from packaging.requirements import InvalidRequirement, Requirement
 from packaging.utils import canonicalize_name
 from packaging.version import InvalidVersion, Version
 
-from pipelex.config import is_pipe_func_sandbox_hosted
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.method_trees.tree_bundle import tree_key_of
 from pipelex.libraries.exceptions import MethodRequirementsFileError, MethodRequirementsNotMetError
-from pipelex.libraries.method_trees import list_library_dir_trees
+from pipelex.libraries.method_trees import list_library_dir_trees, reporting_host_library_tree_faults
 from pipelex.libraries.package_environments import PythonPackageEnvironment, resolve_pipe_func_package_environment
 
 REQUIREMENTS_FILE_NAME = "requirements.txt"
 PYTHON_SUFFIX = ".py"
 
-_UTF8_BOM = "﻿"
+_UTF8_BOM = "\ufeff"
 
 # The variables a PEP 508 marker can read. `extra` is not the environment's to state: a line of a requirements file
 # names no extra of its own, so it reads as empty, as pip reads it.
@@ -62,6 +67,9 @@ _MARKER_VARIABLES = frozenset(
     }
 )
 _QUOTED_MARKER_VALUE = re.compile(r"\"[^\"]*\"|'[^']*'")
+# A comment inside a line starts at a `#` that opens the line or follows whitespace, as pip reads one, so the fragment of
+# a URL, such as `#sha256=…`, is not one.
+_INLINE_COMMENT = re.compile(r"(^|\s+)#.*$")
 _MARKER_WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 
@@ -101,23 +109,19 @@ def _refusal_reason(*, stripped: str) -> tuple[Requirement | None, str | None]:
         return None, "a line continued with a backslash is refused; write each requirement on a line of its own"
     if stripped.startswith("-"):
         return None, "an option line, such as -r, -e, -c or --index-url, is refused; write each package as a PEP 508 requirement"
+    # The requirement is judged without the comment after it, so a comment that mentions a URL is not read as one.
+    remainder = _INLINE_COMMENT.sub("", stripped).rstrip()
     try:
-        requirement = Requirement(stripped)
+        requirement = Requirement(remainder)
     except InvalidRequirement as exc:
-        if "://" in stripped:
+        if "://" in remainder:
             return None, "a requirement naming a URL is refused; name the package and the versions it accepts instead"
-        before_comment, separator, _ = stripped.partition("#")
-        if separator and before_comment.strip():
-            try:
-                Requirement(before_comment.strip())
-            except InvalidRequirement:
-                pass
-            else:
-                return None, "a comment after a requirement is refused; write the comment on a line of its own"
         parser_message = str(exc).splitlines()[0] if str(exc) else "it does not parse"
         return None, f"the line is not a PEP 508 requirement: {parser_message}"
     if requirement.url is not None:
         return None, "a requirement naming a URL is refused; name the package and the versions it accepts instead"
+    if remainder != stripped:
+        return None, "a comment after a requirement is refused; write the comment on a line of its own"
     return requirement, None
 
 
@@ -157,6 +161,8 @@ def _evaluate_marker(*, marker: Marker, environment: PythonPackageEnvironment, e
     Raises:
         UndefinedComparison: The marker compares values that are not versions.
         UndefinedEnvironmentName: The marker reads a variable the evaluation does not define.
+        InvalidVersion: The marker compares, as versions, a value that is not one; releases of `packaging` before 22
+            raise it where later ones compare the values as strings.
     """
     return marker.evaluate(environment={**environment.marker_environment, "extra": extra})
 
@@ -217,7 +223,7 @@ def _unmet_extra_reason(
         try:
             needed_by_extra = _evaluate_marker(marker=dependency.marker, environment=environment, extra=extra)
             needed_anyway = _evaluate_marker(marker=dependency.marker, environment=environment, extra="")
-        except (UndefinedComparison, UndefinedEnvironmentName):
+        except (UndefinedComparison, UndefinedEnvironmentName, InvalidVersion):
             continue
         if not needed_by_extra or needed_anyway:
             continue
@@ -246,7 +252,7 @@ def _requirement_line_unmet_reason(*, requirement_line: RequirementLine, environ
         try:
             if not _evaluate_marker(marker=marker, environment=environment, extra=""):
                 return None
-        except (UndefinedComparison, UndefinedEnvironmentName) as exc:
+        except (UndefinedComparison, UndefinedEnvironmentName, InvalidVersion) as exc:
             return f"its marker cannot be evaluated: {exc}"
     return _unmet_reason(requirement=requirement_line.requirement, environment=environment, followed_extras=set())
 
@@ -258,55 +264,47 @@ def holds_requirements_to_check(*, tree: MethodTree) -> bool:
     return any(tree_path.endswith(PYTHON_SUFFIX) for tree_path in tree.tree_paths)
 
 
-def _names_host_paths() -> bool:
-    """Whether a refusal may name the method's directory on this host.
+class JudgedMethod(NamedTuple):
+    """A method tree whose requirements are judged, with how a refusal names it and its file."""
 
-    Only where PipeFunc steps run in this interpreter, which is a local load's: on a sandbox-hosted deployment the
-    method's files lie in a directory the server made for the request, which means nothing to the method's author and
-    is a path on the host.
+    tree: MethodTree
+    method_name: str
+    requirements_source: str
+
+
+def _judged_method(*, tree: MethodTree, names_host_paths: bool) -> JudgedMethod:
+    """A tree as a refusal names it: by its root on this host when it may name host paths, and as "The method" otherwise.
+
+    The file is named by its path in the tree either way, never by its path on the host.
     """
-    return not is_pipe_func_sandbox_hosted()
+    method_name = f"The method rooted at '{tree.directory}'" if names_host_paths and tree.directory is not None else "The method"
+    return JudgedMethod(tree=tree, method_name=method_name, requirements_source=REQUIREMENTS_FILE_NAME)
 
 
-def _method_named(*, tree: MethodTree) -> str:
-    """The method as a refusal names it: by its root on this host locally, and not at all on a sandbox-hosted deployment."""
-    if _names_host_paths() and tree.directory is not None:
-        return f"The method rooted at '{tree.directory}'"
-    return "The method"
-
-
-def _requirements_source(*, tree: MethodTree) -> str:
-    """The file a refusal's items name: its path on this host locally, its tree path on a sandbox-hosted deployment."""
-    if _names_host_paths():
-        return str(tree.file_location(REQUIREMENTS_FILE_NAME))
-    return REQUIREMENTS_FILE_NAME
-
-
-def _read_requirements_text(*, tree: MethodTree) -> str:
+def _read_requirements_text(*, judged: JudgedMethod) -> str:
     """The text of a tree's `requirements.txt`.
 
     Raises:
         MethodRequirementsFileError: The file cannot be read, or is not UTF-8 text.
     """
-    location = tree.file_location(REQUIREMENTS_FILE_NAME)
-    source = _requirements_source(tree=tree)
+    location = judged.tree.file_location(REQUIREMENTS_FILE_NAME)
+    source = judged.requirements_source
     try:
         return location.read_bytes().decode("utf-8")
     except UnicodeDecodeError as exc:
-        msg = f"{_method_named(tree=tree)} declares its packages in a {REQUIREMENTS_FILE_NAME} that is not UTF-8 text, so they cannot be read."
+        msg = f"{judged.method_name} declares its packages in a {REQUIREMENTS_FILE_NAME} that is not UTF-8 text, so they cannot be read."
         raise MethodRequirementsFileError(msg, items=[PipelexBundleBlueprintValidationErrorData(source=source, message=msg)]) from exc
     except OSError as exc:
-        msg = f"{_method_named(tree=tree)} declares its packages in a {REQUIREMENTS_FILE_NAME} that cannot be read: {exc.strerror or exc}."
+        msg = f"{judged.method_name} declares its packages in a {REQUIREMENTS_FILE_NAME} that cannot be read: {exc.strerror or type(exc).__name__}."
         raise MethodRequirementsFileError(msg, items=[PipelexBundleBlueprintValidationErrorData(source=source, message=msg)]) from exc
 
 
-def _raise_refused_lines(*, tree: MethodTree, refused_lines: list[RefusedRequirementsLine]) -> None:
+def _raise_refused_lines(*, judged: JudgedMethod, refused_lines: list[RefusedRequirementsLine]) -> None:
     """Refuse the file for its lines the standard refuses, naming each.
 
     Raises:
         MethodRequirementsFileError: Always.
     """
-    source = _requirements_source(tree=tree)
     items: list[PipelexBundleBlueprintValidationErrorData] = []
     line_texts: list[str] = []
     for refused_line in refused_lines:
@@ -314,25 +312,24 @@ def _raise_refused_lines(*, tree: MethodTree, refused_lines: list[RefusedRequire
         line_texts.append(line_text)
         items.append(
             PipelexBundleBlueprintValidationErrorData(
-                source=source,
+                source=judged.requirements_source,
                 line=refused_line.line_number,
                 message=f"{REQUIREMENTS_FILE_NAME} {line_text}.",
             )
         )
     msg = (
-        f"{_method_named(tree=tree)} declares its packages in a {REQUIREMENTS_FILE_NAME} holding lines the MTHDS standard "
+        f"{judged.method_name} declares its packages in a {REQUIREMENTS_FILE_NAME} holding lines the MTHDS standard "
         f"refuses, where each line is blank, a comment, or exactly one PEP 508 requirement: {'; '.join(line_texts)}."
     )
     raise MethodRequirementsFileError(msg, items=items)
 
 
-def _raise_unmet(*, tree: MethodTree, unmet: list[UnmetRequirement], environment: PythonPackageEnvironment) -> None:
+def _raise_unmet(*, judged: JudgedMethod, unmet: list[UnmetRequirement], environment: PythonPackageEnvironment) -> None:
     """Refuse the method for the requirements the environment does not meet, naming each and what its author can do.
 
     Raises:
         MethodRequirementsNotMetError: Always.
     """
-    source = _requirements_source(tree=tree)
     items: list[PipelexBundleBlueprintValidationErrorData] = []
     line_texts: list[str] = []
     for unmet_requirement in unmet:
@@ -341,25 +338,24 @@ def _raise_unmet(*, tree: MethodTree, unmet: list[UnmetRequirement], environment
         line_texts.append(line_text)
         items.append(
             PipelexBundleBlueprintValidationErrorData(
-                source=source,
+                source=judged.requirements_source,
                 line=requirement_line.line_number,
                 message=f"The requirement '{requirement_line.text}' is not met by {environment.description}: {unmet_requirement.reason}.",
             )
         )
     advice = environment.advice(requirement_texts=[unmet_requirement.requirement_line.text for unmet_requirement in unmet])
     msg = (
-        f"{_method_named(tree=tree)} needs Python packages that {environment.description} "
+        f"{judged.method_name} needs Python packages that {environment.description} "
         f"does not have, as its {REQUIREMENTS_FILE_NAME} declares: {'; '.join(line_texts)}. {advice}"
     )
     raise MethodRequirementsNotMetError(msg, items=items)
 
 
-def ensure_method_requirements_met(*, trees: Iterable[MethodTree]) -> None:
-    """Refuse a method among the trees whose `requirements.txt` the standard refuses or its PipeFunc environment does not meet.
+def _ensure_judged_methods_met(*, judged_methods: Iterable[JudgedMethod], names_host_paths: bool) -> None:
+    """Refuse the first of the methods whose `requirements.txt` the standard refuses or its PipeFunc environment does not meet.
 
-    Each tree is judged once however often it is given, in the order given, and the first refused ends the check. The
-    environment is resolved only once a tree declares a requirement to judge, so a load of trees declaring none never
-    reads it.
+    Each tree is judged once however often it is given, in the order given. The environment is resolved only once a tree
+    declares a requirement to judge, so methods declaring none never read it.
 
     Raises:
         MethodRequirementsFileError: A tree's `requirements.txt` holds a line the standard refuses, or cannot be read.
@@ -369,37 +365,83 @@ def ensure_method_requirements_met(*, trees: Iterable[MethodTree]) -> None:
     """
     environment: PythonPackageEnvironment | None = None
     judged_tree_keys: set[str] = set()
-    for tree in trees:
-        tree_key = tree_key_of(tree=tree)
+    for judged in judged_methods:
+        tree_key = tree_key_of(tree=judged.tree)
         if tree_key in judged_tree_keys:
             continue
         judged_tree_keys.add(tree_key)
-        if not holds_requirements_to_check(tree=tree):
+        if not holds_requirements_to_check(tree=judged.tree):
             continue
-        parsed = parse_requirements_text(text=_read_requirements_text(tree=tree))
+        parsed = parse_requirements_text(text=_read_requirements_text(judged=judged))
         if parsed.refused_lines:
-            _raise_refused_lines(tree=tree, refused_lines=parsed.refused_lines)
+            _raise_refused_lines(judged=judged, refused_lines=parsed.refused_lines)
         if not parsed.requirements:
             continue
         if environment is None:
-            environment = resolve_pipe_func_package_environment()
+            environment = resolve_pipe_func_package_environment(names_host_paths=names_host_paths)
         unmet = unmet_requirements(requirements=parsed.requirements, environment=environment)
         if unmet:
-            _raise_unmet(tree=tree, unmet=unmet, environment=environment)
+            _raise_unmet(judged=judged, unmet=unmet, environment=environment)
 
 
-def ensure_library_dirs_requirements_met(*, library_dirs: Sequence[Path], limits: TreeLimits | None = None) -> None:
-    """Check the requirements of every method tree the library directories hold, as loading them would, without loading them.
+def ensure_method_requirements_met(*, trees: Iterable[MethodTree], names_host_paths: bool) -> None:
+    """Refuse a method among the trees whose `requirements.txt` the standard refuses or its PipeFunc environment does not meet.
 
-    For a host that hands the directories to a loader elsewhere, such as a server validating a fetched method on a
-    worker that never reads them, so the refusal comes from the place that knows the method's files.
+    Each tree is judged once however often it is given, in the order given, and the first refused ends the check.
+
+    Args:
+        trees: The method trees a load reads, each checked when it lies on disk, declares requirements and holds Python.
+        names_host_paths: Whether a refusal may name the method's root and this interpreter by their paths on this host,
+            as a load's may: its refusal is the caller's own disk's, or the host's fault, withheld from the caller.
 
     Raises:
-        MethodTreeLoadError: A tree of the directories could not be listed.
         MethodRequirementsFileError: A tree's `requirements.txt` holds a line the standard refuses, or cannot be read.
         MethodRequirementsNotMetError: The environment does not meet a tree's requirements.
         PipeFuncPackageSetUnstatedError: PipeFunc steps run out of this process and the deployment states no package
             set for them.
     """
-    library_trees = list_library_dir_trees(library_dirs=library_dirs, limits=limits)
-    ensure_method_requirements_met(trees=[library_tree.tree for library_tree in library_trees])
+    _ensure_judged_methods_met(
+        judged_methods=(_judged_method(tree=tree, names_host_paths=names_host_paths) for tree in trees),
+        names_host_paths=names_host_paths,
+    )
+
+
+def ensure_package_requirements_met(*, tree: MethodTree, package_address: str) -> None:
+    """Refuse a dependency package whose `requirements.txt` the standard refuses or its PipeFunc environment does not meet.
+
+    The package is named by its address and its file by `<address>/requirements.txt`, never by the directory it was
+    installed or fetched into, as its bundles are, since the package is the caller's dependency wherever it loads.
+
+    Raises:
+        MethodRequirementsFileError: The package's `requirements.txt` holds a line the standard refuses, or cannot be read.
+        MethodRequirementsNotMetError: The environment does not meet the package's requirements.
+        PipeFuncPackageSetUnstatedError: PipeFunc steps run out of this process and the deployment states no package
+            set for them.
+    """
+    judged = JudgedMethod(
+        tree=tree,
+        method_name=f"The method package '{package_address}'",
+        requirements_source=f"{package_address}/{REQUIREMENTS_FILE_NAME}",
+    )
+    _ensure_judged_methods_met(judged_methods=[judged], names_host_paths=False)
+
+
+def ensure_served_method_requirements_met(*, library_dirs: Sequence[Path], limits: TreeLimits | None = None) -> None:
+    """Check the requirements of a caller's method a server holds in directories of its own, as loading them would, without loading them.
+
+    For a server that hands the directories to a loader elsewhere, such as a validator on a worker that never reads
+    them, or that loads them as its own library directories, so the refusal is the caller's and comes from the place
+    that knows the method's files. The directories are the server's: a tree of them that cannot be listed is the
+    host's fault, as a load of a host's library directories reports it, and a refusal names no path on the host, the
+    directories' and this interpreter's included.
+
+    Raises:
+        HostLibraryTreeError: A tree of the directories could not be listed.
+        MethodRequirementsFileError: A tree's `requirements.txt` holds a line the standard refuses, or cannot be read.
+        MethodRequirementsNotMetError: The environment does not meet a tree's requirements.
+        PipeFuncPackageSetUnstatedError: PipeFunc steps run out of this process and the deployment states no package
+            set for them.
+    """
+    with reporting_host_library_tree_faults():
+        library_trees = list_library_dir_trees(library_dirs=library_dirs, limits=limits)
+    ensure_method_requirements_met(trees=[library_tree.tree for library_tree in library_trees], names_host_paths=False)
