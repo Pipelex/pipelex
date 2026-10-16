@@ -5,7 +5,7 @@ declares one entry per error code: its title, the domain whose actor must act, i
 the step for that actor and for any other reader, its typed parameters, its templates and its HTTP
 status. The model below reads that format, the core registry's as well as an extension owner's, and
 refuses what the format's JSON Schema refuses: a member missing, a member it does not know, a value
-outside its closed lists, and a member present where the format forbids it.
+outside its closed lists, a member present where the format forbids it, and a member written as `null`.
 
 Pipelex's own registry, under the `pipelex` extension prefix, is authored in
 `pipelex-error-registry.yaml` beside this module and ships as its JSON snapshot,
@@ -18,7 +18,7 @@ import functools
 import importlib.resources
 import re
 from enum import StrEnum
-from typing import Self
+from typing import Any, Self, cast
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -135,9 +135,27 @@ class RegistryParamType(StrEnum):
 
 
 class _RegistryModel(BaseModel):
-    """The base of every part of a registry document: closed, so a member the format does not know is refused."""
+    """The base of every part of a registry document: closed, so a member the format does not know is refused.
+
+    No member of the format may be null: a member the format makes optional is left out, never written as
+    `null`, and one it forbids in a case is absent in that case. The fields that model such a member are
+    `None` when it is absent, so an explicit `null` is refused before validation, as the format's schema
+    refuses it, rather than read as the member being absent.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _refuse_null_members(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        members = cast("dict[Any, Any]", data)
+        for member, value in members.items():
+            if value is None:
+                msg = f"the member '{member}' is null, which the format never allows: leave it out instead"
+                raise ValueError(msg)
+        return members
 
 
 def _check_enum_values(*, param_type: RegistryParamType, values: list[str] | None) -> None:

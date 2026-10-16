@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import copy
+import json
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from pydantic import ValidationError as PydanticValidationError
 
 from pipelex.cli.dev_cli.commands.error_registry.exceptions import ErrorRegistryError
 from pipelex.cli.dev_cli.commands.error_registry.registry_checks import (
@@ -44,6 +46,13 @@ def _set_member(code: str, member: str, value: Any) -> Callable[[dict[str, Any]]
 def _add_param(code: str, name: str, param: dict[str, Any]) -> Callable[[dict[str, Any]], None]:
     def mutate(document: dict[str, Any]) -> None:
         _entry(document, code)["params"][name] = param
+
+    return mutate
+
+
+def _set_document_member(member: str, value: Any) -> Callable[[dict[str, Any]], None]:
+    def mutate(document: dict[str, Any]) -> None:
+        document[member] = value
 
     return mutate
 
@@ -131,6 +140,32 @@ class TestErrorRegistryChecks:
             ),
             ("an empty list of references", _set_member("pipelex.storage.unavailable", "see", [])),
             ("a code with two segments only", _set_member("pipelex.storage.unavailable", "code", "pipelex.unavailable")),
+            ("a null status on a warning", _set_member("pipelex.docgen.template_warning", "status", None)),
+            ("a null status on a client code", _set_member("pipelex.catalog.link_conflict", "status", None)),
+            ("a null status on a problem", _set_member("pipelex.storage.unavailable", "status", None)),
+            ("a null list of references", _set_member("pipelex.storage.unavailable", "see", None)),
+            (
+                "null items on a parameter that is not a list",
+                _add_param("pipelex.storage.unavailable", "name", {"type": "identifier", "items": None, "description": "A name."}),
+            ),
+            (
+                "null values on a parameter that is not an enum",
+                _add_param("pipelex.storage.unavailable", "name", {"type": "identifier", "values": None, "description": "A name."}),
+            ),
+            (
+                "null values on a list item that is not an enum",
+                _add_param(
+                    "pipelex.storage.unavailable",
+                    "names",
+                    {"type": "list", "items": {"type": "identifier", "values": None}, "description": "Names."},
+                ),
+            ),
+            (
+                "a null optional mark",
+                _add_param("pipelex.storage.unavailable", "name", {"type": "identifier", "optional": None, "description": "A name."}),
+            ),
+            ("a null list of extension prefixes", _set_document_member("extension_prefixes", None)),
+            ("a null prefix", _set_document_member("prefix", None)),
         ],
     )
     def test_a_malformed_entry_is_refused_by_the_schema_and_the_typed_model(
@@ -146,6 +181,12 @@ class TestErrorRegistryChecks:
         registry, found_by_model = model_errors(document=composed_document, where=WHERE)
         assert registry is None, f"the typed model accepted {topic}"
         assert found_by_model
+
+    def test_the_snapshot_reader_refuses_a_null_member(self, composed_document: dict[str, Any]) -> None:
+        """The public loader reads JSON through the typed model alone, so the model refuses a null as the schema does, naming it."""
+        _entry(composed_document, "pipelex.docgen.template_warning")["status"] = None
+        with pytest.raises(PydanticValidationError, match="the member 'status' is null"):
+            ErrorRegistryDocument.model_validate_json(json.dumps(composed_document))
 
     def test_a_step_kind_outside_the_closed_list_is_refused(self, composed_document: dict[str, Any], standard_schema: dict[str, Any]) -> None:
         """The step kinds are the protocol's closed list."""
