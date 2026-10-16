@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING
 from pipelex_sdk.crate_models import MthdsFileItem
 from pydantic import BaseModel, ConfigDict
 
+from pipelex.cli.commands.run._run_output_folder import run_output_label
 from pipelex.cli.installed_methods import DuplicateMethodNameError, MethodNotFoundError, find_method_by_name
 from pipelex.cli.method_resolver import method_output_base_dir, resolve_method_target
 from pipelex.hosted.exceptions import HostedRunSourceError
@@ -182,7 +183,11 @@ def resolve_hosted_method_target(*, name: str, pipe_override: str | None, librar
                 "Install it and run it by name, or run its bundle with 'run bundle <path> -L <dir>'."
             )
             raise HostedRunSourceError(msg)
-        label = pipe_override or (parse_method_ref(remote_ref).address.rsplit("/", 1)[-1] if remote_ref else name)
+        label: str
+        if pipe_override:
+            label = run_output_label(pipe_ref=pipe_override)
+        else:
+            label = parse_method_ref(remote_ref).address.rsplit("/", 1)[-1] if remote_ref else name
         return HostedMethodTarget(
             method_ref=remote_ref,
             method_id=remote_id,
@@ -201,7 +206,7 @@ def resolve_hosted_method_target(*, name: str, pipe_override: str | None, librar
     return HostedMethodTarget(
         mthds_files=mthds_files,
         pipe_code=pipe_code,
-        label=pipe_code,
+        label=run_output_label(pipe_ref=pipe_code),
         output_base_dir=method_output_base_dir(method=method),
         inputs_anchor_dir=Path(method_library_dirs[0]),
     )

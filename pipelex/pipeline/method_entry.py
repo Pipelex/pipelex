@@ -18,6 +18,7 @@ from mthds.package.discovery import read_package_manifest_at
 from mthds.package.exceptions import ManifestError
 from mthds.package.manifest.schema import MethodsManifest
 
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.libraries.method_trees import tree_bundles_of
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
@@ -89,8 +90,9 @@ def select_entry(*, candidates: list[EntryCandidate], manifest: MethodsManifest 
     entry_candidate = declaring[0]
     main_pipe = entry_candidate.blueprint.main_pipe
     if main_pipe is None:
+        # Selected because it declares one: this is a bug of the selection, never the caller's method.
         msg = f"The bundle '{entry_candidate.tree_path}' was selected for its main_pipe, yet declares none."
-        raise MethodEntryError(msg)
+        raise PipelexUnexpectedError(msg)
     return _entry_of(candidate=entry_candidate, pipe_code=main_pipe)
 
 

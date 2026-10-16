@@ -15,7 +15,7 @@ from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.commands.run._inputs_file_loader import load_inputs_dict_from_path
 from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths
 from pipelex.cli.commands.run._main_stuff_file import save_main_stuff_file
-from pipelex.cli.commands.run._run_output_folder import make_run_output_folder, write_method_tree_record
+from pipelex.cli.commands.run._run_output_folder import make_run_output_folder, run_output_label, write_method_tree_record
 from pipelex.cli.deck_notice import warn_if_deck_stale
 from pipelex.cli.error_handlers import (
     ErrorContext,
@@ -317,7 +317,7 @@ async def _execute_run(
 
     if needs_output_path:
         # Named after the pipe's own code: a qualified `domain.pipe_code` keeps its domain out of the folder's name.
-        output_path = make_run_output_folder(output_dir=Path(output_dir), label=pipe_code.rsplit(".", 1)[-1])
+        output_path = make_run_output_folder(output_dir=Path(output_dir), label=run_output_label(pipe_ref=pipe_code))
 
     # The method tree the run read, recorded beside its outputs: its digest names the exact files of the method.
     method_tree_record_path: Path | None = None

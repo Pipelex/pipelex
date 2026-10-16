@@ -24,8 +24,9 @@ from typing import Any, NamedTuple
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.base_exceptions import DisclosureMode, PipelexError, ValidationErrorItem
+from pipelex.base_exceptions import DisclosureMode, ErrorDomain, PipelexError, ValidationErrorItem
 from pipelex.config import get_config
+from pipelex.libraries.exceptions import HostLibraryTreeError
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
@@ -293,6 +294,54 @@ class TestVerdictNamesNoHostPath:
         assert f"'{_DEPENDENCY_ADDRESS}/notices/tide_notices.mthds'" in item.message, surface.description
         assert f"'{_DEPENDENCY_ADDRESS}/notices/tide_notices_copy.mthds'" in item.message, surface.description
         _assert_names_no_host_path(payload=_strict_payload(verdict), tmp_path=tmp_path)
+
+    @pytest.mark.parametrize("surface", _SURFACES, ids=[surface.surface_id for surface in _SURFACES])
+    async def test_a_dependency_s_tree_refusal_names_the_package_by_its_address(
+        self, surface: _Surface, installed_methods_dir: Path, tmp_path: Path
+    ) -> None:
+        package_dir = _install_dependency(methods_dir=installed_methods_dir, bundles={"notices/tide_notices.mthds": _DEPENDENCY_NOTICE_BUNDLE})
+        # The membership rule refuses a symbolic link, so the package's tree cannot be listed.
+        (package_dir / "notices" / "linked_notices.mthds").symlink_to(package_dir / "notices" / "tide_notices.mthds")
+
+        verdict = await _verdict_on(surface=surface, caller_bundle=_CALLER_BUNDLE, tmp_path=tmp_path)
+
+        assert "github.com/acme-tests/harbour-methods" in verdict.message, surface.description
+        assert "notices/linked_notices.mthds" in verdict.message, surface.description
+        assert "max_files" not in verdict.message, "no advice about this host's limits reaches the caller"
+        _assert_names_no_host_path(payload=_strict_payload(verdict), tmp_path=tmp_path)
+
+    @pytest.mark.parametrize(
+        "surface",
+        [surface for surface in _SURFACES if surface.surface_id.endswith("_beside_host_library")],
+        ids=lambda surface: surface.surface_id,
+    )
+    async def test_a_host_library_tree_that_cannot_be_listed_is_the_host_s_fault(self, surface: _Surface, tmp_path: Path) -> None:
+        """Beside submitted content, the host's own directories are no input of the caller's: no verdict, and no host path."""
+        host_library_dir = _valid_host_library(tmp_path=tmp_path)
+        (host_library_dir / "linked_board.mthds").symlink_to(host_library_dir / "harbour_board.mthds")
+
+        with pytest.raises(HostLibraryTreeError) as raised:
+            await _load_on(surface=surface, caller_bundle=_VALID_CALLER_BUNDLE, tmp_path=tmp_path)
+
+        report = raised.value.to_error_report()
+        assert report.error_domain == ErrorDomain.CONFIG
+        assert report.caller_facing_message is False
+        _assert_names_no_host_path(payload=report.to_dict(disclosure_mode=DisclosureMode.STRICT), tmp_path=tmp_path)
+
+    async def test_a_callers_library_tree_that_cannot_be_listed_is_their_verdict(self, tmp_path: Path) -> None:
+        library_dir = _valid_host_library(tmp_path=tmp_path)
+        (library_dir / "linked_board.mthds").symlink_to(library_dir / "harbour_board.mthds")
+        runtime = PipelexMTHDSProtocol(
+            library_dirs=[str(library_dir)],
+            library_dirs_are_callers=True,
+            pipe_run_mode=PipeRunMode.DRY,
+            execution_config=_execution_config(),
+        )
+
+        with pytest.raises(ValidateBundleError) as raised:
+            await runtime.validate([_VALID_CALLER_BUNDLE])
+
+        assert "linked_board.mthds" in raised.value.message
 
     async def test_a_host_library_item_carries_no_source_on_submitted_content(self, tmp_path: Path) -> None:
         host_library_dir = tmp_path / "host" / "library"

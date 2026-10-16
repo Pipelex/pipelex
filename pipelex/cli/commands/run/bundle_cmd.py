@@ -11,6 +11,7 @@ from pipelex.cli.commands.run._inputs_file_loader import find_default_inputs_fil
 from pipelex.cli.commands.run._method_folder import list_bundle_file_tree, resolve_method_folder_run
 from pipelex.cli.commands.run._run_core import COMMAND, execute_run, validate_run_flag_combination
 from pipelex.cli.commands.run._run_hosted import bundle_main_pipe_code, execute_hosted_run, refuse_local_only_flags, resolve_cli_run_execution
+from pipelex.cli.commands.run._run_output_folder import run_output_label
 from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError
 from pipelex.cli.error_handlers import handle_validate_bundle_error
 from pipelex.hosted.exceptions import HostedRunSourceError
@@ -148,7 +149,8 @@ def run_bundle_cmd(
 
     # The method tree the run reads, whose digest the run records: the folder's, or the bundle file's own.
     method_tree: MethodTree
-    # The pipe a hosted run names: `--pipe`, else the bare main pipe the hosted API resolves among the files it is sent.
+    # The pipe a hosted run names: `--pipe`, else the main pipe the local run starts at, qualified by its domain, so the
+    # hosted API starts at the same pipe when two domains of the files it is sent define the same code.
     hosted_pipe_code: str | None = pipe
     if target_path.is_dir():
         # Directory mode: the method rooted at or above the folder, started where the protocol's rule says
@@ -160,7 +162,7 @@ def run_bundle_cmd(
         pipe_code = folder_run.pipe_code
         if folder_run.entry is not None and folder_run.entry_bundle_file is not None:
             bundle_path = str(folder_run.entry_bundle_file)
-            hosted_pipe_code = folder_run.entry.pipe_code
+            hosted_pipe_code = folder_run.entry.pipe_ref
             typer.echo(f"Starting at the method's main pipe {folder_run.entry.pipe_ref}, in {folder_run.entry.tree_path}")
 
         # Auto-detect inputs (inputs.json or inputs.toml) if --inputs not explicitly provided
@@ -230,7 +232,7 @@ def run_bundle_cmd(
             inputs=inputs,
             dynamic_output_concept_ref=dynamic_output_concept_ref,
             base_url=base_url,
-            output_label=hosted_pipe_code,
+            output_label=run_output_label(pipe_ref=hosted_pipe_code),
             output_dir=output_dir,
             save_working_memory=save_working_memory,
             working_memory_path=working_memory_path,

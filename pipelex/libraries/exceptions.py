@@ -106,3 +106,16 @@ class MethodTreeLoadError(LibraryLoadingError):
     error_domain = ErrorDomain.INPUT
     retryable = False
     _authors_caller_facing_message = True
+
+
+class HostLibraryTreeError(PipelexError):
+    """Raised when a library directory of this host, one a load reads beside a caller's bundles, cannot be read as a method tree.
+
+    Such a directory is the host's own (installed libraries, the defaults, `PIPELEXPATH` on a server), so a tree of it
+    that the standard refuses, that passes a limit or that cannot be read is a fault of the host's configuration, not
+    of the caller's method: it is not an `INPUT` error, and its message, which names paths on the host, is not
+    caller-facing. It is deliberately no `LibraryError`, which a validation would report as the caller's invalid bundle.
+    """
+
+    error_domain = ErrorDomain.CONFIG
+    retryable = False

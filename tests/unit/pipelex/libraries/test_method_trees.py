@@ -4,8 +4,16 @@ import pytest
 from mthds.method_tree.models import TreeLimits
 from pytest_mock import MockerFixture
 
-from pipelex.libraries.exceptions import MethodTreeLoadError
-from pipelex.libraries.method_trees import LIMITS_ADVICE, list_library_bundle_files, tree_bundle_of_lone_file
+from pipelex.base_exceptions import ErrorDomain
+from pipelex.libraries.exceptions import HostLibraryTreeError, MethodTreeLoadError
+from pipelex.libraries.method_trees import (
+    LIMITS_ADVICE,
+    bundle_files_under,
+    list_library_bundle_files,
+    list_package_method_tree,
+    reporting_host_library_tree_faults,
+    tree_bundle_of_lone_file,
+)
 
 _MANIFEST = '[package]\naddress = "github.com/pipelex-tests/nested"\nversion = "1.0.0"\ndescription = "A nested package"\n'
 
@@ -104,3 +112,96 @@ class TestMethodTrees:
         assert not rooted_bundle.tree.is_one_file
         assert rooted_bundle.tree_path == "bundles/main.mthds"
         assert rooted_bundle.tree.tree_paths == ["METHODS.toml", "bundles/main.mthds"]
+
+    def test_a_library_directory_holding_only_nested_methods_loads_them_all(self, tmp_path: Path) -> None:
+        """Its own tree is empty, yet the packages and repositories nested in it load, and those nested in an empty one of them."""
+        _touch(directory=tmp_path, tree_path=".hidden-notes.md", content="kept out")
+        _touch(directory=tmp_path, tree_path="packages/invoicing/METHODS.toml", content=_MANIFEST)
+        _touch(directory=tmp_path, tree_path="packages/invoicing/invoice.mthds")
+        _touch(directory=tmp_path, tree_path="checkouts/reports/report.mthds")
+        (tmp_path / "checkouts" / "reports" / ".git").mkdir()
+        # A nested repository whose own tree is empty too, holding nothing but a nested package.
+        (tmp_path / "checkouts" / "suite" / ".git").mkdir(parents=True)
+        _touch(directory=tmp_path, tree_path="checkouts/suite/pkg/METHODS.toml", content=_MANIFEST)
+        _touch(directory=tmp_path, tree_path="checkouts/suite/pkg/suite.mthds")
+        # A directory the .gitignore keeps out is never entered, so the package under it is never reached, as in a listing.
+        _touch(directory=tmp_path, tree_path=".gitignore", content="build/\n")
+        _touch(directory=tmp_path, tree_path="build/stale/METHODS.toml", content=_MANIFEST)
+        _touch(directory=tmp_path, tree_path="build/stale/stale.mthds")
+
+        bundle_files = list_library_bundle_files(library_dirs=[tmp_path])
+
+        by_location = {bundle_file.path: bundle_file.tree_bundle for bundle_file in bundle_files}
+        assert set(by_location) == {
+            tmp_path / "packages" / "invoicing" / "invoice.mthds",
+            tmp_path / "checkouts" / "reports" / "report.mthds",
+            tmp_path / "checkouts" / "suite" / "pkg" / "suite.mthds",
+        }
+        suite_tree = by_location[tmp_path / "checkouts" / "suite" / "pkg" / "suite.mthds"].tree
+        assert suite_tree.directory == (tmp_path / "checkouts" / "suite" / "pkg").resolve()
+
+    def test_a_nested_checkout_holding_no_bundle_is_skipped_before_it_is_listed(self, tmp_path: Path) -> None:
+        """A nested repository with nothing to load never refuses the load, whatever it holds; one holding a bundle follows every rule."""
+        _touch(directory=tmp_path, tree_path="top.mthds")
+        _touch(directory=tmp_path, tree_path="vendor/tool/README.md", content="a tool")
+        (tmp_path / "vendor" / "tool" / ".git").mkdir()
+        (tmp_path / "vendor" / "tool" / "latest").symlink_to(tmp_path / "vendor" / "tool" / "README.md")
+
+        assert [bundle_file.tree_bundle.tree_path for bundle_file in list_library_bundle_files(library_dirs=[tmp_path])] == ["top.mthds"]
+
+        _touch(directory=tmp_path, tree_path="vendor/tool/tool.mthds")
+        with pytest.raises(MethodTreeLoadError, match="symbolic link"):
+            list_library_bundle_files(library_dirs=[tmp_path])
+
+    def test_this_machine_s_limits_are_read_once_per_listing(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        limits_spy = mocker.patch("pipelex.libraries.method_trees.local_tree_limits", return_value=TreeLimits())
+        _touch(directory=tmp_path, tree_path="top.mthds")
+        for name in ("one", "two"):
+            _touch(directory=tmp_path, tree_path=f"packages/{name}/METHODS.toml", content=_MANIFEST)
+            _touch(directory=tmp_path, tree_path=f"packages/{name}/{name}.mthds")
+
+        assert len(list_library_bundle_files(library_dirs=[tmp_path, tmp_path / "packages"])) == 3
+        limits_spy.assert_called_once()
+
+    @pytest.mark.parametrize("refusal", ["symbolic_link", "limit"])
+    def test_a_dependency_package_refusal_names_its_address_never_this_host_s_path(self, tmp_path: Path, refusal: str) -> None:
+        package_root = tmp_path / "installed" / "invoicing"
+        _touch(directory=package_root, tree_path="METHODS.toml", content=_MANIFEST)
+        _touch(directory=package_root, tree_path="invoice.mthds")
+        limits: TreeLimits | None = None
+        if refusal == "symbolic_link":
+            (package_root / "link.mthds").symlink_to(package_root / "invoice.mthds")
+        else:
+            limits = TreeLimits(max_files=1)
+
+        with pytest.raises(MethodTreeLoadError) as exc_info:
+            list_package_method_tree(root=package_root, package_address="github.com/pipelex-tests/invoicing", limits=limits)
+
+        message = exc_info.value.message
+        assert "github.com/pipelex-tests/invoicing" in message
+        assert str(tmp_path) not in message
+        assert str(tmp_path.resolve()) not in message
+        assert LIMITS_ADVICE not in message
+
+    def test_a_host_library_tree_that_cannot_be_listed_is_the_host_s_fault(self, tmp_path: Path) -> None:
+        """Beside a caller's bundles, a tree of the host's own directories is no input of theirs, and its message never reaches them."""
+        _touch(directory=tmp_path, tree_path="lib/a.mthds")
+        (tmp_path / "lib" / "link.mthds").symlink_to(tmp_path / "lib" / "a.mthds")
+
+        with pytest.raises(HostLibraryTreeError) as exc_info, reporting_host_library_tree_faults():
+            list_library_bundle_files(library_dirs=[tmp_path / "lib"])
+
+        report = exc_info.value.to_error_report()
+        assert report.error_domain == ErrorDomain.CONFIG
+        assert report.caller_facing_message is False
+        assert isinstance(exc_info.value.__cause__, MethodTreeLoadError)
+
+    def test_every_bundle_file_under_a_directory_is_found_whatever_the_membership_rule(self, tmp_path: Path) -> None:
+        """The superset a verdict's withholding falls back to when listing the trees fails: it never raises."""
+        _touch(directory=tmp_path, tree_path="lib/a.mthds")
+        _touch(directory=tmp_path, tree_path="lib/.hidden/b.mthds")
+        (tmp_path / "lib" / "link.mthds").symlink_to(tmp_path / "lib" / "a.mthds")
+
+        found = bundle_files_under(library_dirs=[tmp_path / "lib", tmp_path / "missing"])
+
+        assert set(found) == {tmp_path / "lib" / "a.mthds", tmp_path / "lib" / ".hidden" / "b.mthds", tmp_path / "lib" / "link.mthds"}

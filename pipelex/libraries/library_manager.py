@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, ForwardRef, Literal, get_args, get_origin
 
 from kajson.class_registry import ClassRegistry
 from kajson.kajson_manager import KajsonManager
+from mthds.method_tree.models import TreeLimits
 from mthds.package.dependency_resolver import ResolvedDependency, determine_exported_pipes, resolve_all_dependencies
 from mthds.package.discovery import find_package_manifest
 from mthds.package.exceptions import DependencyResolveError, ManifestError
@@ -48,7 +49,8 @@ from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.method_trees import (
     LibraryBundleFile,
     list_library_bundle_files,
-    list_local_method_tree_at_root,
+    list_package_method_tree,
+    local_tree_limits,
     tree_bundle_of_lone_file,
     tree_bundles_of,
 )
@@ -579,10 +581,15 @@ class LibraryManager(LibraryManagerAbstract):
             all_dirs.extend(library_dirs)
             # Every bundle is read as a member of its method tree: each library directory's tree and the trees nested
             # in it, then the tree of each file named alone. A file the membership rule keeps out is never read.
-            all_bundle_files: list[LibraryBundleFile] = list_library_bundle_files(library_dirs=library_dirs)
+            # This machine's limits are read once for the whole load.
+            tree_limits = local_tree_limits()
+            all_bundle_files: list[LibraryBundleFile] = list_library_bundle_files(library_dirs=library_dirs, limits=tree_limits)
             for library_file_path in library_file_paths or []:
                 all_bundle_files.append(
-                    LibraryBundleFile(tree_bundle=tree_bundle_of_lone_file(bundle_file=library_file_path), path=library_file_path)
+                    LibraryBundleFile(
+                        tree_bundle=tree_bundle_of_lone_file(bundle_file=library_file_path, limits=tree_limits),
+                        path=library_file_path,
+                    )
                 )
 
             # Each file once, as the member of the first tree that holds it.
@@ -858,9 +865,14 @@ class LibraryManager(LibraryManagerAbstract):
             # A bundle read from a file on this host that no loader placed in a method tree, such as a bundle file a CLI
             # names alone, is read as a member of its own file's tree: the steps of every bundle read from this host's
             # disk read only the files of their tree.
-            for blueprint in blueprints:
-                if blueprint.tree_bundle is None and blueprint.host_bundle_file is not None:
-                    blueprint.place_in_tree(tree_bundle=tree_bundle_of_lone_file(bundle_file=blueprint.host_bundle_file))
+            unplaced_host_blueprints = [
+                blueprint for blueprint in blueprints if blueprint.tree_bundle is None and blueprint.host_bundle_file is not None
+            ]
+            if unplaced_host_blueprints:
+                tree_limits = local_tree_limits()
+                for blueprint in unplaced_host_blueprints:
+                    if blueprint.host_bundle_file is not None:
+                        blueprint.place_in_tree(tree_bundle=tree_bundle_of_lone_file(bundle_file=blueprint.host_bundle_file, limits=tree_limits))
 
             # Accumulate blueprints for later crate construction via get_crate()
             self._blueprints.setdefault(library_id, []).extend(blueprints)
@@ -1286,11 +1298,14 @@ class LibraryManager(LibraryManagerAbstract):
 
         library = self.get_library(library_id=library_id)
 
+        # This machine's limits are read once for every package of the manifest.
+        tree_limits = local_tree_limits()
         for resolved_dep in resolved_deps:
             self._load_single_dependency(
                 library=library,
                 resolved_dep=resolved_dep,
                 package_address=resolved_dep.address,
+                tree_limits=tree_limits,
             )
 
         # Wire concept resolver after all deps are loaded so cross-package
@@ -1303,6 +1318,7 @@ class LibraryManager(LibraryManagerAbstract):
         *,
         resolved_dep: ResolvedDependency,
         package_address: str,
+        tree_limits: TreeLimits | None = None,
     ) -> None:
         """Load a single resolved dependency into an isolated child library.
 
@@ -1323,6 +1339,7 @@ class LibraryManager(LibraryManagerAbstract):
             library: The main library to load into
             resolved_dep: The resolved dependency info
             package_address: The dependency's address as a reference names it, without any ``@<tag>``
+            tree_limits: The limits the package's tree is listed under, read from the configuration when not given
 
         Raises:
             MthdsParserError: A bundle of the dependency does not parse, its items named by the bundle's source.
@@ -1334,7 +1351,8 @@ class LibraryManager(LibraryManagerAbstract):
         dep_blueprints: list[PipelexBundleBlueprint] = []
         # Each bundle as the member of the package's tree, by its caller-facing source, for the pipes reading a file it names.
         tree_bundles_by_source: dict[str, TreeBundle] = {}
-        package_tree = list_local_method_tree_at_root(root=resolved_dep.package_root)
+        # Listed under the package's address: a refusal never names the directory it was installed or fetched into.
+        package_tree = list_package_method_tree(root=resolved_dep.package_root, package_address=package_address, limits=tree_limits)
         for tree_bundle in tree_bundles_of(tree=package_tree):
             # The package's address and the bundle's tree path: never the host's path to the package.
             bundle_source = f"{package_address}/{tree_bundle.tree_path}"

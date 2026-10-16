@@ -30,6 +30,7 @@ from pipelex.cli.agent_cli.commands.run._run_hosted import (
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs
 from pipelex.cli.commands.run._hosted_sources import collect_mthds_files, hosted_library_dirs
 from pipelex.cli.commands.run._method_folder import list_bundle_file_tree, resolve_method_folder_run
+from pipelex.cli.commands.run._run_output_folder import RUN_RESULTS_DIR_NAME
 from pipelex.hosted.exceptions import HostedRunSourceError
 from pipelex.hosted.hosted_run import HostedRunRequest
 from pipelex.hosted.run_config import RunExecution  # ruff: ignore[typing-only-first-party-import] - typer reads the --runner annotation at runtime
@@ -128,9 +129,11 @@ def run_bundle_cmd(
 
     # The method tree the run reads, whose digest the run records: the folder's, or the bundle file's own.
     method_tree: MethodTree | None = None
-    # Where a folder run that named its pipe writes its outputs: the folder, as when it starts at its main pipe.
+    # Where a folder run that named its pipe writes its output folders: `results/` in the folder, which has no entry
+    # bundle to write beside.
     output_dir_override: Path | None = None
-    # The pipe a hosted run names: `--pipe`, else the bare main pipe the hosted API resolves among the files it is sent.
+    # The pipe a hosted run names: `--pipe`, else the main pipe the local run starts at, qualified by its domain, so the
+    # hosted API starts at the same pipe when two domains of the files it is sent define the same code.
     hosted_pipe_code: str | None = pipe
     if target_path.is_dir():
         # Directory mode: the method rooted at or above the folder, started where the protocol's rule says
@@ -142,9 +145,9 @@ def run_bundle_cmd(
         pipe_code = folder_run.pipe_code
         if folder_run.entry is not None and folder_run.entry_bundle_file is not None:
             bundle_path = str(folder_run.entry_bundle_file)
-            hosted_pipe_code = folder_run.entry.pipe_code
+            hosted_pipe_code = folder_run.entry.pipe_ref
         else:
-            output_dir_override = target_path
+            output_dir_override = target_path / RUN_RESULTS_DIR_NAME
 
         # Hand the directory to parse_cli_inputs as the lowest-priority inputs source: it probes
         # for inputs.json / inputs.toml (and applies the ambiguity rule) only after --inputs and

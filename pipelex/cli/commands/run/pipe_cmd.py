@@ -8,6 +8,7 @@ import typer
 from pipelex.cli.commands.run._hosted_sources import hosted_pipe_library_files
 from pipelex.cli.commands.run._run_core import COMMAND, execute_run, validate_run_flag_combination
 from pipelex.cli.commands.run._run_hosted import execute_hosted_run, refuse_local_only_flags, resolve_cli_run_execution
+from pipelex.cli.commands.run._run_output_folder import run_output_label
 from pipelex.cli.method_resolver import resolve_pipe_from_exports
 from pipelex.hosted.exceptions import HostedRunSourceError
 from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
@@ -179,7 +180,7 @@ def run_pipe_cmd(
             inputs=inputs,
             dynamic_output_concept_ref=dynamic_output_concept_ref,
             base_url=base_url,
-            output_label=pipe_code,
+            output_label=run_output_label(pipe_ref=pipe_code),
             output_dir=output_dir,
             save_working_memory=save_working_memory,
             working_memory_path=working_memory_path,

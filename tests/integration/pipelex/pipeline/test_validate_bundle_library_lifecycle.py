@@ -106,6 +106,18 @@ class TestValidateBundleLibraryLifecycle:
         opened_library_id, _ = open_library_spy.spy_return
         assert latest_call.kwargs["library_id"] == opened_library_id
 
+    async def test_validate_bundles_from_directory_refuses_a_tree_it_cannot_list_as_a_verdict(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """A directory whose method tree is refused is the invalid verdict before any library opens, never a raw error."""
+        open_library_spy = mocker.spy(get_library_manager(), "open_library")
+        (tmp_path / "test.mthds").write_text(_VALID_MTHDS, encoding="utf-8")
+        (tmp_path / "linked.mthds").symlink_to(tmp_path / "test.mthds")
+
+        with pytest.raises(ValidateBundleError) as raised:
+            await validate_bundles_from_directory(directory=tmp_path)
+
+        assert "linked.mthds" in raised.value.message
+        open_library_spy.assert_not_called()
+
     async def test_validate_bundle_tears_down_on_base_exception_in_pre_try_window(
         self,
         load_empty_library: Callable[[], str],

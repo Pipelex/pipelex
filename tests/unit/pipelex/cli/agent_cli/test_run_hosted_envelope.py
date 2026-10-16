@@ -260,3 +260,21 @@ class TestRunHostedEnvelope:
         request = run_hosted.await_args.kwargs["request"]
         assert isinstance(request, HostedRunRequest)
         assert [mthds_file.source for mthds_file in request.mthds_files or []] == [str(bundle_path), str(shared_dir / "shared.mthds")]
+
+    def test_a_folder_run_names_its_main_pipe_by_its_domain_when_two_domains_share_its_code(
+        self, run_hosted: AsyncMock, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """The hosted API starts at the pipe the local run would, never at a same-coded pipe of another domain sent with it."""
+        pipe_table = (
+            '[pipe.summarize]\ntype = "PipeLLM"\ndescription = "Summarize"\ninputs = { text = "Text" }\noutput = "Text"\nprompt = "Summarize $text"\n'
+        )
+        (tmp_path / "a_first.mthds").write_text(f'domain = "probe_other"\n\n{pipe_table}', encoding="utf-8")
+        (tmp_path / "z_entry.mthds").write_text(f'domain = "probe_entry"\nmain_pipe = "summarize"\n\n{pipe_table}', encoding="utf-8")
+
+        run_bundle_cmd(path=str(tmp_path), runner=RunExecution.HOSTED, output_format=CliOutputFormat.JSON)
+
+        capsys.readouterr()
+        assert run_hosted.await_args is not None
+        request = run_hosted.await_args.kwargs["request"]
+        assert isinstance(request, HostedRunRequest)
+        assert request.pipe_code == "probe_entry.summarize"

@@ -22,6 +22,7 @@ from pipelex.interpreter_hub import (
 )
 from pipelex.libraries.bundle_resources import check_bundle_resources
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
+from pipelex.libraries.method_trees import reporting_host_library_tree_faults
 from pipelex.libraries.pipe.exceptions import EntryPipeNotFoundError
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
@@ -203,22 +204,27 @@ async def validate_bundle(
         # Beside submitted content, a host's library directories are withheld from the verdict: their files are paths
         # on the host. The caller's own directories, and every directory of a bundle file, keep their paths.
         host_library_withholding: AbstractContextManager[None]
+        # A host's library directories whose trees cannot be listed are the host's fault, never the caller's verdict.
+        host_library_tree_faults: AbstractContextManager[None]
         if mthds_contents is not None and not library_dirs_are_callers:
             host_library_withholding = withholding_host_library_files(
                 library_dirs=effective_dirs,
                 caller_sources=[source for source in mthds_sources or [] if source is not None],
                 caller_contents=mthds_contents,
             )
+            host_library_tree_faults = reporting_host_library_tree_faults()
         else:
             host_library_withholding = nullcontext()
+            host_library_tree_faults = nullcontext()
         await asyncio.sleep(0)  # Yield to event loop (keeps function async-compatible)
         with host_library_withholding, translate_to_validate_bundle_error():
             if effective_dirs:
                 log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}) for validation")
-                library_manager.load_libraries(
-                    library_id=library_id,
-                    library_dirs=effective_dirs,
-                )
+                with host_library_tree_faults:
+                    library_manager.load_libraries(
+                        library_id=library_id,
+                        library_dirs=effective_dirs,
+                    )
             else:
                 log.verbose(f"No library directories to load ({source_label})")
             if mthds_contents is not None:
@@ -298,7 +304,9 @@ async def validate_bundle(
 
 
 async def validate_bundles_from_directory(directory: Path, *, allow_signatures: bool = False) -> ValidateBundleResult:
-    mthds_files = get_pipelex_mthds_files_from_dirs(dirs={directory})
+    # A directory whose tree cannot be listed is the invalid verdict, as a bundle of it that does not load is.
+    with translate_to_validate_bundle_error():
+        mthds_files = get_pipelex_mthds_files_from_dirs(dirs={directory})
     all_blueprints: list[PipelexBundleBlueprint] = []
 
     library_manager = get_library_manager()
