@@ -4,7 +4,7 @@ import pytest
 
 from pipelex.cogt.doc_gen.input_shape import InputShapeKind
 from pipelex.cogt.doc_gen.template_check import TemplateFinding, TemplateFindingSeverity
-from pipelex.core.bundle_resources.bundle_resource import make_bundle_resources
+from pipelex.core.method_trees.tree_bundle import MethodFileRef
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import ValidateBundleResult, validate_bundle
@@ -24,7 +24,7 @@ async def _validate_with_html_template_file(*, directory: Path, load: str, templ
         case _:
             return await validate_bundle(
                 mthds_contents=[PipeDocGenTestData.bundle(step_fields=step_fields)],
-                bundle_resources=make_bundle_resources(files={"invoice.html": template_bytes}),
+                submitted_files={"invoice.html": template_bytes},
             )
 
 
@@ -72,7 +72,10 @@ class TestPipeDocGenTemplateFiles:
 
         (pipe,) = result.pipes
         assert isinstance(pipe, PipeDocGen)
-        assert pipe.template == "<h1>{{ invoice.number }}</h1>"
+        assert pipe.template is None
+        assert pipe.template_file_text == "<h1>{{ invoice.number }}</h1>"
+        assert isinstance(pipe.template_file_ref, MethodFileRef)
+        assert pipe.template_file_ref.tree_path == "templates/invoice.html"
 
     @pytest.mark.usefixtures("stub_engines")
     async def test_a_bundle_file_named_alone_reads_no_file_beside_it(self, tmp_path: Path) -> None:
@@ -135,7 +138,7 @@ class TestPipeDocGenTemplateFiles:
 
         (pipe,) = result.pipes
         assert isinstance(pipe, PipeDocGen)
-        assert pipe.template == template_bytes.decode("utf-8")
+        assert pipe.template_file_text == template_bytes.decode("utf-8")
 
     async def test_the_engine_s_checker_findings_fail_the_dry_run(self, tmp_path: Path, stub_engines: StubEngines) -> None:
         """The dry run hands the checker the file's bytes, the inputs' shapes and the mock data, and an error finding fails it."""

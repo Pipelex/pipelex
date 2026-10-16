@@ -162,6 +162,29 @@ class TestExecutionSeams:
             library_manager.teardown(library_id=library_id)
             clear_current_library()
 
+    async def test_a_run_of_a_bundle_in_no_tree_records_its_crate_fingerprint_only(self) -> None:
+        library_manager = get_library_manager()
+        library_id = "seams_run_record_no_tree_lib"
+        _, qualified_main_pipe = acquire_library(library_id=library_id, mthds_contents=[_SEAMS_MTHDS])
+        try:
+            assert qualified_main_pipe is not None
+            pipe_job = await prepare_pipe_job(
+                storage_scope="test/scope",
+                read_scope=None,
+                user_id="test-user",
+                pipe=get_required_entry_pipe(pipe_code=qualified_main_pipe),
+                library_id=library_id,
+                execution_config=_dry_mock_config(),
+                pipe_run_mode=PipeRunMode.DRY,
+                pipeline_run_id="seams-record-no-tree-run-id",
+            )
+
+            assert pipe_job.job_metadata.run_metadata.method_tree_digest is None
+            assert pipe_job.job_metadata.run_metadata.crate_fingerprint
+        finally:
+            library_manager.teardown(library_id=library_id)
+            clear_current_library()
+
     @pytest.mark.parametrize(
         "bad_scope",
         [

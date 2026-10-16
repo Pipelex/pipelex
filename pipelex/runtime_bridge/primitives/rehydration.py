@@ -1,4 +1,7 @@
+from collections.abc import Mapping
 from typing import Any
+
+from mthds.method_tree.models import MethodTree
 
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.interpreter_hub import get_library_manager, set_current_library
@@ -12,6 +15,7 @@ def rehydrate_library_and_memory(
     crate: LibraryCrate,
     working_memory_raw: dict[str, Any] | None,
     is_crate_prevalidated: bool = False,
+    written_trees: Mapping[str, MethodTree] | None = None,
 ) -> WorkingMemory | None:
     """Open a fresh library from a transported crate and hydrate a transported working memory.
 
@@ -32,7 +36,8 @@ def rehydrate_library_and_memory(
 
     ``is_crate_prevalidated`` skips the pipes' validation, for a crate the sender validated where it was assembled,
     such as the one a `PipeFunc` call carries to a sandbox, whose other steps may name files of trees the sandbox
-    never receives.
+    never receives. ``written_trees`` are the trees this process wrote out, by the digest the crate names each by,
+    such as the tree of a `PipeFunc` call written for its function to import: a step of such a tree is built in it.
 
     Returns the hydrated WorkingMemory, or None when there was nothing to hydrate.
     """
@@ -40,7 +45,7 @@ def rehydrate_library_and_memory(
     library_manager.open_fresh_library(library_id=library_id)
     set_current_library(library_id=library_id)
 
-    library_manager.load_from_crate(library_id=library_id, crate=crate, is_crate_prevalidated=is_crate_prevalidated)
+    library_manager.load_from_crate(library_id=library_id, crate=crate, is_crate_prevalidated=is_crate_prevalidated, written_trees=written_trees)
 
     if working_memory_raw is None:
         return None

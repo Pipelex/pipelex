@@ -8,7 +8,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipelex.base_exceptions import PipelexError
-from pipelex.core.bundle_resources.exceptions import BundleResourceError, BundleResourceNotNamedError
+from pipelex.core.bundle_resources.exceptions import BundleResourceNotNamedError
+from pipelex.core.method_trees.exceptions import MethodFileUnavailableError
 from pipelex.errors.error_pages_generator import (
     _MACRO_SECTIONS,  # pyright: ignore[reportPrivateUsage]
     AUTHORED_MARKER,
@@ -127,7 +128,7 @@ class TestErrorPagesGenerator:
 
     def test_a_class_declaring_retryable_shows_it_and_one_declaring_nothing_does_not(self) -> None:
         assert "| `retryable` | `false` |" in render_error_page(BundleResourceNotNamedError)
-        assert "`retryable`" not in render_error_page(BundleResourceError)
+        assert "`retryable`" not in render_error_page(MethodFileUnavailableError)
 
     def test_report_total_sums_four_populations(self) -> None:
         """``total`` should equal the sum of ``written`` + ``unchanged`` + ``preserved`` + ``removed``."""

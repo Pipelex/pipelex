@@ -53,6 +53,7 @@ KERNEL_TIER_CLAIMS: dict[str, Callable[[PluginRegistrar], None]] = {
     "content_generator": lambda registrar: registrar.claim_content_generator(object),
     "task_manager": lambda registrar: registrar.claim_task_manager(object),
     "isolated_execution_probe": lambda registrar: registrar.claim_isolated_execution_probe(object),
+    "method_file_store": lambda registrar: registrar.claim_method_file_store(object),
 }
 
 

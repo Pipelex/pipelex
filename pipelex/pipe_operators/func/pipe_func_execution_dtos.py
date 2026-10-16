@@ -2,7 +2,6 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from pipelex.core.method_trees.tree_files import TreeFileEntry
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.job_metadata import JobMetadata
@@ -26,25 +25,25 @@ class PipeFuncExecutionRequest(BaseModel):
     The generic transport primitive for out-of-process PipeFunc execution — sibling to the
     runtime-bridge serialization, carrying only open pipelex types. A backend (a sandbox box, a local
     subprocess) runs it and returns a ``PipeFuncExecutionResponse``; a host runtime (a Temporal
-    activity) forwards it across its boundary. Carries the crate (the method, without the files of its
-    PipeFunc calls), the call's files (``files``, the Python root of the step called), the transported
+    activity) forwards it across its boundary. Carries the crate (the method, naming its trees by digest and
+    carrying none of their files), the digest of the called step's tree (``tree_digest``), the transported
     working memory (the function's inputs), and the identity of the pipe/function to run. Deliberately
-    carries NO secrets.
+    carries NO secrets, and no file's bytes: whoever runs the call reads the tree's files through the method
+    file store, where IO is allowed, never in a workflow.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     crate: LibraryCrate
-    files: dict[str, TreeFileEntry] = Field(
-        default_factory=dict,
+    tree_digest: str | None = Field(
+        default=None,
         description=(
-            "The files of the called step's Python root, by tree path, written where the call runs before the function is "
-            "imported: every file of the step's method tree except its .mthds files, or for a step parsed from a content "
-            "string, the files submitted beside it. Each is a file entry of the MTHDS standard, its text or {'base64': ...}. "
-            "The root goes first on sys.path and the function is imported by its import path from there, so it imports "
-            "its sibling modules and reads a file beside its module as it does locally. A sandbox client may move them "
-            "out of the request and unpack them itself, such as from one archive per call, and hand the directory to the "
-            "entrypoint."
+            "The digest of the method tree the called step belongs to, whose files, every one but its .mthds files, are "
+            "written at the call's import root before the function is imported, so it imports its sibling modules and "
+            "reads a file beside its module as it does locally. For a step parsed from a content string, the tree of the "
+            "files submitted beside it; None when none was. The process that runs the call reads them through the method "
+            "file store under the run's read scope (`read_pipe_func_call_files`); a sandbox client reads them there and "
+            "hands the sandbox the directory it unpacked them into."
         ),
     )
     working_memory_raw: dict[str, Any]

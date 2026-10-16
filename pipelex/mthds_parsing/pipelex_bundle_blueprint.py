@@ -132,20 +132,20 @@ class PipelexBundleBlueprint(BaseModel):
     # library manager lists the bundle's method tree from when no loader placed the bundle in one.
     _host_bundle_file: Path | None = PrivateAttr(default=None)
     # The bundle as a member of its method tree, set by the loader that listed the tree. A step reads a file the bundle
-    # names, such as a PipeDocGen `template_file`, only by resolving it in this tree; a bundle parsed from a string has
-    # none, and reads only the files submitted with it.
+    # names, such as a PipeDocGen `template_file`, only by resolving it in this tree. A bundle parsed from a string sits at
+    # the root of the tree of the files submitted with it, with no tree path, and has no tree when none was submitted.
     _tree_bundle: TreeBundle | None = PrivateAttr(default=None)
 
     @property
     def host_bundle_file(self) -> Path | None:
         """The file on this host the bundle was read from, or None for a bundle parsed from a string."""
-        if self._tree_bundle is not None:
+        if self._tree_bundle is not None and self._tree_bundle.tree_path is not None:
             return self._tree_bundle.location
         return self._host_bundle_file
 
     @property
     def tree_bundle(self) -> TreeBundle | None:
-        """The bundle as a member of its method tree, or None for a bundle parsed from a string or not yet placed in one."""
+        """The bundle as a member of its method tree, or None for a bundle not placed in one."""
         return self._tree_bundle
 
     def mark_read_from_host_file(self, *, bundle_file: Path) -> None:
@@ -153,7 +153,9 @@ class PipelexBundleBlueprint(BaseModel):
         self._host_bundle_file = bundle_file
 
     def place_in_tree(self, *, tree_bundle: TreeBundle) -> None:
-        """Record the bundle as `tree_bundle`, the member of the method tree a loader listed it in."""
+        """Record the bundle as `tree_bundle`: the member of the method tree a loader listed it in, or a bundle parsed from a
+        string at the root of the tree of the files submitted with it.
+        """
         self._tree_bundle = tree_bundle
 
     @field_validator("domain", mode="before")

@@ -38,7 +38,7 @@ class TestPipeDocGenDependencyTemplateFile:
         library = LibraryFactory.make_empty()
         mocker.patch.object(get_library_manager(), "get_current_library", return_value=library)
         LibraryManager()._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
-            library=library, package_address=_PACKAGE_ADDRESS, resolved_dep=resolved_dep
+            library=library, library_id="dependency-test", package_address=_PACKAGE_ADDRESS, resolved_dep=resolved_dep
         )
         return library
 
@@ -48,7 +48,7 @@ class TestPipeDocGenDependencyTemplateFile:
 
         pipe = library.dependency_libraries["invoicing"].pipe_library.get_required_pipe(pipe_code="doc_gen_tests.print_invoice")
         assert isinstance(pipe, PipeDocGen)
-        assert pipe.template == _TEMPLATE
+        assert pipe.template_file_text == _TEMPLATE
 
     def test_a_dependency_s_missing_template_file_is_refused_without_the_host_path(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """The refusal is located at the package's address and names the template file as the method does, never where the host installed it."""

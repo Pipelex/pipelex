@@ -66,6 +66,7 @@ class TestDependencyPipeBuildRefusals:
         mocker.patch.object(get_library_manager(), "get_current_library", return_value=library)
         LibraryManager()._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             library=library,
+            library_id="dependency-test",
             package_address="github.com/harbour-board/harbour-dep",
             resolved_dep=resolved_dep,
         )

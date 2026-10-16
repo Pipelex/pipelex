@@ -1,7 +1,9 @@
 from collections.abc import Callable
 from contextlib import nullcontext
+from pathlib import Path
 from typing import Any, Literal, cast, get_args, get_origin, get_type_hints
 
+from mthds.method_tree.models import MethodTree
 from mthds.method_tree.tree_path import nfc
 from pydantic import PrivateAttr, field_validator
 from typing_extensions import override
@@ -12,8 +14,10 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.method_trees.building_bundle import BuildingBundle
 from pipelex.core.method_trees.exceptions import TreePythonError
-from pipelex.core.method_trees.tree_bundle import TreeBundle
+from pipelex.core.method_trees.method_file_store import LOCAL_METHOD_FILES
+from pipelex.core.method_trees.tree_bundle import TreeBundle, TreeBundleRef
 from pipelex.core.method_trees.tree_python import check_tree_module_names, top_level_module_names, tree_label_holding
 from pipelex.core.pipes.exceptions import PipeRunError, PipeValidationError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, TypedNamedStuffSpec
@@ -21,9 +25,8 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.interpreter_hub import get_current_library_id_or_none, get_library_manager, get_pipe_func_executor
+from pipelex.interpreter_hub import get_current_library_id_or_none, get_pipe_func_executor
 from pipelex.kernel.memory_ops import store_result
-from pipelex.libraries.library_crate import SUBMITTED_PYTHON_ROOT_KEY
 from pipelex.pipe_operators.func.exceptions import PipeFuncFunctionError
 from pipelex.pipe_operators.func.function_name import function_name_form_violation
 from pipelex.pipe_operators.func.pipe_func_call_context import pipe_func_call_in_flight
@@ -56,16 +59,17 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
     The function is located and its form proven at validation, without running Python; it is imported, and its calling
     convention and return type checked, when the step first runs, dry or live. In `direct` mode it is imported in
     this process, under the process's hold on the tree's Python; in a sandbox-hosted mode it never is, and the call
-    travels to the sandbox with the tree's files. See `pipe_func_python` for where a `function_name` resolves.
+    names the tree by its digest, the files being read where the call runs. See `pipe_func_python` for where a
+    `function_name` resolves.
     """
 
     type: Literal["PipeFunc"] = "PipeFunc"
     function_name: str
 
-    # The member of its method tree the step's bundle was read as, which the function's import path resolves in; None
-    # for a bundle parsed from a content string. Set by the factory, never serialized: a pipe is rebuilt from its
-    # blueprint wherever it travels, and the crate carries the tree.
-    _tree_bundle: TreeBundle | None = PrivateAttr(default=None)
+    # Where the step's bundle lies, which the function's import path resolves in: a tree this process holds, a tree a
+    # crate names by digest, or None for a bundle parsed from a content string with no file submitted beside it. Set
+    # by the factory, never serialized: a pipe is rebuilt from its blueprint wherever it travels.
+    _tree_bundle: BuildingBundle = PrivateAttr(default=None)
     # The function once imported and checked, with the holder its import was made for.
     _bound_function: tuple[str, Callable[..., Any]] | None = PrivateAttr(default=None)
     # Whether validation located the function and proved its form, which a dependency package's step, validated as it is
@@ -91,12 +95,12 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             raise ValueError(violation)
         return nfc(function_name)
 
-    def place_in_tree(self, *, tree_bundle: TreeBundle | None) -> None:
-        """Record the member of its method tree the step's bundle was read as, or None for a bundle parsed from a string."""
+    def place_in_tree(self, *, tree_bundle: BuildingBundle) -> None:
+        """Record where the step's bundle lies, as `BuildingBundle` describes it."""
         self._tree_bundle = tree_bundle
 
     @property
-    def tree_bundle(self) -> TreeBundle | None:
+    def tree_bundle(self) -> BuildingBundle:
         return self._tree_bundle
 
     @override
@@ -138,54 +142,62 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         """Locate the module where the step's import root puts it, prove the function's form, and check the tree's module names.
 
         A sandbox-hosted deployment imports the function in a sandbox, whose packages are not this process's, so there
-        a module name is checked against the standard library only.
+        a module name is checked against the standard library only. A step built from a crate that names its tree by
+        digest alone is not checked again: its tree holds no file here, and the host that assembled the crate proved the
+        function before the run was dispatched.
 
         Raises:
             PipeFuncFunctionError: The module is not found, or the form is not proven.
             TreeModuleShadowingError: A top-level module of the tree, or of the submitted Python, would shadow another.
         """
-        library_id = get_current_library_id_or_none()
         imports_in_this_process = not is_pipe_func_sandbox_hosted()
-        tree_bundle = self._tree_bundle
         module_source: PipeFuncModuleSource
-        if tree_bundle is not None:
-            tree = tree_bundle.tree
-            # A crate loaded on another host carries the tree's files when its library captured them; the tree's
-            # directory is then the host that listed it, so the files are read in place of the disk.
-            captured = (
-                get_library_manager().get_pipe_func_files(library_id=library_id, root_key=tree_bundle.tree_key) if library_id is not None else None
-            )
-            try:
-                module_source = locate_in_tree(function_name=self.function_name, tree=tree, files=captured)
-            except OSError as exc:
-                msg = f"The module of the function_name '{self.function_name}' cannot be read from the method tree on this host."
-                raise PipeFuncFunctionError(msg) from exc
-            check_pipe_func_definition(module_source=module_source)
-            on_disk = captured is None and tree.directory is not None
-            check_tree_module_names(
-                top_level_modules=top_level_module_names(tree_paths=captured.keys() if captured is not None else tree.members),
-                # Named by the bundle it holds, never by its directory, which is a path on this host.
-                tree_label=tree_label_holding(tree_path=tree_bundle.tree_path),
-                root=tree.directory.resolve() if on_disk and tree.directory is not None else None,
-                checks_this_process=imports_in_this_process,
-            )
-        elif not imports_in_this_process:
-            submitted = (
-                get_library_manager().get_pipe_func_files(library_id=library_id, root_key=SUBMITTED_PYTHON_ROOT_KEY)
-                if library_id is not None
-                else None
-            )
-            module_source = locate_in_files(function_name=self.function_name, files=submitted or {})
-            check_pipe_func_definition(module_source=module_source)
-            check_tree_module_names(
-                top_level_modules=top_level_module_names(tree_paths=(submitted or {}).keys()),
-                tree_label="the Python submitted with the method",
-                root=None,
-                checks_this_process=False,
-            )
-        else:
-            module_source = locate_on_import_path(function_name=self.function_name)
-            check_pipe_func_definition(module_source=module_source)
+        match self._tree_bundle:
+            case TreeBundleRef():
+                return
+            case TreeBundle(tree=MethodTree(directory=Path() as tree_directory)) as tree_bundle:
+                tree = tree_bundle.tree
+                try:
+                    module_source = locate_in_tree(function_name=self.function_name, tree=tree)
+                except OSError as exc:
+                    msg = f"The module of the function_name '{self.function_name}' cannot be read from the method tree on this host."
+                    raise PipeFuncFunctionError(msg) from exc
+                check_pipe_func_definition(module_source=module_source)
+                check_tree_module_names(
+                    top_level_modules=top_level_module_names(tree_paths=tree.members),
+                    # Named by the bundle it holds, never by its directory, which is a path on this host.
+                    tree_label=self._tree_label(tree_bundle=tree_bundle),
+                    root=tree_directory.resolve(),
+                    checks_this_process=imports_in_this_process,
+                )
+            case TreeBundle() as tree_bundle if not imports_in_this_process:
+                # The files submitted with bundles parsed from content strings, which this process holds in memory: a
+                # sandbox imports the function from them.
+                tree = tree_bundle.tree
+                module_source = locate_in_files(function_name=self.function_name, files=_held_files_of(tree_bundle=tree_bundle))
+                check_pipe_func_definition(module_source=module_source)
+                check_tree_module_names(
+                    top_level_modules=top_level_module_names(tree_paths=tree.members),
+                    tree_label=self._tree_label(tree_bundle=tree_bundle),
+                    root=None,
+                    checks_this_process=False,
+                )
+            case None if not imports_in_this_process:
+                # No file was submitted with the bundle, so a sandbox would have no module to import.
+                module_source = locate_in_files(function_name=self.function_name, files={})
+                check_pipe_func_definition(module_source=module_source)
+            case TreeBundle() | None:
+                # A bundle parsed from a content string imports its function from this process's import path, where
+                # the library directories loaded beside it put their Python.
+                module_source = locate_on_import_path(function_name=self.function_name)
+                check_pipe_func_definition(module_source=module_source)
+
+    @staticmethod
+    def _tree_label(*, tree_bundle: TreeBundle) -> str:
+        """How a message names the step's tree: by the bundle it holds, or as the submitted Python for content strings."""
+        if tree_bundle.tree_path is None:
+            return "the Python submitted with the method"
+        return tree_label_holding(tree_path=tree_bundle.tree_path)
 
     def bind_function(self) -> Callable[..., Any]:
         """Import the function in this process and check it, once per holder: the `direct` mode's way to reach it.
@@ -202,15 +214,23 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         if bound is not None and bound[0] == holder:
             return bound[1]
         function: Callable[..., Any]
-        if self._tree_bundle is not None:
-            function = bind_tree_function(
-                function_name=self.function_name,
-                tree=self._tree_bundle.tree,
-                holder=holder,
-                tree_label=tree_label_holding(tree_path=self._tree_bundle.tree_path),
-            )
-        else:
-            function = bind_import_path_function(function_name=self.function_name)
+        match self._tree_bundle:
+            case TreeBundle(tree=MethodTree(directory=Path())) as tree_bundle:
+                function = bind_tree_function(
+                    function_name=self.function_name,
+                    tree=tree_bundle.tree,
+                    holder=holder,
+                    tree_label=self._tree_label(tree_bundle=tree_bundle),
+                )
+            case TreeBundleRef() as tree_bundle_ref:
+                msg = (
+                    f"The method tree '{tree_bundle_ref.tree_digest}' holding this step was named by a crate and is not on "
+                    "this host, so its function cannot be imported here: run the step where its tree's files are written."
+                )
+                raise PipeFuncFunctionError(msg)
+            case TreeBundle() | None:
+                # A bundle parsed from a content string imports its function from this process's import path.
+                function = bind_import_path_function(function_name=self.function_name)
         self._check_return_type(function=function)
         self._bound_function = (holder, function)
         return function
@@ -485,3 +505,21 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass
+
+
+def _held_files_of(*, tree_bundle: TreeBundle) -> dict[str, bytes]:
+    """The Python files of a tree this process assembled in memory, read from the local method file store.
+
+    Raises:
+        PipeFuncFunctionError: The store no longer holds one of the tree's files.
+    """
+    files: dict[str, bytes] = {}
+    for tree_path in tree_bundle.tree.tree_paths:
+        if not tree_path.endswith(".py"):
+            continue
+        data = LOCAL_METHOD_FILES.read_held_file(tree_digest=tree_bundle.tree.digest, tree_path=tree_path)
+        if data is None:
+            msg = f"The file '{tree_path}' submitted with the method is no longer held by this process."
+            raise PipeFuncFunctionError(msg)
+        files[tree_path] = data
+    return files

@@ -33,10 +33,8 @@ from pipelex.runtime_bridge.orchestration_mode import OrchestrationMode
 from pipelex.system.caller_identity import CallerIdentity
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
     from pathlib import Path
-
-    from pipelex.core.bundle_resources.bundle_resource import BundleResources
 
 # The verdict a validator returns: valid arm = the protocol validation report (at runtime
 # always the canonical PipelexValidationReport subtype), invalid arm = the structured
@@ -76,13 +74,13 @@ class BundleValidatorProtocol(Protocol):
     does not resolve degrades the graph to ``None``, like any other graph-arm failure, and
     never changes the verdict.
 
-    ``bundle_resources`` are the files submitted with ``mthds_contents`` that their steps read,
+    ``submitted_files`` are the files submitted with ``mthds_contents`` that their steps read,
     such as a ``PipeDocGen`` step's ``template_file``, keyed by canonical bundle-relative path,
-    each carrying its bytes inline. The validation loads the bundles with them and its dry run
-    reads them, the template check included. It is required for the same reason as
-    ``caller_identity``, with ``None`` meaning none were submitted: a validator that dropped them
-    would refuse a valid bundle for a missing file. A worker-dispatched arm carries them to its
-    worker, by reference to storage rather than inline when they are large.
+    with their bytes. The validation loads the bundles with them and its dry run reads them, the
+    template check included. It is required for the same reason as ``caller_identity``, with
+    ``None`` meaning none were submitted: a validator that dropped them would refuse a valid bundle
+    for a missing file. A worker-dispatched arm hands them to its worker through the method file
+    store, the crate naming their tree by digest.
     """
 
     async def validate_bundles(
@@ -94,7 +92,7 @@ class BundleValidatorProtocol(Protocol):
         library_dirs: "Sequence[Path] | None",
         caller_identity: CallerIdentity | None,
         graph_pipe_code: str | None,
-        bundle_resources: "BundleResources | None",
+        submitted_files: "Mapping[str, bytes] | None",
     ) -> BundleValidationVerdict: ...
 
 

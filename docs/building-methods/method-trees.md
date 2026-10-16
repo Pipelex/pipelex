@@ -34,7 +34,7 @@ A file a bundle names, such as a [`PipeDocGen`](pipes/pipe-operators/PipeDocGen.
 
 ## Python modules
 
-A [`PipeFunc`](pipes/pipe-operators/PipeFunc.md) step names its function by its import path from the root of the tree, such as `funcs.totals.compute_totals` for the function `compute_totals` of `funcs/totals.py`, and its module is found among the tree's files. A run imports the tree's modules with the root first on the import path, refuses the import of a file the membership rule keeps out, such as a `.gitignore`d module, and writes no `__pycache__` into the tree. On a sandbox-hosted deployment, every file of the tree except its `.mthds` files travels with each call of the step.
+A [`PipeFunc`](pipes/pipe-operators/PipeFunc.md) step names its function by its import path from the root of the tree, such as `funcs.totals.compute_totals` for the function `compute_totals` of `funcs/totals.py`, and its module is found among the tree's files. A run imports the tree's modules with the root first on the import path, refuses the import of a file the membership rule keeps out, such as a `.gitignore`d module, and writes no `__pycache__` into the tree. On a sandbox-hosted deployment, each call of the step receives every file of the tree except its `.mthds` files, read by the tree's digest where the call is made (see [Inside a run](#inside-a-run)).
 
 ## Library directories
 
@@ -82,3 +82,11 @@ max_total_bytes = 4294967296
 These limits are not the hosted API's. A deployment sets its own, which a local run cannot know, and applying them locally would refuse a method rooted in a cluttered folder that loads today; a sender warned of the hosted limits before it sends is the hosted run's concern, not a local load's.
 
 Every listing computes the tree's digest, the SHA-256 of its canonical listing of paths, hashes and sizes, which names the exact files of a method: two folders with the same files have the same digest. A local run records the digest of the tree it ran. `pipelex run bundle` prints it with the run's recap and writes `method_tree.json` into the run's output folder, holding the digest, the tree's root on this machine, its entry and each file's path, hash and size. `pipelex-agent run bundle` adds `method_tree_digest` to the run's output file and, with `--with-memory`, to its output.
+
+## Inside a run
+
+A run carries no file of its method. The library a run hands from step to step, its crate, names the tree each bundle belongs to by the tree's digest and the bundle by its path in the tree, and a step names a file it reads, such as a `PipeDocGen` step's template file, the same way. The files a request submits with bundles sent as text make a tree too, with those bundles at its root, named by its digest like a folder's.
+
+Every method file is read where reading is allowed, at the moment a step uses it: a `PipeDocGen` step's template file at its print, and the files of a `PipeFunc` call where the call is made. Each read goes through the method file store, by the tree's digest and under the run's read scope, and is checked against the digest: the listing read must have that digest, and each file the hash the listing gives it. Locally, the store serves the trees the process's libraries hold, from the folder they were listed from or from the files submitted with them. A distributed orchestrator, such as Temporal, runs a step's leaves apart from the process that loaded the method, and its deployment provides the store that serves them there.
+
+A run records two identities of its method: the digest of its tree, which changes with any byte of any file, and the fingerprint of its crate, which changes only with the meaning of its concepts and pipes. A method whose bundles were all sent as text, with no file beside them, belongs to no tree, so its run records the fingerprint alone.

@@ -1,25 +1,58 @@
-from pathlib import Path
 from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
+from pipelex.cogt.doc_gen.input_shape import InputShape
 from pipelex.cogt.doc_gen.layout_tree import LayoutDocument
 from pipelex.cogt.doc_gen.render_job import RenderJob
-from pipelex.core.bundle_resources.bundle_resource import BundleResource
-from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
+from pipelex.core.method_trees.tree_bundle import MethodFileRef
 from pipelex.tools.uri.uri_read_scope import UriReference
+
+
+class TemplateRenderContext(BaseModel):
+    """What the print stage renders a step's HTML template file with: the step's data, and the library that types it.
+
+    The data is the step's working memory as it travels between processes, typed by the concepts of the run's library
+    crate, which travels beside it as plain JSON, so the print stage can type the data again wherever it runs and
+    render the template with the whole stack of a `PipeCompose` HTML template, its filters included.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    crate: dict[str, Any] = Field(description="The run's library crate as JSON, whose concepts type the step's data")
+    working_memory_raw: dict[str, Any] = Field(description="The step's working memory, dumped for transport")
+    runtime_params: dict[str, Any] = Field(default_factory=dict, description="The run's runtime parameters, which a template may read")
+
+
+class ComposedTemplateFile(BaseModel):
+    """A template file a step names, as its print stage reads it: a file of the step's method tree, and what to read it with.
+
+    The compose stage runs where the step runs, in a workflow on a hosted plane, which reads no file, so it names the
+    template file by its tree's digest and its tree path, and the print stage, an activity, reads it through the method
+    file store. An HTML template file carries the context it renders with; an office template file carries the shapes
+    of the step's inputs, which the engine's template checker reads at a dry print.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    file: MethodFileRef = Field(description="The template file, as a file of the step's method tree")
+    name: str = Field(description="The template file as the method names it, for messages")
+    pipe_ref: str = Field(description="The step naming the template file, as 'domain.pipe_code', for the findings of its check")
+    render_context: TemplateRenderContext | None = Field(default=None, description="What an HTML template file is rendered with")
+    input_shapes: dict[str, InputShape] = Field(
+        default_factory=dict, description="The step's declared inputs by name, as the shape of their plain data, for an office template's check"
+    )
 
 
 class DocumentComposition(BaseModel):
     """What a `PipeDocGen` step's compose stage produced, for its print stage to hand an engine.
 
-    The compose stage is pure, so it can run where the pipe runs, inside a workflow; this is what crosses to
-    the print stage, which reads the template file and prints. It differs from the engine's `RenderJob` by
-    naming the template file rather than carrying its bytes: reading a file is the print stage's IO. A template
-    file beside a bundle loaded from disk is named by its path; one submitted with a bundle loaded from content
-    strings is its bundle resource, inline in a run that stays in its process and a reference to the run's storage
-    in one handed to a remote orchestrator, so the bytes never ride in the composition across a workflow boundary.
+    The compose stage is pure, so it can run where the pipe runs, inside a workflow; this is what crosses to the print
+    stage, which reads the template file, renders it when it is an HTML template, and prints. It differs from the
+    engine's `RenderJob` by naming the template file rather than carrying its bytes: reading a method file is the print
+    stage's IO, through the method file store, so the bytes never ride in the composition across a workflow boundary.
+    An inline HTML template, whose text is the bundle's own, is rendered by the compose stage and travels as `html`.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -30,21 +63,27 @@ class DocumentComposition(BaseModel):
     title: str
     layout: LayoutDocument | None = None
     html: str | None = None
-    template_path: str | None = Field(default=None, description="The template file's resolved path, for the print stage to read")
-    template_resource: BundleResource | None = Field(
-        default=None, description="The template file submitted with the bundle, for the print stage to read"
-    )
-    template_name: str | None = Field(default=None, description="The template file as the method names it")
+    template_file: ComposedTemplateFile | None = Field(default=None, description="The template file the print stage reads, renders and prints")
     data: dict[str, Any] = Field(default_factory=dict)
+
+    @property
+    def template_name(self) -> str | None:
+        """The template file as the method names it, when the step prints from one."""
+        return self.template_file.name if self.template_file is not None else None
+
+    @property
+    def renders_html_template_file(self) -> bool:
+        """Whether the print stage renders an HTML template file before it prints."""
+        return self.template_file is not None and self.template_file.render_context is not None
 
     def _carries_payload_of(self, *, source: DocGenSource) -> bool:
         match source:
             case DocGenSource.LAYOUT:
                 return self.layout is not None
             case DocGenSource.HTML:
-                return self.html is not None
+                return self.html is not None or self.renders_html_template_file
             case DocGenSource.TEMPLATE_FILE:
-                return self.template_path is not None or self.template_resource is not None
+                return self.template_file is not None and self.template_file.render_context is None
 
     @model_validator(mode="after")
     def validate_payload(self) -> Self:
@@ -57,46 +96,39 @@ class DocumentComposition(BaseModel):
         if extra_payloads:
             msg = f"A document composed {self.source.desc} carries only its own payload, not the {', '.join(extra_payloads)} one."
             raise ValueError(msg)
-        if self.template_path is not None and self.template_resource is not None:
-            msg = "A template file is read from disk or submitted with its bundle, not both."
+        if self.html is not None and self.template_file is not None:
+            msg = "A document composed from HTML carries its rendered HTML or the template file the print stage renders, not both."
             raise ValueError(msg)
         return self
 
     def referenced_uris(self) -> list[UriReference]:
         """The files the print stage will read for the document, which it authorizes against the run's read scope first.
 
-        The images of the layout tree, and a template file submitted with the bundle and stored with the run.
-        Composed HTML may name files too, but only an engine laying it out finds them, and it reads each through
-        `RenderResources`, which applies the same check.
+        The images of the layout tree. A template file is a method file, read through the method file store under the
+        run's read scope, and composed HTML may name files too, but only an engine laying it out finds them, and it reads
+        each through `RenderResources`, which applies the same check.
         """
-        references: list[UriReference] = []
-        if self.template_resource is not None and self.template_resource.uri is not None:
-            references.append(UriReference(uri=self.template_resource.uri, position=f"the template file '{self.template_name}'"))
-        if self.layout is not None:
-            references.extend(
-                UriReference(uri=image_url, position=f"image {index} of the document '{self.filename}'")
-                for index, image_url in enumerate(self.layout.image_urls(), start=1)
-            )
-        return references
+        if self.layout is None:
+            return []
+        return [
+            UriReference(uri=image_url, position=f"image {index} of the document '{self.filename}'")
+            for index, image_url in enumerate(self.layout.image_urls(), start=1)
+        ]
 
-    async def make_render_job(self, *, storage_provider: StorageProviderAbstract) -> RenderJob:
-        """The engine's job: this composition with the template file's bytes read in, when there is one.
+    def make_render_job(self, *, html: str | None = None, template: bytes | None = None) -> RenderJob:
+        """The engine's job: this composition with what the print stage read and rendered.
 
-        A stored template file is read through the run's storage provider; the caller authorizes the read against the
-        run's read scope first, with `referenced_uris`.
+        Args:
+            html: The HTML template file, rendered with the step's data, when the step prints from one.
+            template: The office template file's bytes, when the step prints from one.
         """
-        template: bytes | None = None
-        if self.template_path is not None:
-            template = Path(self.template_path).read_bytes()
-        elif self.template_resource is not None:
-            template = await self.template_resource.read_bytes(storage_provider=storage_provider)
         return RenderJob(
             format=self.format,
             source=self.source,
             filename=self.filename,
             title=self.title,
             layout=self.layout,
-            html=self.html,
+            html=html if html is not None else self.html,
             template=template,
             template_name=self.template_name,
             data=self.data,

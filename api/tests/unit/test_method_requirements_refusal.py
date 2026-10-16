@@ -9,7 +9,7 @@ the deployment's fault, never the caller's.
 
 import asyncio
 import sys
-from collections.abc import Callable, Generator, Sequence
+from collections.abc import Callable, Generator, Mapping, Sequence
 from pathlib import Path
 
 import pytest
@@ -17,7 +17,6 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pipelex.base_exceptions import DisclosureMode, ErrorReport
 from pipelex.config import get_config
-from pipelex.core.bundle_resources.bundle_resource import BundleResources
 from pipelex.interpreter_hub import get_interpreter_hub
 from pipelex.libraries.exceptions import MethodRequirementsNotMetError
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
@@ -106,7 +105,7 @@ class _UnreachableValidator:
         library_dirs: Sequence[Path] | None,  # noqa: ARG002
         caller_identity: CallerIdentity | None,  # noqa: ARG002
         graph_pipe_code: str | None,  # noqa: ARG002
-        bundle_resources: BundleResources | None,  # noqa: ARG002
+        submitted_files: Mapping[str, bytes] | None,  # noqa: ARG002
     ) -> ErrorReport:
         self.calls += 1
         msg = "A method refused for its requirements must not reach the validator."

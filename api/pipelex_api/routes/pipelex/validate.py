@@ -405,7 +405,7 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
         verdict = await ApiRunner(
             user_id=user_id,
             extras=request_data.analytics_groups,
-            bundle_resources=decode_bundle_resources(resources=request_data.resources),
+            submitted_files=decode_bundle_resources(resources=request_data.resources),
         ).validate_verdict(
             mthds_contents=request_data.mthds_contents,
             mthds_sources=request_data.mthds_sources,

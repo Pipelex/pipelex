@@ -1,10 +1,7 @@
 from typing import TYPE_CHECKING, NamedTuple
 
-from pipelex.core.bundle_resources.bundle_resource import BundleResources
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
-from pipelex.core.method_trees.tree_bundle import TreeBundleRef
-from pipelex.core.method_trees.tree_files import TreeFileEntry
 from pipelex.libraries.collision_messages import duplicate_ref_msg
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.contract_match import contracts_match
@@ -15,9 +12,8 @@ from pipelex.mthds_parsing.pipelex_bundle_blueprint import ElaborationMetadata, 
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 
 if TYPE_CHECKING:
-    from mthds.method_tree.models import MethodTree
-
     from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
+    from pipelex.core.method_trees.tree_bundle import TreeBundleRef
 
 
 class PipeDeclaration(NamedTuple):
@@ -38,9 +34,6 @@ class LibraryCrateFactory:
     def make_from_blueprints(
         cls,
         blueprints: list[PipelexBundleBlueprint],
-        *,
-        pipe_func_files: dict[str, dict[str, TreeFileEntry]] | None = None,
-        bundle_resources: BundleResources | None = None,
     ) -> LibraryCrate:
         """Build a LibraryCrate from parsed bundle blueprints.
 
@@ -54,12 +47,7 @@ class LibraryCrateFactory:
         7. Compute SHA-256 fingerprint
 
         Args:
-            blueprints: List of parsed MTHDS bundle blueprints
-            pipe_func_files: Optional Python root -> the files a PipeFunc call of that root receives, captured (without
-                importing) in sandbox-hosted load mode. Attached verbatim to the crate; intentionally NOT folded
-                into the fingerprint (the fingerprint represents library structure for dedupe).
-            bundle_resources: Optional canonical path -> file submitted with a bundle loaded from content strings.
-                Attached verbatim to the crate and, like ``pipe_func_files``, NOT folded into the fingerprint.
+            blueprints: List of parsed MTHDS bundle blueprints, each naming the method tree it belongs to, if any
 
         Returns:
             A LibraryCrate with all content merged and fingerprinted
@@ -68,20 +56,15 @@ class LibraryCrateFactory:
         pipes: dict[str, PipeBlueprintUnion] = {}
         domains: dict[str, DomainBlueprint] = {}
         source_map: dict[str, str] = {}
-        method_trees: dict[str, MethodTree] = {}
         tree_bundles: dict[str, TreeBundleRef] = {}
         elaboration_metadata: dict[str, ElaborationMetadata] = {}
 
         for blueprint in blueprints:
             domain_code = blueprint.domain
             source = blueprint.source
-            # The member of its method tree the bundle was read as, which a step reading a file the bundle names resolves
-            # it in; None for a bundle parsed from a string.
-            tree_bundle_ref: TreeBundleRef | None = None
-            if blueprint.tree_bundle is not None:
-                tree_key = blueprint.tree_bundle.tree_key
-                method_trees.setdefault(tree_key, blueprint.tree_bundle.tree)
-                tree_bundle_ref = TreeBundleRef(tree_key=tree_key, tree_path=blueprint.tree_bundle.tree_path)
+            # The method tree the bundle belongs to, by digest, which a step reading a file the bundle names resolves it
+            # in; None for a bundle parsed from a string with no file submitted beside it.
+            tree_bundle_ref = blueprint.tree_bundle.make_ref() if blueprint.tree_bundle is not None else None
 
             # Domain metadata: order-independent, omission-quiet merge (see merge_domain_metadata_field).
             if domain_code not in domains:
@@ -188,12 +171,8 @@ class LibraryCrateFactory:
             pipes=pipes,
             domains=domains,
             source_map=source_map,
-            # Only the trees a winning declaration was read from: a tree whose every pipe lost a collision travels nowhere.
-            method_trees={tree_key: method_trees[tree_key].model_dump_json() for tree_key in sorted({ref.tree_key for ref in tree_bundles.values()})},
             tree_bundles=tree_bundles,
             elaboration_metadata=elaboration_metadata,
-            pipe_func_files={root_key: dict(files) for root_key, files in (pipe_func_files or {}).items()},
-            bundle_resources=dict(bundle_resources) if bundle_resources else {},
             fingerprint=fingerprint,
         )
 

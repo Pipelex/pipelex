@@ -13,7 +13,7 @@ from pipelex.libraries.method_trees import (
     list_library_dir_trees,
     list_package_method_tree,
     reporting_host_library_tree_faults,
-    submitted_python_files,
+    submitted_tree_files,
     tree_bundle_of_lone_file,
     tree_python_sources,
 )
@@ -219,7 +219,10 @@ class TestMethodTrees:
         _touch(directory=tmp_path, tree_path="rooted/python/helpers.py", content="X = 3\n")
 
         submitted = {
-            library_tree.library_dir.name: submitted_python_files(library_tree=library_tree)
+            library_tree.library_dir.name: {
+                path: held_file.source.read_bytes() if isinstance(held_file.source, Path) else held_file.source
+                for path, held_file in submitted_tree_files(library_tree=library_tree).items()
+            }
             for library_tree in list_library_dir_trees(library_dirs=[tmp_path / "submitted", tmp_path / "method", tmp_path / "rooted" / "python"])
         }
 

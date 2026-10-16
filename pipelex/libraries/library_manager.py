@@ -1,5 +1,5 @@
 import uuid
-from collections.abc import Generator
+from collections.abc import Generator, Mapping
 from contextlib import ExitStack, contextmanager
 from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, ForwardRef, Literal, get_args, get_origin
 from kajson.class_registry import ClassRegistry
 from kajson.kajson_manager import KajsonManager
 from mthds.method_tree.models import MethodTree, TreeLimits
+from mthds.method_tree.tree_path import path_collisions, tree_path_violation
 from mthds.package.dependency_resolver import ResolvedDependency, determine_exported_pipes, resolve_all_dependencies
 from mthds.package.discovery import find_package_manifest
 from mthds.package.exceptions import DependencyResolveError, ManifestError
@@ -19,7 +20,8 @@ from pipelex import log
 from pipelex.base_exceptions import PipelexError, SecurityError, error_domain_is_input, iter_cause_chain
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.config import is_pipe_func_sandbox_hosted
-from pipelex.core.bundle_resources.bundle_resource import BundleResources
+from pipelex.core.bundle_resources.bundle_resource import canonical_submitted_files
+from pipelex.core.bundle_resources.exceptions import BundleResourcePathError
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.helpers import make_qualified_structure_class_name
@@ -27,9 +29,9 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
-from pipelex.core.method_trees.building_bundle import building_pipe_of
-from pipelex.core.method_trees.tree_bundle import tree_key_of
-from pipelex.core.method_trees.tree_files import TreeFileEntry, encode_tree_file
+from pipelex.core.method_trees.building_bundle import BuildingBundle, building_pipe_of
+from pipelex.core.method_trees.method_file_store import LOCAL_METHOD_FILES, HeldFile
+from pipelex.core.method_trees.tree_bundle import TreeBundle, TreeBundleRef
 from pipelex.core.method_trees.tree_python import TREE_PYTHON_HOLD, sharing_module_name_checks
 from pipelex.core.pipes.exceptions import PipeLoadRefusalError, PipeOperatorModelChoiceError, PipeValidationError
 from pipelex.core.qualified_ref import QualifiedRef
@@ -45,7 +47,7 @@ from pipelex.libraries.exceptions import (
     LibraryLoadingError,
 )
 from pipelex.libraries.library import Library
-from pipelex.libraries.library_crate import SUBMITTED_PYTHON_ROOT_KEY, LibraryCrate
+from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
 from pipelex.libraries.library_factory import LibraryFactory
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
@@ -56,14 +58,14 @@ from pipelex.libraries.method_trees import (
     library_bundle_files_of,
     list_library_dir_trees,
     list_package_method_tree,
+    listing_identity,
     local_tree_limits,
-    submitted_python_files,
+    submitted_tree_files,
     tree_bundle_of_lone_file,
     tree_bundles_of,
     tree_python_sources,
 )
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
-from pipelex.libraries.pipe_func_call_files import holds_pipe_func_step, travels_with_call, tree_pipe_func_files
 from pipelex.libraries.visibility_utils import check_visibility_for_blueprints, make_visibility_checker
 from pipelex.methods.exceptions import MethodDependencyFetchError, MethodFetchDisabledError
 from pipelex.methods.fetch_on_miss import find_vendored_method, resolve_address_based_method
@@ -88,11 +90,10 @@ from pipelex.tools.misc.semver import SemVerError, parse_constraint, parse_versi
 from pipelex.validation_error_types import PipeValidationErrorType
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping
+    from collections.abc import Iterable
 
     from pipelex.core.concepts.concept import Concept
     from pipelex.core.domains.domain import Domain
-    from pipelex.core.method_trees.tree_bundle import TreeBundle
 
 MTHDS_METHODS_DIRNAME = ".mthds/methods"
 
@@ -334,11 +335,11 @@ def _python_sources_by_tree(*, library_trees: list[LibraryTree], bundle_files: l
     The library directories' trees come first, nested ones included, then the tree of each bundle file named alone; a
     tree two of them list is read once.
     """
-    trees: dict[str, tuple[MethodTree, Path | None]] = {}
+    trees: dict[tuple[str, str, bool], tuple[MethodTree, Path | None]] = {}
     for library_tree in library_trees:
-        trees.setdefault(tree_key_of(tree=library_tree.tree), (library_tree.tree, library_tree.library_dir))
+        trees.setdefault(listing_identity(tree=library_tree.tree), (library_tree.tree, library_tree.library_dir))
     for bundle_file in bundle_files:
-        trees.setdefault(bundle_file.tree_bundle.tree_key, (bundle_file.tree_bundle.tree, None))
+        trees.setdefault(listing_identity(tree=bundle_file.tree_bundle.tree), (bundle_file.tree_bundle.tree, None))
     sources_by_tree: dict[Path, dict[str, str]] = {}
     for tree, library_dir in trees.values():
         if tree.directory is None:
@@ -355,11 +356,16 @@ class LibraryManager(LibraryManagerAbstract):
         self._blueprints: dict[str, list[PipelexBundleBlueprint]] = {}  # library_id -> accumulated blueprints
         self._crate_cache: dict[str, LibraryCrate] = {}  # library_id -> cached crate from get_crate()
         self._loaded_fingerprints: dict[str, set[str]] = {}  # library_id -> set of loaded crate fingerprints
-        # library_id -> Python root -> {tree path: file entry}. The files a sandbox-hosted PipeFunc call receives,
-        # captured (without importing) from the library directories in sandbox-hosted load mode, or held from a
-        # transported crate, threaded into get_crate() so the crate carries them to a sandbox, and read by a
-        # PipeFunc's validation in place of a disk that is another host's. Empty in local/direct mode.
-        self._pipe_func_files: dict[str, dict[str, dict[str, TreeFileEntry]]] = {}
+        # library_id -> path -> file. The files submitted beside the bundles a library parses from content strings: the
+        # files of its library directories whose own tree holds no bundle, and the files a caller submitted with the
+        # contents. Those bundles sit at the root of the tree they make, which the library holds in the local method
+        # file store, so their steps resolve a file they name in it and a run reads it by the tree's digest.
+        self._submitted_files: dict[str, dict[str, HeldFile]] = {}
+        # library_id -> the tree of its submitted files, as last held; dropped when a file joins.
+        self._submitted_trees: dict[str, MethodTree] = {}
+        # library_id -> the files its library directories submit, joined only when a bundle parsed from a content
+        # string loads: a library that loads none never has two directories' files judged as one tree.
+        self._library_dir_submissions: dict[str, list[dict[str, HeldFile]]] = {}
 
     ############################################################
     # Manager lifecycle
@@ -395,9 +401,13 @@ class LibraryManager(LibraryManagerAbstract):
             self._blueprints.pop(library_id, None)
             self._crate_cache.pop(library_id, None)
             self._loaded_fingerprints.pop(library_id, None)
-            self._pipe_func_files.pop(library_id, None)
-            # The library's runs are over: its hold on a method tree's Python, if a PipeFunc step took one, is released.
+            self._submitted_files.pop(library_id, None)
+            self._submitted_trees.pop(library_id, None)
+            self._library_dir_submissions.pop(library_id, None)
+            # The library's runs are over: its hold on a method tree's Python, if a PipeFunc step took one, is released,
+            # and so are the trees it held for its runs to read.
             TREE_PYTHON_HOLD.release(holder=library_id)
+            LOCAL_METHOD_FILES.release(holder=library_id)
         return True
 
     @override
@@ -419,8 +429,11 @@ class LibraryManager(LibraryManagerAbstract):
         self._blueprints = {}
         self._crate_cache = {}
         self._loaded_fingerprints = {}
-        self._pipe_func_files = {}
+        self._submitted_files = {}
+        self._submitted_trees = {}
+        self._library_dir_submissions = {}
         TREE_PYTHON_HOLD.release_all()
+        LOCAL_METHOD_FILES.release_all()
         with ExitStack() as teardown_stack:
             for library in libraries:
                 teardown_stack.callback(library.teardown)
@@ -566,28 +579,80 @@ class LibraryManager(LibraryManagerAbstract):
         accumulated = self._blueprints.get(library_id)
         if not accumulated:
             return None
-        library = self._libraries.get(library_id)
-        # The files a sandbox-hosted PipeFunc call receives were read as the library loaded: building the crate reads no
-        # file, so it builds after the directories the library was read from are gone.
-        crate = LibraryCrateFactory.make_from_blueprints(
-            blueprints=accumulated,
-            pipe_func_files=self._pipe_func_files.get(library_id),
-            bundle_resources=library.bundle_resources if library is not None else None,
-        )
+        # The crate names each tree by its digest and reads no file, so it builds after the directories the library was
+        # read from are gone.
+        crate = LibraryCrateFactory.make_from_blueprints(blueprints=accumulated)
         self._crate_cache[library_id] = crate
         return crate
 
     @override
-    def get_pipe_func_files(self, *, library_id: str, root_key: str) -> dict[str, TreeFileEntry] | None:
-        return self._pipe_func_files.get(library_id, {}).get(root_key)
-
-    @override
-    def add_bundle_resources(self, *, library_id: str, bundle_resources: BundleResources) -> None:
-        if not bundle_resources:
+    def add_submitted_files(self, *, library_id: str, submitted_files: "Mapping[str, bytes]") -> None:
+        if not submitted_files:
             return
-        self.get_library(library_id=library_id).add_bundle_resources(bundle_resources=bundle_resources)
-        # The cached crate was built without them.
+        if library_id not in self._libraries:
+            msg = f"Trying to add submitted files to a library that does not exist: '{library_id}'"
+            raise LibraryError(msg)
+        canonical_files = canonical_submitted_files(files=submitted_files)
+        self._join_submitted_files(
+            library_id=library_id,
+            files={path: HeldFile.of_bytes(data=data) for path, data in canonical_files.items()},
+        )
+
+    def _join_submitted_files(self, *, library_id: str, files: "Mapping[str, HeldFile]") -> None:
+        """Join files to the ones submitted beside the library's content strings, keyed by their path from the root.
+
+        A file already joined under the same path is kept when the new one has the same bytes.
+
+        Raises:
+            BundleResourcePathError: A path is not a tree path, or collides with another once case-folded or as a
+                directory, so the files could not make one tree.
+            LibraryError: A file already joined under the same path has different bytes.
+        """
+        if not files:
+            return
+        held = dict(self._submitted_files.get(library_id, {}))
+        for path, held_file in files.items():
+            violation = tree_path_violation(path)
+            if violation is not None:
+                msg = f"The file '{path}' submitted beside the method cannot be a file of its tree: {violation}."
+                raise BundleResourcePathError(msg)
+            already_held = held.get(path)
+            if already_held is not None and already_held.sha256 != held_file.sha256:
+                msg = (
+                    f"Two different files were submitted under the same path '{path}' for one library. The files submitted "
+                    "beside a method's content strings, from its library directories and with its request, make one tree, "
+                    "so each path names one file: give them distinct paths."
+                )
+                raise LibraryError(msg)
+            held[path] = held_file
+        collisions = path_collisions(held)
+        if collisions:
+            listed = ", ".join(f"'{collision}'" for collision in collisions)
+            msg = f"The files submitted beside the method cannot make one tree: their paths collide at {listed}."
+            raise BundleResourcePathError(msg)
+        self._submitted_files[library_id] = held
+        self._submitted_trees.pop(library_id, None)
+        # The cached crate was built before them.
         self._crate_cache.pop(library_id, None)
+
+    def _submitted_tree(self, *, library_id: str) -> MethodTree | None:
+        """The tree of the files submitted beside the library's content strings, held for its runs, or None when there are none.
+
+        Raises:
+            BundleResourcePathError: The files cannot make one tree.
+            LibraryError: Two of them, from two library directories or from one and the request, share a path.
+        """
+        for library_dir_files in self._library_dir_submissions.pop(library_id, []):
+            self._join_submitted_files(library_id=library_id, files=library_dir_files)
+        tree = self._submitted_trees.get(library_id)
+        if tree is not None:
+            return tree
+        files = self._submitted_files.get(library_id)
+        if not files:
+            return None
+        tree = LOCAL_METHOD_FILES.hold_files(holder=library_id, files=files)
+        self._submitted_trees[library_id] = tree
+        return tree
 
     ############################################################
     # Private methods
@@ -642,6 +707,15 @@ class LibraryManager(LibraryManagerAbstract):
                 names_host_paths=True,
             )
 
+            # A library directory whose own tree holds no bundle, such as the directory a server writes a request's
+            # files into, submits its files beside the bundles parsed from content strings, which sit at the root of
+            # the tree they make: nothing is read, each file being held by the hash its listing recorded.
+            for library_tree in library_trees:
+                library_dir_files = submitted_tree_files(library_tree=library_tree)
+                if library_dir_files:
+                    self._library_dir_submissions.setdefault(library_id, []).append(library_dir_files)
+                    self._crate_cache.pop(library_id, None)
+
             # Each file once, as the member of the first tree that holds it.
             seen_locations: set[Path] = set()
             bundle_files: list[LibraryBundleFile] = []
@@ -664,10 +738,6 @@ class LibraryManager(LibraryManagerAbstract):
                 ensure_no_structured_content_in_library_sources(
                     sources_by_dir=_python_sources_by_tree(library_trees=library_trees, bundle_files=all_bundle_files),
                 )
-                # The files a step of a tree's bundle calls with are captured once its blueprints load, per tree;
-                # those of a library directory whose own tree holds no bundle are captured here, to travel with each
-                # call of a PipeFunc parsed from a content string, whose import paths start at that directory.
-                self._capture_submitted_python(library_id=library_id, library_trees=library_trees)
             else:
                 for library_dir in all_dirs:
                     # Only import files that contain StructuredContent subclasses (uses AST pre-check), so
@@ -705,8 +775,15 @@ class LibraryManager(LibraryManagerAbstract):
         return fingerprint in self._loaded_fingerprints.get(library_id, set())
 
     @override
-    def load_from_crate(self, *, library_id: str, crate: LibraryCrate, is_crate_prevalidated: bool = False) -> list[PipeAbstract]:
-        """Load a LibraryCrate into a live Library.
+    def load_from_crate(
+        self,
+        *,
+        library_id: str,
+        crate: LibraryCrate,
+        is_crate_prevalidated: bool = False,
+        written_trees: "Mapping[str, MethodTree] | None" = None,
+    ) -> list[PipeAbstract]:
+        """Load a LibraryCrate into a live Library, reading no file.
 
         Fingerprint idempotency: if a crate with the same fingerprint was already loaded
         into this library_id, the load is skipped and an empty list is returned.
@@ -735,14 +812,30 @@ class LibraryManager(LibraryManagerAbstract):
                 to one another, the concept-cycle check, pipe construction with each pipe's static validation,
                 and source tracking. Leave it False for any crate whose library was not validated by this
                 pipelex version.
+            written_trees: The trees this process wrote out, by the digest the crate names each by, such as the tree
+                of a `PipeFunc` call written for its function to import. A pipe of such a tree is built as a member of
+                the written tree; every other pipe names its tree by digest alone, resolves a file it names lexically,
+                and reads nothing, the host that assembled the crate having checked the file was in its tree.
 
         Returns:
             List of all pipes that were loaded, or empty list if already loaded
         """
-        return self._load_crate(library_id=library_id, crate=crate, is_crate_prevalidated=is_crate_prevalidated, refuses_unresolved_structures=False)
+        return self._load_crate(
+            library_id=library_id,
+            crate=crate,
+            is_crate_prevalidated=is_crate_prevalidated,
+            refuses_unresolved_structures=False,
+            live_trees=written_trees or {},
+        )
 
     def _load_crate(
-        self, *, library_id: str, crate: LibraryCrate, is_crate_prevalidated: bool, refuses_unresolved_structures: bool
+        self,
+        *,
+        library_id: str,
+        crate: LibraryCrate,
+        is_crate_prevalidated: bool,
+        refuses_unresolved_structures: bool,
+        live_trees: "Mapping[str, MethodTree]",
     ) -> list[PipeAbstract]:
         """The load behind load_from_crate and load_from_blueprints.
 
@@ -753,30 +846,20 @@ class LibraryManager(LibraryManagerAbstract):
             refuses_unresolved_structures: Whether a structure class still incomplete once the concepts are loaded
                 refuses the load. True only where the load resolved the bundle's dependencies first, so that a
                 reference which resolves to nothing is the bundle's own fault.
+            live_trees: The trees this process holds, by digest: a pipe whose bundle's tree is one of them is built as a
+                member of it, and every other as a member of a tree the crate names by digest alone.
         """
         # Bind the target library as current for the whole load: PipeFactory and the concept
         # factories resolve concepts and the class registry through the ambient current library,
         # so a load into a non-current library must not read the caller's binding.
         with scoped_current_library(library_id=library_id), sharing_module_name_checks():
             # Cache the crate for a DIRECT crate-load (the transported-crate path used by the Temporal
-            # workflow, which never populates _blueprints). This lets get_crate() hand the crate — with
-            # its pipe_func_files — to the sandbox executor. The blueprint-derived path (load_libraries ->
-            # load_from_blueprints) leaves _blueprints populated and rebuilds from it instead, so it must
-            # NOT be shadowed by a cached crate here.
+            # workflow, which never populates _blueprints). This lets get_crate() hand the crate to the
+            # sandbox executor. The blueprint-derived path (load_libraries -> load_from_blueprints) leaves
+            # _blueprints populated and rebuilds from it instead, so it must NOT be shadowed by a cached
+            # crate here.
             if library_id not in self._blueprints:
                 self._crate_cache[library_id] = crate
-
-            # The files a transported crate carries for its content-string bundles, held before the pipes are built,
-            # since a pipe reading one, such as a PipeDocGen step with an HTML template file, reads it as it is built.
-            if crate.bundle_resources:
-                self.get_library(library_id=library_id).add_bundle_resources(bundle_resources=crate.bundle_resources)
-
-            # The files a transported crate carries for its PipeFunc calls, held before the pipes are validated: a
-            # PipeFunc's validation reads its module from them, the trees' directories being the host's that listed them.
-            if crate.pipe_func_files:
-                held_files = self._pipe_func_files.setdefault(library_id, {})
-                for root_key, root_files in crate.pipe_func_files.items():
-                    held_files.setdefault(root_key, dict(root_files))
 
             # Fingerprint idempotency: skip if this crate was already loaded into this library
             fingerprint = crate.fingerprint
@@ -832,9 +915,6 @@ class LibraryManager(LibraryManagerAbstract):
             # signature change across PipeFactory and belongs with the concept-side work.
             qualified_pipes = qualify_crate(crate).pipes
 
-            # The member of its method tree each pipe's bundle was read as, each tree read back once
-            tree_bundles_by_pipe_ref = crate.tree_bundles_by_pipe_ref()
-
             # Load pipes with domain-filtered concept codes
             all_pipes: list[PipeAbstract] = []
             for pipe_ref, pipe_blueprint in qualified_pipes.items():
@@ -848,13 +928,13 @@ class LibraryManager(LibraryManagerAbstract):
                 concept_codes_for_domain = domain_concept_codes.get(domain_code, [])
 
                 source = crate.source_map.get(pipe_ref)
-                # A pipe that reads a file its bundle names (a PipeDocGen `template_file`) resolves it in the method tree
-                # the host that assembled the crate listed its bundle in, and in nothing else: the pipe's `source` is
-                # cleared, so neither a caller's label (`source_map`) nor a `source` the bundle's text wrote on the pipe
-                # can point the read at a directory on this host. A bundle parsed from a string has no tree.
+                # A pipe that reads a file its bundle names (a PipeDocGen `template_file`) resolves it in its bundle's
+                # method tree, and in nothing else: the pipe's `source` is cleared, so neither a caller's label
+                # (`source_map`) nor a `source` the bundle's text wrote on the pipe can point the read at a directory on
+                # this host.
                 pipe_blueprint = pipe_blueprint.model_copy(update={"source": None})
                 with (
-                    building_pipe_of(tree_bundle=tree_bundles_by_pipe_ref.get(pipe_ref)),
+                    building_pipe_of(tree_bundle=_building_bundle_of(tree_bundle_ref=crate.tree_bundles.get(pipe_ref), live_trees=live_trees)),
                     _locating_pipe_build_refusals(
                         pipe_code=pipe_code, domain_code=domain_code, source=source, elaboration=crate.elaboration_metadata.get(pipe_ref)
                     ),
@@ -921,10 +1001,17 @@ class LibraryManager(LibraryManagerAbstract):
                 trees=[blueprint.tree_bundle.tree for blueprint in blueprints if blueprint.tree_bundle is not None],
                 names_host_paths=True,
             )
-            if is_pipe_func_sandbox_hosted():
-                # Each call of a PipeFunc read from a method tree receives the tree's files in the sandbox: they are read
-                # now, while the directory the tree was listed from is certain to exist, and the crate carries them.
-                self._capture_tree_pipe_func_files(library_id=library_id, blueprints=blueprints)
+            # Bundles parsed from content strings sit at the root of the tree of the files submitted beside them, when
+            # there are any, so a step resolves a file it names there.
+            content_blueprints = [blueprint for blueprint in blueprints if blueprint.tree_bundle is None and blueprint.host_bundle_file is None]
+            if content_blueprints:
+                submitted_tree = self._submitted_tree(library_id=library_id)
+                if submitted_tree is not None:
+                    for blueprint in content_blueprints:
+                        blueprint.place_in_tree(tree_bundle=TreeBundle(tree=submitted_tree, tree_path=None))
+            # The library holds every tree its bundles were read from for its runs, which read a file of one, a
+            # PipeFunc call's or a PipeDocGen template, by the tree's digest through the method file store.
+            live_trees = self._hold_trees_of(library_id=library_id, blueprints=blueprints)
 
             # Accumulate blueprints for later crate construction via get_crate()
             self._blueprints.setdefault(library_id, []).extend(blueprints)
@@ -953,7 +1040,9 @@ class LibraryManager(LibraryManagerAbstract):
 
             # Load from crate (domains, concepts, pipes, validation). The dependencies were loaded above, so a
             # structure reference that still resolves to nothing is the bundle's own, and refuses the load.
-            all_pipes = self._load_crate(library_id=library_id, crate=crate, is_crate_prevalidated=False, refuses_unresolved_structures=True)
+            all_pipes = self._load_crate(
+                library_id=library_id, crate=crate, is_crate_prevalidated=False, refuses_unresolved_structures=True, live_trees=live_trees
+            )
 
             # Also record the aggregate crate fingerprint: get_crate() rebuilds one crate from
             # ALL accumulated blueprints, so once the library holds more than one batch its
@@ -1115,54 +1204,24 @@ class LibraryManager(LibraryManagerAbstract):
     # Private helper methods
     ############################################################
 
-    def _capture_submitted_python(self, *, library_id: str, library_trees: list[LibraryTree]) -> None:
-        """Capture the files the library directories submit beside bundles parsed from content strings, as one Python root.
+    @staticmethod
+    def _hold_trees_of(*, library_id: str, blueprints: "Iterable[PipelexBundleBlueprint]") -> dict[str, MethodTree]:
+        """Hold the trees these bundles were placed in, for the library's runs to read, and return them by digest.
 
-        Only a directory whose own tree holds no bundle submits files (`submitted_python_files`), and the sandbox writes
-        them all at their paths under one root, so two such directories holding different files at one path would
-        clobber each other and run the wrong function: the load fails loud instead.
-
-        Raises:
-            LibraryError: Two directories submit different files at one path.
+        A tree listed from this host's disk is served from it, each file checked against the hash its listing recorded;
+        the tree of submitted files was held when it was assembled. Two trees with one digest hold the same files, so the
+        first placed is the one returned.
         """
-        submitted = dict(self._pipe_func_files.get(library_id, {}).get(SUBMITTED_PYTHON_ROOT_KEY, {}))
-        for library_tree in library_trees:
-            for relpath, data in submitted_python_files(library_tree=library_tree).items():
-                if not travels_with_call(tree_path=relpath, data=data):
-                    # The refusal accepted it as a copy of the method's own concepts, and the sandbox generates its own
-                    # from those concepts, qualified. Shipping this one too would give the sandbox two `structures`
-                    # modules, and a PipeFunc's import would reach either.
-                    continue
-                entry = encode_tree_file(data=data)
-                if relpath in submitted and submitted[relpath] != entry:
-                    msg = (
-                        f"Duplicate PipeFunc file path '{relpath}' across library dirs while loading library '{library_id}'. "
-                        "A sandbox receives the files submitted beside a method's bundles at their paths, so two dirs sharing "
-                        "a path would clobber each other — give them distinct relative paths."
-                    )
-                    raise LibraryError(msg)
-                submitted[relpath] = entry
-        if submitted:
-            self._pipe_func_files.setdefault(library_id, {})[SUBMITTED_PYTHON_ROOT_KEY] = submitted
-
-    def _capture_tree_pipe_func_files(self, *, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> None:
-        """Capture, from this host's disk, the files of each method tree holding a `PipeFunc` step of these bundles.
-
-        A tree already captured for the library is not read again, and a tree holding no `PipeFunc` step is never read.
-        """
-        held_files = self._pipe_func_files.get(library_id, {})
-        captured: dict[str, dict[str, TreeFileEntry]] = {}
+        live_trees: dict[str, MethodTree] = {}
         for blueprint in blueprints:
             tree_bundle = blueprint.tree_bundle
-            if tree_bundle is None or tree_bundle.tree.directory is None or not holds_pipe_func_step(blueprint=blueprint):
+            if tree_bundle is None:
                 continue
-            tree_key = tree_bundle.tree_key
-            if tree_key in held_files or tree_key in captured:
-                continue
-            captured[tree_key] = tree_pipe_func_files(tree=tree_bundle.tree)
-        if captured:
-            self._pipe_func_files.setdefault(library_id, {}).update(captured)
-            self._crate_cache.pop(library_id, None)
+            tree = tree_bundle.tree
+            if tree.directory is not None:
+                LOCAL_METHOD_FILES.hold_tree(holder=library_id, tree=tree)
+            live_trees.setdefault(tree.digest, tree)
+        return live_trees
 
     def _load_mthds_files_into_library(self, *, library_id: str, bundle_files: list[LibraryBundleFile]) -> list[PipeAbstract]:
         """Load MTHDS files into a specific library.
@@ -1404,6 +1463,7 @@ class LibraryManager(LibraryManagerAbstract):
         for resolved_dep in resolved_deps:
             self._load_single_dependency(
                 library=library,
+                library_id=library_id,
                 resolved_dep=resolved_dep,
                 package_address=resolved_dep.address,
                 tree_limits=tree_limits,
@@ -1417,6 +1477,7 @@ class LibraryManager(LibraryManagerAbstract):
         self,
         library: Library,
         *,
+        library_id: str,
         resolved_dep: ResolvedDependency,
         package_address: str,
         tree_limits: TreeLimits | None = None,
@@ -1438,6 +1499,7 @@ class LibraryManager(LibraryManagerAbstract):
 
         Args:
             library: The main library to load into
+            library_id: The id the manager holds the main library under, which holds the package's tree for its runs
             resolved_dep: The resolved dependency info
             package_address: The dependency's address as a reference names it, without any ``@<tag>``
             tree_limits: The limits the package's tree is listed under, read from the configuration when not given
@@ -1458,6 +1520,9 @@ class LibraryManager(LibraryManagerAbstract):
         package_tree = list_package_method_tree(root=resolved_dep.package_root, package_address=package_address, limits=tree_limits)
         # The package's own requirements.txt is judged before any of its bundles loads, as the consumer's tree is.
         ensure_package_requirements_met(tree=package_tree, package_address=package_address)
+        # Held for the consumer's runs, which read a file of the package's tree, such as one of its steps' template
+        # files, by the tree's digest.
+        LOCAL_METHOD_FILES.hold_tree(holder=library_id, tree=package_tree)
         for tree_bundle in tree_bundles_of(tree=package_tree):
             # The package's address and the bundle's tree path: never the host's path to the package.
             bundle_source = f"{package_address}/{tree_bundle.tree_path}"
@@ -1686,6 +1751,7 @@ class LibraryManager(LibraryManagerAbstract):
             try:
                 self._load_address_based_dependency(
                     library=library,
+                    library_id=library_id,
                     full_address=full_address,
                     extra_search_dirs=extra_search_dirs,
                     methods_dirs=methods_dirs,
@@ -1720,6 +1786,7 @@ class LibraryManager(LibraryManagerAbstract):
         self,
         library: "Library",
         *,
+        library_id: str,
         full_address: str,
         extra_search_dirs: list[Path] | None = None,
         methods_dirs: list[Path] | None = None,
@@ -1734,6 +1801,7 @@ class LibraryManager(LibraryManagerAbstract):
 
         Args:
             library: The main library to load into
+            library_id: The id the manager holds the main library under, which holds the package's tree for its runs
             full_address: The full package address (e.g. "github.com/Pipelex/methods/documents")
             extra_search_dirs: Additional .mthds/methods/ directories to scan
             methods_dirs: The load's own methods directories, searched before everything else and never written
@@ -1759,6 +1827,7 @@ class LibraryManager(LibraryManagerAbstract):
 
         self._load_single_dependency(
             library=library,
+            library_id=library_id,
             resolved_dep=resolved_dep,
             # The address the lookup matched (the manifest's address and the method's name), never a tag.
             package_address=f"{installed.manifest.address}/{installed.name}",
@@ -2009,3 +2078,13 @@ class LibraryManager(LibraryManagerAbstract):
         # Check each concept as a starting point
         for concept in concepts:
             check_for_cycle(concept.concept_ref, visiting=set(), path=[])
+
+
+def _building_bundle_of(*, tree_bundle_ref: TreeBundleRef | None, live_trees: "Mapping[str, MethodTree]") -> BuildingBundle:
+    """Where a pipe of a crate is built: in the tree this process holds under the digest the crate names, or by the digest alone."""
+    if tree_bundle_ref is None:
+        return None
+    live_tree = live_trees.get(tree_bundle_ref.tree_digest)
+    if live_tree is None:
+        return tree_bundle_ref
+    return TreeBundle(tree=live_tree, tree_path=tree_bundle_ref.tree_path)

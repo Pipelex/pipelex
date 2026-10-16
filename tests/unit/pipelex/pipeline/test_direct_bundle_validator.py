@@ -16,7 +16,6 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipelex.base_exceptions import ErrorReport
-from pipelex.core.bundle_resources.bundle_resource import make_bundle_resources
 from pipelex.pipeline.direct_bundle_validator import DirectBundleValidator
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.system.caller_identity import CallerIdentity
@@ -30,7 +29,7 @@ class TestDirectBundleValidator:
     async def test_valid_sweep_is_returned_as_the_valid_arm(self, mocker: MockerFixture) -> None:
         """A successful in-process sweep's report is returned verbatim, with arguments forwarded."""
         report = mocker.MagicMock(name="validation_report")
-        bundle_resources = make_bundle_resources(files={"invoice.docx": b"docx bytes"})
+        submitted_files = {"invoice.docx": b"docx bytes"}
         in_process_mock = mocker.patch(
             "pipelex.pipeline.direct_bundle_validator.validate_bundles_in_process",
             new=mocker.AsyncMock(return_value=report),
@@ -43,7 +42,7 @@ class TestDirectBundleValidator:
             library_dirs=[Path("lib_dir")],
             caller_identity=CallerIdentity(user_id="user-42", extras={"organization": "org_acme"}),
             graph_pipe_code="extract_document_markdown",
-            bundle_resources=bundle_resources,
+            submitted_files=submitted_files,
         )
 
         assert verdict is report
@@ -55,7 +54,7 @@ class TestDirectBundleValidator:
             graph_pipe_code="extract_document_markdown",
             log_context="API validate",
             caller_identity=CallerIdentity(user_id="user-42", extras={"organization": "org_acme"}),
-            bundle_resources=bundle_resources,
+            submitted_files=submitted_files,
         )
 
     async def test_validate_bundle_error_becomes_the_invalid_arm(self, mocker: MockerFixture) -> None:
@@ -73,7 +72,7 @@ class TestDirectBundleValidator:
             library_dirs=None,
             caller_identity=None,
             graph_pipe_code=None,
-            bundle_resources=None,
+            submitted_files=None,
         )
 
         assert isinstance(verdict, ErrorReport)
@@ -95,5 +94,5 @@ class TestDirectBundleValidator:
                 library_dirs=None,
                 caller_identity=None,
                 graph_pipe_code=None,
-                bundle_resources=None,
+                submitted_files=None,
             )

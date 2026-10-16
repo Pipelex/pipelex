@@ -4700,6 +4700,10 @@ rationale = "Registers the factory callable as the sole operand."
 param = "factory"
 rationale = "Registers the factory callable as the sole operand."
 
+["pipelex/plugins/registrar.py::PluginRegistrar.claim_method_file_store"]
+param = "factory"
+rationale = "Registers the factory callable as the sole operand, as every other hub slot claim does."
+
 ["pipelex/plugins/registrar.py::PluginRegistrar.claim_pipe_func_executor"]
 param = "factory"
 rationale = "Registrar claim: claims the pipe-func executor hub slot with a factory; single self-labelling operand, consistent with sibling claims."

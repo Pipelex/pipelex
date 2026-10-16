@@ -34,6 +34,7 @@ from pipelex.libraries.library_manager import LibraryManager
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.observer.observer_protocol import ObserverProtocol
 from pipelex.pipe_machinery.registry_models import PipeRegistryModels
+from pipelex.pipe_operators.doc_gen.template_file_stage import DocGenTemplateFileStage
 from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutorProtocol
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
@@ -182,6 +183,12 @@ class Pipelex(RuntimeBoot):
         self.interpreter_hub.set_pipeline_manager(pipeline_manager=self.pipeline_manager)
         self.pipeline_manager.setup()
 
+        # --- Template file stage ---------------------------------------------------------------
+        # The print stage of a PipeDocGen step reads its template file through the method file store, then needs the
+        # loaded method for what it does with it: rendering an HTML one with the step's data, reporting what the
+        # engine's check of an office one found. A kernel-only boot installs none, and prints no template file.
+        self.runtime_hub.set_template_file_stage(template_file_stage=DocGenTemplateFileStage())
+
         # Two manifests, one registry: core's value model (registered by the runtime setup above) and
         # the pipe kinds. They are disjoint by construction and pinned as such by
         # tests/unit/pipelex/test_registry_models_split.py, so the two calls landing in different
@@ -203,12 +210,11 @@ class Pipelex(RuntimeBoot):
 
         # --- Pipe Run --------------------------------------------------------------------------
         # No explicit param for pipe_run: plugin slot-claim thunk > core default. A boot orchestrator's pipe run hands
-        # each job to that orchestrator, outside this process, which is what decides how the job's files travel
-        # (`prepare_job_for_remote_dispatch`); core's runs it here.
+        # each job to that orchestrator, outside this process; the job carries no method file's bytes either way, its
+        # crate naming each tree by digest, so nothing about the job changes with where it runs.
 
         self.interpreter_hub.set_pipe_run(
-            self._resolve_hub_slot(slot=HubSlot.PIPE_RUN, default=lambda: PipeRun(pipe_router=self.interpreter_hub.get_required_pipe_router())),
-            leaves_process=self._is_hub_slot_claimed(slot=HubSlot.PIPE_RUN),
+            self._resolve_hub_slot(slot=HubSlot.PIPE_RUN, default=lambda: PipeRun(pipe_router=self.interpreter_hub.get_required_pipe_router()))
         )
 
     @override

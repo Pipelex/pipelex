@@ -14,8 +14,19 @@ that claims nothing inherits rather than overwrites, and only the release stands
 Temporal worker's replay/activity split and the next thing to ask `is_in_isolated_execution()`.
 """
 
+import pytest
+
+from pipelex.core.method_trees.method_file_store import LOCAL_METHOD_FILES, LocalMethodFileStore
+from pipelex.pipe_operators.doc_gen.template_file_stage import DocGenTemplateFileStage
 from pipelex.pipelex import Pipelex
-from pipelex.runtime_hub import get_boot_orchestrator, get_runtime_hub, is_dry_run_forced, is_in_isolated_execution
+from pipelex.runtime_hub import (
+    get_boot_orchestrator,
+    get_method_file_store,
+    get_runtime_hub,
+    get_template_file_stage,
+    is_dry_run_forced,
+    is_in_isolated_execution,
+)
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 
 
@@ -68,5 +79,27 @@ class TestTeardownReleasesBootScopedHubState:
                 "teardown left the plugin's probe on the hub — a later caller is told it runs inside an "
                 "isolated sub-execution of a boot that no longer exists"
             )
+        finally:
+            Pipelex.teardown_if_needed()
+
+
+class TestMethodFileSeams:
+    def test_a_boot_installs_the_local_store_and_the_template_file_stage_and_teardown_releases_them(self) -> None:
+        """Unclaimed, the method file store is the local one; the interpreter's boot installs the template file stage, and teardown removes it."""
+        Pipelex.teardown_if_needed()
+        try:
+            Pipelex.make(
+                integration_mode=IntegrationMode.CI if runtime_manager.is_ci_testing else IntegrationMode.PYTEST,
+                needs_inference=False,
+            )
+            assert get_method_file_store() is LOCAL_METHOD_FILES
+            assert isinstance(get_template_file_stage(), DocGenTemplateFileStage)
+            get_runtime_hub().set_method_file_store(method_file_store=LocalMethodFileStore())
+
+            Pipelex.teardown_if_needed()
+
+            assert get_method_file_store() is LOCAL_METHOD_FILES, "teardown left a store a plugin installed for a boot that no longer exists"
+            with pytest.raises(RuntimeError, match="template file stage is not installed"):
+                get_template_file_stage()
         finally:
             Pipelex.teardown_if_needed()

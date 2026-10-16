@@ -12,12 +12,6 @@ class CrateNormalizationError(LibraryError):
     _declared_title = "Crate normalization error"
 
 
-class CrateIntegrityError(LibraryError):
-    """Raised when a library crate names a method tree it does not carry: the host that assembled it built it wrong."""
-
-    _declared_title = "Crate integrity error"
-
-
 class LibraryLoadingError(LibraryError):
     """Error raised when loading library components fails.
 

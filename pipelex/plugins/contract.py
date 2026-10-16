@@ -45,6 +45,10 @@ if TYPE_CHECKING:
 # boot: a model of the internal backend, as the table a backend file would hold, and the model deck's default engine for
 # one document format and source — joined under v4 without a bump, on the same reasoning as ``add_log_sink``.
 #
+# ``claim_method_file_store`` — the hub slot an activity reads method files through, by their tree's digest
+# (``MethodFileStoreProtocol`` in ``pipelex.core.method_trees.method_file_store``) — joined under v6 without a bump, on
+# the same reasoning as ``add_log_sink``: a menu addition breaks no plugin targeting v6.
+#
 # v5 changed the log-sink factory contract: boot now resolves the secrets provider before the log sink, and
 # a ``LogSinkFactoryFn`` receives it as the ``secrets_provider`` keyword argument, so a sink's settings can
 # name a secret. A factory written against v4 would be called with a keyword it does not accept and fail at

@@ -128,11 +128,13 @@ A `pdf` step's `template`, or its `.html` `template_file`, is rendered with exac
 - **Pipelex's `format` filter shadows Jinja's own.** To format a number, write `{{ '%.2f' % invoice.total }}` rather than `{{ '%.2f' | format(invoice.total) }}`.
 - **The `markdown` filter** turns Markdown held in a plain text field into HTML: `{{ invoice.notes | markdown }}`. A `Markdown` input needs no filter.
 
+An inline `template` is rendered where the step runs, its text being the bundle's own. A `template_file` is read where the document is printed: the step names the file by its method tree and its path there, and the print stage reads it, renders it with the step's data and prints it, a dry run's print included, so a value the template reads that does not exist fails the dry run as it fails a live one. On a distributed orchestrator such as Temporal, the step runs in a workflow, which reads no file, and the print runs in an activity, which reads the file from the method file store of the deployment.
+
 ### Office template files
 
 An `.xlsx`, `.docx` or `.pptx` template file is filled by its engine from the inputs as plain data, so it sees fields, not the sigils and filters of HTML templates. In plain data a native value is its value, and a verdict is its verdict: a `YesNo` is its boolean, a `Choice` its option key and a `Rating` its level, so the file reads `team` rather than `team.choice`, and a verdict's probability or confidence does not reach it. A `pdf` template reads the verdict whole, `team.choice` and `team.confidence` included, as a `PipeCompose` template does. Its contract is documented with the plugin. When the plugin's engine checks templates, `pipelex validate` and the dry run compare the file with the inputs' concepts: a misspelled name is reported before any run.
 
-A bundle loaded from a directory, a dependency package's included, finds its template file beside its own file, and never among the files sent with a request. A bundle loaded from a string has no directory, so its template files come with it: the API's routes take them in the request's `resources`, each keyed by exactly the path its step names, and the Python entry points take them as `bundle_resources` (see [Template files sent with a bundle](#template-files-sent-with-a-bundle)). A string-loaded step whose file was not supplied is refused at load, saying so, whatever source label the bundle carries: only a bundle file the runtime read itself has a directory beside it, so a label naming a path, or a `source` written in the bundle's text, never makes the runtime read its own disk. An inline `template` works on every load path.
+A bundle loaded from a directory, a dependency package's included, finds its template file beside its own file, and never among the files sent with a request. A bundle loaded from a string has no directory, so its template files come with it: the API's routes take them in the request's `resources`, each keyed by exactly the path its step names, and the Python entry points take them as `submitted_files` (see [Template files sent with a bundle](#template-files-sent-with-a-bundle)). A string-loaded step whose file was not supplied is refused at load, saying so, whatever source label the bundle carries: only a bundle file the runtime read itself has a directory beside it, so a label naming a path, or a `source` written in the bundle's text, never makes the runtime read its own disk. An inline `template` works on every load path.
 
 ### Template files sent with a bundle
 
@@ -150,18 +152,17 @@ When a bundle is sent as content rather than read from a directory, as it is thr
 - **Every file sent must be one a step names.** A file no step reads is refused, so a misspelled key fails loudly rather than leaving its step without a template.
 - **The files are checked like files on disk.** An `.html` template file is checked against the inputs when the method loads, and the engine's template check runs on an office template file at validation and in the dry run.
 
-A run that a remote orchestrator such as Temporal executes, a dry run included, stores each office template file in the run's storage before the run leaves the process, so the run carries a reference rather than the bytes, and the step reads the file back under the run's read scope, to print it or to check it. The stored copy is named by the rule a document's name follows (see [The file's name](#the-files-name)), so `Modèle trimestriel.v2.docx` is stored as `Modele-trimestriel-v2.docx`, and it carries its Office content type, whatever the host's own table of types knows; the step still names the file by its own path. An HTML template file travels with the method, since it is read while the method loads, so the HTML template files sent with a bundle may total 512 KiB at most: keep images and fonts out of them, at URLs they reference.
+The files sent with a bundle make one method tree, with the bundles sent as strings at its root: the run names that tree by its digest, as it names the tree of a bundle loaded from a directory, and carries none of its files. The print stage reads a template file from the tree, under the run's read scope, to print it or to check it, wherever it runs: in the process that loaded the method, the tree is the one its library holds; on a remote orchestrator such as Temporal, the deployment's method file store serves it. No template file rides in the run's payloads, so none is bounded by them.
 
-From Python, the same files are passed as `bundle_resources`, built with `make_bundle_resources`:
+From Python, the same files are passed as `submitted_files`, a mapping from the path the step names to the file's bytes:
 
 ```python
 from pathlib import Path
 
-from pipelex.core.bundle_resources.bundle_resource import make_bundle_resources
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
-resources = make_bundle_resources(files={"templates/invoice.docx": Path("templates/invoice.docx").read_bytes()})
-result = await PipelexMTHDSProtocol(bundle_resources=resources).execute(mthds_contents=[bundle_text], inputs=inputs)
+submitted_files = {"templates/invoice.docx": Path("templates/invoice.docx").read_bytes()}
+result = await PipelexMTHDSProtocol(submitted_files=submitted_files).execute(mthds_contents=[bundle_text], inputs=inputs)
 ```
 
 ## Running and iterating
@@ -174,7 +175,7 @@ pipelex run bundle invoice/ --pipe render_invoice_pdf --inputs invoice/inputs.js
 
 Running the `PipeDocGen` step alone on inputs saved from an earlier run is the loop for working on a document's layout: it spends nothing on inference. Write the inputs file in the shape `pipelex run` takes, one entry per input with its concept and content.
 
-A dry run composes for real against mock inputs, which checks the templates and the file's name, prints nothing, and outputs a mock `Document`.
+A dry run composes for real against mock inputs, which checks the templates and the file's name, and its print reads the template file, renders an HTML one and hands an office one to the engine's template checker, then prints nothing and outputs a mock `Document`.
 
 When the plugin's engine checks an office template file, validation reports what it finds in two ways. An error, such as a Word tag that names no field, fails the step's dry run, and so the validation. A warning, such as an Excel defined name or a PowerPoint shape name that matches no field, leaves the bundle valid and rides the verdict's advisory `warnings` as a `template_check_warning` item naming the step (`pipe_code`, `domain_code`), the file (`template_file`) and the place in it (`template_location`). Read it all the same: a misspelled name fills nothing, so the document keeps the template's sample value there. The warning reaches every surface that returns the verdict: `pipelex validate`, `pipelex-agent validate` and the API server's `POST /v1/validate`. A dry run that returns no verdict, such as `pipelex run --dry-run`, `pipelex fix bundle` or `pipelex build inputs`, logs it instead.
 

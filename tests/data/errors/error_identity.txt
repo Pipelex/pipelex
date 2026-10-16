@@ -24,10 +24,8 @@ BindingPathUnresolvedError | Binding path unresolved | https://docs.pipelex.com/
 BindingStepRunError | Binding step run | https://docs.pipelex.com/latest/errors/binding-step-run-error/
 BrokenPluginError | Broken plugin | https://docs.pipelex.com/latest/errors/broken-plugin-error/
 BundleElaboratorError | Bundle elaborator | https://docs.pipelex.com/latest/errors/bundle-elaborator-error/
-BundleResourceError | Bundle resource | https://docs.pipelex.com/latest/errors/bundle-resource-error/
 BundleResourceNotNamedError | Bundle resource not named | https://docs.pipelex.com/latest/errors/bundle-resource-not-named-error/
 BundleResourcePathError | Bundle resource path | https://docs.pipelex.com/latest/errors/bundle-resource-path-error/
-BundleResourcesTooLargeError | Bundle resources too large | https://docs.pipelex.com/latest/errors/bundle-resources-too-large-error/
 CodegenError | Codegen error | https://docs.pipelex.com/latest/errors/codegen-error/
 CodegenLockError | Codegen lock error | https://docs.pipelex.com/latest/errors/codegen-lock-error/
 CodegenStampError | Codegen stamp error | https://docs.pipelex.com/latest/errors/codegen-stamp-error/
@@ -49,7 +47,6 @@ ConstructFieldBlueprintValueError | Construct field blueprint value | https://do
 ContextProviderError | Context provider | https://docs.pipelex.com/latest/errors/context-provider-error/
 CoreUnconditionalPluginDisabledError | Core unconditional plugin disabled | https://docs.pipelex.com/latest/errors/core-unconditional-plugin-disabled-error/
 CostRegistryError | Cost registry | https://docs.pipelex.com/latest/errors/cost-registry-error/
-CrateIntegrityError | Crate integrity error | https://docs.pipelex.com/latest/errors/crate-integrity-error/
 CrateNormalizationError | Crate normalization error | https://docs.pipelex.com/latest/errors/crate-normalization-error/
 CredentialsError | Missing or invalid credentials | https://docs.pipelex.com/latest/errors/credentials-error/
 CsvCoercionError | CSV coercion error | https://docs.pipelex.com/latest/errors/csv-coercion-error/
@@ -190,6 +187,7 @@ MethodDependencyFetchError | Method dependency fetch | https://docs.pipelex.com/
 MethodEntryError | Method entry | https://docs.pipelex.com/latest/errors/method-entry-error/
 MethodFetchDisabledError | Method fetch disabled | https://docs.pipelex.com/latest/errors/method-fetch-disabled-error/
 MethodFetchError | Method fetch | https://docs.pipelex.com/latest/errors/method-fetch-error/
+MethodFileUnavailableError | Method file unavailable | https://docs.pipelex.com/latest/errors/method-file-unavailable-error/
 MethodInstallError | Method install | https://docs.pipelex.com/latest/errors/method-install-error/
 MethodPackageAmbiguityError | Method package ambiguity | https://docs.pipelex.com/latest/errors/method-package-ambiguity-error/
 MethodPackageNotFoundError | Method package not found | https://docs.pipelex.com/latest/errors/method-package-not-found-error/

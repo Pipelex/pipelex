@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 
 from mthds.method_tree.exceptions import MethodTreeRefusedError, TreeSourceError
+from mthds.method_tree.models import MethodTree
 from mthds.method_tree.written_tree import read_written_tree
 from typing_extensions import override
 
@@ -18,6 +19,7 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.interpreter_hub import get_library_manager, get_required_pipe
 from pipelex.kernel.func_ops import call_function
 from pipelex.libraries.library_crate import LibraryCrate
+from pipelex.libraries.pipe_func_call_files import read_pipe_func_call_files
 from pipelex.pipe_operators.func.exceptions import PipeFuncExecutionError
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_call_context import function_of_call_in_flight
@@ -87,7 +89,7 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
 
     @override
     async def run_pipe_func_transported(self, *, request: PipeFuncExecutionRequest) -> PipeFuncExecutionResponse:
-        """Write the call's files, rebuild the library + memory, run the one PipeFunc, transport the output.
+        """Read and write the call's files, rebuild the library + memory, run the one PipeFunc, transport the output.
 
         The far-from-caller half of out-of-process execution, and the single source of truth for it: a
         sandbox box runs exactly this (its entrypoint is a thin shell over this call), and it pulls in
@@ -96,28 +98,33 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
         isolation boundary. The output rides back wrapped in a working memory so it round-trips with its
         concept (and thus its dynamic-class identity), rebound against the receiver's registry.
 
-        The call's files are written into a fresh temporary directory, removed on every path.
+        The call's files are read through the method file store under the run's read scope, which this process must
+        reach, and written into a fresh temporary directory, removed on every path. A sandbox, which reaches no store,
+        receives them from its client instead, unpacked into the directory `run_pipe_func_transported_at` runs in.
         """
         # Resolved, so the root the hold puts on sys.path is the one the import system reports for its modules
         # (`/var` is `/private/var` on macOS).
         tree_root = Path(tempfile.mkdtemp(prefix="pipelex_pipe_func_")).resolve()
         try:
+            if request.tree_digest is not None:
+                call_files = await read_pipe_func_call_files(tree_digest=request.tree_digest, read_scope=request.job_metadata.run_metadata.read_scope)
+                write_call_files(files=call_files, destination=tree_root)
             return await self.run_pipe_func_transported_at(request=request, tree_root=tree_root)
         finally:
             shutil.rmtree(tree_root, ignore_errors=True)
 
     async def run_pipe_func_transported_at(self, *, request: PipeFuncExecutionRequest, tree_root: Path) -> PipeFuncExecutionResponse:
-        """Run a transported call with its Python root at `tree_root`, a directory the caller may have filled already.
+        """Run a transported call with its Python root at `tree_root`, a directory holding the files of the call's tree.
 
-        A sandbox client may unpack the call's tree into the sandbox itself, such as from one archive per call, and hand
-        the directory over; the files the request carries are written there too, at their tree paths. The directory is
-        the call's import root: it goes first on `sys.path` under the process's hold on its Python, and the function is
-        imported from it under its real import path.
+        The caller wrote the files of the tree the request names there, every one but the `.mthds` files, at their tree
+        paths (`read_pipe_func_call_files`, `write_call_files`): a sandbox client unpacks them into the sandbox itself,
+        such as from one archive per call, and hands the directory over. The directory is the call's import root: it goes
+        first on `sys.path` under the process's hold on its Python, and the function is imported from it under its real
+        import path.
 
         Raises:
             PipeFuncExecutionError: The call's files cannot be read back as a tree, or the function runs past its timeout.
         """
-        write_call_files(files=request.files, destination=tree_root)
         self._write_generated_structures(crate=request.crate, tree_root=tree_root)
         try:
             tree = read_written_tree(tree_root)
@@ -129,7 +136,10 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
         # is removed.
         TREE_PYTHON_HOLD.acquire(tree=tree, holder=_TRANSPORTED_LIBRARY_ID, label=f"the method tree of the call to '{request.pipe_code}'")
         try:
-            return await self._run_transported(request=request, crate=self._crate_rooted_at(request=request, tree_json=tree.model_dump_json()))
+            # The step called is built in the tree written here, which the crate names by the digest of the tree its
+            # bundle was read from; every other step names its tree by digest alone.
+            written_trees = {request.tree_digest: tree} if request.tree_digest is not None else {}
+            return await self._run_transported(request=request, written_trees=written_trees)
         finally:
             TREE_PYTHON_HOLD.release(holder=_TRANSPORTED_LIBRARY_ID)
             TREE_PYTHON_HOLD.unload_if_unheld()
@@ -160,31 +170,15 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
             generated_target.parent.mkdir(parents=True, exist_ok=True)
             generated_target.write_text(emitted.content, encoding="utf-8")
 
-    @staticmethod
-    def _crate_rooted_at(*, request: PipeFuncExecutionRequest, tree_json: str) -> LibraryCrate:
-        """The request's crate with the called step's method tree replaced by the tree written here.
-
-        A step read from a tree resolves its function, and any file its tree's other steps name, in that tree, which the
-        crate carries as the host that assembled it listed it; here the tree is the call's files as written in this
-        process. A step parsed from a content string has no tree, and imports from this process's import path, which
-        the hold starts with the call's root.
-        """
-        crate = request.crate
-        tree_bundle_ref = crate.tree_bundles.get(request.pipe_code)
-        if tree_bundle_ref is None:
-            return crate
-        method_trees = dict(crate.method_trees)
-        method_trees[tree_bundle_ref.tree_key] = tree_json
-        return crate.model_copy(update={"method_trees": method_trees})
-
-    async def _run_transported(self, *, request: PipeFuncExecutionRequest, crate: LibraryCrate) -> PipeFuncExecutionResponse:
-        # The crate was validated where it was assembled; its other steps may name files of trees this process never
-        # receives, so it is loaded as it is, and the one step called checks its function as it binds it.
+    async def _run_transported(self, *, request: PipeFuncExecutionRequest, written_trees: dict[str, MethodTree]) -> PipeFuncExecutionResponse:
+        # The crate was validated where it was assembled; its other steps name trees this process never receives, so it
+        # is loaded as it is, and the one step called checks its function as it binds it.
         working_memory = rehydrate_library_and_memory(
             library_id=_TRANSPORTED_LIBRARY_ID,
-            crate=crate,
+            crate=request.crate,
             working_memory_raw=request.working_memory_raw,
             is_crate_prevalidated=True,
+            written_trees=written_trees,
         )
         if working_memory is None:
             msg = f"Transported rehydration produced no working memory for pipe '{request.pipe_code}'"

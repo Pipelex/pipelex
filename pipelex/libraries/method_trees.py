@@ -44,6 +44,7 @@ from mthds.method_tree.tree_path import nfc
 from mthds.method_tree.vocabulary import ExclusionRule, TreeRefusalCode
 
 from pipelex import log
+from pipelex.core.method_trees.method_file_store import HeldFile
 from pipelex.core.method_trees.tree_bundle import TreeBundle
 from pipelex.hosted.execution import get_or_load_pipelex_config
 from pipelex.libraries.exceptions import HostLibraryRequirementsError, HostLibraryTreeError, MethodRequirementsError, MethodTreeLoadError
@@ -515,15 +516,25 @@ def tree_python_sources(*, tree: MethodTree, library_dir: Path | None) -> dict[s
     return sources
 
 
-def submitted_python_files(*, library_tree: LibraryTree) -> dict[str, bytes]:
+def listing_identity(*, tree: MethodTree) -> tuple[str, str, bool]:
+    """What makes two listings one tree on this host: their root, their digest, and whether they are a one-file tree.
+
+    Two listings of one directory with the same files are one tree, and a one-file tree is never the directory tree of
+    its folder, since only the latter lets a reference reach another file. A crate needs none of this: it names a tree by
+    its digest alone, which names its files' bytes wherever they lie.
+    """
+    return (str(tree.directory), tree.digest, tree.is_one_file)
+
+
+def submitted_tree_files(*, library_tree: LibraryTree) -> dict[str, HeldFile]:
     """The files a library directory submits beside bundles parsed from content strings, keyed by their path from it.
 
-    A directory whose own tree holds no bundle, such as the directory a server writes a request's Python into beside the
-    request's bundles, is where those bundles' import paths start, so its files other than bundles travel with each call
-    of their `PipeFunc` steps. A tree holding a bundle submits nothing: its steps' calls carry their own tree's files, so a
-    directory's files never travel twice, and two such directories never share one import root. Neither does a tree
-    nested in a library directory. The membership rule decides what the tree holds, so a `.gitignore`d file or a virtual
-    environment never travels.
+    A directory whose own tree holds no bundle, such as the directory a server writes a request's files into beside the
+    request's bundles, is where those bundles' references and import paths start, so its files join the tree of the files
+    submitted with them, the bundles sitting at its root. A tree holding a bundle submits nothing: its steps read and
+    call their own tree's files, so a directory's files never join two trees. Neither does a tree nested in a library
+    directory. The membership rule decides what the tree holds, so a `.gitignore`d file or a virtual environment never
+    joins. Nothing is read: each file is held by the hash its listing recorded, and read from the disk when it is used.
 
     Args:
         library_tree: A tree the library directory holds, as `list_library_dir_trees` listed it.
@@ -536,8 +547,10 @@ def submitted_python_files(*, library_tree: LibraryTree) -> dict[str, bytes]:
         # Not the directory's own tree: one nested in it.
         return {}
     stripped_prefix = spelling[0]
-    files: dict[str, bytes] = {}
-    for tree_path in tree.tree_paths:
-        if tree_path.startswith(stripped_prefix):
-            files[tree_path.removeprefix(stripped_prefix)] = tree.file_location(tree_path).read_bytes()
+    files: dict[str, HeldFile] = {}
+    for tree_file in tree.files:
+        if tree_file.path.startswith(stripped_prefix):
+            files[tree_file.path.removeprefix(stripped_prefix)] = HeldFile(
+                sha256=tree_file.sha256, size=tree_file.size, source=tree.file_location(tree_file.path)
+            )
     return files

@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Mapping
 from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
 from typing import Sequence
@@ -11,7 +12,6 @@ from typing_extensions import TypedDict
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexUnexpectedError
-from pipelex.core.bundle_resources.bundle_resource import BundleResources
 from pipelex.core.method_trees.file_references import BundleFileOrigin
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.interpreter_hub import (
@@ -21,7 +21,7 @@ from pipelex.interpreter_hub import (
     resolve_library_dirs,
     set_current_library,
 )
-from pipelex.libraries.bundle_resources import check_bundle_resources
+from pipelex.libraries.bundle_resources import check_submitted_files
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.libraries.method_trees import reporting_host_library_tree_faults
 from pipelex.libraries.pipe.exceptions import EntryPipeNotFoundError
@@ -128,15 +128,14 @@ async def validate_bundle(
     caller_identity: CallerIdentity | None = None,
     library_dirs_are_callers: bool = False,
     collect_dry_run_warnings: bool = False,
-    bundle_resources: BundleResources | None = None,
+    submitted_files: Mapping[str, bytes] | None = None,
 ) -> ValidateBundleResult:
     """Load one bundle into a fresh library and dry-run its pipes.
 
-    ``bundle_resources`` are the files submitted with ``mthds_contents`` that their steps read, such as a
+    ``submitted_files`` are the files submitted with ``mthds_contents`` that their steps read, such as a
     ``PipeDocGen`` step's ``template_file``, keyed by canonical bundle-relative path (see
-    ``make_bundle_resources``). A file none of the submitted steps names is refused with a
-    ``BundleResourceNotNamedError``, and files read at load that total more than ``MAX_LOAD_STAGE_RESOURCES_BYTES`` with
-    a ``BundleResourcesTooLargeError``, neither a verdict. A bundle file reads beside itself on disk and takes none.
+    ``canonical_submitted_files``). A file none of the submitted steps names is refused with a
+    ``BundleResourceNotNamedError``, not a verdict. A bundle file reads the files of its method tree and takes none.
 
     ``caller_identity`` is who asked for the validation, when the host knows it; the dry-run
     sweep is attributed to that caller (see ``BundleValidator.validate_pipes``). ``None``
@@ -186,8 +185,8 @@ async def validate_bundle(
         msg = "mthds_sources, when provided, must be a per-item source list matching mthds_contents in length"
         raise PipelexUnexpectedError(msg)
 
-    if bundle_resources and mthds_contents is None:
-        msg = "bundle_resources accompany mthds_contents: a bundle file reads the files beside it on disk"
+    if submitted_files and mthds_contents is None:
+        msg = "submitted_files accompany mthds_contents: a bundle file reads the files of its method tree"
         raise PipelexUnexpectedError(msg)
 
     library_manager = get_library_manager()
@@ -237,9 +236,9 @@ async def validate_bundle(
                     )
                     for content, source in zip(mthds_contents, content_sources, strict=True)
                 ]
-                if bundle_resources:
-                    check_bundle_resources(blueprints=loaded_blueprints, bundle_resources=bundle_resources)
-                    library_manager.add_bundle_resources(library_id=library_id, bundle_resources=bundle_resources)
+                if submitted_files:
+                    check_submitted_files(blueprints=loaded_blueprints, submitted_files=submitted_files)
+                    library_manager.add_submitted_files(library_id=library_id, submitted_files=submitted_files)
                 loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
                 dry_run_results = await BundleValidator().validate_pipes(
                     pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes=dry_run_pipe_codes),

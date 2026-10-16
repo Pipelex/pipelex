@@ -341,11 +341,6 @@ _ERROR_TYPE_STATUS_OVERRIDES: dict[str, int] = {
     #     sandboxed PipeFuncs, not in-process Python) → 403, the same status as the bundle
     #     transport's custom-code gate.
     "MethodStructuresRefusedError": 403,
-    # The files submitted in `resources` that the bundle's steps read when the method loads, its HTML templates,
-    # total more than they may, since they travel inline with the method wherever it runs. Only the parsed bundle
-    # says which files those are, so the library refuses them rather than this server's decoding: the request
-    # entity itself is too large → 413, as the decoder's own size refusals are.
-    "BundleResourcesTooLargeError": 413,
 }
 
 

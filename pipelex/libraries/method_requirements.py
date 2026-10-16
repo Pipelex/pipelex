@@ -37,9 +37,8 @@ from packaging.utils import canonicalize_name
 from packaging.version import InvalidVersion, Version
 
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
-from pipelex.core.method_trees.tree_bundle import tree_key_of
 from pipelex.libraries.exceptions import MethodRequirementsFileError, MethodRequirementsNotMetError
-from pipelex.libraries.method_trees import list_library_dir_trees, reporting_host_library_tree_faults
+from pipelex.libraries.method_trees import list_library_dir_trees, listing_identity, reporting_host_library_tree_faults
 from pipelex.libraries.package_environments import PythonPackageEnvironment, resolve_pipe_func_package_environment
 
 REQUIREMENTS_FILE_NAME = "requirements.txt"
@@ -364,12 +363,12 @@ def _ensure_judged_methods_met(*, judged_methods: Iterable[JudgedMethod], names_
             set for them.
     """
     environment: PythonPackageEnvironment | None = None
-    judged_tree_keys: set[str] = set()
+    judged_trees: set[tuple[str, str, bool]] = set()
     for judged in judged_methods:
-        tree_key = tree_key_of(tree=judged.tree)
-        if tree_key in judged_tree_keys:
+        tree_identity = listing_identity(tree=judged.tree)
+        if tree_identity in judged_trees:
             continue
-        judged_tree_keys.add(tree_key)
+        judged_trees.add(tree_identity)
         if not holds_requirements_to_check(tree=judged.tree):
             continue
         parsed = parse_requirements_text(text=_read_requirements_text(judged=judged))

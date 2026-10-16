@@ -19,7 +19,7 @@ Two pure-ish building blocks composed by both the single-run wrapper
   library mutation.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -28,7 +28,6 @@ from mthds.protocol.pipeline_inputs import PipelineInputs
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexUnexpectedError
-from pipelex.core.bundle_resources.bundle_resource import BundleResources
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
@@ -42,7 +41,7 @@ from pipelex.interpreter_hub import (
     set_current_library,
 )
 from pipelex.kernel.memory_ops import shape_inputs
-from pipelex.libraries.bundle_resources import check_bundle_resources
+from pipelex.libraries.bundle_resources import check_submitted_files
 from pipelex.libraries.method_trees import reporting_host_library_tree_faults
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
@@ -85,7 +84,7 @@ def acquire_library(
     bundle_uris: list[str] | None = None,
     library_dirs_are_callers: bool = False,
     methods_dirs: list[Path] | None = None,
-    bundle_resources: BundleResources | None = None,
+    submitted_files: Mapping[str, bytes] | None = None,
 ) -> tuple[str, str | None]:
     """Set the current library, open it, and load dirs + blueprints into it.
 
@@ -127,18 +126,17 @@ def acquire_library(
     Every other content belongs to no method tree and reads only the files submitted with it, so a step naming a file
     none of them could be keyed by, such as one through a ``..`` segment, is refused when its blueprint validates.
 
-    ``bundle_resources`` are the files submitted with the ``mthds_contents`` that their steps read, such as a
+    ``submitted_files`` are the files submitted with the ``mthds_contents`` that their steps read, such as a
     ``PipeDocGen`` step's ``template_file``, keyed by canonical bundle-relative path. The library holds them before the
-    contents load, and its crate carries them with the run. A file none of the contents' steps names is refused with a
-    ``BundleResourceNotNamedError``, and files read at load too large to travel with the method with a
-    ``BundleResourcesTooLargeError``.
+    contents load, as files of the tree the contents sit at the root of, and the run's crate names that tree by its
+    digest. A file none of the contents' steps names is refused with a ``BundleResourceNotNamedError``.
 
     Returns the ``library_id`` and the bundle's qualified ``main_pipe`` ref
     (``domain.pipe_code``) when an ``mthds_contents`` bundle declares one, else
     ``None``. Pipe resolution is the caller's responsibility.
     """
-    if bundle_resources and not mthds_contents:
-        msg = "bundle_resources accompany mthds_contents: a bundle loaded from a directory reads the files beside it on disk"
+    if submitted_files and not mthds_contents:
+        msg = "submitted_files accompany mthds_contents: a bundle loaded from a directory reads the files of its method tree"
         raise PipelexUnexpectedError(msg)
     library_manager = get_library_manager()
     prev_library_id = get_current_library_id_or_none()
@@ -184,9 +182,9 @@ def acquire_library(
                     )
                     for content, host_bundle_file in zip(mthds_contents, host_bundle_files, strict=True)
                 ]
-                if bundle_resources:
-                    check_bundle_resources(blueprints=all_blueprints, bundle_resources=bundle_resources)
-                    library_manager.add_bundle_resources(library_id=library_id, bundle_resources=bundle_resources)
+                if submitted_files:
+                    check_submitted_files(blueprints=all_blueprints, submitted_files=submitted_files)
+                    library_manager.add_submitted_files(library_id=library_id, submitted_files=submitted_files)
 
                 # Filter out blueprints whose URIs are already loaded (e.g. via PIPELEXPATH), and record the file on this
                 # host each of the others was read from, so its steps read beside it as when its directory loads.
@@ -401,6 +399,12 @@ async def prepare_pipe_job(
         # certain to reach a pipe whose model cannot read its format.
         check_file_inputs_against_consumers(entry_pipe=pipe, file_inputs=collect_file_inputs(working_memory))
 
+    # Build the library crate from all accumulated blueprints for Temporal dispatch.
+    library_crate = get_library_manager().get_crate(library_id=library_id)
+    # The run records the method it ran twice over: the digest of the tree its pipe was read from, which changes with
+    # any byte of it, and the crate's fingerprint, which changes only with the meaning of its concepts and pipes.
+    tree_bundle_ref = library_crate.tree_bundles.get(pipe.pipe_ref) if library_crate is not None else None
+
     job_metadata = JobMetadata(
         run_metadata=RunMetadata(
             user_id=user_id,
@@ -412,6 +416,8 @@ async def prepare_pipe_job(
             # function; the parameter stays nullable only so every existing call
             # site can keep omitting it.
             extras=extras,
+            method_tree_digest=tree_bundle_ref.tree_digest if tree_bundle_ref is not None else None,
+            crate_fingerprint=library_crate.fingerprint if library_crate is not None else None,
         ),
         otel_context=otel_context,
         trace_context=trace_context,
@@ -423,9 +429,6 @@ async def prepare_pipe_job(
         pipe_run_mode=pipe_run_mode,
         is_mock_usage=is_mock_usage,
     )
-
-    # Build the library crate from all accumulated blueprints for Temporal dispatch.
-    library_crate = get_library_manager().get_crate(library_id=library_id)
 
     return PipeJobFactory.make_pipe_job(
         pipe=pipe,

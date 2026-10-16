@@ -38,3 +38,12 @@ class TreeModuleExcludedError(ImportError):
         super().__init__(message, name=module_name)
         self.message = message
         self.tree_path = tree_path
+
+
+class MethodFileUnavailableError(PipelexError):
+    """A method file, or the listing of the tree that holds it, cannot be read through the method file store.
+
+    The store does not hold it, such as a tree the process that assembled the run never handed over, or the bytes it
+    holds no longer match the hash the tree's listing names, such as a file edited on disk after its tree was listed. The
+    message names the tree by its digest and the file by its tree path, never by a path of this host.
+    """

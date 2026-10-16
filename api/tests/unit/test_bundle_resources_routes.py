@@ -2,12 +2,11 @@
 
 Pins the wire across the routes that load inline contents: the files reach the step that reads them, a file no step
 names is refused as the request's fault, a path that cannot name a file inside the bundle is refused, and the count,
-per-file and total limits are enforced before anything loads, and the files read when the method loads within a bound of
-their own once it is parsed. A run handed to an orchestrator other than `direct` carries its office templates by
-reference to the run's storage, never as bytes in the job.
+per-file and total limits are enforced before anything loads. A run handed to an orchestrator other than `direct` names
+the tree of the submitted files by its digest, in its crate and its run metadata, and carries none of their bytes.
 
-The hermetic API environment has no document engine, so the step's engine is stubbed and its template check records
-the bytes it reads, which is the read the engine's checker would be handed.
+The hermetic API environment has no document engine, so the step's engine is stubbed and the dry print's template check
+records the bytes it reads through the method file store, which is the read the engine's checker would be handed.
 """
 
 import base64
@@ -20,16 +19,15 @@ from typing import Any
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from mthds.method_tree.digest import digest_of_contents
+from pipelex.cogt.content_generation.assignment_models import RenderDocumentAssignment
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
-from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.method_trees.method_files import read_method_file
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
-from pipelex.pipe_operators.doc_gen.template_file_resource import bundle_resource_of_template_file
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
 from pipelex.runtime_bridge.payloads import PipelexPipeDispatchAck, PipelexPipeRunOutput
-from pipelex.system.job_metadata import JobMetadata
-from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 from pytest_mock import MockerFixture
 
 from pipelex_api.api_config import ApiConfig
@@ -38,9 +36,8 @@ from pipelex_api.routes import router as api_router
 from tests.unit._constants import STUB_METHOD_ADDRESS
 
 _PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
-_REMOTE_DISPATCH_NS = "pipelex.pipe_run.remote_dispatch"
 _RESOURCES_NS = "pipelex_api.bundle_resources"
-_LIBRARY_RESOURCES_NS = "pipelex.libraries.bundle_resources"
+_PRINT_STAGE_NS = "pipelex.cogt.content_generation.doc_gen_generate"
 
 _TEMPLATE_PATH = "templates/invoice.docx"
 _TEMPLATE_BYTES = b"PK\x03\x04 a docx template"
@@ -84,20 +81,20 @@ def _build_client() -> TestClient:
 
 
 def _stub_the_document_engine(mocker: MockerFixture) -> list[bytes]:
-    """Resolve every PipeDocGen step to an engine, and record the template bytes each template check finds for its step.
+    """Resolve every PipeDocGen step to an engine, and record the template bytes each dry print's check reads for its step.
 
-    The check looks the step's template file up in the library it runs in, where the files sent with the bundle are held.
+    The dry print reads the step's template file through the method file store, which serves the tree of the files sent
+    with the bundle while the run's library holds it.
     """
     read_templates: list[bytes] = []
 
-    async def _record_template_check(pipe: PipeDocGen, *, job_metadata: JobMetadata, working_memory: WorkingMemory) -> None:  # noqa: ARG001
-        assert pipe.template_file is not None
-        resource = bundle_resource_of_template_file(template_file=pipe.template_file)
-        assert resource is not None, f"the library holds no file for the template file '{pipe.template_file}'"
-        read_templates.append(await resource.read_bytes(storage_provider=InMemoryStorageProvider()))
+    async def _record_template_check(*, render_assignment: RenderDocumentAssignment) -> None:
+        template_file = render_assignment.composition.template_file
+        assert template_file is not None
+        read_templates.append(await read_method_file(file_ref=template_file.file, read_scope=render_assignment.job_metadata.run_metadata.read_scope))
 
     mocker.patch.object(PipeDocGen, "resolve_engine", return_value=DocGenSetting(model="stub-docx"))
-    mocker.patch.object(PipeDocGen, "check_template_file", autospec=True, side_effect=_record_template_check)
+    mocker.patch(f"{_PRINT_STAGE_NS}._check_template_file", side_effect=_record_template_check)
     return read_templates
 
 
@@ -118,16 +115,28 @@ class _RecordingTemporalStub:
         return PipelexPipeDispatchAck(pipeline_run_id=pipe_job.job_metadata.run_metadata.pipeline_run_id, workflow_id="wf-1")
 
 
-def _record_dispatches_to_a_temporal_like_orchestrator(mocker: MockerFixture) -> tuple[_RecordingTemporalStub, InMemoryStorageProvider]:
-    """Make Temporal the deployment's orchestrator, recording each job it is handed, over an in-memory run storage."""
-    storage_provider = InMemoryStorageProvider()
-    mocker.patch(f"{_REMOTE_DISPATCH_NS}.get_storage_provider", return_value=storage_provider)
+def _record_dispatches_to_a_temporal_like_orchestrator(mocker: MockerFixture) -> _RecordingTemporalStub:
+    """Make Temporal the deployment's orchestrator, recording each job it is handed."""
     mocker.patch(
         f"{_PIPELINE_NS}.get_api_config", return_value=ApiConfig(orchestration_mode="temporal", allow_request_orchestration_mode_override=False)
     )
     orchestrator = _RecordingTemporalStub()
     mocker.patch(f"{_PIPELINE_NS}.get_orchestrator_registry", return_value=OrchestratorRegistry({"temporal": orchestrator}))
-    return orchestrator, storage_provider
+    return orchestrator
+
+
+def _assert_the_job_names_the_tree_of(*, pipe_job: PipeJob, files: Mapping[str, bytes], pipe_ref: str = "invoicing.print_invoice") -> None:
+    """The job's crate and run metadata name the tree of these files by digest, and the job carries none of their bytes."""
+    crate = pipe_job.library_crate
+    assert crate is not None
+    tree_digest = digest_of_contents(dict(files))
+    assert crate.tree_bundles[pipe_ref].tree_digest == tree_digest
+    run_metadata = pipe_job.job_metadata.run_metadata
+    assert run_metadata.method_tree_digest == tree_digest
+    assert run_metadata.crate_fingerprint == crate.fingerprint
+    job_json = pipe_job.model_dump_json()
+    for data in files.values():
+        assert _b64(data) not in job_json
 
 
 def _zip_b64(files: Mapping[str, str | bytes]) -> str:
@@ -198,21 +207,6 @@ class TestBundleResourcesRoutes:
 
         assert "'templates/logo.png'" in detail
         # A deterministic refusal of what the caller sent, as InvalidResourcePath is: the same request fails again.
-        assert response.json()["retryable"] is False
-
-    @pytest.mark.parametrize("route", ["/v1/validate", "/v1/execute", "/v1/pipe-io", "/v1/resolve", "/v1/codegen"])
-    def test_html_templates_over_the_load_stage_bound_are_refused_with_a_413_naming_the_limit(self, mocker: MockerFixture, route: str) -> None:
-        """An HTML template travels inline with the method wherever it runs, so the files read at load are bounded in total."""
-        _stub_the_document_engine(mocker)
-        mocker.patch(f"{_LIBRARY_RESOURCES_NS}.MAX_LOAD_STAGE_RESOURCES_BYTES", 1024)
-        html_mthds = _INVOICE_MTHDS.replace('format        = "docx"', 'format        = "pdf"').replace(_TEMPLATE_PATH, "invoice.html")
-        body = _contents_body(route=route, resources={"invoice.html": _b64(b"x" * 1025)}, mthds=html_mthds)
-
-        response = _build_client().post(route, json=body)
-        detail = _assert_problem(response, status=413, error_type="BundleResourcesTooLargeError")
-
-        assert "('invoice.html')" in detail
-        assert "1 KiB limit" in detail
         assert response.json()["retryable"] is False
 
     @pytest.mark.parametrize(
@@ -301,10 +295,10 @@ class TestBundleResourcesRoutes:
 
         assert "resources accompany the bundle" in _assert_problem(response, status=422, error_type="ValidationError")
 
-    def test_a_run_handed_to_a_remote_orchestrator_carries_its_template_by_reference(self, mocker: MockerFixture) -> None:
-        """`/start` on a Temporal-like orchestrator: the job's crate names the stored file, and the run's storage holds its bytes."""
+    def test_a_run_handed_to_a_remote_orchestrator_names_the_tree_of_its_files_by_digest(self, mocker: MockerFixture) -> None:
+        """`/start` on a Temporal-like orchestrator: the job's crate and run metadata name the tree, and the job carries none of its files."""
         _stub_the_document_engine(mocker)
-        orchestrator, storage_provider = _record_dispatches_to_a_temporal_like_orchestrator(mocker)
+        orchestrator = _record_dispatches_to_a_temporal_like_orchestrator(mocker)
 
         response = _build_client().post(
             "/v1/start",
@@ -313,30 +307,36 @@ class TestBundleResourcesRoutes:
 
         assert response.status_code == 202, response.text
         (pipe_job,) = orchestrator.pipe_jobs
-        assert pipe_job.library_crate is not None
-        stored = pipe_job.library_crate.bundle_resources[_TEMPLATE_PATH]
-        assert stored.content_b64 is None
-        assert stored.uri is not None
-        assert stored.uri.startswith(f"pipelex-storage://{pipe_job.job_metadata.run_metadata.storage_scope}/assets/bundle/")
-        assert storage_provider.root[stored.uri.removeprefix("pipelex-storage://")] == _TEMPLATE_BYTES
-        assert _b64(_TEMPLATE_BYTES) not in pipe_job.model_dump_json()
+        _assert_the_job_names_the_tree_of(pipe_job=pipe_job, files={_TEMPLATE_PATH: _TEMPLATE_BYTES})
 
     @pytest.mark.parametrize(
-        ("bundle_files", "resources"),
+        ("bundle_files", "resources", "tree_files"),
         [
-            pytest.param({"invoicing.mthds": _INVOICE_MTHDS, _TEMPLATE_PATH: _TEMPLATE_BYTES}, None, id="beside_the_bundle"),
-            pytest.param({"methods/invoicing.mthds": _INVOICE_MTHDS, f"methods/{_TEMPLATE_PATH}": _TEMPLATE_BYTES}, None, id="in_a_directory"),
             pytest.param(
-                {"invoicing.mthds": _INVOICE_MTHDS, _TEMPLATE_PATH: _TEMPLATE_BYTES}, {_TEMPLATE_PATH: _b64(_TEMPLATE_BYTES)}, id="also_in_resources"
+                {"invoicing.mthds": _INVOICE_MTHDS, _TEMPLATE_PATH: _TEMPLATE_BYTES}, None, {_TEMPLATE_PATH: _TEMPLATE_BYTES}, id="beside_the_bundle"
+            ),
+            # The bundle's other files are written where it ships them, and its step's file is keyed by the path the step
+            # names, both in the one tree the bundle's contents sit at the root of.
+            pytest.param(
+                {"methods/invoicing.mthds": _INVOICE_MTHDS, f"methods/{_TEMPLATE_PATH}": _TEMPLATE_BYTES},
+                None,
+                {_TEMPLATE_PATH: _TEMPLATE_BYTES, f"methods/{_TEMPLATE_PATH}": _TEMPLATE_BYTES},
+                id="in_a_directory",
+            ),
+            pytest.param(
+                {"invoicing.mthds": _INVOICE_MTHDS, _TEMPLATE_PATH: _TEMPLATE_BYTES},
+                {_TEMPLATE_PATH: _b64(_TEMPLATE_BYTES)},
+                {_TEMPLATE_PATH: _TEMPLATE_BYTES},
+                id="also_in_resources",
             ),
         ],
     )
     def test_a_method_bundle_carries_the_office_template_it_ships_to_its_step(
-        self, mocker: MockerFixture, bundle_files: dict[str, str | bytes], resources: dict[str, str] | None
+        self, mocker: MockerFixture, bundle_files: dict[str, str | bytes], resources: dict[str, str] | None, tree_files: dict[str, bytes]
     ) -> None:
-        """A template file shipped beside the bundle's `.mthds` file reaches its step as one sent in `resources` does, by reference."""
+        """A template file shipped beside the bundle's `.mthds` file joins the tree of the submitted files as one sent in `resources` does."""
         _stub_the_document_engine(mocker)
-        orchestrator, storage_provider = _record_dispatches_to_a_temporal_like_orchestrator(mocker)
+        orchestrator = _record_dispatches_to_a_temporal_like_orchestrator(mocker)
         body: dict[str, Any] = {"bundle_b64": _zip_b64(bundle_files), "inputs": _INVOICE_INPUTS}
         if resources is not None:
             body["resources"] = resources
@@ -345,16 +345,15 @@ class TestBundleResourcesRoutes:
 
         assert response.status_code == 202, response.text
         (pipe_job,) = orchestrator.pipe_jobs
-        assert pipe_job.library_crate is not None
-        assert set(pipe_job.library_crate.bundle_resources) == {_TEMPLATE_PATH}
-        stored = pipe_job.library_crate.bundle_resources[_TEMPLATE_PATH]
-        assert stored.uri is not None
-        assert storage_provider.root[stored.uri.removeprefix("pipelex-storage://")] == _TEMPLATE_BYTES
+        _assert_the_job_names_the_tree_of(pipe_job=pipe_job, files=tree_files)
 
-    def test_a_method_bundle_s_files_map_carries_the_html_template_it_ships_inline(self, mocker: MockerFixture) -> None:
-        """An HTML template is read while the method loads, so it travels inline in the job, from a `files` map as from a zip."""
+    def test_a_method_bundle_s_files_map_names_the_html_template_it_ships_by_its_tree(self, mocker: MockerFixture) -> None:
+        """An HTML template is read and checked while the method loads, and the job names it by its tree as an office one.
+
+        A `files` map ships it as a zip does.
+        """
         _stub_the_document_engine(mocker)
-        orchestrator, _ = _record_dispatches_to_a_temporal_like_orchestrator(mocker)
+        orchestrator = _record_dispatches_to_a_temporal_like_orchestrator(mocker)
         html_mthds = _INVOICE_MTHDS.replace('format        = "docx"', 'format        = "pdf"').replace(_TEMPLATE_PATH, "templates/invoice.html")
         html_template = "<h1>{{ invoice.number }}</h1>"
 
@@ -365,8 +364,8 @@ class TestBundleResourcesRoutes:
 
         assert response.status_code == 202, response.text
         (pipe_job,) = orchestrator.pipe_jobs
-        assert pipe_job.library_crate is not None
-        assert pipe_job.library_crate.bundle_resources["templates/invoice.html"].inline_bytes() == html_template.encode("utf-8")
+        _assert_the_job_names_the_tree_of(pipe_job=pipe_job, files={"templates/invoice.html": html_template.encode("utf-8")})
+        assert "invoice.number }}" not in pipe_job.model_dump_json()
 
     @pytest.mark.parametrize(
         ("bundle_files", "resources"),

@@ -88,6 +88,7 @@ class HubSlot(StrEnum):
     PIPE_RUN = "pipe_run"
     TASK_MANAGER = "task_manager"
     ISOLATED_EXECUTION_PROBE = "isolated_execution_probe"
+    METHOD_FILE_STORE = "method_file_store"
 
     @property
     def is_interpreter_layer(self) -> bool:
@@ -97,7 +98,7 @@ class HubSlot(StrEnum):
         runs the kernel boot and not the interpreter tail, so it can never apply an interpreter
         claim — which is exactly what a kernel-group plugin must not be able to reach.
 
-        For the five slots that hand a value back to core, the returned type corroborates the
+        For the slots that hand a value back to core, the returned type corroborates the
         classification — the interpreter ones yield a ``Pipe``-aware object, the kernel ones do not.
         ``TASK_MANAGER`` is why that reading cannot govern on its own: its thunk is invoked for its
         side effects and its return is *discarded*, so there is no handed-back object to classify.
@@ -110,7 +111,7 @@ class HubSlot(StrEnum):
         match self:
             case HubSlot.PIPE_FUNC_EXECUTOR | HubSlot.PIPE_ROUTER | HubSlot.PIPE_RUN:
                 return True
-            case HubSlot.CONTENT_GENERATOR | HubSlot.TASK_MANAGER | HubSlot.ISOLATED_EXECUTION_PROBE:
+            case HubSlot.CONTENT_GENERATOR | HubSlot.TASK_MANAGER | HubSlot.ISOLATED_EXECUTION_PROBE | HubSlot.METHOD_FILE_STORE:
                 return False
 
 
@@ -511,6 +512,14 @@ class PluginRegistrar:
 
     def claim_isolated_execution_probe(self, factory: Callable[[], Any]) -> None:
         self._claim(slot=HubSlot.ISOLATED_EXECUTION_PROBE, factory=factory)
+
+    def claim_method_file_store(self, factory: Callable[[], Any]) -> None:
+        """Claim where activities read method files, by their tree's digest: the factory returns a `MethodFileStoreProtocol`.
+
+        Claimed by a host whose activities run apart from the process that listed a run's method trees, such as a
+        Temporal worker reading the hosted plane's blob store; unclaimed, a process reads the trees its own libraries hold.
+        """
+        self._claim(slot=HubSlot.METHOD_FILE_STORE, factory=factory)
 
     def add_teardown(self, callback: Callable[[], None]) -> None:
         self.teardown_callbacks.append(callback)

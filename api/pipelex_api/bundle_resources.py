@@ -4,8 +4,9 @@ They come in two ways. `resources` is a JSON object mapping each file's bundle-r
 names (a `PipeDocGen` step's `template_file`), to the file's bytes in standard base64, beside `mthds_contents` or a
 method bundle. A method bundle (`bundle_b64` or `files`) may also ship the file beside its `.mthds` file, which
 `files_its_steps_read` picks out. Every bundle of the request is read as sitting in one directory, so one path holds
-one file. The decoded files go to the runtime as `BundleResources`, which refuses a file none of the bundle's steps
-names once the bundle is parsed.
+one file. The decoded files go to the runtime as its `submitted_files`, keyed by canonical path, which refuses a file
+none of the bundle's steps names once the bundle is parsed, and holds the rest as the files of the tree the bundle
+sits at the root of: the run's crate names that tree by its digest and carries none of their bytes.
 
 Refusals, in the order they are checked:
 
@@ -27,12 +28,7 @@ from pathlib import PurePosixPath
 from typing import NoReturn
 
 from pipelex import log
-from pipelex.core.bundle_resources.bundle_resource import (
-    BundleResources,
-    canonical_resource_path,
-    canonical_resource_path_or_none,
-    make_bundle_resources,
-)
+from pipelex.core.bundle_resources.bundle_resource import canonical_resource_path, canonical_resource_path_or_none
 from pipelex.core.bundle_resources.exceptions import BundleResourcePathError
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.parser import MthdsParser
@@ -77,7 +73,7 @@ def files_its_steps_read(
             log.debug("A method bundle's file did not parse, so the files its steps read are left to its load", fields=error_fields(exc=exc))
             continue
         for pipe_blueprint in (blueprint.pipe or {}).values():
-            for named_path in pipe_blueprint.bundle_resource_reads:
+            for named_path in pipe_blueprint.named_file_references:
                 canonical_path = canonical_resource_path_or_none(path=named_path)
                 if canonical_path is None:
                     continue
@@ -91,7 +87,7 @@ def files_its_steps_read(
     return files
 
 
-def decode_bundle_resources(*, resources: dict[str, str] | None, bundle_files: Mapping[str, bytes] | None = None) -> BundleResources | None:
+def decode_bundle_resources(*, resources: dict[str, str] | None, bundle_files: Mapping[str, bytes] | None = None) -> dict[str, bytes] | None:
     """The files the bundle's steps read, decoded and keyed by canonical path, or None when there are none.
 
     `resources` are the ones the request sends, in base64. `bundle_files` are the ones its method bundle ships, as
@@ -145,4 +141,4 @@ def decode_bundle_resources(*, resources: dict[str, str] | None, bundle_files: M
         total_bytes += len(data)
         if total_bytes > MAX_RESOURCES_TOTAL_BYTES:
             raise_payload_too_large(message=f"The files the bundle's steps read exceed the {MAX_RESOURCES_TOTAL_BYTES // 1024} KiB total-size limit")
-    return make_bundle_resources(files=files)
+    return files

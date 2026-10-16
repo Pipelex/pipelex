@@ -111,6 +111,7 @@ class TestDependencyMultiFileReconciliation:
         manager = LibraryManager()
         manager._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             library=library,
+            library_id="dependency-test",
             package_address="github.com/org/summary-dep",
             resolved_dep=self._build_resolved_dep(
                 tmp_path=tmp_path,
@@ -140,6 +141,7 @@ class TestDependencyMultiFileReconciliation:
         manager = LibraryManager()
         manager._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             library=library,
+            library_id="dependency-test",
             package_address="github.com/org/summary-dep",
             resolved_dep=self._build_resolved_dep(
                 tmp_path=tmp_path,
@@ -166,6 +168,7 @@ class TestDependencyMultiFileReconciliation:
         with pytest.raises(PipeLibraryError):
             manager._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
                 library=library,
+                library_id="dependency-test",
                 package_address="github.com/org/summary-dep",
                 resolved_dep=self._build_resolved_dep(
                     tmp_path=tmp_path,

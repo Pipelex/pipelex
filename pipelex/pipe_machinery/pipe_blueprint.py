@@ -6,7 +6,6 @@ from typing import Any, Self, cast, final
 
 from pydantic import BaseModel, ConfigDict, Field, SerializerFunctionWrapHandler, field_validator, model_serializer, model_validator
 
-from pipelex.core.bundle_resources.bundle_resource import BundleResourceReadStage
 from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.core.pipes.exceptions import PipeValidationError
@@ -291,14 +290,13 @@ class PipeBlueprint(ABC, BaseModel):
         return set()
 
     @property
-    def bundle_resource_reads(self) -> dict[str, BundleResourceReadStage]:
-        """The files of its bundle this pipe reads, keyed by the bundle-relative path it names, and when it reads each.
+    def named_file_references(self) -> set[str]:
+        """The files of its method tree this pipe names, as it writes them, relative to its bundle.
 
-        Overridden by a pipe that reads a file beside its bundle, such as a `PipeDocGen` step's `template_file`.
-        A bundle submitted as content strings brings exactly these files with it, and the one read only when the
-        step runs may travel with the run by reference.
+        Overridden by a pipe that reads a file of its tree, such as a `PipeDocGen` step's `template_file`. A bundle
+        submitted as content strings brings exactly these files with it.
         """
-        return {}
+        return set()
 
     @property
     def ordered_pipe_dependencies(self) -> list[str] | None:
