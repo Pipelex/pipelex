@@ -1,4 +1,6 @@
 import asyncio
+from collections.abc import Mapping
+from types import MappingProxyType
 from typing import Any
 
 import httpx
@@ -23,6 +25,26 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.providers.google.google_factory import GoogleFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.log.error_fields import error_fields
+
+# What a reason Gemini gives for refusing an image says, in the words its error gives: the finish reasons that
+# `classify_image_finish_reason` reads as a refusal, and the prompt feedback's block reasons, which share their words
+# and their meanings. A recitation or an unsupported language is no safety filter's doing, so only the safety reasons
+# name one. A reason not listed, such as `OTHER`, is named by its value alone.
+_IMAGE_REFUSAL_CAUSES: Mapping[str, str] = MappingProxyType(
+    {
+        "SAFETY": "a safety filter flagged the content",
+        "IMAGE_SAFETY": "a safety filter flagged the content",
+        "PROHIBITED_CONTENT": "Gemini judged the content prohibited",
+        "IMAGE_PROHIBITED_CONTENT": "Gemini judged the content prohibited",
+        "BLOCKLIST": "the content holds a term from Gemini's blocklist",
+        "SPII": "the content may hold sensitive personal information",
+        "RECITATION": "the output may reproduce an existing source too closely",
+        "IMAGE_RECITATION": "the output may reproduce an existing source too closely",
+        "LANGUAGE": "the prompt's language is not one the model supports",
+        "JAILBREAK": "Gemini took the prompt for a jailbreak attempt",
+        "MODEL_ARMOR": "Model Armor blocked the prompt",
+    }
+)
 
 
 class GoogleImgGenWorker(ImgGenWorkerAbstract):
@@ -216,8 +238,9 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
         for a prompt blocked before the model wrote anything, no candidate at all and a block reason in the prompt
         feedback, which is a refusal whatever its value, as the text workers read it. The finish reason reads from
         Gemini's vocabulary (see `pipelex.cogt.llm.completion_stop`), so an image refused on policy grounds is
-        `model.content_refused`, the caller's input to revise, rather than an empty answer. Any other finish reason
-        leaves the answer to the checks that read what it holds.
+        `model.content_refused`, the caller's input to revise, rather than an empty answer. The message names the
+        reason Gemini gave and what it says, so a recitation or an unsupported language is never called a safety
+        filter's block. Any other finish reason leaves the answer to the checks that read what it holds.
 
         Raises:
             ImgGenGenerationError: With `model.content_refused`, when a finish reason or a block reason says the request
@@ -226,17 +249,21 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
         model_handle = self.inference_model.name
         stop_signal = GoogleFactory.read_stop_signal(response=response)
         refusal_reason: str
+        what_happened: str
         if stop_signal.finish_reason is not None:
             if not classify_image_finish_reason(finish_reason=stop_signal.finish_reason, model_handle=model_handle).is_refused:
                 return
             refusal_reason = stop_signal.finish_reason
+            what_happened = f"The model '{model_handle}' stopped before it generated the image (finish reason '{refusal_reason}')"
         elif stop_signal.block_reason is not None:
             # A prompt blocked before the model answered is a refusal whatever its reason, which the error names
             refusal_reason = stop_signal.block_reason
+            what_happened = f"Gemini blocked the prompt before the model '{model_handle}' generated the image (block reason '{refusal_reason}')"
         else:
             return
+        cause = _IMAGE_REFUSAL_CAUSES.get(refusal_reason.upper())
         next_step = "Revise the image prompt or its input images."
-        msg = f"The model '{model_handle}' refused to generate the image, or a safety filter blocked it (reason '{refusal_reason}'). {next_step}"
+        msg = f"{what_happened}: {cause}. {next_step}" if cause else f"{what_happened}. {next_step}"
         raise (
             ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONTENT, provider_metadata=None)
             .with_error_code(CoreCode.MODEL_CONTENT_REFUSED)

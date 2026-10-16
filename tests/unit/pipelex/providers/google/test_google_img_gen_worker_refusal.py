@@ -122,6 +122,57 @@ class TestGoogleImgGenWorkerRefusal:
         assert report.caller_facing_message is True
 
     @pytest.mark.parametrize(
+        ("answer", "expected_message"),
+        [
+            pytest.param(
+                _finished_without_image("RECITATION"),
+                "The model 'nano-banana' stopped before it generated the image (finish reason 'RECITATION'): "
+                "the output may reproduce an existing source too closely. Revise the image prompt or its input images.",
+                id="recitation",
+            ),
+            pytest.param(
+                _finished_without_image("IMAGE_RECITATION"),
+                "The model 'nano-banana' stopped before it generated the image (finish reason 'IMAGE_RECITATION'): "
+                "the output may reproduce an existing source too closely. Revise the image prompt or its input images.",
+                id="image-recitation",
+            ),
+            pytest.param(
+                _finished_without_image("LANGUAGE"),
+                "The model 'nano-banana' stopped before it generated the image (finish reason 'LANGUAGE'): "
+                "the prompt's language is not one the model supports. Revise the image prompt or its input images.",
+                id="language",
+            ),
+            pytest.param(
+                _finished_without_image("SPII"),
+                "The model 'nano-banana' stopped before it generated the image (finish reason 'SPII'): "
+                "the content may hold sensitive personal information. Revise the image prompt or its input images.",
+                id="spii",
+            ),
+            pytest.param(
+                _finished_without_image("IMAGE_SAFETY"),
+                "The model 'nano-banana' stopped before it generated the image (finish reason 'IMAGE_SAFETY'): "
+                "a safety filter flagged the content. Revise the image prompt or its input images.",
+                id="image-safety",
+            ),
+            pytest.param(
+                _blocked_prompt("OTHER"),
+                "Gemini blocked the prompt before the model 'nano-banana' generated the image (block reason 'OTHER'). "
+                "Revise the image prompt or its input images.",
+                id="blocked-for-another-reason",
+            ),
+        ],
+    )
+    async def test_a_refusal_says_what_its_reason_says(self, mocker: MockerFixture, answer: dict[str, Any], expected_message: str) -> None:
+        """A recitation or an unsupported language is named as such, never as a safety filter's block."""
+        async with _answering(answer) as http_client:
+            worker = _worker(mocker, http_client=http_client)
+            with pytest.raises(ImgGenGenerationError) as exc_info:
+                await worker._gen_image(img_gen_job=_img_gen_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.resolve_error_code() == CoreCode.MODEL_CONTENT_REFUSED
+        assert exc_info.value.message == expected_message
+
+    @pytest.mark.parametrize(
         "answer",
         [
             # The model was asked for an image and made none, for no reason a filter gave
