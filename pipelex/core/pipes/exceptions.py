@@ -116,9 +116,13 @@ class PipeOperatorModelChoiceError(PipelexError):
     The message names the pipe and the field, then keeps the deck check's sentence and its suggestions,
     so it is caller-facing copy: it names only the caller's own model reference and the deck's public
     handles, and it must reach a hosted caller under STRICT disclosure.
+
+    It takes the code of the deck check's refusal it locates: ``model.unknown`` for a reference the deck
+    does not define, ``model.capability_unsupported`` for a bare handle the deck serves only as another
+    model type, and ``model.unknown`` when it has no such cause.
     """
 
-    error_code = CoreCode.MODEL_UNKNOWN
+    error_code = InheritsCause(fallback=CoreCode.MODEL_UNKNOWN)
     _authors_caller_facing_message = True
 
     def __init__(

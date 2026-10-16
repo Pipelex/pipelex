@@ -274,7 +274,7 @@ PipeLibraryError | one of method.name_conflict, method.ref_ambiguous, method.sig
 PipeLoadRefusalError | inherits cause, else method.schema_violation
 PipeNotFoundError | method.pipe_unresolved
 PipeOperatorModelAvailabilityError | inherits cause, else model.unavailable
-PipeOperatorModelChoiceError | model.unknown
+PipeOperatorModelChoiceError | inherits cause, else model.unknown
 PipeParallelFactoryError | method.schema_violation
 PipeRouterError | inherits cause, else runtime.unexpected
 PipeRunError | inherits cause, else runtime.unexpected; or chosen: model.output_schema_mismatch, pipe.function_raised, pipe.condition_unmatched, pipe.condition_refused, pipe.input_unresolved, method.function_invalid, method.template_invalid, method.pipe_unresolved, method.schema_violation, method.wiring_invalid, method.name_conflict, method.optional_unhandled
