@@ -66,22 +66,16 @@ def get_agent_cli_error_format() -> CliOutputFormat:
 
 # Fallback error-classification lookups, keyed by error_type name.
 #
-# agent_error() reads error_domain / user_action from a PipelexError cause's
-# to_error_report() first; these dicts are the fallback for error types that
-# cannot self-describe: builtin and third-party exceptions, synthetic error_type
-# labels passed straight to agent_error(), and PipelexError subclasses not yet
-# migrated to class-level metadata. A PipelexError subclass that declares
-# class-level error_domain / user_action must NOT appear here — enforced by
-# tests/unit/pipelex/cli/test_agent_output_drift.py.
-#
-# A CogtError subclass carrying an error_category self-describes too, without any
-# class-level error_domain of its own: InferenceErrorCategory.error_domain derives
-# one, and to_error_report() puts it on the report, so the report-first read at the
-# bottom of agent_error() always wins and an AGENT_ERROR_DOMAINS entry for such a
-# class can never be read. Those are barred from this dict as well, by the same
-# drift test — a dead entry is exactly the rot it exists to prevent. When the
-# derived domain is not the one this CLI wants, fix it on the class (declare an
-# explicit error_domain, as ModelChoiceNotFoundError does), never here.
+# agent_error() reads error_domain / retryable / user_action from a PipelexError
+# cause's to_error_report() first, and every PipelexError carries a registry code,
+# which decides its domain and its retry verdict: the report always holds both. So
+# AGENT_ERROR_DOMAINS is the fallback for the error types that carry no code alone:
+# builtin and third-party exceptions, and synthetic error_type labels passed straight
+# to agent_error(). A PipelexError subclass must NOT appear in it, since its entry
+# could never be read; when the domain the code projects is not the one this CLI
+# wants, the class needs another code, never an entry here. AGENT_ERROR_HINTS may
+# still name a PipelexError subclass: a hint is read only when the report gives no
+# next step. Both are enforced by tests/unit/pipelex/cli/test_agent_output_drift.py.
 # An unknown model is the author's input fault, whether it is raised bare by the deck check or located
 # on its pipe: the next step is to correct the reference, not to diagnose the installation.
 _UNKNOWN_MODEL_HINT = (
@@ -133,8 +127,6 @@ AGENT_ERROR_HINTS: dict[str, str] = {
         "Without a 'migration' field, correct the telemetry.toml settings named in the message."
     ),
     "BinaryNotFoundError": "Install pipelex-tools: uv tool install pipelex-tools",
-    # Graph errors
-    "GraphSpecParseError": "Validate graphspec.json structure; ensure it matches the expected GraphSpec schema",
     # Input/type errors
     "JsonTypeError": "Input file must be a JSON object {...}, not an array or scalar value",
     "TomlError": "Fix the TOML syntax error (the message includes the line and column)",
@@ -154,32 +146,20 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     "UnknownCommandError": "Check 'valid_commands' in this error response for available commands",
 }
 
-# retryable=True fallback for non-CogtError error types: their ErrorReport
-# carries no `retryable`, unlike CogtError whose error_category drives it.
-RETRYABLE_ERROR_TYPES: set[str] = {
-    "PipeOperatorModelAvailabilityError",
-}
-
 AGENT_ERROR_DOMAINS: dict[str, str] = {
     # input = agent can fix (bad .mthds, wrong args, bad JSON)
-    "PipeValidationError": "input",
     "FixBundleError": "input",
     "FileNotFoundError": "input",
     "JSONDecodeError": "input",
     "StdinEnvelopeShapeError": "input",
-    "JsonTypeError": "input",
-    "TomlError": "input",
     "ArgumentError": "input",
     "ValidationError": "input",
     "ValueError": "input",
     "BundleError": "input",
-    "GraphSpecParseError": "input",
     "UnknownCommandError": "input",
     "CodegenDriftError": "input",
     "CodegenLockNotFoundError": "input",
-    "CodegenLockError": "input",
     # config = environment/config changes needed
-    "PipeOperatorModelAvailabilityError": "config",
     "BinaryNotFoundError": "config",
     "InitConfigError": "config",
 }
@@ -219,7 +199,7 @@ def _build_error_source(exc: BaseException) -> list[str]:
 def _assemble_error_payload(message: str, *, error_type: str, cause: BaseException | None, extra: dict[str, Any]) -> dict[str, Any]:
     """Build the structured error payload shared by the JSON and markdown renderers.
 
-    Sources ``hint`` / ``retryable`` / ``error_domain`` / ``error_category`` /
+    Sources ``hint`` / ``retryable`` / ``error_domain`` / ``error_code`` / ``error_category`` /
     ``model`` / ``provider`` from a ``PipelexError`` cause's ``to_error_report()``
     first, falling back to the lookup dicts for error types that cannot
     self-describe. ``extra`` is merged last and overrides everything.
@@ -246,6 +226,7 @@ def _assemble_error_payload(message: str, *, error_type: str, cause: BaseExcepti
     report_retryable: bool | None = None
     report_category: str | None = None
     report_domain: str | None = None
+    report_code: str | None = None
     report_extras: dict[str, Any] = {}
 
     if isinstance(cause, PipelexError):
@@ -254,6 +235,7 @@ def _assemble_error_payload(message: str, *, error_type: str, cause: BaseExcepti
         report_retryable = report.retryable
         report_category = report.error_category
         report_domain = report.error_domain
+        report_code = report.code
         if report.model:
             report_extras["model"] = report.model
         if report.provider:
@@ -268,19 +250,20 @@ def _assemble_error_payload(message: str, *, error_type: str, cause: BaseExcepti
     if hint:
         error_json["hint"] = hint
 
-    # retryable: report takes precedence, fallback to lookup set (only emit when True)
-    if report_retryable is not None:
-        if report_retryable:
-            error_json["retryable"] = True
-    elif error_type in RETRYABLE_ERROR_TYPES:
+    # retryable: the report's verdict, which its code decides (only emit when True)
+    if report_retryable:
         error_json["retryable"] = True
 
-    # error_domain: report-first (class-level metadata), lookup dict as fallback
+    # error_domain: report-first (its code's projection), lookup dict as fallback for an error that carries no code
     domain = report_domain or AGENT_ERROR_DOMAINS.get(error_type)
     if domain:
         error_json["error_domain"] = domain
         # The command's usage statistics carry the same classification, never the error itself.
         note_command_error_domain(error_domain=usage_stats_error_domain_of(domain=domain))
+
+    # error_code: the cause's registry code, the member a hosted refusal carries as well; an uncoded cause names none
+    if report_code:
+        error_json["error_code"] = report_code
 
     # error_category: from report when available
     if report_category:
@@ -518,7 +501,7 @@ def api_response_error_payload(*, error: ApiResponseError) -> dict[str, Any]:
     - ``http_status`` and ``request_id`` are what to quote when the fault is the runner's.
     - ``error_source`` is the client-side trace, as on every JSON envelope.
     """
-    problem: dict[str, Any] = error.problem or {}
+    problem: dict[str, Any] = error.problem_document or {}
     payload: dict[str, Any] = {
         "error": True,
         "error_type": error.error_type or type(error).__name__,

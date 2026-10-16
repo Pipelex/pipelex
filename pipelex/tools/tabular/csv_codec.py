@@ -20,6 +20,7 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, Union, get_args, get_origin
 
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import ValidationError
 
 from pipelex.core.stuffs.list_content import ListContent
@@ -122,14 +123,14 @@ def _assert_single_char_delimiter(delimiter: str) -> None:
     """
     if len(delimiter) != 1:
         msg = f"CSV delimiter must be a single character, got {delimiter!r}."
-        raise CsvError(msg)
+        raise CsvError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
     if delimiter in {"\n", "\r"}:
         msg = f"CSV delimiter cannot be a newline character, got {delimiter!r}."
-        raise CsvError(msg)
+        raise CsvError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
     if delimiter == '"':
         # The default quote character; csv raises "bad delimiter or quotechar value" if they collide.
         msg = f"CSV delimiter cannot be the quote character, got {delimiter!r}."
-        raise CsvError(msg)
+        raise CsvError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
 
 
 def _validate_header(header: list[str], *, path: Path) -> None:
@@ -249,13 +250,13 @@ def write_rows(
                 writer.writerow([row.get(column, "") for column in headers])
     except LookupError as exc:
         msg = f"Unknown encoding {encoding!r} for CSV file {path}: {exc}"
-        raise CsvError(msg) from exc
+        raise CsvError(msg).with_error_code(CoreCode.REQUEST_INVALID) from exc
     except UnicodeEncodeError as exc:
         msg = f"Could not encode CSV file {path} as {encoding}: {exc}"
-        raise CsvError(msg) from exc
+        raise CsvError(msg).with_error_code(CoreCode.REQUEST_INVALID) from exc
     except OSError as exc:
         msg = f"Could not write CSV file {path}: {exc}"
-        raise CsvError(msg) from exc
+        raise CsvError(msg).with_error_code(CoreCode.REQUEST_INVALID) from exc
 
 
 # ---------------------------------------------------------------------------------------
@@ -406,7 +407,7 @@ def csv_from_list_content(
     for item_index, item in enumerate(list_content.items):
         if not isinstance(item, row_model):
             msg = f"Cannot write CSV: item {item_index} is a {type(item).__name__}, not the declared row model {row_model.__name__!r}."
-            raise CsvError(msg)
+            raise CsvError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
         dumped = item.model_dump(mode="json")
         rows.append({field_name: _to_cell(dumped.get(field_name)) for field_name in headers})
     write_rows(path=path, headers=headers, rows=rows, delimiter=delimiter, encoding=encoding)

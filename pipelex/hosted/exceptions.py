@@ -1,9 +1,11 @@
 from typing import ClassVar
 
+from mthds.protocol.problem.registry import CoreCode
 from pipelex_sdk.validation_models import ValidationErrorItem
 
-from pipelex.base_exceptions import ErrorDomain, PipelexError
+from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
+from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, ErrorCodeSet
 
 
 class HostedRunError(PipelexError):
@@ -12,10 +14,11 @@ class HostedRunError(PipelexError):
     An error the hosted API answers, or one the pipelex-sdk client raises on the way, keeps the SDK's own class
     (`ApiResponseError`, `ApiUnreachableError`, `RunFailedError`, …); these are the ones pipelex detects itself: before
     it sends anything, from the verdict of the method's signature, from a connection lost after the run request was
-    sent, while following a run it started, or when the run is interrupted on this machine.
+    sent, while following a run it started, or when the run is interrupted on this machine. Most are the client's own
+    findings, so they carry the `client.` codes, which no response is the body of.
     """
 
-    _declared_title = "Hosted run error"
+    error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
 
 
 class HostedBaseUrlError(HostedRunError):
@@ -24,7 +27,7 @@ class HostedBaseUrlError(HostedRunError):
     The message names where the value came from, `--base-url` or `PIPELEX_BASE_URL`, and what an origin looks like.
     """
 
-    error_domain = ErrorDomain.INPUT
+    error_code = CoreCode.CLIENT_NOT_CONFIGURED
     user_action = UserAction(
         kind=UserActionKind.CHANGE_INPUT,
         detail="Give the hosted API's origin as scheme://host[:port], such as https://api.pipelex.com, in --base-url or PIPELEX_BASE_URL",
@@ -40,7 +43,7 @@ class HostedRunSourceError(HostedRunError):
     directories, or one that cannot be read.
     """
 
-    error_domain = ErrorDomain.INPUT
+    error_code = CoreCode.CLIENT_ARGUMENT_INVALID
     _authors_caller_facing_message: ClassVar[bool] = True
 
 
@@ -52,7 +55,7 @@ class HostedMethodInvalidError(HostedRunError):
     could not do: it takes the method's files as bare contents.
     """
 
-    error_domain = ErrorDomain.INPUT
+    error_code = CoreCode.METHOD_INVALID
     user_action = UserAction(kind=UserActionKind.CHANGE_INPUT, detail="Fix the method as each validation error says, then run it again")
     _authors_caller_facing_message: ClassVar[bool] = True
 
@@ -68,7 +71,7 @@ class HostedRunPollingError(HostedRunError):
     the command again would start another one. The cause is the failure met while following it.
     """
 
-    error_domain = ErrorDomain.RUNTIME
+    error_code = CoreCode.CLIENT_FOLLOW_FAILED
 
     def __init__(self, message: str, *, pipeline_run_id: str):
         super().__init__(message)
@@ -92,7 +95,7 @@ class HostedRunOutcomeUnknownError(HostedRunError):
     failure or a body that could not be decoded, met after the request left this machine.
     """
 
-    error_domain = ErrorDomain.RUNTIME
+    error_code = CoreCode.CLIENT_OUTCOME_UNKNOWN
     user_action = UserAction(
         kind=UserActionKind.UNKNOWN,
         detail=(
@@ -107,10 +110,12 @@ class HostedRunInterruptedError(HostedRunError):
 
     Interrupting stops the wait, not the run: a run the hosted API acknowledged keeps going and is paid for, and
     `pipeline_run_id` finds it again. Interrupted before the acknowledgement, `pipeline_run_id` is `None`, and the
-    start request may still have reached the hosted API.
+    start request may still have reached the hosted API. The code follows: following a started run stopped
+    (`client.follow_failed`) once a run id arrived, a call that may have created a run (`client.outcome_unknown`)
+    before one did.
     """
 
-    error_domain = ErrorDomain.RUNTIME
+    error_code = ErrorCodeSet(default=CoreCode.CLIENT_OUTCOME_UNKNOWN, others=(CoreCode.CLIENT_FOLLOW_FAILED,))
     _authors_caller_facing_message: ClassVar[bool] = True
 
     def __init__(self, *, pipeline_run_id: str | None):
@@ -130,6 +135,8 @@ class HostedRunInterruptedError(HostedRunError):
         super().__init__(message)
         self.pipeline_run_id = pipeline_run_id
         self.user_action = UserAction(kind=UserActionKind.UNKNOWN, detail=detail)
+        if pipeline_run_id is not None:
+            self.with_error_code(CoreCode.CLIENT_FOLLOW_FAILED)
 
 
 class HostedLocalFileUploadUnavailableError(HostedRunError):
@@ -140,7 +147,7 @@ class HostedLocalFileUploadUnavailableError(HostedRunError):
     run goes through when the file is given as an https URL, which needs no upload.
     """
 
-    error_domain = ErrorDomain.INPUT
+    error_code = CoreCode.REQUEST_UNSUPPORTED
     user_action = UserAction(
         kind=UserActionKind.CHANGE_INPUT,
         detail="Pass each local file as an https URL the hosted API can fetch, instead of a path on this machine, then run again",

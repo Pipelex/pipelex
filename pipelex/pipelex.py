@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Self
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
+from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex import log
@@ -105,7 +106,7 @@ class Pipelex(RuntimeBoot):
     ) -> None:
         if kwargs:
             msg = f"The Pipelex setup method does not support any additional arguments: {kwargs}"
-            raise PipelexSetupError(msg)
+            raise PipelexSetupError(msg).with_error_code(CoreCode.RUNTIME_MISCONFIGURED)
 
         # The kernel layer first, with the *composed* plugin manifests: this process will run methods,
         # so it needs the interpreter-touching built-ins (the `direct` orchestrator, the built-in
@@ -139,7 +140,7 @@ class Pipelex(RuntimeBoot):
         plugin_registrar = self._plugin_registrar
         if plugin_registrar is None:
             msg = "The plugin registrar must be built by the runtime setup before the interpreter setup runs"
-            raise PipelexSetupError(msg)
+            raise PipelexSetupError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
 
         pipe_func_executor_registry = PipeFuncExecutorRegistry(plugin_registrar.pipe_func_executors)
         self.interpreter_hub.set_pipe_func_executor_registry(pipe_func_executor_registry)
@@ -195,7 +196,7 @@ class Pipelex(RuntimeBoot):
         # halves carries no meaning beyond that.
         if self.class_registry is None:
             msg = "The class registry must be created by the runtime setup before the interpreter setup runs"
-            raise PipelexSetupError(msg)
+            raise PipelexSetupError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
         self.class_registry.register_classes(PipeRegistryModels.get_all_models())
 
         # --- Pipe Router -----------------------------------------------------------------------

@@ -3,6 +3,7 @@ import binascii
 from pathlib import Path
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
 from pipelex.tools.misc.filetype_utils import (
@@ -83,24 +84,23 @@ class TestDetectFileTypeFromBytes:
         mock_filetype_guess = mocker.patch("filetype.guess", return_value=None)
 
         test_bytes = b"unknown file content"
-        with pytest.raises(FileTypeError, match="Could not identify file type of given bytes: b'unknown file content'"):
+        with pytest.raises(FileTypeError, match=r"Could not identify the file type of the given 20 bytes$") as exc_info:
             detect_file_type_from_bytes(test_bytes)
+        assert exc_info.value.resolve_error_code() == CoreCode.INPUT_FILE_TYPE_UNSUPPORTED
 
         mock_filetype_guess.assert_called_once_with(test_bytes)
 
-    def test_detect_file_type_from_bytes_failure_long_bytes(self, mocker: MockerFixture):
-        # Mock filetype.guess to return None and test truncation of long bytes in error message
+    def test_detect_file_type_from_bytes_failure_never_quotes_the_bytes(self, mocker: MockerFixture):
+        """The message names the size of the bytes, never their content, which is a caller's or a provider's."""
         mock_filetype_guess = mocker.patch("filetype.guess", return_value=None)
 
-        # Create bytes longer than 300 characters to test truncation
-        test_bytes = b"a" * 350
+        test_bytes = b"secret-ish content " * 20
         with pytest.raises(FileTypeError) as exc_info:
             detect_file_type_from_bytes(test_bytes)
 
-        # Check that the error message contains truncated bytes (first 300 chars)
         error_message = str(exc_info.value)
-        assert "Could not identify file type of given bytes:" in error_message
-        assert len(error_message) < len(f"Could not identify file type of given bytes: {test_bytes!r}")
+        assert error_message == f"Could not identify the file type of the given {len(test_bytes)} bytes"
+        assert "secret-ish" not in error_message
         mock_filetype_guess.assert_called_once_with(test_bytes)
 
 

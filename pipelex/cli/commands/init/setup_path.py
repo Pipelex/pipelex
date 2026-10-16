@@ -18,6 +18,7 @@ from rich.markup import escape
 from pipelex.cli.commands.login.api_key_store import find_pipelex_api_key
 from pipelex.cli.commands.login.command import LOGIN_PASTE_COMMAND, login_with_browser, warn_about_shadowing_env_file
 from pipelex.cli.exceptions import PipelexCLIError
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.hosted.api_key_check import PIPELEX_API_KEY_PREFIX, is_well_formed_pipelex_api_key
 from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY
 from pipelex.hosted.run_config import RunExecution
@@ -100,7 +101,7 @@ def write_run_execution(*, pipelex_toml_path: Path, execution: RunExecution) -> 
     run_section = document[RUN_SECTION]
     if not isinstance(run_section, dict):
         msg = f"'{RUN_SECTION}' in {pipelex_toml_path} is not a table, so where runs execute cannot be written there"
-        raise PipelexCLIError(msg)
+        raise PipelexCLIError(msg).with_error_code(PipelexErrorCode.CONFIG_INVALID)
     run_section[RUN_EXECUTION_KEY] = execution.value
     save_toml_to_path(document, path=pipelex_toml_path)
 

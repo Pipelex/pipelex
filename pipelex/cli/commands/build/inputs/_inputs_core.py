@@ -13,7 +13,6 @@ from pipelex.cli.error_handlers import (
     handle_model_choice_error,
 )
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
-from pipelex.core.pipes.inputs.exceptions import PipeInputError
 from pipelex.interpreter_hub import get_library_manager, get_required_entry_pipe, resolve_library_dirs, set_current_library
 from pipelex.pipe_machinery.rendering.input_renderer import InputsTemplateFormat, NoInputsRequiredError, render_inputs, render_inputs_toml
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
@@ -72,9 +71,6 @@ async def _generate_inputs_core(
             typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
         except ValidateBundleError as exc:
-            typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
-            raise typer.Exit(1) from exc
-        except PipeInputError as exc:
             typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
     elif not pipe_code:

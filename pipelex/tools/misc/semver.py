@@ -10,9 +10,7 @@ disabled at file level for this wrapper module.
 
 from semantic_version import SimpleSpec, Version  # type: ignore[import-untyped]
 
-
-class SemVerError(Exception):
-    """Raised for semver parse failures."""
+from pipelex.tools.misc.exceptions import SemVerError
 
 
 def parse_version(version_str: str) -> Version:

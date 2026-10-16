@@ -18,6 +18,7 @@ from typing import NamedTuple
 from pipelex.tools.misc.file_fetch_utils import fetch_file_and_content_type_from_url_httpx
 from pipelex.tools.misc.file_utils import load_binary_async
 from pipelex.tools.misc.filetype_utils import base_mime_type
+from pipelex.tools.storage.exceptions import StorageNotConfiguredError
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.tools.uri.resolved_uri import (
     ResolvedBase64DataUrl,
@@ -53,7 +54,7 @@ async def load_bytes_and_mime_type_from_any_uri(
             Required when the URI is a pipelex-storage:// URI.
 
     Raises:
-        ValueError: If the URI is a pipelex-storage:// URI and no storage provider is given.
+        StorageNotConfiguredError: If the URI is a pipelex-storage:// URI and no storage provider is given.
         RemoteFileFetchError: The server answered with an error status, refused the connection, or did not answer in time.
         SsrfBlockedError: The destination, or a redirect hop's, is a private, loopback, link-local or metadata address.
     """
@@ -72,7 +73,7 @@ async def load_bytes_and_mime_type_from_any_uri(
         case ResolvedPipelexStorage():
             if storage_provider is None:
                 msg = f"Cannot load a pipelex-storage:// URI without a storage provider: {uri}"
-                raise ValueError(msg)
+                raise StorageNotConfiguredError(msg)
             raw_bytes, declared_mime_type = await storage_provider.load_with_metadata(uri=resolved_uri.storage_uri)
     mime_type = base_mime_type(mime_type=declared_mime_type) if declared_mime_type else None
     return UriBytes(data=raw_bytes, mime_type=mime_type or None)
@@ -86,7 +87,7 @@ async def load_bytes_from_any_uri(
     """Load the bytes a URI points at, whichever kind of URI it is, for a caller that has no use for their media type.
 
     Raises:
-        ValueError: If the URI is a pipelex-storage:// URI and no storage provider is given.
+        StorageNotConfiguredError: If the URI is a pipelex-storage:// URI and no storage provider is given.
         RemoteFileFetchError: The server answered with an error status, refused the connection, or did not answer in time.
         SsrfBlockedError: The destination, or a redirect hop's, is a private, loopback, link-local or metadata address.
     """

@@ -10,7 +10,8 @@ leading space of the second clause made the whole constraint invalid.
 
 import pytest
 
-from pipelex.tools.misc.semver import SemVerError, parse_constraint, parse_version, version_satisfies
+from pipelex.tools.misc.exceptions import SemVerError
+from pipelex.tools.misc.semver import parse_constraint, parse_version, version_satisfies
 
 
 class TestSpecVersionConstraintSyntax:

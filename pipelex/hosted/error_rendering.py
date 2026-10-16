@@ -93,11 +93,12 @@ def sent_verdict(*, error: ApiResponseError) -> SentVerdict:
     pipelex-sdk gives every `ApiResponseError` a decided `error_domain` and `retryable`, filling a member the server
     did not send from its own table by status, which reads every unlabelled 5xx, a 503 included, as retryable. A 503
     does not say whether the run happened (see `_UNAVAILABLE_NEXT_STEP`), and who has to act is only the runner's to
-    say, so both CLIs report what the server sent and nothing the SDK inferred. `problem` keeps the server's members.
+    say, so both CLIs report what the server sent and nothing the SDK inferred. `problem_document` keeps the server's
+    members as it sent them; `problem` is the standard's reading of the answer, which may be inferred from the status.
     """
-    problem = error.problem or {}
-    sent_domain = problem.get("error_domain")
-    sent_retryable = problem.get("retryable")
+    problem_document = error.problem_document or {}
+    sent_domain = problem_document.get("error_domain")
+    sent_retryable = problem_document.get("retryable")
     return SentVerdict(
         error_domain=sent_domain if isinstance(sent_domain, str) and sent_domain else None,
         retryable=sent_retryable if isinstance(sent_retryable, bool) else None,
@@ -166,7 +167,10 @@ def describe_hosted_error(*, error: PipelineRequestError | HostedRunError) -> Ho
         case HostedRunError():
             message = error.message
             next_step = error.user_action.detail if error.user_action is not None else "Check the run request: the method, the pipe and the inputs"
-            error_domain = error.error_domain
+            # Who acts and whether a retry can succeed are the error's code's, read off its report.
+            hosted_report = error.to_error_report()
+            error_domain = hosted_report.error_domain
+            retryable = hosted_report.retryable
             if isinstance(error, (HostedRunPollingError, HostedRunInterruptedError)):
                 pipeline_run_id = error.pipeline_run_id
             if isinstance(error, HostedMethodInvalidError):

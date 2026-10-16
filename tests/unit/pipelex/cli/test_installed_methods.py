@@ -8,10 +8,9 @@ import pytest
 from mthds.package.discovery import MANIFEST_FILENAME
 from mthds.package.manifest.parser import parse_methods_toml
 
+from pipelex.cli.exceptions import DuplicateMethodNameError, MethodNotFoundError
 from pipelex.cli.installed_methods import (
-    DuplicateMethodNameError,
     InstalledMethod,
-    MethodNotFoundError,
     discover_methods_from_library_dirs,
     find_method_by_name,
 )

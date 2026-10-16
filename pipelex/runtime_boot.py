@@ -43,6 +43,7 @@ from typing import TYPE_CHECKING, Any, Self, TypeVar, cast
 from kajson.class_registry import ClassRegistry
 from kajson.class_registry_abstract import ClassRegistryAbstract
 from kajson.kajson_manager import KajsonManager
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexSetupError
@@ -74,6 +75,7 @@ from pipelex.core.method_trees.method_file_store import LOCAL_METHOD_FILES
 from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.stuffs.stuff_template_set import STUFF_TEMPLATE_SET
 from pipelex.core.validation import raise_config_setup_error, report_config_refusal
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.graph.mermaidflow.template_set import MERMAID_TEMPLATE_SET
 from pipelex.graph.reactflow.template_set import REACTFLOW_TEMPLATE_SET
 from pipelex.observer.multi_observer import MultiObserver
@@ -366,7 +368,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         """
         if kwargs:
             msg = f"The base setup method does not support any additional arguments: {kwargs}"
-            raise PipelexSetupError(msg)
+            raise PipelexSetupError(msg).with_error_code(CoreCode.RUNTIME_MISCONFIGURED)
 
         # --- Plugin discovery -----------------------------------------------------------------
         # Build the plugin registrar from the fully-resolved config (pure and import-light:
@@ -519,16 +521,16 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             )
         except RoutingProfileLibraryNotFoundError as routing_not_found_exc:
             msg = self._get_config_file_not_found_error_msg(component=BootComponent.ROUTING_PROFILE_LIBRARY)
-            raise PipelexSetupError(msg) from routing_not_found_exc
+            raise PipelexSetupError(msg).with_error_code(PipelexErrorCode.CONFIG_FILE_MISSING) from routing_not_found_exc
         except InferenceBackendLibraryNotFoundError as backend_not_found_exc:
             msg = self._get_config_file_not_found_error_msg(component=BootComponent.INFERENCE_BACKEND_LIBRARY)
-            raise PipelexSetupError(msg) from backend_not_found_exc
+            raise PipelexSetupError(msg).with_error_code(PipelexErrorCode.CONFIG_FILE_MISSING) from backend_not_found_exc
         except ModelDeckNotFoundError as deck_not_found_exc:
             msg = self._get_config_file_not_found_error_msg(component=BootComponent.MODEL_DECK)
-            raise PipelexSetupError(msg) from deck_not_found_exc
+            raise PipelexSetupError(msg).with_error_code(PipelexErrorCode.CONFIG_FILE_MISSING) from deck_not_found_exc
         except RoutingProfileDisabledBackendError as routing_profile_exc:
             msg = f"Some backend(s) required for a routing profile is not enabled: {routing_profile_exc}"
-            raise PipelexSetupError(msg) from routing_profile_exc
+            raise PipelexSetupError(msg).with_error_code(PipelexErrorCode.CONFIG_INVALID) from routing_profile_exc
         except RoutingProfileLibraryError as routing_validation_exc:
             msg = self._get_validation_error_msg(component=BootComponent.ROUTING_PROFILE_LIBRARY, validation_exc=routing_validation_exc)
             raise PipelexSetupError(msg) from routing_validation_exc
@@ -551,7 +553,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 # A person at either CLI can run on the hosted Pipelex API instead; a server's operator cannot.
                 suggest_hosted_runs=integration_mode.is_pipelex_command_line,
             )
-            raise PipelexSetupError(error_msg) from credentials_exc
+            raise PipelexSetupError(error_msg).with_error_code(PipelexErrorCode.CONFIG_VARIABLE_MISSING) from credentials_exc
 
         # --- Plugin-derived registries --------------------------------------------------------
         # The plugin registrar was built earlier, with the boot-orchestrator gate checked and the
@@ -977,7 +979,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         existing_boot = RuntimeBoot.get_optional_instance()
         if existing_boot is not None:
             msg = f"{type(existing_boot).__name__} is already initialized"
-            raise PipelexSetupError(msg)
+            raise PipelexSetupError(msg).with_error_code(CoreCode.RUNTIME_MISCONFIGURED)
 
     @classmethod
     def get_optional_instance(cls) -> Self | None:

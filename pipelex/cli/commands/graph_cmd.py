@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from mthds.protocol.problem.registry import CoreCode
 from posthog import tag
 from pydantic import ValidationError
 from rich.markup import escape
@@ -68,7 +69,7 @@ def _do_graph_render(
             f"one, whose specs carried fields that have since been retired. Run the pipeline again to get a spec in "
             f"the current shape. ({validation_error.error_count()} field(s) refused in {input_file})"
         )
-        raise GraphSpecValidationError(msg) from validation_error
+        raise GraphSpecValidationError(msg).with_error_code(CoreCode.REQUEST_INVALID) from validation_error
     typer.secho(f"✅ Loaded graph with {len(graph_spec.nodes)} nodes", fg=typer.colors.GREEN, err=True)
 
     # Determine output directory

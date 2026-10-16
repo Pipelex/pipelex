@@ -38,6 +38,7 @@ from markdown_it import MarkdownIt
 from markdown_it.tree import SyntaxTreeNode
 
 from pipelex.tools.jinja2.jinja2_render_budget import MARKDOWN_UNITS_PER_CHARACTER, RenderBudget, active_render_budget
+from pipelex.tools.markdown.exceptions import MarkdownParserDependencyError
 
 if TYPE_CHECKING:
     from markdown_it.rules_inline import StateInline
@@ -71,7 +72,7 @@ def get_markdown_parser() -> MarkdownIt:
     linkify = parser.linkify
     if linkify is None:
         msg = "markdown-it-py found no linkify-it-py: Pipelex requires markdown-it-py[linkify]."
-        raise RuntimeError(msg)
+        raise MarkdownParserDependencyError(msg)
     linkify.set({"fuzzy_link": False, "fuzzy_email": False})  # pyright: ignore[reportUnknownMemberType]
     parser.inline.ruler2.at("fragments_join", _join_text_fragments)
     return parser

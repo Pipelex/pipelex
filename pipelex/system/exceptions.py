@@ -2,15 +2,23 @@ import logging
 from enum import StrEnum
 from typing import ClassVar
 
-from pipelex.base_exceptions import ErrorDomain, PipelexError, PipelexUnexpectedError
+from mthds.protocol.problem.registry import CoreCode
+
+from pipelex.base_exceptions import PipelexError, PipelexUnexpectedError
+from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 
 
 class ToolError(PipelexError):
-    _declared_title = "Tool error"
+    """The base of the errors raised by Pipelex's own tools; never raised directly."""
+
+    error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
 
 
 class JobMetadataError(PipelexUnexpectedError):
-    pass
+    """A worker was called without the job metadata every call carries: a fault of ours."""
+
+    error_code = CoreCode.RUNTIME_UNEXPECTED
 
 
 class InvocationPathError(PipelexUnexpectedError):
@@ -20,22 +28,29 @@ class InvocationPathError(PipelexUnexpectedError):
     of the method.
     """
 
-    _declared_title = "Invocation path not derivable"
+    error_code = CoreCode.RUNTIME_UNEXPECTED
 
 
 class NestedKeyConflictError(ToolError):
-    """Raised when attempting to create nested keys under a non-dict value."""
+    """Raised when attempting to create nested keys under a non-dict value.
+
+    Reached when a method's extra prompt parameters name a dotted key under a value that cannot hold one, so the
+    method's prompt cannot be rendered.
+    """
+
+    error_code = CoreCode.PIPE_TEMPLATE_RENDER_FAILED
 
 
 class EnvVarNotFoundError(ToolError):
-    # A missing required env var is fixed by an operator setting it, not by the
-    # caller correcting input — the textbook CONFIG-domain failure.
-    error_domain = ErrorDomain.CONFIG
-    _declared_title = "Environment variable not set"
+    """A required environment variable is not set: fixed by an operator setting it, not by the caller."""
+
+    error_code = PipelexErrorCode.CONFIG_VARIABLE_MISSING
 
 
 class MissingDependencyError(PipelexError):
-    """Raised when a required dependency is not installed."""
+    """Raised when a required dependency is not installed: an optional extra the operator installs."""
+
+    error_code = PipelexErrorCode.CONFIG_DEPENDENCY_MISSING
 
     def __init__(self, dependency_name: str, extra_name: str, message: str | None = None):
         self.dependency_name = dependency_name
@@ -48,7 +63,9 @@ class MissingDependencyError(PipelexError):
 
 
 class CredentialsError(PipelexError):
-    _declared_title = "Missing or invalid credentials"
+    """The base of the errors about a missing or refused credential; never raised directly."""
+
+    error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
 
 
 class TracebackMessageErrorMode(StrEnum):
@@ -57,6 +74,9 @@ class TracebackMessageErrorMode(StrEnum):
 
 
 class TracebackMessageError(PipelexError):
+    """A base whose constructor logs its message with the traceback; never raised directly."""
+
+    error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
     error_mode: ClassVar[TracebackMessageErrorMode] = TracebackMessageErrorMode.EXCEPTION
 
     def __init__(self, message: str):
@@ -71,8 +91,22 @@ class TracebackMessageError(PipelexError):
 
 
 class FatalError(TracebackMessageError):
-    _declared_title = "Fatal error"
+    """The base of the errors that stop a process; never raised directly."""
+
+    error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
 
 
 class ConfigValidationError(FatalError):
-    pass
+    """A configuration value this process refuses: the operator's configuration."""
+
+    error_code = PipelexErrorCode.CONFIG_INVALID
+
+
+class RunParameterError(PipelexError, ValueError):
+    """A run parameter a host passes is not one the runtime accepts: a request id, run extras, a storage or read scope.
+
+    Also a ``ValueError``: the same checks run inside pydantic validators, which turn only a ``ValueError`` into a
+    validation error, and as plain calls at a host's entry point.
+    """
+
+    error_code = CoreCode.REQUEST_INVALID
