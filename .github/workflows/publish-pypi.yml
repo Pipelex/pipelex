@@ -110,15 +110,19 @@ jobs:
       # version (docs/contribute/error-registry.md). Its snapshot carries the version it
       # was generated with, so a release whose snapshot was not regenerated after the
       # version bump stops here, before anything is published under the wrong number.
+      # The registry format writes a version as SemVer, so a pre-release's PEP 440 number
+      # is written in its SemVer form, 0.88.0rc1 as 0.88.0-rc.1, by the same stdlib-only
+      # module the generator composes the snapshot with.
       - name: Verify the error registry carries the release's version
         env:
           VERSION: ${{ steps.project.outputs.version }}
         run: |
           set -euo pipefail
           ERROR_REGISTRY=pipelex/errors/registry/pipelex-error-registry.json
+          EXPECTED_VERSION=$(python3 -I pipelex/cli/dev_cli/commands/error_registry/registry_version.py "$VERSION")
           REGISTRY_VERSION=$(jq -r '.version' "$ERROR_REGISTRY")
-          if [ "$REGISTRY_VERSION" != "$VERSION" ]; then
-            echo "::error::$ERROR_REGISTRY carries the version $REGISTRY_VERSION, not $VERSION. Run make generate-error-registry after the version bump."
+          if [ "$REGISTRY_VERSION" != "$EXPECTED_VERSION" ]; then
+            echo "::error::$ERROR_REGISTRY carries the version $REGISTRY_VERSION, not $EXPECTED_VERSION, the registry's form of $VERSION. Run make generate-error-registry after the version bump."
             exit 1
           fi
       # A recovery re-run — the one the signing fallback in `github-release`

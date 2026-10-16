@@ -2,9 +2,10 @@
 
 The registry is authored once, in ``pipelex/errors/registry/pipelex-error-registry.yaml``, without a
 version: its snapshot takes Pipelex's own version from ``pyproject.toml``, so the number is written in
-one place and every release publishes the registry under it. Everything else is derived from the
-source and the version: the JSON snapshot beside it, the typed Python of the codes, and the
-documentation pages under ``docs/errors/``.
+one place and every release publishes the registry under it, a pre-release's number in the SemVer form
+the registry format requires (:mod:`pipelex.cli.dev_cli.commands.error_registry.registry_version`).
+Everything else is derived from the source and the version: the JSON snapshot beside it, the typed
+Python of the codes, and the documentation pages under ``docs/errors/``.
 
 The development CLI is not shipped in the wheel, so this module always runs from a checkout and finds
 the repository from its own location.
@@ -22,6 +23,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from pipelex.cli.dev_cli.commands.error_registry.exceptions import ErrorRegistryError
+from pipelex.cli.dev_cli.commands.error_registry.registry_version import registry_version_of
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 PYPROJECT_PATH = REPO_ROOT / "pyproject.toml"
@@ -98,6 +100,20 @@ def read_pipelex_version(*, pyproject_path: Path = PYPROJECT_PATH) -> str:
     return version
 
 
+def read_registry_version(*, pyproject_path: Path = PYPROJECT_PATH) -> str:
+    """The version the registry is published under: Pipelex's version, a pre-release's written in SemVer form.
+
+    Raises:
+        ErrorRegistryError: When ``pyproject.toml`` has no version, or one the registry cannot be published under.
+    """
+    package_version = read_pipelex_version(pyproject_path=pyproject_path)
+    try:
+        return registry_version_of(package_version=package_version)
+    except ValueError as exc:
+        msg = f"{relative_to_repo(path=pyproject_path)}: {exc}"
+        raise ErrorRegistryError(msg) from exc
+
+
 def compose_registry_document(*, source: dict[str, Any], version: str) -> dict[str, Any]:
     """The registry document the snapshot holds: the version first, then the source's members in their order.
 
@@ -119,8 +135,8 @@ def render_snapshot_text(*, document: dict[str, Any]) -> str:
 
 
 def load_composed_document() -> dict[str, Any]:
-    """The registry document composed from the committed source and Pipelex's current version."""
-    return compose_registry_document(source=load_registry_source(), version=read_pipelex_version())
+    """The registry document composed from the committed source and Pipelex's current version, in its SemVer form."""
+    return compose_registry_document(source=load_registry_source(), version=read_registry_version())
 
 
 def load_json_file(*, path: Path) -> Any:

@@ -35,6 +35,8 @@ The test suite fails when any derived file is not what the generator writes, so 
 
 The source carries no version. The snapshot takes Pipelex's own version, the `[project].version` of `pyproject.toml`, so the number is written in one place and every release publishes the registry under the release's number. A version bump therefore leaves the snapshot and the index page stale until they are regenerated, which the test suite reports: run `make generate-error-registry` after bumping the version. The release workflow refuses to attach a snapshot whose version is not the release's.
 
+The registry format writes a version as SemVer, while Pipelex's is a PEP 440 version, so a pre-release's number is written in its SemVer form: `0.88.0a1` becomes `0.88.0-a.1`, `0.88.0b2` becomes `0.88.0-b.2` and `0.88.0rc1` becomes `0.88.0-rc.1`, which SemVer orders as PEP 440 does, while a release's number, such as `0.88.0`, is written as it is. The generator and the release workflow's check both take the conversion from `pipelex/cli/dev_cli/commands/error_registry/registry_version.py`, which needs only the standard library so that the workflow runs it on a bare runner.
+
 ## The typed codes
 
 Whoever raises a code builds its parameters with the model the registry generates, so that the parameters carry exactly the types the registry declares and none it does not:

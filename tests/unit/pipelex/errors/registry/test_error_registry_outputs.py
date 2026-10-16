@@ -13,6 +13,7 @@ from pipelex.cli.dev_cli.commands.error_registry.registry_source import (
     read_pipelex_version,
     vendored_file_errors,
 )
+from pipelex.cli.dev_cli.commands.error_registry.registry_version import registry_version_of
 from pipelex.errors.registry.pipelex_codes import PIPELEX_ERROR_PARAMS, PipelexErrorCode
 from pipelex.errors.registry.registry_document import load_pipelex_error_registry, read_pipelex_error_registry_snapshot_text
 
@@ -31,9 +32,10 @@ class TestErrorRegistryOutputs:
         check_error_registry_cmd(quiet=True)
 
     def test_the_snapshot_carries_pipelex_version(self) -> None:
-        """The registry is published under Pipelex's own version, which only pyproject.toml writes."""
+        """The registry is published under Pipelex's own version, which only pyproject.toml writes, in the form the release gate reads."""
         snapshot = json.loads(REGISTRY_SNAPSHOT_PATH.read_text(encoding="utf-8"))
-        assert snapshot["version"] == read_pipelex_version(), f"the snapshot's version is not pyproject.toml's: {REMEDY}"
+        expected = registry_version_of(package_version=read_pipelex_version())
+        assert snapshot["version"] == expected, f"the snapshot's version is not pyproject.toml's: {REMEDY}"
         assert next(iter(snapshot)) == "version"
         assert "version" not in load_registry_source()
 
