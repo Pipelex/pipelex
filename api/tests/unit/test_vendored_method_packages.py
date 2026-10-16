@@ -1,9 +1,10 @@
-"""A request carries the method packages its bundle calls, under `.mthds/methods/<name>/` at the bundle's root.
+"""A request carries the method packages its method calls: as `dependencies` beside `files`, or under `.mthds/methods/<name>/` in an archive.
 
-The routes and the runner are real, and so is the in-process orchestrator of the run tests: what the run answers is
-what the engine resolved. Fetch-on-miss is off and the installed store is an empty temporary directory, so the shipped
-package is the only one that can answer, or, where a test installs a competing copy, the one that must win. The
-invented package's entry composes a text naming its copy, which a dry run renders too, so the output tells which ran.
+A fetched package carries them the second way, in its repository. The routes and the runner are real, and so is the
+in-process orchestrator of the run tests: what the run answers is what the engine resolved. Fetch-on-miss is off and
+the installed store is an empty temporary directory, so the shipped package is the only one that can answer, or, where
+a test installs a competing copy, the one that must win. The invented package's entry composes a text naming its copy,
+which a dry run renders too, so the output tells which ran.
 """
 
 import base64
@@ -28,7 +29,7 @@ from pytest_mock import MockerFixture
 
 from pipelex_api.api_config import ApiConfig
 from pipelex_api.exception_handlers import register_exception_handlers
-from pipelex_api.method_source import fetch_method_mthds_files, fetched_method_source
+from pipelex_api.method_source import fetch_method_mthds_files, fetched_method
 from pipelex_api.routes import router as api_router
 from tests.unit._constants import (
     STUB_METHOD_ADDRESS,
@@ -131,8 +132,18 @@ def _run_output(body: dict[str, Any]) -> str:
     return json.dumps(body["pipe_output"]["working_memory"])
 
 
+_PROBE_PREFIX = ".mthds/methods/probe/"
+
+
+def _tree_body(files: dict[str, str]) -> dict[str, Any]:
+    """The method of the files in the store's layout as a request sends it: its own `files`, and the probe in `dependencies`."""
+    own = {tree_path: content for tree_path, content in files.items() if not tree_path.startswith(_PROBE_PREFIX)}
+    probe = {tree_path.removeprefix(_PROBE_PREFIX): content for tree_path, content in files.items() if tree_path.startswith(_PROBE_PREFIX)}
+    return {"files": own, "dependencies": {VENDORED_PROBE_ADDRESS: probe}}
+
+
 def _execute_vendored(client: TestClient, *, files: dict[str, str]) -> Any:
-    return client.post("/v1/execute", json={"files": files, "inputs": {"text": "hello"}})
+    return client.post("/v1/execute", json={**_tree_body(files), "inputs": {"text": "hello"}})
 
 
 def _zip_b64(files: Mapping[str, str | bytes]) -> str:
@@ -182,7 +193,7 @@ class TestVendoredMethodPackages:
         orchestrator = _RecordingOrchestrator()
         client = _build_client(mocker, tmp_path=tmp_path, orchestrator=orchestrator)
 
-        response = client.post("/v1/start", json={"files": VENDORED_PROBE_FILES, "inputs": {"text": "hello"}})
+        response = client.post("/v1/start", json={**_tree_body(VENDORED_PROBE_FILES), "inputs": {"text": "hello"}})
 
         assert response.status_code == 202, response.text
         assert orchestrator.dispatches == ["echo"]
@@ -214,7 +225,7 @@ class TestVendoredMethodPackages:
         client = _build_client(mocker, tmp_path=tmp_path, orchestrator=orchestrator)
         files = {**VENDORED_PROBE_FILES, ".mthds/methods/probe/structures.py": _structures_py(sentinel=sentinel)}
 
-        response = client.post("/v1/start", json={"files": files, "inputs": {"text": "hello"}})
+        response = client.post("/v1/start", json={**_tree_body(files), "inputs": {"text": "hello"}})
 
         assert response.status_code == 403, response.text
         body = response.json()
@@ -251,37 +262,30 @@ class TestVendoredMethodPackages:
 
         assert response.status_code == 422, response.text
         body = response.json()
-        assert body["error_type"] == "InvalidBundle"
-        assert f"Method package '{STUB_METHOD_ADDRESS}'" in body["detail"]
+        assert body["error_type"] == "InvalidMethodFiles"
+        assert f"method package '{STUB_METHOD_ADDRESS}'" in body["detail"]
         assert VENDORED_PROBE_ADDRESS in body["detail"]
-        assert "'.mthds/methods/a/'" in body["detail"]
         assert "'.mthds/methods/b/'" in body["detail"]
 
     def test_a_method_ref_package_keeps_its_shipped_files_apart(self, install_method_package: Callable[..., Path]):
         install_method_package(files={"smoke.mthds": UNRESOLVED_PACKAGE_MTHDS, **_package_vendoring_files()})
 
-        with fetched_method_source(_METHOD_REF) as fetched:
-            assert fetched.mthds_sources == ["smoke.mthds"]
-            assert fetched.mthds_contents == [UNRESOLVED_PACKAGE_MTHDS]
-            assert fetched.library_dirs is None
-            assert fetched.methods_dirs is not None
-            (methods_dir,) = fetched.methods_dirs
-            assert sorted(path.relative_to(methods_dir).as_posix() for path in methods_dir.rglob("*") if path.is_file()) == [
-                "probe/METHODS.toml",
-                "probe/probe.mthds",
-            ]
-        assert not methods_dir.exists()
+        fetched = fetched_method(_METHOD_REF)
+
+        assert sorted(fetched.request_method.tree.contents) == ["METHODS.toml", "smoke.mthds"]
+        assert list(fetched.request_method.dependencies) == [VENDORED_PROBE_ADDRESS]
+        assert sorted(fetched.request_method.dependencies[VENDORED_PROBE_ADDRESS].contents) == ["METHODS.toml", "probe.mthds"]
+        assert fetched.provenance.tree_digest == fetched.request_method.tree.tree.digest
 
         tooling = fetch_method_mthds_files(_METHOD_REF)
         assert [item.source for item in tooling.files] == ["smoke.mthds"]
 
-    def test_validate_by_method_ref_validates_only_the_package_s_own_content(
+    def test_validate_by_method_ref_resolves_the_dependency_it_ships(
         self, mocker: MockerFixture, tmp_path: Path, install_method_package: Callable[..., Path]
     ):
-        """`/v1/validate` leaves a shipped package out of the content; the dependency resolves from the installed store there."""
+        """`/v1/validate` loads the package's tree with the dependency it ships, as a run does, and echoes its own bundles only."""
         install_method_package(files={"smoke.mthds": UNRESOLVED_PACKAGE_MTHDS, **_package_vendoring_files()})
         client = _build_client(mocker, tmp_path=tmp_path)
-        _install_competing_probe(tmp_path=tmp_path)
 
         response = client.post("/v1/validate", json={"method_ref": _METHOD_REF})
 
@@ -290,10 +294,10 @@ class TestVendoredMethodPackages:
         assert body["is_valid"] is True, body
         assert body["mthds_contents"] == [UNRESOLVED_PACKAGE_MTHDS]
 
-    def test_validate_by_method_ref_does_not_search_the_shipped_package(
+    def test_validate_by_method_ref_without_the_dependency_is_an_invalid_verdict(
         self, mocker: MockerFixture, tmp_path: Path, install_method_package: Callable[..., Path]
     ):
-        install_method_package(files={"smoke.mthds": UNRESOLVED_PACKAGE_MTHDS, **_package_vendoring_files()})
+        install_method_package(files={"smoke.mthds": UNRESOLVED_PACKAGE_MTHDS})
         client = _build_client(mocker, tmp_path=tmp_path)
 
         response = client.post("/v1/validate", json={"method_ref": _METHOD_REF})

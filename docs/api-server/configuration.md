@@ -48,6 +48,19 @@ PIPELEX_ENV=dev
 # MAX_RESOURCE_FILE_KIB=5120     # decoded bytes per file (default 5 MiB)
 # MAX_RESOURCES_TOTAL_KIB=10240  # decoded bytes across the request (default 10 MiB)
 
+# ── Methods sent as trees, and the blob store (`files`, `/v1/blobs/*`) ─────
+# See pipe-run.md → "Sending a method as a tree" and "Sending files by hash".
+# Each tree of a request is bounded on its own; over any limit is a 422
+# MethodTreeTooLarge. All read at startup.
+# MAX_METHOD_TREE_FILES=1000          # files in one tree
+# MAX_METHOD_TREE_FILE_KIB=32768      # bytes per file, and per uploaded blob (default 32 MiB)
+# MAX_METHOD_TREE_TOTAL_KIB=65536     # bytes across one tree (default 64 MiB)
+# BLOB_UPLOAD_URL_TTL_SECONDS=3600    # how long an upload target stays valid
+# The key the upload targets are signed with. Unset, each process draws its own,
+# so a deployment serving one API through several instances sets it, the same on
+# every instance. Blobs live in the configured storage under <scope>/blobs/.
+# BLOB_UPLOAD_SIGNING_KEY=<a-long-random-secret>
+
 # ── Running a method by address (`method_ref`) ────────────────────────────
 # See pipe-run.md → "Running a method by address". All read at startup.
 #

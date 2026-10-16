@@ -26,14 +26,18 @@ from typing import TYPE_CHECKING
 from pipelex import log
 from pipelex.base_exceptions import PipelexError, ValidationErrorItem
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
+from pipelex.libraries.method_trees import list_local_method_tree
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_run.dry_run_in_process import best_effort_graph_spec
 from pipelex.pipe_run.dry_run_warning_collector import collecting_dry_run_warnings
 from pipelex.pipeline.advisory_warnings import build_advisory_warnings
 from pipelex.pipeline.blueprint_selection import collect_entry_pipe_refs, select_primary_blueprint
 from pipelex.pipeline.build_pipe_io_artifacts import build_pipe_io_artifacts
 from pipelex.pipeline.controller_taint import collect_controller_taint_analyses
+from pipelex.pipeline.exceptions import MethodEntryError
 from pipelex.pipeline.input_form import qualify_current_library_crate
 from pipelex.pipeline.liftable_pipes import LiftablePipeEntry, build_liftable_pipes
+from pipelex.pipeline.method_entry import select_method_entry
 from pipelex.pipeline.usage_stats_reporting import MethodValidationReport
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.pipeline.validation_report import PipelexValidationReport, build_validation_report
@@ -44,9 +48,25 @@ if TYPE_CHECKING:
     from pipelex.graph.graphspec import GraphSpec
 
 
+def _graph_target_ref(*, graph_pipe_code: str | None, method_dir: Path | None, blueprints: list[PipelexBundleBlueprint]) -> str | None:
+    """The pipe the graph arm draws: the explicit target, else a method tree's entry pipe, else the batch's `main_pipe`.
+
+    A method tree starts at its entry pipe by the MTHDS protocol's rule (`select_method_entry`), so its graph is that
+    pipe's, and a tree with no entry pipe, which a run naming no pipe refuses, gets no graph.
+    """
+    if graph_pipe_code is not None:
+        return graph_pipe_code
+    if method_dir is None:
+        return select_primary_blueprint(blueprints).main_pipe_ref
+    try:
+        return select_method_entry(tree=list_local_method_tree(handed_over=method_dir)).pipe_ref
+    except MethodEntryError:
+        return None
+
+
 async def validate_bundles_in_process(
     *,
-    mthds_contents: list[str],
+    mthds_contents: list[str] | None = None,
     mthds_sources: list[str] | None = None,
     library_dirs: Sequence[Path] | None = None,
     allow_signatures: bool = False,
@@ -55,6 +75,8 @@ async def validate_bundles_in_process(
     caller_identity: CallerIdentity | None = None,
     library_dirs_are_callers: bool = False,
     submitted_files: Mapping[str, bytes] | None = None,
+    method_dir: Path | None = None,
+    methods_dirs: Sequence[Path] | None = None,
 ) -> PipelexValidationReport:
     """Parse, validate, and dry-run MTHDS bundles in-process; assemble the canonical report.
 
@@ -67,7 +89,8 @@ async def validate_bundles_in_process(
     graph-arm domain failure degrades to `graph_spec=None` with validation still successful.
 
     Args:
-        mthds_contents: MTHDS contents to load (always a list, even for one file).
+        mthds_contents: MTHDS contents to load (always a list, even for one file), unless `method_dir` names the
+            method instead.
         mthds_sources: Optional per-content sources threaded onto `blueprint.source`
             (length must match `mthds_contents` — `validate_bundle` enforces it). `None`
             for the local protocol runtime, which receives only sourceless content strings
@@ -75,9 +98,10 @@ async def validate_bundles_in_process(
         library_dirs: Resolved library directories to load before the bundle.
         allow_signatures: Tolerate unimplemented pipe signatures (strict by default).
         graph_pipe_code: Optional explicit pipe target for the best-effort graph arm.
-            When omitted, the graph arm keeps the existing default of targeting the
-            selected bundle `main_pipe`. Bare and qualified refs are accepted according
-            to the loaded pipe library's normal resolution rules.
+            When omitted, the graph arm targets the entry pipe of `method_dir` by the MTHDS
+            protocol's rule, drawing no graph when it has none, or for contents the selected
+            bundle `main_pipe`. Bare and qualified refs are accepted according to the loaded
+            pipe library's normal resolution rules.
         log_context: Label the graph-arm degradation and teardown-failure lines carry in their ``caller`` field.
         caller_identity: Who asked for the validation, when the host knows it. It is the
             ambient caller for the whole pass — the sweep's telemetry event and every dry run,
@@ -89,6 +113,9 @@ async def validate_bundles_in_process(
         submitted_files: The files submitted with ``mthds_contents`` that their steps read, such as a
             ``PipeDocGen`` template file, keyed by canonical bundle-relative path. The dry run reads them, so the
             template check runs on them.
+        method_dir: The directory of the caller's method tree, validated whole in place of `mthds_contents`, such as
+            the tree a host wrote out for a request (see `validate_bundle`).
+        methods_dirs: Directories laid out like `.mthds/methods/` holding the packages shipped with `method_dir`.
 
     Returns:
         PipelexValidationReport with the structural artifacts of a valid bundle.
@@ -106,13 +133,15 @@ async def validate_bundles_in_process(
             log_context=log_context,
             library_dirs_are_callers=library_dirs_are_callers,
             submitted_files=submitted_files,
+            method_dir=method_dir,
+            methods_dirs=methods_dirs,
             validation_report=validation_report,
         )
 
 
 async def _validate_bundles_in_scope(
     *,
-    mthds_contents: list[str],
+    mthds_contents: list[str] | None,
     mthds_sources: list[str] | None,
     library_dirs: Sequence[Path] | None,
     allow_signatures: bool,
@@ -120,6 +149,8 @@ async def _validate_bundles_in_scope(
     log_context: str,
     library_dirs_are_callers: bool,
     submitted_files: Mapping[str, bytes] | None,
+    method_dir: Path | None,
+    methods_dirs: Sequence[Path] | None,
     validation_report: MethodValidationReport,
 ) -> PipelexValidationReport:
     """The body of :func:`validate_bundles_in_process`, run inside the caller's scope and timed by `validation_report`."""
@@ -148,6 +179,8 @@ async def _validate_bundles_in_scope(
             library_dirs_are_callers=library_dirs_are_callers,
             collect_dry_run_warnings=True,
             submitted_files=submitted_files,
+            method_dir=method_dir,
+            methods_dirs=methods_dirs,
         )
         # Capture the validation library id ONCE, right after validate_bundle leaves it
         # current — the graph arm and the finally must target the SAME library even if
@@ -170,7 +203,7 @@ async def _validate_bundles_in_scope(
             dry_run_result=result.dry_run_result,
         )
         validation_report.count_warnings(count=len(warnings))
-        graph_target_ref = graph_pipe_code if graph_pipe_code is not None else select_primary_blueprint(result.blueprints).main_pipe_ref
+        graph_target_ref = _graph_target_ref(graph_pipe_code=graph_pipe_code, method_dir=method_dir, blueprints=result.blueprints)
         # The graph arm dry-runs its target once more, and finds again what the sweep found, which `warnings`
         # already carries: it is collected and dropped here rather than logged as if nothing reported it.
         with collecting_dry_run_warnings():

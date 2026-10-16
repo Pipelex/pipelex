@@ -134,6 +134,9 @@ class PipelexVersionInfo(VersionInfo):
     implementation: str
     implementation_version: str
     runtime_version: str | None = None
+    # Whether this runner keeps a blob store and serves the MTHDS protocol's blob routes, `POST /blobs/missing` and
+    # `PUT /blobs/{sha256}`, so a sender may name a file of `files` by its hash. A runtime in process keeps none.
+    blob_store: bool = False
 
 
 _VALIDATE_EXTRA_GRAPH_PIPE_CODE = "graph_pipe_code"
@@ -198,8 +201,9 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         # `acquire_library`.
         library_dirs_are_callers: bool = False,
         # Directories laid out like `.mthds/methods/` holding the method packages a caller ships with the contents it
-        # runs, searched first for an address-based reference and never written. A run reads them; `validate` does
-        # not, and resolves such a reference through the installed stores and fetch-on-miss only.
+        # runs, searched first for an address-based reference and never written. A run reads them, and so does the
+        # validation of a method directory; the validation of contents does not, and resolves such a reference through
+        # the installed stores and fetch-on-miss only.
         methods_dirs: list[Path] | None = None,
         # The files a caller submits with the contents it runs or validates that their steps read, such as a
         # PipeDocGen step's `template_file`, keyed by canonical bundle-relative path (`canonical_submitted_files`).

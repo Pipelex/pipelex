@@ -23,11 +23,17 @@ MAX_METHOD_REF_LEN = 512  # `method_ref` selector strings; a fixed schema bound,
 MAX_JSON_NESTING_DEPTH = 128
 DEFAULT_MAX_CALLBACK_URLS = 5
 DEFAULT_MAX_CALLBACK_URL_LEN = 2048
-DEFAULT_MAX_BUNDLE_FILES = 128  # entries in a materialized method bundle (.mthds + .py + requirements.txt)
+DEFAULT_MAX_BUNDLE_FILES = 128  # members of a `bundle_b64` archive, its shipped packages' files included
 DEFAULT_MAX_BUNDLE_TOTAL_KIB = 8 * 1024  # 8 MiB decompressed across the whole bundle (zip-bomb guard)
 DEFAULT_MAX_RESOURCES_PER_REQUEST = 32  # files submitted with a bundle that its steps read (`resources`)
 DEFAULT_MAX_RESOURCE_FILE_KIB = 5 * 1024  # 5 MiB decoded per submitted file, such as an office template
 DEFAULT_MAX_RESOURCES_TOTAL_KIB = 10 * 1024  # 10 MiB decoded across a request's submitted files
+# A method tree a request sends (`files`, each tree of `dependencies`, a `bundle_b64` archive) or fetches by `method_ref`,
+# whatever form its files travel in: inline, Base64 or by hash. The request body bounds only the inline entries.
+DEFAULT_MAX_METHOD_TREE_FILES = 1000
+DEFAULT_MAX_METHOD_TREE_TOTAL_KIB = 64 * 1024  # 64 MiB across the files of one tree
+DEFAULT_MAX_METHOD_TREE_FILE_KIB = 32 * 1024  # 32 MiB for one file of a tree, and for one blob uploaded
+DEFAULT_BLOB_UPLOAD_URL_TTL_SECONDS = 3600  # how long an upload target `POST /v1/blobs/missing` names stays valid
 DEFAULT_MAX_METHOD_CACHE_CLONES = 64  # cached method-package clones (one per resolved commit SHA)
 DEFAULT_MAX_METHOD_CACHE_TOTAL_KIB = 512 * 1024  # 512 MiB across all cached clones
 DEFAULT_MAX_METHOD_CACHE_AGE_HOURS = 24  # a cached clone unused for this long is evicted
@@ -49,6 +55,12 @@ MAX_BUNDLE_TOTAL_BYTES = get_positive_int_env(env_var="MAX_BUNDLE_TOTAL_KIB", de
 MAX_RESOURCES_PER_REQUEST = get_positive_int_env(env_var="MAX_RESOURCES_PER_REQUEST", default=DEFAULT_MAX_RESOURCES_PER_REQUEST)
 MAX_RESOURCE_FILE_BYTES = get_positive_int_env(env_var="MAX_RESOURCE_FILE_KIB", default=DEFAULT_MAX_RESOURCE_FILE_KIB) * 1024
 MAX_RESOURCES_TOTAL_BYTES = get_positive_int_env(env_var="MAX_RESOURCES_TOTAL_KIB", default=DEFAULT_MAX_RESOURCES_TOTAL_KIB) * 1024
+
+MAX_METHOD_TREE_FILES = get_positive_int_env(env_var="MAX_METHOD_TREE_FILES", default=DEFAULT_MAX_METHOD_TREE_FILES)
+MAX_METHOD_TREE_TOTAL_BYTES = get_positive_int_env(env_var="MAX_METHOD_TREE_TOTAL_KIB", default=DEFAULT_MAX_METHOD_TREE_TOTAL_KIB) * 1024
+MAX_METHOD_TREE_FILE_BYTES = get_positive_int_env(env_var="MAX_METHOD_TREE_FILE_KIB", default=DEFAULT_MAX_METHOD_TREE_FILE_KIB) * 1024
+
+BLOB_UPLOAD_URL_TTL_SECONDS = get_positive_int_env(env_var="BLOB_UPLOAD_URL_TTL_SECONDS", default=DEFAULT_BLOB_UPLOAD_URL_TTL_SECONDS)
 
 MAX_METHOD_CACHE_CLONES = get_positive_int_env(env_var="MAX_METHOD_CACHE_CLONES", default=DEFAULT_MAX_METHOD_CACHE_CLONES)
 MAX_METHOD_CACHE_TOTAL_BYTES = get_positive_int_env(env_var="MAX_METHOD_CACHE_TOTAL_KIB", default=DEFAULT_MAX_METHOD_CACHE_TOTAL_KIB) * 1024

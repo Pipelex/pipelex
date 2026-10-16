@@ -58,9 +58,29 @@ class ErrorType(StrEnum):
     INVALID_MODEL_REFERENCE = "InvalidModelReference"
     INVALID_BASE64 = "InvalidBase64"
     PAYLOAD_TOO_LARGE = "PayloadTooLarge"
-    # A run request carried a malformed method bundle (`bundle_b64` / `files`): a corrupt zip, an
-    # unsafe entry name (absolute path or `..` traversal), or both transport forms supplied at once.
+    # A run request carried a malformed method bundle (`bundle_b64` / `files`): a corrupt zip, a
+    # bundle with no `.mthds` file, or both transport forms supplied at once.
     INVALID_BUNDLE = "InvalidBundle"
+    # A request's map of file entries (`files`, a tree of `dependencies`, a `bundle_b64` archive read as
+    # one) is not a method tree the MTHDS standard admits: a key given twice, a key that is not a tree
+    # path or names a file the membership rule keeps out of every tree, keys that collide, an empty map,
+    # or a malformed entry. A 422 whose `tree_refusal` member carries the standard's refusal code and
+    # the paths it names.
+    INVALID_METHOD_FILES = "InvalidMethodFiles"
+    # A request names, by hash, bytes this runner's blob store does not hold at the stated size. A 422
+    # whose `missing_blobs` member lists every such hash at once, so a sender learns in one answer what to
+    # upload (`POST /v1/blobs/missing`, then `PUT /v1/blobs/{sha256}`).
+    MISSING_BLOBS = "MissingBlobs"
+    # A method tree, or a blob, passes one of this runner's limits on a tree's file count, its total
+    # size or one file's size (`MAX_METHOD_TREE_FILES`, `MAX_METHOD_TREE_TOTAL_KIB`,
+    # `MAX_METHOD_TREE_FILE_KIB`). A 422 naming the limit, refused before any blob is read or uploaded.
+    METHOD_TREE_TOO_LARGE = "MethodTreeTooLarge"
+    # `PUT /v1/blobs/{sha256}` was sent bytes whose SHA-256 is not the one its path names, or
+    # `POST /v1/blobs/missing` named one hash twice with different sizes. A 422: nothing is stored.
+    BLOB_MISMATCH = "BlobMismatch"
+    # `PUT /v1/blobs/{sha256}` was called without the signed query `POST /v1/blobs/missing` names in its upload
+    # target, with one whose signature does not hold, or past its expiry. A 403: the upload is not stored.
+    BLOB_UPLOAD_NOT_AUTHORIZED = "BlobUploadNotAuthorized"
     # A request's `resources` map keys a submitted file by a path that cannot name a file inside the
     # bundle: absolute, with a `..` segment, a backslash or a colon, empty, or a second spelling of a
     # path already submitted. A 422: the key is the path a step names, relative to the bundle.

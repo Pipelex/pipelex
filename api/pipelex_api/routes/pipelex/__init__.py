@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from .agent import router as agent_router
+from .blobs import router as blobs_router
 from .codegen import router as codegen_router
 from .pipe_io import router as pipe_io_router
 from .pipeline import router as pipeline_router
@@ -17,3 +18,4 @@ router.include_router(pipe_io_router)
 router.include_router(codegen_router)
 router.include_router(tools_router)
 router.include_router(agent_router)
+router.include_router(blobs_router)

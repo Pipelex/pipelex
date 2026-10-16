@@ -43,13 +43,15 @@ class _StubBundleValidator:
     async def validate_bundles(
         self,
         *,
-        mthds_contents: list[str],
+        mthds_contents: list[str] | None,
         mthds_sources: list[str] | None,
         allow_signatures: bool,
         library_dirs: Sequence[Path] | None,
         caller_identity: CallerIdentity | None,
         graph_pipe_code: str | None,
         submitted_files: Mapping[str, bytes] | None,
+        method_dir: Path | None,
+        methods_dirs: Sequence[Path] | None,
     ) -> ErrorReport:
         self.calls.append(
             {
@@ -60,6 +62,8 @@ class _StubBundleValidator:
                 "caller_identity": caller_identity,
                 "graph_pipe_code": graph_pipe_code,
                 "submitted_files": submitted_files,
+                "method_dir": method_dir,
+                "methods_dirs": methods_dirs,
             }
         )
         if self._error is not None:

@@ -27,8 +27,10 @@ pipelex_api/
   routes/
     health.py          # GET /health (no auth)
     version.py         # GET /v1/version (no auth — MTHDS Protocol handshake)
+    blob_upload.py     # PUT /v1/blobs/{sha256} (no bearer auth — the signed upload target authorizes it)
     pipelex/
       pipeline.py      # POST /v1/execute, /v1/start (MTHDS Protocol run routes)
+      blobs.py         # POST /v1/blobs/missing (MTHDS Protocol blob route; the signed upload targets)
       validate.py      # POST /v1/validate
       resolve.py       # POST /v1/resolve (closure → normalized crate)
       pipe_io.py       # POST /v1/pipe-io (closure → one pipe's, or every pipe's, I/O artifacts; no dry run)
@@ -46,7 +48,7 @@ scripts/
 hatch_build.py             # The metadata hook that writes the dependencies and the lockstep pin
 ```
 
-This server is the reference implementation of the [MTHDS Protocol](https://mthds.ai): `POST /execute`, `POST /start`, `POST /validate`, `GET /models`, `GET /version` under the `/v1` base path, tagged `x-mthds-protocol: true` in the committed OpenAPI artifact (`docs/api-server/openapi/pipelex-api.openapi.yaml` at the repository root, regenerated via `make openapi-export`, drift-checked via `make openapi-check`). Contract nesting: MTHDS Protocol ⊂ Pipelex API ⊂ Pipelex hosted API.
+This server is the reference implementation of the [MTHDS Protocol](https://mthds.ai): `POST /execute`, `POST /start`, `POST /validate`, `GET /models`, `GET /version`, and the optional blob routes `POST /blobs/missing` and `PUT /blobs/{sha256}`, under the `/v1` base path, tagged `x-mthds-protocol: true` in the committed OpenAPI artifact (`docs/api-server/openapi/pipelex-api.openapi.yaml` at the repository root, regenerated via `make openapi-export`, drift-checked via `make openapi-check`). Contract nesting: MTHDS Protocol ⊂ Pipelex API ⊂ Pipelex hosted API.
 
 **Only the protocol's own operations carry `x-mthds-protocol`** — the flag is how a conformance suite or a third-party runner extracts the portable subset of the artifact, so tagging a Pipelex route would misrepresent the standard. Everything else this server serves is a Pipelex API extension: `/resolve` + `/codegen`, `/pipe-io`, `/models/check`, and `/lint` + `/format`. Watch `/resolve` and `/codegen` in particular: they *look* protocol-shaped (they speak the `/validate` verdict discipline, and the crate `/resolve` emits is genuinely standard-owned — the MTHDS Library Crate Format, so its wire fields stay brand-neutral), but the routes are ours and the standard specifies no type projection at all. `tests/unit/test_openapi_contract.py` pins the tagged set exactly, in both directions.
 

@@ -67,6 +67,7 @@ from pipelex.libraries.method_trees import (
 )
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.libraries.visibility_utils import check_visibility_for_blueprints, make_visibility_checker
+from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES
 from pipelex.methods.exceptions import MethodDependencyFetchError, MethodFetchDisabledError
 from pipelex.methods.fetch_on_miss import find_vendored_method, resolve_address_based_method
 from pipelex.methods.structures_check import ensure_no_structured_content_in_library_sources
@@ -685,7 +686,10 @@ class LibraryManager(LibraryManagerAbstract):
         library_id: str,
         library_dirs: list[Path] | None = None,
         library_file_paths: list[Path] | None = None,
+        methods_dirs: list[Path] | None = None,
     ) -> list[PipeAbstract]:
+        # `methods_dirs` are laid out like `.mthds/methods/` and hold the packages a caller ships with the method these
+        # directories hold, searched first for an address-based reference of their bundles and never written.
         # Ensure libraries exist for this library_id
         if library_id not in self._libraries:
             msg = f"Trying to load a library that does not exist: '{library_id}'"
@@ -780,7 +784,7 @@ class LibraryManager(LibraryManagerAbstract):
                 "Loading the MTHDS files into the library",
                 fields={"library_id": library_id, "mthds_paths": [str(bundle_file.path) for bundle_file in bundle_files]},
             )
-            return self._load_mthds_files_into_library(library_id=library_id, bundle_files=bundle_files)
+            return self._load_mthds_files_into_library(library_id=library_id, bundle_files=bundle_files, methods_dirs=methods_dirs)
 
     @override
     def is_crate_loaded(self, *, library_id: str, fingerprint: str) -> bool:
@@ -1268,7 +1272,9 @@ class LibraryManager(LibraryManagerAbstract):
                 LOCAL_METHOD_FILES.hold_tree(holder=library_id, tree=tree)
         return live_trees
 
-    def _load_mthds_files_into_library(self, *, library_id: str, bundle_files: list[LibraryBundleFile]) -> list[PipeAbstract]:
+    def _load_mthds_files_into_library(
+        self, *, library_id: str, bundle_files: list[LibraryBundleFile], methods_dirs: list[Path] | None = None
+    ) -> list[PipeAbstract]:
         """Load MTHDS files into a specific library.
 
         This method:
@@ -1279,21 +1285,27 @@ class LibraryManager(LibraryManagerAbstract):
         Args:
             library_id: The ID of the library to load into
             bundle_files: The bundle files to load, each the member of its method tree
+            methods_dirs: Directories laid out like ``.mthds/methods/`` holding packages for this load alone
         """
         valid_mthds_paths = [bundle_file.path for bundle_file in bundle_files]
         blueprints: list[PipelexBundleBlueprint] = []
         for bundle_file in bundle_files:
             mthds_file_path = bundle_file.path
+            # A bundle of a tree a host wrote out for a caller is named by its tree path, never by the host's directory.
+            bundle_source = (
+                bundle_file.tree_bundle.tree_path
+                if bundle_file.tree_bundle.tree_path is not None and WRITTEN_METHOD_TREES.holds_tree(tree=bundle_file.tree_bundle.tree)
+                else str(mthds_file_path)
+            )
             try:
-                blueprint = MthdsParser.make_pipelex_bundle_blueprint(bundle_path=mthds_file_path)
-                blueprint.source = str(mthds_file_path)
+                blueprint = MthdsParser.make_pipelex_bundle_blueprint(bundle_path=mthds_file_path, mthds_source=bundle_source)
                 blueprint.place_in_tree(tree_bundle=bundle_file.tree_bundle)
             except FileNotFoundError as file_not_found_error:
-                msg = f"Could not find MTHDS bundle at '{mthds_file_path}'"
+                msg = f"Could not find MTHDS bundle at '{bundle_source}'"
                 raise LibraryLoadingError(msg) from file_not_found_error
             except MthdsParserError as parser_error:
                 # Forward BLUEPRINT validation errors from interpreter
-                msg = f"Could not load MTHDS bundle from '{mthds_file_path}' because of: {parser_error.message}"
+                msg = f"Could not load MTHDS bundle from '{bundle_source}' because of: {parser_error.message}"
                 raise LibraryLoadingError(
                     message=msg,
                     blueprint_validation_errors=parser_error.validation_errors,
@@ -1330,7 +1342,7 @@ class LibraryManager(LibraryManagerAbstract):
             library.loaded_mthds_paths.append(resolved_path)
 
         try:
-            return self.load_from_blueprints(library_id=library_id, blueprints=blueprints)
+            return self.load_from_blueprints(library_id=library_id, blueprints=blueprints, methods_dirs=methods_dirs)
         except ValidationError as validation_error:
             # Categorize before wrapping. `translate_to_validate_bundle_error` has its own
             # `except ValidationError` arm that categorizes, but it never sees this error: wrapping it

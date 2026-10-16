@@ -78,4 +78,4 @@ class TestMethodRefValidate:
         client = _build_client()
         response = client.post("/v1/validate", json={"method_ref": _METHOD_REF, "mthds_sources": ["main.mthds"]})
         assert response.status_code == 422, response.text
-        assert "package's own file names" in response.json()["detail"]
+        assert "named by their tree paths" in response.json()["detail"]

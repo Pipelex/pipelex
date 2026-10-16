@@ -34,13 +34,15 @@ class _FakeBundleValidator:
     async def validate_bundles(
         self,
         *,
-        mthds_contents: list[str],
+        mthds_contents: list[str] | None,
         mthds_sources: list[str] | None,
         allow_signatures: bool,
         library_dirs: Sequence[Path] | None,
         caller_identity: CallerIdentity | None,
         graph_pipe_code: str | None,
         submitted_files: Mapping[str, bytes] | None,
+        method_dir: Path | None,
+        methods_dirs: Sequence[Path] | None,
     ) -> PipelexValidationReport | ErrorReport:
         raise NotImplementedError
 

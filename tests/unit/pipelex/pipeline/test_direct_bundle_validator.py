@@ -43,6 +43,8 @@ class TestDirectBundleValidator:
             caller_identity=CallerIdentity(user_id="user-42", extras={"organization": "org_acme"}),
             graph_pipe_code="extract_document_markdown",
             submitted_files=submitted_files,
+            method_dir=None,
+            methods_dirs=None,
         )
 
         assert verdict is report
@@ -55,6 +57,8 @@ class TestDirectBundleValidator:
             log_context="API validate",
             caller_identity=CallerIdentity(user_id="user-42", extras={"organization": "org_acme"}),
             submitted_files=submitted_files,
+            method_dir=None,
+            methods_dirs=None,
         )
 
     async def test_validate_bundle_error_becomes_the_invalid_arm(self, mocker: MockerFixture) -> None:
@@ -73,6 +77,8 @@ class TestDirectBundleValidator:
             caller_identity=None,
             graph_pipe_code=None,
             submitted_files=None,
+            method_dir=None,
+            methods_dirs=None,
         )
 
         assert isinstance(verdict, ErrorReport)
@@ -95,4 +101,6 @@ class TestDirectBundleValidator:
                 caller_identity=None,
                 graph_pipe_code=None,
                 submitted_files=None,
+                method_dir=None,
+                methods_dirs=None,
             )
