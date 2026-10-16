@@ -11,7 +11,7 @@ from openai.types.chat.chat_completion import Choice
 from openai.types.responses.response import IncompleteDetails
 from types_aiobotocore_bedrock_runtime.literals import StopReasonType
 
-from pipelex.cogt.exceptions import CompletionTruncationLimit, LLMCompletionRefusedError, LLMCompletionTruncatedError
+from pipelex.cogt.exceptions import CompletionOutputKind, CompletionTruncationLimit, LLMCompletionRefusedError, LLMCompletionTruncatedError
 from pipelex.cogt.llm import completion_stop
 from pipelex.cogt.llm.completion_stop import (
     ANTHROPIC_STOP_REASONS,
@@ -162,6 +162,7 @@ class TestCompletionStop:
             )
         assert exc_info.value.stop_reason == stop_reason
         assert exc_info.value.truncation_limit == expected_limit
+        assert exc_info.value.output_kind == CompletionOutputKind.TEXT
         assert exc_info.value.max_tokens == 4096
         assert exc_info.value.output_tokens == 4096
 

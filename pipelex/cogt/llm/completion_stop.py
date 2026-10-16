@@ -29,7 +29,7 @@ from types import MappingProxyType
 from typing import Any, NamedTuple
 
 from pipelex import log
-from pipelex.cogt.exceptions import CompletionTruncationLimit, LLMCompletionRefusedError, LLMCompletionTruncatedError
+from pipelex.cogt.exceptions import CompletionOutputKind, CompletionTruncationLimit, LLMCompletionRefusedError, LLMCompletionTruncatedError
 
 
 class CompletionStopOutcome(StrEnum):
@@ -356,6 +356,7 @@ def raise_for_completion_stop(
         model_handle=model_handle,
         stop_reason=stop_reason,
         truncation_limit=truncation_limit,
+        output_kind=CompletionOutputKind.TEXT,
         pipe_code=pipe_code,
         max_tokens=max_tokens,
         output_tokens=output_tokens,

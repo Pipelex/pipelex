@@ -24,7 +24,7 @@ from instructor.core import IncompleteOutputException
 from mistralai.client import Mistral
 from mthds.protocol.problem.registry import CoreCode
 
-from pipelex.cogt.exceptions import CompletionTruncationLimit, LLMCompletionTruncatedError
+from pipelex.cogt.exceptions import CompletionOutputKind, CompletionTruncationLimit, LLMCompletionTruncatedError, MaxTokensCeiling
 from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.providers.anthropic.anthropic_llm_worker import AnthropicLLMWorker
 from pipelex.providers.mistral.mistral_llm_worker import MistralLLMWorker
@@ -146,6 +146,14 @@ class _ScriptedTransport:
         return httpx.AsyncClient(transport=httpx.MockTransport(self.handle))
 
 
+def _assert_names_a_structured_output(error: LLMCompletionTruncatedError) -> None:
+    """The error says a structured output was cut, never a text."""
+    assert error.output_kind == CompletionOutputKind.STRUCTURED
+    assert f"finished the structured output of pipe '{STOP_TEST_PIPE_CODE}'" in error.message
+    assert "so the structured output is incomplete" in error.message
+    assert "text" not in error.message
+
+
 def _structured_job(*, max_tokens: int | None) -> LLMJob:
     """A real job for the pipe the stop tests name, re-asking once, as a structured output's job does."""
     llm_job = make_text_llm_job(max_tokens=max_tokens)
@@ -245,6 +253,7 @@ class TestInstructorIncompleteOutput:
         assert error.output_tokens == _OUTPUT_TOKENS
         assert isinstance(error.__cause__, IncompleteOutputException)
         assert STOP_TEST_PARTIAL_TEXT not in error.message
+        _assert_names_a_structured_output(error)
 
     async def test_a_cut_after_a_re_ask_is_still_the_truncation(self, mocker: MockerFixture) -> None:
         """A re-asked answer that comes back cut ends the loop with the same exception, which no wrapper hides."""
@@ -276,6 +285,11 @@ class TestInstructorIncompleteOutput:
         assert error.max_tokens == _MAX_TOKENS
         assert error.output_tokens == _OUTPUT_TOKENS
         assert isinstance(error.__cause__, IncompleteOutputException)
+        _assert_names_a_structured_output(error)
+        # The limit sent is the one asked for, so raising it is the next step
+        assert error.max_tokens_ceiling is None
+        assert error.user_action is not None
+        assert error.user_action.detail == "Raise the pipe's max_tokens, or shorten its input."
 
     async def test_the_anthropic_worker_says_its_timeout_lowered_the_limit_that_cut(self, mocker: MockerFixture) -> None:
         """A limit the structured call lowered to fit its timeout can explain the cut, so the error says so."""
@@ -292,7 +306,15 @@ class TestInstructorIncompleteOutput:
         error = exc_info.value
         assert error.resolve_error_code() == CoreCode.MODEL_OUTPUT_TRUNCATED
         assert error.max_tokens == _MAX_TOKENS
+        assert error.max_tokens_ceiling == MaxTokensCeiling(requested_max_tokens=8192, timeout_seconds=1200)
         assert f"lowered from 8192 to {_MAX_TOKENS}" in error.message
+        assert error.message.count("lowered from") == 1
+        # A higher max_tokens is lowered the same way, so neither the message nor the action asks for one
+        next_step = "Lower the pipe's reasoning effort, or ask it for a smaller output, since a higher max_tokens is lowered the same way."
+        assert error.message.endswith(next_step)
+        assert "Raise" not in error.message
+        assert error.user_action is not None
+        assert error.user_action.detail == next_step
 
     async def test_the_mistral_worker_reads_the_cut_as_output_truncated(self, mocker: MockerFixture) -> None:
         transport = _ScriptedTransport([_MISTRAL_CUT_ANSWER])
@@ -309,3 +331,4 @@ class TestInstructorIncompleteOutput:
         assert error.max_tokens == _MAX_TOKENS
         assert error.output_tokens == _OUTPUT_TOKENS
         assert isinstance(error.__cause__, IncompleteOutputException)
+        _assert_names_a_structured_output(error)
