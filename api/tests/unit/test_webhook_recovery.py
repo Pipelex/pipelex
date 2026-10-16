@@ -30,7 +30,8 @@ the document.
 from typing import Any
 
 import pytest
-from pipelex.base_exceptions import DisclosureMode, ErrorDomain, ErrorReport
+from mthds.protocol.problem.registry import CoreCode
+from pipelex.base_exceptions import DisclosureMode, ErrorReport
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.cogt.inference.provider_name import ProviderName
 
@@ -44,6 +45,7 @@ from pipelex_api.problem_document import build_problem_document
 # the request-scoped extension members `instance`/`request_id` — those are
 # rightfully envelope-only.
 _CLASSIFICATION_FIELDS_PRESERVED = (
+    "code",
     "error_type",
     "error_domain",
     "error_category",
@@ -63,45 +65,43 @@ def _fully_populated_llm_report() -> ErrorReport:
     fixture: it pins the parity contract on the maximum field set the API
     ever surfaces.
     """
-    return ErrorReport(
+    report = ErrorReport.make_for_code(
+        code=CoreCode.PROVIDER_RATE_LIMITED,
         error_type="LLMCompletionError",
         message="OpenAI returned 429 (rate_limit_exceeded)",
-        title="LLM completion error",
-        type_uri="https://docs.pipelex.com/latest/errors/llm-completion-error/",
-        error_domain=ErrorDomain.RUNTIME,
-        error_category="rate_limit",
-        retryable=True,
         user_action=UserAction(
             kind=UserActionKind.WAIT_AND_RETRY,
             detail="The provider is rate-limiting your account. Retry after the indicated delay.",
         ),
-        model="gpt-4o-mini",
-        provider="openai",
-        provider_metadata=ProviderErrorMetadata(
-            provider=ProviderName.OPENAI,
-            sdk_exception_type="RateLimitError",
-            status_code=429,
-            retry_after_seconds=12.0,
-            request_id="req_provider_abc",
-        ),
+    )
+    return report.model_copy(
+        update={
+            "error_category": "rate_limit",
+            "model": "gpt-4o-mini",
+            "provider": "openai",
+            "provider_metadata": ProviderErrorMetadata(
+                provider=ProviderName.OPENAI,
+                sdk_exception_type="RateLimitError",
+                status_code=429,
+                retry_after_seconds=12.0,
+                request_id="req_provider_abc",
+            ),
+        }
     )
 
 
 def _caller_facing_input_report() -> ErrorReport:
-    """A caller-facing INPUT-domain report (the other half of the STRICT contract).
+    """A caller-facing `method.syntax` report, which the caller fixes (the other half of the STRICT contract).
 
     Complements the LLM fixture: minimal classification but
     `caller_facing_message=True`, which is the trigger STRICT projection
     keys its `message` passthrough on. Used here to verify that the parity
     contract holds across both message-disclosure provenances.
     """
-    return ErrorReport(
+    return ErrorReport.make_for_code(
+        code=CoreCode.METHOD_SYNTAX,
         error_type="MthdsParserError",
         message="Your .mthds file has a syntax error on line 4",
-        title="Pipelex interpreter error",
-        type_uri="https://docs.pipelex.com/latest/errors/pipelex-interpreter-error/",
-        error_domain=ErrorDomain.INPUT,
-        retryable=False,
         caller_facing_message=True,
     )
 

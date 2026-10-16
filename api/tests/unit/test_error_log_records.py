@@ -131,10 +131,9 @@ class TestErrorLogRecords:
         assert payload["http.response.status_code"] == 500
         assert payload["error.type"] == "PipelexConfigError"
         assert payload["error_domain"] == "config"
-        # `retryable` is absent rather than false: pipelex populates it only on a classifiable
-        # failure, and a field with no value is dropped rather than written as a null a query
-        # filtering on presence would read as an answer.
-        assert "retryable" not in payload
+        # `retryable` is the verdict of the error's code, which every error carries, so it is always
+        # written: `pipelex.config.invalid` is no fault a repeat can cure.
+        assert payload["retryable"] is False
         # `time` and `logger` come from the sink itself; an operator-actionable failure carries
         # its traceback under `exception` rather than spilling it across the line.
         assert payload["time"].endswith("Z")

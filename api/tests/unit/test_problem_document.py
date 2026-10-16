@@ -1,9 +1,12 @@
 """Unit tests for the RFC 7807 problem-document builder."""
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pipelex.base_exceptions import DisclosureMode, ErrorDomain, ErrorReport, PipelexConfigError
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.cogt.inference.provider_name import ProviderName
+from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.system.exceptions import EnvVarNotFoundError
 from pytest_mock import MockerFixture
 
@@ -13,24 +16,25 @@ from pipelex_api.problem_document import build_problem_document, build_problem_d
 
 def _synthetic_llm_report() -> ErrorReport:
     """A fully-populated report standing in for a provider rate-limit failure."""
-    return ErrorReport(
+    report = ErrorReport.make_for_code(
+        code=CoreCode.PROVIDER_RATE_LIMITED,
         error_type="LLMCompletionError",
         message="OpenAI returned 429 (rate_limit_exceeded)",
-        title="LLM completion error",
-        type_uri="https://docs.pipelex.com/latest/errors/llm-completion-error/",
-        error_category="transient",
-        error_domain="runtime",
-        retryable=True,
         user_action=UserAction(kind=UserActionKind.WAIT_AND_RETRY, detail="Retry after 12s."),
-        model="gpt-4o-mini",
-        provider="openai",
-        provider_metadata=ProviderErrorMetadata(
-            provider=ProviderName.OPENAI,
-            sdk_exception_type="RateLimitError",
-            status_code=429,
-            retry_after_seconds=12.0,
-            request_id="req_provider_abc",
-        ),
+    )
+    return report.model_copy(
+        update={
+            "error_category": "transient",
+            "model": "gpt-4o-mini",
+            "provider": "openai",
+            "provider_metadata": ProviderErrorMetadata(
+                provider=ProviderName.OPENAI,
+                sdk_exception_type="RateLimitError",
+                status_code=429,
+                retry_after_seconds=12.0,
+                request_id="req_provider_abc",
+            ),
+        }
     )
 
 
@@ -39,11 +43,12 @@ class TestProblemDocument:
         report = PipelexConfigError("the gateway config is missing").to_error_report()
         doc = build_problem_document(report, instance="/v1/validate", request_id="REQ2", disclosure_mode=DisclosureMode.VERBOSE)
         assert doc["status"] == 500
+        assert doc["code"] == "pipelex.config.invalid"
         assert doc["error_domain"] == "config"
         assert doc["error_type"] == "PipelexConfigError"
         assert doc["detail"] == "the gateway config is missing"
-        assert doc["title"] == "Pipelex config"
-        assert doc["type"].endswith("/pipelex-config-error/")
+        assert doc["title"] == error_code_spec(PipelexErrorCode.CONFIG_INVALID).title
+        assert doc["type"] == "https://docs.pipelex.com/errors/pipelex.config.invalid"
         assert doc["instance"] == "/v1/validate"
         assert doc["request_id"] == "REQ2"
 
@@ -52,8 +57,9 @@ class TestProblemDocument:
         report = EnvVarNotFoundError("Environment variable 'COMPLETION_CALLBACK_SECRET' is required but not set").to_error_report()
         doc = build_problem_document(report, instance="/v1/start", request_id="REQ1", disclosure_mode=DisclosureMode.VERBOSE)
         assert doc["status"] == 500
-        assert doc["type"] == "https://docs.pipelex.com/latest/errors/env-var-not-found-error/"
-        assert doc["title"] == "Environment variable not set"
+        assert doc["code"] == "pipelex.config.variable_missing"
+        assert doc["type"] == "https://docs.pipelex.com/errors/pipelex.config.variable_missing"
+        assert doc["title"] == error_code_spec(PipelexErrorCode.CONFIG_VARIABLE_MISSING).title
         assert "COMPLETION_CALLBACK_SECRET" in doc["detail"]
         assert doc["error_type"] == "EnvVarNotFoundError"
         assert doc["instance"] == "/v1/start"
@@ -67,8 +73,9 @@ class TestProblemDocument:
         report = _synthetic_llm_report()
         doc = build_problem_document(report, instance="/v1/execute", request_id="REQ7", disclosure_mode=DisclosureMode.VERBOSE)
         assert doc["status"] == 429  # provider-429 passthrough
-        assert doc["type"] == "https://docs.pipelex.com/latest/errors/llm-completion-error/"
-        assert doc["title"] == "LLM completion error"
+        assert doc["code"] == "provider.rate_limited"
+        assert doc["type"] == "https://mthds.ai/errors/provider.rate_limited"
+        assert doc["title"] == error_code_spec(CoreCode.PROVIDER_RATE_LIMITED).title
         assert doc["detail"] == "OpenAI returned 429 (rate_limit_exceeded)"
         assert doc["error_type"] == "LLMCompletionError"
         assert doc["error_category"] == "transient"
@@ -81,6 +88,14 @@ class TestProblemDocument:
         assert doc["provider_metadata"]["retry_after_seconds"] == 12.0
         # provider_metadata.body is excluded from serialization by pipelex.
         assert "body" not in doc["provider_metadata"]
+
+    @pytest.mark.parametrize("disclosure_mode", [DisclosureMode.VERBOSE, DisclosureMode.STRICT])
+    def test_the_code_survives_every_disclosure_mode(self, disclosure_mode: DisclosureMode):
+        """The code is what a caller branches on, so even STRICT, which redacts the message, keeps it."""
+        report = PipelexConfigError("bad config").to_error_report()
+        doc = build_problem_document(report, instance="/x", request_id="r", disclosure_mode=disclosure_mode)
+        assert doc["code"] == "pipelex.config.invalid"
+        assert doc["type"] == "https://docs.pipelex.com/errors/pipelex.config.invalid"
 
     @pytest.mark.parametrize("disclosure_mode", [DisclosureMode.VERBOSE, DisclosureMode.STRICT])
     def test_forwards_disclosure_mode(self, mocker: MockerFixture, disclosure_mode: DisclosureMode):

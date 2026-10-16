@@ -8,11 +8,12 @@ A failure response looks like this:
 
 ```json
 {
-  "type": "https://docs.pipelex.com/latest/errors/validate-bundle-error/",
-  "title": "Validate bundle",
+  "type": "https://mthds.ai/errors/method.invalid",
+  "title": "The method does not validate",
   "status": 422,
   "detail": "TOML syntax error at line 1, column 6: Expected '=' after a key in a key/value pair",
-  "instance": "/v1/validate",
+  "instance": "/v1/execute",
+  "code": "method.invalid",
   "error_type": "ValidateBundleError",
   "error_domain": "input",
   "retryable": false,
@@ -26,11 +27,12 @@ A failure response looks like this:
 
 **Standard RFC 7807 members** — `type`, `title`, `status`, `detail`, `instance`.
 
-**Extension members** — only `error_type` is always present; the others appear when the originating error populates them:
+**Extension members** — `error_type` and `retryable` are always present, and so are `code` and `error_domain` on an error the runtime raised; the others appear when the originating error populates them:
 
-- `error_type` — stable class name of the originating error (`ValidateBundleError`, `EnvVarNotFoundError`, `WorkflowExecutionError`, …). The same identifier the `type` URI is derived from.
-- `error_domain` — one of `input`, `config`, `runtime`. See [Status codes](#status-codes). Absent for domain-less pipelex errors (some pipelex tool errors, e.g. `EnvVarNotFoundError`, do not classify a domain — the HTTP status still defaults to **500**).
-- `retryable` — whether retrying the same request can plausibly succeed. Always emitted for API-authored 4xx/5xx (always `false`). For pipelex-originated errors, present only when the source error populates it — `true` only when the originating error explicitly classifies itself as transient (e.g. inference provider rate limits), `false` when it declares itself a deterministic refusal of what the caller sent (e.g. `BundleResourceNotNamedError`, `BundleResourcePathError`, as for the API-authored `InvalidResourcePath`); absent on pipelex errors that don't set it (e.g. `EnvVarNotFoundError`, `PipelexConfigError`).
+- `code` — the registry code naming the fault, such as `method.invalid` or `pipelex.config.variable_missing`: a code of the MTHDS standard, or a `pipelex.` code of the Pipelex error registry, listed on the [Error Codes](../errors/index.md) page. The code decides `type`, `title`, `error_domain` and `retryable`, so a consumer branches on it rather than on the class that raised the error. API-authored errors (`ValidationError`, `Unauthenticated` and the rest of the API's own 4xx and 5xx) carry none. See [The `type` URI](#the-type-uri).
+- `error_type` — stable class name of the originating error (`ValidateBundleError`, `EnvVarNotFoundError`, `WorkflowExecutionError`, …). Several classes can raise the same code, and one class can raise several, so it is the place to look in the server's logs, not the member to branch on.
+- `error_domain` — one of `input`, `config`, `runtime`, read from the code's registry domain: a code the caller fixes, in its input or in the method it sent, reads `input`; one that the account's owner or the deployment's operator fixes reads `config`; and a runtime fault reads `runtime`. See [Status codes](#status-codes).
+- `retryable` — whether retrying the same request can plausibly succeed: `true` only when the code's retry verdict is that a retry can succeed, as for an inference provider's rate limit, and `false` otherwise, including when the code cannot tell whether the request took effect. API-authored errors always carry `false`.
 - `request_id` — server-correlated identifier for the request. Echoed from inbound `X-Request-ID` if provided, otherwise generated. Use this when reporting issues.
 - `error_category` — finer classification when the originating error provides one (currently used by inference errors — see `InferenceErrorCategory` in the [Error Model](../under-the-hood/error-model.md#inferenceerrorcategory)).
 - `user_action` — structured suggestion of what the caller should do next, when the error can author one.
@@ -120,22 +122,24 @@ For `ensure_table` and `delete_table`, `table_path` addresses the table itself r
 
 ## Run failures: the root fault, located at the failing pipe
 
-When a run fails, the problem document describes the **root fault**, the innermost Pipelex error on the cause chain, never the run-level wrapper around it: `error_type`, `title` and `type` are the root fault's, and so are `error_domain`, the HTTP status and whether STRICT disclosure keeps the `detail`. The `detail` names the pipe that failed and its path from the entry pipe, `Pipe '<failing pipe>' failed (<entry pipe> → … → <failing pipe>): <the fault's own message>`, and `user_action` names the next step for that pipe. A consumer that branched on `error_type == "PipelineExecutionError"` branches on the root fault's type instead.
+When a run fails, the problem document describes the **root fault**, never the run-level wrapper around it: the first Pipelex error down the cause chain that carries a code of its own, or the innermost one when none does. The wrappers that only locate the failure take their cause's code, so `code`, `error_type`, `title` and `type` are the root fault's, and so are `error_domain`, `retryable`, the HTTP status and whether STRICT disclosure keeps the `detail`. The `detail` names the pipe that failed and its path from the entry pipe, `Pipe '<failing pipe>' failed (<entry pipe> → … → <failing pipe>): <the fault's own message>`, and `user_action` names the next step for that pipe. A consumer that branched on `error_type == "PipelineExecutionError"` branches on `code` instead.
 
-So a run the caller's own method refuses reads its reason even under STRICT: a `PipeCondition` whose outcome is `fail`, a `PipeParallel` branch whose multiplicity does not match its output field, a step started without a required input, or a model named inline that the deck does not define all answer a **422** in the `input` domain, with a `detail` that says what to change. A model the deck names but does not serve stays a redacted `config` failure, since the deployment, not the caller, has to fix it.
+So a run the caller's own method refuses reads its reason even under STRICT: a `PipeCondition` whose outcome is `fail`, a `PipeParallel` branch whose multiplicity does not match its output field, a step started without a required input, or a model named inline that the deck does not define all answer a **422** whose code is the caller's own, in the `input` or the `method` domain, with a `detail` that says what to change. A model the deck names but does not serve is `model.unavailable`, a redacted `config` failure, since the deployment, not the caller, has to fix it.
 
 ```http
 HTTP/1.1 422 Unprocessable Entity
 Content-Type: application/problem+json
 
 {
-  "type": "https://docs.pipelex.com/latest/errors/stuff-factory-error/",
-  "title": "Stuff factory",
+  "type": "https://mthds.ai/errors/pipe.output_multiplicity",
+  "title": "A pipe's output does not have the declared multiplicity",
   "status": 422,
   "detail": "Pipe 'analyze_topic' failed (review_topic → analyze_topic): PipeParallel 'analyze_topic' cannot combine its branch results into its output 'TopicReview'. Branch 'draft_idea' gives result 'ideas' as a single 'Idea', but field 'ideas' of 'TopicReview' holds a list. Declare the field as a single concept in the structure of 'TopicReview', with type 'concept' and concept_ref 'Idea', or make branch 'draft_idea' output 'Idea[]'.",
   "instance": "/v1/execute",
+  "code": "pipe.output_multiplicity",
   "error_type": "StuffFactoryError",
   "error_domain": "input",
+  "retryable": false,
   "user_action": {
     "kind": "change_input",
     "detail": "Branch 'draft_idea' gives result 'ideas' as a single 'Idea', but field 'ideas' of 'TopicReview' holds a list. Declare the field as a single concept in the structure of 'TopicReview', with type 'concept' and concept_ref 'Idea', or make branch 'draft_idea' output 'Idea[]'."
@@ -167,7 +171,7 @@ A few specific statuses bypass the domain mapping:
 - **429** — an upstream inference provider rate-limited the run. `Retry-After` is set when the originating error carries `provider_metadata.retry_after_seconds`. Only `POST /v1/execute` runs inference, so only `/execute` can produce it.
 - **501** — a request shape the published contract accepts but this server cannot serve. `error_type = "AsyncExecutionNotEnabledError"`: this deployment does not provide async pipeline execution (`POST /v1/start`). `error_type = "MethodRefNotSupported"`: the request selected its closure by a **registry-form** `method_ref` — not a `github.com/...` address — and no server-side method registry resolves those yet. Address-form references are fetched and resolved server-side (see [Pipe Run](pipe-run.md#running-a-method-by-address-method_ref)); use one of those, or submit inline `files[]`. Both 501s are permanent under the current deployment — do not retry.
 
-The `method_ref` resolution errors are also mapped explicitly rather than through the domain table: `MethodRefParseError`, `MethodFetchError`, `MethodPackageAmbiguityError`, `MethodPackageTooLargeError` and `MethodPackageSymlinkError` are **422** (the caller can fix the reference, pin a tag, shrink the package, or remove the symlink it carries), `MethodPackageNotFoundError` is the **404** above, and `MethodStructuresRefusedError` is a **403**, whether the method was fetched by `method_ref` or sent as a tree. These pipelex `MethodRefError` subclasses do not classify an `error_domain`, so without the explicit mapping they would fall through to the 500 default — which would misreport caller-fixable failures as server faults.
+The `method_ref` resolution errors are also mapped explicitly rather than through the domain table: `MethodRefParseError`, `MethodFetchError`, `MethodPackageAmbiguityError`, `MethodPackageTooLargeError` and `MethodPackageSymlinkError` are **422** (the caller can fix the reference, pin a tag, shrink the package, or remove the symlink it carries), `MethodPackageNotFoundError` is the **404** above, and `MethodStructuresRefusedError` is a **403**, whether the method was fetched by `method_ref` or sent as a tree. Each carries its own code (`request.invalid` for a reference that does not parse, `method.fetch_failed`, `method.ambiguous`, `method.package_invalid`, `method.not_found`, and `pipelex.deployment.python_structures_refused` for the structures refusal), and the explicit mapping keeps the statuses listed here while the HTTP status still follows `error_domain` rather than the code.
 
 Every route that takes a JSON body refuses one whose arrays and objects nest more than 128 levels deep, the body's own envelope included, with a **422** `InvalidJSON` whose `detail` says the body is nested too deeply. The depth is checked before the body is parsed, so the answer does not depend on the Python version or the stack size the server runs with. The bound is fixed rather than configurable, and real inputs stay far below it.
 
@@ -193,7 +197,7 @@ The `ERROR_DISCLOSURE` env var controls how much of the originating error makes 
 
 - `verbose` (default) — renders the full `ErrorReport`. Use in dev, staging, and any deployment where the caller is trusted.
 - `strict` — redacts `detail` and provider fields for errors that do not author caller-facing messages. Specifically:
-    - `detail` is preserved only when the error authored a caller-facing message: the bundle's validation verdict (`ValidateBundleError`), a parse error (`MthdsParserError`), and a failure the runtime classifies as the caller's own, such as a pipe refused while it is built or a run that the submitted method itself refuses (see [Run failures](#run-failures-the-root-fault-located-at-the-failing-pipe)). Everything else has `detail` replaced with a generic title-derived string.
+    - `detail` is preserved only when the error authored a caller-facing message: the bundle's validation verdict (`ValidateBundleError`), a parse error (`MthdsParserError`), and a failure the runtime classifies as the caller's own, such as a pipe refused while it is built or a run that the submitted method itself refuses (see [Run failures](#run-failures-the-root-fault-located-at-the-failing-pipe)). Everything else has `detail` replaced with the fixed `"An internal error occurred."`, while `code`, `title` and `type` still say which fault it was.
     - `model`, `provider`, `provider_metadata` are always stripped — they have no business on a caller-facing surface.
     - The redaction is keyed on the **provenance of the message** (`_authors_caller_facing_message` ClassVar), not on `error_domain`. A `RuntimeError` raised `from` an `INPUT`-domain cause does not leak the wrapper's internal message.
 
@@ -205,15 +209,18 @@ An unclassified failure is the one error a caller cannot diagnose from a request
 
 ## The `type` URI
 
-`type` is a stable URI derived from the originating error's class:
+`type` is the page of the error's `code`:
 
 ```
-https://docs.pipelex.com/latest/errors/<kebab-class-name>/
+https://mthds.ai/errors/<code>              a code of the MTHDS standard, such as method.invalid
+https://docs.pipelex.com/errors/<code>      a pipelex. code, such as pipelex.config.variable_missing
 ```
 
-API-authored errors (`ValidationError`, `BadRequest`, `Unauthenticated`, etc.) follow the same convention with their own slugs.
+Both families are listed on the [Error Codes](../errors/index.md) page, and `title` is the code's title. A Pipelex code's type URI names no documentation version: the documentation site answers it with the code's page in the latest release (see [The pages and the type URI](../contribute/error-registry.md#the-pages-and-the-type-uri)).
 
-The per-class pages these URIs named are retired. Errors are moving to the codes of the MTHDS standard and of the Pipelex error registry, whose type URI is the code's page: `https://mthds.ai/errors/<code>` for a core code and `https://docs.pipelex.com/errors/<code>` for a `pipelex.` code, listed on the [Error Codes](../errors/index.md) page. Until a response carries its code, its class-derived `type` names no page of its own: the documentation site sends such a URL to the Error Codes index.
+API-authored errors (`ValidationError`, `BadRequest`, `Unauthenticated`, etc.) carry no code, and their `type` is still derived from their name, `https://docs.pipelex.com/latest/errors/<kebab-name>/`, a URL the documentation site sends to the Error Codes index.
+
+Before every error carried its code, the `type` of an error the runtime raised was derived from its class in the same way and named a page per class. Those pages are retired, and the documentation site redirects each one to the page of its class's code, or to the Error Codes index when the class is gone or raises no single code, so a stored `type` still leads somewhere useful.
 
 ## Request correlation
 
@@ -238,11 +245,12 @@ Content-Type: application/problem+json
 X-Request-ID: 9f2c1ab3-…
 
 {
-  "type": "https://docs.pipelex.com/latest/errors/validate-bundle-error/",
-  "title": "Validate bundle",
+  "type": "https://mthds.ai/errors/method.invalid",
+  "title": "The method does not validate",
   "status": 422,
   "detail": "Value error, Invalid main pipe syntax 'Not A Valid Pipe Code!'. Must be in snake_case.",
   "instance": "/v1/execute",
+  "code": "method.invalid",
   "error_type": "ValidateBundleError",
   "error_domain": "input",
   "user_action": {
@@ -271,19 +279,22 @@ Content-Type: application/problem+json
 X-Request-ID: 9f2c1ab3-…
 
 {
-  "type": "https://docs.pipelex.com/latest/errors/env-var-not-found-error/",
-  "title": "Environment variable not set",
+  "type": "https://docs.pipelex.com/errors/pipelex.config.variable_missing",
+  "title": "A configuration variable is not set",
   "status": 500,
   "detail": "Missing required environment variable: COMPLETION_CALLBACK_SECRET",
   "instance": "/v1/start",
+  "code": "pipelex.config.variable_missing",
   "error_type": "EnvVarNotFoundError",
+  "error_domain": "config",
+  "retryable": false,
   "request_id": "9f2c1ab3-…"
 }
 ```
 
-`EnvVarNotFoundError` is a domain-less pipelex tool error — neither `error_domain` nor `retryable` is populated on the report, so both extension members are absent on the wire. The HTTP status is still **500** (the deployment, not the caller, has to fix it), but the classification fields only ride along when the originating error sets them. See [Fields](#fields).
+`pipelex.config.variable_missing` is a code in the `operator` domain: the deployment, not the caller, has to fix it, so it reads `error_domain: "config"` and answers a **500**. See [Fields](#fields).
 
-Under `ERROR_DISCLOSURE=strict` the same failure has `detail` redacted to `"Server configuration error"` — the env var name lives in the server log only.
+Under `ERROR_DISCLOSURE=strict` the same failure has `detail` redacted to `"An internal error occurred."` — the env var name lives in the server log only, and `code` still names the fault.
 
 ### 401 — missing bearer token
 

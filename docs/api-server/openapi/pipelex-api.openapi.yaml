@@ -6723,11 +6723,14 @@ components:
         type:
           type: string
           title: Type
-          description: 'Stable URI for the error class: `https://docs.pipelex.com/latest/errors/<kebab-class-name>/`.'
+          description: 'Stable URI of the error''s documentation page: the page of its `code` (`https://mthds.ai/errors/<code>`
+            for a core code, `https://docs.pipelex.com/errors/<code>` for a Pipelex code), or `https://docs.pipelex.com/latest/errors/<kebab-error-type>/`
+            for an API-authored error, which carries no `code` yet.'
         title:
           type: string
           title: Title
-          description: Short, human-readable summary of the error class.
+          description: 'Short, human-readable summary: the title of the error''s `code`, or of its `error_type` when it carries
+            none.'
         status:
           type: integer
           title: Status
@@ -6748,6 +6751,14 @@ components:
           - type: 'null'
           title: Request Id
           description: Correlation id, echoed in the `X-Request-ID` response header.
+        code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Code
+          description: 'Registry code of the error, what a client branches on: a core code of the MTHDS standard (e.g. `request.invalid`)
+            or a Pipelex code (e.g. `pipelex.config.invalid`). Present on every error the runtime raises, under every `ERROR_DISCLOSURE`
+            mode; absent on an API-authored error.'
         error_type:
           type: string
           title: Error Type
@@ -6764,8 +6775,8 @@ components:
           - type: boolean
           - type: 'null'
           title: Retryable
-          description: Whether retrying the same request can plausibly succeed. Always present on API-authored errors; on
-            pipelex errors only when the originating error classifies it.
+          description: 'Whether retrying the same request can plausibly succeed. Always present: on an error carrying a `code`,
+            it is that code''s retry verdict.'
         error_category:
           anyOf:
           - type: string
@@ -6821,13 +6832,13 @@ components:
 
         plus the extension members pipelex''s classification adds. Only `type`,
 
-        `title`, `status`, `detail`, and `error_type` are always present: the rest
+        `title`, `status`, `detail`, and `error_type` are always present, and `code`
 
-        ride along when the originating error populates them, so a consumer must
+        on every error the runtime raises: the rest ride along when the originating
 
-        treat them as optional. `extra="allow"` mirrors RFC 7807''s open-ended
+        error populates them, so a consumer must treat them as optional.
 
-        extension-member rule.'
+        `extra="allow"` mirrors RFC 7807''s open-ended extension-member rule.'
     PromptImageDetail:
       type: string
       enum:
@@ -8000,6 +8011,11 @@ components:
           const: true
           title: Is Valid
           default: true
+        warnings:
+          items:
+            $ref: '#/components/schemas/ValidationErrorItem'
+          type: array
+          title: Warnings
         bundle_blueprint:
           $ref: '#/components/schemas/PipelexBundleBlueprint'
         pipe_io_contracts:
@@ -8037,11 +8053,6 @@ components:
             $ref: '#/components/schemas/ValidatedPipeEntry'
           type: array
           title: Validated Pipes
-        warnings:
-          items:
-            $ref: '#/components/schemas/ValidationErrorItem'
-          type: array
-          title: Warnings
         pending_signatures:
           items:
             type: string

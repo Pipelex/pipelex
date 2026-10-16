@@ -16,10 +16,10 @@ from typing import Any, cast
 import pytest
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.testclient import TestClient
+from mthds.protocol.problem.registry import CoreCode
 from pipelex.base_exceptions import (
     INTERNAL_ERROR_PLACEHOLDER,
     DisclosureMode,
-    ErrorDomain,
     ErrorReport,
     PipelexConfigError,
     PipelexError,
@@ -28,6 +28,8 @@ from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.config import get_config
+from pipelex.errors.error_codes import ErrorCode, error_code_spec
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.methods.exceptions import MethodPackageSymlinkError
 from pipelex.pipe_run.exceptions import AsyncExecutionNotEnabledError
 from pipelex.pipeline.exceptions import PipelineManagerAlreadyExistsError
@@ -65,34 +67,42 @@ def _emitted_fields(log_spy: Any, *, as_error: bool) -> dict[str, Any]:
     return cast("dict[str, Any]", fields)
 
 
+def _coded_report(*, code: ErrorCode, error_type: str, message: str, classification: dict[str, Any]) -> ErrorReport:
+    """A report built the way pipelex builds one, for `code`, with the classification an inference failure adds."""
+    return ErrorReport.make_for_code(code=code, error_type=error_type, message=message).model_copy(update=classification)
+
+
 class _SimulatedLLMError(PipelexError):
     """A `PipelexError` whose report mimics a provider rate-limit (429) failure."""
 
+    error_code = CoreCode.PROVIDER_RATE_LIMITED
+
     @override
     def to_error_report(self) -> ErrorReport:
-        return ErrorReport(
+        return _coded_report(
+            code=CoreCode.PROVIDER_RATE_LIMITED,
             error_type="LLMCompletionError",
             message="OpenAI returned 429 (rate_limit_exceeded)",
-            title="LLM completion error",
-            type_uri="https://docs.pipelex.com/latest/errors/llm-completion-error/",
-            error_category="transient",
-            error_domain="runtime",
-            retryable=True,
-            user_action=UserAction(kind=UserActionKind.WAIT_AND_RETRY, detail="Retry after 12s."),
-            model="gpt-4o-mini",
-            provider="openai",
-            provider_metadata=ProviderErrorMetadata(
-                provider=ProviderName.OPENAI,
-                sdk_exception_type="RateLimitError",
-                status_code=429,
-                retry_after_seconds=12.0,
-                request_id="req_provider_abc",
-            ),
+            classification={
+                "error_category": "transient",
+                "user_action": UserAction(kind=UserActionKind.WAIT_AND_RETRY, detail="Retry after 12s."),
+                "model": "gpt-4o-mini",
+                "provider": "openai",
+                "provider_metadata": ProviderErrorMetadata(
+                    provider=ProviderName.OPENAI,
+                    sdk_exception_type="RateLimitError",
+                    status_code=429,
+                    retry_after_seconds=12.0,
+                    request_id="req_provider_abc",
+                ),
+            },
         )
 
 
 class _CorruptReportError(PipelexError):
     """A `PipelexError` whose `to_error_report` itself fails — the handler-of-handlers case."""
+
+    error_code = CoreCode.RUNTIME_UNEXPECTED
 
     @override
     def to_error_report(self) -> ErrorReport:
@@ -101,13 +111,13 @@ class _CorruptReportError(PipelexError):
 
 
 class _CallerFacingInputError(PipelexError):
-    """An `INPUT`-domain error whose message is genuine caller-facing copy.
+    """A `method.syntax` error, which the caller fixes, whose message is genuine caller-facing copy.
 
     `_authors_caller_facing_message` makes STRICT disclosure keep the message
     verbatim — the projection pipelex applies to a `.mthds` syntax error.
     """
 
-    error_domain = ErrorDomain.INPUT
+    error_code = CoreCode.METHOD_SYNTAX
     _authors_caller_facing_message = True
 
 
@@ -128,21 +138,20 @@ class _SyntheticOrchestratorError(PipelexError):
     transport exception.
     """
 
+    error_code = CoreCode.RUN_FAILED
+
 
 def _synthetic_transport_to_report(exc: Exception) -> ErrorReport:
     """The mapper an orchestrator plugin would contribute: classify the bare transport fault.
 
-    Mirrors the classification the (now plugin-owned) Temporal transport mapper produces — a
-    retryable, `RUNTIME`-domain `transient` failure.
+    Mirrors the classification the (now plugin-owned) Temporal transport mapper produces for an
+    unreachable cluster — `runtime.unavailable`, a retryable `transient` failure.
     """
-    return ErrorReport(
+    return _coded_report(
+        code=CoreCode.RUNTIME_UNAVAILABLE,
         error_type="SyntheticTransportError",
         message=str(exc),
-        title="Synthetic transport error",
-        type_uri="https://docs.pipelex.com/latest/errors/synthetic-transport-error/",
-        error_category="transient",
-        error_domain=ErrorDomain.RUNTIME,
-        retryable=True,
+        classification={"error_category": "transient"},
     )
 
 
@@ -164,20 +173,19 @@ def _synthetic_http_error_mappers() -> dict[type[Exception], HttpErrorMapperFn]:
 
 def _report_with_retry(*, status_code: int, retry_after_seconds: float | None) -> ErrorReport:
     """Build a provider-error report carrying a `retry_after_seconds` hint."""
-    return ErrorReport(
+    return _coded_report(
+        code=CoreCode.PROVIDER_RATE_LIMITED if status_code == 429 else CoreCode.PROVIDER_UNAVAILABLE,
         error_type="LLMCompletionError",
         message="provider error",
-        title="LLM completion error",
-        type_uri="https://docs.pipelex.com/latest/errors/llm-completion-error/",
-        error_category="transient",
-        error_domain="runtime",
-        retryable=True,
-        provider_metadata=ProviderErrorMetadata(
-            provider=ProviderName.OPENAI,
-            sdk_exception_type="RateLimitError",
-            status_code=status_code,
-            retry_after_seconds=retry_after_seconds,
-        ),
+        classification={
+            "error_category": "transient",
+            "provider_metadata": ProviderErrorMetadata(
+                provider=ProviderName.OPENAI,
+                sdk_exception_type="RateLimitError",
+                status_code=status_code,
+                retry_after_seconds=retry_after_seconds,
+            ),
+        },
     )
 
 
@@ -195,6 +203,8 @@ _RETRY_REPORTS: dict[str, ErrorReport] = {
 
 class _CraftedRetryError(PipelexError):
     """A `PipelexError` whose report is selected by key — exercises `_retry_after_header`."""
+
+    error_code = CoreCode.PROVIDER_RATE_LIMITED
 
     def __init__(self, report_key: str) -> None:
         super().__init__("crafted retry-after scenario")
@@ -471,8 +481,10 @@ class TestExceptionHandlers:
         assert response.status_code == 500
         assert response.headers["content-type"] == PROBLEM_JSON_MEDIA_TYPE
         body = response.json()
-        assert body["type"].endswith("/pipelex-config-error/")
-        assert body["title"] == "Pipelex config"
+        config_invalid = error_code_spec(PipelexErrorCode.CONFIG_INVALID)
+        assert body["code"] == "pipelex.config.invalid"
+        assert body["type"] == config_invalid.type_uri
+        assert body["title"] == config_invalid.title
         assert body["status"] == 500
         assert body["detail"] == "the gateway config is missing"
         assert body["error_type"] == "PipelexConfigError"
@@ -505,12 +517,16 @@ class TestExceptionHandlers:
         input_response = client.get("/input-error")
         assert input_response.status_code == 422
         assert input_response.json()["detail"] == "your .mthds file has a syntax error on line 4"
+        # STRICT keeps the code, whatever it redacts: it is what a caller branches on.
+        assert config_response.json()["code"] == "pipelex.config.invalid"
+        assert input_response.json()["code"] == "method.syntax"
 
     def test_provider_rate_limit_emits_retry_after(self):
         response = _build_client().get("/llm-error")
         assert response.status_code == 429
         assert response.headers["Retry-After"] == "12"
         body = response.json()
+        assert body["code"] == "provider.rate_limited"
         assert body["error_type"] == "LLMCompletionError"
         assert body["retryable"] is True
         assert body["provider_metadata"]["status_code"] == 429
@@ -583,12 +599,14 @@ class TestExceptionHandlers:
         pipelex_response = client.get("/orchestrator-pipelex-error")
         assert pipelex_response.status_code == 500
         assert pipelex_response.json()["error_type"] == "_SyntheticOrchestratorError"
+        assert pipelex_response.json()["code"] == "run.failed"
 
         # A bare transport error — routed to the plugin's mapper-backed handler, which renders the
         # transport-transient classification the mapper produced.
         transport_response = client.get("/synthetic-transport-error")
         assert transport_response.status_code == 500
         transport_body = transport_response.json()
+        assert transport_body["code"] == "runtime.unavailable"
         assert transport_body["error_type"] == "SyntheticTransportError"
         assert transport_body["error_category"] == "transient"
         assert transport_body["retryable"] is True
@@ -941,8 +959,9 @@ class TestExceptionHandlers:
         assert crafted_detail not in message, f"caller input reached the message: {message!r}"
 
     def test_async_execution_not_enabled_maps_to_501(self):
-        # The pipelex-side ``AsyncExecutionNotEnabledError`` reports as
-        # ``CONFIG``-domain (-> 500 under the default mapping), but the
+        # The pipelex-side ``AsyncExecutionNotEnabledError`` carries
+        # ``runtime.unsupported``, an operator code that reads as the ``CONFIG``
+        # domain (-> 500 under the default mapping), but the
         # API layer overrides it to 501 Not Implemented. 501 is more precise
         # for "this server does not provide async execution": it tells clients
         # the failure is permanent under the current deployment rather than a
@@ -955,11 +974,13 @@ class TestExceptionHandlers:
         # the override path only bumped the header status and left the body at
         # 500, RFC 7807-aware clients would see a contradictory document.
         assert body["status"] == 501
-        assert body["title"] == "Async execution not enabled"
+        runtime_unsupported = error_code_spec(CoreCode.RUNTIME_UNSUPPORTED)
+        assert body["code"] == "runtime.unsupported"
+        assert body["title"] == runtime_unsupported.title
         assert body["error_type"] == "AsyncExecutionNotEnabledError"
         assert body["error_domain"] == "config"
         assert body["instance"] == "/async-execution-not-enabled"
-        assert body["type"].endswith("/async-execution-not-enabled-error/")
+        assert body["type"] == runtime_unsupported.type_uri
         assert body["request_id"] == response.headers[REQUEST_ID_HEADER]
 
     def test_async_execution_not_enabled_logs_post_override_status(self, mocker: MockerFixture):
@@ -978,8 +999,8 @@ class TestExceptionHandlers:
         assert fields["error_domain"] == "config"
 
     def test_pipeline_run_id_conflict_maps_to_409(self):
-        # ``PipelineManagerAlreadyExistsError`` carries no ``error_domain``
-        # (-> 500 under the default mapping), but a duplicate ``pipeline_run_id``
+        # ``PipelineManagerAlreadyExistsError`` carries ``pipelex.run.already_exists``,
+        # whose domain alone does not give 409, and a duplicate ``pipeline_run_id``
         # is a client-visible conflict, not a server fault: the API overrides it
         # to 409 Conflict so callers can tell "this id is currently in use"
         # (resubmit after the in-flight run finishes, or pick a fresh id) apart
@@ -991,23 +1012,25 @@ class TestExceptionHandlers:
         # The body's ``status`` member must agree with the HTTP status (same
         # RFC 7807 agreement contract as the 501 override above).
         assert body["status"] == 409
+        run_already_exists = error_code_spec(PipelexErrorCode.RUN_ALREADY_EXISTS)
+        assert body["code"] == "pipelex.run.already_exists"
         assert body["error_type"] == "PipelineManagerAlreadyExistsError"
-        assert body["title"] == "Pipeline manager already exists"
+        assert body["title"] == run_already_exists.title
         assert body["instance"] == "/pipeline-run-id-conflict"
-        assert body["type"].endswith("/pipeline-manager-already-exists-error/")
+        assert body["type"] == run_already_exists.type_uri
         assert body["request_id"] == response.headers[REQUEST_ID_HEADER]
 
     def test_method_package_symlink_maps_to_422(self, mocker: MockerFixture):
-        # ``MethodPackageSymlinkError`` carries no ``error_domain`` (-> 500 under the
-        # default mapping), but a symlink in a fetched package is a rule about the
-        # fetched content that its author fixes, not a server fault: the API overrides
-        # it to 422, like the fetched-package ceilings, and logs it at warning.
+        # ``MethodPackageSymlinkError`` carries ``method.package_invalid``: a symlink in a
+        # fetched package is a rule about the fetched content that its author fixes, not a
+        # server fault, so it answers 422, like the fetched-package ceilings, and logs at warning.
         log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = _build_client().get("/method-package-symlink")
         assert response.status_code == 422
         assert response.headers["content-type"] == PROBLEM_JSON_MEDIA_TYPE
         body = response.json()
         assert body["status"] == 422
+        assert body["code"] == "method.package_invalid"
         assert body["error_type"] == "MethodPackageSymlinkError"
         assert "contains a symlink ('vendored')" in body["detail"]
         assert body["request_id"] == response.headers[REQUEST_ID_HEADER]

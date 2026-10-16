@@ -16,11 +16,9 @@ disclosure mode is a security-relevant mistake the operator must see.
 from pipelex.base_exceptions import DisclosureMode
 from pipelex.system.environment import get_optional_env
 
+from pipelex_api.exceptions import InvalidErrorDisclosureError
+
 ERROR_DISCLOSURE_ENV_VAR = "ERROR_DISCLOSURE"
-
-
-class InvalidErrorDisclosureError(ValueError):
-    """Raised at startup when `ERROR_DISCLOSURE` holds an unrecognized value."""
 
 
 def resolve_disclosure_mode() -> DisclosureMode:

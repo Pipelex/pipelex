@@ -219,6 +219,7 @@ class TestMethodRefRun:
         assert response.status_code == 422, response.text
         assert response.headers["content-type"] == "application/problem+json"
         assert response.json()["error_type"] == "MethodFetchError"
+        assert response.json()["code"] == "method.fetch_failed"
 
     def test_python_package_forbidden_when_not_sandbox_hosted(self, mocker: MockerFixture, install_method_package: Callable[..., Path]):
         install_method_package(files={"documents.mthds": VALID_MTHDS, "funcs/pipe_func.py": _PIPE_FUNC_PY})

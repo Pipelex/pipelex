@@ -32,6 +32,7 @@ from pydantic import BaseModel, ConfigDict
 
 from pipelex_api.error_types import ErrorType
 from pipelex_api.errors import raise_forbidden
+from pipelex_api.exceptions import ApiBootConfigError
 
 API_CONFIG_NAME = "api"
 
@@ -110,8 +111,15 @@ def resolve_orchestration_mode(requested: str | None, *, config: ApiConfig) -> s
     raise_forbidden(msg, error_type=ErrorType.ORCHESTRATION_MODE_OVERRIDE_FORBIDDEN)
 
 
-class ApiBootConfigError(ValueError):
-    """Raised at startup when the deployment's orchestration config cannot boot coherently."""
+def is_callers_override(*, orchestration_mode: str, config: ApiConfig) -> bool:
+    """Whether a resolved orchestration mode is a per-request override the caller named, not the deployment's default.
+
+    :func:`resolve_orchestration_mode` returns the default unless the caller named a different mode the policy
+    allows, so a resolved mode other than the default is always the caller's. A refusal of such a mode, such as
+    one no installed plugin serves, is the caller's to change (``runtime.unsupported``), where the same refusal of
+    the default is the operator's (``pipelex.plugin.not_found``).
+    """
+    return orchestration_mode != config.orchestration_mode
 
 
 def resolve_boot_orchestrator(config: ApiConfig) -> str | None:

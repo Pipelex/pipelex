@@ -71,6 +71,10 @@ class TestRunSourcePrecondition:
         assert response.headers["content-type"] == "application/problem+json"
         problem = response.json()
         assert problem["error_domain"] == "input"
+        # The runtime's own refusal of a field this runner does not take: `request.unsupported`.
+        assert problem["code"] == "request.unsupported"
+        assert problem["type"] == "https://mthds.ai/errors/request.unsupported"
+        assert problem["error_type"] == "PipelexRequestError"
         detail = problem["detail"]
         assert "`method_id`" in detail
         assert "not handled by this deployment" in detail
@@ -94,6 +98,7 @@ class TestRunSourcePrecondition:
         client, _ = _build_client(mocker)
         response = client.post("/v1/execute", json={})
         assert response.status_code == 422
+        assert response.json()["code"] == "request.invalid"
         detail = response.json()["detail"]
         assert _BASE_PRECONDITION_FRAGMENT in detail
         assert "not handled by this deployment" not in detail

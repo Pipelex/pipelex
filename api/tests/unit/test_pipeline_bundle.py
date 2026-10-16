@@ -389,6 +389,8 @@ class TestPipelineBundle:
         response = client.post("/v1/execute", json={**body, "inputs": {"text": "hi"}})
 
         assert response.status_code == 422, response.text
+        assert response.json()["code"] == "request.invalid"
+        assert response.json()["error_type"] == "PipelexRequestError"
         assert "dependencies" in response.json()["detail"]
         assert snapshot == {}, "the runner was reached"
 

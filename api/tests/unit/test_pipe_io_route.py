@@ -220,7 +220,10 @@ class TestPipeIoRoute:
         assert body["pipe_ref"] is None
         assert body["default_pipe_ref"] is None
         _assert_keys(body, {"other.shout"})
-        detail = _assert_input_422(client.post(PIPE_IO_PATH, json={"method_ref": STUB_METHOD_REF}), error_type=PIPE_NOT_FOUND_ERROR)
+        response = client.post(PIPE_IO_PATH, json={"method_ref": STUB_METHOD_REF})
+        detail = _assert_input_422(response, error_type=PIPE_NOT_FOUND_ERROR)
+        # The author's manifest names a pipe the method lacks: the method's fault, not the caller's selector.
+        assert response.json()["code"] == "method.pipe_unresolved"
         assert "manifest" in detail
         assert "not found" in detail
 
@@ -229,7 +232,9 @@ class TestPipeIoRoute:
         # ambiguous, naming both candidates, and a whole-method request states no default.
         install_method_package(files={"smoke.mthds": VALID_MTHDS, "twin.mthds": COLLIDING_ECHO_LIST_MTHDS})
         client = _build_client()
-        detail = _assert_input_422(client.post(PIPE_IO_PATH, json={"method_ref": STUB_METHOD_REF}), error_type=PIPE_AMBIGUOUS_ERROR)
+        response = client.post(PIPE_IO_PATH, json={"method_ref": STUB_METHOD_REF})
+        detail = _assert_input_422(response, error_type=PIPE_AMBIGUOUS_ERROR)
+        assert response.json()["code"] == "method.pipe_unresolved"
         assert "manifest" in detail
         assert "several domains" in detail
         assert "smoke.echo" in detail
@@ -243,7 +248,9 @@ class TestPipeIoRoute:
     def test_an_ambiguous_pipe_ref_says_ambiguous(self, all_pipes: bool):
         client = _build_client()
         payload = {"files": _files(VALID_MTHDS, COLLIDING_ECHO_LIST_MTHDS), "pipe_ref": "echo", "all_pipes": all_pipes}
-        detail = _assert_input_422(client.post(PIPE_IO_PATH, json=payload), error_type=PIPE_AMBIGUOUS_ERROR)
+        response = client.post(PIPE_IO_PATH, json=payload)
+        detail = _assert_input_422(response, error_type=PIPE_AMBIGUOUS_ERROR)
+        assert response.json()["code"] == "request.pipe_ambiguous"
         assert "Pipe 'echo'" in detail
         assert "several domains" in detail
         assert "smoke.echo" in detail
@@ -312,15 +319,20 @@ class TestPipeIoRoute:
             assert field_name not in body, f"the invalid arm never carries `{field_name}`"
 
     @pytest.mark.parametrize(
-        ("contents", "request_fields", "error_type", "detail_fragment", "fix_fragment"),
+        ("contents", "request_fields", "refusal", "detail_fragment", "fix_fragment"),
         [
             pytest.param(
-                (VALID_MTHDS,), {"pipe_ref": "smoke.not_a_pipe"}, PIPE_NOT_FOUND_ERROR, "not found", "Check the pipe code", id="unknown-ref"
+                (VALID_MTHDS,),
+                {"pipe_ref": "smoke.not_a_pipe"},
+                (PIPE_NOT_FOUND_ERROR, "request.pipe_not_found"),
+                "not found",
+                "Check the pipe code",
+                id="unknown-ref",
             ),
             pytest.param(
                 (VALID_MTHDS,),
                 {"pipe_ref": "smoke.not_a_pipe", "all_pipes": True},
-                PIPE_NOT_FOUND_ERROR,
+                (PIPE_NOT_FOUND_ERROR, "request.pipe_not_found"),
                 "not found",
                 "Check the pipe code",
                 id="unknown-ref-under-all-pipes",
@@ -328,7 +340,7 @@ class TestPipeIoRoute:
             pytest.param(
                 (NO_MAIN_PIPE_MTHDS,),
                 {},
-                PIPE_NOT_FOUND_ERROR,
+                (PIPE_NOT_FOUND_ERROR, "request.pipe_unspecified"),
                 "declares no `main_pipe`",
                 "Send a `pipe_ref` naming the pipe to select",
                 id="no-entry-pipe",
@@ -336,7 +348,7 @@ class TestPipeIoRoute:
             pytest.param(
                 (VALID_MTHDS, SECOND_MAIN_PIPE_MTHDS),
                 {},
-                PIPE_AMBIGUOUS_ERROR,
+                (PIPE_AMBIGUOUS_ERROR, "request.pipe_ambiguous"),
                 "several `main_pipe`s",
                 "one of the declared `main_pipe`s",
                 id="several-entry-pipes",
@@ -344,17 +356,20 @@ class TestPipeIoRoute:
         ],
     )
     def test_selection_refusals_carry_the_entry_lookup_error_type(
-        self, contents: tuple[str, ...], request_fields: dict[str, Any], error_type: str, detail_fragment: str, fix_fragment: str
+        self, contents: tuple[str, ...], request_fields: dict[str, Any], refusal: tuple[str, str], detail_fragment: str, fix_fragment: str
     ):
         # A selection refusal is an input 422 like a malformed request, but its `error_type` is the
         # pipelex entry-lookup class that names the failure, so a client branches on it; its problem
         # `type` names the selection too, and its `user_action` names the fix for this very miss —
         # a default chain that finds no entry pipe, or several, is no pipe-code typo.
+        error_type, code = refusal
         client = _build_client()
         response = client.post(PIPE_IO_PATH, json={"files": _files(*contents), **request_fields})
         detail = _assert_input_422(response, error_type=error_type)
         assert detail_fragment in detail
         problem = response.json()
+        assert problem["code"] == code
+        assert problem["type"] == f"https://mthds.ai/errors/{code}"
         assert problem["type"] != client.post(PIPE_IO_PATH, json={}).json()["type"], "a selection refusal must not share the request-shape type"
         assert problem["user_action"]["kind"] == "change_input"
         assert fix_fragment in problem["user_action"]["detail"]
@@ -406,7 +421,9 @@ class TestPipeIoRoute:
         # none. The manifest only ever adds a default, so the closure arm's refusal stands.
         install_method_package(files={"documents.mthds": NO_MAIN_PIPE_MTHDS}, manifest_toml=STUB_METHOD_MANIFEST_NO_MAIN_PIPE)
         client = _build_client()
-        detail = _assert_input_422(client.post(PIPE_IO_PATH, json={"method_ref": STUB_METHOD_REF}), error_type=PIPE_NOT_FOUND_ERROR)
+        response = client.post(PIPE_IO_PATH, json={"method_ref": STUB_METHOD_REF})
+        detail = _assert_input_422(response, error_type=PIPE_NOT_FOUND_ERROR)
+        assert response.json()["code"] == "request.pipe_unspecified"
         assert "main_pipe" in detail
 
     @pytest.mark.parametrize(
@@ -492,9 +509,10 @@ class TestPipeIoRoute:
         created_library_id, _ = open_spy.spy_return
         teardown_spy.assert_called_once_with(library_id=created_library_id)
 
-    def test_an_underivable_artifact_is_a_no_verdict_500_and_still_tears_down(self, mocker: MockerFixture):
-        # `PipeIOContractError` is left to the global handler, exactly as on `/v1/validate`: a fault of
-        # the tool, not a verdict about the method. The library is still torn down.
+    def test_an_underivable_artifact_is_a_no_verdict_problem_and_still_tears_down(self, mocker: MockerFixture):
+        # `PipeIOContractError` is left to the global handler, exactly as on `/v1/validate`: no verdict,
+        # a problem document carrying `method.concept_invalid`, since a concept's structure cannot be
+        # described. The library is still torn down.
         mocker.patch(
             "pipelex_api.routes.pipelex.pipe_io.build_pipe_io_artifacts",
             side_effect=PipeIOContractError(message="Failed to render the JSON Schema for the output of pipe 'smoke.echo'"),
@@ -506,8 +524,9 @@ class TestPipeIoRoute:
         client = _build_client()
         response = client.post(PIPE_IO_PATH, json={"files": [{"content": VALID_MTHDS}]})
 
-        assert response.status_code == 500, response.text
+        assert response.status_code == 422, response.text
         assert response.headers["content-type"] == "application/problem+json"
         assert "is_valid" not in response.json()
+        assert response.json()["code"] == "method.concept_invalid"
         assert open_spy.call_count == 1
         assert teardown_spy.call_count == 1

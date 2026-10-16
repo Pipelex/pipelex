@@ -268,6 +268,7 @@ class TestMethodTreeRuns:
         assert [(item["source"], item["line"], item["column"]) for item in run.json()["validation_errors"]] == [("bad.mthds", 1, 1)]
         assert run_from_the_entry.status_code == 422, run_from_the_entry.text
         assert run_from_the_entry.json()["error_type"] == "MethodEntryError"
+        assert run_from_the_entry.json()["code"] == "method.syntax"
         assert "'bad.mthds'" in run_from_the_entry.json()["detail"]
         assert validated.status_code == 200, validated.text
         verdict = validated.json()

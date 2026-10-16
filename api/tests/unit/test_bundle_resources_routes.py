@@ -295,8 +295,11 @@ class TestBundleResourcesRoutes:
         body.pop("mthds_contents", None)
         body.pop("files", None)
         body["method_ref"] = f"{STUB_METHOD_ADDRESS}@v0.1.0"
+        # The run route refuses it in its request model, as the runtime's `request.invalid`; the crate
+        # routes refuse it themselves, with the API-authored `ValidationError`.
+        expected_error_type = "PipelexRequestError" if route == "/v1/execute" else "ValidationError"
 
-        detail = _assert_problem(_build_client().post(route, json=body), status=422, error_type="ValidationError")
+        detail = _assert_problem(_build_client().post(route, json=body), status=422, error_type=expected_error_type)
 
         assert "method_ref" in detail
 
@@ -325,7 +328,8 @@ class TestBundleResourcesRoutes:
     def test_resources_with_no_bundle_to_read_them_are_refused(self) -> None:
         response = _build_client().post("/v1/execute", json={"pipe_code": "print_invoice", "resources": {_TEMPLATE_PATH: _b64(_TEMPLATE_BYTES)}})
 
-        assert "resources accompany the bundle" in _assert_problem(response, status=422, error_type="ValidationError")
+        assert "resources accompany the bundle" in _assert_problem(response, status=422, error_type="PipelexRequestError")
+        assert response.json()["code"] == "request.invalid"
 
     def test_a_run_handed_to_a_remote_orchestrator_names_the_tree_of_its_files_by_digest(self, mocker: MockerFixture) -> None:
         """`/start` on a Temporal-like orchestrator: the job's crate and run metadata name the tree, and the job carries none of its files."""
