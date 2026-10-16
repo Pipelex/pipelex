@@ -88,6 +88,7 @@ DuplicateStorageProviderError | Duplicate storage provider | https://docs.pipele
 EntryPipeAmbiguousError | Entry pipe ambiguous | https://docs.pipelex.com/latest/errors/entry-pipe-ambiguous-error/
 EntryPipeNotFoundError | Entry pipe not found | https://docs.pipelex.com/latest/errors/entry-pipe-not-found-error/
 EnvVarNotFoundError | Environment variable not set | https://docs.pipelex.com/latest/errors/env-var-not-found-error/
+ErrorRegistryError | Error registry | https://docs.pipelex.com/latest/errors/error-registry-error/
 EventLogError | Event log | https://docs.pipelex.com/latest/errors/event-log-error/
 EventLogReadError | Event log read | https://docs.pipelex.com/latest/errors/event-log-read-error/
 EventLogSchemaMismatchError | Event log schema mismatch | https://docs.pipelex.com/latest/errors/event-log-schema-mismatch-error/

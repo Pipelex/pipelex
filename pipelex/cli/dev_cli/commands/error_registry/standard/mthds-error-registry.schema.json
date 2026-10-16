@@ -1,0 +1,298 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MTHDS error registry",
+  "description": "The format of an MTHDS error registry: the core registry, which the MTHDS standard publishes, and the registry an owner of an extension prefix publishes for its own codes. Every entry declares every member a code needs, so no code is undomained, no verdict unknown and no step absent. The closed lists of domains, retry verdicts and step kinds are those of the Problem schema in mthds-protocol.openapi.yaml. See spec/error-registry.md on mthds.ai.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "base_url", "families", "codes"],
+  "properties": {
+    "version": {
+      "description": "The version of the release this registry is published with. For the core registry it is the MTHDS standard version; for an extension registry, the version of its owner's release.",
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.\\-]+)?$"
+    },
+    "prefix": {
+      "description": "The registered extension prefix every code of this registry starts with. The core registry has none, since core codes are bare.",
+      "$ref": "#/$defs/segment"
+    },
+    "base_url": {
+      "description": "The base URL the pages of this registry's codes are published under. A code's type URI is this base URL, a slash, then the whole code.",
+      "$ref": "#/$defs/baseUrl"
+    },
+    "extension_prefixes": {
+      "description": "The core registry's list of registered extension prefixes, each with its owner and the base URL its codes' pages are published under. An extension registry has no such list.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/extensionPrefix" }
+    },
+    "families": {
+      "description": "The families this registry's codes belong to, in the order its pages present them. A code's family is the code without its last segment.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/family" }
+    },
+    "codes": {
+      "description": "One entry per code.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "if": { "required": ["prefix"] },
+  "then": {
+    "properties": {
+      "extension_prefixes": false,
+      "families": { "items": { "properties": { "family": { "$ref": "#/$defs/extensionFamily" } } } },
+      "codes": { "items": { "properties": { "code": { "$ref": "#/$defs/extensionCode" } } } }
+    }
+  },
+  "else": {
+    "required": ["extension_prefixes"],
+    "properties": {
+      "families": { "items": { "properties": { "family": { "$ref": "#/$defs/segment" } } } },
+      "codes": { "items": { "properties": { "code": { "$ref": "#/$defs/coreCode" } } } }
+    }
+  },
+  "$defs": {
+    "segment": {
+      "description": "One segment of a code: a lowercase letter, then lowercase letters, digits and underscores.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "coreCode": {
+      "description": "A core code: exactly a family and a name.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$"
+    },
+    "extensionFamily": {
+      "description": "An extension family: the prefix and a family.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$"
+    },
+    "extensionCode": {
+      "description": "An extension code: the prefix, a family and a name.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$"
+    },
+    "baseUrl": {
+      "description": "An https URL: a lowercase host name, an optional port and a path of non-empty segments, with no trailing slash, query or fragment.",
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::[0-9]{1,5})?(?:/[A-Za-z0-9._~%!$&'()*+,;=:@-]+)*$"
+    },
+    "text": {
+      "description": "Prose for a person: a word, a phrase or sentences, never empty.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "template": {
+      "description": "A sentence or two with {name} placeholders, each naming a parameter the code declares. A literal brace is written twice.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "domain": {
+      "description": "Who must act. The closed list of ProblemDomain in mthds-protocol.openapi.yaml.",
+      "enum": ["input", "method", "account", "operator", "runtime"]
+    },
+    "retry": {
+      "description": "Whether repeating the operation that produced the problem can succeed. The closed list of RetryVerdict in mthds-protocol.openapi.yaml.",
+      "enum": ["no", "yes", "outcome_unknown"]
+    },
+    "stepKind": {
+      "description": "What the reader does next. The closed list of StepKind in mthds-protocol.openapi.yaml.",
+      "enum": [
+        "retry",
+        "wait",
+        "read_run",
+        "refresh",
+        "change_input",
+        "change_method",
+        "change_model",
+        "check_credentials",
+        "request_access",
+        "check_account",
+        "fix_configuration",
+        "upgrade",
+        "contact_owner",
+        "report"
+      ]
+    },
+    "step": {
+      "description": "One next step: its closed kind and the template of its detail sentence.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "detail"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/stepKind" },
+        "detail": { "$ref": "#/$defs/template" }
+      }
+    },
+    "scalarType": {
+      "description": "The type of a parameter that holds one value. identifier: a name, a code or an id. integer: a whole number. seconds: a number of seconds, never negative. bytes: a size in bytes, never negative. sha256: a SHA-256 hash in lowercase hexadecimal. enum: one of the listed values. caller_text: the caller's own text, capped, such as a parser's finding about the caller's method.",
+      "enum": ["identifier", "integer", "seconds", "bytes", "sha256", "enum", "caller_text"]
+    },
+    "enumValues": {
+      "description": "The values an enum parameter may hold.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/segment" }
+    },
+    "itemType": {
+      "description": "The type of each item of a list parameter.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "$ref": "#/$defs/scalarType" },
+        "values": { "$ref": "#/$defs/enumValues" }
+      },
+      "if": { "properties": { "type": { "const": "enum" } } },
+      "then": { "required": ["values"] },
+      "else": { "properties": { "values": false } }
+    },
+    "param": {
+      "description": "One parameter of a code: a typed fact its sentences are written from.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "description"],
+      "properties": {
+        "type": {
+          "description": "A scalar type, or list for a list of items of the type items names.",
+          "anyOf": [{ "$ref": "#/$defs/scalarType" }, { "const": "list" }]
+        },
+        "values": { "$ref": "#/$defs/enumValues" },
+        "items": { "$ref": "#/$defs/itemType" },
+        "description": { "$ref": "#/$defs/text" },
+        "optional": {
+          "description": "True when an occurrence of the code may lack this fact. A parameter not declared optional is present on every occurrence that the reader's view includes it in.",
+          "type": "boolean"
+        },
+        "operator_only": {
+          "description": "True for a fact of the runtime's own configuration that only whoever runs the runtime may read. An implementation leaves it out of every problem it answers to a caller.",
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "enum" } } },
+          "then": { "required": ["values"] },
+          "else": { "properties": { "values": false } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "list" } } },
+          "then": { "required": ["items"] },
+          "else": { "properties": { "items": false } }
+        }
+      ]
+    },
+    "reference": {
+      "description": "A page of the specification that defines the situation a code names: a path from the documentation root to a Markdown page, with an optional anchor, and the text to link it with.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "href"],
+      "properties": {
+        "title": { "$ref": "#/$defs/text" },
+        "href": {
+          "type": "string",
+          "pattern": "^[a-z0-9_\\-]+(/[a-z0-9_\\-.]+)*\\.md(#[a-z0-9_\\-]+)?$"
+        }
+      }
+    },
+    "family": {
+      "description": "A family of codes and what its codes are about.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["family", "description"],
+      "properties": {
+        "family": { "type": "string" },
+        "description": { "$ref": "#/$defs/text" }
+      }
+    },
+    "extensionPrefix": {
+      "description": "A registered extension prefix. A registered prefix is never reassigned to another owner.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prefix", "owner", "base_url"],
+      "properties": {
+        "prefix": { "$ref": "#/$defs/segment" },
+        "owner": { "$ref": "#/$defs/text" },
+        "base_url": { "$ref": "#/$defs/baseUrl" }
+      }
+    },
+    "entry": {
+      "description": "One code and everything a reader needs from it. The code decides: its title, domain, retry verdict, steps, parameters and HTTP status are properties of the code, never set independently by an emitter.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "title",
+        "domain",
+        "retry",
+        "raised_as",
+        "detail",
+        "steps",
+        "params",
+        "meaning",
+        "what_to_do"
+      ],
+      "properties": {
+        "code": { "type": "string" },
+        "title": {
+          "description": "The code's short title, the same for every occurrence of the code.",
+          "$ref": "#/$defs/text"
+        },
+        "domain": { "$ref": "#/$defs/domain" },
+        "retry": { "$ref": "#/$defs/retry" },
+        "raised_as": {
+          "description": "How the code reaches a reader. problem: as a problem document, the body of an HTTP response or kept in a run's record, so it has a status. warning: only as an item of a validate verdict's warnings, so it has none. client: detected by a client itself and never received as a body, so it has none.",
+          "enum": ["problem", "warning", "client"]
+        },
+        "status": {
+          "description": "The HTTP status of a response the code is the body of. A code kept only in a run's record carries the status the run's synchronous execution would answer with.",
+          "type": "integer",
+          "minimum": 400,
+          "maximum": 599
+        },
+        "detail": {
+          "description": "The template of the problem's detail: this occurrence, in one or two sentences.",
+          "$ref": "#/$defs/template"
+        },
+        "steps": {
+          "description": "The step for the domain's actor and the step for any other reader.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["actor", "other"],
+          "properties": {
+            "actor": { "$ref": "#/$defs/step" },
+            "other": { "$ref": "#/$defs/step" }
+          }
+        },
+        "params": {
+          "description": "The code's parameters by name, in the order its page lists them. Empty for a code that declares none.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/segment" },
+          "additionalProperties": { "$ref": "#/$defs/param" }
+        },
+        "meaning": {
+          "description": "What the code means, as its page says it.",
+          "$ref": "#/$defs/text"
+        },
+        "what_to_do": {
+          "description": "What to do about it, as its page says it.",
+          "$ref": "#/$defs/text"
+        },
+        "see": {
+          "description": "The pages of the specification that define the situation the code names.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/reference" }
+        }
+      },
+      "if": { "properties": { "raised_as": { "const": "problem" } } },
+      "then": { "required": ["status"] },
+      "else": { "properties": { "status": false } }
+    }
+  }
+}
