@@ -1,5 +1,5 @@
 from collections.abc import Awaitable, Callable
-from typing import Any, Protocol
+from typing import Any, Protocol, TypeVar
 
 from jinja2.exceptions import (
     SecurityError,
@@ -31,18 +31,30 @@ from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.jinja2.template_owner import TemplateOwner
 from pipelex.tools.templating.templating_style import TemplatingStyle
 
+_TemplateError = TypeVar("_TemplateError", bound=ToolError)
+
+
+def _coded_by_owner(*, error: _TemplateError, template_owner: TemplateOwner) -> _TemplateError:
+    """A failure of a template, coded by whose template it is.
+
+    On a method's template the error keeps the code its raise site gave it, or its class's default; on Pipelex's own
+    template the failure is ours, `runtime.unexpected`, whose message never reaches a caller, since a caller must not
+    read that template's source. Every class it serves declares `runtime.unexpected` among its codes.
+    """
+    match template_owner:
+        case TemplateOwner.METHOD:
+            return error
+        case TemplateOwner.PIPELEX:
+            return error.with_error_code(CoreCode.RUNTIME_UNEXPECTED)
+
 
 def _add_to_templating_context(
     templating_context: dict[str, Any], *, jinja2_context_key: Jinja2ContextKey, value: Any, template_owner: TemplateOwner
 ) -> None:
     if jinja2_context_key in templating_context:
+        # On a method's template, a method variable named like the reserved key: `method.name_conflict`, the default.
         msg = f"Jinja2 context key '{jinja2_context_key}' already in templating_context"
-        match template_owner:
-            case TemplateOwner.METHOD:
-                # A method variable named like the reserved key.
-                raise Jinja2StuffError(msg).with_error_code(CoreCode.METHOD_NAME_CONFLICT)
-            case TemplateOwner.PIPELEX:
-                raise Jinja2StuffError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
+        raise _coded_by_owner(error=Jinja2StuffError(msg), template_owner=template_owner)
     templating_context[jinja2_context_key] = value
 
 
@@ -156,32 +168,24 @@ def _make_invalid_template_error(*, template_error: TemplateError, template_owne
     else:
         fault = template_error.message or type(template_error).__name__
     msg = f"Jinja2 render — the template cannot render as written: {fault}"
-    match template_owner:
-        case TemplateOwner.METHOD:
-            return Jinja2TemplateInvalidError(msg, fault=fault).as_caller_fault()
-        case TemplateOwner.PIPELEX:
-            return Jinja2TemplateInvalidError(msg, fault=fault).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
+    invalid_error = _coded_by_owner(error=Jinja2TemplateInvalidError(msg, fault=fault, template_owner=template_owner), template_owner=template_owner)
+    if template_owner.is_method:
+        # The message names the construct Jinja2 refused and never the source, so the method's author reads it.
+        invalid_error.as_caller_fault()
+    return invalid_error
 
 
 def _make_data_render_error(*, msg: str, template_owner: TemplateOwner) -> Jinja2TemplateRenderError:
     """The error of a render that failed on this run's data or on the template, which nothing here tells apart."""
-    match template_owner:
-        case TemplateOwner.METHOD:
-            return Jinja2TemplateRenderError(msg)
-        case TemplateOwner.PIPELEX:
-            return Jinja2TemplateRenderError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
+    return _coded_by_owner(error=Jinja2TemplateRenderError(msg), template_owner=template_owner)
 
 
 def _make_context_render_error(*, msg: str, context_error: Jinja2ContextError, template_owner: TemplateOwner) -> Jinja2TemplateRenderError:
     """The error of a render whose filter refused the context or the value: on a method's template, the filter's code."""
-    match template_owner:
-        case TemplateOwner.METHOD:
-            render_error = Jinja2TemplateRenderError(msg)
-            if context_error.own_error_code is not None:
-                render_error.with_error_code(context_error.own_error_code)
-            return render_error
-        case TemplateOwner.PIPELEX:
-            return Jinja2TemplateRenderError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
+    render_error = Jinja2TemplateRenderError(msg)
+    if context_error.own_error_code is not None:
+        render_error.with_error_code(context_error.own_error_code)
+    return _coded_by_owner(error=render_error, template_owner=template_owner)
 
 
 # What a render can raise, each translated by `_make_render_failure`. `SecurityError` and `UndefinedError` are
@@ -212,11 +216,7 @@ def _make_render_failure(
     """
     if isinstance(render_error, SecurityError):
         security_msg = _make_security_error_msg(security_error=render_error)
-        match template_owner:
-            case TemplateOwner.METHOD:
-                return Jinja2TemplateSecurityError(security_msg)
-            case TemplateOwner.PIPELEX:
-                return Jinja2TemplateSecurityError(security_msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
+        return _coded_by_owner(error=Jinja2TemplateSecurityError(security_msg), template_owner=template_owner)
     if isinstance(render_error, (RenderBudgetExceededError, RecursionError)):
         budget_msg = _make_budget_error_msg(budget_error=render_error) if isinstance(render_error, RenderBudgetExceededError) else _RECURSION_MSG
         match template_owner:

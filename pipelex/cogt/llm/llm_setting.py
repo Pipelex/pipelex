@@ -81,9 +81,6 @@ class LLMSettingChoices(ConfigModel):
     for_text: LLMModelChoice | None
     for_object: LLMModelChoice | None
 
-    def list_choice_references(self) -> set[ModelReference]:
-        return {item for item in (self.for_text, self.for_object) if isinstance(item, ModelReference)}
-
     @classmethod
     def make_completed_with_defaults(cls, *, for_text: LLMModelChoice | None = None, for_object: LLMModelChoice | None = None) -> Self:
         return cls(

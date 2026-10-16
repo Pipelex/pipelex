@@ -11,3 +11,12 @@ class TemplateOwner(StrEnum):
 
     METHOD = "method"
     PIPELEX = "pipelex"
+
+    @property
+    def is_method(self) -> bool:
+        """Whether the template is the method's own, whose failure is the method's to fix."""
+        match self:
+            case TemplateOwner.METHOD:
+                return True
+            case TemplateOwner.PIPELEX:
+                return False
