@@ -16,7 +16,15 @@ from mistralai.client.models import UserMessage
 from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import ErrorDomain
-from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
+from pipelex.cogt.exceptions import (
+    CogtError,
+    ExtractJobFailureError,
+    ImgGenGenerationError,
+    InferenceErrorCategory,
+    JudgmentJobFailureError,
+    LLMCompletionError,
+    SearchJobFailureError,
+)
 from pipelex.cogt.inference.error_classification import (
     ProviderErrorMetadata,
     UserActionKind,
@@ -61,6 +69,18 @@ _OPENAI_CONTEXT_WINDOW: _Body = {
         "message": "Your input exceeds the context window of this model. Please adjust your input and try again.",
         "type": "invalid_request_error",
         "param": "input",
+        "code": "context_length_exceeded",
+    }
+}
+# OpenAI's refusal when the messages and the completion the request reserves with max_tokens together pass the window
+_OPENAI_MESSAGES_AND_COMPLETION: _Body = {
+    "error": {
+        "message": (
+            "This model's maximum context length is 128000 tokens. However, you requested 130000 tokens "
+            "(10000 in the messages, 120000 in the completion). Please reduce the length of the messages or completion."
+        ),
+        "type": "invalid_request_error",
+        "param": "messages",
         "code": "context_length_exceeded",
     }
 }
@@ -175,6 +195,13 @@ _REFUSALS = [
     ),
     pytest.param(_openai_refusal, _OPENAI_CONTEXT_WINDOW, extract_openai_metadata, CoreCode.MODEL_CONTEXT_EXCEEDED, id="openai-context-window"),
     pytest.param(
+        _openai_refusal,
+        _OPENAI_MESSAGES_AND_COMPLETION,
+        extract_openai_metadata,
+        CoreCode.MODEL_CONTEXT_EXCEEDED,
+        id="openai-messages-and-completion",
+    ),
+    pytest.param(
         _anthropic_refusal, _ANTHROPIC_PROMPT_TOO_LONG, extract_anthropic_metadata, CoreCode.MODEL_CONTEXT_EXCEEDED, id="anthropic-prompt-too-long"
     ),
     pytest.param(
@@ -229,6 +256,99 @@ class TestContextWindowRefusals:
         assert rendered.resolve_error_code() == expected_error_code
         assert rendered.user_action is not None
         assert ("context window" in rendered.user_action.detail) is (expected_error_code == CoreCode.MODEL_CONTEXT_EXCEEDED)
+
+    @pytest.mark.parametrize(
+        ("raise_refusal", "answer", "extract_metadata"),
+        [
+            pytest.param(_anthropic_refusal, _ANTHROPIC_INPUT_AND_MAX_TOKENS, extract_anthropic_metadata, id="anthropic-input-and-max-tokens"),
+            pytest.param(_openai_refusal, _OPENAI_MESSAGES_AND_COMPLETION, extract_openai_metadata, id="openai-messages-and-completion"),
+            pytest.param(_anthropic_refusal, _ANTHROPIC_PROMPT_TOO_LONG, extract_anthropic_metadata, id="anthropic-prompt-too-long"),
+        ],
+    )
+    def test_a_language_models_window_advice_names_the_input_and_max_tokens(
+        self,
+        raise_refusal: Callable[[Any], BaseException],
+        answer: Any,
+        extract_metadata: Callable[[BaseException], ProviderErrorMetadata],
+    ) -> None:
+        """The window holds the prompt and the output max_tokens reserves, which may be the deck's default: either can be reduced."""
+        metadata = extract_metadata(raise_refusal(answer))
+        classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
+        rendered = render_inference_error(
+            metadata=metadata,
+            classification=classification,
+            family=InferenceErrorFamily.LLM,
+            model_desc="test-model-desc",
+            model_handle="test-model",
+        )
+
+        assert rendered.resolve_error_code() == CoreCode.MODEL_CONTEXT_EXCEEDED
+        assert rendered.user_action is not None
+        assert rendered.user_action.detail == (
+            "The prompt plus the output requested with max_tokens exceed the model's context window — shorten the input "
+            "or lower max_tokens, or choose a model with a larger context window."
+        )
+
+    @pytest.mark.parametrize(
+        ("family", "expected_class", "expected_detail"),
+        [
+            (
+                InferenceErrorFamily.IMG_GEN,
+                ImgGenGenerationError,
+                "The prompt or its input images exceed what the image model can read — shorten the prompt or send fewer images.",
+            ),
+            (
+                InferenceErrorFamily.EXTRACT,
+                ExtractJobFailureError,
+                "The document exceeds what the extraction model can read — send a shorter document, or split it.",
+            ),
+            (
+                InferenceErrorFamily.SEARCH,
+                SearchJobFailureError,
+                "The query built from the inputs exceeds what the search model can read — shorten the inputs.",
+            ),
+            (
+                InferenceErrorFamily.JUDGMENT,
+                JudgmentJobFailureError,
+                "The material to judge exceeds what the judgment model can read — shorten it.",
+            ),
+        ],
+    )
+    @pytest.mark.parametrize(
+        ("raise_refusal", "answer", "extract_metadata"),
+        [
+            pytest.param(_gemini_refusal, _GEMINI_INPUT_TOKEN_COUNT, extract_google_metadata, id="gemini-input-token-count"),
+            pytest.param(_anthropic_refusal, _ANTHROPIC_PROMPT_TOO_LONG, extract_anthropic_metadata, id="anthropic-prompt-too-long"),
+            pytest.param(_bedrock_refusal, _BEDROCK_INPUT_TOO_LONG, extract_bedrock_metadata, id="bedrock-input-too-long"),
+        ],
+    )
+    def test_another_familys_advice_fits_what_its_model_reads(
+        self,
+        raise_refusal: Callable[[Any], BaseException],
+        answer: Any,
+        extract_metadata: Callable[[BaseException], ProviderErrorMetadata],
+        family: InferenceErrorFamily,
+        expected_class: type[CogtError],
+        expected_detail: str,
+    ) -> None:
+        """The inputs exceed what the model can read, whatever it does, but only a language model has max_tokens or a window to choose."""
+        metadata = extract_metadata(raise_refusal(answer))
+        classification = classify_inference_error(metadata, family=family)
+        rendered = render_inference_error(
+            metadata=metadata,
+            classification=classification,
+            family=family,
+            model_desc="test-model-desc",
+            model_handle="test-model",
+        )
+
+        assert isinstance(rendered, expected_class)
+        assert rendered.resolve_error_code() == CoreCode.MODEL_CONTEXT_EXCEEDED
+        assert rendered.user_action is not None
+        assert rendered.user_action.kind is UserActionKind.CHANGE_INPUT
+        assert rendered.user_action.detail == expected_detail
+        assert "context window" not in rendered.user_action.detail
+        assert "max_tokens" not in rendered.user_action.detail
 
     @pytest.mark.parametrize(
         ("status_code", "sdk_exception_type"),

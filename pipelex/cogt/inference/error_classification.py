@@ -163,9 +163,11 @@ class ProviderErrorMetadata(BaseModel):
 
     @property
     def is_context_window_exceeded(self) -> bool:
-        """Whether the provider refused the request because its prompt is over the model's context window.
+        """Whether the provider refused the request because its inputs are over what the model can read.
 
-        Reads the structured error code first, ``provider_error_code`` and the code an error body carries
+        For a language model, that is its context window, which holds the prompt and the output the request reserves
+        with ``max_tokens`` together, so a refusal the ``max_tokens`` sent caused reads the same. Reads the structured
+        error code first, ``provider_error_code`` and the code an error body carries
         (OpenAI puts ``context_length_exceeded`` in ``code`` beside a generic ``type``, which the Extract step
         prefers), then the wording each provider gives such a refusal in its rendered message. Only the
         classifier's 400 arm reads it, and the Render step words its next step from the code that arm picks, so a
@@ -249,11 +251,16 @@ _CONTENT_POLICY_PATTERNS: tuple[str, ...] = (
 _CONTEXT_WINDOW_ERROR_CODES: frozenset[str] = frozenset({"context_length_exceeded"})
 
 # How each provider words that refusal in the message its SDK renders, every one a 400. Each phrase names the
-# context window or the prompt's length, so a 400 about a parameter or a malformed request matches none of them.
+# context window or the prompt's length, so a 400 about a malformed request matches none of them. A language model's
+# window also holds the output the request reserves with `max_tokens`, so two of them also match a 400 the
+# `max_tokens` sent caused, which the deck's default may be: Anthropic's "exceed context limit" and OpenAI's "maximum
+# context length", which counts the completion beside the messages. The Render step's advice for the language-model
+# family therefore names both the input and `max_tokens`.
 _CONTEXT_WINDOW_PATTERNS: tuple[str, ...] = (
     # OpenAI's code, which its SDK renders into the message with the error body
     "context_length_exceeded",
-    # OpenAI's earlier wording, also Mistral's and that of OpenAI-compatible servers such as vLLM
+    # OpenAI's earlier wording, also Mistral's and that of OpenAI-compatible servers such as vLLM, for the messages
+    # alone or for the messages and the completion together
     "maximum context length",
     # OpenAI's current wording
     "exceeds the context window",

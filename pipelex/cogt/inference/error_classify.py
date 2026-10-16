@@ -250,8 +250,11 @@ def _classify_server_error(*, status_code: int, family: InferenceErrorFamily) ->
 def _bad_request_error_code(*, metadata: SDKErrorEnvelope) -> ErrorCode:
     """The code of a provider 400, which says what the provider refused when it says it, and is ours otherwise.
 
-    A prompt over the model's context window is the caller's input to shorten, and a content-policy signal is the
-    caller's material refused. A 400 nothing recognises is most likely a request of ours the provider could not take.
+    Inputs over what the model can read are the caller's to shorten, and a content-policy signal is the caller's
+    material refused. A 400 nothing recognises is most likely a request of ours the provider could not take. Every
+    family reads the context-window signal: ``model.context_exceeded`` means the inputs exceed what the model can read,
+    whether the model writes text, generates images or reads documents, as an image model whose prompt images exceed
+    its limit already reports, so the code stays the same and the Render step words the advice for the family.
     """
     if metadata.is_context_window_exceeded:
         return CoreCode.MODEL_CONTEXT_EXCEEDED
