@@ -1220,7 +1220,7 @@ docs-deploy-specific-version-pre-release: env generate-error-registry-quiet
 # WARNING: Do NOT insert comments inside the shell continuation chain below.
 # Lines starting with # after a \ continuation become shell comments that silently
 # truncate the command.
-docs-deploy-root:
+docs-deploy-root: env
 ifeq ($(SITE_DOMAIN),)
 	$(error SITE_DOMAIN is empty — docs/CNAME is missing or blank. Cannot generate root assets with valid URLs)
 endif
