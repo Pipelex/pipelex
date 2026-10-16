@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 import re
+from typing import TYPE_CHECKING
 
 from pipelex.cli.dev_cli.commands.error_registry.error_registry_cmd import check_error_registry_cmd
-from pipelex.cli.dev_cli.commands.error_registry.registry_outputs import check_error_registry
+from pipelex.cli.dev_cli.commands.error_registry.registry_outputs import check_error_registry, orphan_pages
 from pipelex.cli.dev_cli.commands.error_registry.registry_source import (
     DOCS_DIR,
     REGISTRY_SNAPSHOT_PATH,
@@ -16,6 +17,9 @@ from pipelex.cli.dev_cli.commands.error_registry.registry_source import (
 from pipelex.cli.dev_cli.commands.error_registry.registry_version import registry_version_of
 from pipelex.errors.registry.pipelex_codes import PIPELEX_ERROR_PARAMS, PipelexErrorCode
 from pipelex.errors.registry.registry_document import load_pipelex_error_registry, read_pipelex_error_registry_snapshot_text
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 REMEDY = "run `make generate-error-registry` to rewrite them from pipelex/errors/registry/pipelex-error-registry.yaml"
 
@@ -64,3 +68,13 @@ class TestErrorRegistryOutputs:
         assert vendored_file_errors(record=record) == []
         assert set(record.files) == {"mthds-error-registry.schema.json", "mthds-error-registry.json"}
         assert re.fullmatch(r"[0-9a-f]{40}", record.source.commit)
+
+    def test_a_hidden_file_under_the_pages_is_no_orphan(self, tmp_path: Path) -> None:
+        """A `.DS_Store` a desktop leaves under docs/errors/ is neither reported nor removed; a stray page is."""
+        pages_dir = tmp_path / "errors"
+        (pages_dir / "pipelex" / ".cache").mkdir(parents=True)
+        generated = pages_dir / "index.md"
+        stray = pages_dir / "pipelex" / "stray.md"
+        for path in (generated, stray, pages_dir / ".DS_Store", pages_dir / "pipelex" / ".DS_Store", pages_dir / "pipelex" / ".cache" / "page.md"):
+            path.write_text("text", encoding="utf-8")
+        assert orphan_pages(outputs={generated: "text"}, pages_dir=pages_dir) == [stray]

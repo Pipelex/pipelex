@@ -8,7 +8,7 @@ From the YAML source and Pipelex's version come, and only come:
 - the documentation pages, ``docs/errors/index.md`` and one page per code beneath it.
 
 The generator owns ``docs/errors/`` whole: a page there that it does not write is removed when it writes,
-and reported when it checks.
+and reported when it checks. A hidden file, such as ``.DS_Store``, is no page, and is left alone.
 """
 
 from __future__ import annotations
@@ -105,12 +105,22 @@ def render_outputs(*, checked: CheckedRegistry) -> dict[Path, str]:
     return outputs
 
 
-def orphan_pages(*, outputs: dict[Path, str]) -> list[Path]:
-    """The pages under ``docs/errors/`` that the generator does not write."""
-    pages_dir = DOCS_DIR / PAGES_ROOT
+def orphan_pages(*, outputs: dict[Path, str], pages_dir: Path = DOCS_DIR / PAGES_ROOT) -> list[Path]:
+    """The pages under ``docs/errors/`` that the generator does not write.
+
+    A hidden file, or a file in a hidden directory, is no page: MkDocs skips it, and a file a desktop or an
+    editor leaves there, such as ``.DS_Store``, is neither reported nor removed.
+    """
     if not pages_dir.is_dir():
         return []
-    return [path for path in sorted(pages_dir.rglob("*")) if path.is_file() and path not in outputs]
+    orphans: list[Path] = []
+    for path in sorted(pages_dir.rglob("*")):
+        if not path.is_file() or path in outputs:
+            continue
+        if any(part.startswith(".") for part in path.relative_to(pages_dir).parts):
+            continue
+        orphans.append(path)
+    return orphans
 
 
 def stale_output_errors(*, outputs: dict[Path, str]) -> list[str]:
