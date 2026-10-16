@@ -31,6 +31,7 @@ class _CountingStorage(StorageProviderAbstract):
         self.loaded_keys: list[str] = []
         self.sized_keys: list[str] = []
         self.created: list[tuple[str, str | None]] = []
+        self.create_attempts: list[str] = []
         self.unconditional_keys: list[str] = []
         self.most_loads_at_once = 0
         self.most_lookups_at_once = 0
@@ -73,6 +74,9 @@ class _CountingStorage(StorageProviderAbstract):
 
     @override
     async def _store_if_absent(self, *, data: bytes, key: str, content_type: str | None, checksum_sha256_hex: str | None) -> bool:
+        self.create_attempts.append(key)
+        # Yield, so every create the store started at once is in flight together.
+        await asyncio.sleep(0)
         if key in self.objects:
             return False
         self.created.append((key, checksum_sha256_hex))
@@ -191,6 +195,24 @@ class TestRunnerBlobStore:
             [(_blob_key(data), sha256_hex(data)) for data in contents.values()] + [(f"{_SCOPE}/trees/{digest_hex}", digest_hex)]
         )
         assert storage.unconditional_keys == []
+
+    async def test_files_of_the_same_bytes_are_one_blob_written_once(self) -> None:
+        """Two empty `__init__.py` files name one blob key, which a tree records with one lookup and one create."""
+        storage = _CountingStorage()
+        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage)
+        contents = {"main.mthds": b"domain = 'a'", "pkg/__init__.py": b"", "pkg/sub/__init__.py": b""}
+        request_tree = RequestTree.make_from_contents(contents=contents)
+
+        await blob_store.record_tree(tree=request_tree.tree, contents=request_tree.contents)
+
+        empty_key = _blob_key(b"")
+        assert storage.sized_keys.count(empty_key) == 1
+        assert storage.create_attempts.count(empty_key) == 1
+        assert storage.objects[empty_key] == b""
+        digest_hex = digest_of_contents(contents).removeprefix("sha256:")
+        assert sorted(storage.created) == sorted(
+            [(_blob_key(b"domain = 'a'"), sha256_hex(b"domain = 'a'")), (empty_key, sha256_hex(b"")), (f"{_SCOPE}/trees/{digest_hex}", digest_hex)]
+        )
 
     async def test_a_blob_another_writer_created_meanwhile_is_held(self, mocker: MockerFixture) -> None:
         """The lookup found nothing, then the create found the key taken: the same bytes are held, and that is no error."""

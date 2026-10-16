@@ -5,7 +5,7 @@
 ### Added
 
 - **`crate_fingerprint` on the run answers**: the API server's `POST /v1/start` acknowledgement and `POST /v1/execute` result, `PipelexRunResultStart` and `PipelexRunResultExecute`, carry the fingerprint of the library crate the run's method was loaded into, so a host records it on its run beside the digest of the method tree that ran; it is `null` for a run built from no crate.
-- **`StorageProviderAbstract.store_if_absent`**: a storage provider creates an object only when its key holds none and answers whether it did, never replacing an object already there, and checks the bytes against `checksum_sha256_hex` before writing, raising the new `StorageChecksumMismatchError` on a mismatch. S3 makes the condition with `If-None-Match: *` and sends the SHA-256 as `x-amz-checksum-sha256` for S3 to check, GCS uploads on generation 0, and the local provider hard-links a temporary file to the key; a provider that does not override `_store_if_absent`, such as an external storage plugin, looks the key up and then stores.
+- **`StorageProviderAbstract.store_if_absent`**: a storage provider creates an object only when its key holds none and answers whether it did, never replacing an object already there, and checks the bytes against `checksum_sha256_hex` before writing, raising the new `StorageChecksumMismatchError` on a mismatch. S3 makes the condition with `If-None-Match: *`, sends the SHA-256 as `x-amz-checksum-sha256` for S3 to check, and retries a `409 ConditionalRequestConflict` a bounded number of times, GCS uploads on generation 0, and the local provider hard-links a temporary file to the key; a provider that does not override `_store_if_absent`, such as an external storage plugin, looks the key up and then stores.
 
 ### Changed
 

@@ -7,7 +7,7 @@ from botocore.exceptions import BotoCoreError, ClientError, EndpointConnectionEr
 from pytest_mock import MockerFixture
 
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidKeyError, StorageS3Error
-from pipelex.tools.storage.s3_storage_provider import S3StorageProvider, checksum_sha256_header_value
+from pipelex.tools.storage.s3_storage_provider import CONDITIONAL_CONFLICT_RETRY_DELAYS_SECONDS, S3StorageProvider, checksum_sha256_header_value
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
 
 # Test constants
@@ -590,33 +590,63 @@ class TestS3StorageProvider:
 
         assert await s3_provider_no_signed_urls.store_if_absent(data=b"bytes", key="scope/blobs/one") is False
 
-    async def test_store_if_absent_racing_another_conditional_write_is_held_once_it_landed(
+    @pytest.mark.parametrize(
+        ("final_answer", "expected_created"),
+        [
+            (ClientError({"Error": {"Code": "PreconditionFailed", "Message": "Precondition Failed"}}, "PutObject"), False),
+            ({"ETag": '"created"'}, True),
+        ],
+    )
+    async def test_store_if_absent_retries_a_conditional_conflict_until_s3_answers(
         self,
         mocker: MockerFixture,
         s3_provider_no_signed_urls: S3StorageProvider,
         mock_aiobotocore: dict[str, Any],
+        final_answer: ClientError | dict[str, str],
+        expected_created: bool,
     ) -> None:
-        """A `409` means another conditional write to the key was in flight: the object it created counts as held."""
+        """A `409` is retried: a later `412` is the other write's object, held, and a later success is this call's own.
+
+        The other operation may have failed or deleted the key, leaving it free, so the PUT is sent again rather than
+        the key looked up.
+        """
+        mocked_sleep = mocker.patch("pipelex.tools.storage.s3_storage_provider.sleep", new_callable=mocker.AsyncMock)
         conflict = ClientError({"Error": {"Code": "ConditionalRequestConflict", "Message": "Conflict"}}, "PutObject")
-        mock_aiobotocore["client"].put_object = mocker.AsyncMock(side_effect=conflict)
-        mock_aiobotocore["client"].head_object = mocker.AsyncMock(return_value={"ContentLength": 5})
+        mock_aiobotocore["client"].put_object = mocker.AsyncMock(side_effect=[conflict, conflict, final_answer])
+        mock_aiobotocore["client"].head_object = mocker.AsyncMock()
 
-        assert await s3_provider_no_signed_urls.store_if_absent(data=b"bytes", key="scope/blobs/one") is False
-        mock_aiobotocore["client"].head_object.assert_called_once_with(Bucket=S3_TEST_BUCKET, Key="scope/blobs/one")
+        created = await s3_provider_no_signed_urls.store_if_absent(
+            data=b"bytes", key="scope/blobs/one", checksum_sha256_hex=hashlib.sha256(b"bytes").hexdigest()
+        )
 
-    async def test_store_if_absent_racing_a_write_that_left_nothing_is_an_error(
+        assert created is expected_created
+        assert mock_aiobotocore["client"].put_object.await_count == 3
+        for put_call in mock_aiobotocore["client"].put_object.await_args_list:
+            assert put_call.kwargs["IfNoneMatch"] == "*"
+            assert put_call.kwargs["ChecksumSHA256"] == checksum_sha256_header_value(sha256_hex=hashlib.sha256(b"bytes").hexdigest())
+        assert [sleep_call.args for sleep_call in mocked_sleep.await_args_list] == [
+            (delay,) for delay in CONDITIONAL_CONFLICT_RETRY_DELAYS_SECONDS[:2]
+        ]
+        mock_aiobotocore["client"].head_object.assert_not_awaited()
+
+    async def test_store_if_absent_whose_conflicts_outlast_the_retries_is_an_error(
         self,
         mocker: MockerFixture,
         s3_provider_no_signed_urls: S3StorageProvider,
         mock_aiobotocore: dict[str, Any],
     ) -> None:
+        mocked_sleep = mocker.patch("pipelex.tools.storage.s3_storage_provider.sleep", new_callable=mocker.AsyncMock)
         conflict = ClientError({"Error": {"Code": "409", "Message": "Conflict"}}, "PutObject")
         mock_aiobotocore["client"].put_object = mocker.AsyncMock(side_effect=conflict)
-        missing = ClientError({"Error": {"Code": "404", "Message": "Not Found"}}, "HeadObject")
-        mock_aiobotocore["client"].head_object = mocker.AsyncMock(side_effect=missing)
+        retry_delays = CONDITIONAL_CONFLICT_RETRY_DELAYS_SECONDS
 
-        with pytest.raises(StorageS3Error, match="ConditionalRequestConflict"):
+        with pytest.raises(StorageS3Error, match="ConditionalRequestConflict") as exc_info:
             await s3_provider_no_signed_urls.store_if_absent(data=b"bytes", key="scope/blobs/one")
+
+        assert exc_info.value.__cause__ is conflict
+        assert mock_aiobotocore["client"].put_object.await_count == len(retry_delays) + 1
+        assert [sleep_call.args for sleep_call in mocked_sleep.await_args_list] == [(delay,) for delay in retry_delays]
+        assert sum(retry_delays) < 10
 
     async def test_store_if_absent_maps_other_errors(
         self,

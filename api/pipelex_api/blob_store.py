@@ -153,6 +153,11 @@ class RunnerBlobStore:
         hash, which only damaged storage could hold and which this runner never writes over.
         """
         sha256 = sha256_hex(data)
+        await self._store_hashed_blob(sha256=sha256, data=data)
+        return sha256
+
+    async def _store_hashed_blob(self, *, sha256: str, data: bytes) -> None:
+        """Hold `data`, whose SHA-256 is `sha256`, as `store_blob` does, for a caller that hashed it already."""
         held_size = await self.stored_size(sha256=sha256)
         if held_size is None:
             await self._storage.store_if_absent(
@@ -164,7 +169,6 @@ class RunnerBlobStore:
                 "storage is damaged, and its operator must remove that object for the blob to be uploaded again."
             )
             raise_internal_server_error(message=msg, error_type=ErrorType.BLOB_STORE_CORRUPTED)
-        return sha256
 
     async def holds_tree(self, *, tree_digest: str) -> bool:
         """Whether the listing of the tree `tree_digest` names is held, which means every file of the tree is."""
@@ -197,11 +201,17 @@ class RunnerBlobStore:
 
         Args:
             tree: The tree, as a map of file entries made it.
-            contents: Each file's bytes by tree path.
+            contents: Each file's bytes by tree path. Files of the same bytes are held as one blob, written once.
         """
         if await self.holds_tree(tree_digest=tree.digest):
             return
-        await gather_bounded([partial(self.store_blob, data=data) for data in contents.values()], max_concurrency=MAX_CONCURRENT_BLOB_TRANSFERS)
+        # One write per distinct blob: two files of the same bytes, such as two empty files, name one key, and two
+        # concurrent creates of one key would race each other for nothing.
+        blobs_by_hash = {sha256_hex(data): data for data in contents.values()}
+        await gather_bounded(
+            [partial(self._store_hashed_blob, sha256=sha256, data=data) for sha256, data in blobs_by_hash.items()],
+            max_concurrency=MAX_CONCURRENT_BLOB_TRANSFERS,
+        )
         await self._storage.store_if_absent(
             data=tree_listing(tree.files),
             key=self._tree_key(tree_digest=tree.digest),

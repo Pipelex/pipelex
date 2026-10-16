@@ -194,16 +194,26 @@ class LocalStorageProvider(StorageProviderAbstract):
 
         Raises:
             StorageInvalidUriError: If the key is invalid.
-            StorageLocalError: If the filesystem write fails, including on a filesystem that cannot make a hard link.
+            StorageLocalError: If the filesystem write fails, including on a filesystem that cannot make a hard link, or
+                when the key names something that is not a file, or a path through a file.
         """
         file_path = self._validate_key(key)
         temporary_path = self._temporary_path_beside(file_path=file_path)
 
+        created: bool
         try:
             await self._write_temporary(temporary_path=temporary_path, data=data)
-            file_path.hardlink_to(temporary_path)
-        except FileExistsError:
-            return False
+            # Only the link reads an existing name as the key held: the same error while preparing the temporary file,
+            # from a file standing where a folder of the key should be, is a failure like any other.
+            try:
+                file_path.hardlink_to(temporary_path)
+            except FileExistsError:
+                created = False
+            else:
+                created = True
+            if not created and not file_path.is_file():
+                msg = f"Failed to create file '{key}': something that is not a file is there"
+                raise StorageLocalError(msg)
         except OSError as exc:
             msg = f"Failed to create file '{key}': {exc}"
             raise StorageLocalError(msg) from exc
@@ -212,7 +222,7 @@ class LocalStorageProvider(StorageProviderAbstract):
             # removing it is best effort.
             with contextlib.suppress(OSError):
                 temporary_path.unlink(missing_ok=True)
-        return True
+        return created
 
     @override
     async def public_url(self, uri: str) -> str:

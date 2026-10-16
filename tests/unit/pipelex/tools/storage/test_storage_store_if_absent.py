@@ -103,3 +103,26 @@ class TestStorageStoreIfAbsent:
 
         assert not (tmp_path / KEY).exists()
         assert list((tmp_path / KEY).parent.iterdir()) == []
+
+    async def test_a_key_through_a_file_is_a_local_storage_error_not_a_key_held(self, tmp_path: Path) -> None:
+        """A file standing where a folder of the key should be fails the temporary file's folder, which is no key held."""
+        provider = LocalStorageProvider(root_path=tmp_path)
+        (tmp_path / "scope").write_bytes(b"a file where a folder should be")
+
+        with pytest.raises(StorageLocalError, match="Failed to create file 'scope/blobs/one'"):
+            await provider.store_if_absent(data=PAYLOAD, key="scope/blobs/one")
+
+        with pytest.raises(StorageLocalError, match="Failed to create file 'scope/one'"):
+            await provider.store_if_absent(data=PAYLOAD, key="scope/one")
+
+        assert (tmp_path / "scope").read_bytes() == b"a file where a folder should be"
+
+    async def test_a_folder_at_the_key_is_a_local_storage_error_not_a_key_held(self, tmp_path: Path) -> None:
+        provider = LocalStorageProvider(root_path=tmp_path)
+        (tmp_path / KEY).mkdir(parents=True)
+
+        with pytest.raises(StorageLocalError, match="not a file"):
+            await provider.store_if_absent(data=PAYLOAD, key=KEY)
+
+        assert (tmp_path / KEY).is_dir()
+        assert [path.name for path in (tmp_path / KEY).parent.iterdir()] == ["one"]
