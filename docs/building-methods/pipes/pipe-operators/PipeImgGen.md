@@ -67,6 +67,8 @@ Common image generation model handles:
 
 Image generation presets are defined in your model deck configuration and can include parameters like `quality`, `guidance_scale`, and `safety_tolerance`.
 
+A prompt or an input image a model's safety filter blocks fails the pipe with the code `model.content_refused`, naming the model and the reason the provider gave, so revising the prompt or its images is the fix. On a Gemini model such as `nano-banana-2`, that reason is the finish reason of the answer (`IMAGE_SAFETY`, `IMAGE_PROHIBITED_CONTENT` and their kin) or the block reason of the prompt, since Gemini answers a refusal with no image rather than with an error.
+
 ### MTHDS Parameters
 
 | Parameter               | Type            | Description                                                                                                                   | Required |
