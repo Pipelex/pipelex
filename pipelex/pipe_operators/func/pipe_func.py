@@ -360,10 +360,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             # The function's own exception, which the in-process executor marks as raised by the function.
             error_desc = exc.message if isinstance(exc, PipeFuncRaisedError) else f"{type(exc).__name__}: {exc}"
             msg = (
-                f"PipeFunc '{self.code}' failed during execution.\n"
-                f"  Expected output: {output_desc}\n"
-                f"  Inputs: {inputs_desc}\n\n"
-                f"  Error: {error_desc}"
+                f"PipeFunc '{self.code}' failed during execution.\n  Expected output: {output_desc}\n  Inputs: {inputs_desc}\n\n  Error: {error_desc}"
             )
             # Not classified as the caller's fault: the function's own exception text can carry
             # whatever the process holds (a path, a setting, a secret), so it stays redacted under
