@@ -4,6 +4,7 @@ from typing import Any
 import httpx
 from anthropic import DEFAULT_MAX_RETRIES, NOT_GIVEN, NotGiven
 from anthropic.lib.bedrock import AsyncAnthropicBedrock
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.providers.anthropic.anthropic_exceptions import AnthropicFactoryError
 
@@ -47,7 +48,7 @@ class AsyncAnthropicBedrockSigV4(AsyncAnthropicBedrock):
                 "AsyncAnthropicBedrockSigV4 signs with AWS access keys and takes no api_key: "
                 "a Bedrock bearer token belongs to the 'bedrock_token' access variant"
             )
-            raise AnthropicFactoryError(msg)
+            raise AnthropicFactoryError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
         super().__init__(
             aws_region=aws_region,
             base_url=base_url,

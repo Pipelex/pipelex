@@ -11,6 +11,7 @@ from pipelex.interpreter_hub import get_library_manager, get_required_entry_pipe
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_machinery.rendering.input_renderer import build_concept_comments, no_inputs_message, render_inputs
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
+from pipelex.pipeline.exceptions import MethodEntryError
 from pipelex.pipeline.validate_bundle import validate_bundle
 
 if TYPE_CHECKING:
@@ -44,7 +45,7 @@ async def build_inputs_for_pipe(
 
     Raises:
         ValidateBundleError: If bundle validation fails.
-        ValueError: If no pipe code can be determined.
+        MethodEntryError: If no pipe code can be determined (``request.pipe_unspecified``).
     """
     if mthds_contents:
         # validate_bundle opens a library, loads blueprints, and sets it as current.
@@ -57,7 +58,7 @@ async def build_inputs_for_pipe(
             main_pipe_ref = select_primary_blueprint(blueprints).main_pipe_ref
             if not main_pipe_ref:
                 msg = "Bundle does not declare a main_pipe. Specify a pipe code."
-                raise ValueError(msg)
+                raise MethodEntryError(msg)
             pipe_code = main_pipe_ref
     elif bundle_path:
         # allow_signatures=True: see the mthds_contents branch — rendering inputs tolerates placeholders.
@@ -67,7 +68,7 @@ async def build_inputs_for_pipe(
             main_pipe_code = bundle_blueprint.main_pipe
             if not main_pipe_code:
                 msg = f"Bundle '{bundle_path}' does not declare a main_pipe. Specify a pipe code."
-                raise ValueError(msg)
+                raise MethodEntryError(msg)
             pipe_code = PipeFactory.make_pipe_ref_with_domain(domain_code=bundle_blueprint.domain, pipe_code=main_pipe_code)
     else:
         # No bundle - initialize the library manually
@@ -80,7 +81,7 @@ async def build_inputs_for_pipe(
 
     if not pipe_code:
         msg = "No pipe code specified"
-        raise ValueError(msg)
+        raise MethodEntryError(msg)
 
     the_pipe = get_required_entry_pipe(pipe_code=pipe_code)
     # The envelope names the pipe that was resolved, always domain-qualified, never the selector

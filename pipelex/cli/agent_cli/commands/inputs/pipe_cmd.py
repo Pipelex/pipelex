@@ -11,6 +11,7 @@ import typer
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, extract_validation_errors
 from pipelex.cli.agent_cli.commands.inputs._inputs_core import emit_inputs_result, inputs_core
+from pipelex.cli.exceptions import ExportedPipeAmbiguousError
 from pipelex.cli.method_resolver import resolve_pipe_from_exports
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
@@ -61,7 +62,7 @@ def inputs_pipe_cmd(
     # Check installed methods' exports for additional library dirs
     try:
         export_dirs = resolve_pipe_from_exports(pipe_code)
-    except ValueError as exc:
+    except ExportedPipeAmbiguousError as exc:
         agent_error(
             f"Ambiguous pipe code '{pipe_code}': {exc}",
             error_type="ArgumentError",

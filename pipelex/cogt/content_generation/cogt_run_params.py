@@ -23,20 +23,21 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
+from pipelex.cogt.content_generation.exceptions import MockUsageOnLiveRunError
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 def check_mock_usage_requires_dry(*, run_mode: PipeRunMode, is_mock_usage: bool) -> None:
     """Single home of the rule: ``is_mock_usage`` is a sub-flag of ``run_mode=DRY``.
 
-    Raises ``ValueError`` on the illegal LIVE combination — called by the model validators on
+    Raises ``MockUsageOnLiveRunError``, a ``ValueError``, on the illegal LIVE combination — called by the model validators on
     both ``CogtRunParams`` and ``PipeRunParams`` (each guards its own boundary) and by
     ``PipeRunParamsFactory.make_run_params`` (which must reject the REQUESTED mode before the
     keyless forced-DRY coercion can mask it).
     """
     if is_mock_usage and run_mode.is_live:
         msg = "is_mock_usage is a sub-flag of run_mode=DRY: it cannot be set on a LIVE run"
-        raise ValueError(msg)
+        raise MockUsageOnLiveRunError(msg)
 
 
 class CogtRunParams(BaseModel):

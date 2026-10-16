@@ -1,10 +1,13 @@
+import json
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.providers.openai.openai_exceptions import VertexAIConfigError, VertexAICredentialsError
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.exceptions import MissingDependencyError
+from pipelex.tools.misc.exceptions import JsonTypeError
 from pipelex.tools.misc.json_utils import load_json_dict_from_path
 from pipelex.tools.misc.placeholder import value_is_placeholder
 
@@ -68,6 +71,13 @@ class VertexAIFactory(ConfigModel):
         except FileNotFoundError as exc:
             msg = f"Could not get VertexAI credentials from GCP credentials file: File not found: {gcp_credentials_file_path}"
             raise VertexAICredentialsError(msg) from exc
+        except json.JSONDecodeError as exc:
+            msg = f"Could not get VertexAI credentials from GCP credentials file: it is not valid JSON: {gcp_credentials_file_path}"
+            raise VertexAIConfigError(msg) from exc
+        except JsonTypeError as exc:
+            # The deployment's credentials file holds JSON that is no object: its configuration, not a request's.
+            exc.with_error_code(PipelexErrorCode.CONFIG_INVALID)
+            raise
 
         credentials = Credentials.from_service_account_info(  # pyright: ignore[reportUnknownMemberType]
             credentials_dict,

@@ -1,10 +1,15 @@
 import httpx
 from httpx import USE_CLIENT_DEFAULT, Response, Timeout
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.config import is_fetch_ssrf_guard_enabled
 from pipelex.tools.misc.exceptions import RemoteFileFetchError
 from pipelex.tools.misc.http_utils import get_user_agent
 from pipelex.tools.network.ssrf_guard import SsrfGuardedTransport
+
+# The statuses by which a server that is there says it cannot answer now, besides every 5xx: a retry may get the file.
+_TRANSIENT_HTTP_STATUSES = frozenset({408, 425, 429})
+_HTTP_SERVER_ERROR_FLOOR = 500
 
 
 async def fetch_file_and_content_type_from_url_httpx(
@@ -61,14 +66,18 @@ async def fetch_file_and_content_type_from_url_httpx(
             )
             response.raise_for_status()
     except httpx.HTTPStatusError as exc:
-        msg = f"Could not fetch '{url}': the server answered HTTP {exc.response.status_code}"
+        status_code = exc.response.status_code
+        msg = f"Could not fetch '{url}': the server answered HTTP {status_code}"
+        if status_code in _TRANSIENT_HTTP_STATUSES or status_code >= _HTTP_SERVER_ERROR_FLOOR:
+            # The server is there but cannot answer now: a retry may get the file.
+            raise RemoteFileFetchError(msg).with_error_code(CoreCode.INPUT_URL_UNREACHABLE) from exc
         raise RemoteFileFetchError(msg) from exc
     except httpx.TimeoutException as exc:
         msg = f"Could not fetch '{url}': the request timed out"
-        raise RemoteFileFetchError(msg) from exc
+        raise RemoteFileFetchError(msg).with_error_code(CoreCode.INPUT_URL_UNREACHABLE) from exc
     except httpx.ConnectError as exc:
         msg = f"Could not fetch '{url}': the host could not be reached"
-        raise RemoteFileFetchError(msg) from exc
+        raise RemoteFileFetchError(msg).with_error_code(CoreCode.INPUT_URL_UNREACHABLE) from exc
     except httpx.RequestError as exc:
         msg = f"Could not fetch '{url}': the request failed ({type(exc).__name__})"
         raise RemoteFileFetchError(msg) from exc

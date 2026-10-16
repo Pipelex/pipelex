@@ -3,11 +3,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex.base_exceptions import INTERNAL_ERROR_PLACEHOLDER, DisclosureMode, ErrorReport, PipelexError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.config import get_config
+from pipelex.errors.error_codes import error_code_spec
 from pipelex.pipe_run.exceptions import PipeRouterError, find_failure_location
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_run import PipeRun
@@ -97,8 +99,9 @@ class TestLocatedRunFailure:
 
         report = error.to_error_report()
         assert report.error_type == "ModelNotFoundError"
-        assert report.title == "Model not found"
-        assert report.type_uri.endswith("/model-not-found-error/")
+        assert report.code == CoreCode.MODEL_UNKNOWN
+        assert report.title == error_code_spec(CoreCode.MODEL_UNKNOWN).title
+        assert report.type_uri == error_code_spec(CoreCode.MODEL_UNKNOWN).type_uri
         unserved_handle = LocatedRunFailureTestData.UNSERVED_MODEL_HANDLE
         assert report.message == f"Pipe 'summarize' failed (two_steps → summarize): Model handle '{unserved_handle}' was not found in the model deck."
         # The local-deck remedy is the local CLI's to give: the message reaches hosted readers too.

@@ -47,6 +47,8 @@ from __future__ import annotations
 
 import re
 
+from pipelex.system.exceptions import RunParameterError
+
 # One to three `[A-Za-z0-9_-]` segments joined by single slashes.
 #
 # Applied with `fullmatch` (see below), it rejects in one rule: the empty string,
@@ -137,10 +139,10 @@ GENERATED_CONTENT_LEAF = "generated"
 
 
 def validate_storage_scope(*, value: str) -> str:
-    """Return `value` if it is a usable storage scope, else raise `ValueError`.
+    """Return `value` if it is a usable storage scope, else raise `RunParameterError`.
 
     Raises:
-        ValueError: the scope is empty, has more than three segments, or
+        RunParameterError: the scope is empty, has more than three segments, or
             contains a segment that is not `[A-Za-z0-9_-]+` — which covers
             traversal (`..`), absolute paths, and empty segments.
     """
@@ -157,19 +159,19 @@ def validate_storage_scope(*, value: str) -> str:
             "Empty segments, '.', '..' and leading or trailing slashes are refused — "
             "the value becomes a storage key prefix, so a traversal in it escapes the tenant."
         )
-        raise ValueError(msg)
+        raise RunParameterError(msg)
     return value
 
 
 def validate_read_scope(*, value: str) -> str:
-    """Return `value` if it is a usable read scope, else raise `ValueError`.
+    """Return `value` if it is a usable read scope, else raise `RunParameterError`.
 
     The same segment rule as the storage scope, which it must contain: one to
     three `[A-Za-z0-9_-]+` segments joined by single slashes, applied with
     `fullmatch` for the reason `validate_storage_scope` gives.
 
     Raises:
-        ValueError: the scope is empty, has more than three segments, or
+        RunParameterError: the scope is empty, has more than three segments, or
             contains a segment that is not `[A-Za-z0-9_-]+`.
     """
     if not STORAGE_SCOPE_PATTERN.fullmatch(value):
@@ -178,7 +180,7 @@ def validate_read_scope(*, value: str) -> str:
             "separated by single slashes (e.g. 'tenant'). Empty segments, '.', '..' and "
             "leading or trailing slashes are refused — the value bounds every storage key the run may read."
         )
-        raise ValueError(msg)
+        raise RunParameterError(msg)
     return value
 
 
@@ -204,7 +206,7 @@ def is_key_within_read_scope(*, key: str, read_scope: str) -> bool:
 
 
 def validate_storage_scope_within_read_scope(*, storage_scope: str, read_scope: str | None) -> None:
-    """Raise `ValueError` if a run could not read what it writes.
+    """Raise `RunParameterError` if a run could not read what it writes.
 
     A run reads its own outputs back — a generated image shown to the next
     model, a page view of its own extraction — so a storage scope outside the
@@ -213,7 +215,7 @@ def validate_storage_scope_within_read_scope(*, storage_scope: str, read_scope: 
     unscoped run (`read_scope` is `None`) reads everything and needs no check.
 
     Raises:
-        ValueError: the storage scope does not lie under the read scope.
+        RunParameterError: the storage scope does not lie under the read scope.
     """
     if read_scope is None:
         return
@@ -224,4 +226,4 @@ def validate_storage_scope_within_read_scope(*, storage_scope: str, read_scope: 
             "The run's storage_scope does not lie under its read_scope: a run must be able to read "
             "what it writes. Pass a read_scope that is the storage_scope or one of its leading segments."
         )
-        raise ValueError(msg)
+        raise RunParameterError(msg)

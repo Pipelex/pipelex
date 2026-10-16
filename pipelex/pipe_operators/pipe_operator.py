@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Generic, Literal, TypeVar, final
 
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import ModelChoiceNotFoundError, ModelNotFoundError, ModelWaterfallError
+from pipelex.cogt.exceptions import ModelChoiceNotFoundError, ModelDeckChoiceUnresolvedError, ModelNotFoundError, ModelWaterfallError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -39,9 +39,15 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
         pipe type — which bundle validation turns into one ``unknown_model`` item. ``field_name`` is the
         blueprint field the reference was written in (``model``, or ``model_to_structure`` on a
         ``PipeLLM``), the key a fix rewrites.
+
+        A miss of a choice the deck names itself, the default a step naming no model runs on, is the deployment's
+        fault and leaves unchanged as its ``ModelDeckChoiceUnresolvedError``: located on the pipe, it would read
+        as the caller's unknown model, and its message, which names the deck's setting, would reach the caller.
         """
         try:
             yield
+        except ModelDeckChoiceUnresolvedError:
+            raise
         except ModelChoiceNotFoundError as model_choice_error:
             raise PipeOperatorModelChoiceError.make_from_model_choice_not_found(
                 model_choice_error=model_choice_error,

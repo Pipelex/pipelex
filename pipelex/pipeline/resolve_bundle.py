@@ -16,6 +16,7 @@ from collections.abc import Mapping
 from typing import Sequence
 
 from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.method_trees.file_references import BundleFileOrigin
@@ -124,4 +125,4 @@ def _reject_address_based_dependencies(*, blueprints: list[PipelexBundleBlueprin
                     f"In-memory resolve cannot load address-based dependency '{alias}' from the host filesystem; "
                     "provide the dependency contents in the request or use directory-based resolution."
                 )
-                raise PipeLibraryError(msg)
+                raise PipeLibraryError(msg).with_error_code(CoreCode.REQUEST_UNSUPPORTED)

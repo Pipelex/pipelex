@@ -4,6 +4,7 @@ import pytest
 from botocore.exceptions import BotoCoreError, ClientError, EndpointConnectionError, NoCredentialsError, ReadTimeoutError
 from pytest_mock import MockerFixture
 
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidKeyError, StorageS3Error
 from pipelex.tools.storage.s3_storage_provider import S3StorageProvider
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
@@ -252,6 +253,7 @@ class TestS3StorageProvider:
             await s3_provider_no_signed_urls.store(data=b"test", key="test.bin")
 
         assert "Bucket not found" in str(exc_info.value)
+        assert exc_info.value.resolve_error_code() == PipelexErrorCode.CONFIG_INVALID
 
     async def test_load_bucket_not_found_raises_error(
         self,
@@ -267,6 +269,7 @@ class TestS3StorageProvider:
             await s3_provider_no_signed_urls.load(uri=uri)
 
         assert "Bucket not found" in str(exc_info.value)
+        assert exc_info.value.resolve_error_code() == PipelexErrorCode.CONFIG_INVALID
 
     async def test_load_client_error_with_no_such_key_code_raises_file_not_found(
         self,
@@ -299,6 +302,7 @@ class TestS3StorageProvider:
             await s3_provider_no_signed_urls.load(uri=uri)
 
         assert "AccessDenied" in str(exc_info.value)
+        assert exc_info.value.resolve_error_code() == PipelexErrorCode.CONFIG_CREDENTIAL_REFUSED
 
     async def test_store_client_error_raises_s3_error(
         self,
@@ -314,6 +318,7 @@ class TestS3StorageProvider:
             await s3_provider_no_signed_urls.store(data=b"test", key="test.bin")
 
         assert "InvalidAccessKeyId" in str(exc_info.value)
+        assert exc_info.value.resolve_error_code() == PipelexErrorCode.CONFIG_CREDENTIAL_REFUSED
 
     async def test_load_no_credentials_error_raises_s3_error(
         self,
@@ -330,6 +335,7 @@ class TestS3StorageProvider:
 
         assert "NoCredentialsError" in str(exc_info.value)
         assert isinstance(exc_info.value.__cause__, BotoCoreError)
+        assert exc_info.value.resolve_error_code() == PipelexErrorCode.CONFIG_CREDENTIAL_MISSING
 
     async def test_store_no_credentials_error_raises_s3_error(
         self,
@@ -345,6 +351,7 @@ class TestS3StorageProvider:
 
         assert "NoCredentialsError" in str(exc_info.value)
         assert isinstance(exc_info.value.__cause__, BotoCoreError)
+        assert exc_info.value.resolve_error_code() == PipelexErrorCode.CONFIG_CREDENTIAL_MISSING
 
     async def test_load_endpoint_connection_error_raises_s3_error(
         self,
@@ -361,6 +368,7 @@ class TestS3StorageProvider:
 
         assert "EndpointConnectionError" in str(exc_info.value)
         assert isinstance(exc_info.value.__cause__, BotoCoreError)
+        assert exc_info.value.resolve_error_code() == PipelexErrorCode.STORAGE_UNAVAILABLE
 
     async def test_load_read_timeout_error_raises_s3_error(
         self,

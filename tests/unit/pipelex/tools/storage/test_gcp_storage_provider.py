@@ -5,9 +5,11 @@ from typing import Any
 import pytest
 from pytest_mock import MockerFixture
 
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.tools.storage.exceptions import (
     StorageFileNotFoundError,
     StorageGcpCredentialsError,
+    StorageGcpError,
     StorageInvalidKeyError,
 )
 from pipelex.tools.storage.gcp_storage_provider import GCS_SIGNED_URL_VERSION, GcpStorageProvider
@@ -164,6 +166,32 @@ class TestGcpStorageProvider:
             await gcp_provider_no_signed_urls.load(uri=nonexistent_uri)
 
         assert "nonexistent/file.bin" in str(exc_info.value)
+
+    @pytest.mark.parametrize(
+        ("failure_name", "expected_code"),
+        [
+            ("Forbidden", PipelexErrorCode.CONFIG_CREDENTIAL_REFUSED),
+            ("Unauthorized", PipelexErrorCode.CONFIG_CREDENTIAL_REFUSED),
+            ("ServiceUnavailable", PipelexErrorCode.STORAGE_UNAVAILABLE),
+        ],
+    )
+    async def test_load_failure_code_tells_a_refusal_from_an_outage(
+        self,
+        gcp_provider_no_signed_urls: GcpStorageProvider,
+        mock_gcp_storage: dict[str, Any],
+        failure_name: str,
+        expected_code: PipelexErrorCode,
+    ) -> None:
+        """GCS refusing the credentials is the operator's configuration; any other GCS failure is storage unavailable."""
+        from google.api_core import exceptions as google_exceptions  # type: ignore[import-untyped]  # ruff: ignore[import-outside-top-level]
+
+        failure_class = getattr(google_exceptions, failure_name)
+        mock_gcp_storage["blob"].download_as_bytes.side_effect = failure_class("refused or down")
+
+        with pytest.raises(StorageGcpError) as exc_info:
+            await gcp_provider_no_signed_urls.load(uri=f"{PIPELEX_STORAGE_SCHEME}test/file.bin")
+
+        assert exc_info.value.resolve_error_code() == expected_code
 
     async def test_store_raises_if_key_has_scheme_prefix(
         self,

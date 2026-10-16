@@ -2,6 +2,7 @@ import asyncio
 import builtins
 from typing import TYPE_CHECKING, Any, Literal, get_origin
 
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import ValidationError, field_validator
 from typing_extensions import override
 
@@ -129,7 +130,7 @@ class PipeParallel(PipeController):
                         f"Batch input item named '{sub_pipe.batch_params.input_item_stuff_name}' is not "
                         f"in this Parallel Pipe '{self.code}' input requirements: {pipe_needed_inputs}"
                     )
-                    raise PipeValidationError(message=msg) from exc
+                    raise PipeValidationError(message=msg).with_error_code(CoreCode.METHOD_WIRING_INVALID) from exc
                 # A branch batches over a plain name only: a dotted `batch_over` is refused on a branch, since it binds.
                 needed_inputs.add_stuff_spec(
                     variable_name=sub_pipe.batch_params.input_list_stuff_name,
@@ -508,7 +509,7 @@ class PipeParallel(PipeController):
                 # TODO: check that at the blueprint / factory level
                 sub_pipe_code = self.parallel_sub_pipes[output_index].pipe_code
                 msg = f"PipeParallel '{self.code}': sub-pipe '{sub_pipe_code}' duplicate output name '{sub_pipe_output_name}'"
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).with_error_code(CoreCode.METHOD_NAME_CONFLICT)
             seen_output_names.add(sub_pipe_output_name)
             branch_resolved = pipe_output.working_memory.resolve_main_stuff()
             if isinstance(branch_resolved, AbsenceRecord):
@@ -526,7 +527,9 @@ class PipeParallel(PipeController):
                             f"'{self.output.concept.concept_ref}' is required. Make the field optional "
                             f"(required = false) or sink the absence upstream (a `?` input on the branch path)."
                         )
-                        raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+                        raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).with_error_code(
+                            CoreCode.METHOD_OPTIONAL_UNHANDLED
+                        )
                 if self.add_each_output:
                     # Branch results are parent slots only under add_each_output — same gate as the
                     # present arm below and as lifted_companion_slots(). Writing the record without
@@ -570,10 +573,12 @@ class PipeParallel(PipeController):
                 "and so that every required field is fed by a branch."
             )
             # When the refusal is a branch whose multiplicity differs from its field's, say which one to change;
-            # any other refusal leaves as it came, flagged as the caller's fault.
+            # any other refusal leaves as it came, flagged as the caller's fault: an output that does not fit its concept.
             next_steps = self._multiplicity_next_steps(structure_class=structure_class, output_stuffs=output_stuffs)
             if not next_steps:
-                exc.as_caller_fault(user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail=method_next_step))
+                exc.with_error_code(CoreCode.PIPE_OUTPUT_INVALID).as_caller_fault(
+                    user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail=method_next_step)
+                )
                 raise
             lead = f"PipeParallel '{self.code}' cannot combine its branch results into its output '{output_concept_ref}'."
             message_parts = [lead, *next_steps.values()]
@@ -588,8 +593,10 @@ class PipeParallel(PipeController):
             # of two faults of the same class on the chain the outer one, which restates the inner with a remedy,
             # is that root (see `pipe_run.located_failure.find_root_fault`), so every surface reports this one.
             # It is the caller's fault like the refusal it restates, with the multiplicity change as its next step.
-            raise StuffFactoryError(" ".join(message_parts)).as_caller_fault(
-                user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail=" ".join(next_step_parts))
+            raise (
+                StuffFactoryError(" ".join(message_parts))
+                .with_error_code(CoreCode.PIPE_OUTPUT_MULTIPLICITY)
+                .as_caller_fault(user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail=" ".join(next_step_parts)))
             ) from exc
         working_memory.set_new_main_stuff(
             stuff=combined_output_stuff,

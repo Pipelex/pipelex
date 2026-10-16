@@ -8,8 +8,10 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
+from pipelex.pipeline.exceptions import MethodEntryError
 from pipelex.pipeline.inputs_template import build_inputs_for_pipe
 
 if TYPE_CHECKING:
@@ -68,7 +70,7 @@ class TestBuildInputsForPipe:
         )
 
     def test_mthds_contents_without_any_main_pipe_raises(self, ops_mocks: dict[str, Any]) -> None:
-        """When no blueprint declares a main_pipe and no pipe code is given, a ValueError is raised."""
+        """When no blueprint declares a main_pipe and no pipe code is given, the request names no pipe to start at."""
         ops_mocks["validate_bundle"].return_value = SimpleNamespace(
             blueprints=[
                 SimpleNamespace(main_pipe=None, domain="alpha_domain"),
@@ -76,8 +78,10 @@ class TestBuildInputsForPipe:
             ]
         )
 
-        with pytest.raises(ValueError, match="Bundle does not declare a main_pipe"):
+        with pytest.raises(MethodEntryError, match="Bundle does not declare a main_pipe") as exc_info:
             asyncio.run(build_inputs_for_pipe(mthds_contents=["mthds content"]))
+
+        assert exc_info.value.to_error_report().code == CoreCode.REQUEST_PIPE_UNSPECIFIED
 
     def test_mthds_contents_explicit_pipe_code_skips_scan(self, ops_mocks: dict[str, Any]) -> None:
         """An explicit pipe code selects the pipe verbatim, and the result names the pipe it resolved to, qualified."""
@@ -105,14 +109,15 @@ class TestBuildInputsForPipe:
         assert result["pipe_ref"] == "demo_domain.bundle_main"
 
     def test_bundle_path_without_main_pipe_raises_with_path(self, ops_mocks: dict[str, Any], tmp_path: Path) -> None:
-        """A bundle file without a main_pipe raises a ValueError naming the bundle path."""
+        """A bundle file without a main_pipe is refused with a message naming the bundle path."""
         bundle_path = tmp_path / "demo.mthds"
         ops_mocks["validate_bundle"].return_value = SimpleNamespace(blueprints=[SimpleNamespace(main_pipe=None, domain="demo_domain")])
 
-        with pytest.raises(ValueError, match="does not declare a main_pipe") as exc_info:
+        with pytest.raises(MethodEntryError, match="does not declare a main_pipe") as exc_info:
             asyncio.run(build_inputs_for_pipe(bundle_path=bundle_path))
 
         assert str(bundle_path) in str(exc_info.value)
+        assert exc_info.value.to_error_report().code == CoreCode.REQUEST_PIPE_UNSPECIFIED
 
     def test_bundle_path_explicit_pipe_code_wins(self, ops_mocks: dict[str, Any], tmp_path: Path) -> None:
         """With a bundle path, an explicit pipe code overrides the bundle's main_pipe, and the result names it qualified."""
@@ -147,8 +152,10 @@ class TestBuildInputsForPipe:
 
     def test_no_bundle_and_no_pipe_code_raises(self, ops_mocks: dict[str, Any]) -> None:
         """Neither a bundle nor a pipe code is an immediate error."""
-        with pytest.raises(ValueError, match="No pipe code specified"):
+        with pytest.raises(MethodEntryError, match="No pipe code specified") as exc_info:
             asyncio.run(build_inputs_for_pipe())
+
+        assert exc_info.value.to_error_report().code == CoreCode.REQUEST_PIPE_UNSPECIFIED
 
         ops_mocks["get_required_entry_pipe"].assert_not_called()
 

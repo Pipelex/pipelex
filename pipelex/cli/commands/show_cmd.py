@@ -20,6 +20,7 @@ from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.credential_resolution import CredentialResolution
 from pipelex.cogt.model_backends.model_lists import ModelLister
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.interpreter_hub import get_library_manager, get_pipe_library, get_required_entry_pipe, resolve_library_dirs, set_current_library
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.pipelex import Pipelex
@@ -44,9 +45,12 @@ def do_show_config() -> None:
     try:
         final_config = config_manager.load_config()
         pretty_print(final_config, title="Pipelex configuration")
-    except (OSError, TomlError) as exc:
+    except TomlError as exc:
         msg = f"Error loading configuration: {exc}"
-        raise PipelexConfigError(msg) from exc
+        raise PipelexConfigError(msg).with_error_code(PipelexErrorCode.CONFIG_SYNTAX) from exc
+    except OSError as exc:
+        msg = f"Error loading configuration: {exc}"
+        raise PipelexConfigError(msg).with_error_code(PipelexErrorCode.CONFIG_FILE_MISSING) from exc
 
 
 def do_list_pipes() -> None:
@@ -82,9 +86,12 @@ def do_show_backends(*, show_all: bool = False) -> None:
             backend_library = models_manager.inference_backend_library
 
         routing_profile = models_manager.routing_profile
-    except (PipelexError, OSError, ValidationError) as exc:
+    except PipelexError as exc:
         msg = f"Error accessing backend or routing configuration: {exc}"
         raise PipelexCLIError(msg) from exc
+    except (OSError, ValidationError) as exc:
+        msg = f"Error accessing backend or routing configuration: {exc}"
+        raise PipelexCLIError(msg).with_error_code(PipelexErrorCode.CONFIG_INVALID) from exc
 
     console = get_console()
 

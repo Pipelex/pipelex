@@ -1,6 +1,7 @@
 from itertools import groupby
 from typing import Self
 
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import PrivateAttr, RootModel
 from typing_extensions import override
 
@@ -120,7 +121,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
                 if len(matches) > 1:
                     domains = [match.domain_code for match in matches]
                     msg = f"Ambiguous cross-package pipe code '{pipe_code}' found in domains: {domains}. Use domain-qualified ref."
-                    raise PipeLibraryError(msg)
+                    raise PipeLibraryError(msg).with_error_code(CoreCode.METHOD_REF_AMBIGUOUS)
             return None
 
         return None
@@ -198,7 +199,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         key = f"{alias}->{pipe.pipe_ref}"
         if key in self.root:
             msg = f"Dependency pipe '{key}' already exists in the library"
-            raise PipeLibraryError(msg)
+            raise PipeLibraryError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
         self.root[key] = pipe
         if not is_exported:
             self._private_dependency_keys.add(key)

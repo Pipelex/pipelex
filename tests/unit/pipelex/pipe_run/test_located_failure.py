@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex.base_exceptions import INTERNAL_ERROR_PLACEHOLDER, DisclosureMode, ErrorDomain, ErrorReport, PipelexError
-from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory
+from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory, LLMCompletionError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.pipes.inputs.exceptions import OptionalValueAbsentError
+from pipelex.errors.error_codes import error_code_spec
 from pipelex.pipe_run.exceptions import PipeRouterError, find_failure_location
 from pipelex.pipe_run.located_failure import compose_located_message, find_foreign_fault, find_root_fault, make_unexpected_failure
 from pipelex.pipeline.exceptions import PipelineExecutionError
@@ -106,7 +108,9 @@ class TestLocatedFailureReport:
 
     def test_identity_and_message_are_the_root_faults(self) -> None:
         """Through the router, a bridge and the runner, the report is the root fault's, located once."""
-        root_fault = CogtError(message="rate limited", error_category=InferenceErrorCategory.TRANSIENT)
+        root_fault = LLMCompletionError(message="rate limited", error_category=InferenceErrorCategory.TRANSIENT).with_error_code(
+            CoreCode.PROVIDER_RATE_LIMITED
+        )
         located = _locate(root_fault, pipe_stack=["flow", "analyze", "gen_ideas"])
         bridge_error = PipelexBridgeDispatchError(f"Pipe execution failed in DIRECT mode for pipe 'flow': {located}")
         bridge_error.__cause__ = located
@@ -118,12 +122,14 @@ class TestLocatedFailureReport:
         assert run_failure.pipe_stack == ["flow", "analyze", "gen_ideas"]
 
         report = run_failure.to_error_report()
-        assert report.error_type == "CogtError"
-        assert report.title == CogtError.title()
-        assert report.type_uri == CogtError.type_uri()
+        assert report.error_type == "LLMCompletionError"
+        root_spec = error_code_spec(CoreCode.PROVIDER_RATE_LIMITED)
+        assert report.code == root_spec.code
+        assert report.title == root_spec.title
+        assert report.type_uri == root_spec.type_uri
         assert report.message == "Pipe 'gen_ideas' failed (flow → analyze → gen_ideas): rate limited"
         assert run_failure.message == report.message
-        # Classification inherited from the chain, untouched by the floor.
+        # Classification inherited from the chain, and the retry verdict the root fault's code decides.
         assert report.error_category == InferenceErrorCategory.TRANSIENT
         assert report.retryable is True
         assert report == located.to_error_report()
@@ -186,7 +192,8 @@ class TestLocatedFailureReport:
 
         assert report.error_type == "CogtError"
         assert report.message == "Pipe 'summarize' failed (flow → summarize): model refused"
-        assert report.error_domain == ErrorDomain.CONFIG
+        assert report.code == leaf_report.code
+        assert report.error_domain == leaf_report.error_domain
 
     def test_a_cyclic_chain_reports_the_wrapper_as_itself(self) -> None:
         """A chain that loops back to the wrapper cannot make the report recurse."""

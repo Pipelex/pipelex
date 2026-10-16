@@ -6,6 +6,7 @@ from pathlib import Path
 from mthds.method_tree.exceptions import MethodTreeRefusedError, TreeSourceError
 from mthds.method_tree.models import MethodTree
 from mthds.method_tree.written_tree import read_written_tree
+from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex import log
@@ -17,10 +18,10 @@ from pipelex.core.method_trees.tree_files import write_call_files
 from pipelex.core.method_trees.tree_python import TREE_PYTHON_HOLD
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.interpreter_hub import get_library_manager, get_required_pipe
-from pipelex.kernel.func_ops import call_function
+from pipelex.kernel.func_ops import coerce_function_output, invoke_function
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe_func_call_files import read_pipe_func_call_files
-from pipelex.pipe_operators.func.exceptions import PipeFuncExecutionError
+from pipelex.pipe_operators.func.exceptions import PipeFuncExecutionError, PipeFuncRaisedError
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_call_context import function_of_call_in_flight
 from pipelex.pipe_operators.func.pipe_func_execution_dtos import PipeFuncExecutionRequest, PipeFuncExecutionResponse
@@ -58,8 +59,8 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
     The function is the step's own: the `PipeFunc` imports it by its import path, under the process's
     hold on its method tree's Python, and checks it (`PipeFunc.bind_function`). What running it *means*
     — async-vs-sync dispatch and the str/list -> StuffContent coercion — is the kernel's
-    ``call_function``, so this executor is what is left once that is factored out: the in-process
-    wiring of the live arm, and the whole transported arm below.
+    (``invoke_function``, then ``coerce_function_output``), so this executor is what is left once
+    that is factored out: the in-process wiring of the live arm, and the whole transported arm below.
     """
 
     @override
@@ -76,11 +77,20 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
         # The step imported and checked its function before the run (its `_validate_before_run`), and names it for its
         # call in flight; a call that names none, the transported run's, finds the step in the current library, which
         # binds it once. The call itself — async/sync dispatch, return coercion — is the kernel's, so an out-of-process
-        # executor and this one share one definition of what running a function means. Nothing is caught here: the
-        # function is arbitrary user code whose failure surface is not enumerable, and the operator wraps this call to
-        # decorate the failure with the pipe's inputs/output for a diagnostic PipeRunError.
+        # executor and this one share one definition of what running a function means. What the function raised is
+        # marked as its own, `PipeFuncRaisedError`, so the operator, which decorates the failure with the pipe's inputs
+        # and output, tells it from a failure of this seam, which keeps its own code.
         function = function_of_call_in_flight(pipe_ref=pipe_code) or resolve_pipe_func(pipe_code=pipe_code).bind_function()
-        call_result = await call_function(function=function, function_name=function_name, memory=working_memory)
+        try:
+            function_output = await invoke_function(function=function, memory=working_memory)
+        except Exception as exc:
+            # Case (2), unbounded code: the function is arbitrary user code whose exception surface cannot be
+            # enumerated. Whatever it raised is its failure, a coded Pipelex error a helper raised inside it included.
+            msg = f"{type(exc).__name__}: {exc}"
+            raise PipeFuncRaisedError(msg) from exc
+        # Outside the function's failure: the kernel's coercion refusing what the function returned is the step's
+        # output failing, `FuncOutputTypeError` with `pipe.output_invalid`, whatever shape it refused.
+        call_result = coerce_function_output(function=function, function_output=function_output, function_name=function_name)
         return PipeFuncExecutionResult(
             content=call_result.content,
             function_module=call_result.function_module,
@@ -208,7 +218,7 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
             )
         except TimeoutError as exc:
             msg = f"PipeFunc '{request.function_name}' exceeded its {request.timeout_seconds}s timeout"
-            raise PipeFuncExecutionError(msg) from exc
+            raise PipeFuncExecutionError(msg).with_error_code(CoreCode.PIPE_FUNCTION_TIMED_OUT) from exc
 
         # Wrap the output in a memory so it round-trips with its concept (and thus its class identity).
         pipe = get_library_manager().get_library(library_id=TRANSPORTED_LIBRARY_ID).pipe_library.get_required_pipe(pipe_code=request.pipe_code)

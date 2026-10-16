@@ -1,6 +1,7 @@
 from typing import Any, Callable
 
 from mthds.protocol.concept import ConceptAbstract
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import Field, field_validator
 
 from pipelex.core.concepts.concept_representation_generator import (
@@ -272,7 +273,7 @@ class Concept(ConceptAbstract):
                 return {"concept": self.concept_ref, "content": json_content}, set()
             case ConceptRepresentationFormat.PYTHON:
                 msg = f"Concept '{self.concept_ref}' declares no structure class, so it has no Python representation"
-                raise ConceptValueError(msg)
+                raise ConceptValueError(msg).with_error_code(CoreCode.REQUEST_UNSUPPORTED)
 
     def _render_schema_representation(
         self,

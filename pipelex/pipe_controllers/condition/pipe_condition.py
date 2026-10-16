@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Any, Literal
 
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ConfigDict
 from typing_extensions import override
 
@@ -35,7 +36,7 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.system.invocation_path import DEFAULT_OUTCOME_SEGMENT, outcome_segment
 from pipelex.system.job_metadata import JobMetadata
-from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
+from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError, Jinja2TemplateInvalidError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
@@ -404,26 +405,26 @@ class PipeCondition(PipeController):
     async def _validate_before_run(
         self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
-        evaluated_expression = await render_template(
-            template=self.expression,
-            category=TemplateCategory.EXPRESSION,
-            context=working_memory.generate_context(),
-        )
+        evaluated_expression = await self._render_expression(working_memory=working_memory, pipe_run_params=pipe_run_params)
         if not evaluated_expression or evaluated_expression == "None":
             # The expression is the caller's own method, rendered over their run's data: when it renders
             # nothing, no outcome can be chosen, and the method is theirs to fix. The message names only the pipe.
             error_msg = f"PipeCondition '{self.code}': Conditional expression returned no result"
-            raise PipeRunError(
-                pipe_code=self.code,
-                message=error_msg,
-                run_mode=pipe_run_params.run_mode,
-            ).as_caller_fault(
-                user_action=UserAction(
-                    kind=UserActionKind.CHANGE_INPUT,
-                    detail=(
-                        f"Change the expression of PipeCondition '{self.code}' so that it always renders a value: "
-                        "the name of one of its outcomes, or any other value, which takes the default outcome."
-                    ),
+            raise (
+                PipeRunError(
+                    pipe_code=self.code,
+                    message=error_msg,
+                    run_mode=pipe_run_params.run_mode,
+                )
+                .with_error_code(CoreCode.PIPE_CONDITION_UNMATCHED)
+                .as_caller_fault(
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_INPUT,
+                        detail=(
+                            f"Change the expression of PipeCondition '{self.code}' so that it always renders a value: "
+                            "the name of one of its outcomes, or any other value, which takes the default outcome."
+                        ),
+                    )
                 )
             )
 
@@ -433,24 +434,53 @@ class PipeCondition(PipeController):
     ):
         pass
 
+    async def _render_expression(self, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams) -> str:
+        """Render the conditional expression over the run's data.
+
+        Raises:
+            PipeRunError: `method.template_invalid` when the expression cannot render as written, such as a filter or
+                a test inside a branch that the expression environment does not define, which only rendering that
+                branch finds. The message names the pipe, its expression and what Jinja2 refused, never the
+                expression's text.
+        """
+        try:
+            return await render_template(
+                template=self.expression,
+                category=TemplateCategory.EXPRESSION,
+                context=working_memory.generate_context(),
+            )
+        except Jinja2TemplateInvalidError as exc:
+            if not exc.template_owner.is_method:
+                # One of Pipelex's own templates, reached from the expression's render: ours, kept as it is.
+                raise
+            msg = f"PipeCondition '{self.code}': its expression cannot render: {exc.fault}"
+            raise (
+                PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+                .with_error_code(CoreCode.METHOD_TEMPLATE_INVALID)
+                .as_caller_fault(
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_INPUT,
+                        detail=f"Fix the expression of PipeCondition '{self.code}': {exc.fault}",
+                    )
+                )
+            ) from exc
+
     async def _evaluate_expression(
         self,
         *,
         working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
     ) -> str:
         """Evaluate the conditional expression and select the appropriate pipe.
 
         Args:
             working_memory: The working memory context for evaluation
+            pipe_run_params: The run's parameters, whose mode a refusal of the expression reports
 
         Returns:
             The evaluated expression
         """
-        evaluated_expression = await render_template(
-            template=self.expression,
-            category=TemplateCategory.EXPRESSION,
-            context=working_memory.generate_context(),
-        )
+        evaluated_expression = await self._render_expression(working_memory=working_memory, pipe_run_params=pipe_run_params)
 
         if self.add_alias_from_expression_to:
             working_memory.add_alias(
@@ -470,7 +500,7 @@ class PipeCondition(PipeController):
         output_name: str | None = None,
         library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
-        evaluated_expression = await self._evaluate_expression(working_memory=working_memory)
+        evaluated_expression = await self._evaluate_expression(working_memory=working_memory, pipe_run_params=pipe_run_params)
         # Select the outcome based on the evaluated expression
         outcome = self.outcome_map.get(evaluated_expression, self.default_outcome)
 
@@ -499,13 +529,17 @@ class PipeCondition(PipeController):
             # message names only the pipe: the value the expression rendered can be literal text of the expression,
             # or an outcome key, of a condition a host library declared. The execution data above keeps that value.
             msg = f"PipeCondition '{self.code}' failed with outcome: {outcome}."
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).as_caller_fault(
-                user_action=UserAction(
-                    kind=UserActionKind.CHANGE_INPUT,
-                    detail=(
-                        f"PipeCondition '{self.code}' refuses this run on purpose: change the inputs so that its expression "
-                        "selects another outcome, or map that outcome to a pipe or to 'continue'."
-                    ),
+            raise (
+                PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+                .with_error_code(CoreCode.PIPE_CONDITION_REFUSED)
+                .as_caller_fault(
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_INPUT,
+                        detail=(
+                            f"PipeCondition '{self.code}' refuses this run on purpose: change the inputs so that its expression "
+                            "selects another outcome, or map that outcome to a pipe or to 'continue'."
+                        ),
+                    )
                 )
             )
 
@@ -531,10 +565,14 @@ class PipeCondition(PipeController):
             # message names only the pipes and the input names.
             missing_names_str = ", ".join(missing_names)
             msg = f"PipeCondition '{self.code}' chose pipe '{outcome}', whose required inputs are missing: {missing_names_str}."
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).as_caller_fault(
-                user_action=UserAction(
-                    kind=UserActionKind.CHANGE_INPUT,
-                    detail=f"Provide the missing required inputs of '{outcome}', which PipeCondition '{self.code}' chose: {missing_names_str}.",
+            raise (
+                PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+                .with_error_code(CoreCode.PIPE_INPUT_UNRESOLVED)
+                .as_caller_fault(
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_INPUT,
+                        detail=f"Provide the missing required inputs of '{outcome}', which PipeCondition '{self.code}' chose: {missing_names_str}.",
+                    )
                 )
             )
 
@@ -644,10 +682,14 @@ class PipeCondition(PipeController):
             # past the `Jinja2DetectVariablesError` that quotes the expression: a run failure reports the innermost
             # Pipelex error on its chain (`find_root_fault`), which must be this refusal.
             msg = f"Dry run failed for pipe '{self.code}' (PipeCondition): its expression {describe_expression_parse_failure(error=exc)}."
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).as_caller_fault(
-                user_action=UserAction(
-                    kind=UserActionKind.CHANGE_INPUT,
-                    detail=f"Fix the expression of PipeCondition '{self.code}' so that it parses as a Jinja2 expression.",
+            raise (
+                PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+                .with_error_code(CoreCode.METHOD_TEMPLATE_INVALID)
+                .as_caller_fault(
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_INPUT,
+                        detail=f"Fix the expression of PipeCondition '{self.code}' so that it parses as a Jinja2 expression.",
+                    )
                 )
             ) from exc.__cause__
 
@@ -663,10 +705,16 @@ class PipeCondition(PipeController):
             # The caller's method names these pipes in its outcomes. The message names only the pipe codes.
             missing_pipes_str = ", ".join(missing_pipes)
             msg = f"Dry run failed for PipeCondition '{self.code}': its outcomes name pipes that do not exist: {missing_pipes_str}."
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).as_caller_fault(
-                user_action=UserAction(
-                    kind=UserActionKind.CHANGE_INPUT,
-                    detail=f"Declare the pipes {missing_pipes_str}, or change the outcomes of PipeCondition '{self.code}' to name existing pipes.",
+            raise (
+                PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+                .with_error_code(CoreCode.METHOD_PIPE_UNRESOLVED)
+                .as_caller_fault(
+                    user_action=UserAction(
+                        kind=UserActionKind.CHANGE_INPUT,
+                        detail=(
+                            f"Declare the pipes {missing_pipes_str}, or change the outcomes of PipeCondition '{self.code}' to name existing pipes."
+                        ),
+                    )
                 )
             )
 
@@ -721,10 +769,14 @@ class PipeCondition(PipeController):
                     f"PipeCondition '{self.code}' maps every outcome (and the default) to 'fail': "
                     f"every live run of this pipe raises. Map at least one outcome to a pipe or to 'continue'."
                 )
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).as_caller_fault(
-                    user_action=UserAction(
-                        kind=UserActionKind.CHANGE_INPUT,
-                        detail=f"Map at least one outcome of PipeCondition '{self.code}' to a pipe or to 'continue'.",
+                raise (
+                    PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+                    .with_error_code(CoreCode.METHOD_SCHEMA_VIOLATION)
+                    .as_caller_fault(
+                        user_action=UserAction(
+                            kind=UserActionKind.CHANGE_INPUT,
+                            detail=f"Map at least one outcome of PipeCondition '{self.code}' to a pipe or to 'continue'.",
+                        )
                     )
                 )
             self._record_declared_absent_output(

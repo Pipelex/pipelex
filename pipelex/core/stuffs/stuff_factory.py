@@ -5,6 +5,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 import shortuuid
 from mthds.protocol.pipeline_inputs import StuffContentOrData
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ValidationError, field_validator
 
 from pipelex.core.concepts.concept import Concept
@@ -141,7 +142,7 @@ class StuffFactory:
             the_stuff_content = the_subclass.model_validate(obj=stuff_contents)
         except ValidationError as exc:
             msg = f"Error combining stuffs for concept {concept.code}, stuff named `{name}`: {format_pydantic_validation_error(exc=exc)}"
-            raise StuffFactoryError(msg) from exc
+            raise StuffFactoryError(msg).with_error_code(CoreCode.PIPE_OUTPUT_INVALID) from exc
         return cls.make_stuff(
             concept=concept,
             content=the_stuff_content,
@@ -287,7 +288,7 @@ class StuffFactory:
             return concept_provider.get_required_entry_concept(concept_ref_or_code=concept_ref_or_code, search_scope=search_scope)
         except ConceptLibraryConceptNotFoundError as exc:
             msg = f"{context_msg} the concept of name '{concept_ref_or_code}' could not be resolved: {exc}"
-            raise StuffFactoryError(msg) from exc
+            raise StuffFactoryError(msg).with_error_code(CoreCode.INPUT_WRONG_CONCEPT) from exc
 
     @classmethod
     def make_stuff_from_stuff_content_or_data(
@@ -537,7 +538,7 @@ class StuffFactory:
                 f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a dict that should represent a StuffContentOrData "
                 f"but the concept of name '{concept_ref}' is not compatible with native concept 'native.YesNo' (the content is a boolean)"
             )
-            raise StuffFactoryError(msg)
+            raise StuffFactoryError(msg).with_error_code(CoreCode.INPUT_WRONG_CONCEPT)
 
         # Case 2.1: content is a string
         if isinstance(content, str):
@@ -573,7 +574,7 @@ class StuffFactory:
                 f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a dict that should represent a StuffContentOrData "
                 f"but the concept of name '{concept_ref}' is not compatible with native concept 'native.Text', 'native.Date', or 'native.Time'"
             )
-            raise StuffFactoryError(msg)
+            raise StuffFactoryError(msg).with_error_code(CoreCode.INPUT_WRONG_CONCEPT)
 
         # Case 2.1e: content is a bare date/datetime object (a TOML temporal literal used as envelope content)
         # → DateContent for a Date-compatible concept. isinstance(date) covers datetime (its subclass).
@@ -590,7 +591,7 @@ class StuffFactory:
                 f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a dict that should represent a StuffContentOrData "
                 f"but the concept of name '{concept_ref}' is not compatible with native concept 'native.Date' (the content is a date/datetime)"
             )
-            raise StuffFactoryError(msg)
+            raise StuffFactoryError(msg).with_error_code(CoreCode.INPUT_WRONG_CONCEPT)
 
         # Case 2.1g: content is a bare time object (a TOML time literal used as envelope content).
         if isinstance(content, datetime.time):
@@ -606,7 +607,7 @@ class StuffFactory:
                 f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a dict that should represent a StuffContentOrData "
                 f"but the concept of name '{concept_ref}' is not compatible with native concept 'native.Time' (the content is a time)"
             )
-            raise StuffFactoryError(msg)
+            raise StuffFactoryError(msg).with_error_code(CoreCode.INPUT_WRONG_CONCEPT)
 
         # Case 2.3: content is a StuffContent object (includes both native and StructuredContent)
         if isinstance(content, StuffContent):
@@ -615,7 +616,7 @@ class StuffFactory:
                     f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a dict that should represent a StuffContentOrData "
                     f"but the concept of name '{concept_ref}' is not compatible with the content of type {content.__class__.__name__}"
                 )
-                raise StuffFactoryError(msg)
+                raise StuffFactoryError(msg).with_error_code(CoreCode.INPUT_WRONG_CONCEPT)
 
             return cls.make_stuff(
                 concept=concept,
@@ -640,7 +641,7 @@ class StuffFactory:
                     f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a dict that should represent a StuffContentOrData "
                     f"but the concept of name '{concept_ref}' is not compatible with a dict content"
                 )
-                raise StuffFactoryError(msg)
+                raise StuffFactoryError(msg).with_error_code(CoreCode.INPUT_WRONG_CONCEPT)
 
             return cls.make_stuff(
                 name=name,
@@ -691,7 +692,7 @@ class StuffFactory:
                     )
 
                 msg = f"Concept '{concept_ref}' is not compatible with list of text content"
-                raise StuffFactoryError(msg)
+                raise StuffFactoryError(msg).with_error_code(CoreCode.INPUT_WRONG_CONCEPT)
 
             # Case 2.4: list[StuffContent] (includes both native and StructuredContent)
             if isinstance(first_item, StuffContent):

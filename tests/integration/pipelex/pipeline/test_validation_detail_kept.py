@@ -18,11 +18,13 @@ Validation used to lose detail before the verdict was built. These tests load re
 from pathlib import Path
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.cogt.inference.error_classification import UserAction
 from pipelex.core.stuffs.exceptions import StuffFactoryError
+from pipelex.errors.error_codes import error_code_spec
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.validation_error_types import PipeValidationErrorType
@@ -88,7 +90,8 @@ class TestValidationDetailKept:
 
         (item,) = items
         assert item.pipe_code == "analyze_topic"
-        assert item.message == f"Pipe 'analyze_topic' failed its dry run: {StuffFactoryError.title()}"
+        # The multiplicity refusal's code, which the combine chooses before it says whose fault it is.
+        assert item.message == f"Pipe 'analyze_topic' failed its dry run: {error_code_spec(CoreCode.PIPE_OUTPUT_MULTIPLICITY).title}"
 
     @pytest.mark.asyncio
     async def test_the_enclosing_pipe_alone_reports_the_innermost_failing_pipe(self) -> None:

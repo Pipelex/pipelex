@@ -55,6 +55,8 @@ from __future__ import annotations
 
 import re
 
+from pipelex.system.exceptions import RunParameterError
+
 # An extras KEY: lowercase snake_case, starting with a letter.
 #
 # Deliberately narrower than the value charset. The key is forwarded as a group
@@ -86,7 +88,7 @@ RUN_EXTRAS_MAX_ENTRIES = 5
 
 
 def validate_run_extras(*, value: dict[str, str]) -> dict[str, str]:
-    """Return `value` if it is a usable run-extras mapping, else raise `ValueError`.
+    """Return `value` if it is a usable run-extras mapping, else raise `RunParameterError`.
 
     Args:
         value: The host-supplied mapping of opaque key to opaque value. An empty
@@ -98,7 +100,7 @@ def validate_run_extras(*, value: dict[str, str]) -> dict[str, str]:
         silently address a different entity.
 
     Raises:
-        ValueError: the mapping holds more than `RUN_EXTRAS_MAX_ENTRIES`
+        RunParameterError: the mapping holds more than `RUN_EXTRAS_MAX_ENTRIES`
             entries, or a key or a value falls outside its charset — which
             covers the empty string, whitespace, control characters, and
             anything that could forge a line in a log or a capture payload.
@@ -109,7 +111,7 @@ def validate_run_extras(*, value: dict[str, str]) -> dict[str, str]:
             "Each entry is forwarded as one group type a telemetry backend registers for the project, and that "
             "budget is small and fixed — an entry beyond it could not be honoured downstream."
         )
-        raise ValueError(msg)
+        raise RunParameterError(msg)
 
     # `fullmatch`, NOT `match`. A trailing `$` in a `match` still admits one
     # final newline, which is how `storage_scope` once let a newline travel into
@@ -122,12 +124,12 @@ def validate_run_extras(*, value: dict[str, str]) -> dict[str, str]:
                 "at most 32 characters (e.g. 'organization'). A key is forwarded as a facet name registered with "
                 "the telemetry backend, not tenant data."
             )
-            raise ValueError(msg)
+            raise RunParameterError(msg)
         if not RUN_EXTRAS_VALUE_PATTERN.fullmatch(extras_value):
             msg = (
                 f"Invalid extras value {extras_value!r} for key {extras_key!r}: expected 1 to 128 characters "
                 "from [A-Za-z0-9_-] (e.g. 'org_acme'). The value is quoted into log lines and capture payloads, "
                 "so whitespace, control characters and separators are refused."
             )
-            raise ValueError(msg)
+            raise RunParameterError(msg)
     return value

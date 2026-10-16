@@ -2,11 +2,8 @@ from typing import NamedTuple
 
 from pydantic import BaseModel, ConfigDict
 
+from pipelex.core.qualified_ref_exceptions import QualifiedRefError
 from pipelex.tools.misc.string_utils import is_pascal_case, is_snake_case
-
-
-class QualifiedRefError(ValueError):
-    """Raised when a qualified reference string is invalid."""
 
 
 class CrossPackageRef(NamedTuple):

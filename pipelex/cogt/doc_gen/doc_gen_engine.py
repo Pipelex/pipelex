@@ -13,11 +13,14 @@ this installation does not declare is told to run `pipelex update` or to install
 model is unknown.
 """
 
-from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
+from functools import partial
+
+from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource, doc_gen_choice_key
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice, DocGenSetting
 from pipelex.cogt.doc_gen.exceptions import KNOWN_DOC_GEN_MODEL_NAMES, DocGenEngineGap, DocGenEngineMissingError, DocGenModelCapabilityError
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.cogt.models.model_deck import resolve_deck_choice
 from pipelex.cogt.models.model_reference import ModelReferenceKind, ensure_model_reference, write_model_handle
 from pipelex.plugins.inference_backend_registry import InferenceFamily
 from pipelex.runtime_hub import get_inference_backend_registry, get_model_deck
@@ -137,19 +140,28 @@ def resolve_doc_gen_setting(
             the built-in one or one of the plugin's and this installation does not declare it, or no installed plugin
             registers the engine.
         ModelChoiceNotFoundError: the step names a reference the deck does not define.
+        ModelDeckChoiceUnresolvedError: the step names no engine and the deck's default for the step names a reference
+            the deck does not define.
         ModelNotFoundError: the reference resolves to no model served here.
         DocGenModelCapabilityError: the engine does not print the step's format from its source.
     """
     model_deck = get_model_deck()
-    resolved_choice = doc_gen_choice
-    if resolved_choice is None:
-        resolved_choice = model_deck.get_doc_gen_choice_default(doc_gen_format=doc_gen_format, source=source)
-    if resolved_choice is None:
-        raise DocGenEngineMissingError(
-            gap=DocGenEngineGap.NO_DEFAULT, doc_gen_format=doc_gen_format, source=source, model=None, sdk=None, pipe_code=pipe_code
+    doc_gen_setting: DocGenSetting
+    if doc_gen_choice is not None:
+        require_doc_gen_engine_declared(doc_gen_choice=doc_gen_choice, doc_gen_format=doc_gen_format, source=source, pipe_code=pipe_code)
+        doc_gen_setting = model_deck.get_doc_gen_setting(doc_gen_choice=doc_gen_choice)
+    else:
+        doc_gen_choice_default = model_deck.get_doc_gen_choice_default(doc_gen_format=doc_gen_format, source=source)
+        if doc_gen_choice_default is None:
+            raise DocGenEngineMissingError(
+                gap=DocGenEngineGap.NO_DEFAULT, doc_gen_format=doc_gen_format, source=source, model=None, sdk=None, pipe_code=pipe_code
+            )
+        require_doc_gen_engine_declared(doc_gen_choice=doc_gen_choice_default, doc_gen_format=doc_gen_format, source=source, pipe_code=pipe_code)
+        # The deck's own default, so a miss is the deployment's, not the method's.
+        doc_gen_setting = resolve_deck_choice(
+            deck_setting=f'doc_gen.choice_defaults["{doc_gen_choice_key(doc_gen_format=doc_gen_format, source=source)}"]',
+            resolve=partial(model_deck.get_doc_gen_setting, doc_gen_choice=doc_gen_choice_default),
         )
-    require_doc_gen_engine_declared(doc_gen_choice=resolved_choice, doc_gen_format=doc_gen_format, source=source, pipe_code=pipe_code)
-    doc_gen_setting = model_deck.get_doc_gen_setting(doc_gen_choice=resolved_choice)
     inference_model = get_doc_gen_inference_model(
         model_handle=doc_gen_setting.model, doc_gen_format=doc_gen_format, source=source, pipe_code=pipe_code
     )

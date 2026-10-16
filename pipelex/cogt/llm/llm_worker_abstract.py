@@ -4,6 +4,7 @@ import sys
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
+from mthds.protocol.problem.registry import CoreCode
 from opentelemetry import trace
 from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, Status, StatusCode, TraceFlags
 from typing_extensions import override
@@ -525,7 +526,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             max_prompt_images = self.inference_model.max_prompt_images or 5000
             if nb_images > max_prompt_images:
                 msg = f"LLM Engine '{self.inference_model.tag}' does not accept that many images: {nb_images}."
-                raise LLMCapabilityError(msg)
+                raise LLMCapabilityError(msg).with_error_code(CoreCode.MODEL_CONTEXT_EXCEEDED)
 
             check_prompt_images_are_images(model_name=self.inference_model.name, prompt_images=llm_job.llm_prompt.user_images)
 

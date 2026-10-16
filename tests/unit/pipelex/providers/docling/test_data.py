@@ -35,18 +35,18 @@ class DoclingErrorHandlingTestData:
             UserActionKind.CHANGE_INPUT,
         ),
         (
-            "io_error_transient",
+            "local_io_error",
             OSError,
             "Disk read error on /tmp/doc.pdf",
-            InferenceErrorCategory.TRANSIENT,
-            UserActionKind.WAIT_AND_RETRY,
+            InferenceErrorCategory.UNKNOWN,
+            UserActionKind.CONTACT_SUPPORT,
         ),
         (
             "permission_error_subclass_of_os_error",
             PermissionError,
             "Permission denied: /tmp/restricted.pdf",
-            InferenceErrorCategory.TRANSIENT,
-            UserActionKind.WAIT_AND_RETRY,
+            InferenceErrorCategory.UNKNOWN,
+            UserActionKind.CONTACT_SUPPORT,
         ),
         (
             "not_implemented_error_subclass_of_runtime_error",

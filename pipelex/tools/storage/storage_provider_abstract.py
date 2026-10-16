@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import NamedTuple
 
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidKeyError
 
 PIPELEX_STORAGE_SCHEME = "pipelex-storage://"
@@ -38,8 +40,9 @@ class StorageProviderAbstract(ABC):
             StorageFileNotFoundError: If URI doesn't start with the expected scheme.
         """
         if not uri.startswith(PIPELEX_STORAGE_SCHEME):
+            # A URI of another scheme reaching this provider is a routing fault of the runtime, not a missing file.
             msg = f"Invalid URI '{uri}': must start with '{PIPELEX_STORAGE_SCHEME}'"
-            raise StorageFileNotFoundError(msg)
+            raise StorageFileNotFoundError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
         return uri.removeprefix(PIPELEX_STORAGE_SCHEME)
 
     def _add_scheme(self, key: str) -> str:

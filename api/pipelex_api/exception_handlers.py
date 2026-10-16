@@ -297,6 +297,9 @@ def _json_safe_report(report: ErrorReport) -> ErrorReport:
     return report.model_copy(update={"provider_metadata": safe_metadata})
 
 
+# Every error the runtime raises carries a code, and the code decides its domain, but the HTTP status still
+# comes from that domain (`ErrorReport.http_status`): these rows keep the statuses the runner answered before
+# the codes, until the status is read from the registry instead.
 _ERROR_TYPE_STATUS_OVERRIDES: dict[str, int] = {
     # Async execution disabled is a deliberate deployment configuration, not
     # an unexpected runtime fault. Mapping it to 501 Not Implemented (rather
@@ -310,16 +313,17 @@ _ERROR_TYPE_STATUS_OVERRIDES: dict[str, int] = {
     # tells clients "this id is currently in use": resubmit after the
     # in-flight run finishes, or pick a fresh id.
     "PipelineManagerAlreadyExistsError": 409,
-    # The `method_ref` resolution failures (pipelex `MethodRefError` subclasses). The library
-    # declares no `error_domain` on them, so without an override each would default to 500 —
-    # wrong for what are overwhelmingly caller-fixable conditions. Each entry keeps the class
-    # name as the distinct `error_type` the caller (or an agent) branches on:
+    # The `method_ref` resolution failures (pipelex `MethodRefError` subclasses), overwhelmingly
+    # caller-fixable conditions. Each entry keeps the class name as the distinct `error_type`
+    # the caller (or an agent) branches on, beside the `code` that names the fault:
     #   - A reference that does not match the `<address>[@<tag>]` grammar: the caller's own
     #     input, plainly fixable → 422.
     "MethodRefParseError": 422,
     #   - The repository could not be fetched (nonexistent repo, a `@tag` that is not a tag,
     #     network refusal). The dominant cause is a mistyped address or tag — caller-fixable —
-    #     so 422; the message carries git's own explanation for the rarer upstream faults.
+    #     so 422; the message carries git's own explanation for the rarer upstream faults, and
+    #     the code tells them apart where the raise site can (`method.not_found`,
+    #     `method.fetch_failed`, `pipelex.config.dependency_missing`).
     "MethodFetchError": 422,
     #   - The repository was fetched but holds no package matching the address by manifest
     #     identity: the referenced resource does not exist → 404 (mirroring the hosted

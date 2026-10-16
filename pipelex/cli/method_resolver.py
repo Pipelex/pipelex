@@ -7,10 +7,9 @@ from pathlib import Path
 
 import typer
 
+from pipelex.cli.exceptions import DuplicateMethodNameError, ExportedPipeAmbiguousError, ExportedPipeNotFoundError, MethodNotFoundError
 from pipelex.cli.installed_methods import (
-    DuplicateMethodNameError,
     InstalledMethod,
-    MethodNotFoundError,
     discover_installed_methods,
     discover_method_at,
     find_method_by_name,
@@ -48,8 +47,8 @@ def _find_method_by_exported_pipe(pipe_code: str) -> InstalledMethod:
         The installed method that exports the given pipe code
 
     Raises:
-        LookupError: If the pipe code is not found in any method's exports
-        ValueError: If the pipe code is found in multiple methods
+        ExportedPipeNotFoundError: If the pipe code is not found in any method's exports
+        ExportedPipeAmbiguousError: If the pipe code is found in multiple methods
     """
     methods = discover_installed_methods()
 
@@ -60,11 +59,11 @@ def _find_method_by_exported_pipe(pipe_code: str) -> InstalledMethod:
 
     if len(matches) == 0:
         msg = f"Pipe code '{pipe_code}' not found in any installed method's exports."
-        raise LookupError(msg)
+        raise ExportedPipeNotFoundError(msg)
     if len(matches) > 1:
         method_names = ", ".join(method.name for method in matches)
         msg = f"Pipe code '{pipe_code}' is exported by multiple methods: {method_names}"
-        raise ValueError(msg)
+        raise ExportedPipeAmbiguousError(msg)
 
     return matches[0]
 
@@ -285,10 +284,10 @@ def resolve_pipe_from_exports(
         Library dirs if the pipe code was found in an installed method, None otherwise.
 
     Raises:
-        ValueError: If the pipe code is found in multiple methods (ambiguous).
+        ExportedPipeAmbiguousError: If the pipe code is found in multiple methods (ambiguous).
     """
     try:
         method = _find_method_by_exported_pipe(pipe_code)
         return [str(method.path)]
-    except LookupError:
+    except ExportedPipeNotFoundError:
         return None

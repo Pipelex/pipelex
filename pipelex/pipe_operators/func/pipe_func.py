@@ -5,13 +5,13 @@ from typing import Any, Literal, cast, get_args, get_origin, get_type_hints
 
 from mthds.method_tree.models import MethodTree
 from mthds.method_tree.tree_path import nfc
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import PrivateAttr, field_validator
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.config import is_pipe_func_sandbox_hosted
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.method_trees.building_bundle import BuildingBundle
@@ -27,7 +27,7 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.interpreter_hub import get_current_library_id_or_none, get_pipe_func_executor
 from pipelex.kernel.memory_ops import store_result
-from pipelex.pipe_operators.func.exceptions import PipeFuncFunctionError
+from pipelex.pipe_operators.func.exceptions import PipeFuncFunctionError, PipeFuncRaisedError
 from pipelex.pipe_operators.func.function_name import function_name_form_violation
 from pipelex.pipe_operators.func.pipe_func_call_context import pipe_func_call_in_flight
 from pipelex.pipe_operators.func.pipe_func_python import (
@@ -353,26 +353,22 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             # PipeFunc runs arbitrary user code — in-process, or (in hosted mode) inside a sandbox
             # reached through a Temporal activity — whose failure surface is not enumerable; any
             # failure is wrapped into a diagnostic PipeRunError below. Re-raises, never swallows.
-            # Build informative error message with actual input values from working memory
-            inputs_lines: list[str] = []
-            for input_name in self.inputs.root:
-                try:
-                    stuff = working_memory.get_stuff(name=input_name)
-                    inputs_lines.append(f"    {input_name} = {stuff.content!r}")
-                except WorkingMemoryStuffNotFoundError:
-                    inputs_lines.append(f"    {input_name} = <not found in working memory>")
-
-            inputs_desc = "\n".join(inputs_lines) if inputs_lines else "    none"
+            # The message names the step's inputs, never their values: those are this run's content.
+            inputs_desc = ", ".join(self.inputs.root) or "none"
             output_desc = self.output.to_bundle_representation()
+            # The function's own exception, which the in-process executor marks as raised by the function.
+            error_desc = exc.message if isinstance(exc, PipeFuncRaisedError) else f"{type(exc).__name__}: {exc}"
             msg = (
-                f"PipeFunc '{self.code}' failed during execution.\n"
-                f"  Expected output: {output_desc}\n"
-                f"  Inputs:\n{inputs_desc}\n\n"
-                f"  Error: {type(exc).__name__}: {exc}"
+                f"PipeFunc '{self.code}' failed during execution.\n  Expected output: {output_desc}\n  Inputs: {inputs_desc}\n\n  Error: {error_desc}"
             )
             # Not classified as the caller's fault: the function's own exception text can carry
             # whatever the process holds (a path, a setting, a secret), so it stays redacted under
-            # STRICT disclosure.
+            # STRICT disclosure. The wrapper takes its cause's code. What the function raised reads
+            # `pipe.function_raised` only because an executor marked it so: the in-process executor
+            # raises it as `PipeFuncRaisedError`, and an out-of-process one must report a coded Pipelex
+            # error the same way. A failure of the seam (a timeout, a sandbox that cannot run the call)
+            # keeps its own code, and an exception that is not a Pipelex error proves nothing about the
+            # function, such as a transport error, so it reads `runtime.unexpected`.
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
 
         the_content = execution_result.content
@@ -428,7 +424,9 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             hinted_return_type = get_type_hints(function).get("return")
             if hinted_return_type is None:
                 msg = f"Dry run of {self.type} '{self.code}' failed: function return type is None; it must be a subclass of StuffContent."
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).with_error_code(
+                    CoreCode.METHOD_FUNCTION_INVALID
+                )
             return_type = hinted_return_type
 
         # Without an annotation (hosted mode), `return_type` is the ITEM structure class, so the
@@ -498,7 +496,9 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             # enumerable: an ImportError, the guard's refusal of a file the tree excludes included, or anything the
             # code raises. Wrapped on the step, as a failure of the function itself is, and never swallowed.
             msg = f"PipeFunc '{self.code}' cannot import the module of its function '{self.function_name}': {type(exc).__name__}: {exc}"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).with_error_code(
+                CoreCode.METHOD_FUNCTION_INVALID
+            ) from exc
 
     @override
     async def _validate_after_run(

@@ -12,6 +12,7 @@ from pipelex.cli.commands.validate._validate_core import (
     execute_validate,
 )
 from pipelex.cli.error_handlers import ErrorContext
+from pipelex.cli.exceptions import ExportedPipeAmbiguousError
 from pipelex.cli.method_resolver import resolve_pipe_from_exports
 from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.pipelex import Pipelex
@@ -105,7 +106,7 @@ def validate_pipe_cmd(
     # Check installed methods' exports for additional library dirs
     try:
         extra_dirs = resolve_pipe_from_exports(pipe_code)
-    except ValueError as exc:
+    except ExportedPipeAmbiguousError as exc:
         typer.secho(
             f"Ambiguous pipe code '{pipe_code}': {exc}",
             fg=typer.colors.RED,

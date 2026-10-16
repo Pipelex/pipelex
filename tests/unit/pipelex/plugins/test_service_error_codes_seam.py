@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.cogt.exceptions import InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import MODEL_NOT_ALLOWED_ERROR_CODE, UserActionKind
@@ -29,6 +30,7 @@ def _entry(code: str) -> ServiceErrorCode:
         code=code,
         category=InferenceErrorCategory.CONTENT,
         user_action_kind=UserActionKind.CHANGE_INPUT,
+        error_code=CoreCode.INPUT_TOO_LARGE,
         detail=f"advice for {code}",
     )
 

@@ -29,6 +29,7 @@ from typing import Any, Final, NamedTuple, TypeAlias, TypeVar, cast
 
 import aiofiles
 import shortuuid
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ConfigDict
 
 from pipelex.config import get_config
@@ -410,7 +411,7 @@ async def _prepare_storage_reference(
         head = await context.storage.load_head(uri=resolved_uri.storage_uri, nb_bytes=FILE_HEAD_NB_BYTES)
     except StorageFileNotFoundError as exc:
         msg = f"{type(content).__name__} input '{input_name}': the storage reference '{content.url}' names no stored file"
-        raise PipelineInputContentError(msg) from exc
+        raise PipelineInputContentError(msg).with_error_code(CoreCode.INPUT_REFERENCE_NOT_FOUND) from exc
     except StorageInvalidUriError as exc:
         msg = f"{type(content).__name__} input '{input_name}': the storage reference '{content.url}' cannot be read ({exc})"
         raise PipelineInputContentError(msg) from exc
@@ -454,7 +455,7 @@ async def _prepare_data_url(
         raw_bytes = base64.b64decode(resolved_uri.base64_data)
     except binascii.Error as exc:
         msg = f"{type(content).__name__} input '{input_name}': the data URL does not hold valid base64 ({exc})"
-        raise PipelineInputContentError(msg) from exc
+        raise PipelineInputContentError(msg).with_error_code(CoreCode.INPUT_FILE_UNREADABLE) from exc
     mime_type = _identify_file_input(
         content=content,
         head=raw_bytes[:FILE_HEAD_NB_BYTES],
@@ -519,7 +520,7 @@ async def _prepare_local_path(
         raw_bytes = await load_binary_async(local_path)
     except (OSError, ValueError) as exc:
         msg = f"Input file cannot be read: '{resolved_uri.path}' ({type(exc).__name__})"
-        raise PipelineInputContentError(msg) from exc
+        raise PipelineInputContentError(msg).with_error_code(CoreCode.INPUT_FILE_UNREADABLE) from exc
     mime_type = _identify_file_input(
         content=content,
         head=raw_bytes[:FILE_HEAD_NB_BYTES],

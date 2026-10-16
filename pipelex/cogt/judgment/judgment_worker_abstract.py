@@ -2,6 +2,7 @@ import math
 from abc import abstractmethod
 from collections.abc import Mapping
 
+from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import CogtError, JudgmentAnswerMismatchError, JudgmentCapabilityError
@@ -103,7 +104,7 @@ class JudgmentWorkerAbstract(InferenceWorkerAbstract):
                     f"Judgment model '{self.inference_model.name}' reads at most {max_prompt_images} images, "
                     f"and the judgment was given {len(prompt_images)}."
                 )
-                raise JudgmentCapabilityError(msg)
+                raise JudgmentCapabilityError(msg).with_error_code(CoreCode.MODEL_CONTEXT_EXCEEDED)
             check_prompt_images_are_images(model_name=self.inference_model.name, prompt_images=prompt_images)
 
         prompt_documents = judgment_job.prompt.documents

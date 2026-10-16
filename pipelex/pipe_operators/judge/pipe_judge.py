@@ -1,5 +1,6 @@
 from typing import Any, Literal, Self
 
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ConfigDict, model_validator
 from typing_extensions import override
 
@@ -469,7 +470,7 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
             result_memory = judgment_result.memory
         else:
             msg = f"PipeJudge '{self.code}' asks no question, which its construction refuses."
-            raise PipeValidationError(message=msg, domain_code=self.domain_code, pipe_code=self.code)
+            raise PipeValidationError(message=msg, domain_code=self.domain_code, pipe_code=self.code).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
 
         # Capture execution data for the graph tracer.
         self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)

@@ -10,7 +10,8 @@ from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError,
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.qualified_ref import QualifiedRef, QualifiedRefError
+from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.core.qualified_ref_exceptions import QualifiedRefError
 from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff import Stuff

@@ -169,7 +169,7 @@ class TestGoogleImgGenWorkerErrorHandling:
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.CHANGE_INPUT
 
-    async def test_server_error_500_is_wait_and_retry(self, mocker: MockerFixture) -> None:
+    async def test_server_error_500_is_an_unknown_outcome(self, mocker: MockerFixture) -> None:
         worker = _make_worker(mocker)
         sdk_exc = _make_google_server_error(500, "Internal server error")
         worker.genai_async_client.models.generate_content.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
@@ -177,29 +177,32 @@ class TestGoogleImgGenWorkerErrorHandling:
         with pytest.raises(ImgGenGenerationError) as exc_info:
             await worker._gen_image(img_gen_job=_make_img_gen_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.error_category is InferenceErrorCategory.AMBIGUOUS
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
         assert exc_info.value.provider_metadata is not None
         assert exc_info.value.provider_metadata.status_code == 500
 
     @pytest.mark.parametrize(
-        ("exc_class", "expected_sdk_type"),
+        ("exc_class", "expected_sdk_type", "expected_category"),
         [
-            (httpx.ConnectError, "ConnectError"),
-            (httpx.ConnectTimeout, "ConnectTimeout"),
-            (httpx.ReadError, "TransportError"),
-            (httpx.RemoteProtocolError, "TransportError"),
+            # Never sent: the connection was not opened, so the image was not generated.
+            (httpx.ConnectError, "ConnectError", InferenceErrorCategory.TRANSIENT),
+            (httpx.ConnectTimeout, "ConnectTimeout", InferenceErrorCategory.TRANSIENT),
+            # Dropped after the request left: the image may exist and be billed.
+            (httpx.ReadError, "TransportError", InferenceErrorCategory.AMBIGUOUS),
+            (httpx.RemoteProtocolError, "TransportError", InferenceErrorCategory.AMBIGUOUS),
         ],
     )
-    async def test_httpx_transport_error_is_wrapped_as_transient(
+    async def test_httpx_transport_error_is_wrapped_by_whether_it_was_sent(
         self,
         mocker: MockerFixture,
         exc_class: type[httpx.TransportError],
         expected_sdk_type: str,
+        expected_category: InferenceErrorCategory,
     ) -> None:
-        """A direct httpx.TransportError from generate_content() must be caught and routed through
-        the categorizer as a TRANSIENT ImgGenGenerationError, matching the Google LLM worker.
+        """A direct httpx.TransportError from generate_content() is caught and routed through the categorizer as an
+        ImgGenGenerationError: transient when the request was never sent, an unknown outcome when it may have been.
         """
         worker = _make_worker(mocker)
         request = httpx.Request("POST", "https://generativelanguage.googleapis.com/v1/models/imagen-3.0-generate-002:generateContent")
@@ -209,7 +212,7 @@ class TestGoogleImgGenWorkerErrorHandling:
         with pytest.raises(ImgGenGenerationError) as exc_info:
             await worker._gen_image(img_gen_job=_make_img_gen_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.error_category is expected_category
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
         assert exc_info.value.provider_metadata is not None

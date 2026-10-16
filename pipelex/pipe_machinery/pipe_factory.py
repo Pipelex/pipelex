@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeVar
 
 from kajson.exceptions import ClassRegistryInheritanceError, ClassRegistryNotFoundError
+from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import runtime_checkable
 
 from pipelex.core.concepts.helpers import strip_markers_from_concept_ref_or_code
@@ -73,7 +74,7 @@ class PipeFactory(Generic[PipeAbstractType]):
                             f"The concept must be either native, declared in domain '{domain_code}', or fully qualified with a domain prefix. "
                             f"Declared concepts are: '{concept_codes_from_the_same_domain}'"
                         )
-                        raise PipeFactoryError(msg)
+                        raise PipeFactoryError(msg).with_error_code(CoreCode.METHOD_CONCEPT_UNRESOLVED)
 
         if "." not in blueprint.output:
             stripped_output_concept_ref_or_code = strip_markers_from_concept_ref_or_code(concept_ref_or_code=blueprint.output)
@@ -93,7 +94,7 @@ class PipeFactory(Generic[PipeAbstractType]):
                     domain_code=domain_code,
                     missing_concept_code=stripped_output_concept_ref_or_code,
                     declared_concepts=concept_codes_from_the_same_domain,
-                )
+                ).with_error_code(CoreCode.METHOD_CONCEPT_UNRESOLVED)
 
         # Parse common attributes
         try:
@@ -129,10 +130,10 @@ class PipeFactory(Generic[PipeAbstractType]):
             )
         except ClassRegistryNotFoundError as factory_not_found_error:
             msg = f"Pipe '{pipe_code}' couldn't be created: factory '{factory_class_name}' not found: {factory_not_found_error}"
-            raise PipeFactoryError(msg) from factory_not_found_error
+            raise PipeFactoryError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED) from factory_not_found_error
         except ClassRegistryInheritanceError as factory_inheritance_error:
             msg = f"Pipe '{pipe_code}' couldn't be created: factory '{factory_class_name}' is not a subclass of {type(PipeFactoryProtocol)}."
-            raise PipeFactoryError(msg) from factory_inheritance_error
+            raise PipeFactoryError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED) from factory_inheritance_error
 
         pipe: PipeAbstractType = pipe_factory.make(
             pipe_category=pipe_category,

@@ -16,6 +16,7 @@ A step asks one question, `run_judgment`, whose verdict native is the result, or
 judging model, every question answered independently over the same evidence.
 """
 
+from functools import partial
 from typing import NamedTuple
 
 from pydantic import BaseModel, ConfigDict
@@ -38,6 +39,7 @@ from pipelex.cogt.judgment.judgment_models import (
 from pipelex.cogt.judgment.judgment_setting import JudgmentModelChoice, JudgmentSetting
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.cogt.models.model_deck import resolve_deck_choice
 from pipelex.cogt.models.model_reference import write_model_handle
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.concepts.concept import Concept
@@ -95,10 +97,14 @@ def judgment_setting_of_choice(*, judgment_choice: JudgmentModelChoice | None = 
     which no backend may serve on this boot.
     """
     model_deck = get_model_deck()
-    resolved_choice = judgment_choice or model_deck.judgment_choice_default
-    if resolved_choice is None:
+    if judgment_choice:
+        return model_deck.get_judgment_setting(judgment_choice=judgment_choice)
+    if (judgment_choice_default := model_deck.judgment_choice_default) is None:
         raise JudgmentModelMissingError(pipe_code=pipe_code)
-    return model_deck.get_judgment_setting(judgment_choice=resolved_choice)
+    # The deck's own default, so a miss is the deployment's, not the method's.
+    return resolve_deck_choice(
+        deck_setting="judgment.choice_default", resolve=partial(model_deck.get_judgment_setting, judgment_choice=judgment_choice_default)
+    )
 
 
 def served_judgment_model(*, model_handle: str) -> InferenceModelSpec | None:

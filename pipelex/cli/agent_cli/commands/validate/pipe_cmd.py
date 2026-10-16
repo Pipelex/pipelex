@@ -18,6 +18,7 @@ from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_all_core,
     validate_pipe_core,
 )
+from pipelex.cli.exceptions import ExportedPipeAmbiguousError
 from pipelex.cli.method_resolver import resolve_pipe_from_exports
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
@@ -145,7 +146,7 @@ def validate_pipe_cmd(
     # Check installed methods' exports for additional library dirs
     try:
         export_dirs = resolve_pipe_from_exports(pipe_code)
-    except ValueError as exc:
+    except ExportedPipeAmbiguousError as exc:
         agent_error(
             f"Ambiguous pipe code '{pipe_code}': {exc}",
             error_type="ArgumentError",

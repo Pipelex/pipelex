@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 
 from pipelex_api.error_types import ErrorType
 from pipelex_api.errors import raise_bad_request, raise_internal_server_error, raise_unauthenticated
+from pipelex_api.exceptions import InvalidAuthModeError
 
 AUTH_MODE_ENV_VAR = "AUTH_MODE"
 
@@ -143,10 +144,6 @@ class RequestUser(BaseModel):
 def _set_request_user(request: Request, user_id: str) -> None:
     """Store caller identity on request.state for downstream handlers."""
     request.state.user = RequestUser(user_id=user_id)
-
-
-class InvalidAuthModeError(ValueError):
-    """Raised at startup when `AUTH_MODE` holds a value that is not an `AuthMode` member."""
 
 
 def get_auth_mode() -> AuthMode:

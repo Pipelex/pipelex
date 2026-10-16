@@ -2,6 +2,8 @@ import datetime
 import re
 from typing import Any
 
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.exceptions import StuffContentFactoryError
@@ -102,6 +104,6 @@ class StuffContentFactory:
 
         if not issubclass(the_structure_class, StuffContent):
             msg = f"Concept '{concept.code}', subclass '{the_structure_class}' is not a subclass of StuffContent"
-            raise StuffContentFactoryError(msg)
+            raise StuffContentFactoryError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
 
         return cls.make_content_from_value(stuff_content_subclass=the_structure_class, value=value)

@@ -49,10 +49,11 @@ class FalErrorHandlingTestData:
             UserActionKind.CHANGE_INPUT,
         ),
         (
+            # An image generation is billed and not idempotent, so a failure after it was sent is an unknown outcome.
             "server_error_500",
             500,
             "Internal server error",
-            InferenceErrorCategory.TRANSIENT,
+            InferenceErrorCategory.AMBIGUOUS,
             UserActionKind.WAIT_AND_RETRY,
         ),
     ]
@@ -68,7 +69,7 @@ class FalErrorHandlingTestData:
     TIMEOUT_CASES: ClassVar[list[tuple[str, InferenceErrorCategory, UserActionKind]]] = [
         (
             "request_timeout",
-            InferenceErrorCategory.TRANSIENT,
+            InferenceErrorCategory.AMBIGUOUS,
             UserActionKind.WAIT_AND_RETRY,
         ),
     ]
@@ -76,7 +77,7 @@ class FalErrorHandlingTestData:
     GENERIC_CLIENT_ERROR_CASES: ClassVar[list[tuple[str, InferenceErrorCategory, UserActionKind]]] = [
         (
             "generic_fal_error",
-            InferenceErrorCategory.TRANSIENT,
+            InferenceErrorCategory.AMBIGUOUS,
             UserActionKind.WAIT_AND_RETRY,
         ),
     ]

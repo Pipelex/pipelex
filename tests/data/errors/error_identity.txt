@@ -1,385 +1,401 @@
-# Wire identity of every PipelexError subclass: error_type | title | type_uri
+# Wire identity of every PipelexError subclass: error_type | code declaration
 #
 # `error_type` is the Python class name, verbatim — base_exceptions.py builds it as
 # `type(self).__name__`. Consumers outside this repo switch on that string, so renaming
 # an error class is a wire break that no build anywhere catches: they stay green and
-# silently fall through to a generic branch. A diff in this file IS that wire break.
+# silently fall through to a generic branch. The declaration is the registry code the
+# class raises, the set its raise sites choose from, the cause it takes its code from,
+# or `abstract`; a change to it changes what every reader of the code is told to do.
+# A diff in this file IS that wire change.
 #
 # Generated — do not hand-edit. Regenerate with `make generate-error-identity` (alias `make gei`).
 # Verified by tests/unit/pipelex/errors/test_error_identity_snapshot.py.
 
-AmbiguousInputsFilesError | Ambiguous inputs files | https://docs.pipelex.com/latest/errors/ambiguous-inputs-files-error/
-AnthropicFactoryError | Anthropic factory | https://docs.pipelex.com/latest/errors/anthropic-factory-error/
-AnthropicModelListingError | Anthropic model listing | https://docs.pipelex.com/latest/errors/anthropic-model-listing-error/
-AnthropicSDKUnsupportedError | Anthropic SDK unsupported | https://docs.pipelex.com/latest/errors/anthropic-sdk-unsupported-error/
-AnthropicWorkerConfigurationError | Anthropic worker configuration | https://docs.pipelex.com/latest/errors/anthropic-worker-configuration-error/
-ArgumentTypeError | Argument type | https://docs.pipelex.com/latest/errors/argument-type-error/
-AsyncExecutionNotEnabledError | Async execution not enabled | https://docs.pipelex.com/latest/errors/async-execution-not-enabled-error/
-AwsCredentialsError | Aws credentials | https://docs.pipelex.com/latest/errors/aws-credentials-error/
-AzureCredentialsError | Azure credentials | https://docs.pipelex.com/latest/errors/azure-credentials-error/
-BatchParamsError | Batch params | https://docs.pipelex.com/latest/errors/batch-params-error/
-BedrockFactoryError | Bedrock factory | https://docs.pipelex.com/latest/errors/bedrock-factory-error/
-BedrockWorkerConfigurationError | Bedrock worker configuration | https://docs.pipelex.com/latest/errors/bedrock-worker-configuration-error/
-BindingPathUnresolvedError | Binding path unresolved | https://docs.pipelex.com/latest/errors/binding-path-unresolved-error/
-BindingStepRunError | Binding step run | https://docs.pipelex.com/latest/errors/binding-step-run-error/
-BrokenPluginError | Broken plugin | https://docs.pipelex.com/latest/errors/broken-plugin-error/
-BundleElaboratorError | Bundle elaborator | https://docs.pipelex.com/latest/errors/bundle-elaborator-error/
-BundleResourceNotNamedError | Bundle resource not named | https://docs.pipelex.com/latest/errors/bundle-resource-not-named-error/
-BundleResourcePathError | Bundle resource path | https://docs.pipelex.com/latest/errors/bundle-resource-path-error/
-CodegenError | Codegen error | https://docs.pipelex.com/latest/errors/codegen-error/
-CodegenLockError | Codegen lock error | https://docs.pipelex.com/latest/errors/codegen-lock-error/
-CodegenStampError | Codegen stamp error | https://docs.pipelex.com/latest/errors/codegen-stamp-error/
-CogtError | AI inference failed | https://docs.pipelex.com/latest/errors/cogt-error/
-ConceptCodeError | Concept code | https://docs.pipelex.com/latest/errors/concept-code-error/
-ConceptError | Concept error | https://docs.pipelex.com/latest/errors/concept-error/
-ConceptFactoryError | Concept factory | https://docs.pipelex.com/latest/errors/concept-factory-error/
-ConceptLibraryConceptNotFoundError | Concept library concept not found | https://docs.pipelex.com/latest/errors/concept-library-concept-not-found-error/
-ConceptLibraryError | Concept library | https://docs.pipelex.com/latest/errors/concept-library-error/
-ConceptLoadingError | Concept loading | https://docs.pipelex.com/latest/errors/concept-loading-error/
-ConceptRefAmbiguousError | Concept ref ambiguous | https://docs.pipelex.com/latest/errors/concept-ref-ambiguous-error/
-ConceptRefineError | Concept refine | https://docs.pipelex.com/latest/errors/concept-refine-error/
-ConceptStringError | Concept string | https://docs.pipelex.com/latest/errors/concept-string-error/
-ConceptStructureGeneratorError | Concept structure generator | https://docs.pipelex.com/latest/errors/concept-structure-generator-error/
-ConceptStructureValidationError | Concept structure validation | https://docs.pipelex.com/latest/errors/concept-structure-validation-error/
-ConfigValidationError | Config validation | https://docs.pipelex.com/latest/errors/config-validation-error/
-ConstructFieldBlueprintTypeError | Construct field blueprint type | https://docs.pipelex.com/latest/errors/construct-field-blueprint-type-error/
-ConstructFieldBlueprintValueError | Construct field blueprint value | https://docs.pipelex.com/latest/errors/construct-field-blueprint-value-error/
-ContextProviderError | Context provider | https://docs.pipelex.com/latest/errors/context-provider-error/
-CoreUnconditionalPluginDisabledError | Core unconditional plugin disabled | https://docs.pipelex.com/latest/errors/core-unconditional-plugin-disabled-error/
-CostRegistryError | Cost registry | https://docs.pipelex.com/latest/errors/cost-registry-error/
-CrateNormalizationError | Crate normalization error | https://docs.pipelex.com/latest/errors/crate-normalization-error/
-CredentialsError | Missing or invalid credentials | https://docs.pipelex.com/latest/errors/credentials-error/
-CsvCoercionError | CSV coercion error | https://docs.pipelex.com/latest/errors/csv-coercion-error/
-CsvColumnError | CSV column error | https://docs.pipelex.com/latest/errors/csv-column-error/
-CsvError | CSV error | https://docs.pipelex.com/latest/errors/csv-error/
-CsvFlatnessError | CSV flatness error | https://docs.pipelex.com/latest/errors/csv-flatness-error/
-CsvReadError | CSV read error | https://docs.pipelex.com/latest/errors/csv-read-error/
-DateContentError | Date content | https://docs.pipelex.com/latest/errors/date-content-error/
-DeliveryError | Delivery | https://docs.pipelex.com/latest/errors/delivery-error/
-DocGenEngineMissingError | Doc gen engine missing | https://docs.pipelex.com/latest/errors/doc-gen-engine-missing-error/
-DocGenHandleNotFoundError | Doc gen handle not found | https://docs.pipelex.com/latest/errors/doc-gen-handle-not-found-error/
-DocGenModelCapabilityError | Doc gen model capability | https://docs.pipelex.com/latest/errors/doc-gen-model-capability-error/
-DocGenRenderError | Doc gen render | https://docs.pipelex.com/latest/errors/doc-gen-render-error/
-DomainCodeError | Domain code | https://docs.pipelex.com/latest/errors/domain-code-error/
-DomainFactoryError | Domain factory | https://docs.pipelex.com/latest/errors/domain-factory-error/
-DomainLibraryError | Domain library | https://docs.pipelex.com/latest/errors/domain-library-error/
-DomainLoadingError | Domain loading | https://docs.pipelex.com/latest/errors/domain-loading-error/
-DriftAckError | Drift ack | https://docs.pipelex.com/latest/errors/drift-ack-error/
-DriftError | Drift | https://docs.pipelex.com/latest/errors/drift-error/
-DriftGitError | Drift git | https://docs.pipelex.com/latest/errors/drift-git-error/
-DriftManifestError | Drift manifest | https://docs.pipelex.com/latest/errors/drift-manifest-error/
-DryRunError | Dry run | https://docs.pipelex.com/latest/errors/dry-run-error/
-DryRunGraphNotProducedError | Dry run graph not produced | https://docs.pipelex.com/latest/errors/dry-run-graph-not-produced-error/
-DryRunMockBuildError | Dry run mock build | https://docs.pipelex.com/latest/errors/dry-run-mock-build-error/
-DryRunObjectFidelityError | Dry run object fidelity | https://docs.pipelex.com/latest/errors/dry-run-object-fidelity-error/
-DuplicateBundleValidatorError | Duplicate bundle validator | https://docs.pipelex.com/latest/errors/duplicate-bundle-validator-error/
-DuplicateDocGenDefaultError | Duplicate doc gen default | https://docs.pipelex.com/latest/errors/duplicate-doc-gen-default-error/
-DuplicateHttpErrorMapperError | Duplicate http error mapper | https://docs.pipelex.com/latest/errors/duplicate-http-error-mapper-error/
-DuplicateInferenceBackendError | Duplicate inference backend | https://docs.pipelex.com/latest/errors/duplicate-inference-backend-error/
-DuplicateInternalModelError | Duplicate internal model | https://docs.pipelex.com/latest/errors/duplicate-internal-model-error/
-DuplicateLogSinkError | Duplicate log sink | https://docs.pipelex.com/latest/errors/duplicate-log-sink-error/
-DuplicateModelListerError | Duplicate model lister | https://docs.pipelex.com/latest/errors/duplicate-model-lister-error/
-DuplicateOrchestratorError | Duplicate orchestrator | https://docs.pipelex.com/latest/errors/duplicate-orchestrator-error/
-DuplicatePipeFuncExecutorError | Duplicate pipe func executor | https://docs.pipelex.com/latest/errors/duplicate-pipe-func-executor-error/
-DuplicatePipeFuncPackageOfferError | Duplicate pipe func package offer | https://docs.pipelex.com/latest/errors/duplicate-pipe-func-package-offer-error/
-DuplicateSecretsProviderError | Duplicate secrets provider | https://docs.pipelex.com/latest/errors/duplicate-secrets-provider-error/
-DuplicateServiceErrorCodeError | Duplicate service error code | https://docs.pipelex.com/latest/errors/duplicate-service-error-code-error/
-DuplicateStorageProviderError | Duplicate storage provider | https://docs.pipelex.com/latest/errors/duplicate-storage-provider-error/
-EntryPipeAmbiguousError | Entry pipe ambiguous | https://docs.pipelex.com/latest/errors/entry-pipe-ambiguous-error/
-EntryPipeNotFoundError | Entry pipe not found | https://docs.pipelex.com/latest/errors/entry-pipe-not-found-error/
-EnvVarNotFoundError | Environment variable not set | https://docs.pipelex.com/latest/errors/env-var-not-found-error/
-ErrorRegistryError | Error registry | https://docs.pipelex.com/latest/errors/error-registry-error/
-EventLogError | Event log | https://docs.pipelex.com/latest/errors/event-log-error/
-EventLogReadError | Event log read | https://docs.pipelex.com/latest/errors/event-log-read-error/
-EventLogSchemaMismatchError | Event log schema mismatch | https://docs.pipelex.com/latest/errors/event-log-schema-mismatch-error/
-EventLogSetupError | Event log setup | https://docs.pipelex.com/latest/errors/event-log-setup-error/
-ExplicitConceptIncompatibleError | Explicit concept incompatible | https://docs.pipelex.com/latest/errors/explicit-concept-incompatible-error/
-ExtractCapabilityError | Extract capability | https://docs.pipelex.com/latest/errors/extract-capability-error/
-ExtractHandleNotFoundError | Extract handle not found | https://docs.pipelex.com/latest/errors/extract-handle-not-found-error/
-ExtractInputError | Extract input | https://docs.pipelex.com/latest/errors/extract-input-error/
-ExtractInputFormatError | Extract input format | https://docs.pipelex.com/latest/errors/extract-input-format-error/
-ExtractJobFailureError | Extract job failure | https://docs.pipelex.com/latest/errors/extract-job-failure-error/
-ExtractModelNotFoundError | Extract model not found | https://docs.pipelex.com/latest/errors/extract-model-not-found-error/
-ExtractOutputError | Extract output | https://docs.pipelex.com/latest/errors/extract-output-error/
-FalCredentialsError | Fal credentials | https://docs.pipelex.com/latest/errors/fal-credentials-error/
-FatalError | Fatal error | https://docs.pipelex.com/latest/errors/fatal-error/
-FileTypeError | File type | https://docs.pipelex.com/latest/errors/file-type-error/
-FixTransactionError | Fix transaction | https://docs.pipelex.com/latest/errors/fix-transaction-error/
-FixWriteConflictError | Fix write conflict | https://docs.pipelex.com/latest/errors/fix-write-conflict-error/
-FormerReleaseConfigError | Configuration left by a former release | https://docs.pipelex.com/latest/errors/former-release-config-error/
-FunctionNamesMigrationError | Function names migration error | https://docs.pipelex.com/latest/errors/function-names-migration-error/
-GcpLogSinkCredentialsError | Log sink credentials missing or refused | https://docs.pipelex.com/latest/errors/gcp-log-sink-credentials-error/
-GeneratedImageError | Generated image | https://docs.pipelex.com/latest/errors/generated-image-error/
-GoogleImgGenWorkerError | Google img gen worker | https://docs.pipelex.com/latest/errors/google-img-gen-worker-error/
-GoogleLLMWorkerError | Google LLM worker | https://docs.pipelex.com/latest/errors/google-llm-worker-error/
-GraphSpecError | Graph spec | https://docs.pipelex.com/latest/errors/graph-spec-error/
-GraphSpecValidationError | Graph spec validation | https://docs.pipelex.com/latest/errors/graph-spec-validation-error/
-HostLibraryRequirementsError | Host library requirements | https://docs.pipelex.com/latest/errors/host-library-requirements-error/
-HostLibraryTreeError | Host library tree | https://docs.pipelex.com/latest/errors/host-library-tree-error/
-HostedBaseUrlError | Hosted base url | https://docs.pipelex.com/latest/errors/hosted-base-url-error/
-HostedLocalFileUploadUnavailableError | Hosted local file upload unavailable | https://docs.pipelex.com/latest/errors/hosted-local-file-upload-unavailable-error/
-HostedMethodInvalidError | Hosted method invalid | https://docs.pipelex.com/latest/errors/hosted-method-invalid-error/
-HostedRunError | Hosted run error | https://docs.pipelex.com/latest/errors/hosted-run-error/
-HostedRunInterruptedError | Hosted run interrupted | https://docs.pipelex.com/latest/errors/hosted-run-interrupted-error/
-HostedRunOutcomeUnknownError | Hosted run outcome unknown | https://docs.pipelex.com/latest/errors/hosted-run-outcome-unknown-error/
-HostedRunPollingError | Hosted run polling | https://docs.pipelex.com/latest/errors/hosted-run-polling-error/
-HostedRunSourceError | Hosted run source | https://docs.pipelex.com/latest/errors/hosted-run-source-error/
-HubSlotAlreadyClaimedError | Hub slot already claimed | https://docs.pipelex.com/latest/errors/hub-slot-already-claimed-error/
-ImageContentError | Image content | https://docs.pipelex.com/latest/errors/image-content-error/
-ImgGenGeneratedTypeError | Img gen generated type | https://docs.pipelex.com/latest/errors/img-gen-generated-type-error/
-ImgGenGenerationError | Img gen generation | https://docs.pipelex.com/latest/errors/img-gen-generation-error/
-ImgGenHandleNotFoundError | Img gen handle not found | https://docs.pipelex.com/latest/errors/img-gen-handle-not-found-error/
-ImgGenModelNotFoundError | Img gen model not found | https://docs.pipelex.com/latest/errors/img-gen-model-not-found-error/
-ImgGenParameterError | Img gen parameter | https://docs.pipelex.com/latest/errors/img-gen-parameter-error/
-ImgGenPromptError | Img gen prompt | https://docs.pipelex.com/latest/errors/img-gen-prompt-error/
-ImgGenSettingsValidationError | Img gen settings validation | https://docs.pipelex.com/latest/errors/img-gen-settings-validation-error/
-InferenceBackendCredentialsError | Inference backend credentials | https://docs.pipelex.com/latest/errors/inference-backend-credentials-error/
-InferenceBackendLibraryError | Inference backend library | https://docs.pipelex.com/latest/errors/inference-backend-library-error/
-InferenceBackendLibraryNotFoundError | Inference backend library not found | https://docs.pipelex.com/latest/errors/inference-backend-library-not-found-error/
-InferenceBackendLibraryValidationError | Inference backend library validation | https://docs.pipelex.com/latest/errors/inference-backend-library-validation-error/
-InferenceBackendNotFoundError | Inference backend not found | https://docs.pipelex.com/latest/errors/inference-backend-not-found-error/
-InferenceModelSpecError | Inference model spec | https://docs.pipelex.com/latest/errors/inference-model-spec-error/
-InputShapingError | Input shaping | https://docs.pipelex.com/latest/errors/input-shaping-error/
-InputStuffSpecNotFoundError | Input stuff spec not found | https://docs.pipelex.com/latest/errors/input-stuff-spec-not-found-error/
-InputStuffSpecsError | Input stuff specs | https://docs.pipelex.com/latest/errors/input-stuff-specs-error/
-InputStuffSpecsFactoryError | Input stuff specs factory | https://docs.pipelex.com/latest/errors/input-stuff-specs-factory-error/
-InvocationPathError | Invocation path not derivable | https://docs.pipelex.com/latest/errors/invocation-path-error/
-Jinja2ContextError | Jinja 2 context | https://docs.pipelex.com/latest/errors/jinja2-context-error/
-Jinja2DetectVariablesError | Jinja 2 detect variables | https://docs.pipelex.com/latest/errors/jinja2-detect-variables-error/
-Jinja2StuffError | Jinja 2 stuff | https://docs.pipelex.com/latest/errors/jinja2-stuff-error/
-Jinja2TemplateBudgetError | Template render budget exceeded | https://docs.pipelex.com/latest/errors/jinja2-template-budget-error/
-Jinja2TemplateRenderError | Jinja 2 template render | https://docs.pipelex.com/latest/errors/jinja2-template-render-error/
-Jinja2TemplateSecurityError | Jinja 2 template security | https://docs.pipelex.com/latest/errors/jinja2-template-security-error/
-Jinja2TemplateSyntaxError | Jinja 2 template syntax | https://docs.pipelex.com/latest/errors/jinja2-template-syntax-error/
-JobMetadataError | Job metadata | https://docs.pipelex.com/latest/errors/job-metadata-error/
-JsonTypeError | Json type | https://docs.pipelex.com/latest/errors/json-type-error/
-JudgmentAnswerMismatchError | Judgment answer mismatch | https://docs.pipelex.com/latest/errors/judgment-answer-mismatch-error/
-JudgmentCapabilityError | Judgment capability | https://docs.pipelex.com/latest/errors/judgment-capability-error/
-JudgmentHandleNotFoundError | Judgment handle not found | https://docs.pipelex.com/latest/errors/judgment-handle-not-found-error/
-JudgmentJobFailureError | Judgment job failure | https://docs.pipelex.com/latest/errors/judgment-job-failure-error/
-JudgmentModelMissingError | Judgment model missing | https://docs.pipelex.com/latest/errors/judgment-model-missing-error/
-JudgmentModelNotFoundError | Judgment model not found | https://docs.pipelex.com/latest/errors/judgment-model-not-found-error/
-JudgmentRefusedError | Judgment refused | https://docs.pipelex.com/latest/errors/judgment-refused-error/
-KitError | Kit | https://docs.pipelex.com/latest/errors/kit-error/
-KitIndexLoadingError | Kit index loading | https://docs.pipelex.com/latest/errors/kit-index-loading-error/
-LLMAssignmentError | LLM assignment | https://docs.pipelex.com/latest/errors/llm-assignment-error/
-LLMCapabilityError | LLM capability | https://docs.pipelex.com/latest/errors/llm-capability-error/
-LLMCompletionError | LLM completion | https://docs.pipelex.com/latest/errors/llm-completion-error/
-LLMCompletionRefusedError | LLM completion refused | https://docs.pipelex.com/latest/errors/llm-completion-refused-error/
-LLMCompletionTruncatedError | LLM completion truncated | https://docs.pipelex.com/latest/errors/llm-completion-truncated-error/
-LLMConfigError | LLM config | https://docs.pipelex.com/latest/errors/llm-config-error/
-LLMHandleNotFoundError | LLM handle not found | https://docs.pipelex.com/latest/errors/llm-handle-not-found-error/
-LLMModelNotFoundError | LLM model not found | https://docs.pipelex.com/latest/errors/llm-model-not-found-error/
-LLMPromptParameterError | LLM prompt parameter | https://docs.pipelex.com/latest/errors/llm-prompt-parameter-error/
-LLMPromptSpecError | LLM prompt spec | https://docs.pipelex.com/latest/errors/llm-prompt-spec-error/
-LLMSettingRefusedError | LLM setting refused | https://docs.pipelex.com/latest/errors/llm-setting-refused-error/
-LLMSettingsValidationError | LLM settings validation | https://docs.pipelex.com/latest/errors/llm-settings-validation-error/
-LangfuseCredentialsError | Langfuse credentials | https://docs.pipelex.com/latest/errors/langfuse-credentials-error/
-LibraryError | Library error | https://docs.pipelex.com/latest/errors/library-error/
-LibraryLoadingError | Library loading | https://docs.pipelex.com/latest/errors/library-loading-error/
-LinkupError | Linkup | https://docs.pipelex.com/latest/errors/linkup-error/
-LinkupSearchEmptyResultError | Linkup search empty result | https://docs.pipelex.com/latest/errors/linkup-search-empty-result-error/
-LinkupSearchResponseError | Linkup search response | https://docs.pipelex.com/latest/errors/linkup-search-response-error/
-ListWhereSingularError | List where singular | https://docs.pipelex.com/latest/errors/list-where-singular-error/
-LogSinkHeaderValueError | Log sink header value holds a line break | https://docs.pipelex.com/latest/errors/log-sink-header-value-error/
-LogSinkVariableError | Log sink variable did not resolve | https://docs.pipelex.com/latest/errors/log-sink-variable-error/
-MarkdownFormattingBudgetError | Markdown formatting budget exceeded | https://docs.pipelex.com/latest/errors/markdown-formatting-budget-error/
-MethodDependencyFetchError | Method dependency fetch | https://docs.pipelex.com/latest/errors/method-dependency-fetch-error/
-MethodEntryError | Method entry | https://docs.pipelex.com/latest/errors/method-entry-error/
-MethodFetchDisabledError | Method fetch disabled | https://docs.pipelex.com/latest/errors/method-fetch-disabled-error/
-MethodFetchError | Method fetch | https://docs.pipelex.com/latest/errors/method-fetch-error/
-MethodFileUnavailableError | Method file unavailable | https://docs.pipelex.com/latest/errors/method-file-unavailable-error/
-MethodInstallError | Method install | https://docs.pipelex.com/latest/errors/method-install-error/
-MethodPackageAmbiguityError | Method package ambiguity | https://docs.pipelex.com/latest/errors/method-package-ambiguity-error/
-MethodPackageNotFoundError | Method package not found | https://docs.pipelex.com/latest/errors/method-package-not-found-error/
-MethodPackageSymlinkError | Method package symlink | https://docs.pipelex.com/latest/errors/method-package-symlink-error/
-MethodPackageTooLargeError | Method package too large | https://docs.pipelex.com/latest/errors/method-package-too-large-error/
-MethodRefError | Method reference error | https://docs.pipelex.com/latest/errors/method-ref-error/
-MethodRefParseError | Method ref parse | https://docs.pipelex.com/latest/errors/method-ref-parse-error/
-MethodRequirementsError | Method requirements | https://docs.pipelex.com/latest/errors/method-requirements-error/
-MethodRequirementsFileError | Method requirements file | https://docs.pipelex.com/latest/errors/method-requirements-file-error/
-MethodRequirementsNotMetError | Method requirements not met | https://docs.pipelex.com/latest/errors/method-requirements-not-met-error/
-MethodStructuresRefusedError | Method structures refused | https://docs.pipelex.com/latest/errors/method-structures-refused-error/
-MethodTreeLoadError | Method tree load | https://docs.pipelex.com/latest/errors/method-tree-load-error/
-MigrationError | Migration error | https://docs.pipelex.com/latest/errors/migration-error/
-MigrationGoldenError | Migration golden error | https://docs.pipelex.com/latest/errors/migration-golden-error/
-MigrationLedgerError | Migration ledger error | https://docs.pipelex.com/latest/errors/migration-ledger-error/
-MigrationRegistryError | Migration registry error | https://docs.pipelex.com/latest/errors/migration-registry-error/
-MigrationSnapshotRefusedError | Migration snapshot refused | https://docs.pipelex.com/latest/errors/migration-snapshot-refused-error/
-MissingBundleValidatorError | Missing bundle validator | https://docs.pipelex.com/latest/errors/missing-bundle-validator-error/
-MissingDependencyError | Missing dependency | https://docs.pipelex.com/latest/errors/missing-dependency-error/
-MissingOrchestratorError | Missing orchestrator | https://docs.pipelex.com/latest/errors/missing-orchestrator-error/
-MistralExtractResponseError | Mistral extract response | https://docs.pipelex.com/latest/errors/mistral-extract-response-error/
-MistralModelListingError | Mistral model listing | https://docs.pipelex.com/latest/errors/mistral-model-listing-error/
-MistralPluginError | Mistral plugin | https://docs.pipelex.com/latest/errors/mistral-plugin-error/
-MistralWorkerConfigurationError | Mistral worker configuration | https://docs.pipelex.com/latest/errors/mistral-worker-configuration-error/
-ModelChoiceNotFoundError | Model choice not found | https://docs.pipelex.com/latest/errors/model-choice-not-found-error/
-ModelDeckNotFoundError | Model deck not found | https://docs.pipelex.com/latest/errors/model-deck-not-found-error/
-ModelDeckPresetValidatonError | Model deck preset validaton | https://docs.pipelex.com/latest/errors/model-deck-preset-validaton-error/
-ModelDeckValidationError | Model deck validation | https://docs.pipelex.com/latest/errors/model-deck-validation-error/
-ModelDeckValidatonError | Model deck validaton | https://docs.pipelex.com/latest/errors/model-deck-validaton-error/
-ModelListingUnsupportedError | Model listing unsupported | https://docs.pipelex.com/latest/errors/model-listing-unsupported-error/
-ModelManagerError | Model manager | https://docs.pipelex.com/latest/errors/model-manager-error/
-ModelNotFoundError | Model not found | https://docs.pipelex.com/latest/errors/model-not-found-error/
-ModelReferenceParseError | Model reference parse | https://docs.pipelex.com/latest/errors/model-reference-parse-error/
-ModelWaterfallError | Model waterfall | https://docs.pipelex.com/latest/errors/model-waterfall-error/
-ModuleFileError | Module file | https://docs.pipelex.com/latest/errors/module-file-error/
-MthdsParserError | MTHDS parser | https://docs.pipelex.com/latest/errors/mthds-parser-error/
-MultiplicityCountMismatchError | Multiplicity count mismatch | https://docs.pipelex.com/latest/errors/multiplicity-count-mismatch-error/
-NativeConceptDefinitionError | Native concept definition | https://docs.pipelex.com/latest/errors/native-concept-definition-error/
-NeitherUrlNorDataError | Neither url nor data | https://docs.pipelex.com/latest/errors/neither-url-nor-data-error/
-NestedKeyConflictError | Nested key conflict | https://docs.pipelex.com/latest/errors/nested-key-conflict-error/
-NullInputError | Null input | https://docs.pipelex.com/latest/errors/null-input-error/
-OpenAIClientFactoryError | OpenAI client factory error | https://docs.pipelex.com/latest/errors/open-ai-client-factory-error/
-OptionalValueAbsentError | Optional value absent | https://docs.pipelex.com/latest/errors/optional-value-absent-error/
-OutputStructureSchemaError | Output structure schema | https://docs.pipelex.com/latest/errors/output-structure-schema-error/
-PipeBatchFactoryError | Pipe batch factory | https://docs.pipelex.com/latest/errors/pipe-batch-factory-error/
-PipeComposeError | Pipe compose | https://docs.pipelex.com/latest/errors/pipe-compose-error/
-PipeComposeFactoryError | Pipe compose factory | https://docs.pipelex.com/latest/errors/pipe-compose-factory-error/
-PipeConditionFactoryError | Pipe condition factory | https://docs.pipelex.com/latest/errors/pipe-condition-factory-error/
-PipeControllerError | Pipe controller | https://docs.pipelex.com/latest/errors/pipe-controller-error/
-PipeControllerOutputConceptMismatchError | Pipe controller output concept mismatch | https://docs.pipelex.com/latest/errors/pipe-controller-output-concept-mismatch-error/
-PipeDocGenFactoryError | Pipe doc gen factory | https://docs.pipelex.com/latest/errors/pipe-doc-gen-factory-error/
-PipeDocGenRunError | Pipe doc gen run | https://docs.pipelex.com/latest/errors/pipe-doc-gen-run-error/
-PipeDocGenTemplateCheckError | Pipe doc gen template check | https://docs.pipelex.com/latest/errors/pipe-doc-gen-template-check-error/
-PipeDocGenTemplateFileUncheckedError | Pipe doc gen template file unchecked | https://docs.pipelex.com/latest/errors/pipe-doc-gen-template-file-unchecked-error/
-PipeDocGenUndefinedValueError | Pipe doc gen undefined value | https://docs.pipelex.com/latest/errors/pipe-doc-gen-undefined-value-error/
-PipeExecutionError | Pipe execution | https://docs.pipelex.com/latest/errors/pipe-execution-error/
-PipeExtractFactoryError | Pipe extract factory | https://docs.pipelex.com/latest/errors/pipe-extract-factory-error/
-PipeFactoryError | Pipe factory | https://docs.pipelex.com/latest/errors/pipe-factory-error/
-PipeFuncExecutionError | Pipe func execution | https://docs.pipelex.com/latest/errors/pipe-func-execution-error/
-PipeFuncFunctionError | Pipe func function | https://docs.pipelex.com/latest/errors/pipe-func-function-error/
-PipeFuncPackageSetUnstatedError | Pipe func package set unstated | https://docs.pipelex.com/latest/errors/pipe-func-package-set-unstated-error/
-PipeFuncTransportError | Pipe func transport | https://docs.pipelex.com/latest/errors/pipe-func-transport-error/
-PipeIOContractError | Pipe IO contract | https://docs.pipelex.com/latest/errors/pipe-io-contract-error/
-PipeImgGenFactoryError | Pipe img gen factory | https://docs.pipelex.com/latest/errors/pipe-img-gen-factory-error/
-PipeImgGenRunError | Pipe img gen run | https://docs.pipelex.com/latest/errors/pipe-img-gen-run-error/
-PipeInputError | Pipe input | https://docs.pipelex.com/latest/errors/pipe-input-error/
-PipeInputsFactoryError | Pipe inputs factory | https://docs.pipelex.com/latest/errors/pipe-inputs-factory-error/
-PipeJobError | Pipe job | https://docs.pipelex.com/latest/errors/pipe-job-error/
-PipeJudgeError | Pipe judge | https://docs.pipelex.com/latest/errors/pipe-judge-error/
-PipeJudgeInputCapabilityError | Pipe judge input capability | https://docs.pipelex.com/latest/errors/pipe-judge-input-capability-error/
-PipeLLMFactoryError | Pipe LLM factory | https://docs.pipelex.com/latest/errors/pipe-llm-factory-error/
-PipeLibraryError | Pipe library | https://docs.pipelex.com/latest/errors/pipe-library-error/
-PipeLoadRefusalError | Pipe load refusal | https://docs.pipelex.com/latest/errors/pipe-load-refusal-error/
-PipeLoadingError | Pipe loading | https://docs.pipelex.com/latest/errors/pipe-loading-error/
-PipeNotFoundError | Pipe not found | https://docs.pipelex.com/latest/errors/pipe-not-found-error/
-PipeOperatorModelAvailabilityError | Pipe operator model availability | https://docs.pipelex.com/latest/errors/pipe-operator-model-availability-error/
-PipeOperatorModelChoiceError | Pipe operator model choice | https://docs.pipelex.com/latest/errors/pipe-operator-model-choice-error/
-PipeParallelFactoryError | Pipe parallel factory | https://docs.pipelex.com/latest/errors/pipe-parallel-factory-error/
-PipeRouterError | Pipe router | https://docs.pipelex.com/latest/errors/pipe-router-error/
-PipeRunError | Pipe run | https://docs.pipelex.com/latest/errors/pipe-run-error/
-PipeRunInputsError | Pipe run inputs | https://docs.pipelex.com/latest/errors/pipe-run-inputs-error/
-PipeRunParamsError | Pipe run params | https://docs.pipelex.com/latest/errors/pipe-run-params-error/
-PipeSearchError | Pipe search | https://docs.pipelex.com/latest/errors/pipe-search-error/
-PipeSearchFactoryError | Pipe search factory | https://docs.pipelex.com/latest/errors/pipe-search-factory-error/
-PipeSequenceFactoryError | Pipe sequence factory | https://docs.pipelex.com/latest/errors/pipe-sequence-factory-error/
-PipeSignatureNotExecutableError | Pipe signature not executable | https://docs.pipelex.com/latest/errors/pipe-signature-not-executable-error/
-PipeStackOverflowError | Pipe stack overflow | https://docs.pipelex.com/latest/errors/pipe-stack-overflow-error/
-PipelexBridgeDispatchError | Pipelex bridge dispatch | https://docs.pipelex.com/latest/errors/pipelex-bridge-dispatch-error/
-PipelexCLIError | Pipelex CLI | https://docs.pipelex.com/latest/errors/pipelex-cli-error/
-PipelexConfigError | Pipelex config | https://docs.pipelex.com/latest/errors/pipelex-config-error/
-PipelexError | Pipelex error | https://docs.pipelex.com/latest/errors/pipelex-error/
-PipelexRuntimeBridgeError | Pipelex runtime bridge | https://docs.pipelex.com/latest/errors/pipelex-runtime-bridge-error/
-PipelexSetupError | Pipelex setup | https://docs.pipelex.com/latest/errors/pipelex-setup-error/
-PipelexUnexpectedError | Unexpected internal error | https://docs.pipelex.com/latest/errors/pipelex-unexpected-error/
-PipelineExecutionError | Pipeline execution | https://docs.pipelex.com/latest/errors/pipeline-execution-error/
-PipelineInputContentError | Pipeline input content | https://docs.pipelex.com/latest/errors/pipeline-input-content-error/
-PipelineInputFormatError | Pipeline input format | https://docs.pipelex.com/latest/errors/pipeline-input-format-error/
-PipelineInputFormatUnsupportedError | Pipeline input format unsupported | https://docs.pipelex.com/latest/errors/pipeline-input-format-unsupported-error/
-PipelineInputNotAnImageError | Pipeline input not an image | https://docs.pipelex.com/latest/errors/pipeline-input-not-an-image-error/
-PipelineInputUrlInvalidError | Pipeline input url invalid | https://docs.pipelex.com/latest/errors/pipeline-input-url-invalid-error/
-PipelineInputUrlMissingError | Pipeline input url missing | https://docs.pipelex.com/latest/errors/pipeline-input-url-missing-error/
-PipelineManagerAlreadyExistsError | Pipeline manager already exists | https://docs.pipelex.com/latest/errors/pipeline-manager-already-exists-error/
-PipelineManagerNotFoundError | Pipeline manager not found | https://docs.pipelex.com/latest/errors/pipeline-manager-not-found-error/
-PluginApiVersionMismatchError | Plugin api version mismatch | https://docs.pipelex.com/latest/errors/plugin-api-version-mismatch-error/
-PluginDeclaredInMultipleGroupsError | Plugin declared in multiple groups | https://docs.pipelex.com/latest/errors/plugin-declared-in-multiple-groups-error/
-PluginError | Plugin error | https://docs.pipelex.com/latest/errors/plugin-error/
-PluginLayerViolationError | Plugin layer violation | https://docs.pipelex.com/latest/errors/plugin-layer-violation-error/
-PluginModelDeclarationError | Plugin model declaration | https://docs.pipelex.com/latest/errors/plugin-model-declaration-error/
-PortkeyCredentialsError | Portkey credentials | https://docs.pipelex.com/latest/errors/portkey-credentials-error/
-PortkeyError | Portkey | https://docs.pipelex.com/latest/errors/portkey-error/
-PortkeyFactoryError | Portkey factory | https://docs.pipelex.com/latest/errors/portkey-factory-error/
-PromptDocumentFactoryError | Prompt document factory | https://docs.pipelex.com/latest/errors/prompt-document-factory-error/
-PromptDocumentFormatError | Prompt document format | https://docs.pipelex.com/latest/errors/prompt-document-format-error/
-PromptImageFactoryError | Prompt image factory | https://docs.pipelex.com/latest/errors/prompt-image-factory-error/
-PromptImageFormatError | Prompt image format | https://docs.pipelex.com/latest/errors/prompt-image-format-error/
-PyPdfium2RendererError | Py pdfium 2 renderer | https://docs.pipelex.com/latest/errors/py-pdfium2-renderer-error/
-ReadinessCheckError | Readiness check | https://docs.pipelex.com/latest/errors/readiness-check-error/
-RemoteFileFetchError | Remote file could not be fetched | https://docs.pipelex.com/latest/errors/remote-file-fetch-error/
-ReportingManagerError | Reporting manager | https://docs.pipelex.com/latest/errors/reporting-manager-error/
-ReservedServiceErrorCodeError | Reserved service error code | https://docs.pipelex.com/latest/errors/reserved-service-error-code-error/
-RetiredPluginEntryPointGroupError | Retired plugin entry point group | https://docs.pipelex.com/latest/errors/retired-plugin-entry-point-group-error/
-RoutingProfileBlueprintValueError | Routing profile blueprint value | https://docs.pipelex.com/latest/errors/routing-profile-blueprint-value-error/
-RoutingProfileDisabledBackendError | Routing profile disabled backend | https://docs.pipelex.com/latest/errors/routing-profile-disabled-backend-error/
-RoutingProfileLibraryError | Routing profile library | https://docs.pipelex.com/latest/errors/routing-profile-library-error/
-RoutingProfileLibraryNotFoundError | Routing profile library not found | https://docs.pipelex.com/latest/errors/routing-profile-library-not-found-error/
-SdkTypeError | Sdk type | https://docs.pipelex.com/latest/errors/sdk-type-error/
-SearchHandleNotFoundError | Search handle not found | https://docs.pipelex.com/latest/errors/search-handle-not-found-error/
-SearchJobFailureError | Search job failure | https://docs.pipelex.com/latest/errors/search-job-failure-error/
-SearchModelNotFoundError | Search model not found | https://docs.pipelex.com/latest/errors/search-model-not-found-error/
-SecretNotFoundError | Secret not found | https://docs.pipelex.com/latest/errors/secret-not-found-error/
-SecurityError | Security policy violation | https://docs.pipelex.com/latest/errors/security-error/
-SsrfBlockedError | Outbound request blocked (SSRF guard) | https://docs.pipelex.com/latest/errors/ssrf-blocked-error/
-StorageConfigError | Storage config | https://docs.pipelex.com/latest/errors/storage-config-error/
-StorageDeliveryError | Storage delivery | https://docs.pipelex.com/latest/errors/storage-delivery-error/
-StorageError | Storage error | https://docs.pipelex.com/latest/errors/storage-error/
-StorageFileNotFoundError | Storage file not found | https://docs.pipelex.com/latest/errors/storage-file-not-found-error/
-StorageGcpCredentialsError | Storage gcp credentials | https://docs.pipelex.com/latest/errors/storage-gcp-credentials-error/
-StorageGcpError | Storage gcp | https://docs.pipelex.com/latest/errors/storage-gcp-error/
-StorageInvalidKeyError | Storage invalid key | https://docs.pipelex.com/latest/errors/storage-invalid-key-error/
-StorageInvalidUriError | Storage invalid uri | https://docs.pipelex.com/latest/errors/storage-invalid-uri-error/
-StorageLocalError | Local storage error | https://docs.pipelex.com/latest/errors/storage-local-error/
-StorageS3Error | S3 storage error | https://docs.pipelex.com/latest/errors/storage-s3-error/
-StructureClassError | Structure class | https://docs.pipelex.com/latest/errors/structure-class-error/
-StructureValidationError | Structure validation | https://docs.pipelex.com/latest/errors/structure-validation-error/
-StructuredContentComposerTypeError | Structured content composer type | https://docs.pipelex.com/latest/errors/structured-content-composer-type-error/
-StructuredContentComposerValidationError | Structured content composer validation | https://docs.pipelex.com/latest/errors/structured-content-composer-validation-error/
-StructuredContentComposerValueError | Structured content composer value | https://docs.pipelex.com/latest/errors/structured-content-composer-value-error/
-StuffArtefactError | Stuff artefact | https://docs.pipelex.com/latest/errors/stuff-artefact-error/
-StuffArtefactReservedFieldError | Stuff artefact reserved field | https://docs.pipelex.com/latest/errors/stuff-artefact-reserved-field-error/
-StuffContentFactoryError | Stuff content factory | https://docs.pipelex.com/latest/errors/stuff-content-factory-error/
-StuffContentTypeError | Stuff content type | https://docs.pipelex.com/latest/errors/stuff-content-type-error/
-StuffContentValidationError | Stuff content validation | https://docs.pipelex.com/latest/errors/stuff-content-validation-error/
-StuffError | Stuff error | https://docs.pipelex.com/latest/errors/stuff-error/
-StuffFactoryError | Stuff factory | https://docs.pipelex.com/latest/errors/stuff-factory-error/
-StuffSpecError | Stuff spec | https://docs.pipelex.com/latest/errors/stuff-spec-error/
-StuffSpecFactoryError | Stuff spec factory | https://docs.pipelex.com/latest/errors/stuff-spec-factory-error/
-TelemetryConfigError | Telemetry config | https://docs.pipelex.com/latest/errors/telemetry-config-error/
-TelemetryConfigValidationError | Telemetry config validation | https://docs.pipelex.com/latest/errors/telemetry-config-validation-error/
-TemplateSigilSyntaxError | Template sigil syntax | https://docs.pipelex.com/latest/errors/template-sigil-syntax-error/
-TemplateUrlRefusedError | Relative URL refused | https://docs.pipelex.com/latest/errors/template-url-refused-error/
-TomlError | TOML parse error | https://docs.pipelex.com/latest/errors/toml-error/
-ToolError | Tool error | https://docs.pipelex.com/latest/errors/tool-error/
-TraceEventModeError | Trace event mode | https://docs.pipelex.com/latest/errors/trace-event-mode-error/
-TracebackMessageError | Traceback message | https://docs.pipelex.com/latest/errors/traceback-message-error/
-TreeModuleShadowingError | Tree module shadowing | https://docs.pipelex.com/latest/errors/tree-module-shadowing-error/
-TreePythonError | Tree python | https://docs.pipelex.com/latest/errors/tree-python-error/
-TreePythonHeldError | Tree python held | https://docs.pipelex.com/latest/errors/tree-python-held-error/
-TypesafeError | Typesafe | https://docs.pipelex.com/latest/errors/typesafe-error/
-TypesafeJudgmentResponseError | Typesafe judgment response | https://docs.pipelex.com/latest/errors/typesafe-judgment-response-error/
-TypesafeQuestionUnsupportedError | Typesafe question unsupported | https://docs.pipelex.com/latest/errors/typesafe-question-unsupported-error/
-UnknownBootOrchestratorError | Unknown boot orchestrator | https://docs.pipelex.com/latest/errors/unknown-boot-orchestrator-error/
-UnknownInputNameError | Unknown input name | https://docs.pipelex.com/latest/errors/unknown-input-name-error/
-UnknownLogSinkError | Unknown log sink | https://docs.pipelex.com/latest/errors/unknown-log-sink-error/
-UnknownPipeFuncExecutionModeError | Unknown pipe func execution mode | https://docs.pipelex.com/latest/errors/unknown-pipe-func-execution-mode-error/
-UnknownSecretsMethodError | Unknown secrets method | https://docs.pipelex.com/latest/errors/unknown-secrets-method-error/
-UnknownStorageMethodError | Unknown storage method | https://docs.pipelex.com/latest/errors/unknown-storage-method-error/
-UnknownVarPrefixError | Unknown var prefix | https://docs.pipelex.com/latest/errors/unknown-var-prefix-error/
-UnsafeSchemaError | Unsafe schema | https://docs.pipelex.com/latest/errors/unsafe-schema-error/
-UriReadRefusedError | Read outside the run's scope refused | https://docs.pipelex.com/latest/errors/uri-read-refused-error/
-ValidateBundleError | Validate bundle | https://docs.pipelex.com/latest/errors/validate-bundle-error/
-VarFallbackPatternError | Var fallback pattern | https://docs.pipelex.com/latest/errors/var-fallback-pattern-error/
-VarNotFoundError | Var not found | https://docs.pipelex.com/latest/errors/var-not-found-error/
-VertexAIConfigError | VertexAI configuration error | https://docs.pipelex.com/latest/errors/vertex-ai-config-error/
-VertexAICredentialsError | VertexAI credentials error | https://docs.pipelex.com/latest/errors/vertex-ai-credentials-error/
-WebhookDeliveryError | Webhook delivery | https://docs.pipelex.com/latest/errors/webhook-delivery-error/
-WithImagesFilterError | With images filter | https://docs.pipelex.com/latest/errors/with-images-filter-error/
-WorkingMemoryConsistencyError | Working memory consistency | https://docs.pipelex.com/latest/errors/working-memory-consistency-error/
-WorkingMemoryError | Working memory | https://docs.pipelex.com/latest/errors/working-memory-error/
-WorkingMemoryFactoryError | Working memory factory | https://docs.pipelex.com/latest/errors/working-memory-factory-error/
-WorkingMemoryStuffAttributeNotFoundError | Working memory stuff attribute not found | https://docs.pipelex.com/latest/errors/working-memory-stuff-attribute-not-found-error/
-WorkingMemoryStuffNotFoundError | Working memory stuff not found | https://docs.pipelex.com/latest/errors/working-memory-stuff-not-found-error/
-WorkingMemoryTypeError | Working memory type | https://docs.pipelex.com/latest/errors/working-memory-type-error/
-WorkingMemoryVariableError | Working memory variable | https://docs.pipelex.com/latest/errors/working-memory-variable-error/
-WrongScalarKindError | Wrong scalar kind | https://docs.pipelex.com/latest/errors/wrong-scalar-kind-error/
+AmbiguousInputsFilesError | request.invalid
+AnthropicFactoryError | one of pipelex.config.invalid, runtime.unexpected
+AnthropicModelListingError | provider.response_invalid
+AnthropicSDKUnsupportedError | runtime.unsupported
+AnthropicWorkerConfigurationError | pipelex.config.invalid
+ArgumentTypeError | runtime.unexpected
+AsyncExecutionNotEnabledError | runtime.unsupported
+AwsCredentialsError | pipelex.config.credential_missing
+AzureCredentialsError | pipelex.config.credential_missing
+AzureWorkerConfigurationError | pipelex.config.invalid
+BedrockFactoryError | pipelex.config.invalid
+BedrockWorkerConfigurationError | pipelex.config.invalid
+BindingPathUnresolvedError | method.field_path_unresolved
+BindingStepRunError | one of pipe.binding_failed, pipe.output_multiplicity
+BrokenPluginError | pipelex.plugin.broken
+BundleClosureEmptyError | method.not_found
+BundleElaboratorError | method.schema_violation
+BundleResourceNotNamedError | request.invalid
+BundleResourcePathError | one of security.input_path_refused, request.invalid
+CodegenError | pipelex.codegen.output_conflict
+CodegenLockError | one of pipelex.codegen.lock_invalid, pipelex.codegen.lock_unsupported
+CodegenStampError | runtime.unexpected
+CogtError | abstract
+ConceptCodeError | method.schema_violation
+ConceptError | abstract
+ConceptFactoryError | one of method.concept_invalid, method.schema_violation, runtime.unexpected
+ConceptLibraryConceptNotFoundError | one of input.wrong_concept, runtime.unexpected
+ConceptLibraryError | one of method.concept_unresolved, method.name_conflict, runtime.unexpected
+ConceptRefAmbiguousError | method.ref_ambiguous
+ConceptStringError | method.schema_violation
+ConceptStructureClassNotFoundError | method.concept_invalid
+ConceptStructureGeneratorError | one of method.concept_invalid, runtime.unexpected
+ConceptStructureValidationError | method.concept_invalid
+ConceptValueError | one of method.schema_violation, request.unsupported
+ConfigValidationError | pipelex.config.invalid
+ConstructFieldBlueprintTypeError | method.schema_violation
+ConstructFieldBlueprintValueError | method.schema_violation
+ContextProviderError | abstract
+CoreUnconditionalPluginDisabledError | pipelex.config.invalid
+CostRegistryError | runtime.unexpected
+CrateNormalizationError | one of runtime.unexpected, method.cycle
+CredentialsError | abstract
+CsvCoercionError | input.invalid
+CsvColumnError | input.invalid
+CsvError | one of input.invalid, request.invalid, runtime.unexpected
+CsvFlatnessError | input.invalid
+CsvReadError | input.file_unreadable
+DateContentError | pipe.function_raised
+DeliveryError | abstract
+DocGenChoiceKeyError | pipelex.config.invalid
+DocGenEngineMissingError | pipelex.docgen.engine_unavailable
+DocGenHandleNotFoundError | pipelex.config.invalid
+DocGenModelCapabilityError | model.capability_unsupported
+DocGenRenderError | one of runtime.unexpected, pipelex.docgen.content_unprintable, pipelex.docgen.print_timeout, pipelex.docgen.resource_refused, pipelex.docgen.template_invalid, security.method_url_refused
+DomainCodeError | method.schema_violation
+DomainFactoryError | runtime.unexpected
+DomainLibraryError | runtime.unexpected
+DriftAckError | request.invalid
+DriftError | runtime.unexpected
+DriftGitError | runtime.unexpected
+DriftManifestError | pipelex.config.invalid
+DryRunError | inherits cause, else runtime.unexpected
+DryRunGraphNotProducedError | runtime.unexpected
+DryRunMockBuildError | method.mock_unsatisfiable
+DryRunObjectFidelityError | method.mock_unsatisfiable
+DuplicateBundleValidatorError | pipelex.plugin.conflict
+DuplicateDocGenDefaultError | pipelex.plugin.conflict
+DuplicateHttpErrorMapperError | pipelex.plugin.conflict
+DuplicateInferenceBackendError | pipelex.plugin.conflict
+DuplicateInternalModelError | pipelex.plugin.conflict
+DuplicateLogSinkError | pipelex.plugin.conflict
+DuplicateMethodNameError | method.ambiguous
+DuplicateModelListerError | pipelex.plugin.conflict
+DuplicateOrchestratorError | pipelex.plugin.conflict
+DuplicatePipeFuncExecutorError | pipelex.plugin.conflict
+DuplicatePipeFuncPackageOfferError | pipelex.plugin.conflict
+DuplicateSecretsProviderError | pipelex.plugin.conflict
+DuplicateServiceErrorCodeError | pipelex.plugin.conflict
+DuplicateStorageProviderError | pipelex.plugin.conflict
+EntryPipeAmbiguousError | one of request.pipe_ambiguous, method.pipe_unresolved
+EntryPipeNotFoundError | one of request.pipe_not_found, request.pipe_unspecified, method.pipe_unresolved
+EnvVarNotFoundError | pipelex.config.variable_missing
+ErrorRegistryError | runtime.unexpected
+EventLogError | abstract
+EventLogReadError | runtime.unavailable
+EventLogSchemaMismatchError | runtime.unexpected
+EventLogSetupError | runtime.misconfigured
+ExplicitConceptIncompatibleError | input.wrong_concept
+ExportedPipeAmbiguousError | request.pipe_ambiguous
+ExportedPipeNotFoundError | request.pipe_not_found
+ExtractCapabilityError | model.capability_unsupported
+ExtractHandleNotFoundError | pipelex.config.invalid
+ExtractInputError | one of runtime.unexpected, model.capability_unsupported
+ExtractInputFormatError | input.file_type_unsupported
+ExtractJobFailureError | inherits cause, else runtime.unexpected; or chosen: runtime.misconfigured, provider.rate_limited, provider.unavailable, provider.timeout, provider.failed, provider.response_invalid, provider.credential_refused, provider.quota_exhausted, provider.outcome_unknown, model.unavailable, model.capability_unsupported, model.context_exceeded, model.content_refused, model.output_schema_mismatch, model.no_result, input.too_large, input.file_type_unsupported, input.file_unreadable, input.reference_not_found, input.url_unreachable, security.input_url_refused, security.method_url_refused, pipelex.config.invalid, pipelex.config.credential_missing, pipelex.billing.credit_exhausted
+ExtractModelNotFoundError | model.unavailable
+FatalError | abstract
+FileTypeError | one of input.file_type_unsupported, provider.response_invalid
+FixTransactionError | runtime.unexpected
+FixWriteConflictError | method.changed_concurrently
+FormerReleaseConfigError | pipelex.config.invalid
+FuncOutputTypeError | pipe.output_invalid
+FunctionNamesMigrationError | inherits cause, else runtime.unexpected; or chosen: request.invalid
+GcpLogSinkCredentialsError | one of pipelex.config.file_missing, pipelex.config.credential_refused
+GeneratedImageError | provider.response_invalid
+GoogleLLMWorkerError | model.output_schema_mismatch
+GraphSpecError | abstract
+GraphSpecValidationError | one of runtime.unexpected, request.invalid
+HostLibraryLoadRefusalError | pipelex.config.invalid
+HostLibraryRequirementsError | pipelex.config.invalid
+HostLibraryTreeError | pipelex.config.invalid
+HostedBaseUrlError | client.not_configured
+HostedLocalFileUploadUnavailableError | request.unsupported
+HostedMethodInvalidError | method.invalid
+HostedRunError | abstract
+HostedRunInterruptedError | one of client.outcome_unknown, client.follow_failed
+HostedRunOutcomeUnknownError | client.outcome_unknown
+HostedRunPollingError | client.follow_failed
+HostedRunSourceError | client.argument_invalid
+HubSlotAlreadyClaimedError | pipelex.plugin.conflict
+HuggingFaceProviderUnknownError | pipelex.config.invalid
+ImgGenGenerationError | inherits cause, else provider.outcome_unknown; or chosen: runtime.unexpected, runtime.misconfigured, provider.rate_limited, provider.unavailable, provider.timeout, provider.failed, provider.response_invalid, provider.credential_refused, provider.quota_exhausted, model.unavailable, model.capability_unsupported, model.context_exceeded, model.content_refused, model.output_schema_mismatch, model.no_result, input.too_large, input.file_type_unsupported, input.file_unreadable, input.reference_not_found, input.url_unreachable, security.input_url_refused, security.method_url_refused, pipelex.config.invalid, pipelex.config.credential_missing, pipelex.billing.credit_exhausted
+ImgGenHandleNotFoundError | pipelex.config.invalid
+ImgGenModelNotFoundError | model.unavailable
+ImgGenParameterError | one of model.capability_unsupported, pipelex.config.invalid, runtime.unexpected
+ImgGenPromptError | pipe.prompt_empty
+ImgGenSettingValueError | method.model_setting_invalid
+InferenceBackendCredentialsError | one of pipelex.config.credential_missing, pipelex.config.invalid, runtime.misconfigured
+InferenceBackendLibraryError | pipelex.config.invalid
+InferenceBackendLibraryNotFoundError | pipelex.config.invalid
+InferenceBackendLibraryValidationError | pipelex.config.invalid
+InferenceBackendNotFoundError | model.unavailable
+InferenceModelSpecError | pipelex.config.invalid
+InputShapingError | abstract
+InputStuffSpecNotFoundError | method.wiring_invalid
+InputStuffSpecsError | abstract
+InputStuffSpecsFactoryError | method.schema_violation
+InvalidPipeCodeSyntaxError | method.identifier_invalid
+InvocationPathError | runtime.unexpected
+Jinja2ContextError | one of pipe.template_render_failed, method.template_invalid, runtime.unexpected
+Jinja2DetectVariablesError | method.syntax
+Jinja2StuffError | one of method.name_conflict, runtime.unexpected
+Jinja2TemplateBudgetError | one of pipe.template_budget_exceeded, input.too_large
+Jinja2TemplateInvalidError | one of method.template_invalid, runtime.unexpected
+Jinja2TemplateRenderError | one of pipe.template_render_failed, method.template_invalid, runtime.unexpected
+Jinja2TemplateSecurityError | one of security.template_refused, runtime.unexpected
+Jinja2TemplateSyntaxError | method.syntax
+JobMetadataError | runtime.unexpected
+JsonTypeError | one of request.invalid, pipelex.config.invalid, runtime.unexpected
+JudgmentAnswerMismatchError | model.output_schema_mismatch
+JudgmentCapabilityError | one of model.capability_unsupported, model.context_exceeded, pipelex.config.invalid
+JudgmentHandleNotFoundError | pipelex.config.invalid
+JudgmentJobFailureError | inherits cause, else runtime.unexpected; or chosen: runtime.misconfigured, provider.rate_limited, provider.unavailable, provider.timeout, provider.failed, provider.response_invalid, provider.credential_refused, provider.quota_exhausted, provider.outcome_unknown, model.unavailable, model.capability_unsupported, model.context_exceeded, model.content_refused, model.output_schema_mismatch, model.no_result, input.too_large, input.file_type_unsupported, input.file_unreadable, input.reference_not_found, input.url_unreachable, security.input_url_refused, security.method_url_refused, pipelex.config.invalid, pipelex.config.credential_missing, pipelex.billing.credit_exhausted
+JudgmentModelMissingError | model.unspecified
+JudgmentModelNotFoundError | model.unavailable
+JudgmentOutputFieldsError | runtime.unexpected
+JudgmentRefusedError | model.content_refused
+KitError | runtime.unexpected
+KitIndexLoadingError | runtime.unexpected
+LLMCapabilityError | one of model.capability_unsupported, model.context_exceeded
+LLMCompletionError | inherits cause, else runtime.unexpected; or chosen: runtime.misconfigured, provider.rate_limited, provider.unavailable, provider.timeout, provider.failed, provider.response_invalid, provider.credential_refused, provider.quota_exhausted, provider.outcome_unknown, model.unavailable, model.capability_unsupported, model.context_exceeded, model.content_refused, model.output_schema_mismatch, model.no_result, input.too_large, input.file_type_unsupported, input.file_unreadable, input.reference_not_found, input.url_unreachable, security.input_url_refused, security.method_url_refused, pipelex.config.invalid, pipelex.config.credential_missing, pipelex.billing.credit_exhausted
+LLMCompletionRefusedError | model.content_refused
+LLMCompletionTruncatedError | one of model.output_truncated, model.context_exceeded
+LLMConfigError | pipelex.config.invalid
+LLMHandleNotFoundError | pipelex.config.invalid
+LLMModelNotFoundError | model.unavailable
+LLMPromptParameterError | pipe.prompt_empty
+LLMSettingRefusedError | model.capability_unsupported
+LLMSettingValueError | method.model_setting_invalid
+LangfuseCredentialsError | pipelex.config.variable_missing
+LibraryError | one of runtime.unexpected, request.invalid, method.concept_unresolved, pipelex.config.invalid
+LibraryLoadingError | one of method.invalid, method.cycle, method.name_conflict, method.pipe_not_exported, method.dependency_missing, method.concept_invalid, method.not_found
+LinkupError | pipelex.config.credential_missing
+LinkupSearchEmptyResultError | model.no_result
+LinkupSearchResponseError | provider.response_invalid
+ListWhereSingularError | input.wrong_multiplicity
+LocalFileMissingError | input.reference_not_found
+LogSinkHeaderValueError | pipelex.config.invalid
+LogSinkVariableError | pipelex.config.variable_missing
+MarkdownFormattingBudgetError | input.too_large
+MarkdownParserDependencyError | pipelex.config.dependency_missing
+MethodDependencyFetchError | method.dependency_missing
+MethodEntryError | one of request.pipe_unspecified, request.pipe_ambiguous, method.pipe_unresolved, method.package_invalid, method.syntax, method.invalid
+MethodFetchDisabledError | method.dependency_missing
+MethodFetchError | one of method.fetch_failed, pipelex.config.dependency_missing, method.not_found, method.package_invalid
+MethodFileUnavailableError | one of runtime.unexpected, method.resource_missing
+MethodInstallError | one of pipelex.config.invalid, method.package_invalid
+MethodNotFoundError | method.not_found
+MethodPackageAmbiguityError | method.ambiguous
+MethodPackageNotFoundError | method.not_found
+MethodPackageSymlinkError | method.package_invalid
+MethodPackageTooLargeError | method.package_invalid
+MethodRefError | abstract
+MethodRefParseError | one of request.invalid, request.unsupported
+MethodRequirementsError | abstract
+MethodRequirementsFileError | method.package_invalid
+MethodRequirementsNotMetError | method.dependency_missing
+MethodStructuresRefusedError | pipelex.deployment.python_structures_refused
+MethodTreeLoadError | method.package_invalid
+MigrationError | abstract
+MigrationGoldenError | runtime.unexpected
+MigrationLedgerError | runtime.unexpected
+MigrationRegistryError | runtime.unexpected
+MigrationSnapshotRefusedError | runtime.unexpected
+MissingBundleValidatorError | one of pipelex.plugin.not_found, runtime.unsupported, pipelex.config.dependency_missing, runtime.unexpected
+MissingDependencyError | pipelex.config.dependency_missing
+MissingOrchestratorError | one of pipelex.plugin.not_found, runtime.unsupported, pipelex.config.dependency_missing, runtime.unexpected
+MistralExtractResponseError | provider.response_invalid
+MistralModelListingError | provider.response_invalid
+MistralPluginError | abstract
+MistralWorkerConfigurationError | pipelex.config.invalid
+MockUsageOnLiveRunError | request.invalid
+ModelChoiceNotFoundError | one of model.unknown, model.capability_unsupported
+ModelDeckChoiceUnresolvedError | one of pipelex.config.invalid, model.unavailable
+ModelDeckNotFoundError | pipelex.config.invalid
+ModelDeckPresetValidationError | pipelex.config.invalid
+ModelDeckValidationError | pipelex.config.invalid
+ModelListingUnsupportedError | runtime.unsupported
+ModelManagerError | pipelex.config.invalid
+ModelNotFoundError | one of model.unavailable, model.unknown
+ModelReferenceParseError | one of method.model_setting_invalid, pipelex.config.invalid
+ModelWaterfallError | model.unavailable
+ModuleFileError | runtime.unexpected
+MthdsParserError | one of method.invalid, method.syntax, method.schema_violation, method.dependency_invalid, request.invalid, request.pipe_unspecified, runtime.unexpected
+MultiplicityCountMismatchError | input.wrong_multiplicity
+NativeConceptDefinitionError | runtime.unexpected
+NativeConceptRedeclarationError | method.name_conflict
+NeitherUrlNorDataError | provider.response_invalid
+NestedKeyConflictError | pipe.template_render_failed
+NoInputsRequiredError | request.unsupported
+NullInputError | input.invalid
+OpenAIClientFactoryError | pipelex.config.invalid
+OptionalValueAbsentError | pipe.forced_input_absent
+OutputShapeUnavailableError | request.unsupported
+OutputStructureSchemaError | method.concept_invalid
+PipeComposeError | inherits cause, else pipe.output_invalid
+PipeComposeFactoryError | one of method.template_invalid, method.schema_violation
+PipeComposeTemplateError | method.template_invalid
+PipeConditionFactoryError | method.schema_violation
+PipeControllerError | abstract
+PipeDocGenFactoryError | one of method.template_invalid, method.output_concept_mismatch, method.resource_missing, security.method_path_refused, method.input_undeclared, method.field_path_unresolved
+PipeDocGenRunError | inherits cause, else pipe.template_render_failed; or chosen: runtime.unexpected, method.template_invalid
+PipeDocGenTemplateCheckError | pipelex.docgen.template_invalid
+PipeDocGenTemplateFileUncheckedError | runtime.unsupported
+PipeDocGenUndefinedValueError | pipe.template_render_failed
+PipeExecutionError | one of runtime.unexpected, request.pipe_unspecified, input.invalid
+PipeExtractFactoryError | method.schema_violation
+PipeFactoryError | one of method.schema_violation, method.concept_unresolved, runtime.unexpected
+PipeFuncExecutionError | inherits cause, else runtime.unexpected; or chosen: pipe.function_timed_out
+PipeFuncFunctionError | method.function_invalid
+PipeFuncPackageSetUnstatedError | runtime.misconfigured
+PipeFuncRaisedError | pipe.function_raised
+PipeFuncTransportError | runtime.misconfigured
+PipeIOContractError | method.concept_invalid
+PipeImgGenFactoryError | model.context_exceeded
+PipeImgGenRunError | inherits cause, else pipe.input_unresolved
+PipeJobError | runtime.unexpected
+PipeJudgeError | abstract
+PipeJudgeInputCapabilityError | model.capability_unsupported
+PipeLLMFactoryError | method.template_invalid
+PipeLibraryError | one of method.name_conflict, method.ref_ambiguous, method.signature_mismatch, request.unsupported, runtime.unexpected
+PipeLoadRefusalError | inherits cause, else method.schema_violation
+PipeNotFoundError | method.pipe_unresolved
+PipeOperatorModelAvailabilityError | inherits cause, else model.unavailable
+PipeOperatorModelChoiceError | inherits cause, else model.unknown
+PipeParallelFactoryError | method.schema_violation
+PipeRouterError | inherits cause, else runtime.unexpected
+PipeRunError | inherits cause, else runtime.unexpected; or chosen: model.output_schema_mismatch, pipe.condition_unmatched, pipe.condition_refused, pipe.input_unresolved, method.function_invalid, method.template_invalid, method.pipe_unresolved, method.schema_violation, method.wiring_invalid, method.name_conflict, method.optional_unhandled
+PipeRunInputsError | one of pipe.input_unresolved, input.missing, input.reference_not_found, method.wiring_invalid
+PipeRunParamsError | method.schema_violation
+PipeSequenceValueError | method.wiring_invalid
+PipeSignatureNotExecutableError | method.not_runnable
+PipeStackOverflowError | pipe.stack_overflow
+PipeValidationError | one of method.schema_violation, method.input_undeclared, method.input_unused, method.input_concept_mismatch, method.output_concept_mismatch, method.output_multiplicity_mismatch, method.identifier_invalid, method.pipe_type_invalid, method.name_conflict, method.binding_step_invalid, method.field_path_unresolved, method.optional_marker_invalid, method.optional_unhandled, method.template_private_name, method.optional_force_redundant, method.input_presence_vacuous, method.concept_unresolved, method.pipe_unresolved, method.dependency_missing, method.pipe_not_exported, method.function_invalid, method.wiring_invalid, model.unknown, model.capability_unsupported, runtime.unexpected
+PipeVariableMultiplicityError | method.schema_violation
+PipelexBridgeDispatchError | inherits cause, else runtime.unexpected; or chosen: runtime.unsupported, request.invalid
+PipelexCLIError | inherits cause, else runtime.unexpected; or chosen: pipelex.config.invalid, pipelex.config.variable_missing, pipelex.config.credential_missing, provider.credential_refused, provider.failed
+PipelexConfigError | one of pipelex.config.invalid, pipelex.config.syntax, pipelex.config.file_missing
+PipelexError | abstract
+PipelexRequestError | one of request.invalid, request.unsupported
+PipelexRuntimeBridgeError | abstract
+PipelexSetupError | inherits cause, else runtime.misconfigured; or chosen: runtime.unexpected, pipelex.config.file_missing, pipelex.config.invalid, pipelex.config.syntax
+PipelexUnexpectedError | runtime.unexpected
+PipelineExecutionError | inherits cause, else runtime.unexpected
+PipelineInputContentError | inherits cause, else pipelex.storage.uri_invalid; or chosen: input.reference_not_found, input.file_unreadable
+PipelineInputFormatError | abstract
+PipelineInputFormatUnsupportedError | input.file_type_unsupported
+PipelineInputNotAnImageError | input.file_type_unsupported
+PipelineInputUrlInvalidError | input.invalid
+PipelineInputUrlMissingError | input.invalid
+PipelineManagerAlreadyExistsError | pipelex.run.already_exists
+PipelineManagerNotFoundError | runtime.unexpected
+PluginApiVersionMismatchError | pipelex.plugin.api_mismatch
+PluginDeclaredInMultipleGroupsError | pipelex.plugin.broken
+PluginError | abstract
+PluginErrorCodeNotRegisteredError | pipelex.plugin.broken
+PluginLayerViolationError | pipelex.plugin.broken
+PluginModelDeclarationError | pipelex.config.invalid
+PortkeyCredentialsError | pipelex.config.credential_missing
+PortkeyError | abstract
+PortkeyFactoryError | pipelex.config.invalid
+PromptContentError | one of runtime.unexpected, method.wiring_invalid
+PromptDocumentFactoryError | runtime.unexpected
+PromptDocumentFormatError | input.file_type_unsupported
+PromptImageFactoryError | runtime.unexpected
+PromptImageFormatError | input.file_type_unsupported
+QualifiedRefError | method.schema_violation
+ReadinessCheckError | runtime.misconfigured
+RemoteFileFetchError | one of input.file_unreadable, input.url_unreachable, provider.response_invalid
+ReservedServiceErrorCodeError | pipelex.plugin.broken
+RetiredPluginEntryPointGroupError | pipelex.plugin.broken
+RoutingProfileBlueprintValueError | pipelex.config.invalid
+RoutingProfileDisabledBackendError | pipelex.config.invalid
+RoutingProfileLibraryError | pipelex.config.invalid
+RoutingProfileLibraryNotFoundError | pipelex.config.invalid
+RunParameterError | request.invalid
+SdkTypeError | runtime.unexpected
+SearchHandleNotFoundError | pipelex.config.invalid
+SearchJobFailureError | inherits cause, else runtime.unexpected; or chosen: runtime.misconfigured, provider.rate_limited, provider.unavailable, provider.timeout, provider.failed, provider.response_invalid, provider.credential_refused, provider.quota_exhausted, provider.outcome_unknown, model.unavailable, model.capability_unsupported, model.context_exceeded, model.content_refused, model.output_schema_mismatch, model.no_result, input.too_large, input.file_type_unsupported, input.file_unreadable, input.reference_not_found, input.url_unreachable, security.input_url_refused, security.method_url_refused, pipelex.config.invalid, pipelex.config.credential_missing, pipelex.billing.credit_exhausted
+SearchModelNotFoundError | model.unavailable
+SecretNotFoundError | pipelex.config.variable_missing
+SecretVersionUnsupportedError | runtime.unsupported
+SecurityError | abstract
+SemVerError | method.package_invalid
+SsrfBlockedError | one of security.input_url_refused, security.method_url_refused, security.provider_url_refused
+StorageConfigError | pipelex.config.invalid
+StorageDeliveryError | inherits cause, else pipelex.storage.unavailable
+StorageError | abstract
+StorageFileNotFoundError | one of pipelex.storage.not_found, runtime.unexpected
+StorageGcpCredentialsError | pipelex.config.file_missing
+StorageGcpError | one of pipelex.storage.unavailable, pipelex.config.credential_refused
+StorageInvalidKeyError | runtime.unexpected
+StorageInvalidUriError | one of security.input_path_refused, security.method_url_refused, runtime.unexpected
+StorageLocalError | runtime.misconfigured
+StorageNotConfiguredError | pipelex.storage.not_configured
+StorageS3Error | one of pipelex.storage.unavailable, pipelex.config.invalid, pipelex.config.credential_refused, pipelex.config.credential_missing
+StructureValidationError | one of input.invalid, input.wrong_concept
+StructuredContentComposerTypeError | pipe.output_invalid
+StructuredContentComposerValidationError | pipe.output_invalid
+StructuredContentComposerValueError | one of runtime.unexpected, method.field_path_unresolved
+StuffContentFactoryError | one of input.invalid, runtime.unexpected
+StuffContentTypeError | method.wiring_invalid
+StuffContentValidationError | method.wiring_invalid
+StuffError | abstract
+StuffFactoryError | one of input.invalid, input.wrong_concept, pipe.output_invalid, pipe.output_multiplicity
+StuffSpecFactoryError | method.schema_violation
+TelemetryApiKeyMissingError | pipelex.config.variable_missing
+TelemetryConfigError | abstract
+TelemetryConfigValidationError | pipelex.config.invalid
+TemplateSigilSyntaxError | method.syntax
+TemplateUrlRefusedError | security.method_path_refused
+TomlError | one of pipelex.config.syntax, request.malformed, method.syntax
+ToolError | abstract
+TraceContextRunModeError | runtime.unexpected
+TraceEventModeError | runtime.unexpected
+TracebackMessageError | abstract
+TreeModuleShadowingError | method.name_conflict
+TreePythonError | one of runtime.unexpected, request.unsupported, method.name_conflict
+TreePythonHeldError | runtime.unavailable
+TypesafeError | pipelex.config.credential_missing
+TypesafeJudgmentResponseError | provider.response_invalid
+TypesafeQuestionUnsupportedError | one of model.capability_unsupported, runtime.unexpected
+UnknownBootOrchestratorError | pipelex.plugin.not_found
+UnknownInputNameError | input.unexpected
+UnknownLogSinkError | pipelex.plugin.not_found
+UnknownPipeFuncExecutionModeError | pipelex.plugin.not_found
+UnknownSecretsMethodError | pipelex.plugin.not_found
+UnknownStorageMethodError | pipelex.plugin.not_found
+UnknownVarPrefixError | pipelex.config.invalid
+UnsafeSchemaError | security.schema_refused
+UnsupportedImageMimeTypeError | one of input.file_type_unsupported, provider.response_invalid
+UriReadRefusedError | one of security.input_url_refused, security.method_url_refused
+UrlSyntaxError | input.invalid
+ValidateBundleError | one of method.invalid, request.invalid
+VarFallbackPatternError | pipelex.config.variable_missing
+VarNotFoundError | pipelex.config.variable_missing
+VertexAIConfigError | pipelex.config.invalid
+VertexAICredentialsError | pipelex.config.credential_missing
+WebhookDeliveryError | pipelex.webhook.delivery_failed
+WithImagesFilterError | method.template_invalid
+WorkingMemoryConsistencyError | runtime.unexpected
+WorkingMemoryError | abstract
+WorkingMemoryFactoryError | runtime.unexpected
+WorkingMemoryStuffAttributeNotFoundError | one of method.wiring_invalid, method.template_private_name
+WorkingMemoryStuffNotFoundError | runtime.unexpected
+WorkingMemoryTypeError | one of method.wiring_invalid, input.invalid
+WorkingMemoryVariableError | abstract
+WrongScalarKindError | input.invalid

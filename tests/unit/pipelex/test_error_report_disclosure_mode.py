@@ -21,6 +21,7 @@ be redacted. ``caller_facing_message`` is not inherited, so STRICT redacts it.
 from typing import Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import ValidationError
 
 from pipelex.base_exceptions import (
@@ -28,17 +29,25 @@ from pipelex.base_exceptions import (
     DisclosureMode,
     ErrorDomain,
     ErrorReport,
-    PipelexUnexpectedError,
+    PipelexError,
     ValidationErrorCategory,
     ValidationErrorItem,
 )
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.cogt.inference.provider_name import ProviderName
+from pipelex.errors.error_code_declaration import InheritsCause
 from pipelex.mthds_parsing.exceptions import MthdsParserError
+
+
+class _PassThroughWrapperError(PipelexError):
+    """A wrapper that adds no fact deciding the code: it takes its cause's."""
+
+    error_code = InheritsCause(fallback=CoreCode.RUNTIME_UNEXPECTED)
 
 
 def _runtime_report(message: str = "rate limited on the worker") -> ErrorReport:
     return ErrorReport(
+        code="provider.quota_exhausted",
         error_type="CogtError",
         message=message,
         title="AI inference failed",
@@ -60,6 +69,7 @@ def _runtime_report(message: str = "rate limited on the worker") -> ErrorReport:
 
 def _config_report(message: str = "OPENAI_API_KEY is not set") -> ErrorReport:
     return ErrorReport(
+        code="pipelex.config.variable_missing",
         error_type="EnvVarNotFoundError",
         message=message,
         title="Environment variable not set",
@@ -71,6 +81,7 @@ def _config_report(message: str = "OPENAI_API_KEY is not set") -> ErrorReport:
 def _caller_facing_report(message: str = "pipe 'summarize' references unknown concept 'Reportt' at line 14") -> ErrorReport:
     """A report whose message was authored as caller-facing copy (interpreter / bundle-validation)."""
     return ErrorReport(
+        code="method.syntax",
         error_type="MthdsParserError",
         message=message,
         title="MTHDS parser",
@@ -88,6 +99,7 @@ def _input_domain_wrapper_report(message: str = "internal invariant violated: ca
     ``__cause__`` chain while keeping its own internal ``message``.
     """
     return ErrorReport(
+        code="runtime.unexpected",
         error_type="PipelexUnexpectedError",
         message=message,
         title="Unexpected internal error",
@@ -249,21 +261,23 @@ class TestErrorReportDisclosureMode:
         assert provider_metadata["retry_after_seconds"] == 12.0
 
     def test_strict_redacts_domain_less_wrapper_raised_from_input_cause(self) -> None:
-        """A domain-less wrapper raised ``from`` an INPUT cause must not leak its own message in STRICT.
+        """A wrapper that takes its cause's code must not leak its own message in STRICT.
 
-        ``PipelexUnexpectedError`` (no domain, internal message) wrapping a
-        ``MthdsParserError`` (INPUT) produces a report classified
-        ``error_domain=INPUT`` via ``__cause__``-chain inheritance — yet the
-        report's ``message`` is the wrapper's internal text. ``caller_facing_message``
-        is NOT inherited, so STRICT redacts the message.
+        ``_PassThroughWrapperError`` (inherits its cause's code, internal message)
+        wrapping a ``MthdsParserError`` (a method code, caller-facing) produces a
+        report carrying the cause's code, and with it the cause's domain, through
+        the ``__cause__`` walk — yet the report's ``message`` is the wrapper's
+        internal text. ``caller_facing_message`` is NOT inherited, so STRICT
+        redacts the message.
         """
         cause = MthdsParserError("parse failed at /srv/secret/internal/bundle.mthds")
         wrapper_message = "internal invariant violated: cache slot is None"
         try:
-            raise PipelexUnexpectedError(wrapper_message) from cause
-        except PipelexUnexpectedError as exc:
+            raise _PassThroughWrapperError(wrapper_message) from cause
+        except _PassThroughWrapperError as exc:
             report = exc.to_error_report()
-        # error_domain IS inherited from the INPUT cause ...
+        # The code, and the domain it decides, are the cause's ...
+        assert report.code == cause.resolve_error_code()
         assert report.error_domain == ErrorDomain.INPUT
         # ... but caller_facing_message is NOT — the wrapper authored the message.
         assert report.caller_facing_message is False
@@ -307,6 +321,7 @@ class TestErrorReportDisclosureMode:
     def test_retryable_survives_disclosure_mode(self, retryable: bool | None, mode: DisclosureMode) -> None:
         """``retryable`` is a stable identifier — kept in both modes for True / False / None."""
         report = ErrorReport(
+            code="provider.quota_exhausted",
             error_type="CogtError",
             message="boom",
             title="AI inference failed",
@@ -403,6 +418,7 @@ class TestErrorReportDisclosureMode:
         # exercise each branch — using ``model_copy`` so pyright sees the
         # concrete field types instead of the union we'd get from ``**kwargs``.
         caller_facing_report = ErrorReport(
+            code="method.syntax",
             error_type="MthdsParserError",
             message="pipe references unknown concept",
             title="MTHDS parser",
@@ -448,6 +464,7 @@ class TestErrorReportDisclosureMode:
         non-caller-facing report carrying it is not silently redacted.
         """
         report = ErrorReport(
+            code="method.invalid",
             error_type="ValidateBundleError",
             message="bundle failed validation",
             title="Validate bundle error",

@@ -35,10 +35,10 @@ class Pypdfium2ErrorHandlingTestData:
             UserActionKind.CHANGE_INPUT,
         ),
         (
-            "io_error_transient",
+            "local_io_error",
             OSError,
             "Permission denied: /tmp/locked.pdf",
-            InferenceErrorCategory.TRANSIENT,
-            UserActionKind.WAIT_AND_RETRY,
+            InferenceErrorCategory.UNKNOWN,
+            UserActionKind.CONTACT_SUPPORT,
         ),
     ]

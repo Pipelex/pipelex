@@ -259,6 +259,8 @@ A setting the model it resolves to cannot take is refused when the method loads,
 
 A text the model cannot finish within `max_tokens`, or within its context window, fails the pipe with `LLMCompletionTruncatedError` rather than passing the partial text on as the pipe's output; a text the model refuses or a safety filter stops fails it with `LLMCompletionRefusedError`. The first names the output tokens used and the limit sent, so raising `max_tokens` or shortening the input is the fix; a model that reasons spends its reasoning from the same limit.
 
+A `prompt` or `system_prompt` that names a filter or a test Jinja2 does not know inside a conditional block loads, because Jinja2 resolves such a name only when the block renders. The run then fails at the pipe, before any model is called, with the code `method.template_invalid`: the message names the field and the unknown name, quotes none of the prompt, and comes with a next step, and a hosted run answers it with HTTP 422.
+
 !!! tip "More on Reasoning"
     For provider-specific behavior and model-specific examples, see [Reasoning Controls](../../../under-the-hood/reasoning-controls.md).
 

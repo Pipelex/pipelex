@@ -183,9 +183,9 @@ def render_index_page(*, registry: ErrorRegistryDocument) -> str:
         ),
         "",
         (
-            "The registry declares the Pipelex codes, but Pipelex's errors do not carry them yet: an error still reports its "
-            "`error_type` and a type URI derived from its class, and giving every error its code is the next step of this "
-            f"work, as the [Error Model]({_link(page=page, target=ERROR_MODEL_SECTION)}) describes."
+            "Every Pipelex error carries a code, one of these or a core code: its problem document names it as `code`, "
+            "and its `type` is the code's page. The [Error Model]"
+            f"({_link(page=page, target=ERROR_MODEL_SECTION)}) describes how an error class declares the code it raises."
         ),
         "",
     ]

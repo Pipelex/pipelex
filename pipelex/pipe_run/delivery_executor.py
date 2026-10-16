@@ -18,7 +18,8 @@ from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.absence_render import build_absence_html, build_absence_json, build_absence_markdown
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
 from pipelex.core.pipes.pipe_io_artifacts import INPUT_FORM_FILE_NAME, OUTPUT_FORM_FILE_NAME, PIPE_IO_CONTRACTS_FILE_NAME
-from pipelex.core.qualified_ref import QualifiedRef, QualifiedRefError
+from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.core.qualified_ref_exceptions import QualifiedRefError
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer

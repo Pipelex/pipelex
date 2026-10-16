@@ -10,9 +10,12 @@ it, leave it out and it comes back as a sourced answer. Resolving a concept to t
 library's business, so the kernel never asks for one.
 """
 
+from functools import partial
+
 from pipelex.cogt.content_generation.assignment_models import SearchAssignment
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.cogt.models.model_deck import resolve_deck_choice
 from pipelex.cogt.models.model_reference import write_model_handle
 from pipelex.cogt.search.search_setting import SearchModelChoice, SearchSetting
 from pipelex.cogt.templating.template_rendering import render_template
@@ -38,10 +41,18 @@ def resolve_search_setting(
     The middle step is the one worth naming: the deck's setting may name a waterfall or an alias, and
     the returned setting is pinned to the *resolved* handle so it doubles as a distributed run's
     routing key. A caller that skipped it would route on a name no worker recognises.
+
+    The step's choice that the deck does not resolve is the method's, `model.unknown`; the deck's default is the
+    deployment's, `ModelDeckChoiceUnresolvedError`.
     """
     model_deck = get_model_deck()
-    resolved_choice = search_choice or model_deck.search_choice_default
-    search_setting = model_deck.get_search_setting(search_choice=resolved_choice)
+    search_setting: SearchSetting
+    if search_choice:
+        search_setting = model_deck.get_search_setting(search_choice=search_choice)
+    else:
+        search_setting = resolve_deck_choice(
+            deck_setting="search.choice_default", resolve=partial(model_deck.get_search_setting, search_choice=model_deck.search_choice_default)
+        )
 
     inference_model = model_deck.get_required_inference_model(model_handle=search_setting.model, model_type=ModelType.SEARCH)
     # Pinned as a reference that parses back to the resolved handle, whatever its spelling, since every lookup reads it again.

@@ -33,7 +33,7 @@ from pipelex.core.validation import report_validation_error
 from pipelex.interpreter_hub import get_library_manager
 from pipelex.libraries.exceptions import LibraryError, LibraryLoadingError, MethodTreeLoadError
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
-from pipelex.libraries.method_trees import bundle_files_under
+from pipelex.libraries.method_trees import bundle_files_under, reporting_host_library_tree_faults
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.handle_pipe_errors import (
@@ -42,8 +42,8 @@ from pipelex.mthds_parsing.handle_pipe_errors import (
     categorize_pipe_validation_error,
     categorize_pipe_validation_with_libraries_error,
 )
-from pipelex.pipe_run.exceptions import DryRunError
-from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipe_run.exceptions import DryRunError, DryRunGraphNotProducedError
+from pipelex.pipeline.exceptions import HostLibraryLoadRefusalError, ValidateBundleError
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.typing.module_inspector import convert_file_path_to_module_path
 
@@ -150,6 +150,11 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
         # violations, factory failures). Surface them as a clean ValidateBundleError instead of a
         # raw traceback. LibraryLoadingError carries blueprint- and pipe/concept-validation errors;
         # forward them so the CLI renders the same structured detail it does for the other arms.
+        # A library error that is not the caller's input, such as an invariant of the library manager
+        # (`runtime.unexpected`) or library directories configured wrongly (`pipelex.config.invalid`), is a fault of
+        # the runtime, never a verdict about the bundle, and propagates as it is.
+        if not error_domain_is_input(library_error.to_error_report().error_domain):
+            raise
         if isinstance(library_error, LibraryLoadingError):
             blueprint_validation_errors = library_error.blueprint_validation_errors
             pipe_concept_validation_errors = library_error.pipe_concept_validation_errors
@@ -174,6 +179,9 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
                 )
             ],
         ) from pipe_run_error
+    except DryRunGraphNotProducedError:
+        # A graph-producing dry run that produced none is a fault of its entrypoint, not of the bundle.
+        raise
     except DryRunError as dry_run_error:
         # The sweep's failures, one per failing pipe, located at the innermost pipe that failed. A
         # DryRunError raised elsewhere carries none, and becomes one item under the disclosure rule.
@@ -202,6 +210,37 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
         if verdict is None:
             raise
         raise verdict from refusal
+
+
+@contextmanager
+def reporting_host_library_faults() -> Generator[None, None, None]:
+    """Report a fault of loading this host's own library directories as the deployment's, never as the caller's input.
+
+    Around a load of library directories that are not the caller's (`library_dirs_are_callers` False), such as the
+    ones a server loads beside a request's bundles. A tree that cannot be listed, or whose requirements refuse it,
+    leaves as `reporting_host_library_tree_faults` reports it. Any other refusal that would be the caller's input in
+    the caller's own content (an `input`-domained `PipelexError`, such as a pipe factory's refusal or an unknown
+    model, or a pydantic `ValidationError` of a blueprint) leaves as a `HostLibraryLoadRefusalError`, which the
+    validation translation lets through as no verdict. A security refusal keeps its own class, as everywhere.
+
+    Raises:
+        HostLibraryLoadRefusalError: A method of the directories refused to load.
+        HostLibraryTreeError: A tree of the directories could not be listed.
+        HostLibraryRequirementsError: A method of the directories declares requirements its environment refuses.
+    """
+    try:
+        with reporting_host_library_tree_faults():
+            yield
+    except SecurityError:
+        raise
+    except ValidationError as validation_error:
+        msg = f"A method in a library directory of this host does not validate: {report_validation_error(validation_error=validation_error).message}"
+        raise HostLibraryLoadRefusalError(msg) from validation_error
+    except PipelexError as refusal:
+        if not error_domain_is_input(refusal.to_error_report().error_domain):
+            raise
+        msg = f"A method in a library directory of this host refuses to load ({type(refusal).__name__}): {refusal.message}"
+        raise HostLibraryLoadRefusalError(msg) from refusal
 
 
 def _make_refusal_verdict(*, refusal: PipelexError) -> ValidateBundleError | None:

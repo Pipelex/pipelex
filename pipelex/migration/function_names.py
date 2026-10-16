@@ -29,6 +29,7 @@ import tomlkit
 from mthds.method_tree.exceptions import MethodTreeRefusedError, TreeLimitError, TreeSourceError
 from mthds.method_tree.lister import list_method_tree
 from mthds.method_tree.python_modules import is_valid_function_segment
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ConfigDict, Field
 from tomlkit.exceptions import TOMLKitError
 from tomlkit.items import String
@@ -227,7 +228,7 @@ def migrate_function_names_in_directory(*, directory: Path, is_dry_run: bool) ->
     """
     if not directory.is_dir():
         msg = f"'{directory}' is not a directory: hand over the folder of the method, whose tree holds its bundles and its Python."
-        raise FunctionNamesMigrationError(msg)
+        raise FunctionNamesMigrationError(msg).with_error_code(CoreCode.REQUEST_INVALID)
     try:
         tree = list_method_tree(directory)
     except (MethodTreeRefusedError, TreeLimitError, TreeSourceError) as exc:

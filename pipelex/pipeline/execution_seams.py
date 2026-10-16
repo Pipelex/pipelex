@@ -42,7 +42,6 @@ from pipelex.interpreter_hub import (
 )
 from pipelex.kernel.memory_ops import shape_inputs
 from pipelex.libraries.bundle_resources import check_submitted_files
-from pipelex.libraries.method_trees import reporting_host_library_tree_faults
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.pipe_job import PipeJob
@@ -52,7 +51,11 @@ from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.file_input_consumers import check_file_inputs_against_consumers
 from pipelex.pipeline.input_normalizer import collect_file_inputs, prepare_file_inputs
-from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error, withholding_host_library_files
+from pipelex.pipeline.validate_bundle_translation import (
+    reporting_host_library_faults,
+    translate_to_validate_bundle_error,
+    withholding_host_library_files,
+)
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -153,9 +156,10 @@ def acquire_library(
         if effective_dirs:
             effective_dirs_desc = ", ".join(str(dir_path) for dir_path in effective_dirs)
             log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}): {effective_dirs_desc}")
-            # The caller's directories refuse as their invalid bundle; a host's report a tree it cannot list as its own fault.
+            # The caller's directories refuse as their invalid bundle; a host's report a tree it cannot list, or a method
+            # that refuses to load, as its own fault.
             library_dirs_translation: AbstractContextManager[None] = (
-                translate_to_validate_bundle_error() if library_dirs_are_callers else reporting_host_library_tree_faults()
+                translate_to_validate_bundle_error() if library_dirs_are_callers else reporting_host_library_faults()
             )
             with library_dirs_translation:
                 library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs, methods_dirs=methods_dirs)

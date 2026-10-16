@@ -17,6 +17,7 @@ from pipelex.cogt.inference.provider_name import ProviderName
 
 def _runtime_report() -> ErrorReport:
     return ErrorReport(
+        code="provider.quota_exhausted",
         error_type="CogtError",
         message="rate limited on the worker",
         title="AI inference failed",
@@ -91,6 +92,7 @@ class TestErrorReportProblemDocument:
     def test_status_follows_http_status_property(self, error_domain: ErrorDomain, expected_status: int) -> None:
         """``status`` follows ``ErrorReport.http_status`` so the domain → HTTP mapping is honored."""
         report = ErrorReport(
+            code="runtime.unexpected",
             error_type="X",
             message="m",
             title="X",
@@ -124,6 +126,7 @@ class TestErrorReportProblemDocument:
     def test_strict_mode_passes_through_detail_for_caller_facing_report(self) -> None:
         """A caller-facing-message report reflects ``detail`` back unchanged in STRICT mode."""
         report = ErrorReport(
+            code="method.syntax",
             error_type="MthdsParserError",
             message="pipe 'summarize' references unknown concept at line 14",
             title="MTHDS parser",
@@ -142,6 +145,7 @@ class TestErrorReportProblemDocument:
         passthrough — only ``caller_facing_message`` does.
         """
         report = ErrorReport(
+            code="runtime.unexpected",
             error_type="PipelexUnexpectedError",
             message="internal invariant violated at /srv/secret/handler.py",
             title="Unexpected internal error",
@@ -159,6 +163,7 @@ class TestErrorReportProblemDocument:
         the RFC 7807 envelope.
         """
         report = ErrorReport(
+            code="method.syntax",
             error_type="MthdsParserError",
             message="pipe 'summarize' references unknown concept at line 14",
             title="MTHDS parser",
@@ -178,6 +183,7 @@ class TestErrorReportProblemDocument:
     def test_caller_facing_message_flag_never_rides_as_extension_member(self) -> None:
         """``caller_facing_message`` is internal redaction plumbing — never an RFC 7807 extension member."""
         report = ErrorReport(
+            code="method.syntax",
             error_type="MthdsParserError",
             message="pipe 'summarize' references unknown concept at line 14",
             title="MTHDS parser",

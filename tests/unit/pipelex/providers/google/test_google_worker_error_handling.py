@@ -225,8 +225,8 @@ class TestGoogleWorkerErrorHandling:
 
     # ---- ImgGen worker ServerError test ----
 
-    async def test_img_gen_server_error_has_transient_category(self, mocker: MockerFixture) -> None:
-        """ServerError should be categorized as TRANSIENT for ImgGen worker."""
+    async def test_img_gen_server_error_is_an_unknown_outcome(self, mocker: MockerFixture) -> None:
+        """A ServerError on an image generation, which is billed and not idempotent, is an unknown outcome."""
         worker = _make_google_img_gen_worker(mocker)
         sdk_exc = _make_google_server_error(code=500, message="Internal server error")
         worker.genai_async_client.models.generate_content.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
@@ -234,7 +234,7 @@ class TestGoogleWorkerErrorHandling:
         with pytest.raises(ImgGenGenerationError) as exc_info:
             await worker._gen_image(img_gen_job=_make_img_gen_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.error_category is InferenceErrorCategory.AMBIGUOUS
         assert exc_info.value.__cause__ is sdk_exc
 
     # ---- to_error_report() integration ----

@@ -1,17 +1,24 @@
-from pipelex.base_exceptions import ErrorDomain
+from typing import ClassVar
+
+from mthds.protocol.problem.registry import CoreCode
+
+from pipelex.errors.error_code_declaration import ErrorCodeDeclaration, ErrorCodeSet
 from pipelex.system.exceptions import ToolError
 
 
 class CsvError(ToolError):
-    """Base for CSV codec errors.
+    """Base for CSV codec errors, also raised directly.
 
-    CSV problems are caller-fixable input issues (a missing/unreadable file, a header
-    that does not match the row concept, a cell that cannot be coerced), so the whole
-    family is classified under the ``INPUT`` error domain.
+    CSV problems are mostly caller-fixable input issues (a missing/unreadable file, a header
+    that does not match the row concept, a cell that cannot be coerced), so the default is
+    ``input.invalid``. Writing a table the CLI's ``--save-csv`` asked for is
+    ``request.invalid``, and a delimiter or a row the codec was handed by its own caller is
+    ``runtime.unexpected``.
     """
 
-    error_domain = ErrorDomain.INPUT
-    _declared_title = "CSV error"
+    error_code: ClassVar[ErrorCodeDeclaration] = ErrorCodeSet(
+        default=CoreCode.INPUT_INVALID, others=(CoreCode.REQUEST_INVALID, CoreCode.RUNTIME_UNEXPECTED)
+    )
     # The whole family describes faults in the caller's OWN CSV input (a missing file, a header that
     # does not match the concept, a cell that will not coerce), so the message is safe and useful to
     # expose. Opt in so STRICT disclosure keeps it instead of redacting it to a generic placeholder.
@@ -26,7 +33,7 @@ class CsvReadError(CsvError):
     third-party exception escapes into core/runner.
     """
 
-    _declared_title = "CSV read error"
+    error_code = CoreCode.INPUT_FILE_UNREADABLE
 
 
 class CsvFlatnessError(CsvError):
@@ -38,7 +45,7 @@ class CsvFlatnessError(CsvError):
     offending field and telling the author to project to a flat concept first.
     """
 
-    _declared_title = "CSV flatness error"
+    error_code = CoreCode.INPUT_INVALID
 
 
 class CsvColumnError(CsvError):
@@ -50,7 +57,7 @@ class CsvColumnError(CsvError):
     that default.
     """
 
-    _declared_title = "CSV column error"
+    error_code = CoreCode.INPUT_INVALID
 
 
 class CsvCoercionError(CsvError):
@@ -60,4 +67,4 @@ class CsvCoercionError(CsvError):
     the offending cell.
     """
 
-    _declared_title = "CSV coercion error"
+    error_code = CoreCode.INPUT_INVALID

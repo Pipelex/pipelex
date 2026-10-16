@@ -8,7 +8,7 @@ from types import MappingProxyType
 from typing import Any
 
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
-from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
+from pipelex.cogt.exceptions import ModelDeckPresetValidationError
 from pipelex.migration.exceptions import FormerReleaseConfigError
 from pipelex.pipelex import Pipelex
 from pipelex.runtime_hub import RuntimeHub
@@ -216,10 +216,10 @@ def make_pipelex_for_agent_cli(*, library_dirs: list[str] | list[Path] | None = 
         # Its own hint, the class's user_action, rather than the generic one, which offers a reset: the cleanup keeps
         # everything but what a former release left, and an agent can run it.
         agent_error(exc.message, error_type="FormerReleaseConfigError", cause=exc)
-    except ModelDeckPresetValidatonError as exc:
+    except ModelDeckPresetValidationError as exc:
         agent_error(
             exc.message,
-            error_type="ModelDeckPresetValidatonError",
+            error_type="ModelDeckPresetValidationError",
             cause=exc,
             preset_id=exc.preset_id,
             model_type=str(exc.model_type),

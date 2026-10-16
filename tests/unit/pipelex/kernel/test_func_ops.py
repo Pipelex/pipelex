@@ -15,12 +15,14 @@ from collections.abc import Callable
 from typing import Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.kernel.exceptions import FuncOutputTypeError
 from pipelex.kernel.func_ops import call_function, run_func
 
 ASYNC_TEXT = "produced by the async function"
@@ -37,6 +39,18 @@ async def _async_producer(working_memory: WorkingMemory) -> TextContent:  # ruff
 
 def _sync_producer(working_memory: WorkingMemory) -> TextContent:  # ruff: ignore[unused-function-argument]
     return TextContent(text=SYNC_TEXT)
+
+
+def _number_producer(working_memory: WorkingMemory) -> int:  # ruff: ignore[unused-function-argument]
+    return 42
+
+
+def _dict_list_producer(working_memory: WorkingMemory) -> list[dict[str, int]]:  # ruff: ignore[unused-function-argument]
+    return [{"parcel": 7}]
+
+
+def _number_list_producer(working_memory: WorkingMemory) -> list[Any]:  # ruff: ignore[unused-function-argument]
+    return [TextContent(text=SYNC_TEXT), 42]
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -80,3 +94,19 @@ class TestFuncOps:
         assert main_stuff.content.text == ASYNC_TEXT
         assert result.content is main_stuff.content
         assert result.memory.get_stuff(name=RESULT_NAME).content is main_stuff.content
+
+    @pytest.mark.parametrize(
+        ("function", "refused_type"),
+        [
+            pytest.param(_number_producer, "int", id="no-content"),
+            pytest.param(_dict_list_producer, "dict", id="list-holding-a-dict"),
+            pytest.param(_number_list_producer, "int", id="list-holding-a-number"),
+        ],
+    )
+    async def test_a_function_returning_no_content_fails_the_step_output(self, function: Callable[..., Any], refused_type: str) -> None:
+        """A registered function's wrong return shape is the step's output failing, not a runtime defect, and never a silent empty content."""
+        with pytest.raises(FuncOutputTypeError, match=function.__name__) as exc_info:
+            await call_function(function=function, memory=WorkingMemoryFactory.make_empty())
+
+        assert f"<class '{refused_type}'>" in exc_info.value.message
+        assert exc_info.value.resolve_error_code() == CoreCode.PIPE_OUTPUT_INVALID

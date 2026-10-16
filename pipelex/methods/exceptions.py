@@ -1,6 +1,10 @@
 from typing import ClassVar
 
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex.base_exceptions import PipelexError
+from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, ErrorCodeSet
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 
 
 class MethodRefError(PipelexError):
@@ -10,32 +14,53 @@ class MethodRefError(PipelexError):
     so the messages are caller-facing by design.
     """
 
-    _declared_title = "Method reference error"
+    error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
     _authors_caller_facing_message: ClassVar[bool] = True
 
 
 class MethodRefParseError(MethodRefError):
-    """The method reference does not match the `<address>[@<tag>]` grammar."""
+    """The method reference does not match the `<address>[@<tag>]` grammar, or names an address this runtime does not fetch."""
+
+    error_code = ErrorCodeSet(default=CoreCode.REQUEST_INVALID, others=(CoreCode.REQUEST_UNSUPPORTED,))
 
 
 class MethodFetchError(MethodRefError):
-    """Fetching the repository behind a method reference failed (clone, tag verification, or commit resolution)."""
+    """Fetching the repository behind a method reference failed (clone, tag verification, or commit resolution).
+
+    The default ``method.fetch_failed`` is a clone, a resolution or a timeout that failed; a raise site chooses
+    ``pipelex.config.dependency_missing`` when git is not installed on this host, ``method.not_found`` when the
+    repository holds no such tag or no commit, and ``method.package_invalid`` for a fetched package that breaks a
+    package rule.
+    """
+
+    error_code = ErrorCodeSet(
+        default=CoreCode.METHOD_FETCH_FAILED,
+        others=(PipelexErrorCode.CONFIG_DEPENDENCY_MISSING, CoreCode.METHOD_NOT_FOUND, CoreCode.METHOD_PACKAGE_INVALID),
+    )
 
 
 class MethodPackageNotFoundError(MethodRefError):
     """No package inside the fetched repository matches the requested address by manifest identity."""
 
+    error_code = CoreCode.METHOD_NOT_FOUND
+
 
 class MethodPackageAmbiguityError(MethodRefError):
     """More than one package inside the fetched repository matches the requested address."""
+
+    error_code = CoreCode.METHOD_AMBIGUOUS
 
 
 class MethodPackageTooLargeError(MethodRefError):
     """Fetched content exceeds a ceiling: the selected package's file count or total bytes, or the repository's manifest scan."""
 
+    error_code = CoreCode.METHOD_PACKAGE_INVALID
+
 
 class MethodPackageSymlinkError(MethodRefError):
     """The fetched package contains a symlink, which fetched packages must not carry (it would bypass the content scans)."""
+
+    error_code = CoreCode.METHOD_PACKAGE_INVALID
 
 
 class MethodStructuresRefusedError(MethodRefError):
@@ -45,14 +70,26 @@ class MethodStructuresRefusedError(MethodRefError):
     whatever the content's origin: an inline bundle, a stored method or a host directory.
     """
 
+    error_code = PipelexErrorCode.DEPLOYMENT_PYTHON_STRUCTURES_REFUSED
+
 
 class MethodInstallError(MethodRefError):
-    """Installing a fetched method package into the installed-methods directory failed (occupied target, path escape, or copy failure)."""
+    """Installing a fetched method package into the installed-methods directory failed (occupied target, path escape, or copy failure).
+
+    The default ``pipelex.config.invalid`` is an installed-methods directory that cannot take the package; a package
+    whose name escapes the directory or that carries no manifest chooses ``method.package_invalid``.
+    """
+
+    error_code = ErrorCodeSet(default=PipelexErrorCode.CONFIG_INVALID, others=(CoreCode.METHOD_PACKAGE_INVALID,))
 
 
 class MethodFetchDisabledError(MethodRefError):
     """An address-referenced method is not installed and fetch-on-miss is disabled, so it cannot be fetched."""
 
+    error_code = CoreCode.METHOD_DEPENDENCY_MISSING
+
 
 class MethodDependencyFetchError(MethodRefError):
     """An address-referenced method is not installed and fetching it failed (or its address is not fetchable)."""
+
+    error_code = CoreCode.METHOD_DEPENDENCY_MISSING

@@ -112,6 +112,7 @@ class TestRunRefusals:
         assert response.headers["content-type"].startswith("application/problem+json")
         body = response.json()
         assert body["error_type"] == "ValidateBundleError"
+        assert body["code"] == "method.invalid"
         assert body["error_domain"] == "input"
         assert body["user_action"]["kind"] == "change_input"
         items: list[dict[str, Any]] = body["validation_errors"]
@@ -138,7 +139,9 @@ class TestRunRefusals:
         body = response.json()
         # The root fault's class, not the run-level `PipelineExecutionError` that wraps it.
         assert body["error_type"] == "StuffFactoryError"
-        assert body["type"] == "https://docs.pipelex.com/latest/errors/stuff-factory-error/"
+        # The code names the fault: a branch's multiplicity is not its field's.
+        assert body["code"] == "pipe.output_multiplicity"
+        assert body["type"] == "https://mthds.ai/errors/pipe.output_multiplicity"
         assert body["error_domain"] == "input"
         # Located at the failing step, with its path from the entry pipe, and kept under STRICT
         # because the fault is the caller's own method.

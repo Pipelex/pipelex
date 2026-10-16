@@ -4,6 +4,7 @@ from urllib.parse import urljoin
 
 import pytest
 from mthds.method_tree.vocabulary import TreeRefusalCode
+from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.content_generation import doc_gen_generate
@@ -165,8 +166,9 @@ class TestRunRenderResources:
         loaded = await asyncio.to_thread(unscoped.load, uri=str(photo_path), position="image 1 of the document")
 
         assert loaded.data == b"\x89PNG local"
-        with pytest.raises(UriReadRefusedError):
+        with pytest.raises(UriReadRefusedError) as exc_info:
             await asyncio.to_thread(scoped.load, uri=str(photo_path), position="image 1 of the document")
+        assert exc_info.value.resolve_error_code() == CoreCode.SECURITY_METHOD_URL_REFUSED
 
     async def test_a_method_file_url_in_a_document_with_no_html_is_refused_for_its_source(self, mocker: MockerFixture) -> None:
         loader = mocker.patch.object(doc_gen_generate, "load_bytes_and_mime_type_from_any_uri", new_callable=mocker.AsyncMock)

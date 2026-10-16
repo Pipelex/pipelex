@@ -22,6 +22,7 @@ from pipelex.cli.commands.init.credentials import get_global_env_path
 from pipelex.cli.commands.login.api_key_store import find_shadowing_env_file, save_pipelex_api_key
 from pipelex.cli.commands.login.loopback import CallbackRefusal, LoopbackListener
 from pipelex.cli.exceptions import PipelexCLIError
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.hosted.api_key_check import PIPELEX_API_KEY_PREFIX, ApiKeyVerdict, check_pipelex_api_key, is_well_formed_pipelex_api_key
 from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY, redact_url_for_display
 from pipelex.runtime_hub import get_console
@@ -85,7 +86,7 @@ def resolve_app_origin() -> str:
             f"{PIPELEX_APP_URL_ENV_KEY} is not an origin: {redact_url_for_display(url=configured)!r}. "
             f"Give scheme://host[:port], with http or https and no path, such as {URLs.app}, or unset it."
         )
-        raise PipelexCLIError(msg)
+        raise PipelexCLIError(msg).with_error_code(PipelexErrorCode.CONFIG_INVALID)
     return origin
 
 

@@ -6,6 +6,7 @@ from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from pipelex.system.exceptions import RunParameterError
 from pipelex.system.run_extras import validate_run_extras
 from pipelex.system.storage_scope import validate_read_scope, validate_storage_scope, validate_storage_scope_within_read_scope
 from pipelex.system.telemetry.otel_context import OtelContext
@@ -17,25 +18,25 @@ REQUEST_ID_PATTERN = re.compile(r"[\x20-\x7E]+")
 
 
 def validate_request_id(*, value: str) -> str:
-    """Return `value` if it is a usable inbound request id, else raise `ValueError`.
+    """Return `value` if it is a usable inbound request id, else raise `RunParameterError`.
 
     The one statement of the constraint, which `RunMetadata` applies at construction and a
     host entry point applies before it builds a run, so both refuse exactly the same values.
 
     Raises:
-        ValueError: the value is empty, longer than `REQUEST_ID_MAX_LENGTH`, or holds a
+        RunParameterError: the value is empty, longer than `REQUEST_ID_MAX_LENGTH`, or holds a
             character outside printable ASCII.
     """
     if len(value) > REQUEST_ID_MAX_LENGTH:
         msg = f"Invalid request_id: it has {len(value)} characters, and at most {REQUEST_ID_MAX_LENGTH} are allowed."
-        raise ValueError(msg)
+        raise RunParameterError(msg)
     # `fullmatch`, not `match` with a trailing `$`, which would admit one final newline.
     if not REQUEST_ID_PATTERN.fullmatch(value):
         msg = (
             f"Invalid request_id {value!r}: expected one or more printable ASCII characters. "
             "The value is quoted into log lines and error reports, so a control character in it would forge one."
         )
-        raise ValueError(msg)
+        raise RunParameterError(msg)
     return value
 
 

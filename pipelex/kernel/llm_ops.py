@@ -16,6 +16,7 @@ Two seams are deliberately *not* here, because they are the caller's job by cons
   always has; the kernel has no pipe to name.
 """
 
+from functools import partial
 from typing import Any
 
 from pipelex import log
@@ -26,6 +27,7 @@ from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.cogt.models.model_deck import resolve_deck_choice
 from pipelex.cogt.models.model_reference import ModelReferenceKind, ensure_model_reference
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.config import get_config
@@ -41,15 +43,26 @@ from pipelex.system.exceptions import MissingDependencyError
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.telemetry.otel_constants import GenAISpanAttr
 from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.jinja2.template_owner import TemplateOwner
 from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.tools.typing.structure_printer import StructurePrinter
 
 
 def resolve_llm_setting_for_text(*, llm_choice: LLMModelChoice | None = None) -> LLMSetting:
-    """The deck chain for a text output: the step's own choice, then the deck's override, then its default."""
+    """The deck chain for a text output: the step's own choice, then the deck's override, then its default.
+
+    A choice the step names that the deck does not resolve is the method's, `model.unknown`; the deck's own override
+    or default is the deployment's, `ModelDeckChoiceUnresolvedError`.
+    """
     model_deck = get_model_deck()
-    resolved_choice = llm_choice or model_deck.llm_choice_overrides.for_text or model_deck.llm_choice_defaults.for_text
-    return model_deck.get_llm_setting(llm_choice=resolved_choice)
+    if llm_choice:
+        return model_deck.get_llm_setting(llm_choice=llm_choice)
+    if override := model_deck.llm_choice_overrides.for_text:
+        return resolve_deck_choice(deck_setting="llm.choice_overrides.for_text", resolve=partial(model_deck.get_llm_setting, llm_choice=override))
+    return resolve_deck_choice(
+        deck_setting="llm.choice_defaults.for_text",
+        resolve=partial(model_deck.get_llm_setting, llm_choice=model_deck.llm_choice_defaults.for_text),
+    )
 
 
 def resolve_llm_setting_for_object(*, llm_choice: LLMModelChoice | None = None, llm_choice_for_text: LLMModelChoice | None = None) -> LLMSetting:
@@ -59,10 +72,19 @@ def resolve_llm_setting_for_object(*, llm_choice: LLMModelChoice | None = None, 
     for text only still generates its objects with that model, so `llm_choice_for_text` is consulted
     before the deck's own object override. A caller with no text choice (a step that only ever
     produces objects) leaves it unset and gets the plain override-then-default chain.
+
+    Either choice of the step's that the deck does not resolve is the method's, `model.unknown`; the deck's own
+    override or default is the deployment's, `ModelDeckChoiceUnresolvedError`.
     """
     model_deck = get_model_deck()
-    resolved_choice = llm_choice or llm_choice_for_text or model_deck.llm_choice_overrides.for_object or model_deck.llm_choice_defaults.for_object
-    return model_deck.get_llm_setting(llm_choice=resolved_choice)
+    if step_choice := llm_choice or llm_choice_for_text:
+        return model_deck.get_llm_setting(llm_choice=step_choice)
+    if override := model_deck.llm_choice_overrides.for_object:
+        return resolve_deck_choice(deck_setting="llm.choice_overrides.for_object", resolve=partial(model_deck.get_llm_setting, llm_choice=override))
+    return resolve_deck_choice(
+        deck_setting="llm.choice_defaults.for_object",
+        resolve=partial(model_deck.get_llm_setting, llm_choice=model_deck.llm_choice_defaults.for_object),
+    )
 
 
 def served_llm_model(*, model_handle: str) -> InferenceModelSpec | None:
@@ -194,7 +216,8 @@ async def derive_structure_prompt(*, output_class: type[StuffContent], templatin
 
     It renders under a style like every other prompt fragment: the shipped template uses no tagging
     filter, but the template is config-editable, and one that reached this render style-less could
-    not use one at all.
+    not use one at all. The template is Pipelex's own, not the method's, so a failure to render it is
+    ours, ``runtime.unexpected``, never the method's ``method.template_invalid``.
     """
     llm_config = get_config().inference.llm
     if not llm_config.is_structure_prompt_enabled:
@@ -207,6 +230,7 @@ async def derive_structure_prompt(*, output_class: type[StuffContent], templatin
         category=TemplateCategory.LLM_PROMPT,
         context={"class_structure_str": "\n".join(class_structure)},
         templating_style=templating_style,
+        template_owner=TemplateOwner.PIPELEX,
     )
 
 

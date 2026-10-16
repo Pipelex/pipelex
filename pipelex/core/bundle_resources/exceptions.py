@@ -1,4 +1,7 @@
-from pipelex.base_exceptions import ErrorDomain, PipelexError
+from mthds.protocol.problem.registry import CoreCode
+
+from pipelex.base_exceptions import PipelexError
+from pipelex.errors.error_code_declaration import ErrorCodeSet
 
 
 class BundleResourcePathError(PipelexError):
@@ -8,11 +11,12 @@ class BundleResourcePathError(PipelexError):
     absolute path, a `..` segment, a backslash, a drive colon and an empty path are refused, and so are two keys naming
     the same file, or a key the tree of the submitted files cannot hold, such as one colliding with another once
     case-folded, or naming a file already submitted, from a library directory or with the request, with other bytes.
-    The path is the caller's own, so the message is theirs to read, and the same request is refused again.
+    The path is the caller's own, so the message is theirs to read, and the same request is refused again. A path that
+    cannot name a file inside the bundle is ``security.input_path_refused``; paths that each could but that cannot
+    make one tree together choose ``request.invalid``.
     """
 
-    error_domain = ErrorDomain.INPUT
-    retryable = False
+    error_code = ErrorCodeSet(default=CoreCode.SECURITY_INPUT_PATH_REFUSED, others=(CoreCode.REQUEST_INVALID,))
     _authors_caller_facing_message = True
 
 
@@ -24,6 +28,5 @@ class BundleResourceNotNamedError(PipelexError):
     the same request is refused again.
     """
 
-    error_domain = ErrorDomain.INPUT
-    retryable = False
+    error_code = CoreCode.REQUEST_INVALID
     _authors_caller_facing_message = True

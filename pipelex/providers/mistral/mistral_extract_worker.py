@@ -13,8 +13,8 @@ from pipelex.cogt.extract.extract_job_components import ExtractJobParams
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.inference.error_classification import extract_mistral_metadata
-from pipelex.cogt.inference.error_classify import classify_inference_error
-from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
+from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.providers.mistral.mistral_factory import MistralFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -115,7 +115,7 @@ class MistralExtractWorker(ExtractWorkerAbstract):
             )
         except (MistralError, httpx.TransportError) as sdk_exc:
             metadata = extract_mistral_metadata(sdk_exc)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.EXTRACT)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,

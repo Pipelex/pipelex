@@ -39,7 +39,7 @@ An error rises through a series of layers. Each layer has exactly one job.
 | **1 — Workers / SDK calls** | `pipelex/providers/*/` | **Catch the SDK exception → classify → raise `CogtError`** |
 | **0 — Third-party SDKs** | OpenAI, Anthropic, Google, … | Raise raw, untyped provider exceptions |
 
-Classification happens once, at **Layer 1**. Layers 2–5 are wrappers: they attach context as they catch and re-raise, but the `error_category`, `error_domain`, `model`, and `provider` set at Layer 1 reach Layer 5 unchanged (see [Cause-Chain Enrichment](#cause-chain-enrichment)). The worker states only the `error_category`; the matching `error_domain` is [derived from it](#the-cogterror-family-derives-its-domain-from-its-category), so a single Layer-1 decision settles both the retry question and the HTTP status.
+Classification happens once, at **Layer 1**. Layers 2–5 are wrappers: they attach context as they catch and re-raise, but the registry code chosen at Layer 1, and the `error_category`, `model` and `provider` beside it, reach Layer 5 unchanged (see [Cause-Chain Enrichment](#cause-chain-enrichment)). The worker's classification picks the code, and the code decides the domain, the retry verdict and the HTTP status, so a single Layer-1 decision settles all three.
 
 ---
 
@@ -49,13 +49,14 @@ Classification happens once, at **Layer 1**. Layers 2–5 are wrappers: they att
 
 | Field | Type | Meaning |
 |-------|------|---------|
+| `code` | `str` | The registry code the error resolved to, a core code of the MTHDS standard or a Pipelex code: see [Error codes](#error-codes-and-the-pipelex-error-registry) |
 | `error_type` | `str` | The exception class name |
 | `message` | `str` | Human-readable message |
-| `title` | `str` | Stable human-readable summary — the RFC 7807 `title` |
-| `type_uri` | `str` | Class-derived URI — the RFC 7807 `type`; the per-class pages it named are retired, see [Error codes](#error-codes-and-the-pipelex-error-registry) |
-| `error_category` | `str \| None` | `InferenceErrorCategory` value (inference errors only) |
-| `error_domain` | `str \| None` | `ErrorDomain` value — `input` / `config` / `runtime`. Declared per class, except on the `CogtError` family where it is [derived from `error_category`](#the-cogterror-family-derives-its-domain-from-its-category) |
-| `retryable` | `bool \| None` | Whether a retry could succeed. Declared per class, `retryable = False` on a deterministic refusal of what the caller sent (`BundleResourceNotNamedError`, `BundleResourcePathError`), except on the `CogtError` family where it is derived from `error_category`; left `None`, it is taken from the cause chain, or absent |
+| `title` | `str` | The code's title — the RFC 7807 `title`, the same for every occurrence of the code |
+| `type_uri` | `str` | The code's documentation page — the RFC 7807 `type`: `https://mthds.ai/errors/<code>` for a core code, `https://docs.pipelex.com/errors/<code>` for a Pipelex code |
+| `error_category` | `str \| None` | `InferenceErrorCategory` value (inference errors only), the runtime's own classification that picked the code |
+| `error_domain` | `str \| None` | `ErrorDomain` value — `input` / `config` / `runtime`, read from the domain the registry gives the code (see [ErrorDomain](#errordomain)) |
+| `retryable` | `bool \| None` | Whether repeating the operation can succeed: `true` only when the code's retry verdict is `yes`, `false` for `no` and for `outcome_unknown` |
 | `user_action` | `UserAction \| None` | Typed advice — `kind` + free-form `detail` |
 | `model` | `str \| None` | Model handle, when the failure is attributable to one |
 | `provider` | `str \| None` | Backend name, when attributable |
@@ -64,13 +65,13 @@ Classification happens once, at **Layer 1**. Layers 2–5 are wrappers: they att
 
 `PipelexError.to_error_report()` is the entry point. `to_dict()` serializes, dropping `None` fields; `from_dict()` is its strict inverse.
 
-### The identity triple, and why renaming an error class is a wire break
+### The identity, and why renaming an error class or changing its code is a wire break
 
-`error_type`, `title` and `type_uri` are the three identity fields on every report. `title` and `type_uri` are *presentation*, and each has a declaration hatch — set `_declared_title` or `_declared_type_uri` directly in a subclass body and that value is used verbatim instead of the auto-derived one (inheritance is deliberately bypassed via `cls.__dict__`, so a parent's curated title never captures its subclasses).
+`code` and `error_type` are the two identity fields on every report. `title` and `type_uri` follow from the code, so no class declares them.
 
-`error_type` has no such hatch: it is `type(self).__name__`, the Python class name with no indirection. That makes it the **machine contract** — consumers outside this repo `switch` on that string. Renaming an error class therefore breaks them *silently*: their build stays green and the branch simply stops matching, falling through to a generic error path.
+`error_type` is `type(self).__name__`, the Python class name with no indirection, and consumers outside this repo `switch` on that string until the problem document moves the class name to the operator's diagnostics. Renaming an error class therefore breaks them *silently*: their build stays green and the branch simply stops matching, falling through to a generic error path. Changing the code a class declares breaks them the same way, and changes what every reader is told to do.
 
-The guard against that is a committed snapshot of the full `(error_type, title, type_uri)` set at `tests/data/errors/error_identity.txt`, regenerated with `make generate-error-identity` (alias `make gei`) and gated by `tests/unit/pipelex/errors/test_error_identity_snapshot.py`. A rename cannot land without producing a reviewable one-line-pair diff on that file at the moment it is made — which is also the moment to plan the matching consumer updates.
+The guard against both is a committed snapshot of every class's name and code declaration at `tests/data/errors/error_identity.txt`, regenerated with `make generate-error-identity` (alias `make gei`) and gated by `tests/unit/pipelex/errors/test_error_identity_snapshot.py`. A rename or a change of code cannot land without producing a reviewable diff on that file at the moment it is made — which is also the moment to plan the matching consumer updates. The same command rewrites the static redirects of the retired per-class error pages, described below.
 
 ### Error codes and the Pipelex error registry
 
@@ -78,7 +79,36 @@ The MTHDS standard names every error a runner or a client can meet with a code, 
 
 The Pipelex codes are authored in one public file, `pipelex/errors/registry/pipelex-error-registry.yaml`, in the standard's registry format. Everything else is generated from it with `make generate-error-registry` (alias `make ger`): the JSON snapshot `pipelex-error-registry.json` beside it, which the package ships, every release publishes as an asset, and `load_pipelex_error_registry()` (`pipelex/errors/registry/registry_document.py`) reads; the typed Python of the codes, `pipelex/errors/registry/pipelex_codes.py`, with a `PipelexErrorCode` member and a closed parameters model per code; and one page per code under `docs/errors/`, which is where a Pipelex code's type URI, `https://docs.pipelex.com/errors/<code>`, leads. [The Error Registry](../contribute/error-registry.md) describes the format's checks and the workflow.
 
-The registry does not yet drive the reports above: `error_type` and the class-derived `type_uri` are still what a report carries, and the per-class pages that `type_uri` named are retired. Moving each raise site and the API's problem documents onto the codes is the next step of this work.
+#### Every error declares its code
+
+Every `PipelexError` subclass declares, in its own class body, the code it raises (`pipelex/errors/error_code_declaration.py`):
+
+- **A code**, a `CoreCode` from the `mthds` package or a `PipelexErrorCode`: every instance raises it.
+- **A set**, `ErrorCodeSet(default=..., others=(...))`: the raise site that knows which applies chooses it with `with_error_code(code)`, and an instance whose raise site chose none carries the default. Two cases that need different verdicts are two codes, so a class whose raise sites need different readings declares a set, never a domain or a verdict of its own.
+- **Its cause's code**, `InheritsCause(fallback=..., others=(...))`: a wrapper that adds no fact deciding the code takes its cause's, and carries its fallback when no error below it carries one. A raise site that knows the code itself may still choose the fallback or one of the `others`.
+- **An abstract base**, `ABSTRACT_ERROR`: a class never raised directly.
+
+```python
+class PipeRunInputsError(PipeRunError):
+    error_code = ErrorCodeSet(default=CoreCode.PIPE_INPUT_UNRESOLVED, others=(CoreCode.INPUT_MISSING,))
+
+
+raise PipeRunInputsError(msg).with_error_code(CoreCode.INPUT_MISSING)
+```
+
+`PipelexError.resolve_error_code()` walks the `__cause__` chain: it stops at the first error that carries a code by itself, the code its raise site chose or its class's, descends through every error that takes its cause's code, and stops at a cause that is not a Pipelex error. When no error on the way carries one, the error reports the code the deepest error implies (`implied_error_code`, which an inference error built with a category alone names, see below), else the fallback of the deepest wrapper, and `runtime.unexpected`, whose step is `report`, when none names one. It is one walk, guarded against a cyclic chain, and no error's code starts a walk of its own. So a wrapper that adds the fact deciding the code keeps its own over a coded cause, as `pipe.function_raised` does over any coded error raised inside the method's function (the in-process executor raises what the function raised as `PipeFuncRaisedError`, so a failure of the executor itself keeps its own code; an out-of-process executor must mark the function's failure the same way, with a Pipelex error carrying `pipe.function_raised`, since an exception that is not a Pipelex error, such as a transport failure, proves nothing about the function and reads `runtime.unexpected`), and a wrapper that adds nothing passes its cause's code through.
+
+`ErrorReport.make_for_code()` builds every report from its code: the title, the documentation page, the domain and the retry verdict are the code's, read from the registries' generated tables (`pipelex/errors/error_codes.py`), so classifying an error is a pure lookup with no file read, safe inside a Temporal workflow's sandbox.
+
+Four checks keep the declarations honest, in `tests/unit/pipelex/errors/test_error_code_gate.py`: every subclass declares a code in its own body, every declared code is registered, no subclass declares what its code decides (`error_domain`, `retryable`, a title or a type URI), and no raise constructs an abstract base. A fifth reads every `SomeError(...).with_error_code(Enum.MEMBER)` chain in the package and the runner, and fails on a code the class does not declare. A closed plugin declares at boot the public codes its errors raise, and a code neither registry holds refuses the boot.
+
+#### Raises outside the root
+
+An exception class outside the root carries no code, so a reader that meets one gets nothing better than the catch-all. Our own code therefore raises coded classes wherever a reader can see the raise, and `tests/unit/pipelex/errors/test_foreign_raises.py` catches a new foreign raise: `pipelex/errors/foreign_raises.py` reads every module of the package and the runner and allows by their shape the raises that are right (a builtin inside a pydantic validator, `NotImplementedError` in an abstract method, the data-model dunders Python and Jinja read, the framework carriers a library expects by type, and developer tooling), and every other foreign raise must be listed with its disposition in `tests/data/errors/foreign_raises.txt`: an invariant raised only on a bug of ours, which a boundary reports as `runtime.unexpected`, a builtin in a helper only validators call, a private class caught where it is defined, a carrier the scan cannot tell by its name (the import system's `ImportError`, the standard's method tree refusal its callers translate), developer tooling outside the exempt directories, or a builtin of a module that must import nothing of Pipelex and that its every caller catches. The check fails on an unlisted foreign raise and on a listed one that is gone.
+
+#### The retired per-class pages
+
+Before every error carried a code, each class had a page at `errors/<kebab-class-name>/`, which its class-derived type URI named. Those pages are retired. `mkdocs.yml`'s `redirect_maps` holds a static redirect for each, generated by `make generate-error-identity` (`pipelex/errors/retired_error_pages.py`), so a client following an old type URI, a non-browser one included, lands on the page of the class's code: the default of a set, the fallback of a class that takes its cause's code, or the error codes' index for a class that is abstract or gone. The site's `404.html` still sends any other single-segment error path to the index.
 
 ### `validation_errors` — structured bundle-validation diagnostics
 
@@ -97,13 +127,13 @@ The **structured-info invariant is total**: every invalid verdict carries a non-
 
 Besides `category` and `message`, each item carries whatever identity fields its stage produced — `error_type`, `pipe_code`, `concept_code`, `domain_code`, `field_path`, `field_name`, `variable_names`, `missing_concept_code`, `declared_concepts` (on an `unresolved_concept` item, the bare codes of the concepts the validated bundle declares in the domain the reference was looked up in, native concepts excluded, and never those a library loaded before it, which may be a host's own), the TOML position `line` and `column`, the unknown-model locators `model_reference`, `model_type` and `suggestions`, the template-check locators `template_file` and `template_location` (on a `template_check_warning`, which rides `warnings`), and a `source` (the declaring file path, or the per-content source the in-memory load path was given) that hands a consumer the owning file for cross-file diagnostic placement. When the error has a deterministic remedy, the item also carries a [`suggested_fix`](#suggested_fix-structured-deterministic-fixes).
 
-**A verdict names no path on the host.** An item and the verdict's message are kept verbatim under STRICT disclosure, so neither names where the host keeps a file. A bundle of a package the method depends on by address is named by the package's address and the bundle's path inside the package, such as `github.com/acme/harbour-methods/tides/notices/tide_notices.mthds`, never by the directory the host installed the package in: that is the `source` of an item located inside the dependency and the file a duplicate declaration inside it names, on every surface, a local one included. When submitted content is validated or run, the library directories loaded beside it are the host's (installed libraries, the defaults, `PIPELEXPATH`) unless the caller says they are its own, so the verdict names none of their files: an item located in one carries no `source`, nor a `field_path` naming it, and is found by its `pipe_code` and `domain_code`, a warning found at a pipe of theirs carries no `template_file` (the sweep withholds it, `BundleValidator`'s `source_pipe_refs`), and a message that named one, named the template file a `PipeDocGen` step of theirs names (a step refused while they load, or one whose template the engine's check refuses in the dry run of a caller's pipe that runs it), or named the module a Python file of theirs was imported as (two `@pipe_func` functions of the same name, for instance), reads `<host library file>` in its place (`withholding_host_library_files` in `pipelex/pipeline/validate_bundle_translation.py`). A name only counts standing on its own, never inside a longer one, and neither a source the caller submitted nor a template file its own content names is ever withheld. A step can only name its template file relative to its bundle, so no message about one names a path on the host. A bundle validated from a file on the caller's own disk, and content validated or run against library directories that are the caller's (`library_dirs_are_callers`, an option of `validate_bundle`, of the in-process validator and of the local runtime `PipelexMTHDSProtocol`, whose `validate` and `execute` both read it), keep the full path of every file, since there the directories are the caller's own. `pipelex fix bundle --diff` leaves a dependency's address-named source as it is.
+**A verdict names no path on the host.** An item and the verdict's message are kept verbatim under STRICT disclosure, so neither names where the host keeps a file. A bundle of a package the method depends on by address is named by the package's address and the bundle's path inside the package, such as `github.com/acme/harbour-methods/tides/notices/tide_notices.mthds`, never by the directory the host installed the package in: that is the `source` of an item located inside the dependency and the file a duplicate declaration inside it names, on every surface, a local one included. When submitted content is validated or run, the library directories loaded beside it are the host's (installed libraries, the defaults, `PIPELEXPATH`) unless the caller says they are its own, so the verdict names none of their files: an item located in one carries no `source`, nor a `field_path` naming it, and is found by its `pipe_code` and `domain_code`, a warning found at a pipe of theirs carries no `template_file` (the sweep withholds it, `BundleValidator`'s `source_pipe_refs`), and a message that named one, named the template file a `PipeDocGen` step of theirs names (one whose template the engine's check refuses in the dry run of a caller's pipe that runs it), or named the module a Python file of theirs was imported as (two `@pipe_func` functions of the same name, for instance), reads `<host library file>` in its place (`withholding_host_library_files` in `pipelex/pipeline/validate_bundle_translation.py`). A name only counts standing on its own, never inside a longer one, and neither a source the caller submitted nor a template file its own content names is ever withheld. A method of those directories that refuses to load is not an item at all: it is the deployment's configuration failing to validate, so `reporting_host_library_faults` in the same module raises it as a `HostLibraryLoadRefusalError`, carrying `pipelex.config.invalid`, which an API answers with a 500 and whose message, the host library's own text, STRICT disclosure withholds. A step can only name its template file relative to its bundle, so no message about one names a path on the host. A bundle validated from a file on the caller's own disk, and content validated or run against library directories that are the caller's (`library_dirs_are_callers`, an option of `validate_bundle`, of the in-process validator and of the local runtime `PipelexMTHDSProtocol`, whose `validate` and `execute` both read it), keep the full path of every file, since there the directories are the caller's own. `pipelex fix bundle --diff` leaves a dependency's address-named source as it is.
 
-**Every refusal of the bundle is a verdict.** A validator answers either a verdict — valid, or invalid with located items — or *no verdict could be produced*, which is reserved for a failure of the tool or its environment. So a refusal raised while loading or validating a bundle becomes an item, never a no-verdict fault. After its class-specific arms, the shared cascade (`translate_to_validate_bundle_error` in `pipelex/pipeline/validate_bundle_translation.py`) turns any other `PipelexError` whose report is `input`-domained into a verdict with one item: `pipe_validation`, with the `pipe_code`, `domain_code` and `source`, when the library load located it on the pipe it was building, and `blueprint_validation` otherwise. That item carries no `error_type`, since a refusal with a closed code has an arm of its own. It keeps the refusal's message only when the refusal authored that message as caller-facing copy, and otherwise names the refusal's title, because the verdict as a whole is kept verbatim under STRICT disclosure. The location comes from the load loop in `LibraryManager.load_from_crate`, the one place that holds a pipe's code, domain and file when building it fails: it raises such a refusal again as a `PipeLoadRefusalError` naming the pipe and the file, `from` the original. A `config` or `runtime` fault, an unclassified one, a `SecurityError`, a `PipeNotFoundError` (which has its own not-found handler) and anything that is not a `PipelexError` still propagate as no verdict. The rule therefore reaches exactly the refusals whose class declares the `input` domain. The pipe factories' refusals do: `PipeLLMFactoryError`, `PipeComposeFactoryError`, `PipeExtractFactoryError`, `PipeConditionFactoryError` and `PipeParallelFactoryError` are raised only while a pipe is built, about its own blueprint, so each is `input`-domained and caller-facing, and a `PipeExtract` whose input is neither an image nor a document validates to one item on that pipe, saying which input to redeclare. `PipeImgGenFactoryError` is not among them: it is raised while an image-generation pipe runs, not while it is built.
+**Every refusal of the bundle is a verdict.** A validator answers either a verdict — valid, or invalid with located items — or *no verdict could be produced*, which is reserved for a failure of the tool or its environment. So a refusal raised while loading or validating a bundle becomes an item, never a no-verdict fault. After its class-specific arms, the shared cascade (`translate_to_validate_bundle_error` in `pipelex/pipeline/validate_bundle_translation.py`) turns any other `PipelexError` whose code is the caller's to fix, in the `input` or the `method` domain, which a report reads as `input`, into a verdict with one item: `pipe_validation`, with the `pipe_code`, `domain_code` and `source`, when the library load located it on the pipe it was building, and `blueprint_validation` otherwise. That item carries no `error_type`, since a refusal with a closed code has an arm of its own. It keeps the refusal's message only when the refusal authored that message as caller-facing copy, and otherwise names the refusal's title, because the verdict as a whole is kept verbatim under STRICT disclosure. The location comes from the load loop in `LibraryManager.load_from_crate`, the one place that holds a pipe's code, domain and file when building it fails: it raises such a refusal again as a `PipeLoadRefusalError` naming the pipe and the file, `from` the original. A fault whose code an operator or the runtime must fix, a `LibraryError` among them (a library invariant of ours reads `runtime.unexpected`), a `SecurityError`, a `PipeNotFoundError` (which has its own not-found handler) and anything that is not a `PipelexError` still propagate as no verdict, and so does a missing document engine, `pipelex.docgen.engine_unavailable`, which the deployment has to install. The rule therefore reaches exactly the refusals whose code is the caller's. The pipe factories' refusals are: `PipeLLMFactoryError`, `PipeComposeFactoryError`, `PipeExtractFactoryError`, `PipeConditionFactoryError` and `PipeParallelFactoryError` are raised only while a pipe is built, about its own blueprint, so each declares a `method` code, `method.template_invalid` or `method.schema_violation`, and is caller-facing, and a `PipeExtract` whose input is neither an image nor a document validates to one item on that pipe, saying which input to redeclare. `PipeImgGenFactoryError` is not among them: it is raised while an image-generation pipe runs, not while it is built.
 
-**The unknown model is the worked example.** A pipe whose model field names a handle, an alias, a preset or a waterfall the model deck does not define is refused when the pipe is built: the operator's deck check raises `ModelChoiceNotFoundError`, and the operator raises it again as a `PipeOperatorModelChoiceError` located on the pipe and on the field, to which the load adds the file. Every pipe type that names a model (`PipeLLM`, `PipeStructure`, `PipeImgGen`, `PipeExtract`, `PipeSearch`) does this through the same `PipeOperator.locating_model_choice` wrapper, so each gives the same item: `category: pipe_validation`, `error_type: unknown_model`, the `pipe_code`, `domain_code` and `source`, the `field_name` and a `field_path` of `pipe.<code>.model` (`pipe.<code>.model_to_structure` for a `PipeLLM`'s structuring model), the `model_reference` exactly as written, the `model_type` (`llm`, `text_extractor`, `img_gen` or `search`), and the deck's `suggestions` of the same kind, each spelled as a reference the field accepts. The suggestions stay in the item's `message` too, for consumers that keep only the message. When the deck offers exactly one suggestion, the item carries an `unsafe` `rename-model` fix, a `remap_value` of the field from the reference as written to that suggestion. It is unsafe because the suggestion is a fuzzy match over the deck's names, which can be a different model altogether, so `pipelex fix bundle` never applies it on its own; an author or an agent applies it deliberately. An inline setting table (`model = { model = "…", temperature = 0.2 }`) is not looked up in the deck, so it is not refused here. On a run the same refusal stops the bundle before any pipe runs, as the same `unknown_model` item (see the next paragraph).
+**The unknown model is the worked example.** A pipe whose model field names a handle, an alias, a preset or a waterfall the model deck does not define is refused when the pipe is built: the operator's deck check raises `ModelChoiceNotFoundError`, and the operator raises it again as a `PipeOperatorModelChoiceError` located on the pipe and on the field, to which the load adds the file. Every pipe type that names a model (`PipeLLM`, `PipeStructure`, `PipeImgGen`, `PipeExtract`, `PipeSearch`) does this through the same `PipeOperator.locating_model_choice` wrapper, so each gives the same item: `category: pipe_validation`, `error_type: unknown_model`, the `pipe_code`, `domain_code` and `source`, the `field_name` and a `field_path` of `pipe.<code>.model` (`pipe.<code>.model_to_structure` for a `PipeLLM`'s structuring model), the `model_reference` exactly as written, the `model_type` (`llm`, `text_extractor`, `img_gen` or `search`), and the deck's `suggestions` of the same kind, each spelled as a reference the field accepts. The suggestions stay in the item's `message` too, for consumers that keep only the message. When the deck offers exactly one suggestion, the item carries an `unsafe` `rename-model` fix, a `remap_value` of the field from the reference as written to that suggestion. It is unsafe because the suggestion is a fuzzy match over the deck's names, which can be a different model altogether, so `pipelex fix bundle` never applies it on its own; an author or an agent applies it deliberately. An inline setting table (`model = { model = "…", temperature = 0.2 }`) is not looked up in the deck, so it is not refused here. A default the deck names itself, which a `PipeJudge` naming no model resolves as its method loads, is not the method's: the wrapper lets its `ModelDeckChoiceUnresolvedError` through unchanged, the deployment's fault and no verdict item. On a run the same refusal stops the bundle before any pipe runs, as the same `unknown_model` item (see the next paragraph).
 
-**A run refuses an invalid bundle with the same verdict.** A run loads its bundle before any pipe runs, and the run path's `acquire_library` performs that load inside the same `translate_to_validate_bundle_error`, so a bundle the load refuses raises the `ValidateBundleError` with exactly the items validating it gives, before any inference is spent. `ValidateBundleError` is `input`-domained and caller-facing, so a hosted run route answers it as a 422 whose `validation_errors` STRICT disclosure keeps, where each refusal used to reach the host in its raw class: a misspelled concept as a `ConceptLibraryError` answered 500, a wiring mismatch as a `PipeValidationError` answered by the catch-all 500, a TOML fault as a 422 with no items, and a check firing inside a pipe's pydantic validator as a `runtime` `PipeExecutionError` reading "Input validation failed". The translation's own exceptions hold on this path too: an unknown entry pipe still raises its `PipeNotFoundError`, and a fault of the tool or its environment still propagates as itself. Two things differ from the validate path, both about whose files are loaded. The run path threads no source of its own onto its contents, so their items carry no `source`, even on a local run of a bundle file. A package the bundle depends on by address is loaded from the host's install directory within the same translation, as it is on the in-memory validate path, and a refusal inside it names the package by its address, never that directory. And the library directories load translated only when they are the caller's own, as on a local CLI run (`library_dirs_are_callers`); a host's directories (installed libraries, a temporary directory of shipped Python) load untranslated, because a fault there is not the caller's to fix. The local `pipelex run` renders the verdict with the grouped panel `pipelex validate` prints, and `pipelex-agent run` copies its `validation_errors` into the error envelope.
+**A run refuses an invalid bundle with the same verdict.** A run loads its bundle before any pipe runs, and the run path's `acquire_library` performs that load inside the same `translate_to_validate_bundle_error`, so a bundle the load refuses raises the `ValidateBundleError` with exactly the items validating it gives, before any inference is spent. `ValidateBundleError` carries `method.invalid` and is caller-facing, so a hosted run route answers it as a 422 whose `validation_errors` STRICT disclosure keeps, where each refusal used to reach the host in its raw class: a misspelled concept as a `ConceptLibraryError` answered 500, a wiring mismatch as a `PipeValidationError` answered by the catch-all 500, a TOML fault as a 422 with no items, and a check firing inside a pipe's pydantic validator as a `runtime` `PipeExecutionError` reading "Input validation failed". The translation's own exceptions hold on this path too: an unknown entry pipe still raises its `PipeNotFoundError`, and a fault of the tool or its environment still propagates as itself. Two things differ from the validate path, both about whose files are loaded. The run path threads no source of its own onto its contents, so their items carry no `source`, even on a local run of a bundle file. A package the bundle depends on by address is loaded from the host's install directory within the same translation, as it is on the in-memory validate path, and a refusal inside it names the package by its address, never that directory. And the library directories load translated only when they are the caller's own, as on a local CLI run (`library_dirs_are_callers`); a host's directories (installed libraries, a temporary directory of shipped Python) load untranslated, because a fault there is not the caller's to fix: a refusal there is the `HostLibraryLoadRefusalError` described above, `pipelex.config.invalid`. The local `pipelex run` renders the verdict with the grouped panel `pipelex validate` prints, and `pipelex-agent run` copies its `validation_errors` into the error envelope.
 
 **Signatures are never an error.** An unimplemented `PipeSignature` reached during validation is a *runnability fact*, not a validation failure: the validator no longer raises on it. The assembled library's outstanding signatures ride the validation report's `pending_signatures`, and `is_runnable = not pending_signatures`. `allow_signatures` is a sweep-mechanics flag only (whether signature pipes are mock-run and listed in `validated_pipes`) — it does not change the verdict, so strict ≡ lenient in the report body. The "is this a failure?" decision moves to the consumer: the CLI exits non-zero on `not is_runnable` unless `--allow-signatures`; the HTTP caller reads `is_runnable`. (The **execute/run** path is different: running a stub still raises `PipeSignatureNotExecutableError`.)
 
@@ -155,103 +185,66 @@ On the hosted API the same payload rides the wire verbatim as `validation_errors
 
 ## Classification Enums
 
-Two `StrEnum`s drive every downstream decision.
+Two `StrEnum`s sit beside the code. Neither decides anything a reader branches on any more: the code does.
 
 ### InferenceErrorCategory
 
-Defined in `pipelex/cogt/exceptions.py`. It carries two derived properties: `is_retryable` drives retry decisions and is `True` only for `TRANSIENT`; `error_domain` drives the HTTP status the whole `CogtError` family answers with.
+Defined in `pipelex/cogt/exceptions.py`. It stays inside the runtime as the classification that **picks a provider failure's code**: the worker's classification (`pipelex/cogt/inference/error_classify.py`) reads the provider's answer, assigns a category and a code together, and the rendered error carries both. The category also still drives one decision the code cannot carry: whether the Temporal activity may repeat a provider call within the run, through `is_retryable` and `find_inference_error_category_in_chain`. A call whose outcome is unknown (`AMBIGUOUS`) must never be repeated within the run, though its code, `provider.outcome_unknown`, says a new run may succeed.
 
-| Category | Meaning | Retryable | Domain | Typical cause |
-|----------|---------|-----------|--------|---------------|
-| `TRANSIENT` | A brief, self-correcting failure | ✅ | `RUNTIME` | Rate limit, 5xx, connection blip |
-| `CONFIGURATION` | The setup is wrong | ❌ | `CONFIG` | Bad API key, missing backend |
-| `CONTENT` | The input or prompt is wrong | ❌ | **`INPUT`** | Content-policy violation, bad prompt |
-| `CAPACITY` | Account quota / billing exhausted | ❌ | `RUNTIME` | `insufficient_quota`, HTTP 402 |
-| `AMBIGUOUS` | Outcome unknown — may have committed | ❌ | `RUNTIME` | Connection dropped mid-request |
-| `UNKNOWN` | Could not classify | ❌ | *none* | Unrecognized inner exception |
+| Category | Meaning | Repeated within the run | Typical codes |
+|----------|---------|-------------------------|---------------|
+| `TRANSIENT` | A brief, self-correcting failure | ✅ | `provider.rate_limited`, `provider.unavailable`, `provider.timeout`, `provider.failed` |
+| `CONFIGURATION` | The setup is wrong | ❌ | `provider.credential_refused`, `model.unavailable`, `pipelex.config.*` |
+| `CONTENT` | The input or prompt is wrong | ❌ | `model.content_refused`, `model.context_exceeded`, `input.file_type_unsupported` |
+| `CAPACITY` | Account quota / billing exhausted | ❌ | `provider.quota_exhausted` |
+| `AMBIGUOUS` | Outcome unknown — may have committed | ❌ | `provider.outcome_unknown` |
+| `UNKNOWN` | Could not classify | ❌ | `runtime.unexpected` |
 
-```python
-class InferenceErrorCategory(StrEnum):
-    TRANSIENT = "transient"
-    # ... CONFIGURATION, CONTENT, CAPACITY, AMBIGUOUS ...
-    UNKNOWN = "unknown"
-
-    @property
-    def is_retryable(self) -> bool:
-        match self:
-            case InferenceErrorCategory.TRANSIENT:
-                return True
-            case _:  # all other categories
-                return False
-
-    @property
-    def error_domain(self) -> ErrorDomain | None:
-        match self:
-            case InferenceErrorCategory.CONTENT:
-                return ErrorDomain.INPUT
-            case InferenceErrorCategory.CONFIGURATION:
-                return ErrorDomain.CONFIG
-            # ... TRANSIENT / CAPACITY / AMBIGUOUS -> RUNTIME, UNKNOWN -> None ...
-```
+The category and the code are checked against each other. A classification whose category repeats the call within the run must pick a code whose verdict invites a retry, so `ClassificationResult` and a plugin's service error vocabulary both refuse a `TRANSIENT` entry naming a code such as `runtime.unexpected`. An error a worker or a plugin builds by hand with a category and no code reports its category's code, `InferenceErrorCategory.default_error_code`, when its class declares that code and nothing down its cause chain names one: `TRANSIENT` reads `provider.unavailable`, `CONFIGURATION` `runtime.misconfigured`, `CAPACITY` `provider.quota_exhausted` and `AMBIGUOUS` `provider.outcome_unknown`, while `CONTENT` and `UNKNOWN` name no code, since a content failure may be the caller's material or a request the runtime built, and such an error keeps its class's fallback. A local `OSError` on a local extractor is the machine's, not the input's and not a provider's, so it is `UNKNOWN` with a contact-support next step and `runtime.unexpected`, and it is not repeated within the run.
 
 !!! info "`AMBIGUOUS` vs `UNKNOWN`"
     `AMBIGUOUS` means the *error type is known* but the operation may or may not have committed — a blind retry is unsafe for a non-idempotent call. `UNKNOWN` means classification itself failed. Both are non-retryable, for different reasons.
 
-!!! info "`UNKNOWN` maps to no domain at all"
-    `UNKNOWN` means the classification step itself failed, so claiming `RUNTIME` would assert something the code cannot support. An absent `error_domain` already renders 500 (see below), so the honest answer costs nothing at the HTTP boundary and keeps "could not classify" distinguishable from "classified as a server-side fault".
-
 ### ErrorDomain
 
-Defined in `pipelex/base_exceptions.py`. Set as a class-level attribute on the exception, or on one error by the site that raises it (see [Classified where it is raised](#classified-where-it-is-raised)), drives HTTP status.
+Defined in `pipelex/base_exceptions.py`. A report's `error_domain` is read from the domain the registry gives its code, through `ErrorDomain.from_problem_domain()`, and drives the HTTP status until the problem document carries the code's own status and five-valued domain:
 
-| Domain | Meaning | HTTP status | Who can fix it |
-|--------|---------|-------------|----------------|
-| `INPUT` | Caller sent something it can fix | **422** | The caller |
-| `CONFIG` | Environment / configuration change needed | **500** | The operator |
-| `RUNTIME` | A failure during execution | **500** | Depends on the cause |
+| Code's domain | `error_domain` | HTTP status | Who acts |
+|---------------|----------------|-------------|----------|
+| `input` | `INPUT` | **422** | The caller, by changing the request or its inputs |
+| `method` | `INPUT` | **422** | The method's author, by changing the method |
+| `account` | `CONFIG` | **500** | The account's owner |
+| `operator` | `CONFIG` | **500** | Whoever runs the runtime |
+| `runtime` | `RUNTIME` | **500** | Nobody beforehand: wait, retry or report |
 
-`error_domain_to_http_status()` is the pure mapping table — it maps an unset or unrecognized domain to 500 as well. `ErrorReport.http_status` layers one rule on top: a provider 429 (`provider_metadata.status_code == 429`) takes precedence over the domain, so the API can emit a `Retry-After` header. That precedence is why `CAPACITY -> RUNTIME` does not swallow a rate-limit passthrough.
+`error_domain_to_http_status()` is the pure mapping table — it maps an unset or unrecognized domain to 500 as well. `ErrorReport.http_status` layers one rule on top: a provider 429 (`provider_metadata.status_code == 429`) takes precedence over the domain, so the API can emit a `Retry-After` header.
 
-```python
-class PipelexConfigError(PipelexError):
-    error_domain = ErrorDomain.CONFIG  # class-level — every instance carries it
-```
-
-#### The `CogtError` family derives its domain from its category
-
-The inference branch is the one place where `error_domain` is **not** declared per class. A worker has already decided whose fault the failure is when it assigns an `InferenceErrorCategory`, so `CogtError.to_error_report()` derives the domain from that category rather than asking several dozen leaf classes to state the same fact twice — which is also what keeps `error_domain` and `error_category` from ever contradicting each other on the wire.
-
-Precedence on the derived field mirrors every other field on that method: an `error_domain` declared explicitly on the leaf class wins, then the category derivation, then whatever the `__cause__` chain surfaced.
-
-```python
-own_domain = self.error_category.error_domain if self.error_category is not None else None
-"error_domain": self.error_domain or own_domain or base_report.error_domain,
-```
-
-The consequence worth knowing at the HTTP boundary: a **content-classified inference failure answers 422, not 500** — a content-policy refusal, a malformed prompt image, a bad prompt parameter are all properties of material the caller submitted. Everything else keeps the status it already had; only the report became truthful about why.
-
-The category a class declares is its default, and a raise site that knows better passes its own through the `error_category` argument. `ImgGenParameterError` is `CONTENT`, because an aspect ratio or a size the model's grid refuses is a property of the caller's request. A model spec its worker cannot use is not: no `rules`, a rule value this release does not know, a missing `model_choice` or `endpoint_path`, or, where a worker reads the Gemini geometry, a missing `aspect_ratio` taxonomy or one of another family. Those sites raise it with `error_category=InferenceErrorCategory.CONFIGURATION`, so the failure answers 500 and lands in server-error alerting like any other configuration fault, rather than a 422 telling the caller to change what they sent.
+No class declares a domain: a class whose raise sites need two readings declares two codes, and the raise site chooses.
 
 #### Classified where it is raised
 
-Most classes state whose fault they are in their body: an `error_domain`, and `_authors_caller_facing_message = True` when their message is copy written for the caller, which STRICT disclosure then keeps instead of replacing it with `An internal error occurred.`. Every instance of such a class is the same kind of fault. A few classes are raised both for faults in the caller's own method or inputs and for faults that are not the caller's, so they cannot state it. For those, the site that raises the error and knows calls `as_caller_fault()` on it: the report then carries the `input` domain, so an HTTP surface answers 422, a caller-facing message, and the next step the raise site passes, if any.
+The code says who must act. Whether the error's *message* may be shown to the caller is a separate fact: `_authors_caller_facing_message = True` on a class whose message is copy written for the caller, which STRICT disclosure then keeps instead of replacing it with `An internal error occurred.`. A few classes are raised both with messages that describe only the caller's own method or inputs and with messages that do not, so they cannot state it. For those, the site that raises the error and knows calls `as_caller_fault()` on it, which marks this one message caller-facing and may pass a next step; the domain stays the code's, which the raise site chooses with `with_error_code()` when the class declares a set.
 
 ```python
-raise PipeRunInputsError(message=msg, run_mode=run_mode, pipe_code=pipe_code).as_caller_fault(
-    user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail="Provide the missing required inputs of 'flow': topic."),
+raise (
+    PipeRunInputsError(message=msg, run_mode=run_mode, pipe_code=pipe_code)
+    .with_error_code(CoreCode.INPUT_MISSING)
+    .as_caller_fault(
+        user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail="Provide the missing required inputs of 'flow': topic."),
+    )
 )
 ```
 
-The raise site vouches for the message: it names only the caller's own method and data (pipe codes, concept codes, variable names, the values the caller sent), never a path on the host, a secret or the text of a foreign exception. As with the class-level flag, a plain wrapper raised from the error inherits its domain but not its caller-facing flag, since the wrapper's message is its own; the located wrappers of a run failure report their root fault, so they carry both.
+The raise site vouches for the message: it names only the caller's own method and data (pipe codes, concept codes, variable names, the values the caller sent), never a path on the host, a secret or the text of a foreign exception. A plain wrapper raised from the error takes its code when it declares none of its own, but never its caller-facing flag, since the wrapper's message is its own; the located wrappers of a run failure report their root fault, so they carry both.
 
-| Raise site | Error | Why it is the caller's fault |
+| Raise site | Error | Why its message is the caller's |
 |------------|-------|------------------------------|
 | A `PipeParallel` combining its branch results into its output | `StuffFactoryError` | The method sets which branch feeds which field, what each branch produces and whether it produces a list. A branch whose multiplicity differs from its field's is restated by a second `StuffFactoryError` raised from the combine's, whose next step names the multiplicity to change, and which the run reports as its root fault |
 | A pipe checking that its required inputs are present | `PipeRunInputsError` | The request, or an earlier step of the method, left the input out |
 | A `PipeCondition` whose expression renders nothing, whose outcome is `fail`, whose chosen pipe misses inputs, or, in a dry run, whose expression does not parse, whose outcomes name no pipe or whose every outcome is `fail` | `PipeRunError` | The method writes the expression and the outcomes, and the run's data it renders is the caller's; the messages name only the pipes and the input names, never the expression's text or the value it rendered, either of which may be a host library's |
 | A model lookup for a reference the deck neither defines nor names in any of its own entries | `ModelNotFoundError` | Only an inline model setting of the method can have named it, so the next step is a `CHANGE_MODEL` action naming the reference as the method wrote it and the type of model the lookup needs; a reference the deck names but cannot serve stays `config` and redacted, with no next step of its own |
 
-Some failures stay unclassified on purpose, each with a sentence at its raise site saying why: a model output that does not fit its structure, which depends on what the model produced; a `PipeFunc` crash, whose exception text can carry anything the process holds; an input resource the pipe cannot use, whose message names the path as resolved on the host; a template that fails to render, where the same failure can come from the template or from the data; and a working-memory miss, since a step naming a variable nothing produces is refused when the bundle loads.
+Some failures carry their code with a message that stays redacted under STRICT on purpose, each with a sentence at its raise site saying why: a model output that does not fit its structure, which depends on what the model produced; a `PipeFunc` crash, whose exception text can carry anything the process holds; an input resource the pipe cannot use, whose message names the path as resolved on the host; a template that fails to render, where the same failure can come from the template or from the data; and a working-memory miss, since a step naming a variable nothing produces is refused when the bundle loads.
 
 ---
 
@@ -322,11 +315,11 @@ One refusal outside any service's own namespace is classified by the runtime its
 
 - **It is not a model-not-found.** The model exists and an integration serves it, only not for this caller, so `ClassificationResult.is_model_not_allowed` is set and `is_model_not_found` is not: the error stays on the family's generic failure class and carries the distinction in its advice. The ladder's generic 4xx arm would have given it the right category and advice sending the caller to edit their inputs.
 - **Its advice names the model.** The refusal's message names only the backend's wire id (`us.anthropic.claude-sonnet-4-5-20250929-v1:0`), which the method's author never wrote, so the advice names the model handle the deck resolved the pipe's model to. Both of its hints are conditional, because the Render step cannot tell the cases apart: leaving the pipe's model unset helps only when the pipe named the refused model rather than falling back to it as the default, and a model deck that lists a model the allow-list refuses is the operator's to settle on a hosted gateway and the user's own on a Portkey workspace of theirs.
-- **It answers 500 on an HTTP surface.** `InferenceErrorCategory.CONFIGURATION` implies `ErrorDomain.CONFIG`, which `error_domain_to_http_status` renders as 500: it lands in server-error alerting, and 500 is a status outer clients retry, though an outer retry earns an identical refusal.
+- **It answers 500 on an HTTP surface.** It carries `model.unavailable`, a code in the operator's domain, which reads `ErrorDomain.CONFIG` and which `error_domain_to_http_status` renders as 500: it lands in server-error alerting, and its verdict tells a client not to retry, since an outer retry earns an identical refusal.
 
 ### The `instructor` Unwrap
 
-On structured-generation paths, `instructor` raises an `InstructorRetryException` from the exception that ended its retry loop. The loop re-asks only a response that fails the schema, so that exception is either the raw SDK exception of a call that failed in transport, or, once the re-ask budget is spent, the last parse failure. `extract_underlying_sdk_exception()` recovers it from the wrapper's cause, not from `failed_attempts`, which lists only parse failures and would name an earlier one when a re-ask then fails in transport. The recovered exception routes through the same per-provider categorization as the plain-text path. Once the re-ask budget is spent, the recovered exception is the last `pydantic.ValidationError`, which `_STATUSLESS_BY_TYPE_NAME` classifies as `CONTENT` / `CHANGE_INPUT`, so it answers 422. A recovered exception the classifier does not recognize lands in `UNKNOWN`.
+On structured-generation paths, `instructor` raises an `InstructorRetryException` from the exception that ended its retry loop. The loop re-asks only a response that fails the schema, so that exception is either the raw SDK exception of a call that failed in transport, or, once the re-ask budget is spent, the last parse failure. `extract_underlying_sdk_exception()` recovers it from the wrapper's cause, not from `failed_attempts`, which lists only parse failures and would name an earlier one when a re-ask then fails in transport. The recovered exception routes through the same per-provider categorization as the plain-text path. Once the re-ask budget is spent, the recovered exception is the last `pydantic.ValidationError`, which `_STATUSLESS_BY_TYPE_NAME` classifies as `CONTENT` / `CHANGE_INPUT` with `model.output_schema_mismatch`, so it answers 422. A recovered exception the classifier does not recognize lands in `UNKNOWN`.
 
 ### Model and Provider Attribution
 
@@ -341,7 +334,7 @@ def fill_model_and_provider(self, model_handle: str | None, *, backend_name: str
 
 ## Cause-Chain Enrichment
 
-A wrapper exception — `PipeRunError` → `PipeRouterError` → `PipelineExecutionError` — carries no `error_category` of its own. `to_error_report()` enriches the report from the `__cause__` chain, so the inference classification survives every wrapping layer.
+A wrapper exception — `PipeRunError` → `PipeRouterError` → `PipelineExecutionError` — carries no `error_category` of its own. Its code comes from `resolve_error_code()`, which already walked the `__cause__` chain (see [Every error declares its code](#every-error-declares-its-code)); `to_error_report()` then enriches the report's diagnostic fields from the chain, so the inference classification survives every wrapping layer.
 
 ```python
 def _enrich_error_report_from_cause(self, report: ErrorReport) -> ErrorReport:
@@ -349,16 +342,16 @@ def _enrich_error_report_from_cause(self, report: ErrorReport) -> ErrorReport:
     if not isinstance(cause, PipelexError):
         return report
     cause_report = cause.to_error_report()
-    return ErrorReport(
-        error_type=report.error_type,  # keep own identity
-        message=report.message,
-        error_category=report.error_category or cause_report.error_category,
-        error_domain=report.error_domain or cause_report.error_domain,
-        # ... retryable, user_action, model, provider, provider_metadata ...
+    return report.model_copy(
+        update={
+            "error_category": report.error_category or cause_report.error_category,
+            "user_action": report.user_action or cause_report.user_action,
+            # ... model, provider, provider_metadata ...
+        }
     )
 ```
 
-A wrapper keeps its own `error_type` and `message` but inherits every classification field it does not set itself. The two wrappers of a run failure go further, and report their root fault instead of themselves: see [Run Failures: the Root Fault, Located](#run-failures-the-root-fault-located).
+A wrapper keeps its own `error_type` and `message`, and its code with everything the code decides, but inherits every diagnostic field it does not set itself. The two wrappers of a run failure go further, and report their root fault instead of themselves: see [Run Failures: the Root Fault, Located](#run-failures-the-root-fault-located).
 
 !!! warning "Overrides must call the enrichment helper"
     A `to_error_report()` override on a subclass **must** end with `self._enrich_error_report_from_cause(report)`. Otherwise that subclass becomes a black hole that drops the cause's classification. A cyclic-`__cause__` guard ensures a malformed chain can never turn error reporting into a `RecursionError`.
@@ -367,7 +360,7 @@ A wrapper keeps its own `error_type` and `message` but inherits every classifica
 
 ## Run Failures: the Root Fault, Located
 
-When a pipe fails during a run, the error a surface receives sits under several wrappers: the pipe router's `PipeRouterError`, maybe a runtime bridge's `PipelexBridgeDispatchError`, and the runner's `PipelineExecutionError`. None of them is what went wrong, and a report reading `PipelineExecutionError` with a bridge's sentence for a message tells the reader nothing. So the two located wrappers, `PipeRouterError` and `PipelineExecutionError`, report the **root fault**, the innermost `PipelexError` on the cause chain, and only add where it happened (`pipelex/pipe_run/located_failure.py`). The walk stops at the first exception that is not a `PipelexError`, whose stand-in is then the fault, and an error raised from one of its own class (a remedy or an item index added to the same fault) counts as the outer one.
+When a pipe fails during a run, the error a surface receives sits under several wrappers: the pipe router's `PipeRouterError`, maybe a runtime bridge's `PipelexBridgeDispatchError`, and the runner's `PipelineExecutionError`. None of them is what went wrong, and a report reading `PipelineExecutionError` with a bridge's sentence for a message tells the reader nothing. So the two located wrappers, `PipeRouterError` and `PipelineExecutionError`, which take their cause's code, report the **root fault** and only add where it happened (`pipelex/pipe_run/located_failure.py`). The root fault is the error whose code the failure resolves to: the first `PipelexError` down the cause chain that declares a code of its own, the walk `resolve_error_code()` makes, so a wrapper that adds the fact deciding the code (a PipeFunc's `pipe.function_raised` over a coded error its function raised) is the root fault over its cause, and the innermost `PipelexError` when none declares one. The walk stops at the first exception that is not a `PipelexError`, whose stand-in is then the fault.
 
 **Locating.** `PipeRouterProtocol.run()` catches every failure of the pipe it runs and re-raises it as a `PipeRouterError` chained to it, with the pipe's code and a snapshot of its stack taken where it failed. A failure that already carries a `PipeRouterError` rises untouched through the routers of the controllers above, so the innermost location is the one reported. An exception that is not a `PipelexError` first becomes a `PipelexUnexpectedError` whose message names its class (`KeyError: 'boom'`); it is never caller-facing, and a dry run that sorts its own failures from programming bugs (the bundle validator's sweep, the validate surfaces' graph step) finds the foreign exception behind it with `find_foreign_fault()` and lets it propagate rather than report it as the bundle's failure. A host router whose transport raises its own failures overrides the `_as_pipelex_failure()` hook, and returns `None` for a control-flow exception such as a cancellation, which then propagates as it is. For a transport failure carrying a recovered report, the far side packs the root fault's own report, never a located one: when it packs that report alone, the hook returns a `PipelexError` carrying it and the router locates it at the pipe it ran; when it packs the location it found as well, the hook returns a `PipeRouterError` rebuilt over that report with `make_located()`, which the router raises untouched, so the report reads exactly as the local run's. The runner wraps any failure of the run into a `PipelineExecutionError` with `make_for_run_failure()`, which takes the location from the innermost `PipeRouterError` on the chain (`find_failure_location()`), never from the live stack, which has unwound by then.
 
@@ -375,11 +368,10 @@ When a pipe fails during a run, the error a surface receives sits under several 
 
 | Field | Taken from |
 |-------|------------|
-| `error_type`, `title`, `type_uri` | The root fault |
+| `code`, `error_type`, and what the code decides: `title`, `type_uri`, `error_domain`, `retryable` | The root fault |
 | `message` | The root fault's own message, prefixed with the failing pipe and its path |
 | `caller_facing_message`, `validation_errors`, `migration` | The root fault |
-| `error_category`, `retryable`, `model`, `provider`, `provider_metadata` | The cause-chain enrichment |
-| `error_domain` | The cause-chain enrichment, with a `runtime` floor |
+| `error_category`, `model`, `provider`, `provider_metadata` | The cause-chain enrichment |
 | `user_action` | The cause-chain enrichment or, when nothing on the chain advises an action, a fallback naming the failing pipe |
 
 The message reads `Pipe 'summarize' failed (two_steps → summarize): Model handle 'x' was not found in the model deck.` for a nested pipe, and `Pipe 'flow' failed: …` for the entry pipe. Pipe codes are the caller's own names, so the located message is caller-facing exactly when the root fault's message is, and STRICT disclosure keeps it exactly then. `ErrorReport` has no location field, so the location rides the message; `PipeRouterError` and `PipelineExecutionError` carry it structurally as `pipe_code` and `pipe_stack`.
@@ -396,13 +388,13 @@ The error model is built to survive serialization. Because `ErrorReport` round-t
 
 The runtime itself stays transport-agnostic: the machinery that carries an error across a worker boundary ships in the **host-runtime plugin** for each distributed backend, not in core. A backend plugin is responsible for three things.
 
-**Packing.** Convert a `PipelexError` into the transport's failure type and stash `to_error_report().to_dict()` in its details payload, so worker and submitter code keep the full classification rather than a bare message. The same step derives the transport's retry decision from `InferenceErrorCategory.is_retryable`.
+**Packing.** Convert a `PipelexError` into the transport's failure type and stash `to_error_report().to_dict()` in its details payload, so worker and submitter code keep the code and the full classification rather than a bare message. The same step derives the transport's retry decision from `InferenceErrorCategory.is_retryable`, which tells a provider call that may be repeated within the run from one whose outcome is unknown.
 
 **Recovering.** On the submitter side, walk the returned failure, pull the packed dict, and rebuild the `ErrorReport`. Recovery is **total**: when no report dict is found — a non-Pipelex exception, a worker crash, a timeout — the plugin synthesizes a fallback report so the recovery path always has structured classification to surface.
 
 **A fail-safe floor.** Ensure a domain error that escapes the conversion path fails the unit of work *terminally* rather than hanging. In a durable-execution system the default for an unconverted exception might be to retry forever, so "convert all the errors we know about" is not enough — the floor must hold for the errors, and the code paths, that nobody enumerated.
 
-**Net effect:** a pipe failing on a remote worker reaches the CLI and HTTP adapters with the *same* `error_category` / `retryable` / `model` / `provider` / `user_action` as the identical failure run locally — and a failure that escapes conversion fails loud and bounded instead of hanging.
+**Net effect:** a pipe failing on a remote worker reaches the CLI and HTTP adapters with the *same* `code` / `error_category` / `retryable` / `model` / `provider` / `user_action` as the identical failure run locally — and a failure that escapes conversion fails loud and bounded instead of hanging.
 
 See [Runtime Bridge & Transport](./runtime-bridge-and-transport.md) for the boundary these converters span; the per-backend converters themselves live in the host-runtime plugins.
 
@@ -487,38 +479,31 @@ flowchart TB
 
 ### Class Hierarchy
 
-`PipelexError` is the single root. `CogtError` is the inference branch — it overrides `to_error_report()` to add `error_category`, `retryable`, `user_action`, `provider_metadata`, and reads `model_handle` / `backend_name` from the instance. It is also where `error_domain` is *derived* rather than declared: the whole subtree gets its domain from its category.
+`PipelexError` is the single root, and every subclass declares its code (see [Every error declares its code](#every-error-declares-its-code)). `CogtError` is the inference branch: an abstract base whose subclasses declare the codes the classification picks from, and which overrides `to_error_report()` to add `error_category`, `provider_metadata`, and the `model_handle` / `backend_name` it reads from the instance.
 
 ```
 Exception
-└── PipelexError                  base_exceptions.py — error_domain, user_action, to_error_report()
-    ├── PipelexConfigError         → error_domain = CONFIG
-    ├── PipelexSetupError          → error_domain = CONFIG
-    ├── CogtError                  cogt/exceptions.py — error_category, provider_metadata
-    │   │                          → error_domain derived from error_category (no per-class declaration)
-    │   ├── LLMCompletionError      ← per-instance category from the worker → per-instance domain
-    │   ├── ImgGenGenerationError   ← per-instance category
-    │   ├── LLMPromptSpecError      ← class-level CONTENT → INPUT → HTTP 422
-    │   ├── LLMConfigError          ← class-level CONFIGURATION → CONFIG
-    │   ├── ModelNotFoundError      ← sibling family raised on provider HTTP 404
-    │   │   ├── LLMModelNotFoundError / ImgGenModelNotFoundError
-    │   │   └── ExtractModelNotFoundError / SearchModelNotFoundError
+└── PipelexError                  base_exceptions.py — error_code, with_error_code(), resolve_error_code(), to_error_report()
+    ├── PipelexUnexpectedError     → runtime.unexpected
+    ├── PipelexConfigError         → one of pipelex.config.invalid, .syntax, .file_missing
+    ├── PipelexSetupError          → inherits its cause's code, else runtime.misconfigured
+    ├── CogtError                  cogt/exceptions.py — abstract; error_category, provider_metadata
+    │   ├── LLMCompletionError      ← a set the worker's classification picks from
+    │   ├── ImgGenGenerationError   ← a set the worker's classification picks from
     │   └── ... (see worker classification) ...
-    ├── PipelineExecutionError      pipeline/exceptions.py — reports its located root fault, RUNTIME only as a floor
+    ├── PipelineExecutionError      pipeline/exceptions.py — reports its located root fault and its code
     └── ... (one exceptions.py per package) ...
 ```
-
-`PipelineExecutionError`'s `RUNTIME` is deliberately a *floor*, applied only when the cause chain surfaced no domain — so a `CONTENT`-categorized inference failure now reaches the HTTP boundary as `INPUT` / 422 through every wrapping layer instead of being flattened to the wrapper's generic 500. Its identity and message are its root fault's (see [Run Failures: the Root Fault, Located](#run-failures-the-root-fault-located)).
 
 ### Factory-time vs Runtime
 
 | When | What carries metadata | How |
 |------|----------------------|-----|
-| **Class definition** | `error_domain`, `error_category` defaults, `user_action` defaults | Class-level attributes — one source of truth per exception type |
-| **Raise time** | Per-instance `error_category`, `user_action`, `provider_metadata` | Constructor args — set by the worker that classified the failure |
-| **Report time** | `model`, `provider`, cause-chain fields; `error_domain` on the `CogtError` family | `fill_model_and_provider()` at the worker chokepoint; `InferenceErrorCategory.error_domain` derivation and `_enrich_error_report_from_cause()` on `to_error_report()` |
+| **Class definition** | `error_code` (a code, a set, its cause's, or abstract), `error_category` defaults, `user_action` defaults | Class-level attributes — one source of truth per exception type |
+| **Raise time** | The code chosen from the class's set, per-instance `error_category`, `user_action`, `provider_metadata` | `with_error_code()` and constructor args — set by the raise site or the worker that classified the failure |
+| **Report time** | The resolved code and everything it decides; `model`, `provider`, cause-chain fields | `resolve_error_code()` and `ErrorReport.make_for_code()`; `fill_model_and_provider()` at the worker chokepoint; `_enrich_error_report_from_cause()` on `to_error_report()` |
 
-The "outcome" exceptions (`LLMCompletionError`, `ImgGenGenerationError`, `ExtractJobFailureError`, `SearchJobFailureError`) intentionally carry **no** class-level `error_category` — their category is genuinely per-instance, decided by the worker.
+The "outcome" exceptions (`LLMCompletionError`, `ImgGenGenerationError`, `ExtractJobFailureError`, `SearchJobFailureError`) intentionally carry **no** class-level `error_category` — their category and their code are genuinely per-instance, decided by the worker.
 
 ---
 
@@ -531,10 +516,16 @@ The "outcome" exceptions (`LLMCompletionError`, `ImgGenGenerationError`, `Extrac
 report = exc.to_error_report()  # enriched from the __cause__ chain
 payload = report.to_dict()  # None-free dict for serialization
 
-# Classify one error as the caller's own fault, where it is raised
-raise SomeError(msg).as_caller_fault(user_action=user_action)  # input domain, caller-facing
+
+# Declare a class's code, and choose one of its set where it is raised
+class SomeError(PipelexError):
+    error_code = ErrorCodeSet(default=CoreCode.INPUT_INVALID, others=(CoreCode.INPUT_MISSING,))
+
+
+raise SomeError(msg).with_error_code(CoreCode.INPUT_MISSING).as_caller_fault(user_action=user_action)  # caller-facing
 
 # Consume a report
+report.code  # "input.missing" — the code decides everything below
 report.http_status  # 422 / 429 / 500
 report.user_action_detail()  # free-form advice text, or None
 report.error_category  # "transient" / "capacity" / ...
@@ -551,6 +542,10 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 | File | Purpose |
 |------|---------|
 | `pipelex/base_exceptions.py` | `PipelexError`, `ErrorReport`, `ErrorDomain`, `ValidationErrorItem`, `error_domain_to_http_status()` |
+| `pipelex/errors/error_code_declaration.py` | What a class declares: a code, `ErrorCodeSet`, `InheritsCause`, `ABSTRACT_ERROR` |
+| `pipelex/errors/error_codes.py` | `ErrorCode`, `error_code_spec()`: what the registries declare about each code, as generated tables |
+| `pipelex/errors/foreign_raises.py` | The scan behind the foreign-raise check |
+| `pipelex/errors/retired_error_pages.py` | The static redirects of the retired per-class error pages |
 | `pipelex/errors/registry/pipelex-error-registry.yaml` | The Pipelex error registry, the single source of the `pipelex.` codes; its snapshot, its typed codes (`pipelex_codes.py`) and its pages are generated from it |
 | `pipelex/errors/registry/registry_document.py` | The typed model of an MTHDS error registry, and `load_pipelex_error_registry()` |
 | `pipelex/pipeline/validation_errors.py` | `build_validation_error_items()` — shared CLI/API structured bundle-validation builder |
@@ -569,30 +564,34 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 
 | Scenario | Behavior |
 |----------|----------|
-| Rate limit hit | `TRANSIENT` → retryable; `error_domain = RUNTIME`; transport retry honors `Retry-After` (a provider 429 answers 429 regardless of domain) |
-| Quota / billing exhausted | `CAPACITY` → non-retryable; `UserAction(CHECK_BILLING)`; `error_domain = RUNTIME` → HTTP 500 |
-| Bad API key | `CONFIGURATION` → non-retryable; `error_domain = CONFIG` → HTTP 500 |
-| Model or deployment not found (provider HTTP 404) | Raises a dedicated `*ModelNotFoundError` sibling (`LLMModelNotFoundError`, `ImgGenModelNotFoundError`, `ExtractModelNotFoundError`, `SearchModelNotFoundError`); operator re-raises `PipeOperatorModelAvailabilityError` |
-| Model reference unknown to the deck (a method naming `gpt-5.1`, a mistyped `@alias` or `$preset`) | `ModelChoiceNotFoundError` → `CONFIGURATION` category, but `error_domain = INPUT` → **HTTP 422**, and caller-facing under STRICT: the message names the reference and its "Did you mean" suggestions, which are all a caller needs to fix the method |
-| Content-policy violation | `CONTENT` → non-retryable; `UserAction(CHANGE_INPUT)`; `error_domain = INPUT` → **HTTP 422** |
-| Malformed prompt image / bad prompt parameter | `CONTENT` class-level (`PromptImageFormatError`, `LLMPromptParameterError`, …) → `error_domain = INPUT` → **HTTP 422** |
-| Any other provider **HTTP 400** | `CONTENT` → `error_domain = INPUT` → **HTTP 422**. This is the widest reach of the derivation: a 400 covers a context-length overflow and a parameter the model rejects alike, and an engine-side request-construction fault lands here too — reported as the caller's to fix, and absent from the 5xx rate |
-| Local file extractor raises a builtin (docling, pypdfium2) | `ValueError` / `RuntimeError` / `FileNotFoundError` → `CONTENT` → `error_domain = INPUT` → **HTTP 422**; `OSError` → `TRANSIENT` (see `_LOCAL_EXTRACT_BY_TYPE_NAME`) |
-| A text completion stops at its output limit or context window (`length`, `max_tokens`, `MAX_TOKENS`, an `incomplete` Responses answer at `max_output_tokens`, `model_context_window_exceeded`, `model_length`), with partial or empty text | Every LLM worker reads the stop before returning text and raises `LLMCompletionTruncatedError` → `CONTENT` / `CHANGE_INPUT`, non-retryable; `error_domain = INPUT` → **HTTP 422**, caller-facing under STRICT. The message names the model, the pipe, the stop value, the output tokens used and the `max_tokens` sent, never the partial text. The error's `truncation_limit` tells the output limit from the context window (`model_context_window_exceeded`, `model_length`), and so does its next step: a higher `max_tokens` or a shorter input for the first, a shorter input, a lower reasoning effort or a larger model for the second, never a higher `max_tokens`. A gateway in non-strict mode passing each provider's own value through the completions shape is read the same way, since the classifier reads the union of the provider vocabularies |
-| A text completion refused or stopped by a safety filter (`content_filter`, `refusal`, `content_filtered`, `guardrail_intervened`, Gemini's `SAFETY` and its kin), or a Gemini prompt blocked before any candidate (its `prompt_feedback.block_reason`, whatever its value) | `LLMCompletionRefusedError` → `CONTENT` / `CHANGE_INPUT`, non-retryable; `error_domain = INPUT` → **HTTP 422**, caller-facing under STRICT |
+| Rate limit hit | `TRANSIENT` → repeated within the run; `provider.rate_limited`, retryable; transport retry honors `Retry-After` (a provider 429 answers 429 whatever the domain) |
+| Quota / billing exhausted | `CAPACITY` → not repeated; `UserAction(CHECK_BILLING)`; `provider.quota_exhausted` → HTTP 500 |
+| Bad API key | `CONFIGURATION` → not repeated; `provider.credential_refused`, the operator's → HTTP 500 |
+| Model or deployment not found (provider HTTP 404) | Raises a dedicated `*ModelNotFoundError` sibling (`LLMModelNotFoundError`, `ImgGenModelNotFoundError`, `ExtractModelNotFoundError`, `SearchModelNotFoundError`) carrying `model.unavailable`, since a method cannot name a provider's raw model id; operator re-raises `PipeOperatorModelAvailabilityError` |
+| Model reference unknown to the deck (a method naming `gpt-5.1`, a mistyped `@alias` or `$preset`) | `ModelChoiceNotFoundError` → `CONFIGURATION` category, but the code `model.unknown`, the method's → **HTTP 422**, and caller-facing under STRICT: the message names the reference and its "Did you mean" suggestions, which are all a caller needs to fix the method. A handle the deck serves only as another type of model is `model.capability_unsupported` |
+| The deck's own default or override names a model it does not define | `ModelDeckChoiceUnresolvedError`, naming the deck setting: `pipelex.config.invalid`, the deployment's → HTTP 500, redacted, never the caller's `model.unknown`; a bad override is refused when the deck is built |
+| Content-policy violation | `CONTENT` → not repeated; `UserAction(CHANGE_INPUT)`; `model.content_refused` → **HTTP 422** |
+| Malformed prompt image / bad prompt parameter | `CONTENT` class-level (`PromptImageFormatError`, `LLMPromptParameterError`, …), each with its own code (`input.file_type_unsupported`, `pipe.prompt_empty`, …) |
+| Any other provider **HTTP 400** | `CONTENT` / `CHANGE_INPUT`, but `runtime.unexpected` → HTTP 500: a 400 nothing recognises is most likely a request of ours the provider could not take, and only a content-policy signal makes it the caller's `model.content_refused` |
+| Local file extractor raises a builtin (docling, pypdfium2) | `FileNotFoundError` → `input.reference_not_found`, `ValueError` / `RuntimeError` → `input.file_unreadable`, both `CONTENT` → **HTTP 422**; `OSError` → `UNKNOWN`, `runtime.unexpected` (see `_LOCAL_EXTRACT_BY_TYPE_NAME`) |
+| A text completion stops at its output limit or context window (`length`, `max_tokens`, `MAX_TOKENS`, an `incomplete` Responses answer at `max_output_tokens`, `model_context_window_exceeded`, `model_length`), with partial or empty text | Every LLM worker reads the stop before returning text and raises `LLMCompletionTruncatedError` → `CONTENT` / `CHANGE_INPUT`, not repeated: `model.output_truncated` at the output limit, which the method's `max_tokens` sets, and `model.context_exceeded` at the context window, both the method's → **HTTP 422**, caller-facing under STRICT. The message names the model, the pipe, the stop value, the output tokens used and the `max_tokens` sent, never the partial text. The error's `truncation_limit` tells the output limit from the context window (`model_context_window_exceeded`, `model_length`), and so does its next step: a higher `max_tokens` or a shorter input for the first, a shorter input, a lower reasoning effort or a larger model for the second, never a higher `max_tokens`. A gateway in non-strict mode passing each provider's own value through the completions shape is read the same way, since the classifier reads the union of the provider vocabularies |
+| A text completion refused or stopped by a safety filter (`content_filter`, `refusal`, `content_filtered`, `guardrail_intervened`, Gemini's `SAFETY` and its kin), or a Gemini prompt blocked before any candidate (its `prompt_feedback.block_reason`, whatever its value) | `LLMCompletionRefusedError` → `CONTENT` / `CHANGE_INPUT`, not repeated; `model.content_refused` → **HTTP 422**, caller-facing under STRICT |
 | A stop value no provider vocabulary lists | Logged at warning level with the model and the value, and taken as normal: the text is returned. An `incomplete` Responses answer whose reason is missing or unknown is the exception: logged at warning level and taken as a truncation, since the status alone says the text is unfinished |
 | An Anthropic structured generation whose `max_tokens` its structured-output timeout lowers | Sent with the lowered limit; logged at warning level when the pipe set the limit, at debug level when it is the model's default; an error the lowered limit can explain, a structured output that failed validation or came back incomplete once the re-asks are spent, or a timeout, keeps its class and category and ends with a sentence saying the limit was lowered and to what; a rate limit, an authentication failure, an overload, a server error or a lost connection carries no such sentence |
-| LLM returns schema-mismatched JSON | `instructor` re-asks; if exhausted → the last `pydantic.ValidationError` → `CONTENT` / `CHANGE_INPUT` → `error_domain = INPUT` → **HTTP 422** |
-| The gateway does not allow the model for this account (`model_not_allowed_error`, HTTP 412) | `CONFIGURATION` / `CHANGE_MODEL`, never retried; the advice names the model handle; `error_domain = CONFIG` → HTTP 500 |
-| Connection dropped mid-request | `AMBIGUOUS` → non-retryable (outcome unknown); `error_domain = RUNTIME` |
-| A step names, in an inline model setting, a model the deck neither defines nor names | `ModelNotFoundError`, classified by the lookup as the caller's: `error_domain = INPUT` → **HTTP 422**, caller-facing under STRICT, with a `CHANGE_MODEL` next step naming the model as the method wrote it and the type of model the step needs. A model the deck itself names but does not serve (a preset or alias on a backend that is not enabled) keeps `CONFIG` → HTTP 500, redacted |
-| A `PipeParallel` cannot combine its branch results, or a pipe starts without a required input | The caller's own method or request: `error_domain = INPUT` → **HTTP 422**, caller-facing under STRICT, with a `CHANGE_INPUT` next step |
-| Unknown or ambiguous entry `pipe_code` (a CLI argument, a run request's field, the `--pipe` / `pipe_ref` slice selector of bundle validation) | `EntryPipeNotFoundError` / `EntryPipeAmbiguousError` → `UserAction(CHANGE_INPUT)`; `error_domain = INPUT` → **HTTP 422**, and caller-facing under STRICT. The in-body lookups (`get_optional_pipe` / `get_required_pipe`) keep raising the undomained `PipeNotFoundError` / `PipeLibraryError`: a ref written inside a bundle is not the caller's input |
-| Wrapper exception (no own category) | Inherits cause's classification via enrichment — including the domain the cause derived |
-| A pipe fails during a run | `PipeRouterError` → `PipelineExecutionError`, both reporting the root fault's `error_type` and its own message prefixed with `Pipe '<code>' failed (<path>): `; the classification comes from the chain |
+| LLM returns schema-mismatched JSON | `instructor` re-asks; if exhausted → the last `pydantic.ValidationError` → `CONTENT` / `CHANGE_INPUT`, `model.output_schema_mismatch` → **HTTP 422** |
+| The gateway does not allow the model for this account (`model_not_allowed_error`, HTTP 412) | `CONFIGURATION` / `CHANGE_MODEL`, never repeated; the advice names the model handle; `model.unavailable` → HTTP 500 |
+| Connection dropped mid-request | `AMBIGUOUS` → not repeated (outcome unknown); `provider.outcome_unknown`, whose next step says to check the account, since the lost call may have been billed |
+| A step names, in an inline model setting, a model the deck neither defines nor names | `ModelNotFoundError`, which the lookup raises with `model.unknown` as the caller's: **HTTP 422**, caller-facing under STRICT, with a `CHANGE_MODEL` next step naming the model as the method wrote it and the type of model the step needs. A model the deck itself names but does not serve (a preset or alias on a backend that is not enabled) keeps the class's `model.unavailable` → HTTP 500, redacted |
+| A `PipeParallel` cannot combine its branch results, or a pipe starts without a required input | The caller's own method or request: `pipe.output_multiplicity`, or `input.missing` at the entry pipe and `pipe.input_unresolved` below it → **HTTP 422**, caller-facing under STRICT, with a `CHANGE_INPUT` next step |
+| Unknown or ambiguous entry `pipe_code` (a CLI argument, a run request's field, the `--pipe` / `pipe_ref` slice selector of bundle validation) | `EntryPipeNotFoundError` / `EntryPipeAmbiguousError` → `UserAction(CHANGE_INPUT)`; `request.pipe_not_found`, `request.pipe_unspecified` or `request.pipe_ambiguous` → **HTTP 422**, and caller-facing under STRICT. The in-body lookups (`get_optional_pipe` / `get_required_pipe`) keep raising `PipeNotFoundError` / `PipeLibraryError`, whose codes are the method's: a ref written inside a bundle is not the caller's input |
+| A template naming a filter or a test that does not exist, found only when it renders | `Jinja2TemplateInvalidError` at the pipe, naming the filter or test and none of the template: `method.template_invalid` → **HTTP 422**, caller-facing under STRICT, for a method's `PipeCondition` expression, `PipeLLM` prompt or `PipeDocGen` template, and `runtime.unexpected` for one of Pipelex's own templates |
+| A URL or a storage key refused by the SSRF guard or the run's read scope | A `security.*` code saying whose the URL was: `security.input_url_refused` for one of the run's inputs, the default when the guard cannot tell, `security.method_url_refused` for one the method names and for a read refused inside a step, whose inputs were authorized when they were normalized, both → **HTTP 422**, and `security.provider_url_refused` for one in a model's generated answer, the runtime's → HTTP 500; a traversal in a storage key the caller supplied is `security.input_path_refused`, which `PipelineInputContentError` takes from its cause |
+| A method of the host's own library directories refuses to load | `HostLibraryLoadRefusalError`, `pipelex.config.invalid` → HTTP 500, its message withheld under STRICT; the same refusal in the caller's own content stays the caller's verdict |
+| Wrapper exception (no own category) | Takes its cause's code, and its classification via enrichment |
+| A pipe fails during a run | `PipeRouterError` → `PipelineExecutionError`, both reporting the root fault's `code` and `error_type` and its own message prefixed with `Pipe '<code>' failed (<path>): `; the classification comes from the chain |
 | A pipe raises a non-Pipelex exception | Located as a `PipelexUnexpectedError` whose message names the original class; redacted under STRICT |
 | Failure on a distributed worker | `ErrorReport` recovered from the transport's serialized details — same classification as local |
-| Worker exception with no `ErrorReport` | Synthesized fallback report — `error_domain = RUNTIME` |
+| Worker exception with no `ErrorReport` | Synthesized fallback report — `runtime.unexpected` |
 
 ---
 

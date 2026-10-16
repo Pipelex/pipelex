@@ -17,6 +17,7 @@ from enum import StrEnum
 from typing import Literal, NamedTuple, NoReturn
 
 from fastapi.responses import JSONResponse
+from mthds.protocol.problem.registry import CoreCode
 from pipelex.base_exceptions import ErrorReport, ValidationErrorItem
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_entry_pipe
@@ -177,6 +178,14 @@ class PipeSelectionMissKind(StrEnum):
     AMBIGUOUS = "ambiguous"
 
 
+class SelectorOrigin(StrEnum):
+    """Where a pipe selector came from, which is what its refusal must tell the caller, and who must act on it."""
+
+    REQUEST = "request"
+    MANIFEST = "manifest"
+    CLOSURE = "closure"
+
+
 class PipeSelectionMiss(NamedTuple):
     """A link of the pipe selection chain that selected no pipe, with the refusal a selection answers."""
 
@@ -186,16 +195,12 @@ class PipeSelectionMiss(NamedTuple):
     message: str
     """The detail of the `422` a selection that depends on this link raises."""
 
+    origin: SelectorOrigin | None
+    """Where the selector that missed came from, which picks the refusal's code; `None` when there was no selector
+    at all, because the request named no pipe and the closure declares no single `main_pipe`."""
+
     user_action: UserAction | None = None
     """The fix to name instead of the error class's own, when the class's is wrong for this miss."""
-
-
-class _SelectorOrigin(StrEnum):
-    """Where a pipe selector came from, which is what its refusal must tell the caller."""
-
-    REQUEST = "request"
-    MANIFEST = "manifest"
-    CLOSURE = "closure"
 
 
 def resolve_requested_pipe(crate: LibraryCrate, *, pipe_ref: str | None, manifest_main_pipe: str | None) -> RequestedPipe:
@@ -212,7 +217,7 @@ def resolve_requested_pipe(crate: LibraryCrate, *, pipe_ref: str | None, manifes
     Must be called while the library `resolve_requested_crate` opened is still loaded + current.
     """
     if pipe_ref is not None:
-        selected = _select_entry_pipe(pipe_ref, origin=_SelectorOrigin.REQUEST)
+        selected = _select_entry_pipe(pipe_ref, origin=SelectorOrigin.REQUEST)
     else:
         selected = select_default_pipe(crate, manifest_main_pipe=manifest_main_pipe)
     if isinstance(selected, PipeSelectionMiss):
@@ -235,12 +240,49 @@ def _raise_selection_refusal(miss: PipeSelectionMiss) -> NoReturn:
     The no-entry-pipe miss is a not-found and the several-`main_pipe`s miss an ambiguity, the way the
     pipe-selector design classifies them. Neither is a typo in a pipe code, so each carries its own
     `user_action`, which replaces the class's code-typo advice for that one error.
+
+    The code says who must act, which is where the selector came from. A selector the request named that
+    misses is the caller's (`request.pipe_not_found`, `request.pipe_ambiguous`), and so is a request naming no
+    pipe where the closure gives no single `main_pipe` to default to (`request.pipe_unspecified` when it
+    declares none, `request.pipe_ambiguous` when it declares several). A `main_pipe` the method itself
+    declares, in the fetched package's manifest or in the closure, that names no pipe of the closure is the
+    method's (`method.pipe_unresolved`), whose author fixes the declaration.
     """
     match miss.kind:
         case PipeSelectionMissKind.NOT_FOUND:
-            raise EntryPipeNotFoundError(miss.message).as_caller_fault(user_action=miss.user_action)
+            match miss.origin:
+                case SelectorOrigin.REQUEST:
+                    raise (
+                        EntryPipeNotFoundError(miss.message)
+                        .with_error_code(CoreCode.REQUEST_PIPE_NOT_FOUND)
+                        .as_caller_fault(user_action=miss.user_action)
+                    )
+                case SelectorOrigin.MANIFEST | SelectorOrigin.CLOSURE:
+                    raise (
+                        EntryPipeNotFoundError(miss.message)
+                        .with_error_code(CoreCode.METHOD_PIPE_UNRESOLVED)
+                        .as_caller_fault(user_action=miss.user_action)
+                    )
+                case None:
+                    raise (
+                        EntryPipeNotFoundError(miss.message)
+                        .with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED)
+                        .as_caller_fault(user_action=miss.user_action)
+                    )
         case PipeSelectionMissKind.AMBIGUOUS:
-            raise EntryPipeAmbiguousError(miss.message).as_caller_fault(user_action=miss.user_action)
+            match miss.origin:
+                case SelectorOrigin.REQUEST | None:
+                    raise (
+                        EntryPipeAmbiguousError(miss.message)
+                        .with_error_code(CoreCode.REQUEST_PIPE_AMBIGUOUS)
+                        .as_caller_fault(user_action=miss.user_action)
+                    )
+                case SelectorOrigin.MANIFEST | SelectorOrigin.CLOSURE:
+                    raise (
+                        EntryPipeAmbiguousError(miss.message)
+                        .with_error_code(CoreCode.METHOD_PIPE_UNRESOLVED)
+                        .as_caller_fault(user_action=miss.user_action)
+                    )
 
 
 def select_default_pipe(crate: LibraryCrate, *, manifest_main_pipe: str | None) -> RequestedPipe | PipeSelectionMiss:
@@ -265,12 +307,13 @@ def select_default_pipe(crate: LibraryCrate, *, manifest_main_pipe: str | None) 
     Must be called while the library `resolve_requested_crate` opened is still loaded + current.
     """
     if manifest_main_pipe:
-        return _select_entry_pipe(manifest_main_pipe, origin=_SelectorOrigin.MANIFEST)
+        return _select_entry_pipe(manifest_main_pipe, origin=SelectorOrigin.MANIFEST)
     candidates = [f"{domain_code}.{domain.main_pipe}" for domain_code, domain in crate.domains.items() if domain.main_pipe]
     if not candidates:
         return PipeSelectionMiss(
             kind=PipeSelectionMissKind.NOT_FOUND,
             message="No `pipe_ref` was given and the closure declares no `main_pipe` — name the pipe explicitly.",
+            origin=None,
             user_action=UserAction(
                 kind=UserActionKind.CHANGE_INPUT,
                 detail="Send a `pipe_ref` naming the pipe to select, since the closure declares no `main_pipe` to default to.",
@@ -281,15 +324,16 @@ def select_default_pipe(crate: LibraryCrate, *, manifest_main_pipe: str | None) 
         return PipeSelectionMiss(
             kind=PipeSelectionMissKind.AMBIGUOUS,
             message=f"No `pipe_ref` was given and the closure declares several `main_pipe`s ({joined}) — name the pipe explicitly.",
+            origin=None,
             user_action=UserAction(
                 kind=UserActionKind.CHANGE_INPUT,
                 detail="Send a `pipe_ref` naming one of the declared `main_pipe`s.",
             ),
         )
-    return _select_entry_pipe(candidates[0], origin=_SelectorOrigin.CLOSURE)
+    return _select_entry_pipe(candidates[0], origin=SelectorOrigin.CLOSURE)
 
 
-def _select_entry_pipe(selector: str, *, origin: _SelectorOrigin) -> RequestedPipe | PipeSelectionMiss:
+def _select_entry_pipe(selector: str, *, origin: SelectorOrigin) -> RequestedPipe | PipeSelectionMiss:
     """Look one selector up through the engine's entry lookup, the way every selection chain link does.
 
     The returned `ref` is read back off the **resolved pipe**, never echoed from the selector: the
@@ -303,14 +347,14 @@ def _select_entry_pipe(selector: str, *, origin: _SelectorOrigin) -> RequestedPi
     missing, which would contradict the candidates in the same sentence.
     """
     match origin:
-        case _SelectorOrigin.REQUEST:
+        case SelectorOrigin.REQUEST:
             described = f"Pipe '{selector}'"
             scope = "the submitted closure"
-        case _SelectorOrigin.MANIFEST:
+        case SelectorOrigin.MANIFEST:
             # The caller never spelled this selector — say where it came from, or the 422 names a pipe out of nowhere.
             described = f"Pipe '{selector}' (the fetched package manifest's `main_pipe`)"
             scope = "the package's closure"
-        case _SelectorOrigin.CLOSURE:
+        case SelectorOrigin.CLOSURE:
             described = f"Pipe '{selector}' (the closure's declared `main_pipe`)"
             scope = "the submitted closure"
     try:
@@ -319,9 +363,10 @@ def _select_entry_pipe(selector: str, *, origin: _SelectorOrigin) -> RequestedPi
         return PipeSelectionMiss(
             kind=PipeSelectionMissKind.AMBIGUOUS,
             message=f"{described} matches pipes in several domains of {scope}, so it selects none: {exc}",
+            origin=origin,
         )
     except PipeNotFoundError as exc:
-        return PipeSelectionMiss(kind=PipeSelectionMissKind.NOT_FOUND, message=f"{described} not found in {scope}: {exc}")
+        return PipeSelectionMiss(kind=PipeSelectionMissKind.NOT_FOUND, message=f"{described} not found in {scope}: {exc}", origin=origin)
     return RequestedPipe(ref=the_pipe.pipe_ref, pipe=the_pipe)
 
 

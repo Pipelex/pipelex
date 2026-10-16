@@ -2,6 +2,8 @@
 
 from typing import NoReturn
 
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice, DocGenSetting
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
@@ -26,11 +28,15 @@ def _raise_model_choice_not_found(
     reference_kind: ModelReferenceKind,
     available_options: list[str],
 ) -> NoReturn:
-    """Compute fuzzy suggestions and raise ModelChoiceNotFoundError."""
+    """Compute fuzzy suggestions and raise ModelChoiceNotFoundError.
+
+    A bare handle the deck serves only as other types names a model that exists, so its refusal is the capability
+    that model lacks, `model.capability_unsupported`, rather than an unknown model.
+    """
     suggestions, wrong_sigil_hints, cross_suggestions = suggest_model_alternatives(
         model_deck=model_deck, model_type=model_type, name=name, kind=reference_kind
     )
-    raise ModelChoiceNotFoundError(
+    not_found = ModelChoiceNotFoundError(
         message=msg,
         model_type=model_type,
         model_choice=raw_choice,
@@ -40,6 +46,13 @@ def _raise_model_choice_not_found(
         wrong_sigil_hints=wrong_sigil_hints,
         cross_collection_suggestions=cross_suggestions,
     )
+    match reference_kind:
+        case ModelReferenceKind.HANDLE:
+            if model_deck.is_served_only_as_other_types(name=name, model_type=model_type):
+                raise not_found.with_error_code(CoreCode.MODEL_CAPABILITY_UNSUPPORTED)
+            raise not_found
+        case ModelReferenceKind.PRESET | ModelReferenceKind.ALIAS | ModelReferenceKind.WATERFALL:
+            raise not_found
 
 
 def check_llm_choice_with_deck(llm_choice: LLMModelChoice) -> None:

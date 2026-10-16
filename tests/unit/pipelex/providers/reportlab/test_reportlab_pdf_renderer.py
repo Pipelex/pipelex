@@ -25,6 +25,7 @@ from pipelex.cogt.doc_gen.layout_tree import (
     TableBlock,
 )
 from pipelex.cogt.doc_gen.render_job import RenderJob
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from tests.unit.pipelex.providers.reportlab.reportlab_test_helpers import (
     TEST_FILENAME,
     TEST_TITLE,
@@ -130,7 +131,11 @@ class TestReportlabPdfRenderer:
         resources = StubRenderResources(answer=b"<svg xmlns='http://www.w3.org/2000/svg'/>")
         with pytest.raises(DocGenRenderError, match="image 1 of the document") as exc_info:
             render_layout(blocks=[ImageBlock(url="pipelex-storage://run/chart.svg", caption=None)], resources=resources)
-        assert exc_info.value.error_domain == ErrorDomain.INPUT
+        # The run's data the engine cannot lay out: the caller's to change, and caller-facing.
+        report = exc_info.value.to_error_report()
+        assert report.code == PipelexErrorCode.DOCGEN_CONTENT_UNPRINTABLE
+        assert report.error_domain == ErrorDomain.INPUT
+        assert report.caller_facing_message is True
 
     def test_a_job_that_is_not_a_pdf_from_the_layout_is_refused(self) -> None:
         job = RenderJob(
@@ -159,7 +164,11 @@ class TestReportlabPdfRenderer:
             f"The PDF engine cannot print '{TEST_FILENAME}': the table 'Line items' does not fit on an A4 page, "
             "as part of it is taller than a page and cannot be split across pages."
         )
-        assert exc_info.value.error_domain == ErrorDomain.INPUT
+        # The run's data the engine cannot lay out: the caller's to change, and caller-facing.
+        report = exc_info.value.to_error_report()
+        assert report.code == PipelexErrorCode.DOCGEN_CONTENT_UNPRINTABLE
+        assert report.error_domain == ErrorDomain.INPUT
+        assert report.caller_facing_message is True
 
     def test_table_cells_print_their_scalars(self) -> None:
         table = TableBlock(

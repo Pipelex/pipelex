@@ -17,6 +17,7 @@ from typing import Any
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from mthds.protocol.problem.registry import CoreCode
 from pipelex.base_exceptions import ErrorDomain, ErrorReport, PipelexConfigError, ValidationErrorCategory, ValidationErrorItem
 from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
 from pipelex.runtime_bridge.exceptions import MissingBundleValidatorError
@@ -94,11 +95,10 @@ def _register_stub_for_temporal(mocker: MockerFixture, stub: _StubBundleValidato
 class TestValidateDispatch:
     def test_non_direct_validators_invalid_verdict_maps_to_200_invalid_report(self, mocker: MockerFixture) -> None:
         """A non-direct validator's returned ErrorReport is mapped to a 200 InvalidReport, threading the request."""
-        invalid_verdict = ErrorReport(
+        invalid_verdict = ErrorReport.make_for_code(
+            code=CoreCode.METHOD_INVALID,
             error_type="ValidateBundleError",
             message="bundle is invalid",
-            title="Validate bundle error",
-            type_uri="https://errors.pipelex.com/validate-bundle-error/",
             validation_errors=[ValidationErrorItem(category=ValidationErrorCategory.BLUEPRINT_VALIDATION, message="bad ref")],
         )
         stub = _StubBundleValidator(verdict=invalid_verdict)
@@ -130,12 +130,10 @@ class TestValidateDispatch:
 
     def test_returned_non_verdict_error_report_maps_to_problem_json(self, mocker: MockerFixture) -> None:
         """A registry-backed validator can return a classified backend fault report, not an invalid-bundle verdict."""
-        backend_fault = ErrorReport(
+        backend_fault = ErrorReport.make_for_code(
+            code=CoreCode.RUNTIME_UNAVAILABLE,
             error_type="TemporalTransportError",
             message="validator backend unavailable",
-            title="Temporal transport error",
-            type_uri="https://errors.pipelex.com/temporal-transport-error/",
-            error_domain=ErrorDomain.CONFIG,
         )
         stub = _StubBundleValidator(verdict=backend_fault)
         _register_stub_for_temporal(mocker, stub)
@@ -146,8 +144,9 @@ class TestValidateDispatch:
         assert response.status_code == 500, response.text
         assert response.headers["content-type"].startswith("application/problem+json")
         body = response.json()
+        assert body["code"] == "runtime.unavailable"
         assert body["error_type"] == "TemporalTransportError"
-        assert body["error_domain"] == ErrorDomain.CONFIG
+        assert body["error_domain"] == ErrorDomain.RUNTIME
         assert body["status"] == 500
         assert "is_valid" not in body
         assert "validation_errors" not in body
@@ -166,6 +165,7 @@ class TestValidateDispatch:
                 graph_pipe_code=None,
             )
         assert exc_info.value.mode == "direct"
+        assert exc_info.value.to_error_report().code == "pipelex.plugin.not_found"
 
     def test_forbidden_orchestration_mode_override_is_a_403(self) -> None:
         """The route threads orchestration_mode into the same override policy /start uses: a forbidden override is a 403."""

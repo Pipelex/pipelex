@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, cast
 
 import openai
+from mthds.protocol.problem.registry import CoreCode
 from openai import (
     NOT_GIVEN,
     omit,
@@ -22,14 +23,15 @@ from pipelex.cogt.inference.error_classification import (
     extract_openai_metadata,
     extract_underlying_sdk_exception,
 )
-from pipelex.cogt.inference.error_classify import classify_inference_error
-from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
+from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.llm.completion_stop import classify_responses_stop
 from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.config import get_config
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.system.telemetry.otel_constants import InferenceOutputType
 
 if TYPE_CHECKING:
@@ -164,7 +166,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
             )
         except (openai.APIStatusError, openai.APIConnectionError) as sdk_exc:
             metadata = extract_openai_metadata(sdk_exc)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,
@@ -196,7 +198,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
                     kind=UserActionKind.CHANGE_INPUT,
                     detail="OpenAI Responses API returned no text — try rephrasing the prompt or using a different model",
                 ),
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
 
         return response.output_text
 
@@ -225,7 +227,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
                         " — set a responses-capable structure_method or switch to a model that supports it"
                     ),
                 ),
-            )
+            ).with_error_code(PipelexErrorCode.CONFIG_INVALID)
         extra_headers, extra_body = self.openai_responses_factory.make_extras(
             inference_model=self.inference_model, inference_job=llm_job, output_desc=schema.__name__
         )
@@ -257,7 +259,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
             underlying_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc)
             if underlying_exc is not None:
                 metadata = extract_openai_metadata(underlying_exc)
-                classification = classify_inference_error(metadata)
+                classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
                 raise render_inference_error(
                     metadata=metadata,
                     classification=classification,
@@ -269,10 +271,12 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
                 f"OpenAI structured generation via 'instructor' failed with model: {self.inference_model.desc} "
                 f"trying to generate schema: {schema} with error: {instructor_exc}"
             )
-            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.UNKNOWN) from instructor_exc
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.UNKNOWN).with_error_code(
+                CoreCode.RUNTIME_UNEXPECTED
+            ) from instructor_exc
         except (openai.APIStatusError, openai.APIConnectionError) as sdk_exc:
             metadata = extract_openai_metadata(sdk_exc)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,

@@ -1,5 +1,6 @@
 import httpx
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import DisclosureMode
 from pipelex.tools.misc.exceptions import RemoteFileFetchError
@@ -25,27 +26,42 @@ class TestFetchFileFromUrl:
         raw_bytes = await fetch_file_from_url_httpx(url=URL, transport=_transport_answering(200, b"%PDF-1.4"))
         assert raw_bytes == b"%PDF-1.4"
 
-    @pytest.mark.parametrize("status_code", [404, 403, 500])
-    async def test_error_status_raises_caller_facing_error(self, status_code: int) -> None:
-        """A 4xx/5xx becomes an INPUT-domain error naming the URL and the status, kept under STRICT disclosure."""
+    @pytest.mark.parametrize(
+        ("status_code", "expected_code"),
+        [
+            (404, CoreCode.INPUT_FILE_UNREADABLE),
+            (403, CoreCode.INPUT_FILE_UNREADABLE),
+            (429, CoreCode.INPUT_URL_UNREACHABLE),
+            (500, CoreCode.INPUT_URL_UNREACHABLE),
+            (503, CoreCode.INPUT_URL_UNREACHABLE),
+        ],
+    )
+    async def test_error_status_raises_caller_facing_error(self, status_code: int, expected_code: CoreCode) -> None:
+        """A 4xx/5xx becomes an input error naming the URL and the status, kept under STRICT disclosure.
+
+        A server that will not serve the file is ``input.file_unreadable``; one that cannot answer now, a 5xx or a
+        429, is ``input.url_unreachable``, which a retry may get past.
+        """
         with pytest.raises(RemoteFileFetchError) as exc_info:
             await fetch_file_from_url_httpx(url=URL, transport=_transport_answering(status_code))
 
+        assert exc_info.value.resolve_error_code() == expected_code
         strict = exc_info.value.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)
         assert f"HTTP {status_code}" in strict["message"]
         assert URL in strict["message"]
 
     @pytest.mark.parametrize(
-        ("exc", "expected"),
+        ("exc", "expected", "expected_code"),
         [
-            pytest.param(httpx.ConnectError("boom"), "could not be reached", id="connect"),
-            pytest.param(httpx.ReadTimeout("slow"), "timed out", id="timeout"),
-            pytest.param(httpx.RemoteProtocolError("bad"), "request failed", id="protocol"),
+            pytest.param(httpx.ConnectError("boom"), "could not be reached", CoreCode.INPUT_URL_UNREACHABLE, id="connect"),
+            pytest.param(httpx.ReadTimeout("slow"), "timed out", CoreCode.INPUT_URL_UNREACHABLE, id="timeout"),
+            pytest.param(httpx.RemoteProtocolError("bad"), "request failed", CoreCode.INPUT_FILE_UNREADABLE, id="protocol"),
         ],
     )
-    async def test_network_failure_raises_caller_facing_error(self, exc: httpx.RequestError, expected: str) -> None:
-        with pytest.raises(RemoteFileFetchError, match=expected):
+    async def test_network_failure_raises_caller_facing_error(self, exc: httpx.RequestError, expected: str, expected_code: CoreCode) -> None:
+        with pytest.raises(RemoteFileFetchError, match=expected) as exc_info:
             await fetch_file_from_url_httpx(url=URL, transport=_transport_raising(exc))
+        assert exc_info.value.resolve_error_code() == expected_code
 
 
 @pytest.mark.asyncio(loop_scope="class")

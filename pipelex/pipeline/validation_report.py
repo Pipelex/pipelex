@@ -12,7 +12,7 @@ nowhere. Primary-blueprint selection (`bundle_blueprint`) goes through
 """
 
 from collections.abc import Sequence
-from typing import Literal
+from typing import Any, Literal
 
 from mthds.protocol.models import ValidationReport
 from pydantic import Field
@@ -29,7 +29,7 @@ from pipelex.pipeline.validate_bundle import ValidatedPipeEntry, build_validated
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 
-class PipelexValidationReport(ValidationReport):
+class PipelexValidationReport(ValidationReport[Any]):
     """Pipelex's validation artifacts — this implementation's extensions on the
     protocol's `ValidationReport` (which declares no body fields).
 

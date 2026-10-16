@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
+from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
 from pipelex.core.qualified_ref import QualifiedRef
 
@@ -30,11 +31,11 @@ def get_structure_class_name_from_blueprint(
         The structure class name to use
 
     Raises:
-        ValueError: If concept_ref_or_code is not a valid concept reference or code
+        ConceptStringError: If concept_ref_or_code is not a valid concept reference or code
     """
     if not is_concept_ref_or_code_valid(concept_ref_or_code):
         msg = f"Invalid concept_ref_or_code: '{concept_ref_or_code}'"
-        raise ValueError(msg)
+        raise ConceptStringError(msg)
 
     # Extract concept_code from concept_ref_or_code
     ref = QualifiedRef.parse_stripping_cross_package(concept_ref_or_code)
@@ -120,10 +121,13 @@ def extract_concept_code_from_concept_ref_or_code(concept_ref_or_code: str) -> s
 
     Returns:
         The concept code
+
+    Raises:
+        ConceptStringError: If concept_ref_or_code is not a valid concept reference or code
     """
     if not is_concept_ref_or_code_valid(concept_ref_or_code):
         msg = f"Invalid concept_ref_or_code: '{concept_ref_or_code}' for extracting concept code"
-        raise ValueError(msg)
+        raise ConceptStringError(msg)
 
     ref = QualifiedRef.parse_stripping_cross_package(concept_ref_or_code)
     return ref.local_code

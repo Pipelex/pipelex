@@ -1,36 +1,47 @@
-from pipelex.base_exceptions import ErrorDomain, PipelexError
+from typing import ClassVar
+
+from mthds.protocol.problem.registry import CoreCode
+
+from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
+from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, ErrorCodeSet
 from pipelex.tools.misc.exceptions import ContextProviderError
 
 
 class WorkingMemoryFactoryError(PipelexError):
-    pass
+    error_code = CoreCode.RUNTIME_UNEXPECTED
 
 
 class WorkingMemoryError(PipelexError):
-    pass
+    error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
 
 
 class WorkingMemoryConsistencyError(WorkingMemoryError):
-    pass
+    error_code = CoreCode.RUNTIME_UNEXPECTED
 
 
 class WorkingMemoryVariableError(WorkingMemoryError, ContextProviderError):
-    pass
+    error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
 
 
 class WorkingMemoryTypeError(WorkingMemoryVariableError):
-    pass
+    """The method reads a variable as a type it does not hold; ``input.invalid`` for an empty list where an item is read."""
+
+    error_code = ErrorCodeSet(default=CoreCode.METHOD_WIRING_INVALID, others=(CoreCode.INPUT_INVALID,))
 
 
 class WorkingMemoryStuffAttributeNotFoundError(WorkingMemoryVariableError):
-    pass
+    """The method reads an attribute a variable does not have; ``method.template_private_name`` for a private one."""
+
+    error_code = ErrorCodeSet(default=CoreCode.METHOD_WIRING_INVALID, others=(CoreCode.METHOD_TEMPLATE_PRIVATE_NAME,))
 
 
 class WorkingMemoryStuffNotFoundError(WorkingMemoryVariableError):
     # Not classified as the caller's fault: a step that names a variable nothing produces, a batch
     # over one included, is refused when the bundle loads, so a miss at run time is the runtime's own
     # bookkeeping going wrong, not a mistake in the caller's method.
+    error_code = CoreCode.RUNTIME_UNEXPECTED
+
     def __init__(self, message: str, variable_name: str, pipe_code: str | None = None, concept_code: str | None = None):
         super().__init__(message, variable_name)
         self.pipe_code = pipe_code
@@ -42,14 +53,14 @@ class InputShapingError(PipelexError):
 
     Every subclass describes a fault in the *caller's own* provided inputs — the input name,
     the declared concept, what was provided, and the expected shape rendered from the pipe's
-    signature. ``error_domain = INPUT`` (the caller can fix it) and ``_authors_caller_facing_message``
+    signature. Each subclass carries an ``input.`` code (the caller can fix it), and ``_authors_caller_facing_message``
     (the copy names only the caller's inputs and method, so it survives STRICT disclosure).
 
     Each subclass sets a per-instance ``user_action`` (advice tailored to the specific failure)
     rather than a class-level one, because the actionable fix differs per failure mode.
     """
 
-    error_domain = ErrorDomain.INPUT
+    error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
     _authors_caller_facing_message = True
 
     def __init__(self, message: str, *, variable_name: str, user_action: UserAction | None = None):
@@ -65,6 +76,8 @@ class WrongScalarKindError(InputShapingError):
     E.g. a string for a Number-refining input, a boolean for a Text input. No cross-type parsing
     is attempted — JSON already distinguishes scalars — so the mismatch is a hard error.
     """
+
+    error_code = CoreCode.INPUT_INVALID
 
     @classmethod
     def make(
@@ -86,6 +99,8 @@ class WrongScalarKindError(InputShapingError):
 
 class ListWhereSingularError(InputShapingError):
     """A list was provided where the signature declares a single value (D2)."""
+
+    error_code = CoreCode.INPUT_WRONG_MULTIPLICITY
 
     @classmethod
     def make(
@@ -109,6 +124,8 @@ class ListWhereSingularError(InputShapingError):
 
 class MultiplicityCountMismatchError(InputShapingError):
     """A fixed-count list input received the wrong number of items (D2)."""
+
+    error_code = CoreCode.INPUT_WRONG_MULTIPLICITY
 
     @classmethod
     def make(
@@ -144,6 +161,8 @@ class StructureValidationError(InputShapingError):
     input; and a scalar at an input of a verdict native, such as a bare level at a ``Rating`` input.
     The last three are fixed in the value, sent in the expected shape.
     """
+
+    error_code = ErrorCodeSet(default=CoreCode.INPUT_INVALID, others=(CoreCode.INPUT_WRONG_CONCEPT,))
 
     @classmethod
     def make(
@@ -273,7 +292,7 @@ class StructureValidationError(InputShapingError):
             kind=UserActionKind.CHANGE_INPUT,
             detail=f"Send input '{variable_name}' in the expected shape, which names its concept and spells out its content.",
         )
-        return cls(message, variable_name=variable_name, user_action=user_action)
+        return cls(message, variable_name=variable_name, user_action=user_action).with_error_code(CoreCode.INPUT_WRONG_CONCEPT)
 
 
 class ExplicitConceptIncompatibleError(InputShapingError):
@@ -282,6 +301,8 @@ class ExplicitConceptIncompatibleError(InputShapingError):
     The escape-hatch ``{"concept": C, "content": ...}`` (and a directly-provided ``StuffContent``)
     is now checked: ``C`` must be compatible with — refine or equal — the declared concept.
     """
+
+    error_code = CoreCode.INPUT_WRONG_CONCEPT
 
     @classmethod
     def make(
@@ -310,6 +331,8 @@ class UnknownInputNameError(InputShapingError):
     the declared names, instead of silently carrying an input that is never read.
     """
 
+    error_code = CoreCode.INPUT_UNEXPECTED
+
     @classmethod
     def make(cls, *, variable_name: str, declared_names: list[str]) -> "UnknownInputNameError":
         declared_display = ", ".join(f"'{name}'" for name in declared_names) if declared_names else "(none)"
@@ -327,6 +350,8 @@ class NullInputError(InputShapingError):
     Absence is expressed by *omitting* the key (Optionals), never by a null value, so a top-level
     null is a hard error rather than a silently-dropped or mis-shaped input.
     """
+
+    error_code = CoreCode.INPUT_INVALID
 
     @classmethod
     def make(cls, *, variable_name: str, declared_concept_ref: str, expected_shape: str) -> "NullInputError":

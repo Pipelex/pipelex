@@ -45,6 +45,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, Protocol, cast
 from opentelemetry import trace
 from typing_extensions import override
 
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.system.telemetry.current_span import current_span_context_for_logs, pipelex_trace_fields_for_logs
 from pipelex.tools.log.exceptions import GcpLogSinkCredentialsError
@@ -706,7 +707,7 @@ def confirm_credentials_at_boot(*, credentials_check: GcpCredentialsCheck, remed
                 f"was refused at boot, so every record it exported would be lost ({describe_failure(failure=verdict.failure)}). "
                 f"{remedy}, or select the '{LogSinkMethod.JSON}' sink in [runtime.log]."
             )
-            raise GcpLogSinkCredentialsError(msg) from verdict.failure
+            raise GcpLogSinkCredentialsError(msg).with_error_code(PipelexErrorCode.CONFIG_CREDENTIAL_REFUSED) from verdict.failure
         case GcpCredentialsOutcome.UNREACHABLE:
             why = f"a refresh could not reach the credential endpoint ({describe_failure(failure=verdict.failure)})"
         case GcpCredentialsOutcome.UNANSWERED:

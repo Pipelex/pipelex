@@ -1,6 +1,8 @@
-from collections.abc import Container, Mapping
-from typing import NoReturn, Self
+from collections.abc import Callable, Container, Mapping
+from functools import partial
+from typing import NoReturn, Self, TypeVar
 
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import Field, PrivateAttr, field_validator, model_validator
 
 from pipelex import log
@@ -15,7 +17,8 @@ from pipelex.cogt.exceptions import (
     JudgmentHandleNotFoundError,
     LLMHandleNotFoundError,
     ModelChoiceNotFoundError,
-    ModelDeckPresetValidatonError,
+    ModelDeckChoiceUnresolvedError,
+    ModelDeckPresetValidationError,
     ModelNotFoundError,
     ModelWaterfallError,
     SearchHandleNotFoundError,
@@ -54,6 +57,29 @@ from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pipelex.urls import URLs
 
 LLM_PRESET_DISABLED = "disabled"
+
+DeckSettingT = TypeVar("DeckSettingT")
+
+
+def resolve_deck_choice(*, deck_setting: str, resolve: Callable[[], DeckSettingT]) -> DeckSettingT:
+    """Resolve a model choice the deck names itself, a default or an override, so that a miss is the deck's fault.
+
+    The deck's lookups refuse a reference they do not resolve as ``ModelChoiceNotFoundError``, which reads as the
+    method's: ``model.unknown`` and caller-facing. A step that names no model reaches the same lookups with the deck's
+    own choice, and the caller can change nothing about that, so the miss is raised again as a
+    ``ModelDeckChoiceUnresolvedError`` naming the deck's setting.
+
+    Args:
+        deck_setting: Where the deck names the choice, as its file spells it, such as ``extract.choice_default``.
+        resolve: The lookup of the deck's choice.
+
+    Returns:
+        What the lookup returns.
+    """
+    try:
+        return resolve()
+    except ModelChoiceNotFoundError as exc:
+        raise ModelDeckChoiceUnresolvedError(deck_setting=deck_setting, unresolved=exc) from exc
 
 
 def _warn_if_ambiguous_bare_handle(
@@ -298,14 +324,22 @@ class ModelDeck(ConfigModel):
             case ModelReferenceKind.HANDLE:
                 return self.is_bare_handle_resolvable(name=reference.name, model_type=model_type)
 
+    def is_served_only_as_other_types(self, *, name: str, model_type: ModelType) -> bool:
+        """Whether the deck serves a model of this name, but never as this model type.
+
+        A bare handle refused for that reason names a model that exists and is served, so its refusal is the
+        model lacking the capability the step needs (``model.capability_unsupported``), not an unknown model.
+        """
+        served_types = self.inference_models.types_serving(handle=name)
+        return bool(served_types) and model_type not in served_types
+
     def unresolved_handle_sentence(self, *, name: str, model_type: ModelType) -> str:
         """The sentence refusing a bare handle that does not resolve for this model type.
 
         It names the handle and the type the field needs. When the deck serves a model of that name
         only as other types, it says so rather than calling the handle missing, without naming them.
         """
-        served_types = self.inference_models.types_serving(handle=name)
-        if served_types and model_type not in served_types:
+        if self.is_served_only_as_other_types(name=name, model_type=model_type):
             return f"Model handle '{name}' is served by the model deck, but not as {model_type.indefinite_description}"
         return f"Model handle '{name}' was not found in the model deck"
 
@@ -425,13 +459,16 @@ class ModelDeck(ConfigModel):
         if hints:
             msg += "\n\nMigration hints:\n" + "\n".join(f"  - {hint}" for hint in hints)
 
-        raise ModelChoiceNotFoundError(
+        not_found = ModelChoiceNotFoundError(
             message=msg,
             model_type=model_type,
             model_choice=ref.raw,
             reference_kind=ModelReferenceKind.HANDLE,
             available_options=self.inference_models.handles_of_type(model_type=model_type),
         )
+        if self.is_served_only_as_other_types(name=ref.name, model_type=model_type):
+            raise not_found.with_error_code(CoreCode.MODEL_CAPABILITY_UNSUPPORTED)
+        raise not_found
 
     def check_llm_choice(
         self,
@@ -484,13 +521,16 @@ class ModelDeck(ConfigModel):
                 if self.is_bare_handle_resolvable(name=ref.name, model_type=ModelType.LLM):
                     return
                 msg = self.unresolved_handle_sentence(name=ref.name, model_type=ModelType.LLM)
-                raise ModelChoiceNotFoundError(
+                not_found = ModelChoiceNotFoundError(
                     message=msg,
                     model_type=ModelType.LLM,
                     model_choice=ref.raw,
                     reference_kind=ModelReferenceKind.HANDLE,
                     available_options=self.inference_models.handles_of_type(model_type=ModelType.LLM),
                 )
+                if self.is_served_only_as_other_types(name=ref.name, model_type=ModelType.LLM):
+                    raise not_found.with_error_code(CoreCode.MODEL_CAPABILITY_UNSUPPORTED)
+                raise not_found
 
     def get_llm_setting(self, llm_choice: LLMModelChoice) -> LLMSetting:
         if isinstance(llm_choice, LLMSetting):
@@ -821,8 +861,13 @@ class ModelDeck(ConfigModel):
 
     @model_validator(mode="after")
     def validate_llm_choice_overrides(self) -> Self:
-        for llm_choice_ref in self.llm_choice_overrides.list_choice_references():
-            self.check_llm_choice(llm_choice=llm_choice_ref)
+        # An override is the deck's own choice, so a miss is the deck's fault, refused before any caller is involved.
+        for field_name, llm_choice in (("for_text", self.llm_choice_overrides.for_text), ("for_object", self.llm_choice_overrides.for_object)):
+            if isinstance(llm_choice, ModelReference):
+                resolve_deck_choice(
+                    deck_setting=f"llm.choice_overrides.{field_name}",
+                    resolve=partial(self.check_llm_choice, llm_choice=llm_choice),
+                )
         return self
 
     def validate_llm_presets(self) -> Self:
@@ -913,7 +958,7 @@ class ModelDeck(ConfigModel):
             match self.model_deck_config.missing_presets_reaction:
                 case ProblemReaction.RAISE:
                     msg = f"Failed to validate all LLM presets: {exc}"
-                    raise ModelDeckPresetValidatonError(
+                    raise ModelDeckPresetValidationError(
                         message=msg,
                         model_type=ModelType.LLM,
                         preset_id=exc.preset_id,
@@ -930,7 +975,7 @@ class ModelDeck(ConfigModel):
             match self.model_deck_config.missing_presets_reaction:
                 case ProblemReaction.RAISE:
                     msg = f"Failed to validate all ImgGen presets: {exc}"
-                    raise ModelDeckPresetValidatonError(
+                    raise ModelDeckPresetValidationError(
                         message=msg,
                         model_type=ModelType.IMG_GEN,
                         preset_id=exc.preset_id,
@@ -946,7 +991,7 @@ class ModelDeck(ConfigModel):
             match self.model_deck_config.missing_presets_reaction:
                 case ProblemReaction.RAISE:
                     msg = f"Failed to validate all Extract presets: {exc}"
-                    raise ModelDeckPresetValidatonError(
+                    raise ModelDeckPresetValidationError(
                         message=msg,
                         model_type=ModelType.TEXT_EXTRACTOR,
                         preset_id=exc.preset_id,
@@ -962,7 +1007,7 @@ class ModelDeck(ConfigModel):
             match self.model_deck_config.missing_presets_reaction:
                 case ProblemReaction.RAISE:
                     msg = f"Failed to validate all Search presets: {exc}"
-                    raise ModelDeckPresetValidatonError(
+                    raise ModelDeckPresetValidationError(
                         message=msg,
                         model_type=ModelType.SEARCH,
                         preset_id=exc.preset_id,
@@ -978,7 +1023,7 @@ class ModelDeck(ConfigModel):
             match self.model_deck_config.missing_presets_reaction:
                 case ProblemReaction.RAISE:
                     msg = f"Failed to validate all DocGen presets: {exc}"
-                    raise ModelDeckPresetValidatonError(
+                    raise ModelDeckPresetValidationError(
                         message=msg,
                         model_type=ModelType.DOC_GEN,
                         preset_id=exc.preset_id,
@@ -994,7 +1039,7 @@ class ModelDeck(ConfigModel):
             match self.model_deck_config.missing_presets_reaction:
                 case ProblemReaction.RAISE:
                     msg = f"Failed to validate all Judgment presets: {exc}"
-                    raise ModelDeckPresetValidatonError(
+                    raise ModelDeckPresetValidationError(
                         message=msg,
                         model_type=ModelType.JUDGMENT,
                         preset_id=exc.preset_id,
@@ -1328,7 +1373,6 @@ class ModelDeck(ConfigModel):
             # reaches, a hosted run's stored error included, whose reader has no local deck. The
             # remedy for a stale local deck is the local CLI's to give, in its model panel.
             msg = f"Model handle '{model_handle}' was not found in the model deck."
-            model_not_found_error = ModelNotFoundError(message=msg, model_handle=model_handle)
             if not self._is_deck_model_reference(model_handle=model_handle, model_type=model_type):
                 # The deck neither defines this reference for this type nor names it anywhere, so the
                 # method being run named it. The load-time check refuses every reference it sees that
@@ -1338,15 +1382,19 @@ class ModelDeck(ConfigModel):
                 # The message and the next step name nothing but the caller's own reference, as the
                 # method wrote it, and the type its pipe asked for, never the type the deck serves it
                 # as. A reference the deck itself names but cannot serve (a preset or an alias target on
-                # a backend that is not enabled) stays the deployment's fault, and stays redacted, with
-                # no next step.
-                model_not_found_error.as_caller_fault(
-                    user_action=UserAction(
-                        kind=UserActionKind.CHANGE_MODEL,
-                        detail=f"Change the model '{model_handle}' to {model_type.indefinite_description} the model deck serves.",
+                # a backend that is not enabled) stays the deployment's fault, `model.unavailable`, and stays
+                # redacted, with no next step.
+                raise (
+                    ModelNotFoundError(message=msg, model_handle=model_handle)
+                    .with_error_code(CoreCode.MODEL_UNKNOWN)
+                    .as_caller_fault(
+                        user_action=UserAction(
+                            kind=UserActionKind.CHANGE_MODEL,
+                            detail=f"Change the model '{model_handle}' to {model_type.indefinite_description} the model deck serves.",
+                        )
                     )
                 )
-            raise model_not_found_error
+            raise ModelNotFoundError(message=msg, model_handle=model_handle)
         if self.inference_models.get(model_type=model_type, handle=model_handle) is None:
             log.verbose(f"Model reference '{model_handle}' resolves to model '{inference_model.name}'")
         return inference_model

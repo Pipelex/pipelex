@@ -22,6 +22,7 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     set_agent_cli_error_format,
 )
 from pipelex.cli.commands.crate_loading import load_normalized_crate
+from pipelex.cli.exceptions import BundleClosureEmptyError
 from pipelex.codegen.emission import write_stamped_projection
 from pipelex.codegen.emitters.target import CodegenKind, CodegenTarget
 from pipelex.codegen.emitters.types_emitter import emit_types
@@ -89,6 +90,9 @@ def agent_codegen_types_cmd(
             except FileNotFoundError as exc:
                 # No verdict: the closure could not even be assembled.
                 agent_error(f"Cannot resolve — {exc}", error_type="FileNotFoundError", cause=exc, exit_code=2)
+            except BundleClosureEmptyError as exc:
+                # No verdict: the closure holds no bundle to read.
+                agent_error(f"Cannot resolve — {exc}", error_type=type(exc).__name__, cause=exc, exit_code=2)
             generation_report.describe(crate=crate)
 
             emitted = emit_types(crate, target=target)

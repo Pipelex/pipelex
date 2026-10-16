@@ -229,11 +229,11 @@ class SchemaToModelFactory:
         """
         if level != 0:
             msg = f"Relative imports are not allowed in generated code: {name!r}"
-            raise ImportError(msg)
+            raise UnsafeSchemaError(msg)
         top_level = name.split(".", 1)[0]
         if top_level not in cls._ALLOWED_IMPORT_TOP_LEVELS:
             msg = f"Import of {name!r} is not allowed in generated code"
-            raise ImportError(msg)
+            raise UnsafeSchemaError(msg)
         return builtins.__import__(name, import_globals, import_locals, fromlist or (), level)
 
     @classmethod

@@ -9,6 +9,7 @@ from anthropic import (
 )
 from anthropic.lib.bedrock import AsyncAnthropicBedrock
 from anthropic.types import OutputConfigParam, ThinkingConfigParam
+from mthds.protocol.problem.registry import CoreCode
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 from typing_extensions import override
 
@@ -20,8 +21,8 @@ from pipelex.cogt.inference.error_classification import (
     extract_anthropic_metadata,
     extract_underlying_sdk_exception,
 )
-from pipelex.cogt.inference.error_classify import classify_inference_error
-from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
+from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
@@ -369,7 +370,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                 final_message: Message = await stream.get_final_message()
         except (APIStatusError, APIConnectionError) as sdk_exc:
             metadata = extract_anthropic_metadata(sdk_exc)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,
@@ -412,7 +413,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                         " — shorten the prompt, raise max_tokens, or disable thinking"
                     ),
                 ),
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
 
         return "\n\n".join(text_parts)
 
@@ -516,7 +517,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
             underlying_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc)
             if underlying_exc is not None:
                 metadata = extract_anthropic_metadata(underlying_exc)
-                classification = classify_inference_error(metadata)
+                classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
                 rendered_error = render_inference_error(
                     metadata=metadata,
                     classification=classification,
@@ -536,11 +537,11 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                     kind=UserActionKind.CONTACT_SUPPORT,
                     detail="Structured generation failed for an unrecognized reason — retry, and report this if it persists",
                 ),
-            )
+            ).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
             raise self._with_note(error=fallback_error, note=lowered_max_tokens_note, failure=None) from instructor_exc
         except (APIStatusError, APIConnectionError) as sdk_exc:
             metadata = extract_anthropic_metadata(sdk_exc)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
             rendered_error = render_inference_error(
                 metadata=metadata,
                 classification=classification,

@@ -33,6 +33,7 @@ from typing import TYPE_CHECKING, Any
 import anthropic
 import httpx
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from openai import OpenAI
 from portkey_ai import Portkey
 
@@ -46,8 +47,8 @@ from pipelex.cogt.inference.error_classification import (
     extract_gateway_metadata,
     extract_openai_metadata,
 )
-from pipelex.cogt.inference.error_classify import classify_inference_error
-from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
+from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -137,7 +138,7 @@ def _rendered_error(
 ) -> CogtError:
     return render_inference_error(
         metadata=metadata,
-        classification=classify_inference_error(metadata),
+        classification=classify_inference_error(metadata, family=family),
         family=family,
         model_desc=f"{model_handle} → Model[{_MODEL_NOT_ALLOWED_WIRE_ID}]",
         model_handle=model_handle,
@@ -204,22 +205,24 @@ class TestClassification:
         So ``CHANGE_MODEL`` is what the caller can do, and the flag stays unset:
         "not found" would be false.
         """
-        result = classify_inference_error(_envelope(MODEL_NOT_ALLOWED_ERROR_CODE))
+        result = classify_inference_error(_envelope(MODEL_NOT_ALLOWED_ERROR_CODE), family=InferenceErrorFamily.LLM)
 
         assert result.is_model_not_allowed is True
         assert result.category == InferenceErrorCategory.CONFIGURATION
         assert result.category.is_retryable is False
         assert result.user_action_kind == UserActionKind.CHANGE_MODEL
         assert result.is_model_not_found is False
+        assert result.error_code == CoreCode.MODEL_UNAVAILABLE
         assert result.service_error_code is None
 
     def test_a_412_without_the_code_still_takes_the_status_ladder(self) -> None:
         """The contrast: the ladder's generic 4xx arm, which is what the refusal would otherwise read as."""
-        result = classify_inference_error(_envelope("something-else"))
+        result = classify_inference_error(_envelope("something-else"), family=InferenceErrorFamily.LLM)
 
         assert result.is_model_not_allowed is False
         assert result.category == InferenceErrorCategory.CONFIGURATION
         assert result.user_action_kind == UserActionKind.CHANGE_INPUT
+        assert result.error_code == CoreCode.RUNTIME_UNEXPECTED
 
 
 class TestEndToEnd:
@@ -286,19 +289,17 @@ class TestRenderedAdvice:
 
 
 class TestWhatItAnswersOverHTTP:
-    def test_it_answers_500_as_an_unrecognized_412_does(self) -> None:
-        """At its real status the refusal's answer does not move: only its advice does.
+    def test_it_answers_as_the_operator_s_where_an_unrecognized_412_is_a_runtime_fault(self) -> None:
+        """Recognizing the code moves the refusal from a request of ours the provider could not take to the operator's.
 
-        The ladder's generic 4xx arm already reads a 412 as ``CONFIGURATION``, so
-        recognizing the code changes this refusal's ``user_action`` and nothing about
-        its status.
+        The ladder's generic 4xx arm reads an unrecognized 412 as ``runtime.unexpected``; the refusal's code is
+        ``model.unavailable``, which the deployment's operator settles by serving or allowing the model.
         """
         report = _rendered_error(_envelope(MODEL_NOT_ALLOWED_ERROR_CODE)).to_error_report()
         unrecognized_report = _rendered_error(_envelope("something-else")).to_error_report()
 
         assert report.error_domain == ErrorDomain.CONFIG
-        assert report.http_status == 500
-        assert unrecognized_report.error_domain == ErrorDomain.CONFIG
+        assert unrecognized_report.error_domain == ErrorDomain.RUNTIME
         assert unrecognized_report.http_status == 500
 
 

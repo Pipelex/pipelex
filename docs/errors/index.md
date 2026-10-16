@@ -9,7 +9,7 @@ An error code names a situation a runner or a client can meet, and its type URI 
 
 These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.87.0` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
 
-The registry declares the Pipelex codes, but Pipelex's errors do not carry them yet: an error still reports its `error_type` and a type URI derived from its class, and giving every error its code is the next step of this work, as the [Error Model](../under-the-hood/error-model.md#error-codes-and-the-pipelex-error-registry) describes.
+Every Pipelex error carries a code, one of these or a core code: its problem document names it as `code`, and its `type` is the code's page. The [Error Model](../under-the-hood/error-model.md#error-codes-and-the-pipelex-error-registry) describes how an error class declares the code it raises.
 
 ## pipelex.billing { #pipelex-billing }
 
