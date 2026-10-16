@@ -19,9 +19,9 @@ class Jinja2TemplateSecurityError(SecurityError):
     # A template reached for something the sandbox policy refuses (`jinja2_sandbox.py`): an undeclared
     # private name, or a call that is not a method of a plain value. Its message names the attribute or
     # the callable and the type it was reached on, and never quotes the template source, since the same
-    # render serves Pipelex's own templates. A `SecurityError`, not a `ToolError`, like the runtime's other
-    # policy refusals, so that a host treating every refusal alike (never absorbed into a domain answer,
-    # never retried) relies on that one base class. A type of its own, apart from `Jinja2TemplateRenderError`,
+    # render serves Pipelex's own templates. A `SecurityError`, not a `ToolError`, in the family of
+    # `UriReadRefusedError`, `SsrfBlockedError` and `UnsafeSchemaError`, so that a host catching that family
+    # never absorbs it into a domain answer and never retries it. A type of its own, apart from `Jinja2TemplateRenderError`,
     # so that the classification of render-time template failures can tell a refusal from the rest,
     # although for now both are classified alike: runtime domain, message not caller-facing.
     pass
