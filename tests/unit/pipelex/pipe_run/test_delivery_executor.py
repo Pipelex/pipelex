@@ -4,10 +4,11 @@ import socket
 from datetime import UTC, datetime
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture, MockType
 
 from pipelex import log
-from pipelex.base_exceptions import ErrorDomain, ErrorReport
+from pipelex.base_exceptions import ErrorReport
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
@@ -881,24 +882,24 @@ class TestDeliveryExecutor:
         mock_client.post = mocker.AsyncMock(return_value=mock_response)
         mocker.patch("pipelex.pipe_run.delivery_executor.httpx.AsyncClient", return_value=mock_client)
 
-        error_report = ErrorReport(
+        error_report = ErrorReport.make_for_code(
+            code=CoreCode.PROVIDER_RATE_LIMITED,
             error_type="LLMCompletionError",
             message="provider returned 429",
-            title="AI inference failed",
-            type_uri="https://docs.pipelex.com/latest/errors/llm-completion-error/",
-            error_category="transient",
-            error_domain=ErrorDomain.RUNTIME,
-            retryable=True,
             user_action=UserAction(kind=UserActionKind.WAIT_AND_RETRY, detail="Wait a moment and retry"),
-            model="gpt-4o-mini",
-            provider="openai",
-            provider_metadata=ProviderErrorMetadata(
-                provider=ProviderName.OPENAI,
-                sdk_exception_type="RateLimitError",
-                message="429 Too Many Requests",
-                status_code=429,
-                retry_after_seconds=2.5,
-            ),
+        ).model_copy(
+            update={
+                "error_category": "transient",
+                "model": "gpt-4o-mini",
+                "provider": "openai",
+                "provider_metadata": ProviderErrorMetadata(
+                    provider=ProviderName.OPENAI,
+                    sdk_exception_type="RateLimitError",
+                    message="429 Too Many Requests",
+                    status_code=429,
+                    retry_after_seconds=2.5,
+                ),
+            }
         )
 
         executor = DeliveryExecutor()
@@ -1014,15 +1015,11 @@ class TestDeliveryExecutor:
             (DeliveryStatus.COMPLETED, None),
             (
                 DeliveryStatus.FAILED,
-                ErrorReport(
+                ErrorReport.make_for_code(
+                    code=CoreCode.PROVIDER_RATE_LIMITED,
                     error_type="LLMCompletionError",
                     message="provider returned 429",
-                    title="AI inference failed",
-                    type_uri="https://docs.pipelex.com/latest/errors/llm-completion-error/",
-                    error_category="transient",
-                    error_domain=ErrorDomain.RUNTIME,
-                    retryable=True,
-                ),
+                ).model_copy(update={"error_category": "transient"}),
             ),
         ],
     )

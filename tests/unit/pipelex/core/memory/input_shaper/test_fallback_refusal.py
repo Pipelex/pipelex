@@ -46,7 +46,7 @@ class TestInputShaperFallbackRefusal:
         # the chain as the cause and out of what a caller reads.
         assert "typing.Union" not in message
         assert isinstance(error.__cause__, StuffFactoryError)
-        assert error.error_domain == ErrorDomain.INPUT
+        assert error.to_error_report().error_domain == ErrorDomain.INPUT
         # The fix is on the author's side: the declaration, and no envelope.
         assert error.user_action is not None
         assert error.user_action.kind == UserActionKind.CHANGE_INPUT

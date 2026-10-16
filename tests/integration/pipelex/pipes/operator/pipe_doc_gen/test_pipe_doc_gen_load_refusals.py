@@ -2,7 +2,7 @@ import pytest
 
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import refusal_report
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import engine_unavailable_report, refusal_report
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 
@@ -18,14 +18,14 @@ class TestPipeDocGenLoadRefusals:
     )
     async def test_a_step_no_installed_engine_prints_names_the_plugin(self, step_fields: str, asks: str) -> None:
         """Open Pipelex declares a default for a pdf without a template only: any other step is refused at load, naming the plugin."""
-        report = await refusal_report(step_fields=step_fields)
+        report = await engine_unavailable_report(step_fields=step_fields)
         assert asks in report
         assert "pipelex-doc-gen" in report
         assert "pipelex update" not in report
 
     async def test_a_step_naming_a_plugin_engine_is_refused_where_the_plugin_is_absent(self) -> None:
         """A step may name the plugin's `pipelex-pdf` for a pdf without a template, and open Pipelex refuses it at load, naming the plugin."""
-        report = await refusal_report(step_fields='format = "pdf"\nmodel = "pipelex-pdf"')
+        report = await engine_unavailable_report(step_fields='format = "pdf"\nmodel = "pipelex-pdf"')
         assert "pipelex-pdf" in report
         assert "pipelex-doc-gen" in report
         assert "was not found in the model deck" not in report
@@ -38,7 +38,7 @@ class TestPipeDocGenLoadRefusals:
     )
     async def test_a_pdf_layout_step_is_refused_where_internal_toml_predates_the_built_in_engine(self, step_fields: str) -> None:
         """An installation whose internal.toml does not declare `reportlab-pdf` is told to run `pipelex update`, not that the model is unknown."""
-        report = await refusal_report(step_fields=step_fields)
+        report = await engine_unavailable_report(step_fields=step_fields)
         assert "reportlab-pdf" in report
         assert "pipelex update" in report
         assert "was not found in the model deck" not in report
@@ -60,7 +60,7 @@ class TestPipeDocGenLoadRefusals:
     @pytest.mark.usefixtures("no_engines")
     async def test_a_pdf_layout_step_is_refused_where_the_built_in_engine_is_disabled(self) -> None:
         """A host that disables the built-in engine and installs no plugin refuses even a pdf without a template."""
-        report = await refusal_report(step_fields=PipeDocGenTestData.PDF_LAYOUT_STEP)
+        report = await engine_unavailable_report(step_fields=PipeDocGenTestData.PDF_LAYOUT_STEP)
         assert "built into Pipelex and disabled" in report
 
     @pytest.mark.usefixtures("stub_engines")

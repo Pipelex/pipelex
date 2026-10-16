@@ -17,14 +17,15 @@ from mthds.package.exceptions import VCSFetchError
 from mthds.package.manifest.parser import parse_methods_toml
 from pytest_mock import MockerFixture
 
-from pipelex.base_exceptions import DisclosureMode, ValidationErrorCategory, ValidationErrorItem
+from pipelex.base_exceptions import DisclosureMode, ErrorDomain, ValidationErrorCategory, ValidationErrorItem
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.interpreter_hub import get_library_manager
 from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.methods.exceptions import MethodInstallError, MethodPackageNotFoundError
 from pipelex.methods.fetching import FetchedMethodPackage, fetch_method_package
 from pipelex.methods.method_ref import MethodRef, parse_method_ref
 from pipelex.mthds_parsing.parser import MthdsParser
-from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.exceptions import HostLibraryLoadRefusalError, ValidateBundleError
 from pipelex.pipeline.execution_seams import acquire_library
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.tools.log.error_fields import ERROR_MESSAGE_FIELD, ERROR_TYPE_FIELD
@@ -225,8 +226,11 @@ class TestUnresolvedPackageDependency:
         host_dir.mkdir()
         write_consumer(root=host_dir, bundles={"consumer.mthds": ProbePackageTestData.CONSUMER_BUNDLE})
 
-        with pytest.raises(LibraryLoadingError) as exc_info:
+        with pytest.raises(HostLibraryLoadRefusalError) as exc_info:
             acquire_library(library_id="", library_dirs=[str(host_dir)])
 
-        assert not isinstance(exc_info.value, ValidateBundleError)
-        assert exc_info.value.to_error_report().error_domain is None
+        # The refusal is the deployment's misconfiguration, raised from the library's own refusal, which the operator reads.
+        assert isinstance(exc_info.value.__cause__, LibraryLoadingError)
+        report = exc_info.value.to_error_report()
+        assert report.code == PipelexErrorCode.CONFIG_INVALID
+        assert report.error_domain is not ErrorDomain.INPUT

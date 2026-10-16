@@ -14,9 +14,12 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from mthds.protocol.exceptions import PipelineRequestError
 from mthds.protocol.models import ModelCategory as MthdsModelCategory
+from mthds.protocol.problem.registry import CoreCode
 from mthds.protocol.protocol import PROTOCOL_VERSION
 
 from pipelex.cogt.models.model_listing import ModelCategory
+from pipelex.pipe_run.exceptions import AsyncExecutionNotEnabledError
+from pipelex.pipeline.request_exceptions import PipelexRequestError
 from pipelex.pipeline.runner import (
     PipelexModelDeck,
     PipelexMTHDSProtocol,
@@ -53,7 +56,10 @@ class TestRunnerProtocolSurfaces:
         with pytest.raises(PipelineRequestError) as exc_info:
             await runner.execute(pipe_code="any_pipe", extra={"zed": 1, "abc": 2})
 
-        assert str(exc_info.value) == "The local runtime defines no extension args; got ['abc', 'zed']."
+        assert isinstance(exc_info.value, PipelexRequestError)
+        assert exc_info.value.message == "The local runtime defines no extension args; got ['abc', 'zed']."
+        assert exc_info.value.problem.code == CoreCode.REQUEST_UNSUPPORTED
+        assert exc_info.value.to_error_report().code == CoreCode.REQUEST_UNSUPPORTED
 
     async def test_validate_rejects_blank_graph_pipe_code_extra(self) -> None:
         """A blank explicit graph target must not silently fall back to main_pipe."""
@@ -65,15 +71,19 @@ class TestRunnerProtocolSurfaces:
                 extra={"graph_pipe_code": "   "},
             )
 
-        assert str(exc_info.value) == "validate extra 'graph_pipe_code' must not be blank when provided."
+        assert isinstance(exc_info.value, PipelexRequestError)
+        assert exc_info.value.message == "validate extra 'graph_pipe_code' must not be blank when provided."
+        assert exc_info.value.field == "extra.graph_pipe_code"
+        assert exc_info.value.to_error_report().code == CoreCode.REQUEST_INVALID
 
     async def test_start_raises_not_implemented_pointing_at_execute(self) -> None:
         """The local runtime does not implement async start; the message redirects to execute."""
         runner = PipelexMTHDSProtocol()
 
-        with pytest.raises(NotImplementedError) as exc_info:
+        with pytest.raises(AsyncExecutionNotEnabledError) as exc_info:
             await runner.start(pipe_code="any_pipe")
 
+        assert exc_info.value.to_error_report().code == CoreCode.RUNTIME_UNSUPPORTED
         assert "execute" in str(exc_info.value)
         assert "not implemented by the local runtime" in str(exc_info.value)
 

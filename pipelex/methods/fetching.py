@@ -12,8 +12,10 @@ from pathlib import Path
 from mthds.package.exceptions import VCSFetchError
 from mthds.package.manifest.schema import MethodsManifest
 from mthds.package.vcs_resolver import clone_at_version, clone_default_branch
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ConfigDict, Field
 
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.methods.exceptions import MethodFetchError, MethodPackageSymlinkError, MethodPackageTooLargeError
 from pipelex.methods.fetch_limits import MAX_FETCHED_PACKAGE_FILES, MAX_FETCHED_PACKAGE_TOTAL_BYTES
 from pipelex.methods.method_ref import MethodRef
@@ -102,7 +104,7 @@ def resolve_head_commit_sha(*, clone_dir: Path) -> str:
         )
     except FileNotFoundError as exc:
         msg = "git is not installed or not found on PATH"
-        raise MethodFetchError(msg) from exc
+        raise MethodFetchError(msg).with_error_code(PipelexErrorCode.CONFIG_DEPENDENCY_MISSING) from exc
     except subprocess.CalledProcessError as exc:
         msg = f"Failed to resolve the fetched commit: {_without_host_directory(text=exc.stderr.strip(), directory=clone_dir)}"
         raise MethodFetchError(msg) from exc
@@ -136,7 +138,7 @@ def ensure_cloned_at_tag(*, clone_dir: Path, ref: MethodRef) -> None:
         )
     except FileNotFoundError as exc:
         msg = "git is not installed or not found on PATH"
-        raise MethodFetchError(msg) from exc
+        raise MethodFetchError(msg).with_error_code(PipelexErrorCode.CONFIG_DEPENDENCY_MISSING) from exc
     except subprocess.TimeoutExpired as exc:
         msg = f"Timed out verifying tag '{ref.tag}' of method reference '{ref.ref_str}'"
         raise MethodFetchError(msg) from exc
@@ -145,7 +147,7 @@ def ensure_cloned_at_tag(*, clone_dir: Path, ref: MethodRef) -> None:
             f"'{ref.tag}' in method reference '{ref.ref_str}' does not name a git tag on the repository — "
             f"`@<tag>` pins a git tag (recommended form vX.Y.Z); branch names are not accepted."
         )
-        raise MethodFetchError(msg)
+        raise MethodFetchError(msg).with_error_code(CoreCode.METHOD_NOT_FOUND)
 
 
 def ensure_package_within_bounds(*, package_dir: Path, package_address: str) -> None:

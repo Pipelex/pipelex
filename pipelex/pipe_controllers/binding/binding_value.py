@@ -19,6 +19,8 @@ import datetime
 import math
 from typing import Any, NamedTuple, cast
 
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.list_content import ListContent
@@ -110,14 +112,14 @@ def _refuse_shape_mismatch(*, root_content: StuffContent, derivation: BindingDer
             f"{item_count} items, and a binding never chooses one item of a list. The root was typed before the run as a single value, "
             "so whatever stored it stored a list instead, such as a step whose caller asked for several outputs."
         )
-        raise BindingStepRunError(msg)
+        raise BindingStepRunError(msg).with_error_code(CoreCode.PIPE_OUTPUT_MULTIPLICITY)
     if derivation.is_bare_name and derivation.is_plural:
         msg = (
             f"Binding '{derivation.path}' was derived as a list, but its root '{derivation.root_name}' holds a single value, "
             "and a bare name binds its root's value as it is. The root was typed before the run as a list, so whatever stored it "
             "stored a single value instead."
         )
-        raise BindingStepRunError(msg)
+        raise BindingStepRunError(msg).with_error_code(CoreCode.PIPE_OUTPUT_MULTIPLICITY)
 
 
 def _list_items(*, value: Any, reached_path: str, path: str) -> list[Any]:

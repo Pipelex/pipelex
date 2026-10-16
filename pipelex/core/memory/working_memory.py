@@ -1,6 +1,7 @@
 from operator import attrgetter
 from typing import Any, Self, cast
 
+from mthds.protocol.problem.registry import CoreCode
 from mthds.protocol.working_memory import WorkingMemoryAbstract
 from pydantic import Field, model_validator
 from typing_extensions import override
@@ -345,7 +346,7 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
                 raise WorkingMemoryStuffAttributeNotFoundError(
                     variable_name=name,
                     message=f"Attribute path '{name}' reads '{private_segment}', which starts with an underscore: a path reads public fields only",
-                )
+                ).with_error_code(CoreCode.METHOD_TEMPLATE_PRIVATE_NAME)
             parts = name.split(".", 1)  # Split only at the first dot
             base_name = parts[0]
             attr_path_str = parts[1]  # Keep the rest as a dot-separated string
@@ -426,7 +427,7 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
                     raise WorkingMemoryTypeError(
                         variable_name=name,
                         message=f"Content of '{name}' is ListContent, but it is empty",
-                    )
+                    ).with_error_code(CoreCode.INPUT_INVALID)
                 return top_level_content_items
 
         if wanted_type is not None and not isinstance(top_level_content, wanted_type):

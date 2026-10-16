@@ -9,10 +9,11 @@ Both raise the same errors, worded the same way.
 from typing import Any
 
 from jinja2.exceptions import UndefinedError
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.pipe_operators.doc_gen.exceptions import PipeDocGenRunError, PipeDocGenUndefinedValueError
-from pipelex.tools.jinja2.exceptions import Jinja2TemplateRenderError
+from pipelex.tools.jinja2.exceptions import Jinja2TemplateInvalidError, Jinja2TemplateRenderError
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.templating.templating_style import TemplatingStyle
 
@@ -40,6 +41,10 @@ async def render_doc_gen_template(
             templating_style=templating_style,
             is_undefined_strict=True,
         )
+    except Jinja2TemplateInvalidError as exc:
+        # The template is the method author's own: the message names the step, the template and what Jinja2 refused.
+        msg = f"PipeDocGen '{pipe_code}' could not render its {label}: {exc.fault}"
+        raise PipeDocGenRunError(msg).with_error_code(CoreCode.METHOD_TEMPLATE_INVALID).as_caller_fault() from exc
     except Jinja2TemplateRenderError as exc:
         undefined_error = exc.__cause__
         if isinstance(undefined_error, UndefinedError):

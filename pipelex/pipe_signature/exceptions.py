@@ -1,3 +1,5 @@
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex.base_exceptions import PipelexError
 
 
@@ -12,6 +14,8 @@ class PipeSignatureNotExecutableError(PipelexError):
     `PipeSignature` reached during a dry-run sweep is a runnability fact (`pending_signatures`
     + `is_runnable`), not a validation error (D-B). Running a stub, by contrast, must fail.
     """
+
+    error_code = CoreCode.METHOD_NOT_RUNNABLE
 
     def __init__(self, pipe_ref: str) -> None:
         self.pipe_ref = pipe_ref

@@ -10,6 +10,8 @@ it would in a folder, and the run's crate names that tree by its digest like any
 from collections.abc import Mapping
 from pathlib import PurePosixPath
 
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex.core.bundle_resources.exceptions import BundleResourcePathError
 
 
@@ -76,6 +78,6 @@ def canonical_submitted_files(*, files: Mapping[str, bytes]) -> dict[str, bytes]
         canonical_path = canonical_resource_path(path=path)
         if canonical_path in canonical_files:
             msg = f"Two files submitted with the bundle name the same file '{canonical_path}'."
-            raise BundleResourcePathError(msg)
+            raise BundleResourcePathError(msg).with_error_code(CoreCode.REQUEST_INVALID)
         canonical_files[canonical_path] = content
     return canonical_files

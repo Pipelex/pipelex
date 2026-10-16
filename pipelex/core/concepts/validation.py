@@ -1,5 +1,6 @@
 from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringError
-from pipelex.core.qualified_ref import QualifiedRef, QualifiedRefError
+from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.core.qualified_ref_exceptions import QualifiedRefError
 from pipelex.tools.misc.string_utils import is_pascal_case
 
 

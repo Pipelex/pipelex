@@ -4,6 +4,7 @@ from datetime import date, datetime, time
 from enum import Enum
 from typing import Any, Literal, cast
 
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import Field
 
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
@@ -106,7 +107,8 @@ class StructureGenerator:
             raise ConceptStructureGeneratorError(
                 msg, structure_class_python_code=generated_code, syntax_error_data=syntax_error_data
             ) from syntax_error
-        except (ConceptStructureValidationError, ValueError, ImportError, Exception) as exc:
+        except Exception as exc:
+            # Unbounded code (case 2): the generated module is executed, so its exception surface cannot be enumerated.
             msg = f"Error validating generated code: {exc}\nGenerated code:\n```python\n{generated_code}\n```"
             raise ConceptStructureGeneratorError(msg, structure_class_python_code=generated_code) from exc
 
@@ -270,7 +272,7 @@ class StructureGenerator:
             cls = NativeConceptCode.get_native_structure_class(base_class)
             if not cls:
                 msg = f"Native structure class '{base_class}' not found"
-                raise ConceptStructureGeneratorError(msg)
+                raise ConceptStructureGeneratorError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
             self.imports.add(f"from {cls.__module__} import {cls.__name__}")
         elif base_class != "StructuredContent":
             # Cross-package refines: base class lives in another already-installed package — recover its module via the class registry.
@@ -329,7 +331,7 @@ class StructureGenerator:
                     f"Field '{resolved_field.name}' is required AND carries default_value {default_value!r} — "
                     f"the blueprint validator rejects this pair, so reaching the generator with it is a bug."
                 )
-                raise ConceptStructureGeneratorError(msg)
+                raise ConceptStructureGeneratorError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
             field_params.insert(0, "...")
         elif default_value is not None:
             field_params.insert(0, f"default={self._format_default_value(default_value)}")

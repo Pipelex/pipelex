@@ -42,6 +42,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.codegen.exceptions import CodegenError, CodegenLockError
 from pipelex.codegen.stamp import STAMPABLE_SUFFIXES
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.file_utils import load_text_from_path
 from pipelex.tools.misc.toml_utils import load_toml_from_content
@@ -239,4 +240,4 @@ def _reject_unknown_lock_version(*, data: dict[str, Any], lock_path: Path) -> No
     else:
         reason = f"lock_version {raw_version!r} is not a known codegen lock format version"
     msg = f"Unsupported codegen lock version at '{lock_path}': this build reads lock_version {CODEGEN_LOCK_VERSION}, but {reason}."
-    raise CodegenLockError(msg)
+    raise CodegenLockError(msg).with_error_code(PipelexErrorCode.CODEGEN_LOCK_UNSUPPORTED)

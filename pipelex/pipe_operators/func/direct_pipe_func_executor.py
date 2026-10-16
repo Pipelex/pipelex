@@ -6,6 +6,7 @@ from pathlib import Path
 from mthds.method_tree.exceptions import MethodTreeRefusedError, TreeSourceError
 from mthds.method_tree.models import MethodTree
 from mthds.method_tree.written_tree import read_written_tree
+from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex import log
@@ -208,7 +209,7 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
             )
         except TimeoutError as exc:
             msg = f"PipeFunc '{request.function_name}' exceeded its {request.timeout_seconds}s timeout"
-            raise PipeFuncExecutionError(msg) from exc
+            raise PipeFuncExecutionError(msg).with_error_code(CoreCode.PIPE_FUNCTION_TIMED_OUT) from exc
 
         # Wrap the output in a memory so it round-trips with its concept (and thus its class identity).
         pipe = get_library_manager().get_library(library_id=TRANSPORTED_LIBRARY_ID).pipe_library.get_required_pipe(pipe_code=request.pipe_code)

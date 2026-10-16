@@ -1,8 +1,13 @@
-from pipelex.base_exceptions import ErrorDomain, PipelexError
+from typing import ClassVar
+
+from mthds.protocol.problem.registry import CoreCode
+
+from pipelex.base_exceptions import PipelexError
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
+from pipelex.errors.error_code_declaration import ErrorCodeDeclaration, ErrorCodeSet
 
 
-class NativeConceptRedeclarationError(ValueError):
+class NativeConceptRedeclarationError(PipelexError, ValueError):
     """A bundle declares a concept whose code collides with a native Pipelex concept.
 
     Subclasses ``ValueError`` so a ``mode="before"`` pydantic field validator can raise it and
@@ -11,12 +16,14 @@ class NativeConceptRedeclarationError(ValueError):
     Carrying the offending code is what lets the fix planner emit a targeted delete.
     """
 
+    error_code = CoreCode.METHOD_NAME_CONFLICT
+
     def __init__(self, message: str, concept_code: str):
         self.concept_code = concept_code
         super().__init__(message)
 
 
-class InvalidPipeCodeSyntaxError(ValueError):
+class InvalidPipeCodeSyntaxError(PipelexError, ValueError):
     """A same-domain over-qualified pipe code the fix planner can strip back to its bare form.
 
     Raised (in place of a bare ``ValueError``) only at the two snake_case-enforcing raise sites —
@@ -29,6 +36,8 @@ class InvalidPipeCodeSyntaxError(ValueError):
     that the ``strip-namespace`` planner needs. Genuinely malformed codes and cross-package dotted
     refs stay bare ``ValueError``s → uncategorized-as-fixable, so they are never stripped.
     """
+
+    error_code = CoreCode.METHOD_IDENTIFIER_INVALID
 
     def __init__(self, message: str, offending_code: str, stripped_code: str):
         self.offending_code = offending_code
@@ -43,14 +52,25 @@ class MthdsParserError(PipelexError):
     does not parse, and TOML that parses but fails blueprint validation. The
     message is always caller-facing copy describing a fault in the caller's own
     input.
+
+    The default ``method.invalid`` is the umbrella refusal whose items carry their own codes. A raise site that
+    finds one fault chooses its code: ``method.syntax`` for a source that does not parse, ``method.schema_violation``
+    for one that parses into no valid bundle, ``method.dependency_invalid`` for a dependency's bundle,
+    ``request.invalid`` or ``request.pipe_unspecified`` for a request naming no usable pipe, and
+    ``runtime.unexpected`` for a caller of the parser that passed it nothing to parse.
     """
 
-    error_domain = ErrorDomain.INPUT
-    # Declared rather than auto-derived: `_humanize_class_name` would render the
-    # class name as "Mthds parser", and MTHDS is the open standard's brand, always
-    # uppercase. This string is the RFC 7807 `title` on every ErrorReport, so the
-    # mis-casing would be wire-visible, not merely a docs-heading concern.
-    _declared_title = "MTHDS parser"
+    error_code: ClassVar[ErrorCodeDeclaration] = ErrorCodeSet(
+        default=CoreCode.METHOD_INVALID,
+        others=(
+            CoreCode.METHOD_SYNTAX,
+            CoreCode.METHOD_SCHEMA_VIOLATION,
+            CoreCode.METHOD_DEPENDENCY_INVALID,
+            CoreCode.REQUEST_INVALID,
+            CoreCode.REQUEST_PIPE_UNSPECIFIED,
+            CoreCode.RUNTIME_UNEXPECTED,
+        ),
+    )
     # The parser's messages describe faults in the caller's own .mthds
     # source — caller-facing copy, kept verbatim under STRICT disclosure.
     _authors_caller_facing_message = True
@@ -66,3 +86,5 @@ class MthdsParserError(PipelexError):
 
 class BundleElaboratorError(MthdsParserError):
     """Raised when bundle elaboration fails (e.g. synthetic-name collision, invalid output for preliminary_text)."""
+
+    error_code = CoreCode.METHOD_SCHEMA_VIOLATION

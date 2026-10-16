@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, NamedTuple, Self, final
 
 import shortuuid
+from mthds.protocol.problem.registry import CoreCode
 from opentelemetry import trace
 from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, Status, StatusCode, TraceFlags
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -598,19 +599,28 @@ class PipeAbstract(ABC, BaseModel):
             ]
             if optional_input_names:
                 msg += f" These optional inputs may be omitted: {', '.join(optional_input_names)}."
-            # Whether the caller left the inputs out of the request or an earlier step of their
-            # method did not produce them, the fault is in the caller's own request or method, and
-            # the message names only the pipe and its input names.
-            raise PipeRunInputsError(
-                message=msg,
-                run_mode=pipe_run_params.run_mode,
-                pipe_code=self.code,
-                missing_inputs=presence_scan.missing_names,
-            ).as_caller_fault(
-                user_action=UserAction(
-                    kind=UserActionKind.CHANGE_INPUT,
-                    detail=f"Provide the missing required inputs of '{self.code}': {', '.join(presence_scan.missing_names)}.",
+            # The run's entry pipe reads what the caller sent, so a name missing there is an input the caller left
+            # out of the request; a nested pipe reads what earlier steps of the method produced, so a name missing
+            # there is the method's wiring. The pipe stack tells them apart: it holds this pipe alone at the entry.
+            # Either way the message names only the pipe and its input names.
+            missing_inputs_str = ", ".join(presence_scan.missing_names)
+            missing_inputs_code: CoreCode
+            missing_inputs_detail: str
+            if len(pipe_run_params.pipe_stack) <= 1:
+                missing_inputs_code = CoreCode.INPUT_MISSING
+                missing_inputs_detail = f"Provide the missing required inputs of '{self.code}': {missing_inputs_str}."
+            else:
+                missing_inputs_code = CoreCode.PIPE_INPUT_UNRESOLVED
+                missing_inputs_detail = f"Change the method so that an earlier step produces the inputs '{self.code}' reads: {missing_inputs_str}."
+            raise (
+                PipeRunInputsError(
+                    message=msg,
+                    run_mode=pipe_run_params.run_mode,
+                    pipe_code=self.code,
+                    missing_inputs=presence_scan.missing_names,
                 )
+                .with_error_code(missing_inputs_code)
+                .as_caller_fault(user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail=missing_inputs_detail))
             )
 
         # The pipe is about to be lifted (skipped): per-pipe validation and resource checks are
@@ -641,7 +651,7 @@ class PipeAbstract(ABC, BaseModel):
                             run_mode=pipe_run_params.run_mode,
                             pipe_code=self.code,
                             variable_name=variable_name,
-                        ) from exc
+                        ).with_error_code(CoreCode.INPUT_REFERENCE_NOT_FOUND) from exc
 
         # Specific pipe validation function
         await self._validate_before_run(

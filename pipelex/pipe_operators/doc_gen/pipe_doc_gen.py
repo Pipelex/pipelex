@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Any, Literal
 
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import Field, PrivateAttr
 from typing_extensions import override
 
@@ -341,7 +342,7 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         """
         if self.template_file is None or self.template_file_ref is None:
             msg = f"PipeDocGen '{self.code}' prints from a template file but names none in its method tree."
-            raise PipeDocGenRunError(msg)
+            raise PipeDocGenRunError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
         return ComposedTemplateFile(
             file=self.template_file_ref,
             name=self.template_file,
@@ -363,7 +364,7 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         crate = get_library_manager().get_crate(library_id=library_id)
         if crate is None:
             msg = f"PipeDocGen '{self.code}' cannot name its template file's data: the library it runs in has no crate."
-            raise PipeDocGenRunError(msg)
+            raise PipeDocGenRunError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
         input_stuffs: dict[str, Stuff] = {}
         for input_name in self.inputs.variables:
             stuff = working_memory.get_optional_stuff(input_name)

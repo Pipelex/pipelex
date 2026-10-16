@@ -15,19 +15,21 @@ reading "Input validation failed".
   ``runtime`` input-validation failure.
 - **The unknown entry pipe** is not a bundle fault: it still raises its own ``PipeNotFoundError``.
 - **Whose library directories.** A local caller's directories are theirs, so a refusal while loading
-  them is the verdict too, located on their file; a host's directories load untranslated by default.
+  them is the verdict too, located on their file; by default the directories are the host's, and their refusal is the host's fault
+  (``HostLibraryLoadRefusalError``), never a verdict.
 """
 
 from pathlib import Path
 from typing import Any, NamedTuple
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import DisclosureMode
 from pipelex.config import get_config
 from pipelex.libraries.exceptions import LibraryError
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
-from pipelex.pipeline.exceptions import PipeExecutionError, ValidateBundleError
+from pipelex.pipeline.exceptions import HostLibraryLoadRefusalError, PipeExecutionError, ValidateBundleError
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
@@ -224,11 +226,12 @@ class TestRunPathBundleVerdict:
             await validate_bundle(mthds_file_path=bundle_path, library_dirs=[tmp_path])
         assert items == validated.value.to_error_report().validation_errors
 
-    async def test_a_hosts_library_dir_refusal_loads_untranslated_by_default(self, tmp_path: Path) -> None:
+    async def test_a_hosts_library_dir_refusal_is_the_hosts_fault_by_default(self, tmp_path: Path) -> None:
         bundle_path = tmp_path / "bundle.mthds"
         bundle_path.write_text(_MISSPELLED_CONCEPT_BUNDLE, encoding="utf-8")
 
-        with pytest.raises(LibraryError) as raised:
+        with pytest.raises(HostLibraryLoadRefusalError) as raised:
             await _run_setup(library_dirs=[str(tmp_path)], pipe_code="write_tide_notice")
 
-        assert not isinstance(raised.value, ValidateBundleError)
+        assert isinstance(raised.value.__cause__, LibraryError)
+        assert raised.value.to_error_report().code == CoreCode.RUNTIME_MISCONFIGURED

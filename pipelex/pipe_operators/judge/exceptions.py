@@ -1,8 +1,15 @@
-from pipelex.base_exceptions import ErrorDomain, PipelexError
+from typing import ClassVar
+
+from mthds.protocol.problem.registry import CoreCode
+
+from pipelex.base_exceptions import PipelexError
+from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration
 
 
 class PipeJudgeError(PipelexError):
-    pass
+    """Base of the refusals of a ``PipeJudge``."""
+
+    error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
 
 
 class PipeJudgeInputCapabilityError(PipeJudgeError):
@@ -14,7 +21,7 @@ class PipeJudgeInputCapabilityError(PipeJudgeError):
     the model and its declared inputs, so it is kept verbatim for the caller.
     """
 
-    error_domain = ErrorDomain.INPUT
+    error_code = CoreCode.MODEL_CAPABILITY_UNSUPPORTED
     _authors_caller_facing_message = True
 
     def __init__(self, *, pipe_code: str, variable_path: str, file_kind: str, model_name: str, model_inputs: list[str]):

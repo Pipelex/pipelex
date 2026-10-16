@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from mthds.protocol.pipeline_inputs import PipelineInputs
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex import log
 from pipelex.config import get_config
@@ -34,6 +35,7 @@ from pipelex.runtime_hub import (
 )
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.environment import get_optional_env
+from pipelex.system.exceptions import RunParameterError
 from pipelex.system.job_metadata import OtelContext
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.run_extras import validate_run_extras
@@ -222,7 +224,7 @@ async def pipeline_run_setup(
     # production. The constant survives for telemetry only.
     if not mthds_contents and not pipe_code:
         msg = "Either pipe_code or mthds_contents must be provided to the pipeline API."
-        raise ValueError(msg)
+        raise PipeExecutionError(message=msg).with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED).as_caller_fault()
 
     # Validate the extras HERE, before this function causes anything observable.
     #
@@ -264,7 +266,7 @@ async def pipeline_run_setup(
                 "A run with a read_scope must pass its own storage_scope: the local storage scope becomes the run id, "
                 "which lies under no read_scope, and the run could not read what it writes."
             )
-            raise ValueError(msg)
+            raise RunParameterError(msg)
         validate_storage_scope_within_read_scope(storage_scope=storage_scope, read_scope=read_scope)
 
     # TODO: rethink this, it's not forcing
@@ -353,7 +355,7 @@ async def pipeline_run_setup(
                 pipe = get_required_pipe(pipe_code=qualified_main_pipe)
             else:
                 msg = "No pipe_code provided and no main_pipe found in any of the MTHDS contents."
-                raise PipeExecutionError(message=msg)
+                raise PipeExecutionError(message=msg).with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED).as_caller_fault()
         elif pipe_code:
             pipe = get_required_entry_pipe(pipe_code=pipe_code)
         else:

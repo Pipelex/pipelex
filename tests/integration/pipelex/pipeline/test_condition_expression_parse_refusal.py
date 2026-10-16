@@ -6,8 +6,8 @@ bundle answers with the same verdict, which a hosted run serves as HTTP 422. Bef
 escaped the load, so validation gave no verdict and a hosted run answered 500 "An internal error occurred.".
 
 The item quotes neither the expression nor the parser's diagnosis, which names the token it stopped at: the
-verdict is kept verbatim under STRICT disclosure, and a condition declared in a host's library directories must
-not put its text there.
+verdict is kept verbatim under STRICT disclosure. A condition declared in a host's library directories is no
+verdict at all but the deployment's fault, whose text STRICT redacts.
 """
 
 import json
@@ -17,7 +17,7 @@ from typing import Any
 import pytest
 
 from pipelex.base_exceptions import DisclosureMode, ValidationErrorCategory, ValidationErrorItem
-from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.exceptions import HostLibraryLoadRefusalError, ValidateBundleError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
 from tests.integration.pipelex.pipeline.test_data import ConditionExpressionParseTestData, ConditionMethodFaultsTestData
@@ -115,17 +115,17 @@ class TestConditionExpressionParseRefusal:
         assert document["user_action"]["kind"] == "change_input"
         assert expression_text not in json.dumps(document)
 
-    async def test_a_host_library_condition_puts_none_of_its_text_in_the_strict_verdict(self, tmp_path: Path) -> None:
-        """Beside a host's library directory, the refusal of its condition names neither its expression nor its file."""
+    async def test_a_host_library_condition_puts_none_of_its_text_in_the_strict_payload(self, tmp_path: Path) -> None:
+        """Beside a host's library directory, the refusal of its condition is the host's fault, naming neither its expression nor its file."""
         host_library_dir = tmp_path / "host" / "library"
         host_library_dir.mkdir(parents=True)
         (host_library_dir / "routing.mthds").write_text(ConditionExpressionParseTestData.UNKNOWN_TAG_TEMPLATE_MTHDS, encoding="utf-8")
 
-        with pytest.raises(ValidateBundleError) as exc_info:
+        with pytest.raises(HostLibraryLoadRefusalError) as exc_info:
             await validate_bundle(mthds_contents=[ConditionExpressionParseTestData.VALID_CALLER_MTHDS], library_dirs=[host_library_dir])
 
         strict_payload = exc_info.value.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)
-        assert _strict_item_messages(strict_payload) == [_TEMPLATE_REASON]
+        assert "validation_errors" not in strict_payload
         serialized_payload = json.dumps(strict_payload)
         assert "frobnicate_the_parcel" not in serialized_payload
         assert "lane ==" not in serialized_payload

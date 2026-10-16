@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Any
 
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ValidationError
 
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
@@ -75,7 +76,7 @@ class MthdsParser(BaseModel):
                 blueprint_dict[PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD] = mthds_source
             else:
                 msg = "Either 'bundle_path' or 'mthds_content' must be provided for the MthdsParser to make a PipelexBundleBlueprint"
-                raise MthdsParserError(msg)
+                raise MthdsParserError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
         except TomlError as exc:
             toml_message = exc.message
             if bundle_path is not None and mthds_source is not None:
@@ -94,7 +95,7 @@ class MthdsParser(BaseModel):
                         column=exc.colno,
                     )
                 ],
-            ) from exc
+            ).with_error_code(CoreCode.METHOD_SYNTAX) from exc
         except UnicodeDecodeError as exc:
             # tomli reads a file as bytes and decodes them as UTF-8, so a file of a tree that is not text fails here.
             source = mthds_source if mthds_source is not None else str(bundle_path)
@@ -103,11 +104,11 @@ class MthdsParser(BaseModel):
             raise MthdsParserError(
                 msg,
                 validation_errors=[PipelexBundleBlueprintValidationErrorData(source=source, message=msg, line=line, column=column)],
-            ) from exc
+            ).with_error_code(CoreCode.METHOD_SYNTAX) from exc
 
         if not blueprint_dict:
             msg = "Could not make 'PipelexBundleBlueprint': no blueprint found in the MTHDS file"
-            raise MthdsParserError(msg)
+            raise MthdsParserError(msg).with_error_code(CoreCode.METHOD_SCHEMA_VIOLATION)
 
         try:
             # ``source`` is already populated from the seeded ``blueprint_dict`` above
@@ -133,7 +134,7 @@ class MthdsParser(BaseModel):
         try:
             elaborated_blueprint = BundleElaborator.elaborate(bundle=pipelex_bundle_blueprint)
         except BundleElaboratorError as exc:
-            raise MthdsParserError(message=str(exc)) from exc
+            raise MthdsParserError(message=str(exc)).with_error_code(CoreCode.METHOD_SCHEMA_VIOLATION) from exc
         # Only a bundle read from a file here may read beside it: a content string's `mthds_source` is a label.
         if bundle_path is not None:
             elaborated_blueprint.mark_read_from_host_file(bundle_file=Path(bundle_path))

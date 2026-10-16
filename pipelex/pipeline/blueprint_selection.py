@@ -11,6 +11,8 @@ without an import cycle through ``bundle_validator``.
 
 from typing import NamedTuple, Sequence
 
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipeline.exceptions import ValidateBundleError
@@ -45,7 +47,7 @@ def select_primary_blueprint(blueprints: Sequence[PipelexBundleBlueprint]) -> Pr
     """
     if not blueprints:
         msg = "Cannot select a primary blueprint from an empty batch: no MTHDS contents were provided."
-        raise ValidateBundleError(message=msg)
+        raise ValidateBundleError(message=msg).with_error_code(CoreCode.REQUEST_INVALID)
     for blueprint in blueprints:
         if blueprint.main_pipe:
             main_pipe_ref = PipeFactory.make_pipe_ref_with_domain(domain_code=blueprint.domain, pipe_code=blueprint.main_pipe)

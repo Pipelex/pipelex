@@ -1,13 +1,16 @@
 from typing import TYPE_CHECKING, Any, Literal
 
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import ValidationError
 from typing_extensions import override
 
 from pipelex.base_exceptions import iter_cause_chain
 from pipelex.cogt.exceptions import LLMCompletionError, ModelChoiceNotFoundError
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting, LLMSettingChoices
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
 from pipelex.cogt.models.model_reference import ModelReference
+from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
@@ -40,6 +43,8 @@ from pipelex.pipe_run.pipe_run_params import (
 from pipelex.runtime_hub import get_class_registry
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_param_key import PipeRunParamKey
+from pipelex.tools.jinja2.exceptions import Jinja2TemplateInvalidError
+from pipelex.tools.jinja2.jinja2_unknown_names import find_unknown_filters_and_tests
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
@@ -328,6 +333,8 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     result_name=output_name,
                     result_code=pipe_run_params.final_stuff_code,
                 )
+            except Jinja2TemplateInvalidError as exc:
+                raise self._make_invalid_prompt_error(invalid_template_error=exc, pipe_run_params=pipe_run_params) from exc
             except LLMCompletionError as exc:
                 location = self._format_error_location(pipe_run_params=pipe_run_params)
                 error_details = self._format_llm_error(exc=exc, settings=[llm_setting_main])
@@ -340,7 +347,9 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 location = self._format_error_location(pipe_run_params=pipe_run_params)
                 error_details = format_pydantic_validation_error(exc)
                 msg = f"Error generating text content in PipeLLM {location}: {error_details}"
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).with_error_code(
+                    CoreCode.MODEL_OUTPUT_SCHEMA_MISMATCH
+                ) from exc
             working_memory = text_result.memory
             rendered_llm_prompt = text_result.rendered_prompt
             structuring_path = text_result.structuring_path
@@ -361,6 +370,8 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     result_name=output_name,
                     result_code=pipe_run_params.final_stuff_code,
                 )
+            except Jinja2TemplateInvalidError as exc:
+                raise self._make_invalid_prompt_error(invalid_template_error=exc, pipe_run_params=pipe_run_params) from exc
             except LLMCompletionError as exc:
                 location = self._format_error_location(pipe_run_params=pipe_run_params)
                 error_details = self._format_llm_error(exc=exc, settings=[llm_setting_for_object])
@@ -389,6 +400,41 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         return PipeLLMOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.run_metadata.pipeline_run_id,
+        )
+
+    def _make_invalid_prompt_error(self, *, invalid_template_error: Jinja2TemplateInvalidError, pipe_run_params: PipeRunParams) -> PipeRunError:
+        """The refusal of a prompt that cannot render as written, naming the pipe, the prompt field and what Jinja2 refused.
+
+        Such a prompt names a filter or a test its environment does not define inside a branch, which only rendering that
+        branch finds, since a prompt is parsed at load and not compiled. The render reports what Jinja2 refused, not
+        which prompt it was, so the prompt fields are named by which of them names an unknown filter or test. The
+        message never quotes a prompt's text.
+        """
+        field_names: list[str] = []
+        for template_blueprint, template_label in [
+            (self.llm_prompt_spec.system_prompt_blueprint, "system_prompt"),
+            (self.llm_prompt_spec.prompt_blueprint, "prompt"),
+        ]:
+            if template_blueprint is None:
+                continue
+            unknown_names = find_unknown_filters_and_tests(
+                template_source=rewrite_template_sigils(template_blueprint.template),
+                template_category=template_blueprint.category,
+            )
+            if unknown_names:
+                field_names.append(template_label)
+        where = " and its ".join(field_names) if field_names else "prompt"
+        fault = invalid_template_error.fault
+        msg = f"PipeLLM '{self.code}': its {where} cannot render: {fault}"
+        return (
+            PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+            .with_error_code(CoreCode.METHOD_TEMPLATE_INVALID)
+            .as_caller_fault(
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail=f"Fix the {where} of PipeLLM '{self.code}': {fault}",
+                )
+            )
         )
 
     def _format_error_location(self, pipe_run_params: PipeRunParams) -> str:

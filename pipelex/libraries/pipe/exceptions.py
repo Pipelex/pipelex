@@ -1,14 +1,31 @@
-from pipelex.base_exceptions import ErrorDomain
+from typing import ClassVar
+
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
+from pipelex.errors.error_code_declaration import ErrorCodeDeclaration, ErrorCodeSet
 from pipelex.libraries.exceptions import LibraryError
 
 
 class PipeLibraryError(LibraryError):
-    pass
+    """A pipe library that cannot hold the pipes it is given.
+
+    The default ``method.name_conflict`` is two declarations of one pipe; a raise site chooses
+    ``method.ref_ambiguous`` for a bare code matching several packages, ``method.signature_mismatch`` for a concrete
+    pipe whose contract differs from its signature, ``request.unsupported`` for a form of request the resolve does not
+    take, and ``runtime.unexpected`` for an invariant of the crate.
+    """
+
+    error_code: ClassVar[ErrorCodeDeclaration] = ErrorCodeSet(
+        default=CoreCode.METHOD_NAME_CONFLICT,
+        others=(CoreCode.METHOD_REF_AMBIGUOUS, CoreCode.METHOD_SIGNATURE_MISMATCH, CoreCode.REQUEST_UNSUPPORTED, CoreCode.RUNTIME_UNEXPECTED),
+    )
 
 
 class PipeNotFoundError(PipeLibraryError):
-    pass
+    """A pipe ref written inside a bundle that names no pipe the library holds."""
+
+    error_code: ClassVar[ErrorCodeDeclaration] = CoreCode.METHOD_PIPE_UNRESOLVED
 
 
 class EntryPipeNotFoundError(PipeNotFoundError):
@@ -17,15 +34,19 @@ class EntryPipeNotFoundError(PipeNotFoundError):
     The in-body sibling `PipeNotFoundError` reports a ref written inside a bundle, which is a fault
     of the loaded methods and stays unclassified. This one reports a code the caller supplied at an
     entry point (a CLI argument, the `pipe_code` field of a run request, the `--pipe` / `pipe_ref`
-    slice selector of bundle validation), so it is the caller's own typo: INPUT domain, which every
-    presentation derives from at once — 422 rather than a 500 that reads as retryable to every SDK.
+    slice selector of bundle validation), so it is the caller's own typo: ``request.pipe_not_found``, or
+    ``request.pipe_unspecified`` where the caller named no pipe and the method declares no entry pipe. An entry pipe
+    the method itself declares that names no pipe of the method chooses ``method.pipe_unresolved``.
 
     Caller-facing copy: the message names only the caller's own `pipe_code`, so STRICT disclosure
     keeps it verbatim. The flag spans every raise site of the class, so each one owes that invariant:
     a message here may name what the caller typed and nothing from the loaded library.
     """
 
-    error_domain = ErrorDomain.INPUT
+    error_code = ErrorCodeSet(
+        default=CoreCode.REQUEST_PIPE_NOT_FOUND,
+        others=(CoreCode.REQUEST_PIPE_UNSPECIFIED, CoreCode.METHOD_PIPE_UNRESOLVED),
+    )
     user_action = UserAction(
         kind=UserActionKind.CHANGE_INPUT,
         # Scope-neutral on purpose, because a class-level detail cannot name the scope its raise
@@ -37,7 +58,6 @@ class EntryPipeNotFoundError(PipeNotFoundError):
         # stop asserting a scope it cannot know.
         detail="Check the pipe code for typos and make sure the bundle in scope for this operation declares it.",
     )
-    _declared_title = "Entry pipe not found"
     _authors_caller_facing_message = True
 
 
@@ -46,7 +66,8 @@ class EntryPipeAmbiguousError(PipeLibraryError):
 
     Raised only by the entry lookup, which searches a bare code across domains precisely because a
     human typed it. Refusing to guess is the right answer, but it is the caller who picks the winner
-    — INPUT domain, same reasoning as :class:`EntryPipeNotFoundError`.
+    — ``request.pipe_ambiguous``, same reasoning as :class:`EntryPipeNotFoundError`; several entry pipes the method
+    itself declares choose ``method.pipe_unresolved``.
 
     Caller-facing copy: the message names the caller's own `pipe_code` and the qualified `pipe_ref`s
     of bundles they loaded themselves, so it survives STRICT disclosure intact — and it has to, since
@@ -57,7 +78,7 @@ class EntryPipeAmbiguousError(PipeLibraryError):
     library would put host `pipe_ref`s in this message.
     """
 
-    error_domain = ErrorDomain.INPUT
+    error_code = ErrorCodeSet(default=CoreCode.REQUEST_PIPE_AMBIGUOUS, others=(CoreCode.METHOD_PIPE_UNRESOLVED,))
     user_action = UserAction(
         kind=UserActionKind.CHANGE_INPUT,
         # Both spellings, because both raise sites reach this one detail: the bare-code arm is fixed by
@@ -65,5 +86,4 @@ class EntryPipeAmbiguousError(PipeLibraryError):
         # the alias too — a bare 'domain.pipe_code' does not reach a dependency pipe at all.
         detail="Name one candidate explicitly: 'domain.pipe_code', or 'alias->domain.pipe_code' for a cross-package code.",
     )
-    _declared_title = "Entry pipe ambiguous"
     _authors_caller_facing_message = True

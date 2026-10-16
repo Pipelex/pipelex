@@ -1,9 +1,12 @@
-from typing import Self
+from typing import ClassVar, Self
 
+from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
-from pipelex.base_exceptions import ErrorDomain, ErrorReport, PipelexError, iter_cause_chain
+from pipelex.base_exceptions import ErrorReport, PipelexError, iter_cause_chain
 from pipelex.core.exceptions import DryRunFailureErrorData
+from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, InheritsCause
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.pipe_run.located_failure import build_located_failure_report, locate_failure_message
 from pipelex.system.pipe_run_mode import PipeRunMode
 
@@ -19,15 +22,11 @@ class AsyncExecutionNotEnabledError(PipelexError):
     class name, title, and detail therefore talk about *async execution* as a
     capability of the deployment, not about any specific backend brand.
 
-    ``error_domain = CONFIG`` because the caller's request is well-formed; what
-    is missing is server-side configuration. The pipelex-api layer maps this
-    class to HTTP 501 (Not Implemented), which is more precise than the
-    ``CONFIG`` -> 500 default and tells clients the failure is permanent under
-    the current deployment rather than a transient runtime fault.
+    Its code is ``runtime.unsupported``: the caller's request is well-formed, and what is missing is a
+    capability of this deployment, permanent under it, so the caller's useful step is the synchronous route.
     """
 
-    error_domain = ErrorDomain.CONFIG
-    _declared_title = "Async execution not enabled"
+    error_code = CoreCode.RUNTIME_UNSUPPORTED
 
     DEFAULT_MESSAGE = (
         "Asynchronous pipeline execution is not enabled on this deployment. "
@@ -48,27 +47,37 @@ class AsyncExecutionNotEnabledError(PipelexError):
 
 
 class PipeRunParamsError(PipelexError):
-    pass
+    """A pipe's declaration and the run's params cannot settle a value the pipe needs, such as an image count."""
 
-
-class BatchParamsError(PipelexError):
-    pass
+    error_code = CoreCode.METHOD_SCHEMA_VIOLATION
 
 
 class PipeJobError(PipelexError):
-    pass
+    """Our own serialized run state could not be rebuilt, or a completed run broke an invariant of ours.
+
+    It declares its own code rather than taking its cause's: a concept-library error raised while rehydrating
+    a run's memory is a fault of the transport, not of the method's concepts.
+    """
+
+    error_code = CoreCode.RUNTIME_UNEXPECTED
 
 
 class DeliveryError(PipelexError):
-    pass
+    """Base of the failures to deliver a finished run's results."""
+
+    error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
 
 
 class WebhookDeliveryError(DeliveryError):
-    pass
+    """A webhook announcing a run's outcome could not be delivered."""
+
+    error_code = PipelexErrorCode.WEBHOOK_DELIVERY_FAILED
 
 
 class StorageDeliveryError(DeliveryError):
-    pass
+    """A finished run's results could not be stored; it takes its cause's code, else storage being unavailable."""
+
+    error_code = InheritsCause(fallback=PipelexErrorCode.STORAGE_UNAVAILABLE)
 
 
 class DryRunError(PipelexError):
@@ -79,8 +88,11 @@ class DryRunError(PipelexError):
     keeps the failure's own text only when that text is caller-facing and otherwise names the failure's
     title.
 
-    Raised elsewhere it may carry no failures, and validation then reports it as one item.
+    Raised elsewhere it may carry no failures, and validation then reports it as one item. It takes the code of
+    its cause, the failure it reports.
     """
+
+    error_code: ClassVar[ErrorCodeDeclaration] = InheritsCause(fallback=CoreCode.RUNTIME_UNEXPECTED)
 
     def __init__(self, message: str, *, failures: list[DryRunFailureErrorData] | None = None):
         self.failures = failures or []
@@ -94,8 +106,11 @@ class DryRunGraphNotProducedError(DryRunError):
     graph, so a run that finishes without one is a contract violation on their side — not a
     validation failure of the bundle. Distinct from the bare ``PipelexError`` it replaces so that
     hosts logging only the exception type (e.g. pipelex-api's best-effort ``/validate`` graph step)
-    get an unambiguous signal.
+    get an unambiguous signal. Bundle validation lets it through rather than turning it into a ``dry_run``
+    item, since the bundle is not at fault.
     """
+
+    error_code = CoreCode.RUNTIME_UNEXPECTED
 
 
 class PipeRouterError(PipelexError):
@@ -106,8 +121,11 @@ class PipeRouterError(PipelexError):
     carries one keeps it as it rises through the routers of the controllers above, so the innermost
     location is the one reported. Its report is its root fault's, located (see
     `pipelex.pipe_run.located_failure`): a run whose pipe raised `StuffFactoryError` reports
-    `StuffFactoryError`, with a message naming the pipe and its path, never `PipeRouterError`.
+    `StuffFactoryError`, with a message naming the pipe and its path, never `PipeRouterError`, and its code
+    is the root fault's.
     """
+
+    error_code = InheritsCause(fallback=CoreCode.RUNTIME_UNEXPECTED)
 
     def __init__(
         self,

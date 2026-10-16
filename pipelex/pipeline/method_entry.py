@@ -17,6 +17,7 @@ from mthds.method_tree.models import MethodTree
 from mthds.package.discovery import read_package_manifest_at
 from mthds.package.exceptions import ManifestError
 from mthds.package.manifest.schema import MethodsManifest
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.mthds_parsing.parser import MthdsParser
@@ -67,7 +68,7 @@ def select_entry(*, candidates: list[EntryCandidate], manifest: MethodsManifest 
     bundle_paths = [candidate.tree_path for candidate in candidates]
     if not candidates:
         msg = f"The method {method_label} holds no .mthds bundle, so it has no pipe to start at."
-        raise MethodEntryError(msg)
+        raise MethodEntryError(msg).with_error_code(CoreCode.METHOD_INVALID)
     if manifest is not None:
         return _manifest_entry(candidates=candidates, manifest=manifest, method_label=method_label, bundle_paths=bundle_paths)
 
@@ -85,7 +86,7 @@ def select_entry(*, candidates: list[EntryCandidate], manifest: MethodsManifest 
             f"A method starts at one pipe: keep one main_pipe, declare the method's main_pipe in a {MANIFEST_NAME} at its root, "
             "or name the pipe to run."
         )
-        raise MethodEntryError(msg)
+        raise MethodEntryError(msg).with_error_code(CoreCode.REQUEST_PIPE_AMBIGUOUS)
     entry_candidate = declaring[0]
     main_pipe = entry_candidate.blueprint.main_pipe
     if main_pipe is None:
@@ -120,14 +121,14 @@ def _manifest_entry(*, candidates: list[EntryCandidate], manifest: MethodsManife
             f"The {MANIFEST_NAME} of the method {method_label} declares the main_pipe '{main_pipe}', exported by "
             f"{_listed(names=sorted(exporting_domains))}, which none of its bundles defines in that domain: {_listed(names=bundle_paths)}."
         )
-        raise MethodEntryError(msg)
+        raise MethodEntryError(msg).with_error_code(CoreCode.METHOD_PIPE_UNRESOLVED)
     if len(defining) > 1:
         definitions = ", ".join(f"'{candidate.tree_path}' in domain '{candidate.blueprint.domain}'" for candidate in defining)
         msg = (
             f"The {MANIFEST_NAME} of the method {method_label} declares the main_pipe '{main_pipe}', which several of its "
             f"bundles define: {definitions}. Name the pipe to run as domain.pipe_code."
         )
-        raise MethodEntryError(msg)
+        raise MethodEntryError(msg).with_error_code(CoreCode.REQUEST_PIPE_AMBIGUOUS)
     return _entry_of(candidate=defining[0], pipe_code=main_pipe)
 
 
@@ -138,13 +139,14 @@ def select_method_entry(*, tree: MethodTree) -> MethodEntry:
     holds one, is read.
 
     Raises:
-        MethodEntryError: The tree has no directory on this host, its manifest cannot be read, or `select_entry`
-            refuses it.
+        MethodEntryError: Its manifest cannot be read, or `select_entry` refuses it.
+        PipelexUnexpectedError: The tree has no directory on this host, which is a host's wiring bug.
         MthdsParserError: A bundle of the tree does not parse.
     """
     if tree.directory is None:
+        # A host handing an in-memory tree to the reader of trees on disk: a wiring bug of ours, never the caller's method.
         msg = "A method tree read from a map of file entries has no folder on this host to read its bundles from."
-        raise MethodEntryError(msg)
+        raise PipelexUnexpectedError(msg)
     method_label = f"at '{tree.directory}'"
     candidates = [
         EntryCandidate(tree_path=tree_path, blueprint=MthdsParser.make_pipelex_bundle_blueprint(bundle_path=tree.file_location(tree_path)))
@@ -157,8 +159,8 @@ def select_method_entry(*, tree: MethodTree) -> MethodEntry:
             manifest = read_package_manifest_at(tree.directory)
         except ManifestError as exc:
             msg = f"The {MANIFEST_NAME} of the method {method_label} cannot be read: {exc}"
-            raise MethodEntryError(msg) from exc
+            raise MethodEntryError(msg).with_error_code(CoreCode.METHOD_PACKAGE_INVALID) from exc
         if manifest is None:
             msg = f"The method {method_label} lists a {MANIFEST_NAME} at its root that could not be read back."
-            raise MethodEntryError(msg)
+            raise MethodEntryError(msg).with_error_code(CoreCode.METHOD_PACKAGE_INVALID)
     return select_entry(candidates=candidates, manifest=manifest, method_label=method_label)

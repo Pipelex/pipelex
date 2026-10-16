@@ -1,5 +1,6 @@
 from typing import Any
 
+from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex.cogt.templating.exceptions import TemplateSigilSyntaxError
@@ -63,7 +64,7 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
         template_source = blueprint.template_source
         if template_source is None:
             msg = "Template source is required for template mode"
-            raise PipeComposeFactoryError(msg)
+            raise PipeComposeFactoryError(msg).with_error_code(CoreCode.METHOD_SCHEMA_VIOLATION)
 
         # Preprocess here only to validate at load time (sigil syntax + Jinja2 parseability).
         # The PipeCompose stores the *authored* source, like every other pipe (PipeLLM,
