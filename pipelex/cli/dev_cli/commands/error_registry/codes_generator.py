@@ -192,7 +192,7 @@ def render_pipelex_codes(*, registry: ErrorRegistryDocument) -> str:
             "class PipelexErrorParams(BaseModel):",
             '    """The parameters of a Pipelex code: the base of each code\'s own model, closed, frozen and strict.',
             "",
-            "    Strict, so that a value of another type is refused rather than coerced: a line given as ``\"3\"`` or",
+            '    Strict, so that a value of another type is refused rather than coerced: a line given as ``"3"`` or',
             "    ``True`` is refused rather than read as an integer. An integer is still accepted where a number of",
             "    seconds is declared.",
             "",
