@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:1ed250b7f7895e5a94b70b4329c99cef9f1f2c41803c69494deeacbce044392c"
+digest = "sha256:3ac351addba0c0ef338f06edc502ccbfb51ab30a145a97a2a5c911ad874451d7"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-13T02:26:32Z"
-rationale = "real-catch: PipelexKernel.make now resolves its mode through runtime_hub.resolve_effective_run_mode and refuses a trace_context stating another mode with the new TraceContextRunModeError in kernel/exceptions.py. pipelex-kernel.md's usage example built a TraceContext without the now-required run_mode; it now states the effective mode on the context and on make, a paragraph explains the refusal and why the kernel refuses rather than corrects its copy, and the keyless-boot sentence names resolve_effective_run_mode."
+reviewed_at = "2026-10-15T23:42:58Z"
+rationale = "clean-pass: the PipelexKernel.make docstring's parenthetical now names the scoped event log beside the runner fallback as stamping the metadata's pipeline_run_id; pipelex-kernel.md already says the same since this branch, so the doc needs no change."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -22,7 +22,7 @@ rationale = "real-catch: PipelexKernel.make now resolves its mode through runtim
 "pipelex/kernel/llm_prompt_content.py" = "blob:f996cead6e7789494f01f69c128ae71d6dcf8466"
 "pipelex/kernel/llm_results.py" = "blob:6e3b8a2878b5bb284ece5fac10262fb59ac2029d"
 "pipelex/kernel/memory_ops.py" = "blob:7fbbfaaec99f9712d8e215520cb02e26aad3fb40"
-"pipelex/kernel/pipelex_kernel.py" = "blob:a923ec3c37769d0eac1b37be075971464c27c06c"
+"pipelex/kernel/pipelex_kernel.py" = "blob:c7d40db1572aaca00d1c04a1039f5e3e564d6f87"
 "pipelex/kernel/prompt_assembly.py" = "blob:7559725bc0d813cd136bf258b8178d96a8f49194"
 "pipelex/kernel/prompt_references.py" = "blob:a4a8c5535c7e51a16ac6c8d1296439b331192a7f"
 "pipelex/kernel/search_ops.py" = "blob:b7de7ff62c45dde7f7aa8a9f409aecf3b664cce5"

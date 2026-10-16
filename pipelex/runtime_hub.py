@@ -722,6 +722,19 @@ def scoped_event_log(event_log: "EventLogProtocol") -> Generator[None, None, Non
     store bridges the two sides). A set override implies tracing-enabled: it is honored
     even when ``runtime.tracing.is_enabled`` is False.
 
+    Usage events honor it too, ahead of everything else: ``ReportingManager`` writes a
+    usage event emitted in the scope into this instance and nowhere else — not into an
+    event log registered with ``set_event_log``, not into the per-process runner fallback —
+    including inside an isolated sub-execution (``is_in_isolated_execution()`` true). So
+    code running a leaf inside an activity can scope a fresh log around it, read the
+    leaf's usage events back and return them with its result (each leaf's log with a
+    ``writer_id`` of its own, since the leaves of one workflow attempt share its chain and
+    would otherwise collide on the store key once gathered), which is how a backend
+    with no shared tracing store, such as Mistral Workflows, gets a run's usage into the
+    run's own log, where a replay rebuilds it from the recorded results. Being a
+    ContextVar, the override reaches only code running in the context that set it and the
+    tasks started from it, so an activity sees one only when its own code scoped it.
+
     Lifecycle: the machinery never calls ``cleanup`` on the instance and the read side does
     not ``close`` it — but the write-side tracer DOES call ``close()`` on its event log at
     teardown (``GraphTracer._reset``), which happens BEFORE the read side assembles. A scoped
