@@ -10,7 +10,7 @@ from google.genai import types as genai_types
 from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import ErrorDomain
-from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategory
+from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenOutputTruncatedError, InferenceErrorCategory
 from pipelex.cogt.img_gen.img_gen_gemini_mapping import ResolvedGeminiImageConfig
 from pipelex.cogt.img_gen.img_gen_model_rules import AspectRatioTaxonomy, ImgGenArgTopic
 from pipelex.cogt.inference.error_classification import UserActionKind
@@ -50,6 +50,12 @@ _GENERATED_IMAGE: dict[str, Any] = {
     ],
     "usageMetadata": _USAGE,
     "modelVersion": _MODEL_ID,
+}
+
+# The model finished its image, then reached its output token limit: the image is whole
+_GENERATED_IMAGE_AT_THE_LIMIT: dict[str, Any] = {
+    **_GENERATED_IMAGE,
+    "candidates": [{**_GENERATED_IMAGE["candidates"][0], "finishReason": "MAX_TOKENS"}],
 }
 
 
@@ -205,8 +211,33 @@ class TestGoogleImgGenWorkerRefusal:
             fields={"model_handle": _MODEL_HANDLE, "finish_reason": "IMAGE_BRAND_NEW"},
         )
 
-    async def test_a_generated_image_is_returned(self, mocker: MockerFixture) -> None:
-        async with _answering(_GENERATED_IMAGE) as http_client:
+    async def test_an_answer_cut_before_its_image_reads_output_truncated(self, mocker: MockerFixture) -> None:
+        """A finish reason of MAX_TOKENS with no image is the cut it states, not an empty answer to rephrase."""
+        async with _answering(_finished_without_image("MAX_TOKENS")) as http_client:
+            worker = _worker(mocker, http_client=http_client)
+            with pytest.raises(ImgGenOutputTruncatedError) as exc_info:
+                await worker._gen_image(img_gen_job=_img_gen_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
+        error = exc_info.value
+        assert error.resolve_error_code() == CoreCode.MODEL_OUTPUT_TRUNCATED
+        assert error.error_category is InferenceErrorCategory.CONTENT
+        assert error.message == (
+            "The model 'nano-banana' reached its output token limit before it generated the image (finish reason 'MAX_TOKENS'). "
+            "Simplify the image prompt, or choose another image model."
+        )
+        assert error.user_action is not None
+        assert error.user_action.kind is UserActionKind.CHANGE_INPUT
+        assert error.user_action.detail == "Simplify the image prompt, or choose another image model."
+        report = error.to_error_report()
+        assert report.code == CoreCode.MODEL_OUTPUT_TRUNCATED
+        assert report.http_status == 422
+        assert report.retryable is False
+        assert report.caller_facing_message is True
+
+    @pytest.mark.parametrize("answer", [_GENERATED_IMAGE, _GENERATED_IMAGE_AT_THE_LIMIT], ids=["stopped", "stopped-at-the-limit"])
+    async def test_a_generated_image_is_returned(self, mocker: MockerFixture, answer: dict[str, Any]) -> None:
+        """An image the model finished is returned, even when the output token limit stopped the answer after it."""
+        async with _answering(answer) as http_client:
             worker = _worker(mocker, http_client=http_client)
             generated = await worker._gen_image(img_gen_job=_img_gen_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 

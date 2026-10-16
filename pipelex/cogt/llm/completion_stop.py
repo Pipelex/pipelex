@@ -17,8 +17,9 @@ with them: a Responses API answer whose status is `incomplete` is never normal, 
 taken as a truncation, and a Gemini answer with no candidate whose prompt feedback names a block reason is a refusal.
 
 The Google image worker reads its answer's finish reason with `classify_image_finish_reason`, from Gemini's
-vocabulary alone, the image values included, so a safety filter that refused the image is told from an empty answer,
-and the prompt's block reason as the text workers read it.
+vocabulary alone, the image values included, so a safety filter that refused the image, or an output token limit
+that cut the answer before its image, is told from an empty answer, and the prompt's block reason as the text workers
+read it.
 
 The classifier only turns a stop that was silently a success into an error. Structured generation's stops are read
 by the structuring library, instructor, whose configured re-asks are left as they are: it raises its
@@ -53,6 +54,15 @@ class CompletionStopOutcome(StrEnum):
             case CompletionStopOutcome.REFUSED:
                 return True
             case CompletionStopOutcome.NORMAL | CompletionStopOutcome.TRUNCATED | CompletionStopOutcome.CONTEXT_WINDOW_EXCEEDED:
+                return False
+
+    @property
+    def is_truncated(self) -> bool:
+        """Whether an output limit cut the output: the one the request sent, or the model's own when it sent none."""
+        match self:
+            case CompletionStopOutcome.TRUNCATED:
+                return True
+            case CompletionStopOutcome.NORMAL | CompletionStopOutcome.CONTEXT_WINDOW_EXCEEDED | CompletionStopOutcome.REFUSED:
                 return False
 
 

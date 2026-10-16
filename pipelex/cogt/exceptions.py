@@ -810,6 +810,29 @@ class ImgGenGenerationError(CogtError):
     error_code = _inference_failure_declaration(fallback=CoreCode.PROVIDER_OUTCOME_UNKNOWN)
 
 
+class ImgGenOutputTruncatedError(ImgGenGenerationError):
+    """An image generation the model's output token limit cut before it produced the image.
+
+    A worker raises it when its provider's answer, a success all the same, says its output stopped at that limit and
+    holds no image (a Gemini candidate whose finish reason is `MAX_TOKENS`), instead of reading it as an empty answer.
+    It is ``model.output_truncated``, and not retryable: the same request stops at the same limit. The worker sends no
+    output limit of its own, so the limit is the model's, which the image and the model's thinking share, and the
+    next step is a simpler prompt or another model, never a setting of the pipe's. The message names only the model's
+    deck handle and the provider's stop value, so it is kept verbatim for the caller.
+    """
+
+    error_code = CoreCode.MODEL_OUTPUT_TRUNCATED
+    error_category = InferenceErrorCategory.CONTENT
+    _authors_caller_facing_message = True
+
+    def __init__(self, *, model_handle: str, stop_reason: str):
+        next_step = "Simplify the image prompt, or choose another image model."
+        message = f"The model '{model_handle}' reached its output token limit before it generated the image (finish reason '{stop_reason}'). {next_step}"
+        super().__init__(message, user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail=next_step))
+        self.model_handle = model_handle
+        self.stop_reason = stop_reason
+
+
 class ExtractCapabilityError(CogtError):
     """An extraction the model cannot perform, such as captioning images it does not read."""
 

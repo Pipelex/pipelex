@@ -135,6 +135,7 @@ HuggingFaceProviderUnknownError | pipelex.config.invalid
 ImgGenGenerationError | inherits cause, else provider.outcome_unknown; or chosen: runtime.unexpected, runtime.misconfigured, provider.rate_limited, provider.unavailable, provider.timeout, provider.failed, provider.response_invalid, provider.credential_refused, provider.quota_exhausted, model.unavailable, model.capability_unsupported, model.context_exceeded, model.content_refused, model.output_schema_mismatch, model.no_result, input.too_large, input.file_type_unsupported, input.file_unreadable, input.reference_not_found, input.url_unreachable, security.input_url_refused, security.method_url_refused, pipelex.config.invalid, pipelex.config.credential_missing, pipelex.billing.credit_exhausted
 ImgGenHandleNotFoundError | pipelex.config.invalid
 ImgGenModelNotFoundError | model.unavailable
+ImgGenOutputTruncatedError | model.output_truncated
 ImgGenParameterError | one of model.capability_unsupported, pipelex.config.invalid, runtime.unexpected
 ImgGenPromptError | pipe.prompt_empty
 ImgGenSettingValueError | method.model_setting_invalid
