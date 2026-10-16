@@ -89,6 +89,7 @@ own page. Classes are grouped by subsystem.
 - [`SearchJobFailureError`](search-job-failure-error.md) — Search job failure
 - [`SearchModelNotFoundError`](search-model-not-found-error.md) — Search model not found
 - [`TemplateSigilSyntaxError`](template-sigil-syntax-error.md) — Template sigil syntax
+- [`TemplateUrlRefusedError`](template-url-refused-error.md) — Relative URL refused
 - [`UnsafeSchemaError`](unsafe-schema-error.md) — Unsafe schema
 
 ## Provider adapters
