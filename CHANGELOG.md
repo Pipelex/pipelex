@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **A bundle validator receives the read scope, plugin API version 8 (Breaking)**: `BundleValidatorProtocol.validate_bundles` takes `read_scope`, the scope the host named for the validation, `None` when it named none, so a validator dispatching the validation to another process hands the method's trees to its worker through that scope's blob store and the worker reads them by digest under it, as a run's worker reads under the run's read scope. The API server's `POST /v1/validate` hands its validator the request's `read_scope` on every arm, never the caller's own id, and `PLUGIN_API_VERSION` moves to 8, so a plugin declaring `targets_api = 7` is refused at discovery with `PluginApiVersionMismatchError`.
+
 ## [v0.88.0] - 2026-10-16
 
 ### Added

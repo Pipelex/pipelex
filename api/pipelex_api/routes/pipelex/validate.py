@@ -138,10 +138,12 @@ class ValidateRequest(MthdsContentsRequest, CallerAnalyticsGroupsMixin):
     read_scope: str | None = Field(
         default=None,
         description=(
-            "PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the scope of the blob store a hash entry of `files` "
-            "resolves in, as a run's `read_scope`: a multi-tenant host sends the one of the organization it serves. Omit it "
-            "and the caller's own id is the scope. Only a validation carrying it records the tree it read in the blob "
-            "store, so a dry run without one leaves nothing stored."
+            "PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the scope the validation reads the method under, as a "
+            "run's `read_scope`: a multi-tenant host sends the one of the organization it serves. A hash entry of `files` "
+            "resolves in that scope's blob store, the tree the validation read is recorded there, and the runner hands the "
+            "scope to its validator, so a validation dispatched to a worker hands it the method through that store. Omit it "
+            "and a hash entry resolves in the caller's own id's store, but nothing is recorded and the validator is handed "
+            "no scope, so a dry run without one leaves nothing stored."
         ),
     )
 
@@ -379,6 +381,10 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
     # The validation is done for the caller: its dry runs and `pipe_dry_run` event carry the
     # authenticated user and the body's groups, exactly as a run of this request would.
     user_id = get_request_user_id(request)
+    # The scope the host named, which the validator reads the method under: a dispatched validator hands the method's
+    # trees to its worker through that scope's blob store. Never the caller's id a run falls back to, a prefix no host
+    # lists or erases, where a validation must leave nothing stored.
+    read_scope = request_data.read_scope
     # Verdict-as-value: the runner resolves the orchestration mode and dispatches through the bundle
     # validator registry, returning either a validation verdict or a classified fault report.
     # Only `ErrorReport`s with validation diagnostics are invalid-bundle verdicts (→ 200
@@ -388,6 +394,7 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
         verdict = await ApiRunner(
             user_id=user_id,
             extras=request_data.analytics_groups,
+            read_scope=read_scope,
             submitted_files=decode_bundle_resources(resources=request_data.resources),
         ).validate_verdict(
             mthds_contents=request_data.mthds_contents,
@@ -411,7 +418,7 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
             ensure_method_holds_a_bundle(request_method=request_method, label=f"Method package {fetched.label}")
             ensure_python_allowed(request_method=request_method, label=f"Method package {fetched.label}")
         else:
-            blob_store = RunnerBlobStore.make_for_scope(scope=resolve_blob_scope(request, read_scope=request_data.read_scope))
+            blob_store = RunnerBlobStore.make_for_scope(scope=resolve_blob_scope(request, read_scope=read_scope))
             sent_method = await read_request_method(documents=tree_documents_of(body=await request.body()), blob_store=blob_store)
             if sent_method is None:
                 # Unreachable: the envelope's selector validator already 422'd a body with no `files`.
@@ -421,8 +428,9 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
             ensure_method_holds_a_bundle(request_method=request_method, label="This method")
             ensure_python_allowed(request_method=request_method, label="This method")
             # A dry run records the tree only under the scope a host named: without one, the fallback scope is the
-            # caller's own id, a prefix no host lists or erases, and a validation must leave nothing stored there.
-            if request_data.read_scope is not None:
+            # caller's own id, a prefix no host lists or erases, and a validation must leave nothing stored there. Under
+            # one, the tree is held there before the validator is called, so a dispatched validator names it by digest.
+            if read_scope is not None:
                 await record_request_method(request_method=request_method, blob_store=blob_store)
         validated_contents = _bundle_texts(request_method=request_method)
         # The entry pipe of the tree, the one a selector-less run executes, is the graph's pipe and the default the
@@ -437,6 +445,7 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
                 methods_dirs=written.methods_dirs,
                 user_id=user_id,
                 extras=request_data.analytics_groups,
+                read_scope=read_scope,
             ).validate_verdict(
                 mthds_contents=None,
                 mthds_sources=None,

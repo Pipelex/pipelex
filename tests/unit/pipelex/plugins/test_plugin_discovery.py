@@ -165,13 +165,13 @@ class TestPluginDiscovery:
             _build_registrar_with(mocker=mocker, plugins=[future_plugin])
         assert "from_the_future" in str(exc_info.value)
 
-    def test_a_plugin_written_before_crates_named_their_trees_is_refused(self, mocker: MockerFixture) -> None:
-        """Plugin API v6 handed validators `bundle_resources` and executors the call's `files`; a v6 plugin would fail on its first call."""
-        v6_plugin = _InferencePlugin(name="written_against_v6", sdk="v6_sdk", targets_api=6)
+    def test_a_plugin_written_before_validators_received_the_read_scope_is_refused(self, mocker: MockerFixture) -> None:
+        """Plugin API v7 handed validators no `read_scope`; a v7 validator would fail on its first validation."""
+        v7_plugin = _InferencePlugin(name="written_against_v7", sdk="v7_sdk", targets_api=7)
         with pytest.raises(PluginApiVersionMismatchError) as exc_info:
-            _build_registrar_with(mocker=mocker, plugins=[v6_plugin])
-        assert "written_against_v6" in str(exc_info.value)
-        assert PLUGIN_API_VERSION == 7
+            _build_registrar_with(mocker=mocker, plugins=[v7_plugin])
+        assert "written_against_v7" in str(exc_info.value)
+        assert PLUGIN_API_VERSION == 8
 
     def test_duplicate_inference_backend_names_both(self, mocker: MockerFixture) -> None:
         with pytest.raises(DuplicateInferenceBackendError) as exc_info:
