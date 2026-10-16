@@ -9,6 +9,10 @@
 - **A documentation page per error code**: docs.pipelex.com documents each code of the Pipelex error registry on its own page, under the Error Codes index at `errors/`, and its type URI, `https://docs.pipelex.com/errors/<code>`, leads to that page once a release documenting the code is the latest.
 - **`pipelex-dev generate-error-registry` and `pipelex-dev check-error-registry`** (`make ger`, `make cer`): generate the registry's snapshot, its typed Python and its pages from the source, refusing a source the format's JSON Schema, the typed model or the registry's rules refuse, or check that every derived file is what the generator writes; `pipelex-dev write-error-type-redirects` writes the redirects that make a code's type URI resolve, which every documentation deploy runs.
 
+### Fixed
+
+- **Pre-release documentation is published**: a push to a `pre-release/` branch deploys its documentation under the `pre-release` alias of docs.pipelex.com, where the deploy workflow called a make target with no recipe and published nothing.
+
 ### Removed
 
 - **The per-class error pages (Breaking)**: the generated page every `PipelexError` class had under `docs/errors/`, `pipelex-dev generate-error-pages` (`make gep`) and `pipelex.errors.error_pages_generator` are gone; a class-derived `type_uri` names no page any more, and docs.pipelex.com sends such a URL to the Error Codes index.
