@@ -71,7 +71,7 @@ async def resolve_mthds(request_data: MthdsFilesRequest) -> JSONResponse:
     """
     try:
         # Whole-closure route: no pipe is selected here, so the manifest's `main_pipe` beside the crate is unused.
-        crate = resolve_requested_crate(request_data).crate
+        crate = (await resolve_requested_crate(request_data)).crate
     except ValidateBundleError as validate_error:
         return invalid_crate_report_response(validate_error.to_error_report())
     try:

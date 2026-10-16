@@ -81,18 +81,29 @@ class BundleValidatorProtocol(Protocol):
     ``None`` meaning none were submitted: a validator that dropped them would refuse a valid bundle
     for a missing file. A worker-dispatched arm hands them to its worker through the method file
     store, the crate naming their tree by digest.
+
+    ``method_dir`` names the caller's method as a tree in place of ``mthds_contents``, which is then
+    ``None``: the directory of a tree the host wrote out on its own disk, such as a request's map of
+    file entries or a fetched package, held as written (``pipelex.libraries.written_trees``). Every
+    bundle of the tree is validated, its Python included, and every refusal is the caller's verdict,
+    naming the tree's files by their tree paths. ``methods_dirs``, laid out like ``.mthds/methods/``,
+    hold the dependency trees the caller ships with it. Both are required for the same reason as
+    ``caller_identity``, ``None`` meaning the method came as contents. A worker-dispatched arm reads
+    the tree's files on the host, where it is called, and hands them to its worker as trees.
     """
 
     async def validate_bundles(
         self,
         *,
-        mthds_contents: list[str],
+        mthds_contents: list[str] | None,
         mthds_sources: list[str] | None,
         allow_signatures: bool,
         library_dirs: "Sequence[Path] | None",
         caller_identity: CallerIdentity | None,
         graph_pipe_code: str | None,
         submitted_files: "Mapping[str, bytes] | None",
+        method_dir: "Path | None",
+        methods_dirs: "Sequence[Path] | None",
     ) -> BundleValidationVerdict: ...
 
 

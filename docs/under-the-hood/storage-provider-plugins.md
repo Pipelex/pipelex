@@ -147,7 +147,7 @@ The duplicate detection is the same fail-loud `_add` helper the inference/orches
 
 A third-party storage plugin is a distribution that:
 
-1. implements a `StorageProviderAbstract` subclass — the three hooks `_load_with_metadata`, `_store`, and `public_url` — deferring any SDK import into those methods (import-light);
+1. implements a `StorageProviderAbstract` subclass — the three hooks `_load_with_metadata`, `_store`, and `public_url` — deferring any SDK import into those methods (import-light); `_store` publishes the bytes whole or not at all, never leaving an object cut short under its key, and a provider that can read a byte range or an object's size without its bytes also overrides `_load_head` and `_load_size`, whose defaults load the whole object;
 2. defines a plugin class (`name`, `targets_api`, `register`) whose `register` calls `add_storage_provider(method="<token>", factory=...)` — and nothing else;
 3. advertises itself under the `pipelex.plugins.kernel` entry-point group — a storage provider is kernel-layer, and the group is how a plugin declares that (see [Inference Backend Plugins](inference-backend-plugins.md#shipping-it-as-an-out-of-tree-plugin) for what each group means and what happens if you pick the wrong one; the pre-split `pipelex.plugins` group is retired and now fails startup):
 

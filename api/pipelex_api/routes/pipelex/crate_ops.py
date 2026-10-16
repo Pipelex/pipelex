@@ -12,6 +12,7 @@ The invalid arm here is the *crate* verdict: it deliberately omits `/validate`'s
 rides that same static core: it reads the selected pipe's *declared* IO with no dry-run sweep.
 """
 
+import asyncio
 from enum import StrEnum
 from typing import Literal, NamedTuple, NoReturn
 
@@ -83,7 +84,7 @@ class SelectedFiles(NamedTuple):
     """The fetched package manifest's `main_pipe` (a bare pipe code). Always None for inline `files[]`, which carry no manifest."""
 
 
-def selected_files(request_data: MthdsFilesRequest) -> SelectedFiles:
+async def selected_files(request_data: MthdsFilesRequest) -> SelectedFiles:
     """The files the closure selector names: inline `files[]`, or an address `method_ref`'s package.
 
     Every route on the `files[]` envelope reaches it through `resolve_requested_crate`, so they all
@@ -105,7 +106,8 @@ def selected_files(request_data: MthdsFilesRequest) -> SelectedFiles:
     """
     if request_data.method_ref is not None:
         if looks_like_method_ref(request_data.method_ref):
-            fetched = fetch_method_mthds_files(request_data.method_ref)
+            # The fetch runs git and reads the package from disk, so it runs off the event loop, as a run's does.
+            fetched = await asyncio.to_thread(fetch_method_mthds_files, request_data.method_ref)
             return SelectedFiles(files=fetched.files, manifest_main_pipe=fetched.main_pipe)
         raise_not_implemented(
             "Registry-form method_ref resolution is not available on this server: no method registry is wired. "
@@ -129,7 +131,7 @@ class ResolvedClosure(NamedTuple):
     """The fetched package manifest's `main_pipe`, carried through from `selected_files` (None for inline `files[]`)."""
 
 
-def resolve_requested_crate(request_data: MthdsFilesRequest) -> ResolvedClosure:
+async def resolve_requested_crate(request_data: MthdsFilesRequest) -> ResolvedClosure:
     """Resolve the request's closure selector into a normalized library crate.
 
     Inherits the engine core's **loaded-on-success contract**: on success the freshly opened
@@ -148,7 +150,7 @@ def resolve_requested_crate(request_data: MthdsFilesRequest) -> ResolvedClosure:
         ApiError: 501 for a registry-form `method_ref` (see `selected_files`).
         MethodRefError subclasses: address-form fetch/location failures (see `selected_files`).
     """
-    selection = selected_files(request_data)
+    selection = await selected_files(request_data)
     crate = resolve_crate_from_contents(
         mthds_contents=[item.content for item in selection.files],
         mthds_sources=[item.source for item in selection.files],

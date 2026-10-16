@@ -276,7 +276,9 @@ def _marked_functions(*, files: Mapping[str, str]) -> list[_MarkedFunction]:
             continue
         try:
             module = ast.parse(files[tree_path], filename=tree_path)
-        except SyntaxError:
+        except (SyntaxError, ValueError, RecursionError, MemoryError):
+            # A source that does not parse declares no function: a NUL byte is a ValueError on Python 3.11, and
+            # nesting deep enough to exhaust the parser a RecursionError or a MemoryError.
             continue
         marker_refs = marker_references(module=module)
         if not marker_refs:

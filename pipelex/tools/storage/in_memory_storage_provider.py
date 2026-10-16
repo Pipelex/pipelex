@@ -44,6 +44,18 @@ class InMemoryStorageProvider(RootModel[InMemoryStorageRoot], StorageProviderAbs
         return StoredData(data=data, mime_type=mime_type)
 
     @override
+    async def _load_size(self, key: str) -> int:
+        """The length of the bytes held under `key`.
+
+        Raises:
+            StorageFileNotFoundError: If no data exists for the key.
+        """
+        if key not in self.root:
+            msg = f"File not found: '{key}'"
+            raise StorageFileNotFoundError(msg)
+        return len(self.root[key])
+
+    @override
     async def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
         """Store bytes in memory.
 

@@ -9,10 +9,12 @@ The hermetic API environment has no document engine, so the step's engine is stu
 records the bytes it reads through the method file store, which is the read the engine's checker would be handed.
 """
 
+import asyncio
 import base64
 import io
+import json
 import zipfile
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +24,7 @@ from fastapi.testclient import TestClient
 from mthds.method_tree.digest import digest_of_contents, sha256_hex, tree_files_from_contents, tree_listing
 from pipelex.cogt.content_generation.assignment_models import RenderDocumentAssignment
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
+from pipelex.core.method_trees.exceptions import MethodFileUnavailableError
 from pipelex.core.method_trees.method_files import StoredTree, read_method_file, read_stored_trees
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
@@ -67,6 +70,19 @@ template_file = "{_TEMPLATE_PATH}"
 """
 
 _INVOICE_INPUTS: dict[str, Any] = {"invoice": {"concept": "invoicing.Invoice", "content": {"number": "INV-1"}}}
+
+# The stub package's manifest, starting the method at the invoice's print.
+_INVOICE_PACKAGE_MANIFEST = """\
+[package]
+name = "documents"
+address = "github.com/pipelex/methods"
+version = "0.1.0"
+description = "A stub package printing an invoice from the template it ships."
+main_pipe = "print_invoice"
+
+[exports.invoicing]
+pipes = ["print_invoice"]
+"""
 
 
 def _b64(data: bytes) -> str:
@@ -330,20 +346,22 @@ class TestBundleResourcesRoutes:
         ("bundle_files", "resources", "tree_files"),
         [
             pytest.param(
-                {"invoicing.mthds": _INVOICE_MTHDS, _TEMPLATE_PATH: _TEMPLATE_BYTES}, None, {_TEMPLATE_PATH: _TEMPLATE_BYTES}, id="beside_the_bundle"
+                {"invoicing.mthds": _INVOICE_MTHDS, _TEMPLATE_PATH: _TEMPLATE_BYTES},
+                None,
+                {"invoicing.mthds": _INVOICE_MTHDS.encode("utf-8"), _TEMPLATE_PATH: _TEMPLATE_BYTES},
+                id="beside_the_bundle",
             ),
-            # The bundle's other files are written where it ships them, and its step's file is keyed by the path the step
-            # names, both in the one tree the bundle's contents sit at the root of.
+            # The archive is the method's tree: the bundle's step names its file from the bundle's own tree path.
             pytest.param(
                 {"methods/invoicing.mthds": _INVOICE_MTHDS, f"methods/{_TEMPLATE_PATH}": _TEMPLATE_BYTES},
                 None,
-                {_TEMPLATE_PATH: _TEMPLATE_BYTES, f"methods/{_TEMPLATE_PATH}": _TEMPLATE_BYTES},
+                {"methods/invoicing.mthds": _INVOICE_MTHDS.encode("utf-8"), f"methods/{_TEMPLATE_PATH}": _TEMPLATE_BYTES},
                 id="in_a_directory",
             ),
             pytest.param(
                 {"invoicing.mthds": _INVOICE_MTHDS, _TEMPLATE_PATH: _TEMPLATE_BYTES},
                 {_TEMPLATE_PATH: _b64(_TEMPLATE_BYTES)},
-                {_TEMPLATE_PATH: _TEMPLATE_BYTES},
+                {"invoicing.mthds": _INVOICE_MTHDS.encode("utf-8"), _TEMPLATE_PATH: _TEMPLATE_BYTES},
                 id="also_in_resources",
             ),
         ],
@@ -351,7 +369,7 @@ class TestBundleResourcesRoutes:
     def test_a_method_bundle_carries_the_office_template_it_ships_to_its_step(
         self, mocker: MockerFixture, bundle_files: dict[str, str | bytes], resources: dict[str, str] | None, tree_files: dict[str, bytes]
     ) -> None:
-        """A template file shipped beside the bundle's `.mthds` file joins the tree of the submitted files as one sent in `resources` does."""
+        """A method sent as an archive is a method tree: the job names that tree, its bundle and the template it ships, by its digest."""
         _stub_the_document_engine(mocker)
         orchestrator = _record_dispatches_to_a_temporal_like_orchestrator(mocker)
         body: dict[str, Any] = {"bundle_b64": _zip_b64(bundle_files), "inputs": _INVOICE_INPUTS}
@@ -382,50 +400,130 @@ class TestBundleResourcesRoutes:
 
         assert response.status_code == 202, response.text
         (pipe_job,) = orchestrator.pipe_jobs
-        _assert_the_job_names_the_tree_of(pipe_job=pipe_job, files={"templates/invoice.html": html_template.encode("utf-8")})
-        _assert_the_orchestrator_copied_the_tree_of(orchestrator=orchestrator, files={"templates/invoice.html": html_template.encode("utf-8")})
+        tree_files = {"invoicing.mthds": html_mthds.encode("utf-8"), "templates/invoice.html": html_template.encode("utf-8")}
+        _assert_the_job_names_the_tree_of(pipe_job=pipe_job, files=tree_files)
+        _assert_the_orchestrator_copied_the_tree_of(orchestrator=orchestrator, files=tree_files)
         assert "invoice.number }}" not in pipe_job.model_dump_json()
 
-    @pytest.mark.parametrize(
-        ("bundle_files", "resources"),
-        [
-            pytest.param(
-                {"invoicing.mthds": _INVOICE_MTHDS, _TEMPLATE_PATH: _TEMPLATE_BYTES}, {_TEMPLATE_PATH: _b64(b"another template")}, id="and_resources"
-            ),
-            pytest.param(
-                {
-                    "a/invoicing.mthds": _INVOICE_MTHDS,
-                    f"a/{_TEMPLATE_PATH}": _TEMPLATE_BYTES,
-                    "b/invoicing.mthds": _INVOICE_MTHDS.replace('domain = "invoicing"', 'domain = "invoicing_b"').replace(
-                        "invoicing.Invoice", "invoicing_b.Invoice"
-                    ),
-                    f"b/{_TEMPLATE_PATH}": b"another template",
-                },
-                None,
-                id="two_of_its_bundles",
-            ),
-        ],
-    )
-    def test_two_different_files_a_step_reads_under_one_path_are_refused(
-        self, mocker: MockerFixture, bundle_files: dict[str, str | bytes], resources: dict[str, str] | None
-    ) -> None:
-        """Every bundle of a request reads its files as if it sat in one directory, so one path holds one file."""
+    def test_a_tree_sent_to_start_is_served_in_this_process_only_until_start_returns(self, mocker: MockerFixture) -> None:
+        """Why an orchestrator copies a job's trees before its `start` returns: the runner drops them as soon as it does.
+
+        The runner wrote the sent tree into a temporary directory and its library held it for the request; both are
+        gone once `/start` answers, so a job still running in any process reads its files from where its orchestrator
+        copied them.
+        """
         _stub_the_document_engine(mocker)
-        body: dict[str, Any] = {"bundle_b64": _zip_b64(bundle_files), "inputs": _INVOICE_INPUTS}
-        if resources is not None:
-            body["resources"] = resources
+        orchestrator = _record_dispatches_to_a_temporal_like_orchestrator(mocker)
+        html_mthds = _INVOICE_MTHDS.replace('format        = "docx"', 'format        = "pdf"').replace(_TEMPLATE_PATH, "templates/invoice.html")
+        files = {"invoicing.mthds": html_mthds, "templates/invoice.html": "<h1>{{ invoice.number }}</h1>"}
+
+        response = _build_client().post("/v1/start", json={"files": files, "inputs": _INVOICE_INPUTS})
+
+        assert response.status_code == 202, response.text
+        (pipe_job,) = orchestrator.pipe_jobs
+        crate = pipe_job.library_crate
+        assert crate is not None
+        assert [copied.tree_digest for copied in orchestrator.copied_trees] == list(crate.tree_digests())
+        with pytest.raises(MethodFileUnavailableError):
+            asyncio.run(read_stored_trees(tree_digests=crate.tree_digests(), read_scope=pipe_job.job_metadata.run_metadata.read_scope))
+
+    def test_a_file_of_the_method_and_other_bytes_in_resources_under_one_path_are_refused(self, mocker: MockerFixture) -> None:
+        """`resources` joins the method's tree, so other bytes under a path the tree holds are two files under one path."""
+        _stub_the_document_engine(mocker)
+        body: dict[str, Any] = {
+            "bundle_b64": _zip_b64({"invoicing.mthds": _INVOICE_MTHDS, _TEMPLATE_PATH: _TEMPLATE_BYTES}),
+            "inputs": _INVOICE_INPUTS,
+            "resources": {_TEMPLATE_PATH: _b64(b"another template")},
+        }
 
         detail = _assert_problem(_build_client().post("/v1/execute", json=body), status=422, error_type="InvalidResourcePath")
 
         assert f"'{_TEMPLATE_PATH}'" in detail
 
-    def test_a_template_a_method_bundle_ships_is_held_to_the_per_file_limit(self, mocker: MockerFixture) -> None:
+    @pytest.mark.parametrize("sends_the_logo", [True, False])
+    def test_a_file_only_a_template_s_relative_url_names_travels_in_the_method_s_tree(self, mocker: MockerFixture, sends_the_logo: bool) -> None:
+        """No step names the logo, only the template's `<img src>` does: a tree keeps it, and the load's check finds it there.
+
+        Beside inline contents, `resources` still refuses a file no step names, so such a method is sent as a tree.
+        """
         _stub_the_document_engine(mocker)
-        mocker.patch(f"{_RESOURCES_NS}.MAX_RESOURCE_FILE_BYTES", len(_TEMPLATE_BYTES) - 1)
+        html_mthds = _INVOICE_MTHDS.replace('format        = "docx"', 'format        = "pdf"').replace(_TEMPLATE_PATH, "templates/invoice.html")
+        files: dict[str, Any] = {
+            "invoicing.mthds": html_mthds,
+            "templates/invoice.html": '<img src="logo.png" alt="Acme"><h1>{{ invoice.number }}</h1>',
+        }
+        if sends_the_logo:
+            files["templates/logo.png"] = {"base64": _b64(b"\x89PNG\r\n\x1a\n a logo")}
+
+        response = _build_client().post("/v1/validate", json={"files": files})
+
+        assert response.status_code == 200, response.text
+        verdict = response.json()
+        assert verdict["is_valid"] is sends_the_logo, response.text
+        if not sends_the_logo:
+            assert "logo.png" in json.dumps(verdict["validation_errors"])
+
+    def test_two_bundles_of_a_method_each_read_the_file_beside_them(self, mocker: MockerFixture) -> None:
+        """A step names its file from its bundle's own tree path, so two bundles shipping a template each under one relative path both run."""
+        _stub_the_document_engine(mocker)
+        orchestrator = _record_dispatches_to_a_temporal_like_orchestrator(mocker)
+        mthds_b = _INVOICE_MTHDS.replace('domain = "invoicing"', 'domain = "invoicing_b"').replace('main_pipe = "print_invoice"\n', "")
+        tree_files = {
+            "a/invoicing.mthds": _INVOICE_MTHDS.encode("utf-8"),
+            f"a/{_TEMPLATE_PATH}": _TEMPLATE_BYTES,
+            "b/invoicing.mthds": mthds_b.encode("utf-8"),
+            f"b/{_TEMPLATE_PATH}": b"another template",
+        }
+
+        response = _build_client().post("/v1/start", json={"bundle_b64": _zip_b64(tree_files), "inputs": _INVOICE_INPUTS})
+
+        assert response.status_code == 202, response.text
+        (pipe_job,) = orchestrator.pipe_jobs
+        _assert_the_job_names_the_tree_of(pipe_job=pipe_job, files=tree_files)
+
+    def test_a_method_ref_package_supplies_the_template_its_step_names(
+        self, mocker: MockerFixture, install_method_package: Callable[..., Path]
+    ) -> None:
+        """A fetched package is a method tree read from its commit: its validation reads the template it ships, and a job names that tree."""
+        read_templates = _stub_the_document_engine(mocker)
+        install_method_package(
+            files={"invoicing.mthds": _INVOICE_MTHDS, _TEMPLATE_PATH: _TEMPLATE_BYTES.decode("ascii")}, manifest_toml=_INVOICE_PACKAGE_MANIFEST
+        )
+        method_ref = f"{STUB_METHOD_ADDRESS}@v0.1.0"
+        client = _build_client()
+
+        validated = client.post("/v1/validate", json={"method_ref": method_ref})
+
+        assert validated.status_code == 200, validated.text
+        assert validated.json()["is_valid"] is True, validated.text
+        assert read_templates
+        assert set(read_templates) == {_TEMPLATE_BYTES}
+
+        orchestrator = _record_dispatches_to_a_temporal_like_orchestrator(mocker)
+        started = client.post("/v1/start", json={"method_ref": method_ref, "inputs": _INVOICE_INPUTS})
+
+        assert started.status_code == 202, started.text
+        (pipe_job,) = orchestrator.pipe_jobs
+        tree_files = {
+            "METHODS.toml": _INVOICE_PACKAGE_MANIFEST.encode("utf-8"),
+            "invoicing.mthds": _INVOICE_MTHDS.encode("utf-8"),
+            _TEMPLATE_PATH: _TEMPLATE_BYTES,
+        }
+        _assert_the_job_names_the_tree_of(pipe_job=pipe_job, files=tree_files)
+        _assert_the_orchestrator_copied_the_tree_of(orchestrator=orchestrator, files=tree_files)
+        assert started.json()["method_provenance"]["tree_digest"] == digest_of_contents(tree_files)
+
+    def test_a_template_a_method_bundle_ships_is_held_to_the_per_file_limit_of_a_tree(self, mocker: MockerFixture) -> None:
+        _stub_the_document_engine(mocker)
+        mocker.patch("pipelex_api.method_tree_request.MAX_METHOD_TREE_FILE_BYTES", len(_INVOICE_MTHDS.encode("utf-8")) + 1)
 
         response = _build_client().post(
             "/v1/execute",
-            json={"bundle_b64": _zip_b64({"invoicing.mthds": _INVOICE_MTHDS, _TEMPLATE_PATH: _TEMPLATE_BYTES}), "inputs": _INVOICE_INPUTS},
+            json={
+                "bundle_b64": _zip_b64({"invoicing.mthds": _INVOICE_MTHDS, _TEMPLATE_PATH: bytes(len(_INVOICE_MTHDS) + 2)}),
+                "inputs": _INVOICE_INPUTS,
+            },
         )
 
-        assert "per-file" in _assert_problem(response, status=413, error_type="PayloadTooLarge")
+        detail = _assert_problem(response, status=422, error_type="MethodTreeTooLarge")
+        assert f"'{_TEMPLATE_PATH}'" in detail

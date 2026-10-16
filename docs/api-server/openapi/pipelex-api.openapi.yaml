@@ -12,7 +12,7 @@ info:
   license:
     name: Elastic License 2.0
     identifier: Elastic-2.0
-  version: 0.86.1
+  version: 0.87.0
 paths:
   /health:
     get:
@@ -51,7 +51,13 @@ paths:
 
         identifies this runner, `implementation_version` is this server package''s
 
-        version, and `runtime_version` is the underlying pipelex runtime version.'
+        version, and `runtime_version` is the underlying pipelex runtime version.
+
+        `blob_store` is true: this runner keeps a blob store over its storage
+
+        provider and serves `POST /v1/blobs/missing` and `PUT /v1/blobs/{sha256}`,
+
+        so a sender may name a file of `files` by its hash.'
       operationId: get_version_v1_version_get
       responses:
         '200':
@@ -68,6 +74,105 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
       x-mthds-protocol: true
+  /v1/blobs/{sha256}:
+    put:
+      tags:
+      - blobs
+      summary: Upload one blob's bytes to the target POST /blobs/missing named.
+      description: 'Store one blob''s bytes under its SHA-256, as the upload target `POST /v1/blobs/missing` named (MTHDS
+        Protocol).
+
+
+        The body is the blob''s bytes and nothing else. A target whose signature does not hold, or that has expired, is a
+
+        403 `BlobUploadNotAuthorized`, as is a query that is not one this runner signs, such as an expiry that is not a
+
+        decimal integer; a body past `MAX_METHOD_TREE_FILE_KIB` a 422 `MethodTreeTooLarge`; and a body whose SHA-256 is not
+
+        the path''s a 422 `BlobMismatch`. A blob is never changed: uploading bytes the runner already holds answers 204 and
+
+        changes nothing.'
+      operationId: put_blob_v1_blobs__sha256__put
+      parameters:
+      - name: sha256
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          description: The SHA-256 of the body, in lowercase hexadecimal.
+          title: Sha256
+        description: The SHA-256 of the body, in lowercase hexadecimal.
+      - name: scope
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: The blob store's scope, as the signed target names it.
+          title: Scope
+        description: The blob store's scope, as the signed target names it.
+      - name: expires
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: When the target expires, in seconds since the epoch.
+          title: Expires
+        description: When the target expires, in seconds since the epoch.
+      - name: signature
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: The target's signature.
+          title: Signature
+        description: The target's signature.
+      responses:
+        '204':
+          description: Successful Response
+        '403':
+          description: '`BlobUploadNotAuthorized` — the upload does not carry the signed query an upload target of `POST /v1/blobs/missing`
+            names, its signature does not hold for this hash and scope, or it has expired. Ask `POST /v1/blobs/missing` again
+            for a fresh target.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
+        '413':
+          description: Request body exceeds the deployment's size limit (`MAX_REQUEST_BODY_MIB`, 100 MiB by default).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
+        '422':
+          description: 'The request could not be processed: a malformed body, a field failing validation, or an `input`-domain
+            pipelex error (a `.mthds` bundle the caller must fix). Note that on the diagnostic routes an *invalid bundle*
+            is a **200** verdict, not a 422 — see each route''s response contract.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
+        '500':
+          description: A `config`-domain or `runtime`-domain failure the caller cannot fix (a missing env var, a bad TOML
+            override, a backend fault), or an unclassified error sanitized by the catch-all handler. Report the `request_id`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
+      x-mthds-protocol: true
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
   /v1/execute:
     post:
       tags:
@@ -93,6 +198,38 @@ paths:
           application/json:
             schema:
               $defs:
+                Base64FileEntry:
+                  properties:
+                    base64:
+                      type: string
+                      title: Base64
+                      description: The file's bytes in canonical padded standard Base64.
+                  additionalProperties: false
+                  type: object
+                  required:
+                  - base64
+                  title: Base64FileEntry
+                  description: A file entry carrying the file's bytes in canonical padded standard Base64.
+                HashFileEntry:
+                  properties:
+                    sha256:
+                      type: string
+                      pattern: ^[0-9a-f]{64}$
+                      title: Sha256
+                      description: The SHA-256 of the file's bytes, in lowercase hexadecimal.
+                    size:
+                      type: integer
+                      minimum: 0.0
+                      title: Size
+                      description: The file's size in bytes, an integer written with no fraction or exponent.
+                  additionalProperties: false
+                  type: object
+                  required:
+                  - sha256
+                  - size
+                  title: HashFileEntry
+                  description: A file entry naming, by their SHA-256 and their size, bytes the receiver already holds in its
+                    blob store.
                 StuffContentAbstract:
                   properties: {}
                   type: object
@@ -148,21 +285,50 @@ paths:
                   - type: string
                   - type: 'null'
                   title: Bundle B64
-                  description: PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — base64-encoded zip of the whole method
-                    bundle (`.mthds` + `.py` + `structures/*.py` + `requirements.txt`), materialized into a temporary library
-                    directory before the run so custom PipeFunc Python travels with the method. The method packages the bundle
-                    calls by address may travel with it under `.mthds/methods/<name>/`, each with its `METHODS.toml`; they
-                    are searched before the runner's installed copies, for this run alone. Mutually exclusive with `files`.
-                    Custom `.py` is only honored on a sandbox-hosted deployment.
+                  description: PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — base64-encoded zip of the method's
+                    folder, read as a map of its entries, so the archive's names are judged by the method tree's rule as the
+                    keys of `files` are. The method packages it calls by address may travel with it under `.mthds/methods/<name>/`,
+                    each with its `METHODS.toml`; they are searched before the runner's installed copies, for this run alone.
+                    Mutually exclusive with `files`. Custom `.py` is only honored on a sandbox-hosted deployment.
                 files:
                   anyOf:
                   - additionalProperties:
-                      type: string
+                      anyOf:
+                      - type: string
+                      - $ref: '#/$defs/Base64FileEntry'
+                      - $ref: '#/$defs/HashFileEntry'
                     type: object
                   - type: 'null'
                   title: Files
-                  description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the method bundle as a `{relative_path:
-                    text}` map (the unzipped equivalent of `bundle_b64`). Mutually exclusive with `bundle_b64`.'
+                  description: 'The method as a map of file entries, the MTHDS standard''s form of a method tree that travels:
+                    each key is a tree path (relative, forward slashes, in Unicode NFC, no `.` or `..` segment, no segment
+                    starting with a dot), and each value is the file''s UTF-8 text, `{"base64": ...}` holding its bytes, or
+                    `{"sha256": ..., "size": ...}` naming bytes this runner already holds (uploaded with `POST /v1/blobs/missing`
+                    then `PUT /v1/blobs/{sha256}`). The map is read from the request''s JSON text: a key given twice, a key
+                    the membership rule keeps out of every tree (`.mthds/` included), colliding keys and a malformed entry
+                    are a 422 `InvalidMethodFiles` whose `tree_refusal` names the code and the paths, and hash entries the
+                    runner does not hold are one 422 `MissingBlobs` whose `missing_blobs` lists every such hash. Its `.mthds`
+                    files are the method''s bundles and every other file is one a step may read, such as a `PipeDocGen` template
+                    or a `PipeFunc` module. With no `pipe_code`, the run starts at the `main_pipe` of the `METHODS.toml` at
+                    the tree''s root, or else at the one `main_pipe` its bundles declare. Custom `.py` is only honored on
+                    a sandbox-hosted deployment.'
+                dependencies:
+                  anyOf:
+                  - additionalProperties:
+                      additionalProperties:
+                        anyOf:
+                        - type: string
+                        - $ref: '#/$defs/Base64FileEntry'
+                        - $ref: '#/$defs/HashFileEntry'
+                      type: object
+                    type: object
+                  - type: 'null'
+                  title: Dependencies
+                  description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the method packages the method calls
+                    by address that this runner cannot fetch, such as one an author has not published, as `{"<address>": <map
+                    of file entries>}`: each value is a tree of its own, read as `files` is, with a `METHODS.toml` at its
+                    root declaring the address it is keyed by. They are searched before the runner''s installed copies, for
+                    this request alone. Accompanies `files`.'
                 method_ref:
                   anyOf:
                   - type: string
@@ -187,14 +353,15 @@ paths:
                   title: Resources
                   description: 'The files submitted with the bundle that its steps read, such as a PipeDocGen step''s `template_file`
                     (an `.xlsx`, `.docx`, `.pptx` or `.html` template): a JSON object mapping each file''s bundle-relative
-                    path, exactly as the step names it, to the file''s bytes in standard base64. Every bundle of the request
-                    is read as sitting in one directory. A path must be relative and written with forward slashes, with no
-                    `..` segment, backslash or colon. Every file must be named by a step, or the request is refused with a
-                    422 `BundleResourceNotNamedError`. By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded,
-                    counting the files a method bundle ships for its steps; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
-                    `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. A file both sent here and shipped in a method bundle
-                    must be the same. The files make one method tree with the bundle at its root, which the run names by its
-                    digest: no file''s bytes travel with the run, each being read where a step uses it.'
+                    path, exactly as the step names it, to the file''s bytes in standard base64. A path must be relative and
+                    written with forward slashes, with no `..` segment, backslash or colon. Beside inline `mthds_contents`,
+                    every bundle of the request is read as sitting in one directory, and every file must be named by a step,
+                    or the request is refused with a 422 `BundleResourceNotNamedError`. Beside a method tree, `files` or `bundle_b64`,
+                    each file joins the tree at its path from the tree''s root, where a file the tree already holds must have
+                    the same bytes. By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment
+                    sets its own with `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.
+                    The files make one method tree with the bundles, which the run names by its digest: no file''s bytes travel
+                    with the run, each being read where a step uses it.'
                 orchestration_mode:
                   anyOf:
                   - type: string
@@ -366,6 +533,38 @@ paths:
           application/json:
             schema:
               $defs:
+                Base64FileEntry:
+                  properties:
+                    base64:
+                      type: string
+                      title: Base64
+                      description: The file's bytes in canonical padded standard Base64.
+                  additionalProperties: false
+                  type: object
+                  required:
+                  - base64
+                  title: Base64FileEntry
+                  description: A file entry carrying the file's bytes in canonical padded standard Base64.
+                HashFileEntry:
+                  properties:
+                    sha256:
+                      type: string
+                      pattern: ^[0-9a-f]{64}$
+                      title: Sha256
+                      description: The SHA-256 of the file's bytes, in lowercase hexadecimal.
+                    size:
+                      type: integer
+                      minimum: 0.0
+                      title: Size
+                      description: The file's size in bytes, an integer written with no fraction or exponent.
+                  additionalProperties: false
+                  type: object
+                  required:
+                  - sha256
+                  - size
+                  title: HashFileEntry
+                  description: A file entry naming, by their SHA-256 and their size, bytes the receiver already holds in its
+                    blob store.
                 StuffContentAbstract:
                   properties: {}
                   type: object
@@ -421,21 +620,50 @@ paths:
                   - type: string
                   - type: 'null'
                   title: Bundle B64
-                  description: PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — base64-encoded zip of the whole method
-                    bundle (`.mthds` + `.py` + `structures/*.py` + `requirements.txt`), materialized into a temporary library
-                    directory before the run so custom PipeFunc Python travels with the method. The method packages the bundle
-                    calls by address may travel with it under `.mthds/methods/<name>/`, each with its `METHODS.toml`; they
-                    are searched before the runner's installed copies, for this run alone. Mutually exclusive with `files`.
-                    Custom `.py` is only honored on a sandbox-hosted deployment.
+                  description: PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — base64-encoded zip of the method's
+                    folder, read as a map of its entries, so the archive's names are judged by the method tree's rule as the
+                    keys of `files` are. The method packages it calls by address may travel with it under `.mthds/methods/<name>/`,
+                    each with its `METHODS.toml`; they are searched before the runner's installed copies, for this run alone.
+                    Mutually exclusive with `files`. Custom `.py` is only honored on a sandbox-hosted deployment.
                 files:
                   anyOf:
                   - additionalProperties:
-                      type: string
+                      anyOf:
+                      - type: string
+                      - $ref: '#/$defs/Base64FileEntry'
+                      - $ref: '#/$defs/HashFileEntry'
                     type: object
                   - type: 'null'
                   title: Files
-                  description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the method bundle as a `{relative_path:
-                    text}` map (the unzipped equivalent of `bundle_b64`). Mutually exclusive with `bundle_b64`.'
+                  description: 'The method as a map of file entries, the MTHDS standard''s form of a method tree that travels:
+                    each key is a tree path (relative, forward slashes, in Unicode NFC, no `.` or `..` segment, no segment
+                    starting with a dot), and each value is the file''s UTF-8 text, `{"base64": ...}` holding its bytes, or
+                    `{"sha256": ..., "size": ...}` naming bytes this runner already holds (uploaded with `POST /v1/blobs/missing`
+                    then `PUT /v1/blobs/{sha256}`). The map is read from the request''s JSON text: a key given twice, a key
+                    the membership rule keeps out of every tree (`.mthds/` included), colliding keys and a malformed entry
+                    are a 422 `InvalidMethodFiles` whose `tree_refusal` names the code and the paths, and hash entries the
+                    runner does not hold are one 422 `MissingBlobs` whose `missing_blobs` lists every such hash. Its `.mthds`
+                    files are the method''s bundles and every other file is one a step may read, such as a `PipeDocGen` template
+                    or a `PipeFunc` module. With no `pipe_code`, the run starts at the `main_pipe` of the `METHODS.toml` at
+                    the tree''s root, or else at the one `main_pipe` its bundles declare. Custom `.py` is only honored on
+                    a sandbox-hosted deployment.'
+                dependencies:
+                  anyOf:
+                  - additionalProperties:
+                      additionalProperties:
+                        anyOf:
+                        - type: string
+                        - $ref: '#/$defs/Base64FileEntry'
+                        - $ref: '#/$defs/HashFileEntry'
+                      type: object
+                    type: object
+                  - type: 'null'
+                  title: Dependencies
+                  description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the method packages the method calls
+                    by address that this runner cannot fetch, such as one an author has not published, as `{"<address>": <map
+                    of file entries>}`: each value is a tree of its own, read as `files` is, with a `METHODS.toml` at its
+                    root declaring the address it is keyed by. They are searched before the runner''s installed copies, for
+                    this request alone. Accompanies `files`.'
                 method_ref:
                   anyOf:
                   - type: string
@@ -460,14 +688,15 @@ paths:
                   title: Resources
                   description: 'The files submitted with the bundle that its steps read, such as a PipeDocGen step''s `template_file`
                     (an `.xlsx`, `.docx`, `.pptx` or `.html` template): a JSON object mapping each file''s bundle-relative
-                    path, exactly as the step names it, to the file''s bytes in standard base64. Every bundle of the request
-                    is read as sitting in one directory. A path must be relative and written with forward slashes, with no
-                    `..` segment, backslash or colon. Every file must be named by a step, or the request is refused with a
-                    422 `BundleResourceNotNamedError`. By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded,
-                    counting the files a method bundle ships for its steps; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
-                    `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. A file both sent here and shipped in a method bundle
-                    must be the same. The files make one method tree with the bundle at its root, which the run names by its
-                    digest: no file''s bytes travel with the run, each being read where a step uses it.'
+                    path, exactly as the step names it, to the file''s bytes in standard base64. A path must be relative and
+                    written with forward slashes, with no `..` segment, backslash or colon. Beside inline `mthds_contents`,
+                    every bundle of the request is read as sitting in one directory, and every file must be named by a step,
+                    or the request is refused with a 422 `BundleResourceNotNamedError`. Beside a method tree, `files` or `bundle_b64`,
+                    each file joins the tree at its path from the tree''s root, where a file the tree already holds must have
+                    the same bytes. By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment
+                    sets its own with `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.
+                    The files make one method tree with the bundles, which the run names by its digest: no file''s bytes travel
+                    with the run, each being read where a step uses it.'
                 pipeline_run_id:
                   anyOf:
                   - type: string
@@ -1270,6 +1499,91 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
+  /v1/blobs/missing:
+    post:
+      tags:
+      - blobs
+      summary: Which of these blobs the runner lacks, and where to upload each.
+      description: 'List every blob of the request this runner does not hold, each with a signed upload target (MTHDS Protocol).
+
+
+        A blob it holds at the stated size is left out, and an empty list means there is nothing to upload; bytes held
+
+        under a hash at another size are listed, for the upload to write over. When the request names the tree the blobs
+
+        make up by its `digest`, this runner has recorded that tree as held in full, which it does only after reading every
+
+        file of a tree a request sent, and every listed blob is a file of that tree, the answer is an empty list at once.
+
+        A hash given twice with different sizes is a 422 `BlobMismatch`, and a blob or a set of blobs past this runner''s
+
+        tree limits a 422 `MethodTreeTooLarge`, both refused before anything is uploaded. Each upload target is this runner''s
+        own
+
+        `PUT /v1/blobs/{sha256}`, at `PUBLIC_BASE_URL` when the deployment sets it, its query signed for that hash and
+
+        the caller''s scope, valid for `BLOB_UPLOAD_URL_TTL_SECONDS`, to send with exactly the headers it names.'
+      operationId: find_missing_blobs_v1_blobs_missing_post
+      parameters:
+      - name: read_scope
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: 'PIPELEX-API EXTENSION — the blob store''s scope, as a run''s `read_scope`: a multi-tenant host sends
+            the one of the organization it serves. Omit it and the caller''s own id is the scope.'
+          title: Read Scope
+        description: 'PIPELEX-API EXTENSION — the blob store''s scope, as a run''s `read_scope`: a multi-tenant host sends
+          the one of the organization it serves. Omit it and the caller''s own id is the scope.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MissingBlobsRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MissingBlobsResult'
+        '401':
+          description: Missing or invalid bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key`
+            or `AUTH_MODE=jwt`).
+          headers:
+            WWW-Authenticate:
+              description: Authentication challenge — always `Bearer`.
+              schema:
+                type: string
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
+        '413':
+          description: Request body exceeds the deployment's size limit (`MAX_REQUEST_BODY_MIB`, 100 MiB by default).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
+        '422':
+          description: 'The request could not be processed: a malformed body, a field failing validation, or an `input`-domain
+            pipelex error (a `.mthds` bundle the caller must fix). Note that on the diagnostic routes an *invalid bundle*
+            is a **200** verdict, not a 422 — see each route''s response contract.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
+        '500':
+          description: A `config`-domain or `runtime`-domain failure the caller cannot fix (a missing env var, a bad TOML
+            override, a backend fault), or an unclassified error sanitized by the catch-all handler. Report the `request_id`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
+      x-mthds-protocol: true
   /:
     get:
       tags:
@@ -1388,6 +1702,18 @@ components:
       - opaque
       - auto
       title: Background
+    Base64FileEntry:
+      properties:
+        base64:
+          type: string
+          title: Base64
+          description: The file's bytes in canonical padded standard Base64.
+      additionalProperties: false
+      type: object
+      required:
+      - base64
+      title: Base64FileEntry
+      description: A file entry carrying the file's bytes in canonical padded standard Base64.
     BindingStepBlueprint:
       properties:
         from:
@@ -1414,6 +1740,26 @@ components:
         under `total_amount`, as the concept the path derives through the declared structures. A binding step
 
         lives in a PipeSequence''s `steps` only, and carries exactly these two fields.'
+    BlobRef:
+      properties:
+        sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          title: Sha256
+          description: The SHA-256 of the bytes, in lowercase hexadecimal.
+        size:
+          type: integer
+          minimum: 0.0
+          title: Size
+          description: The length of the bytes, a JSON integer written without a fraction or an exponent. A size written 13.0
+            is refused, although JSON Schema's integer type admits it.
+      additionalProperties: false
+      type: object
+      required:
+      - sha256
+      - size
+      title: BlobRef
+      description: A blob, named by its SHA-256 in lowercase hexadecimal and its length in bytes.
     BooleanField:
       properties:
         title:
@@ -1572,14 +1918,14 @@ components:
           title: Resources
           description: 'The files submitted with the bundle that its steps read, such as a PipeDocGen step''s `template_file`
             (an `.xlsx`, `.docx`, `.pptx` or `.html` template): a JSON object mapping each file''s bundle-relative path, exactly
-            as the step names it, to the file''s bytes in standard base64. Every bundle of the request is read as sitting
-            in one directory. A path must be relative and written with forward slashes, with no `..` segment, backslash or
-            colon. Every file must be named by a step, or the request is refused with a 422 `BundleResourceNotNamedError`.
-            By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded, counting the files a method bundle ships
-            for its steps; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.
-            A file both sent here and shipped in a method bundle must be the same. The files make one method tree with the
-            bundle at its root, which the run names by its digest: no file''s bytes travel with the run, each being read where
-            a step uses it.'
+            as the step names it, to the file''s bytes in standard base64. A path must be relative and written with forward
+            slashes, with no `..` segment, backslash or colon. Beside inline `mthds_contents`, every bundle of the request
+            is read as sitting in one directory, and every file must be named by a step, or the request is refused with a
+            422 `BundleResourceNotNamedError`. Beside a method tree, `files` or `bundle_b64`, each file joins the tree at
+            its path from the tree''s root, where a file the tree already holds must have the same bytes. By default at most
+            32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
+            `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The files make one method tree with the bundles, which
+            the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it.'
         kind:
           $ref: '#/components/schemas/CodegenRouteKind'
           description: What to project. `types` projects the crate's concept set into typed models.
@@ -2805,6 +3151,25 @@ components:
       - via
       title: HandleMatch
       description: What a bare handle reference is in one category.
+    HashFileEntry:
+      properties:
+        sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          title: Sha256
+          description: The SHA-256 of the file's bytes, in lowercase hexadecimal.
+        size:
+          type: integer
+          minimum: 0.0
+          title: Size
+          description: The file's size in bytes, an integer written with no fraction or exponent.
+      additionalProperties: false
+      type: object
+      required:
+      - sha256
+      - size
+      title: HashFileEntry
+      description: A file entry naming, by their SHA-256 and their size, bytes the receiver already holds in its blob store.
     HealthResponse:
       properties:
         status:
@@ -3637,12 +4002,73 @@ components:
         commit_sha:
           type: string
           title: Commit Sha
+        tree_digest:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Tree Digest
+          description: The digest of the package's method tree, `sha256:` and 64 lowercase hex characters, as read from the
+            commit's git objects, set by a runner that reads the package as a tree, and null otherwise.
       type: object
       required:
       - address
       - commit_sha
       title: MethodProvenance
       description: 'What a fetched-method run must record: address, tag, and the resolved commit SHA.'
+    MissingBlob:
+      properties:
+        sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          title: Sha256
+        size:
+          type: integer
+          minimum: 0.0
+          title: Size
+          description: The length of the bytes, a JSON integer written without a fraction or an exponent. A size written 13.0
+            is refused, although JSON Schema's integer type admits it.
+        upload:
+          $ref: '#/components/schemas/UploadTarget'
+      type: object
+      required:
+      - sha256
+      - size
+      - upload
+      title: MissingBlob
+      description: A blob the runner lacks, with where to upload it.
+    MissingBlobsRequest:
+      properties:
+        blobs:
+          items:
+            $ref: '#/components/schemas/BlobRef'
+          type: array
+          title: Blobs
+          description: The blobs to check, each hash listed once.
+        digest:
+          anyOf:
+          - type: string
+            pattern: ^sha256:[0-9a-f]{64}$
+          - type: 'null'
+          title: Digest
+          description: The tree digest of the method tree the blobs make up (optional).
+      additionalProperties: true
+      type: object
+      required:
+      - blobs
+      title: MissingBlobsRequest
+      description: The blobs a sender is about to send by hash, and optionally the tree they make up.
+    MissingBlobsResult:
+      properties:
+        missing:
+          items:
+            $ref: '#/components/schemas/MissingBlob'
+          type: array
+          title: Missing
+      type: object
+      required:
+      - missing
+      title: MissingBlobsResult
+      description: The blobs of the request the runner does not hold.
     ModelCategory:
       type: string
       enum:
@@ -3961,14 +4387,14 @@ components:
           title: Resources
           description: 'The files submitted with the bundle that its steps read, such as a PipeDocGen step''s `template_file`
             (an `.xlsx`, `.docx`, `.pptx` or `.html` template): a JSON object mapping each file''s bundle-relative path, exactly
-            as the step names it, to the file''s bytes in standard base64. Every bundle of the request is read as sitting
-            in one directory. A path must be relative and written with forward slashes, with no `..` segment, backslash or
-            colon. Every file must be named by a step, or the request is refused with a 422 `BundleResourceNotNamedError`.
-            By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded, counting the files a method bundle ships
-            for its steps; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.
-            A file both sent here and shipped in a method bundle must be the same. The files make one method tree with the
-            bundle at its root, which the run names by its digest: no file''s bytes travel with the run, each being read where
-            a step uses it.'
+            as the step names it, to the file''s bytes in standard base64. A path must be relative and written with forward
+            slashes, with no `..` segment, backslash or colon. Beside inline `mthds_contents`, every bundle of the request
+            is read as sitting in one directory, and every file must be named by a step, or the request is refused with a
+            422 `BundleResourceNotNamedError`. Beside a method tree, `files` or `bundle_b64`, each file joins the tree at
+            its path from the tree''s root, where a file the tree already holds must have the same bytes. By default at most
+            32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
+            `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The files make one method tree with the bundles, which
+            the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it.'
       type: object
       title: MthdsFilesRequest
       description: 'Shared closure selector for the resolve/codegen routes: inline `files[]` XOR a `method_ref`.
@@ -5040,14 +5466,14 @@ components:
           title: Resources
           description: 'The files submitted with the bundle that its steps read, such as a PipeDocGen step''s `template_file`
             (an `.xlsx`, `.docx`, `.pptx` or `.html` template): a JSON object mapping each file''s bundle-relative path, exactly
-            as the step names it, to the file''s bytes in standard base64. Every bundle of the request is read as sitting
-            in one directory. A path must be relative and written with forward slashes, with no `..` segment, backslash or
-            colon. Every file must be named by a step, or the request is refused with a 422 `BundleResourceNotNamedError`.
-            By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded, counting the files a method bundle ships
-            for its steps; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.
-            A file both sent here and shipped in a method bundle must be the same. The files make one method tree with the
-            bundle at its root, which the run names by its digest: no file''s bytes travel with the run, each being read where
-            a step uses it.'
+            as the step names it, to the file''s bytes in standard base64. A path must be relative and written with forward
+            slashes, with no `..` segment, backslash or colon. Beside inline `mthds_contents`, every bundle of the request
+            is read as sitting in one directory, and every file must be named by a step, or the request is refused with a
+            422 `BundleResourceNotNamedError`. Beside a method tree, `files` or `bundle_b64`, each file joins the tree at
+            its path from the tree''s root, where a file the tree already holds must have the same bytes. By default at most
+            32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
+            `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The files make one method tree with the bundles, which
+            the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it.'
         pipe_ref:
           anyOf:
           - type: string
@@ -6204,6 +6630,10 @@ components:
           - type: string
           - type: 'null'
           title: Runtime Version
+        blob_store:
+          type: boolean
+          title: Blob Store
+          default: false
       additionalProperties: true
       type: object
       required:
@@ -7504,6 +7934,30 @@ components:
         The mandatory escape hatch that makes a total derivation truthful: a renderer falls back to raw
 
         entry against the slot''s `json_schema` in the pipe I/O contract.'
+    UploadTarget:
+      properties:
+        method:
+          type: string
+          title: Method
+          description: The HTTP method, such as PUT.
+        url:
+          type: string
+          title: Url
+          description: 'Where to send the bytes: this runner''s own `PUT /v1/blobs/{sha256}`, with a signed query.'
+        headers:
+          additionalProperties:
+            type: string
+          type: object
+          title: Headers
+          description: The headers to send, exactly.
+      type: object
+      required:
+      - method
+      - url
+      - headers
+      title: UploadTarget
+      description: 'Where to upload one blob: send its bytes as the whole body of a request with this method to this URL,
+        with exactly these headers.'
     UserAction:
       properties:
         kind:
@@ -7602,7 +8056,8 @@ components:
             type: string
           type: array
           title: Mthds Contents
-          description: The MTHDS contents that were validated (echo of the request)
+          description: 'The MTHDS contents that were validated: the request''s `mthds_contents`, or the texts of a method
+            tree''s `.mthds` bundles in tree path order.'
         message:
           type: string
           title: Message
@@ -7614,11 +8069,10 @@ components:
           - type: 'null'
           title: Default Pipe Ref
           description: 'The qualified `domain.pipe_code` a caller gets by omitting the pipe selector — the pipe a selector-less
-            run of THIS request would execute. On a `method_ref` request it is the fetched package manifest''s `main_pipe`
-            (the package author''s declared entry pipe, qualified against the closure); otherwise, and when the manifest declares
-            none, it is the closure''s primary blueprint''s `main_pipe` qualified by its domain. `null` when no entry pipe
-            is determined: no blueprint declares `main_pipe`, or a manifest names a pipe the closure does not declare (or
-            declares ambiguously), in which case a selector-less run by this address would fail to resolve it too.'
+            run of THIS request would execute. For a method tree (`files` or a `method_ref`) it is the tree''s entry pipe
+            by the MTHDS protocol''s rule: the `main_pipe` of the `METHODS.toml` at its root, else the one `main_pipe` its
+            bundles declare. For inline `mthds_contents` it is the closure''s primary blueprint''s `main_pipe` qualified by
+            its domain. `null` when no entry pipe is determined, in which case a selector-less run would be refused too.'
         rendered_markdown:
           anyOf:
           - type: string
@@ -7685,7 +8139,45 @@ components:
           - type: 'null'
           title: Mthds Contents
           description: MTHDS contents to load (always an array, even for a single file). Exactly one of `mthds_contents` /
-            `method_ref`.
+            `files` / `method_ref`.
+        files:
+          anyOf:
+          - additionalProperties:
+              anyOf:
+              - type: string
+              - $ref: '#/components/schemas/Base64FileEntry'
+              - $ref: '#/components/schemas/HashFileEntry'
+            type: object
+          - type: 'null'
+          title: Files
+          description: 'The method as a map of file entries, the MTHDS standard''s form of a method tree that travels: each
+            key is a tree path (relative, forward slashes, in Unicode NFC, no `.` or `..` segment, no segment starting with
+            a dot), and each value is the file''s UTF-8 text, `{"base64": ...}` holding its bytes, or `{"sha256": ..., "size":
+            ...}` naming bytes this runner already holds (uploaded with `POST /v1/blobs/missing` then `PUT /v1/blobs/{sha256}`).
+            The map is read from the request''s JSON text: a key given twice, a key the membership rule keeps out of every
+            tree (`.mthds/` included), colliding keys and a malformed entry are a 422 `InvalidMethodFiles` whose `tree_refusal`
+            names the code and the paths, and hash entries the runner does not hold are one 422 `MissingBlobs` whose `missing_blobs`
+            lists every such hash. Its `.mthds` files are the method''s bundles and every other file is one a step may read,
+            such as a `PipeDocGen` template or a `PipeFunc` module. With no `pipe_code`, the run starts at the `main_pipe`
+            of the `METHODS.toml` at the tree''s root, or else at the one `main_pipe` its bundles declare. Custom `.py` is
+            only honored on a sandbox-hosted deployment. The whole tree is validated, its Python included, by syntax. Exactly
+            one of `mthds_contents` / `files` / `method_ref`.'
+        dependencies:
+          anyOf:
+          - additionalProperties:
+              additionalProperties:
+                anyOf:
+                - type: string
+                - $ref: '#/components/schemas/Base64FileEntry'
+                - $ref: '#/components/schemas/HashFileEntry'
+              type: object
+            type: object
+          - type: 'null'
+          title: Dependencies
+          description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the method packages the method calls by address
+            that this runner cannot fetch, such as one an author has not published, as `{"<address>": <map of file entries>}`:
+            each value is a tree of its own, read as `files` is, with a `METHODS.toml` at its root declaring the address it
+            is keyed by. They are searched before the runner''s installed copies, for this request alone. Accompanies `files`.'
         method_ref:
           anyOf:
           - type: string
@@ -7695,10 +8187,10 @@ components:
           title: Method Ref
           description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — validate a published method by reference
             instead of inline contents. Address form: `github.com/<owner>/<repo>[/<selector>][@<tag>]`, resolved by THIS runner
-            through the same fetch path as a `method_ref` run; the package''s `.mthds` files feed the validation with their
-            real relative paths as per-file sources. Exactly one of `mthds_contents` / `method_ref`. A resolution failure
-            (fetch, package location, the custom-Python policy) is a non-2xx `problem+json` — never an `is_valid: false` verdict,
-            which is reserved for actual MTHDS content.'
+            through the same fetch path as a `method_ref` run; the package''s tree, read from its commit, is validated as
+            a `files` tree is. Exactly one of `mthds_contents` / `files` / `method_ref`. A resolution failure (fetch, package
+            location, the custom-Python policy) is a non-2xx `problem+json` — never an `is_valid: false` verdict, which is
+            reserved for actual MTHDS content.'
         allow_signatures:
           type: boolean
           title: Allow Signatures
@@ -7724,14 +8216,14 @@ components:
           title: Resources
           description: 'The files submitted with the bundle that its steps read, such as a PipeDocGen step''s `template_file`
             (an `.xlsx`, `.docx`, `.pptx` or `.html` template): a JSON object mapping each file''s bundle-relative path, exactly
-            as the step names it, to the file''s bytes in standard base64. Every bundle of the request is read as sitting
-            in one directory. A path must be relative and written with forward slashes, with no `..` segment, backslash or
-            colon. Every file must be named by a step, or the request is refused with a 422 `BundleResourceNotNamedError`.
-            By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded, counting the files a method bundle ships
-            for its steps; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.
-            A file both sent here and shipped in a method bundle must be the same. The files make one method tree with the
-            bundle at its root, which the run names by its digest: no file''s bytes travel with the run, each being read where
-            a step uses it.'
+            as the step names it, to the file''s bytes in standard base64. A path must be relative and written with forward
+            slashes, with no `..` segment, backslash or colon. Beside inline `mthds_contents`, every bundle of the request
+            is read as sitting in one directory, and every file must be named by a step, or the request is refused with a
+            422 `BundleResourceNotNamedError`. Beside a method tree, `files` or `bundle_b64`, each file joins the tree at
+            its path from the tree''s root, where a file the tree already holds must have the same bytes. By default at most
+            32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
+            `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The files make one method tree with the bundles, which
+            the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it.'
         render:
           items:
             type: string
@@ -7761,6 +8253,14 @@ components:
             to a worker; any plugin-provided token is accepted and an unregistered one is refused at dispatch. Honored only
             when the deployment sets `allow_request_orchestration_mode_override = true` in its `api.toml`; otherwise a token
             that differs from the deployment default is refused with a 403. Omitted → the default.'
+        read_scope:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Read Scope
+          description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the scope of the blob store a hash entry
+            of `files` resolves in, as a run''s `read_scope`: a multi-tenant host sends the one of the organization it serves.
+            Omit it and the caller''s own id is the scope.'
       type: object
       title: ValidateRequest
       description: 'The shared `mthds_contents` + `allow_signatures` payload, plus optional per-file sources.

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from pipelex import log, pretty_print
@@ -37,3 +39,50 @@ class TestMthdsParser:
         assert len(err.validation_errors) == 1
         assert err.validation_errors[0].source == "broken.mthds"
         assert "TOML syntax error" in err.validation_errors[0].message
+
+    def test_a_bundle_read_from_a_path_is_named_by_its_source_when_given(self, tmp_path: Path):
+        """A host reading a tree it wrote out names each bundle by its tree path, never by the file it wrote."""
+        bundle_path = tmp_path / "written" / "methods" / "greet.mthds"
+        bundle_path.parent.mkdir(parents=True)
+        bundle_path.write_text('domain = "greeting"\n', encoding="utf-8")
+
+        blueprint = MthdsParser.make_pipelex_bundle_blueprint(bundle_path=bundle_path, mthds_source="methods/greet.mthds")
+
+        assert blueprint.source == "methods/greet.mthds"
+
+    def test_a_toml_error_of_a_bundle_read_from_a_path_names_its_source_not_the_path(self, tmp_path: Path):
+        bundle_path = tmp_path / "written" / "methods" / "broken.mthds"
+        bundle_path.parent.mkdir(parents=True)
+        bundle_path.write_text('domain = "broken"\n[pipe.oops\n', encoding="utf-8")
+
+        with pytest.raises(MthdsParserError) as exc_info:
+            MthdsParser.make_pipelex_bundle_blueprint(bundle_path=bundle_path, mthds_source="methods/broken.mthds")
+
+        (item,) = exc_info.value.validation_errors or []
+        assert item.source == "methods/broken.mthds"
+        assert "'methods/broken.mthds'" in item.message
+        assert str(tmp_path) not in item.message
+        assert str(tmp_path) not in exc_info.value.message
+
+    @pytest.mark.parametrize(
+        ("content", "line", "column"),
+        [
+            pytest.param(b"\xff", 1, 1, id="first_byte"),
+            pytest.param(b'domain = "x"\ndefinition = "caf\xe9"\n', 2, 18, id="later_line"),
+        ],
+    )
+    def test_a_bundle_file_that_is_not_utf8_is_a_located_parser_error(self, tmp_path: Path, content: bytes, line: int, column: int):
+        """A file of a tree that is not text is the caller's invalid bundle, located at its first byte that does not decode."""
+        bundle_path = tmp_path / "written" / "bad.mthds"
+        bundle_path.parent.mkdir(parents=True)
+        bundle_path.write_bytes(content)
+
+        with pytest.raises(MthdsParserError) as exc_info:
+            MthdsParser.make_pipelex_bundle_blueprint(bundle_path=bundle_path, mthds_source="bad.mthds")
+
+        assert exc_info.value.validation_errors is not None
+        (item,) = exc_info.value.validation_errors
+        assert item.source == "bad.mthds"
+        assert (item.line, item.column) == (line, column)
+        assert "not UTF-8 text" in item.message
+        assert str(tmp_path) not in item.message

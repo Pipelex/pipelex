@@ -57,7 +57,9 @@ if TYPE_CHECKING:
 #
 # v7 changed what a run hands an orchestration plugin, now that a run's library crate names each method tree by its
 # digest and carries no file's bytes. A bundle validator's ``validate_bundles`` receives ``submitted_files``, a mapping
-# from the path a step names to the file's bytes, where it received ``bundle_resources``; a PipeFunc executor's
+# from the path a step names to the file's bytes, where it received ``bundle_resources``, and ``method_dir`` and
+# ``methods_dirs``, a method's tree and its dependency trees written out on the host, in place of ``mthds_contents``,
+# which may now be ``None``; a PipeFunc executor's
 # transported request names its tree by ``tree_digest`` where it carried the call's ``files``, and the transported
 # entrypoint takes the directory the call's files were unpacked into as a required argument; and an orchestrator that
 # runs a job out of process copies the trees the job's crate names before its ``execute`` or ``start`` returns

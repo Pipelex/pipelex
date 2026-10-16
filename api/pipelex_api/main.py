@@ -31,6 +31,7 @@ from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.middleware import RequestIdMiddleware, request_body_size_middleware
 from pipelex_api.openapi_schema import PipelexFastAPI
 from pipelex_api.routes import router as api_router
+from pipelex_api.routes.blob_upload import router as blob_upload_router
 from pipelex_api.routes.health import router as health_router
 from pipelex_api.routes.version import router as version_router
 from pipelex_api.security import get_auth_dependency
@@ -186,6 +187,11 @@ fastapi_app.include_router(health_router)
 # the auth dependency exactly like `/health` (clients call it for feature
 # detection before they have credentials).
 fastapi_app.include_router(version_router, prefix="/v1")
+
+# `PUT /v1/blobs/{sha256}` is authorized by the signed query of the upload target `POST /v1/blobs/missing` names
+# (`pipelex_api.blob_upload`), so a sender uploads with exactly the headers that target names: it mounts without the
+# auth dependency, and only a caller who passed it on `POST /v1/blobs/missing` holds a target.
+fastapi_app.include_router(blob_upload_router, prefix="/v1")
 
 # Register all other routes WITH authentication, the dependency selected by the AUTH_MODE env var. An
 # unrecognized AUTH_MODE raises `InvalidAuthModeError` here and the app fails to boot, the same fail-fast

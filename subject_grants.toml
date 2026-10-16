@@ -3948,6 +3948,10 @@ rationale = "Predicate on the file path; single operand."
 param = "bundle_path"
 rationale = "Factory from source: parses the bundle at the path; options stay keyword."
 
+["pipelex/mthds_parsing/parser.py::_decode_error_position"]
+param = "exc"
+rationale = "Reads the position out of the one exception it is handed; single operand."
+
 ["pipelex/mthds_parsing/pipelex_bundle_blueprint.py::PipelexBundleBlueprint._collect_local_refs_from_concept"]
 param = "concept_code"
 rationale = "Verb-object: collects refs from the concept named; context stays keyword."
@@ -6524,6 +6528,10 @@ rationale = "Keyed accessor by the key; single operand."
 param = "key"
 rationale = "Keyed accessor by the storage key, called positionally through asyncio.to_thread."
 
+["pipelex/tools/storage/gcp_storage_provider.py::GcpStorageProvider._load_size_sync"]
+param = "key"
+rationale = "Keyed accessor by the storage key, called positionally through asyncio.to_thread."
+
 ["pipelex/tools/storage/gcp_storage_provider.py::GcpStorageProvider._load_with_metadata_sync"]
 param = "key"
 rationale = "Parses/reads the key; single operand."
@@ -6552,6 +6560,10 @@ rationale = "Keyed accessor by the key; single operand."
 param = "key"
 rationale = "Keyed accessor by the storage key; single operand."
 
+["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract._load_size"]
+param = "key"
+rationale = "Keyed accessor by the storage key; single operand, as _load_head."
+
 ["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract._load_with_metadata"]
 param = "key"
 rationale = "Parses/reads the key; single operand."
@@ -6571,6 +6583,10 @@ rationale = "Keyed accessor by the uri; single operand."
 ["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract.load_head"]
 param = "uri"
 rationale = "Keyed accessor by the uri; single operand."
+
+["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract.load_size"]
+param = "uri"
+rationale = "Keyed accessor by the uri; single operand, as load_head."
 
 ["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract.load_with_metadata"]
 param = "uri"

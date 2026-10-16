@@ -14,6 +14,16 @@ from pipelex.tools.misc.toml_utils import load_toml_from_content, load_toml_from
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
+def _decode_error_position(exc: UnicodeDecodeError) -> tuple[int, int]:
+    """The line and the column, both counted from 1 as tomli counts them, of the first byte that did not decode.
+
+    The bytes before it decode, so the column counts the characters before it on its line.
+    """
+    before = exc.object[: exc.start].decode("utf-8")
+    line_start = before.rfind("\n") + 1
+    return before.count("\n") + 1, len(before) - line_start + 1
+
+
 class MthdsParser(BaseModel):
     """MTHDS -> PipelexBundleBlueprint"""
 
@@ -37,7 +47,8 @@ class MthdsParser(BaseModel):
         both on the validated blueprint AND on any blueprint-validation error the
         categorizer reads off that dict — mirroring the real file path the disk
         path already records, and overriding any ``source`` the bundle text
-        itself declared. Ignored when ``bundle_path`` is provided (the path wins).
+        itself declared. With ``bundle_path``, it names the file in place of its path on
+        this host, as a host names a file of a tree it wrote out for a caller by its tree path.
 
         ``file_origin`` says where the bundle's steps find the files they name, and so the rule a file
         reference, such as a ``PipeDocGen`` step's ``template_file``, is held to when the blueprint validates.
@@ -52,7 +63,7 @@ class MthdsParser(BaseModel):
         try:
             if bundle_path is not None:
                 blueprint_dict = load_toml_from_path(path=str(bundle_path))
-                blueprint_dict[PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD] = str(bundle_path)
+                blueprint_dict[PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD] = mthds_source if mthds_source is not None else str(bundle_path)
                 validation_context = BundleValidationContext(file_origin=BundleFileOrigin.METHOD_TREE)
             elif mthds_content is not None:
                 validation_context = BundleValidationContext(file_origin=file_origin)
@@ -66,8 +77,12 @@ class MthdsParser(BaseModel):
                 msg = "Either 'bundle_path' or 'mthds_content' must be provided for the MthdsParser to make a PipelexBundleBlueprint"
                 raise MthdsParserError(msg)
         except TomlError as exc:
-            msg = f"TOML syntax error at line {exc.lineno}, column {exc.colno}: {exc.message}"
-            source = str(bundle_path) if bundle_path is not None else mthds_source
+            toml_message = exc.message
+            if bundle_path is not None and mthds_source is not None:
+                # The file is named by its source, never by its path on this host, the error's message included.
+                toml_message = toml_message.replace(str(bundle_path), mthds_source)
+            msg = f"TOML syntax error at line {exc.lineno}, column {exc.colno}: {toml_message}"
+            source = str(bundle_path) if bundle_path is not None and mthds_source is None else mthds_source
             raise MthdsParserError(
                 msg,
                 validation_errors=[
@@ -79,6 +94,15 @@ class MthdsParser(BaseModel):
                         column=exc.colno,
                     )
                 ],
+            ) from exc
+        except UnicodeDecodeError as exc:
+            # tomli reads a file as bytes and decodes them as UTF-8, so a file of a tree that is not text fails here.
+            source = mthds_source if mthds_source is not None else str(bundle_path)
+            line, column = _decode_error_position(exc)
+            msg = f"The MTHDS file is not UTF-8 text: the byte at line {line}, column {column} does not decode."
+            raise MthdsParserError(
+                msg,
+                validation_errors=[PipelexBundleBlueprintValidationErrorData(source=source, message=msg, line=line, column=column)],
             ) from exc
 
         if not blueprint_dict:

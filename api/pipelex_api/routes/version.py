@@ -36,6 +36,9 @@ async def get_version() -> PipelexVersionInfo:
     The handshake clients use for feature detection: `implementation`
     identifies this runner, `implementation_version` is this server package's
     version, and `runtime_version` is the underlying pipelex runtime version.
+    `blob_store` is true: this runner keeps a blob store over its storage
+    provider and serves `POST /v1/blobs/missing` and `PUT /v1/blobs/{sha256}`,
+    so a sender may name a file of `files` by its hash.
     """
     try:
         implementation_version = version(IMPLEMENTATION_NAME)
@@ -48,4 +51,5 @@ async def get_version() -> PipelexVersionInfo:
         implementation=IMPLEMENTATION_NAME,
         implementation_version=implementation_version,
         runtime_version=runtime_version,
+        blob_store=True,
     )

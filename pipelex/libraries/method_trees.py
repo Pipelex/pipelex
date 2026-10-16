@@ -17,6 +17,9 @@ whose own tree is empty, one holding nothing but nested methods, still has its n
 
 Each tree is listed under `[interpreter.method_tree_limits]`, this machine's own limits, read once per load: the lister
 stops before hashing any file once a tree passes one, so a directory handed over by mistake is refused in moments.
+
+A directory a host wrote a tree out as, and holds in `WRITTEN_METHOD_TREES`, is never listed: every listing of it returns
+the tree as written, so the membership rule is not applied twice (`pipelex.libraries.written_trees`).
 """
 
 from collections.abc import Generator, Iterable
@@ -48,6 +51,7 @@ from pipelex.core.method_trees.method_file_store import HeldFile
 from pipelex.core.method_trees.tree_bundle import TreeBundle
 from pipelex.hosted.execution import get_or_load_pipelex_config
 from pipelex.libraries.exceptions import HostLibraryRequirementsError, HostLibraryTreeError, MethodRequirementsError, MethodTreeLoadError
+from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES
 
 LIMITS_ADVICE = (
     "Hand over the method's own folder rather than a directory above it, or raise the limits of "
@@ -82,6 +86,9 @@ def list_local_method_tree(*, handed_over: Path, limits: TreeLimits | None = Non
     Raises:
         MethodTreeLoadError: The standard refused the tree, it passed a limit, or it could not be read.
     """
+    written = WRITTEN_METHOD_TREES.tree_written_at(directory=handed_over)
+    if written is not None:
+        return written
     try:
         return list_method_tree(handed_over, limits=limits or local_tree_limits())
     except TreeLimitError as exc:
@@ -113,6 +120,9 @@ def list_package_method_tree(*, root: Path, package_address: str, limits: TreeLi
     Raises:
         MethodTreeLoadError: The standard refused the tree, it passed a limit, or it could not be read.
     """
+    written = WRITTEN_METHOD_TREES.tree_written_at(directory=root)
+    if written is not None:
+        return written
     try:
         return list_method_tree_at_root(root, limits=limits or local_tree_limits())
     except (MethodTreeRefusedError, TreeLimitError, TreeSourceError) as exc:
@@ -362,6 +372,9 @@ def list_library_trees(*, library_dir: Path, limits: TreeLimits | None = None) -
     if not library_dir.exists():
         log.debug(f"A library directory that does not exist was skipped: {library_dir}")
         return []
+    written = WRITTEN_METHOD_TREES.tree_written_at(directory=library_dir)
+    if written is not None:
+        return [written]
     active_limits = limits or local_tree_limits()
     try:
         tree = list_method_tree(library_dir, limits=active_limits)
