@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [v0.87.0] - 2026-10-16
+
+### Highlights
+
+**A method is now its whole folder, its method tree, and every file of it travels with it.** Pipelex lists each method as the MTHDS standard's method tree, so its templates, images, stylesheets, fonts, Python and `requirements.txt` reach its steps wherever it runs: locally, on the API server through the `files` map and the blob routes, or fetched by `method_ref`, and every run records the digest of the tree it read. A `PipeFunc` now names its function by import path, a method's `requirements.txt` is checked before any of its Python runs, and a relative URL in an HTML template names a file of the method.
 
 ### Added
 
