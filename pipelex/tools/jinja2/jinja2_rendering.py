@@ -2,6 +2,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any, Protocol, TypeVar
 
 from jinja2.exceptions import (
+    FilterArgumentError,
     SecurityError,
     TemplateError,
     TemplateNotFound,
@@ -150,7 +151,7 @@ def _make_non_type_error_msg(
     template_source: str,
     *,
     error_label: str,
-    error: Jinja2StuffError | UndefinedError | Jinja2ContextError | ArithmeticError,
+    error: Jinja2StuffError | UndefinedError | Jinja2ContextError | FilterArgumentError | ArithmeticError,
 ) -> str:
     return f"Jinja2 render — {error_label}: '{error}', template_source:\n{template_source}"
 
@@ -188,8 +189,9 @@ def _make_context_render_error(*, msg: str, context_error: Jinja2ContextError, t
     return _coded_by_owner(error=render_error, template_owner=template_owner)
 
 
-# What a render can raise, each translated by `_make_render_failure`. `SecurityError` and `UndefinedError` are
-# `TemplateRuntimeError`s, and `RenderBudgetExceededError` a `TemplateError`; they are named for the reader.
+# What a render can raise, each translated by `_make_render_failure`. `SecurityError`, `UndefinedError` and
+# `FilterArgumentError` are `TemplateRuntimeError`s, and `RenderBudgetExceededError` a `TemplateError`; they are named
+# for the reader.
 _RENDER_FAILURES: tuple[type[BaseException], ...] = (
     SecurityError,
     RenderBudgetExceededError,
@@ -198,6 +200,7 @@ _RENDER_FAILURES: tuple[type[BaseException], ...] = (
     Jinja2ContextError,
     TemplateSyntaxError,
     UndefinedError,
+    FilterArgumentError,
     TemplateNotFound,
     TemplateRuntimeError,
     ArithmeticError,
@@ -210,9 +213,10 @@ def _make_render_failure(
 ) -> ToolError:
     """Translate what a render raised into the error the render reports, coded by the template's owner.
 
-    The order of the arms matters: a refusal of the sandbox and an undefined value are `TemplateRuntimeError`s too,
-    and only what is left of that family, such as a filter or a test inside a branch that the environment does not
-    define, is the template's own fault.
+    The order of the arms matters: a refusal of the sandbox, an undefined value and a filter refusing its argument are
+    `TemplateRuntimeError`s too, and only what is left of that family, the plain `TemplateRuntimeError` Jinja2 raises
+    for the template's own constructs, such as a filter or a test inside a branch that the environment does not define,
+    is the template's fault on any input.
     """
     if isinstance(render_error, SecurityError):
         security_msg = _make_security_error_msg(security_error=render_error)
@@ -233,6 +237,11 @@ def _make_render_failure(
         return _make_data_render_error(msg=msg, template_owner=template_owner)
     if isinstance(render_error, UndefinedError):
         msg = _make_non_type_error_msg(template_source=template_source, error_label="undefined error", error=render_error)
+        return _make_data_render_error(msg=msg, template_owner=template_owner)
+    if isinstance(render_error, FilterArgumentError):
+        # A filter refusing its argument may be refusing this run's value (`reverse` on a value that is not iterable)
+        # as well as the template's own literal, which nothing here tells apart, so it is not the template's alone.
+        msg = _make_non_type_error_msg(template_source=template_source, error_label="filter argument error", error=render_error)
         return _make_data_render_error(msg=msg, template_owner=template_owner)
     if isinstance(render_error, (TemplateSyntaxError, TemplateNotFound, TemplateRuntimeError)):
         return _make_invalid_template_error(template_error=render_error, template_owner=template_owner)

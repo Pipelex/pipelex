@@ -10,11 +10,10 @@ template's field and the filter Jinja2 refused, kept under STRICT disclosure, wh
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from mthds.protocol.problem.registry import CoreCode
-from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import INTERNAL_ERROR_PLACEHOLDER, DisclosureMode
 from pipelex.config import get_config
@@ -22,6 +21,9 @@ from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.integration.pipelex.pipeline.test_data import RenderTimeTemplateTestData
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 _UNKNOWN_FILTER_FAULT = f"No filter named '{RenderTimeTemplateTestData.UNKNOWN_FILTER}' found."
 

@@ -104,6 +104,15 @@ class TestJinja2RenderOwner:
                 CoreCode.RUNTIME_UNEXPECTED,
             ),
             (
+                "filter_refusing_a_value_of_the_run",
+                "{{ lane | reverse }}",
+                {"lane": 42},
+                False,
+                Jinja2TemplateRenderError,
+                CoreCode.PIPE_TEMPLATE_RENDER_FAILED,
+                CoreCode.RUNTIME_UNEXPECTED,
+            ),
+            (
                 "arithmetic",
                 "{{ 1 // 0 }}",
                 {},
