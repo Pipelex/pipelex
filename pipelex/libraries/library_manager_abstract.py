@@ -188,5 +188,6 @@ class LibraryManagerAbstract(ABC):
         library_id: str,
         library_dirs: list[Path] | None = None,
         library_file_paths: list[Path] | None = None,
+        methods_dirs: list[Path] | None = None,
     ) -> list[PipeAbstract]:
         pass

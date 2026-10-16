@@ -97,6 +97,8 @@ class TestRunnerValidatePlumbing:
             library_dirs_are_callers=True,
             collect_dry_run_warnings=True,
             submitted_files=submitted_files,
+            method_dir=None,
+            methods_dirs=None,
         )
 
     async def test_no_library_dirs_passes_none_and_strict_default(self, mocker: MockerFixture) -> None:
@@ -114,6 +116,8 @@ class TestRunnerValidatePlumbing:
             library_dirs_are_callers=False,
             collect_dry_run_warnings=True,
             submitted_files=None,
+            method_dir=None,
+            methods_dirs=None,
         )
 
     async def test_validation_runs_with_the_protocols_caller_in_scope(self, mocker: MockerFixture) -> None:

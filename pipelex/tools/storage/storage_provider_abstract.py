@@ -124,6 +124,34 @@ class StorageProviderAbstract(ABC):
         stored_data = await self._load_with_metadata(key)
         return stored_data.data[:nb_bytes]
 
+    async def load_size(self, uri: str) -> int:
+        """The size of a stored object in bytes, read without its bytes where the provider can.
+
+        Args:
+            uri: Full URI including PIPELEX_STORAGE_SCHEME prefix.
+
+        Returns:
+            The object's length in bytes.
+        """
+        key = self._strip_scheme(uri)
+        return await self._load_size(key)
+
+    async def _load_size(self, key: str) -> int:
+        """The size of an object by key.
+
+        This default loads the whole object and measures it, so a provider that cannot read an object's
+        metadata alone, an external storage plugin included, keeps working unchanged. A provider that can
+        overrides it, and a caller bounding what it reads relies on that override.
+
+        Args:
+            key: Storage key (without scheme prefix).
+
+        Returns:
+            The object's length in bytes.
+        """
+        stored_data = await self._load_with_metadata(key)
+        return len(stored_data.data)
+
     async def store(self, data: bytes, *, key: str, content_type: str | None = None) -> str:
         """Store data and return full URI with scheme.
 

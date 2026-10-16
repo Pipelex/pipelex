@@ -497,3 +497,48 @@ class TestS3StorageProvider:
 
         with pytest.raises(StorageS3Error, match="AccessDenied"):
             await s3_provider_no_signed_urls.load_head(uri=f"{PIPELEX_STORAGE_SCHEME}test/file.pdf", nb_bytes=8192)
+
+    async def test_load_size_reads_the_content_length_of_a_head_request(
+        self,
+        mocker: MockerFixture,
+        s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aiobotocore: dict[str, Any],
+    ) -> None:
+        """A size read asks S3 for the object's metadata alone, never its bytes."""
+        mock_aiobotocore["client"].head_object = mocker.AsyncMock(return_value={"ContentLength": 4096})
+
+        size = await s3_provider_no_signed_urls.load_size(uri=f"{PIPELEX_STORAGE_SCHEME}test/file.pdf")
+
+        assert size == 4096
+        mock_aiobotocore["client"].head_object.assert_called_once_with(Bucket=S3_TEST_BUCKET, Key="test/file.pdf")
+        mock_aiobotocore["client"].get_object.assert_not_called()
+
+    @pytest.mark.parametrize("error_code", ["404", "NoSuchKey", "NotFound"])
+    async def test_load_size_of_a_missing_object_raises_not_found(
+        self,
+        mocker: MockerFixture,
+        s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aiobotocore: dict[str, Any],
+        error_code: str,
+    ) -> None:
+        """A HEAD answer has no body, so S3 names a missing object by its bare status code."""
+        missing = ClientError({"Error": {"Code": error_code, "Message": "Not Found"}}, "HeadObject")
+        mock_aiobotocore["client"].head_object = mocker.AsyncMock(side_effect=missing)
+
+        with pytest.raises(StorageFileNotFoundError, match=r"missing/file\.pdf"):
+            await s3_provider_no_signed_urls.load_size(uri=f"{PIPELEX_STORAGE_SCHEME}missing/file.pdf")
+
+    async def test_load_size_maps_other_errors(
+        self,
+        mocker: MockerFixture,
+        s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aiobotocore: dict[str, Any],
+    ) -> None:
+        access_denied = ClientError({"Error": {"Code": "403", "Message": "Forbidden"}}, "HeadObject")
+        mock_aiobotocore["client"].head_object = mocker.AsyncMock(side_effect=access_denied)
+        with pytest.raises(StorageS3Error, match="403"):
+            await s3_provider_no_signed_urls.load_size(uri=f"{PIPELEX_STORAGE_SCHEME}test/file.pdf")
+
+        mock_aiobotocore["client"].head_object = mocker.AsyncMock(side_effect=EndpointConnectionError(endpoint_url="https://s3.example.com"))
+        with pytest.raises(StorageS3Error):
+            await s3_provider_no_signed_urls.load_size(uri=f"{PIPELEX_STORAGE_SCHEME}test/file.pdf")

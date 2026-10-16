@@ -99,13 +99,15 @@ class _UnreachableValidator:
     async def validate_bundles(
         self,
         *,
-        mthds_contents: list[str],  # noqa: ARG002
+        mthds_contents: list[str] | None,  # noqa: ARG002
         mthds_sources: list[str] | None,  # noqa: ARG002
         allow_signatures: bool,  # noqa: ARG002
         library_dirs: Sequence[Path] | None,  # noqa: ARG002
         caller_identity: CallerIdentity | None,  # noqa: ARG002
         graph_pipe_code: str | None,  # noqa: ARG002
         submitted_files: Mapping[str, bytes] | None,  # noqa: ARG002
+        method_dir: Path | None,  # noqa: ARG002
+        methods_dirs: Sequence[Path] | None,  # noqa: ARG002
     ) -> ErrorReport:
         self.calls += 1
         msg = "A method refused for its requirements must not reach the validator."

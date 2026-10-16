@@ -1,24 +1,40 @@
+import asyncio
 from enum import StrEnum
 from typing import Annotated, Literal, Self, Union
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pipelex.base_exceptions import ErrorReport, ValidationErrorItem
-from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
+from pipelex.pipeline.exceptions import MethodEntryError, ValidateBundleError
 from pipelex.pipeline.input_form import PipeInputFormDescriptor, PipeOutputFormDescriptor
+from pipelex.pipeline.method_entry import MethodEntry
 from pipelex.pipeline.validation_render import format_validate_markdown, render_invalid_validation_markdown
 from pipelex.pipeline.validation_report import PipelexValidationReport
+from pipelex.system.storage_scope import validate_read_scope
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
+from pipelex_api.blob_store import RunnerBlobStore
 from pipelex_api.bundle_resources import decode_bundle_resources
 from pipelex_api.errors import raise_validation_error
 from pipelex_api.exception_handlers import problem_response_from_error_report
 from pipelex_api.json_body import JsonBodyRoute
-from pipelex_api.method_source import fetched_method_source
+from pipelex_api.method_source import fetched_method
+from pipelex_api.method_tree_request import (
+    REQUEST_METHOD_LABEL,
+    RequestMethod,
+    ensure_method_holds_a_bundle,
+    ensure_python_allowed,
+    read_request_method,
+    record_request_method,
+    select_tree_entry,
+    tree_documents_of,
+    with_resources,
+    written_method,
+)
 from pipelex_api.openapi_responses import PROBLEM_403_RUN_POLICY, PROBLEM_404_METHOD_PACKAGE
-from pipelex_api.routes.pipelex.pipeline import ApiRunner, get_request_user_id
+from pipelex_api.routes.pipelex.pipeline import ApiRunner, get_request_user_id, resolve_blob_scope
 from pipelex_api.schemas.models import RESOURCES_FIELD_DESCRIPTION, CallerAnalyticsGroupsMixin, MthdsContentsRequest
 
 router = APIRouter(tags=["validate"], route_class=JsonBodyRoute)
@@ -119,12 +135,28 @@ class ValidateRequest(MthdsContentsRequest, CallerAnalyticsGroupsMixin):
         ),
     )
 
+    read_scope: str | None = Field(
+        default=None,
+        description=(
+            "PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the scope of the blob store a hash entry of `files` "
+            "resolves in, as a run's `read_scope`: a multi-tenant host sends the one of the organization it serves. Omit it "
+            "and the caller's own id is the scope."
+        ),
+    )
+
+    @field_validator("read_scope")
+    @classmethod
+    def _validate_read_scope(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return validate_read_scope(value=value)
+
     @model_validator(mode="after")
     def _sources_match_contents(self) -> Self:
-        # `mthds_sources` labels INLINE contents; a `method_ref`'s sources are the package's own
-        # file names, so pairing the two is a request-shape bug → 422.
-        if self.mthds_sources is not None and self.method_ref is not None:
-            msg = "mthds_sources accompanies inline mthds_contents; a method_ref's sources are the package's own file names"
+        # `mthds_sources` labels INLINE contents; a method tree's files are named by their tree paths, so pairing the
+        # two is a request-shape bug → 422.
+        if self.mthds_sources is not None and self.mthds_contents is None:
+            msg = "mthds_sources accompanies inline mthds_contents; the files of a method tree are named by their tree paths"
             raise ValueError(msg)
         # `resources` are the files the inline contents' steps read; a `method_ref`'s files are the package's own.
         if self.resources and self.method_ref is not None:
@@ -139,63 +171,37 @@ class ValidateRequest(MthdsContentsRequest, CallerAnalyticsGroupsMixin):
         return self
 
 
-def _qualify_manifest_main_pipe(main_pipe: str, *, pipe_refs: list[str]) -> str | None:
-    """Qualify a manifest's bare `main_pipe` against the pipes the verdict actually saw.
+def _effective_default_pipe_ref(report: PipelexValidationReport) -> str | None:
+    """The qualified ref of the pipe a selector-less run of inline contents would execute.
 
-    A `METHODS.toml` `main_pipe` is a bare pipe code, and the runner resolves it exactly as it
-    resolves a human-supplied selector (`get_optional_entry_pipe`): an already-qualified ref matches
-    outright, a bare code is matched across the library's own domains, and an ambiguous bare code
-    resolves to nothing rather than picking a winner. That rule is mirrored here against
-    `pipe_io_contracts`' keys — the verdict's own complete, qualified pipe set — because the
-    validate path holds no loaded library to ask (the Temporal-dispatched arm never loaded one in
-    this process at all).
-
-    Cross-package keys (`alias->domain.code`) are excluded, as they are in the engine: an installed
-    dependency must never make a host package's own entry pipe ambiguous.
-
-    Returns:
-        The qualified ref, or None when the closure declares no such pipe or declares it in several
-        domains — both cases in which a selector-less run by this address would fail to resolve it.
+    The run routes' precedence for inline contents, minus the request selector `/validate` does not have: the
+    closure's own declaration, the batch's primary blueprint's `main_pipe` (`select_primary_blueprint`), qualified by
+    its domain. The report's `bundle_blueprint` IS that first declaring blueprint (`build_validation_report` selects it
+    through the same `select_primary_blueprint`), so qualifying its `main_pipe` reproduces the run's own choice. A
+    method tree's default is its entry pipe instead, by the protocol's rule (`select_tree_entry`).
     """
-    own_refs = [ref for ref in pipe_refs if not QualifiedRef.has_cross_package_prefix(ref)]
-    if main_pipe in own_refs:
-        return main_pipe
-    matches = sorted({ref for ref in own_refs if ref.rpartition(".")[2] == main_pipe})
-    if len(matches) == 1:
-        return matches[0]
-    return None
-
-
-def _effective_default_pipe_ref(report: PipelexValidationReport, *, manifest_main_pipe: str | None) -> str | None:
-    """The qualified ref of the pipe a selector-less run of THIS request would execute.
-
-    The run routes' precedence, minus the request selector `/validate` does not have
-    (`pipeline.py`: `pipe_code or fetched.main_pipe`, then the batch's primary blueprint via
-    `select_primary_blueprint`): a fetched package's manifest `main_pipe` wins, and only when there
-    is none does the closure's own declaration decide. The per-pipe tooling route applies that same
-    chain in `crate_ops.resolve_requested_pipe`, so a caller reading this field and a caller omitting
-    `pipe_ref` on `/pipe-io` are told about the same pipe wherever `/pipe-io` defaults at all — see
-    the one case below where it refuses to.
-
-    It deliberately states the RUN default, not the per-pipe route's stricter one: a closure whose
-    domains each declare a `main_pipe` is refused by `/pipe-io` but runs happily — `execute` and
-    `start` take the first declaring blueprint — so reporting `null` for it would make a consumer
-    refuse to prepare a method the server would run. The report's `bundle_blueprint` IS that first
-    declaring blueprint (`build_validation_report` selects it through the same
-    `select_primary_blueprint`), so qualifying its `main_pipe` reproduces the run's own choice.
-
-    Inline `mthds_contents` carry no manifest, so for them the chain is exactly the closure's
-    declaration.
-    """
-    if manifest_main_pipe is not None:
-        # A manifest entry that does not resolve yields None rather than falling through to the
-        # closure's declaration: the run would pass the manifest's code and fail, so naming the
-        # closure's pipe here would report a pipe no selector-less run of this address executes.
-        return _qualify_manifest_main_pipe(manifest_main_pipe, pipe_refs=list(report.pipe_io_contracts))
     blueprint = report.bundle_blueprint
     if not blueprint.main_pipe:
         return None
     return PipeFactory.make_pipe_ref_with_domain(domain_code=blueprint.domain, pipe_code=blueprint.main_pipe)
+
+
+def _bundle_texts(*, request_method: RequestMethod) -> list[str]:
+    """The texts of a method tree's `.mthds` bundles, in tree path order, as the valid verdict echoes them."""
+    tree = request_method.tree
+    return [tree.contents[tree_path].decode("utf-8", errors="replace") for tree_path in tree.bundle_paths]
+
+
+def _optional_tree_entry(*, request_method: RequestMethod, method_label: str) -> MethodEntry | None:
+    """The method's entry pipe, or None when it has none or a bundle does not parse, for the verdict to say why.
+
+    A validation needs no entry pipe: a method without one validates, and its verdict carries no graph and no
+    `default_pipe_ref`.
+    """
+    try:
+        return select_tree_entry(tree=request_method.tree, method_label=method_label)
+    except (ValidateBundleError, MethodEntryError):
+        return None
 
 
 class ValidReport(PipelexValidationReport):
@@ -216,18 +222,23 @@ class ValidReport(PipelexValidationReport):
     tool signature wants the output, and neither should pay for the other.
     """
 
-    mthds_contents: list[str] = Field(..., description="The MTHDS contents that were validated (echo of the request)")
+    mthds_contents: list[str] = Field(
+        ...,
+        description=(
+            "The MTHDS contents that were validated: the request's `mthds_contents`, or the texts of a method tree's "
+            "`.mthds` bundles in tree path order."
+        ),
+    )
     message: str = Field(default="MTHDS content validated successfully", description="Status message")
     default_pipe_ref: str | None = Field(
         default=None,
         description=(
             "The qualified `domain.pipe_code` a caller gets by omitting the pipe selector — the pipe a "
-            "selector-less run of THIS request would execute. On a `method_ref` request it is the fetched "
-            "package manifest's `main_pipe` (the package author's declared entry pipe, qualified against the "
-            "closure); otherwise, and when the manifest declares none, it is the closure's primary blueprint's "
-            "`main_pipe` qualified by its domain. `null` when no entry pipe is determined: no blueprint declares "
-            "`main_pipe`, or a manifest names a pipe the closure does not declare (or declares ambiguously), in "
-            "which case a selector-less run by this address would fail to resolve it too."
+            "selector-less run of THIS request would execute. For a method tree (`files` or a `method_ref`) it is "
+            "the tree's entry pipe by the MTHDS protocol's rule: the `main_pipe` of the `METHODS.toml` at its root, "
+            "else the one `main_pipe` its bundles declare. For inline `mthds_contents` it is the closure's primary "
+            "blueprint's `main_pipe` qualified by its domain. `null` when no entry pipe is determined, in which case a "
+            "selector-less run would be refused too."
         ),
     )
     input_form: dict[str, PipeInputFormDescriptor] = Field(
@@ -371,37 +382,8 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
     # validator registry, returning either a validation verdict or a classified fault report.
     # Only `ErrorReport`s with validation diagnostics are invalid-bundle verdicts (→ 200
     # InvalidReport); backend/config/runtime reports keep the global problem+json mapping.
-    if request_data.method_ref is not None:
-        # Validate-by-address (the addressing design's Phase 2 delta): the runner resolves the
-        # `method_ref` through the SAME fetch path as a `method_ref` run, and the package's real
-        # file names feed `mthds_sources` so diagnostics carry true per-file labels. Every
-        # selector-resolution failure — parse, fetch, no package, ambiguity, the custom-Python
-        # policy — raises OUT of this block as a non-2xx problem+json: no verdict was produced,
-        # so it is never rendered as `is_valid: false` (that verdict is about MTHDS content).
-        with fetched_method_source(request_data.method_ref) as fetched:
-            validated_contents = fetched.mthds_contents
-            # The manifest's declared entry pipe outranks the closure's own in the default chain the
-            # run routes and `/pipe-io` share, so it must reach `default_pipe_ref` — the report itself
-            # is manifest-blind — and the graph arm, which would otherwise draw the primary blueprint's
-            # `main_pipe`: a different pipe when the two disagree, and no graph at all when the bundles
-            # declare none.
-            # The bare code is passed as is, so the graph arm resolves it exactly as the run does.
-            manifest_main_pipe = fetched.main_pipe
-            verdict = await ApiRunner(
-                library_dirs=fetched.library_dirs,
-                user_id=user_id,
-                extras=request_data.analytics_groups,
-            ).validate_verdict(
-                mthds_contents=fetched.mthds_contents,
-                mthds_sources=fetched.mthds_sources,
-                allow_signatures=request_data.allow_signatures,
-                requested_orchestration_mode=request_data.orchestration_mode,
-                graph_pipe_code=manifest_main_pipe,
-            )
-    elif request_data.mthds_contents is not None:
+    if request_data.mthds_contents is not None:
         validated_contents = request_data.mthds_contents
-        # Inline contents carry no manifest, so the closure's own declaration is the whole chain.
-        manifest_main_pipe = None
         verdict = await ApiRunner(
             user_id=user_id,
             extras=request_data.analytics_groups,
@@ -413,10 +395,52 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
             requested_orchestration_mode=request_data.orchestration_mode,
             graph_pipe_code=None,
         )
+        default_pipe_ref_known = False
+        tree_default_pipe_ref: str | None = None
     else:
-        # Unreachable: the envelope's XOR validator already 422'd this shape. Kept for the type
-        # checker (and as a defensive backstop should the envelope ever loosen).
-        raise_validation_error(message="provide exactly one of `mthds_contents` or `method_ref`")
+        # A method tree: sent as `files`, or fetched by `method_ref` from its commit's git objects through the same path
+        # as a `method_ref` run. Every failure to obtain the tree — a map that is not a tree, missing blobs, a fetch, a
+        # package location, the custom-Python policy — raises OUT of this block as a non-2xx problem+json: no verdict
+        # was produced, so it is never rendered as `is_valid: false` (that verdict is about the method's content).
+        request_method: RequestMethod
+        if request_data.method_ref is not None:
+            fetched = await asyncio.to_thread(fetched_method, request_data.method_ref)
+            request_method = fetched.request_method
+            method_label = fetched.label
+            ensure_method_holds_a_bundle(request_method=request_method, label=f"Method package {fetched.label}")
+            ensure_python_allowed(request_method=request_method, label=f"Method package {fetched.label}")
+        else:
+            blob_store = RunnerBlobStore.make_for_scope(scope=resolve_blob_scope(request, read_scope=request_data.read_scope))
+            sent_method = await read_request_method(documents=tree_documents_of(body=await request.body()), blob_store=blob_store)
+            if sent_method is None:
+                # Unreachable: the envelope's selector validator already 422'd a body with no `files`.
+                raise_validation_error(message="provide exactly one of `mthds_contents`, `files` or `method_ref`")
+            request_method = with_resources(request_method=sent_method, resources=decode_bundle_resources(resources=request_data.resources))
+            method_label = REQUEST_METHOD_LABEL
+            ensure_method_holds_a_bundle(request_method=request_method, label="This method")
+            ensure_python_allowed(request_method=request_method, label="This method")
+            await record_request_method(request_method=request_method, blob_store=blob_store)
+        validated_contents = _bundle_texts(request_method=request_method)
+        # The entry pipe of the tree, the one a selector-less run executes, is the graph's pipe and the default the
+        # verdict reports; a tree with none still validates.
+        entry = _optional_tree_entry(request_method=request_method, method_label=method_label)
+        tree_default_pipe_ref = entry.pipe_ref if entry is not None else None
+        default_pipe_ref_known = True
+        with written_method(request_method=request_method) as written:
+            verdict = await ApiRunner(
+                library_dirs=[str(written.method_dir)],
+                library_dirs_are_callers=True,
+                methods_dirs=written.methods_dirs,
+                user_id=user_id,
+                extras=request_data.analytics_groups,
+            ).validate_verdict(
+                mthds_contents=None,
+                mthds_sources=None,
+                allow_signatures=request_data.allow_signatures,
+                requested_orchestration_mode=request_data.orchestration_mode,
+                graph_pipe_code=tree_default_pipe_ref,
+                method_dir=written.method_dir,
+            )
     if not isinstance(verdict, PipelexValidationReport):
         if verdict.validation_errors:
             return _invalid_report_response(verdict, requested_formats=requested_formats)
@@ -430,7 +454,7 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
         {
             **dict(report),
             "mthds_contents": validated_contents,
-            "default_pipe_ref": _effective_default_pipe_ref(report, manifest_main_pipe=manifest_main_pipe),
+            "default_pipe_ref": tree_default_pipe_ref if default_pipe_ref_known else _effective_default_pipe_ref(report),
         }
     )
     content = response_data.model_dump(mode="json", serialize_as_any=True, by_alias=True)

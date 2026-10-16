@@ -30,6 +30,11 @@ def _parsed_module(*, source: str, module_label: str) -> ast.Module | str:
         return ast.parse(source, filename=module_label)
     except SyntaxError as exc:
         return f"The module {module_label} does not parse as Python: {exc.msg} (line {exc.lineno})."
+    except ValueError as exc:
+        # Python 3.11 refuses a source holding a NUL byte with a ValueError where later versions raise a SyntaxError.
+        return f"The module {module_label} does not parse as Python: {exc}."
+    except (RecursionError, MemoryError):
+        return f"The module {module_label} does not parse as Python: it nests too deeply."
 
 
 def pipe_func_definition_violation(*, source: str, function: str, module_label: str) -> str | None:

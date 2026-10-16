@@ -12,7 +12,7 @@ from pathlib import Path
 from mthds.package.exceptions import VCSFetchError
 from mthds.package.manifest.schema import MethodsManifest
 from mthds.package.vcs_resolver import clone_at_version, clone_default_branch
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.methods.exceptions import MethodFetchError, MethodPackageSymlinkError, MethodPackageTooLargeError
 from pipelex.methods.fetch_limits import MAX_FETCHED_PACKAGE_FILES, MAX_FETCHED_PACKAGE_TOTAL_BYTES
@@ -33,6 +33,13 @@ class MethodProvenance(BaseModel):
     address: str
     tag: str | None = None
     commit_sha: str
+    tree_digest: str | None = Field(
+        default=None,
+        description=(
+            "The digest of the package's method tree, `sha256:` and 64 lowercase hex characters, as read from the commit's "
+            "git objects, set by a runner that reads the package as a tree, and null otherwise."
+        ),
+    )
 
 
 class FetchedMethodPackage(BaseModel):

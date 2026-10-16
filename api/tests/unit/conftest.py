@@ -1,4 +1,6 @@
-from collections.abc import Callable
+import subprocess
+from collections.abc import Callable, Generator
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -8,11 +10,20 @@ from pipelex.methods.package_locator import locate_package_in_clone
 from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode
 from pipelex.test_extras.shared_pytest_plugins import needs_inference_in_pipelex
+from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 from pytest import FixtureRequest
 from pytest_mock import MockerFixture
 
 from pipelex_api.api_config import get_api_config
 from tests.unit._constants import STUB_METHOD_COMMIT_SHA, STUB_METHOD_MANIFEST
+
+
+@pytest.fixture(autouse=True, name="blob_storage")
+def blob_storage_fixture(mocker: MockerFixture) -> InMemoryStorageProvider:
+    """Keep each test's blob store in memory: a request's trees are recorded there, and nothing is written to disk."""
+    storage = InMemoryStorageProvider()
+    mocker.patch("pipelex_api.blob_store.get_storage_provider", return_value=storage)
+    return storage
 
 
 @pytest.fixture(autouse=True)
@@ -38,6 +49,13 @@ def reset_api_config_fixture(request: FixtureRequest):
     pipelex_instance.teardown()
 
 
+def commit_stub_clone(*, clone_root: Path) -> None:
+    """Make a stub clone a git repository holding its files in one commit, as a fetched clone does."""
+    git_identity = ["-c", "user.name=stub", "-c", "user.email=stub@example.com", "-c", "commit.gpgsign=false"]
+    for args in (["init", "--quiet"], ["add", "--all"], [*git_identity, "commit", "--quiet", "--allow-empty", "-m", "stub"]):
+        subprocess.run(["git", "-C", str(clone_root), *args], check=True, capture_output=True)  # noqa: S603, S607
+
+
 class _StubCloneCache:
     """A method clone cache whose network fetch is replaced by a local directory tree.
 
@@ -50,10 +68,11 @@ class _StubCloneCache:
         self._clone_root = clone_root
         self._commit_sha = commit_sha
 
-    def get_or_fetch(self, *, ref: MethodRef, clone_url: str | None = None) -> FetchedMethodPackage:  # noqa: ARG002
+    @contextmanager
+    def pinned_package(self, *, ref: MethodRef, clone_url: str | None = None) -> Generator[FetchedMethodPackage, None, None]:  # noqa: ARG002
         located = locate_package_in_clone(clone_root=self._clone_root, requested_address=ref.address)
         ensure_package_within_bounds(package_dir=located.package_dir, package_address=located.full_address)
-        return FetchedMethodPackage(
+        yield FetchedMethodPackage(
             ref=ref,
             full_address=located.full_address,
             commit_sha=self._commit_sha,
@@ -82,6 +101,9 @@ def install_method_package(mocker: MockerFixture, tmp_path: Path) -> Callable[..
             target = package_dir / relative_path
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8")
+        # The runner reads a fetched package from its commit's git objects, so the stub clone is a repository with
+        # its files committed, as a real clone is.
+        commit_stub_clone(clone_root=clone_root)
         stub = _StubCloneCache(clone_root=clone_root, commit_sha=commit_sha)
         mocker.patch("pipelex_api.method_source.get_method_clone_cache", return_value=stub)
         return package_dir

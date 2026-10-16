@@ -114,9 +114,10 @@ def acquire_library(
     the caller's to fix and its paths are not the caller's to read, so by default they load untranslated.
 
     ``methods_dirs`` are directories laid out like ``.mthds/methods/`` holding the packages the caller ships with the
-    ``mthds_contents`` (on a host, the ones a request carries under ``.mthds/methods/<name>/``). An address-based
-    reference of the contents is looked up there first, before the installed stores and fetch-on-miss, and a package
-    found there is never installed; the bundles of a package are named by its address, never by these directories.
+    ``mthds_contents`` or with the method of its own ``library_dirs`` (on a host, the dependency trees a request carries
+    beside its method's tree). An address-based reference of those bundles is looked up there first, before the
+    installed stores and fetch-on-miss, and a package found there is never installed; the bundles of a package are
+    named by its address, never by these directories.
 
     ``bundle_uris``, parallel to ``mthds_contents``, name the files on this host the caller read them from, such as the
     bundle file a CLI runs. A bundle already loaded from the library directories under that path is skipped, and one
@@ -157,7 +158,7 @@ def acquire_library(
                 translate_to_validate_bundle_error() if library_dirs_are_callers else reporting_host_library_tree_faults()
             )
             with library_dirs_translation:
-                library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
+                library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs, methods_dirs=methods_dirs)
         else:
             log.verbose(f"No library directories to load ({source_label})")
 
