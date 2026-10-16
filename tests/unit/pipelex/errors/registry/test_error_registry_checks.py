@@ -182,6 +182,26 @@ class TestErrorRegistryChecks:
             ),
             ("a null list of extension prefixes", _set_document_member("extension_prefixes", None)),
             ("a null prefix", _set_document_member("prefix", None)),
+            ("a status written as a string", _set_member("pipelex.storage.unavailable", "status", "503")),
+            ("a status written as a boolean", _set_member("pipelex.storage.unavailable", "status", True)),
+            ("a status with a fractional part", _set_member("pipelex.storage.unavailable", "status", 503.5)),
+            (
+                "an optional mark written as a string",
+                _add_param("pipelex.storage.unavailable", "name", {"type": "identifier", "optional": "true", "description": "A name."}),
+            ),
+            (
+                "an optional mark written as an integer",
+                _add_param("pipelex.storage.unavailable", "name", {"type": "identifier", "optional": 1, "description": "A name."}),
+            ),
+            (
+                "an operator-only mark written as a string",
+                _add_param("pipelex.storage.unavailable", "name", {"type": "identifier", "operator_only": "yes", "description": "A name."}),
+            ),
+            (
+                "an enum value written as a number",
+                _add_param("pipelex.storage.unavailable", "kind", {"type": "enum", "values": [1], "description": "A kind."}),
+            ),
+            ("a retry verdict written as a boolean", _set_member("pipelex.storage.unavailable", "retry", False)),
         ],
     )
     def test_a_malformed_entry_is_refused_by_the_schema_and_the_typed_model(
@@ -197,6 +217,19 @@ class TestErrorRegistryChecks:
         registry, found_by_model = model_errors(document=composed_document, where=WHERE)
         assert registry is None, f"the typed model accepted {topic}"
         assert found_by_model
+
+    def test_a_status_written_as_an_integral_number_is_accepted_by_both(
+        self, composed_document: dict[str, Any], standard_schema: dict[str, Any]
+    ) -> None:
+        """JSON Schema's integer is any number with no fractional part, so the strict model reads `503.0` as the status 503."""
+        _entry(composed_document, "pipelex.storage.unavailable")["status"] = 503.0
+        assert schema_errors(document=composed_document, schema=standard_schema, where=WHERE) == []
+        registry, found_by_model = model_errors(document=composed_document, where=WHERE)
+        assert found_by_model == []
+        assert registry is not None
+        entry = registry.entry(code="pipelex.storage.unavailable")
+        assert entry is not None
+        assert entry.status == 503
 
     def test_the_snapshot_reader_refuses_a_null_member(self, composed_document: dict[str, Any]) -> None:
         """The public loader reads JSON through the typed model alone, so the model refuses a null as the schema does, naming it."""

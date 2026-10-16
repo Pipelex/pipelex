@@ -20,7 +20,7 @@ import re
 from enum import StrEnum
 from typing import Any, Self, cast
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 PIPELEX_ERROR_REGISTRY_PACKAGE = "pipelex.errors.registry"
 PIPELEX_ERROR_REGISTRY_SNAPSHOT_NAME = "pipelex-error-registry.json"
@@ -137,13 +137,17 @@ class RegistryParamType(StrEnum):
 class _RegistryModel(BaseModel):
     """The base of every part of a registry document: closed, so a member the format does not know is refused.
 
+    Strict, so that a value of another JSON type is refused rather than coerced, as the format's schema refuses
+    it: a status written `"402"`, or an `optional` written `"true"` or `1`, is not read as the integer or the
+    boolean. The closed lists stay lax fields, since a document names their members by their string values.
+
     No member of the format may be null: a member the format makes optional is left out, never written as
     `null`, and one it forbids in a case is absent in that case. The fields that model such a member are
     `None` when it is absent, so an explicit `null` is refused before validation, as the format's schema
     refuses it, rather than read as the member being absent.
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
     @model_validator(mode="before")
     @classmethod
@@ -265,6 +269,15 @@ class RegistryEntry(_RegistryModel):
     meaning: str = Field(min_length=1, pattern=r"\S")
     what_to_do: str = Field(min_length=1, pattern=r"\S")
     see: list[RegistryReference] | None = Field(default=None, min_length=1)
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def _accept_an_integral_number(cls, value: Any) -> Any:
+        # JSON Schema's `integer` is any number with no fractional part, so the format accepts a status written
+        # `422.0`, which the strict field would refuse; a boolean, never a number to the schema, stays refused.
+        if isinstance(value, float) and value.is_integer():
+            return int(value)
+        return value
 
     @model_validator(mode="after")
     def _validate_entry(self) -> Self:
