@@ -140,7 +140,8 @@ class ValidateRequest(MthdsContentsRequest, CallerAnalyticsGroupsMixin):
         description=(
             "PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the scope of the blob store a hash entry of `files` "
             "resolves in, as a run's `read_scope`: a multi-tenant host sends the one of the organization it serves. Omit it "
-            "and the caller's own id is the scope."
+            "and the caller's own id is the scope. Only a validation carrying it records the tree it read in the blob "
+            "store, so a dry run without one leaves nothing stored."
         ),
     )
 
@@ -419,7 +420,10 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
             method_label = REQUEST_METHOD_LABEL
             ensure_method_holds_a_bundle(request_method=request_method, label="This method")
             ensure_python_allowed(request_method=request_method, label="This method")
-            await record_request_method(request_method=request_method, blob_store=blob_store)
+            # A dry run records the tree only under the scope a host named: without one, the fallback scope is the
+            # caller's own id, a prefix no host lists or erases, and a validation must leave nothing stored there.
+            if request_data.read_scope is not None:
+                await record_request_method(request_method=request_method, blob_store=blob_store)
         validated_contents = _bundle_texts(request_method=request_method)
         # The entry pipe of the tree, the one a selector-less run executes, is the graph's pipe and the default the
         # verdict reports; a tree with none still validates.

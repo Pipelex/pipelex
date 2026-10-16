@@ -105,8 +105,10 @@ async def find_missing_blobs(
 ) -> MissingBlobsResult:
     """List every blob of the request this runner does not hold, each with a signed upload target (MTHDS Protocol).
 
-    A blob it holds at the stated size is left out, and an empty list means there is nothing to upload; bytes held
-    under a hash at another size are listed, for the upload to write over. When the request names the tree the blobs
+    A blob it holds at the stated size is left out, and an empty list means there is nothing to upload; a hash held
+    at another size than the one stated is listed too, and its upload tells the two cases apart: bytes of the size held
+    change nothing, and bytes of another size mean the object held is damaged, a 500 `BlobStoreCorrupted`, since nothing
+    writes over a blob. When the request names the tree the blobs
     make up by its `digest`, this runner has recorded that tree as held in full, which it does only after reading every
     file of a tree a request sent, and every listed blob is a file of that tree, the answer is an empty list at once.
     A hash given twice with different sizes is a 422 `BlobMismatch`, and a blob or a set of blobs past this runner's

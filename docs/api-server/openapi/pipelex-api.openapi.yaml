@@ -12,7 +12,7 @@ info:
   license:
     name: Elastic License 2.0
     identifier: Elastic-2.0
-  version: 0.87.0
+  version: 0.88.0
 paths:
   /health:
     get:
@@ -91,7 +91,9 @@ paths:
 
         the path''s a 422 `BlobMismatch`. A blob is never changed: uploading bytes the runner already holds answers 204 and
 
-        changes nothing.'
+        changes nothing, and uploading bytes whose hash names an object of another size, which only damaged storage could
+
+        hold, is a 500 `BlobStoreCorrupted` that leaves the object as it is.'
       operationId: put_blob_v1_blobs__sha256__put
       parameters:
       - name: sha256
@@ -1507,9 +1509,13 @@ paths:
       description: 'List every blob of the request this runner does not hold, each with a signed upload target (MTHDS Protocol).
 
 
-        A blob it holds at the stated size is left out, and an empty list means there is nothing to upload; bytes held
+        A blob it holds at the stated size is left out, and an empty list means there is nothing to upload; a hash held
 
-        under a hash at another size are listed, for the upload to write over. When the request names the tree the blobs
+        at another size than the one stated is listed too, and its upload tells the two cases apart: bytes of the size held
+
+        change nothing, and bytes of another size mean the object held is damaged, a 500 `BlobStoreCorrupted`, since nothing
+
+        writes over a blob. When the request names the tree the blobs
 
         make up by its `digest`, this runner has recorded that tree as held in full, which it does only after reading every
 
@@ -6424,6 +6430,14 @@ components:
         main_stuff_name:
           type: string
           title: Main Stuff Name
+        crate_fingerprint:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Crate Fingerprint
+          description: PIPELEX EXTENSION (not part of the MTHDS Protocol) — the fingerprint of the library crate the run's
+            method was loaded into, the identity of its concepts and pipes, which changes with their meaning and not with
+            their formatting or comments. Null when the run was built from no crate.
         method_provenance:
           anyOf:
           - $ref: '#/components/schemas/MethodProvenance'
@@ -6473,6 +6487,14 @@ components:
           - type: string
           - type: 'null'
           title: Workflow Id
+        crate_fingerprint:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Crate Fingerprint
+          description: PIPELEX EXTENSION (not part of the MTHDS Protocol) — the fingerprint of the library crate the run's
+            method was loaded into, the identity of its concepts and pipes, which changes with their meaning and not with
+            their formatting or comments. Null when the run was built from no crate.
         method_provenance:
           anyOf:
           - $ref: '#/components/schemas/MethodProvenance'
@@ -8260,7 +8282,8 @@ components:
           title: Read Scope
           description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the scope of the blob store a hash entry
             of `files` resolves in, as a run''s `read_scope`: a multi-tenant host sends the one of the organization it serves.
-            Omit it and the caller''s own id is the scope.'
+            Omit it and the caller''s own id is the scope. Only a validation carrying it records the tree it read in the blob
+            store, so a dry run without one leaves nothing stored.'
       type: object
       title: ValidateRequest
       description: 'The shared `mthds_contents` + `allow_signatures` payload, plus optional per-file sources.

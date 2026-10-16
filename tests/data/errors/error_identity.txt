@@ -320,6 +320,7 @@ SearchModelNotFoundError | Search model not found | https://docs.pipelex.com/lat
 SecretNotFoundError | Secret not found | https://docs.pipelex.com/latest/errors/secret-not-found-error/
 SecurityError | Security policy violation | https://docs.pipelex.com/latest/errors/security-error/
 SsrfBlockedError | Outbound request blocked (SSRF guard) | https://docs.pipelex.com/latest/errors/ssrf-blocked-error/
+StorageChecksumMismatchError | Storage checksum mismatch | https://docs.pipelex.com/latest/errors/storage-checksum-mismatch-error/
 StorageConfigError | Storage config | https://docs.pipelex.com/latest/errors/storage-config-error/
 StorageDeliveryError | Storage delivery | https://docs.pipelex.com/latest/errors/storage-delivery-error/
 StorageError | Storage error | https://docs.pipelex.com/latest/errors/storage-error/
