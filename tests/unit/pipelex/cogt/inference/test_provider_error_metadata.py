@@ -9,10 +9,13 @@ from __future__ import annotations
 
 from typing import Any
 
+import httpx
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import ValidationError
 
-from pipelex.cogt.inference.error_classification import ProviderErrorMetadata
+from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, extract_azure_metadata
+from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
 from pipelex.cogt.inference.provider_name import ProviderName
 
 
@@ -197,6 +200,24 @@ class TestProviderErrorMetadata:
         )
 
         assert metadata.is_context_window_exceeded is expected
+
+    def test_is_context_window_exceeded_reads_the_wording_in_the_body(self) -> None:
+        """A raw httpx error renders only its status and URL, so the provider's wording is in the body alone."""
+        body = {
+            "error": {
+                "code": "invalid_request",
+                "message": "This model's maximum context length is 4096 tokens. However, your prompt resulted in 5210 tokens.",
+            }
+        }
+        request = httpx.Request("POST", "https://test.openai.azure.com/openai/deployments/flux/images/generations")
+        with pytest.raises(httpx.HTTPStatusError) as exc_info:
+            httpx.Response(status_code=400, json=body, request=request).raise_for_status()
+        metadata = extract_azure_metadata(exc_info.value)
+        assert "context" not in metadata.message.lower()
+
+        assert metadata.is_context_window_exceeded is True
+        classification = classify_inference_error(metadata, family=InferenceErrorFamily.IMG_GEN)
+        assert classification.error_code == CoreCode.MODEL_CONTEXT_EXCEEDED
 
     def test_is_content_policy_violation_scans_body_when_message_is_empty(self) -> None:
         """Azure REST puts safety phrasing only in the response body; the message stays the

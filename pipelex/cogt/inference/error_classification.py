@@ -169,16 +169,19 @@ class ProviderErrorMetadata(BaseModel):
         with ``max_tokens`` together, so a refusal the ``max_tokens`` sent caused reads the same. Reads the structured
         error code first, ``provider_error_code`` and the code an error body carries
         (OpenAI puts ``context_length_exceeded`` in ``code`` beside a generic ``type``, which the Extract step
-        prefers), then the wording each provider gives such a refusal in its rendered message. Only the
-        classifier's 400 arm reads it, and the Render step words its next step from the code that arm picks, so a
-        phrase in an answer of another status says nothing.
+        prefers), then the wording each provider gives such a refusal, in its rendered message or in the in-process
+        ``body``, as the content-policy check reads them: a raw ``httpx`` error, such as Azure REST's, renders only
+        its status and URL, and keeps the provider's words in the body alone. Only the classifier's 400 arm reads it,
+        and the Render step words its next step from the code that arm picks, so a phrase in an answer of another
+        status says nothing.
         """
         if self.provider_error_code in _CONTEXT_WINDOW_ERROR_CODES:
             return True
         if error_code_from_body_code_first(self.body) in _CONTEXT_WINDOW_ERROR_CODES:
             return True
-        lower_message = self.message.lower()
-        return any(pattern in lower_message for pattern in _CONTEXT_WINDOW_PATTERNS)
+        if _names_the_context_window(text=self.message):
+            return True
+        return self.body is not None and _names_the_context_window(text=_stringify_for_scan(self.body))
 
     @property
     def is_network_error(self) -> bool:
@@ -370,6 +373,12 @@ def _is_content_policy_violation(error_message: str) -> bool:
     """Check if an error message indicates a content policy or safety filter violation."""
     lower_message = error_message.lower()
     return any(pattern in lower_message for pattern in _CONTENT_POLICY_PATTERNS)
+
+
+def _names_the_context_window(*, text: str) -> bool:
+    """Check if an error's text words a refusal of inputs over the model's context window, as some provider words it."""
+    lower_text = text.lower()
+    return any(pattern in lower_text for pattern in _CONTEXT_WINDOW_PATTERNS)
 
 
 def _stringify_for_scan(body: Any) -> str:
