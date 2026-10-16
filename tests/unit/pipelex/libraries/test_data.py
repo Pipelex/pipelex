@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
@@ -8,6 +10,7 @@ from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParall
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
+from pipelex.plugins.pipe_func_package_offer_registry import PipeFuncPackageOffer
 
 
 class CrateQualificationTestData:
@@ -62,4 +65,54 @@ class CrateQualificationTestData:
                 ),
             },
             domains={"alpha": DomainBlueprint(code="alpha", description="alpha domain")},
+        )
+
+
+class MethodRequirementsTestData:
+    """Lines of a method's requirements.txt, as the MTHDS standard reads them, and a package set to judge them against."""
+
+    # (topic, line, the requirement's name when the line declares one)
+    ACCEPTED_LINES: ClassVar[list[tuple[str, str, str]]] = [
+        ("bare name", "pandas", "pandas"),
+        ("range", "pandas>=2.2,<3", "pandas"),
+        ("pinned", "openpyxl==3.1.5", "openpyxl"),
+        ("wildcard", "pandas==2.*", "pandas"),
+        ("extras", "pandas[excel]>=2", "pandas"),
+        ("marker", 'tzdata; python_version >= "3.12"', "tzdata"),
+        ("spaced marker", "pandas >= 2.0 ; sys_platform == 'linux'", "pandas"),
+        ("indented", "   numpy", "numpy"),
+        ("dotted name", "zope.interface>=6", "zope.interface"),
+    ]
+
+    # (topic, line, a fragment of the reason the line is refused)
+    REFUSED_LINES: ClassVar[list[tuple[str, str, str]]] = [
+        ("direct reference", "name @ https://example.com/name-1.0.whl", "naming a URL"),
+        ("bare URL", "https://example.com/name-1.0.whl", "naming a URL"),
+        ("requirement file option", "-r base.txt", "option line"),
+        ("editable option", "-e .", "option line"),
+        ("constraint option", "-c constraints.txt", "option line"),
+        ("index option", "--index-url https://example.com/simple", "option line"),
+        ("trailing comment", "openpyxl==3.1.5  # spreadsheets", "comment after a requirement"),
+        ("continued line", "pandas>=2 \\", "continued with a backslash"),
+        ("local path", "./vendor/package", "not a PEP 508 requirement"),
+        ("version without operator", "pandas 2.2", "not a PEP 508 requirement"),
+    ]
+
+    SANDBOX_ENVIRONMENT = "the Daytona sandbox snapshot 'pipelex-base-test'"
+
+    @classmethod
+    def sandbox_offer(cls) -> PipeFuncPackageOffer:
+        """A package set as the Daytona plugin would state it for its snapshot: canonical names, a Linux CPython 3.12."""
+        return PipeFuncPackageOffer(
+            environment=cls.SANDBOX_ENVIRONMENT,
+            distributions={"pandas": "2.2.3", "openpyxl": "3.1.5", "numpy": "2.1.0rc1", "Zope.Interface": "7.0"},
+            marker_environment={
+                "implementation_name": "cpython",
+                "os_name": "posix",
+                "platform_machine": "x86_64",
+                "platform_python_implementation": "CPython",
+                "platform_system": "Linux",
+                "python_version": "3.12",
+                "sys_platform": "linux",
+            },
         )

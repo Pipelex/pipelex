@@ -11,13 +11,16 @@ from fastapi.responses import JSONResponse
 from mthds.protocol.exceptions import PipelineRequestError
 from pipelex.config import get_config, is_pipe_func_sandbox_hosted
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.libraries.method_requirements import ensure_library_dirs_requirements_met
 from pipelex.methods.structures_check import ensure_no_structured_content_python
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, StorageTarget, WebhookTarget
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipe_run.remote_dispatch import prepare_job_for_remote_dispatch
+from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 from pipelex.reporting.usage_records import apply_tokens_usage_wire_shape
 from pipelex.runtime_bridge.exceptions import MissingBundleValidatorError, MissingOrchestratorError
 from pipelex.runtime_bridge.orchestration_mode import DIRECT_ORCHESTRATION_MODE
@@ -513,8 +516,10 @@ class ApiRunner(PipelexMTHDSProtocol):
         and the `bundle_blueprint` on success — carry a real `source` instead of `None`. The route
         maps a length mismatch to a 422 before we get here; `None` keeps the sourceless behavior.
         `library_dirs` is host context the in-process arm needs; a dispatched arm ignores it (the
-        worker loads its own library). A bundle without a declared `main_pipe` validates fine and
-        simply carries `graph_spec=None` (D2 — no precondition).
+        worker loads its own library), so the requirements.txt of the methods they hold is checked here
+        first, for every arm, and a method whose requirements are not met is an invalid verdict. A
+        bundle without a declared `main_pipe` validates fine and simply carries `graph_spec=None`
+        (D2 — no precondition).
 
         `graph_pipe_code` is the pipe the best-effort graph is drawn from, resolved the way a run
         resolves its entry pipe; `None` keeps the runtime's default, the primary blueprint's
@@ -528,6 +533,15 @@ class ApiRunner(PipelexMTHDSProtocol):
         if validator is None:
             raise MissingBundleValidatorError(mode=orchestration_mode)
         library_dirs = [Path(library_dir) for library_dir in self.library_dirs] if self.library_dirs else None
+        if library_dirs:
+            # The method's requirements.txt is judged here, on the runner, which holds the method's files and the package
+            # set its PipeFunc steps run with, before any dispatch: a dispatched validator never reads these directories.
+            # A refusal is the method's invalid verdict, as a run of it is refused when its files load.
+            try:
+                with translate_to_validate_bundle_error():
+                    ensure_library_dirs_requirements_met(library_dirs=library_dirs)
+            except ValidateBundleError as invalid_method:
+                return invalid_method.to_error_report()
         verdict = await validator.validate_bundles(
             mthds_contents=mthds_contents,
             mthds_sources=mthds_sources,

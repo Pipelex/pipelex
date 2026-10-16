@@ -108,6 +108,10 @@ async def summarize(working_memory: WorkingMemory) -> TextContent:
 
 Prefixing names with the domain they serve is the simplest way to keep them distinct as a project grows.
 
+## Declaring the packages your functions need
+
+When your functions import a package beyond Pipelex and the standard library, such as pandas or openpyxl, declare it in a `requirements.txt` at the root of the method's folder, one PEP 508 requirement per line. Pipelex checks it when the method loads and refuses the method, naming each requirement that is not met, rather than letting the function fail at its first import. Locally the check reads the interpreter Pipelex runs in and the refusal gives the `uv pip install` command that fixes it; on a sandbox-hosted deployment it reads the packages the sandbox holds, which are all a PipeFunc gets there. Pipelex never installs anything. The rules of the file are in [Method Trees](../../method-trees.md#python-packages-requirementstxt).
+
 ## Configuration
 
 Once the function is registered, you can use it in your `.mthds` file.

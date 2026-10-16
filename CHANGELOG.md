@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`PluginRegistrar.add_pipe_func_package_offer`**: the plugin providing an out-of-process PipeFunc execution mode states, keyed by the same mode, the Python packages and the marker environment its sandbox offers (`PipeFuncPackageOffer`), which a method's `requirements.txt` is checked against; a mode stating none refuses every method declaring requirements with `PipeFuncPackageSetUnstatedError`, a configuration fault. `MethodRequirementsFileError`, `MethodRequirementsNotMetError`, `PipeFuncPackageSetUnstatedError` and `DuplicatePipeFuncPackageOfferError` are new `error_type`s.
+
+### Changed
+
+- **A method's `requirements.txt` is checked when it loads (Breaking)**: a method tree holding Python and a `requirements.txt` at its root is refused before any of its Python is imported, naming each requirement, when the environment its PipeFunc steps run in does not meet it, or when the file holds a line the MTHDS standard refuses (a URL, an option such as `-r` or `-e`, a comment after a requirement, a continued line). Locally the environment is the interpreter Pipelex runs in and the refusal gives the `uv pip install` command that fixes it; on a sandbox-hosted deployment it is the package set the deployment states for its sandbox, a run is refused with a `422` and a validation by `method_ref` with an `is_valid: false` verdict located on the line. Pipelex never installs anything. A project root loaded as a library directory is such a tree, so hand over the folder holding the methods instead when the root's `requirements.txt` is an application's.
+
 ## [v0.86.1] - 2026-10-16
 
 ### Added

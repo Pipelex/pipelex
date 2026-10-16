@@ -20,6 +20,7 @@ from pipelex.plugins.exceptions import (
     DuplicateModelListerError,
     DuplicateOrchestratorError,
     DuplicatePipeFuncExecutorError,
+    DuplicatePipeFuncPackageOfferError,
     DuplicateSecretsProviderError,
     DuplicateServiceErrorCodeError,
     DuplicateStorageProviderError,
@@ -32,6 +33,7 @@ from pipelex.plugins.log_sink_registry import LogSinkFactoryFn
 from pipelex.plugins.model_lister_registry import ListModelsFn
 from pipelex.plugins.orchestrator_registry import OrchestratorProtocol
 from pipelex.plugins.pipe_func_executor_registry import PipeFuncExecutorFactoryFn
+from pipelex.plugins.pipe_func_package_offer_registry import PipeFuncPackageOfferFactoryFn
 from pipelex.plugins.plugin_group import PluginGroup
 from pipelex.plugins.plugin_model_declarations import PluginDocGenDefault, PluginInternalModel, PluginModelDeclarations
 from pipelex.plugins.secrets_provider_registry import SecretsProviderFactoryFn
@@ -175,6 +177,7 @@ class PluginRegistrar:
         self.secrets_providers: dict[str, SecretsProviderFactoryFn] = {}
         self.log_sinks: dict[str, LogSinkFactoryFn] = {}
         self.pipe_func_executors: dict[str, PipeFuncExecutorFactoryFn] = {}
+        self.pipe_func_package_offers: dict[str, PipeFuncPackageOfferFactoryFn] = {}
         # Plain data, read once by ``make_model_declarations`` for the model manager to merge at boot.
         # Keyed by the model's name and its model type as written, since a handle names one model per model type.
         self.internal_models: dict[tuple[str, str], dict[str, Any]] = {}
@@ -195,6 +198,7 @@ class PluginRegistrar:
         self._secrets_provider_sources: dict[str, str] = {}
         self._log_sink_sources: dict[str, str] = {}
         self._pipe_func_executor_sources: dict[str, str] = {}
+        self._pipe_func_package_offer_sources: dict[str, str] = {}
         self._internal_model_sources: dict[tuple[str, str], str] = {}
         self._doc_gen_default_sources: dict[tuple[DocGenFormat, DocGenSource], str] = {}
         self._service_error_code_sources: dict[str, str] = {}
@@ -442,6 +446,28 @@ class PluginRegistrar:
             value=factory,
             contribution=f"pipe_func executor {mode}",
             on_duplicate=lambda first_plugin, second_plugin: DuplicatePipeFuncExecutorError(
+                mode=mode, first_plugin=first_plugin, second_plugin=second_plugin
+            ),
+        )
+
+    def add_pipe_func_package_offer(self, *, mode: str, factory: PipeFuncPackageOfferFactoryFn) -> None:
+        """State the Python packages a PipeFunc step finds in one execution mode, keyed by the same ``mode`` token as its executor.
+
+        A method's ``requirements.txt`` is checked when it loads against the packages its PipeFunc steps will run
+        with. In ``direct`` mode those are this interpreter's own; in any other mode they are the sandbox's, which this
+        process cannot read, so the plugin contributing that mode's executor states them here (e.g. our Daytona plugin,
+        from the lock of the Daytona sandbox snapshot). ``factory`` is called with the pipe_func config each time a
+        method declaring requirements loads, never here, and answers ``None`` when it cannot state the offer; a mode
+        with no offer, or a ``None`` answer, meets no requirement. Fail-loud on a duplicate mode, naming both plugins.
+        """
+        self._require_interpreter_layer(capability=f"pipe_func package offer {mode}")
+        self._add(
+            store=self.pipe_func_package_offers,
+            sources=self._pipe_func_package_offer_sources,
+            key=mode,
+            value=factory,
+            contribution=f"pipe_func package offer {mode}",
+            on_duplicate=lambda first_plugin, second_plugin: DuplicatePipeFuncPackageOfferError(
                 mode=mode, first_plugin=first_plugin, second_plugin=second_plugin
             ),
         )

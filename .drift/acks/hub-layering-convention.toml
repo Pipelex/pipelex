@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:8ad6535ebd13f9a08da05c84f082e11f9dec80718a9666d9bcaba5c3c4a55747"
+digest = "sha256:72fac07cc613e7b8eefe3ffa16d368fcfd1c883e9ca67fa42521189cd29509f0"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-15T23:18:44Z"
-rationale = "clean-pass: runtime_hub.py changes only the scoped_event_log docstring, which now says usage events honour the override too; no symbol moves between the hubs, no import crosses the boundary, and the tracing row of the partition table already names scoped_event_log and get_event_log_override."
+reviewed_at = "2026-10-16T01:21:40Z"
+rationale = "clean-pass: interpreter_hub.py gains the PipeFuncPackageOfferRegistry setter and getters and the module accessor get_pipe_func_package_offer_registry; this change already lists it in the pipe func row of the partition table and names the registry's install beside the PipeFuncExecutorRegistry in Pipelex.setup; no import crosses the boundary."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:fda2237457fe0b6830ff2ae8f720698735bec4c3"
-"pipelex/interpreter_hub.py" = "blob:023f8452daf76dde409afc7c0966b149b11edabb"
+"pipelex/interpreter_hub.py" = "blob:4efc29ca60c42ca0fe0533c402d7bb246b0bb2c2"
 "pipelex/runtime_hub.py" = "blob:2af9f62d93b2005daa55a7c61e0390601e430c00"

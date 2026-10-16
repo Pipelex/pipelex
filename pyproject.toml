@@ -34,6 +34,7 @@ dependencies = [
   "mthds==0.22.0",
   "networkx>=3.4.2",
   "openai>=2.0.0",
+  "packaging>=24.0",                                # reads a method's requirements.txt: PEP 508 requirements, markers and versions
   "opentelemetry-api>=1.39.0",
   "opentelemetry-exporter-otlp-proto-http>=1.38.0",
   "opentelemetry-semantic-conventions>=0.59b0",

@@ -119,3 +119,58 @@ class HostLibraryTreeError(PipelexError):
 
     error_domain = ErrorDomain.CONFIG
     retryable = False
+
+
+class MethodRequirementsError(LibraryLoadingError):
+    """Raised when a method's `requirements.txt` refuses the method as it loads.
+
+    The method's own declaration, so the caller can fix it: the message names the file's lines and the packages, and
+    one structured item per line rides the validation verdict. Never a `MethodTreeLoadError`, which a server reports as
+    its own fault around the library directories it loads, since the tree of a bundle sent to a server is loaded there.
+    """
+
+    error_domain = ErrorDomain.INPUT
+    retryable = False
+    _authors_caller_facing_message = True
+
+    def __init__(self, message: str, *, items: list[PipelexBundleBlueprintValidationErrorData]):
+        super().__init__(message, blueprint_validation_errors=items)
+
+
+class MethodRequirementsFileError(MethodRequirementsError):
+    """Raised when a method's `requirements.txt` holds a line the MTHDS standard refuses, or cannot be read as UTF-8 text.
+
+    Each line is blank, a comment, or exactly one PEP 508 requirement; a requirement naming a URL, an option such as
+    `-r`, `-e` or `--index-url`, a comment after a requirement and a line continued with a backslash are refused.
+    """
+
+
+class MethodRequirementsNotMetError(MethodRequirementsError):
+    """Raised when the Python environment a method's PipeFunc steps run in does not satisfy its `requirements.txt`.
+
+    Locally that environment is the interpreter Pipelex runs in, which Pipelex never installs anything into; on a
+    sandbox-hosted deployment it is the package set the deployment states for its PipeFunc sandbox, which is the whole
+    offer. The message names each requirement not met and why.
+    """
+
+
+class PipeFuncPackageSetUnstatedError(PipelexError):
+    """Raised when a method declaring requirements loads on a deployment that states no package set for its PipeFunc sandbox.
+
+    PipeFunc steps run out of this process, in the configured execution mode's sandbox, and no plugin stated the
+    packages found there (`PluginRegistrar.add_pipe_func_package_offer`), so no requirement can be judged and the method
+    is refused rather than left to fail inside the sandbox. A fault of the deployment, not of the method: it is no
+    `LibraryError`, which a validation would report as the caller's invalid bundle, and its message is not caller-facing.
+    """
+
+    error_domain = ErrorDomain.CONFIG
+    retryable = False
+
+    def __init__(self, *, execution_mode: str):
+        self.execution_mode = execution_mode
+        message = (
+            f"PipeFunc steps run in the '{execution_mode}' execution mode, for which no plugin states the Python packages "
+            "they run with, so a method declaring requirements in its requirements.txt cannot load. The plugin providing "
+            "the mode must register its package offer with add_pipe_func_package_offer."
+        )
+        super().__init__(message)
