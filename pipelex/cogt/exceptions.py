@@ -807,7 +807,7 @@ class ImgGenGenerationError(CogtError):
     no coded cause, it is ``provider.outcome_unknown``, since an image generation is a call no one may blindly repeat.
     """
 
-    error_code = _inference_failure_declaration(fallback=CoreCode.PROVIDER_OUTCOME_UNKNOWN)
+    error_code: ClassVar[ErrorCodeDeclaration] = _inference_failure_declaration(fallback=CoreCode.PROVIDER_OUTCOME_UNKNOWN)
 
 
 class ImgGenOutputTruncatedError(ImgGenGenerationError):
@@ -827,7 +827,9 @@ class ImgGenOutputTruncatedError(ImgGenGenerationError):
 
     def __init__(self, *, model_handle: str, stop_reason: str):
         next_step = "Simplify the image prompt, or choose another image model."
-        message = f"The model '{model_handle}' reached its output token limit before it generated the image (finish reason '{stop_reason}'). {next_step}"
+        message = (
+            f"The model '{model_handle}' reached its output token limit before it generated the image (finish reason '{stop_reason}'). {next_step}"
+        )
         super().__init__(message, user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail=next_step))
         self.model_handle = model_handle
         self.stop_reason = stop_reason
