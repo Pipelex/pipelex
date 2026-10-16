@@ -42,7 +42,10 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
             raise PipeDocGenFactoryError(msg)
 
         template_file_ref: MethodFileRef | None = None
+        template_bundle_ref: TreeBundleRef | None = None
         template_file_text: str | None = None
+        if blueprint.template is not None:
+            template_bundle_ref = cls._inline_template_bundle_ref()
         if blueprint.template_file is not None:
             template_file = blueprint.template_file
             match get_building_tree_bundle():
@@ -86,11 +89,28 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
             template=blueprint.template,
             template_file=blueprint.template_file,
             template_file_ref=template_file_ref,
+            template_bundle_ref=template_bundle_ref,
             filename=blueprint.filename,
         )
         if template_file_text is not None:
             pipe_doc_gen.hold_template_file_text(template_file_text=template_file_text)
         return pipe_doc_gen
+
+    @classmethod
+    def _inline_template_bundle_ref(cls) -> TreeBundleRef | None:
+        """The bundle of an inline template, as its method tree names it: what the template's relative URLs resolve against.
+
+        Nothing is resolved here: a relative URL is the rendered HTML's, which only the print stage's engine reads, so each
+        is resolved in the tree when the engine asks for its file. None for bundles parsed from content strings with no
+        file submitted beside them, which belong to no tree, so their template's relative URLs name no file.
+        """
+        match get_building_tree_bundle():
+            case TreeBundle() as tree_bundle:
+                return tree_bundle.make_ref()
+            case TreeBundleRef() as tree_bundle_ref:
+                return tree_bundle_ref
+            case None:
+                return None
 
     @classmethod
     def _resolve_template_file(cls, *, pipe_code: str, template_file: str, tree_bundle: TreeBundle) -> str:

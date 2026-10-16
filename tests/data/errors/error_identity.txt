@@ -347,6 +347,7 @@ StuffSpecFactoryError | Stuff spec factory | https://docs.pipelex.com/latest/err
 TelemetryConfigError | Telemetry config | https://docs.pipelex.com/latest/errors/telemetry-config-error/
 TelemetryConfigValidationError | Telemetry config validation | https://docs.pipelex.com/latest/errors/telemetry-config-validation-error/
 TemplateSigilSyntaxError | Template sigil syntax | https://docs.pipelex.com/latest/errors/template-sigil-syntax-error/
+TemplateUrlRefusedError | Relative URL names no file of the method | https://docs.pipelex.com/latest/errors/template-url-refused-error/
 TomlError | TOML parse error | https://docs.pipelex.com/latest/errors/toml-error/
 ToolError | Tool error | https://docs.pipelex.com/latest/errors/tool-error/
 TraceEventModeError | Trace event mode | https://docs.pipelex.com/latest/errors/trace-event-mode-error/

@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
 from pipelex.cogt.doc_gen.input_shape import InputShape
 from pipelex.cogt.doc_gen.layout_tree import LayoutDocument
+from pipelex.cogt.doc_gen.method_file_urls import RelativeUrlBase
 from pipelex.cogt.doc_gen.render_job import RenderJob
 from pipelex.core.method_trees.tree_bundle import MethodFileRef
 from pipelex.tools.uri.uri_read_scope import UriReference
@@ -61,6 +62,11 @@ class DocumentComposition(BaseModel):
     engine's `RenderJob` by naming the template file rather than carrying its bytes: reading a method file is the print
     stage's IO, through the method file store, so the bytes never ride in the composition across a workflow boundary.
     An inline HTML template, whose text is the bundle's own, is rendered by the compose stage and travels as `html`.
+
+    An HTML document's relative URLs, such as an image beside the template, name files of the template's method tree:
+    `url_base` says where the template sits there, the template file or the bundle of an inline template, and the print
+    stage hands the engine its base URL and reads each file the engine asks for from the tree. It is None for a document
+    whose template belongs to no method tree, whose relative URLs then name no file, and for a document with no HTML.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -73,6 +79,9 @@ class DocumentComposition(BaseModel):
     html: str | None = None
     template_file: ComposedTemplateFile | None = Field(default=None, description="The template file the print stage reads, renders and prints")
     data: dict[str, Any] = Field(default_factory=dict)
+    url_base: RelativeUrlBase | None = Field(
+        default=None, description="Where the HTML template sits in its method tree, which every relative URL of the document resolves against"
+    )
 
     @property
     def template_name(self) -> str | None:
@@ -107,14 +116,28 @@ class DocumentComposition(BaseModel):
         if self.html is not None and self.template_file is not None:
             msg = "A document composed from HTML carries its rendered HTML or the template file the print stage renders, not both."
             raise ValueError(msg)
+        self._validate_url_base()
         return self
+
+    def _validate_url_base(self) -> None:
+        """A base for relative URLs only for HTML, and for an HTML template file, the template file's own place in its tree."""
+        if self.url_base is None:
+            return
+        if not self.source.is_html:
+            msg = f"A document composed {self.source.desc} has no HTML, so it carries no base for relative URLs."
+            raise ValueError(msg)
+        if self.template_file is not None:
+            file_ref = self.template_file.file
+            if self.url_base.tree_digest != file_ref.tree_digest or self.url_base.holder != file_ref.tree_path:
+                msg = "A document composed from an HTML template file resolves its relative URLs against that file, in its method tree."
+                raise ValueError(msg)
 
     def referenced_uris(self) -> list[UriReference]:
         """The files the print stage will read for the document, which it authorizes against the run's read scope first.
 
         The images of the layout tree. A template file is a method file, read through the method file store under the
         run's read scope, and composed HTML may name files too, but only an engine laying it out finds them, and it reads
-        each through `RenderResources`, which applies the same check.
+        each through `RenderResources`, which applies the same check, and reads a relative URL from the method tree.
         """
         if self.layout is None:
             return []
@@ -140,4 +163,5 @@ class DocumentComposition(BaseModel):
             template=template,
             template_name=self.template_name,
             data=self.data,
+            base_url=self.url_base.base_url if self.url_base is not None else None,
         )

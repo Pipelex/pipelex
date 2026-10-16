@@ -74,7 +74,13 @@ async def read_tree_listing(*, tree_digest: str, read_scope: str | None) -> Tree
     return TreeListing.parse(tree_digest=tree_digest, listing=listing)
 
 
-async def _read_listed_file(*, listing: TreeListing, tree_path: str, read_scope: str | None) -> bytes:
+async def read_listed_file(*, listing: TreeListing, tree_path: str, read_scope: str | None) -> bytes:
+    """The bytes of the file at `tree_path` in a tree whose listing was read, through the method file store and checked.
+
+    Raises:
+        MethodFileUnavailableError: The listing names no file at `tree_path`, the store does not hold its bytes, or it
+            serves bytes the listing does not name.
+    """
     sha256 = listing.files.get(tree_path)
     if sha256 is None:
         msg = f"The tree '{listing.tree_digest}' holds no file '{tree_path}'."
@@ -96,7 +102,7 @@ async def read_method_file(*, file_ref: MethodFileRef, read_scope: str | None) -
         MethodFileUnavailableError: The store does not hold the tree or the file, or serves bytes the tree does not name.
     """
     listing = await read_tree_listing(tree_digest=file_ref.tree_digest, read_scope=read_scope)
-    return await _read_listed_file(listing=listing, tree_path=file_ref.tree_path, read_scope=read_scope)
+    return await read_listed_file(listing=listing, tree_path=file_ref.tree_path, read_scope=read_scope)
 
 
 async def read_tree_files(*, tree_digest: str, read_scope: str | None, keeps: Callable[[str], bool] | None = None) -> dict[str, bytes]:
@@ -115,7 +121,7 @@ async def read_tree_files(*, tree_digest: str, read_scope: str | None, keeps: Ca
     for tree_path in listing.files:
         if keeps is not None and not keeps(tree_path):
             continue
-        files[tree_path] = await _read_listed_file(listing=listing, tree_path=tree_path, read_scope=read_scope)
+        files[tree_path] = await read_listed_file(listing=listing, tree_path=tree_path, read_scope=read_scope)
     return files
 
 
@@ -151,6 +157,6 @@ async def read_stored_trees(*, tree_digests: Iterable[str], read_scope: str | No
         blobs: dict[str, bytes] = {}
         for tree_path, sha256 in listing.files.items():
             if sha256 not in blobs:
-                blobs[sha256] = await _read_listed_file(listing=listing, tree_path=tree_path, read_scope=read_scope)
+                blobs[sha256] = await read_listed_file(listing=listing, tree_path=tree_path, read_scope=read_scope)
         stored_trees.append(StoredTree(tree_digest=tree_digest, listing=listing_bytes, blobs=blobs))
     return stored_trees

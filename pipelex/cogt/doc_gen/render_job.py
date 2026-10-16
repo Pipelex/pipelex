@@ -10,6 +10,13 @@ a file the document names (an image, a stylesheet), it reads through the `Render
 applies the run's read scope and returns the file as a `LoadedResource`, its bytes with the media type its source
 gives it. The job never carries a Pipelex object, so an ordinary Pipelex release does not break an
 engine; changing this module is a change of the plugin contract, versioned by `PLUGIN_API_VERSION`.
+
+A relative URL in an HTML document names a file of its template's method tree, such as the logo beside the template or
+the font a stylesheet beside it names. An engine resolves it as HTML and CSS resolve one, by joining it to the URL of the
+file that holds it: the job's `base_url` for the document's own URLs, and a stylesheet's URL for the URLs the stylesheet
+holds. That base lies under `METHOD_FILE_URL_PREFIX`, a host no network serves, and an engine reads a URL it joined under
+it through `RenderResources.load`, like any other, which finds the file in the method tree and never on a disk
+(`pipelex.cogt.doc_gen.method_file_urls`).
 """
 
 from typing import Any, Protocol, Self
@@ -19,12 +26,22 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
 from pipelex.cogt.doc_gen.layout_tree import LayoutDocument
 
+#: The start of every URL that names a file of a document's method tree: the job's `base_url`, and every URL an engine
+#: joins to it, such as a stylesheet's and the URLs it holds. Its host is in the `.invalid` domain, which RFC 2606
+#: reserves for names that never resolve, so no URL under it is ever fetched: an engine hands one to
+#: `RenderResources.load`, which reads the file it names from the method tree.
+METHOD_FILE_URL_PREFIX = "https://method-files.pipelex.invalid/"
+
 
 class RenderJob(BaseModel):
     """Everything an engine needs to print one document, as plain data.
 
     Exactly one payload is set, the one the source names: `layout` for `DocGenSource.LAYOUT`, `html` for
     `DocGenSource.HTML`, and `template` with `data` for `DocGenSource.TEMPLATE_FILE`.
+
+    `base_url` is set only for HTML, when its template belongs to a method tree: an engine joins every relative URL of
+    the document to it, and reads what it joined through `RenderResources.load`. Without it, a relative URL in the
+    document names no file.
     """
 
     model_config = ConfigDict(extra="forbid", ser_json_bytes="base64", val_json_bytes="base64")
@@ -40,6 +57,13 @@ class RenderJob(BaseModel):
     data: dict[str, Any] = Field(
         default_factory=dict,
         description="The step's inputs as plain data, by input name: what a template file is filled with",
+    )
+    base_url: str | None = Field(
+        default=None,
+        description=(
+            "The URL a relative URL of the HTML is joined to, under METHOD_FILE_URL_PREFIX: where the template sits in its "
+            "method tree. None when the document has no template of a method tree"
+        ),
     )
 
     def _carries_payload_of(self, *, source: DocGenSource) -> bool:
@@ -61,6 +85,13 @@ class RenderJob(BaseModel):
         if extra_payloads:
             msg = f"A render job {self.source.desc} carries only its own payload, not the {', '.join(extra_payloads)} one."
             raise ValueError(msg)
+        if self.base_url is not None:
+            if not self.source.is_html:
+                msg = f"A render job {self.source.desc} has no HTML, so it carries no base URL for its relative URLs."
+                raise ValueError(msg)
+            if not self.base_url.startswith(METHOD_FILE_URL_PREFIX):
+                msg = f"A render job's base URL names a file of its method tree, under '{METHOD_FILE_URL_PREFIX}'."
+                raise ValueError(msg)
         return self
 
 
@@ -87,6 +118,7 @@ class LoadedResource(BaseModel):
       content type recorded when the file was stored; the local and in-memory providers identify binary formats from
       the bytes and have none for a text format, such as a stylesheet or an SVG.
     - **A local path**, which only an unscoped run reads: `None`, since a file system records no type.
+    - **A file of the method tree**, named by a URL under `METHOD_FILE_URL_PREFIX`: `None`, since a tree records none.
 
     A declared type is returned as declared, even a generic one such as `application/octet-stream`, and is not checked
     against the bytes. An engine that needs a type, such as an HTML engine that keeps a stylesheet only when it is
@@ -103,18 +135,24 @@ class RenderResources(Protocol):
 
     Pipelex hands one to every render. It resolves `pipelex-storage://` keys through the run's storage
     provider, decodes `data:` URLs and fetches `https://` through the SSRF guard, and it refuses what the
-    run's read scope does not allow, a local path included. It is synchronous, since engines are, and it
-    may be called from the thread the engine prints in.
+    run's read scope does not allow, a local path included. A URL under `METHOD_FILE_URL_PREFIX`, which an
+    engine joined to the job's `base_url` or to the URL of a stylesheet read that way, is a file of the
+    document's method tree: it is resolved in the tree by the MTHDS standard's rules for a relative URL and
+    read through the method file store, under the run's read scope. So is a relative URL of an HTML document
+    an engine hands as written, against the job's `base_url`. Neither ever reaches a disk. It is synchronous,
+    since engines are, and it may be called from the thread the engine prints in.
     """
 
     def load(self, *, uri: str, position: str) -> LoadedResource:
         """Return the bytes a URI points at, with the media type its source gives them (`LoadedResource`).
 
         Args:
-            uri: The URI the document names.
+            uri: The URI the document names, or, for a relative URL, the URL an engine joined it to.
             position: Where the URI sits, in words, which a refusal names instead of the URI: "image 2 of the document".
 
         Raises:
             UriReadRefusedError: the run's read scope does not allow the URI.
+            TemplateUrlRefusedError: the URI names no file of the document's method tree: it climbs above the tree's
+                root, names a file the tree does not hold, or the document has no method tree to resolve it in.
         """
         ...

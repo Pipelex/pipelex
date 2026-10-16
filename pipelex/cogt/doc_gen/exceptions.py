@@ -1,5 +1,7 @@
 from enum import StrEnum
 
+from mthds.method_tree.vocabulary import TreeRefusalCode
+
 from pipelex.base_exceptions import ErrorDomain, PipelexError
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource, doc_gen_choice_key
 
@@ -144,3 +146,28 @@ class MarkdownFormattingBudgetError(PipelexError):
     error_domain = ErrorDomain.INPUT
     _authors_caller_facing_message = True
     _declared_title = "Markdown formatting budget exceeded"
+
+
+class TemplateUrlRefusedError(PipelexError):
+    """A relative URL of an HTML document names no file of its template's method tree, so the print reads nothing for it.
+
+    A relative URL in a `PipeDocGen` step's HTML template, or in a stylesheet of the method tree the template links, names
+    a file of the template's method tree, resolved by the MTHDS standard's rules for a relative URL and looked up in the
+    tree's listing (`pipelex.cogt.doc_gen.method_file_urls`), never on a disk. One the standard refuses fails the print:
+    it is malformed, it is not a tree path, it climbs above the tree's root, or the tree holds no file where it resolves,
+    a directory and a file the tree's membership rule keeps out included. `refusal_code` is the standard's code for the
+    refusal, and None when the template belongs to no method tree, such as an inline template of a bundle loaded from a
+    content string with no file submitted beside it, whose relative URLs name no file at all.
+
+    `RenderResources.load` raises it, and an engine lets it pass, as it lets the read scope's refusal pass. The method's
+    author fixes it, so it is an input error, and its message names only the method's own files, by their tree paths,
+    and where the URL sat in the document, so it is kept for the caller.
+    """
+
+    error_domain = ErrorDomain.INPUT
+    _authors_caller_facing_message = True
+    _declared_title = "Relative URL names no file of the method"
+
+    def __init__(self, message: str, *, refusal_code: TreeRefusalCode | None):
+        super().__init__(message)
+        self.refusal_code = refusal_code
