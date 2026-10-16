@@ -513,7 +513,7 @@ umigf: up-migration-schemas-force
 	@echo "> done: umigf = up-migration-schemas-force"
 
 generate-error-registry: env
-	$(call PRINT_TITLE,"Generating the error registry's snapshot, typed codes and pages")
+	$(call PRINT_TITLE,"Writing every file derived from the error registry")
 	$(VENV_PIPELEX_DEV) generate-error-registry
 
 generate-error-registry-quiet: env
