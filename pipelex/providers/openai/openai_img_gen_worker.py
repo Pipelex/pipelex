@@ -2,6 +2,7 @@ import base64
 from typing import TYPE_CHECKING, Any, cast
 
 import openai
+from mthds.protocol.problem.registry import CoreCode
 from openai import (
     APIConnectionError,
     APIStatusError,
@@ -16,11 +17,13 @@ from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_openai_metadata
-from pipelex.cogt.inference.error_classify import classify_inference_error
-from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
+from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.tools.misc.exceptions import FileTypeError, UnsupportedImageMimeTypeError
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_bytes
 from pipelex.tools.misc.image_utils import ImageFormat
 
@@ -60,7 +63,7 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
     ) -> list[GeneratedImageRawDetails]:
         if self.inference_model.rules is None:
             msg = f"Model '{self.inference_model.name}' does not have rules configured"
-            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
+            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION).with_error_code(PipelexErrorCode.CONFIG_INVALID)
 
         args_dict = await ImgGenArgsFactory.make_args_for_model(
             model_rules=self.inference_model.rules,
@@ -82,7 +85,7 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
                 images_response = cast("ImagesResponse", await self.openai_client.images.generate(**args_dict))
         except (APIStatusError, APIConnectionError) as sdk_exc:
             metadata = extract_openai_metadata(sdk_exc)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.IMG_GEN)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,
@@ -101,7 +104,7 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
                     detail="OpenAI returned no image — try rephrasing the prompt or using a different model",
                 ),
                 provider_metadata=None,
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
 
         response_output_format: str | None = images_response.output_format
         size: str | None = images_response.size or self._get_requested_size(args_dict=args_dict)
@@ -115,7 +118,7 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
                     detail="OpenAI returned an image without size metadata — try a different model",
                 ),
                 provider_metadata=None,
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
         size_split = size.split("x")
         if len(size_split) != 2:
             msg = f"Size from OpenAI is not a valid size: '{size}'"
@@ -127,7 +130,7 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
                     detail="OpenAI returned a malformed image size — try a different model",
                 ),
                 provider_metadata=None,
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
         width_str, height_str = size_split
         width = int(width_str)
         height = int(height_str)
@@ -143,7 +146,7 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
                     detail="OpenAI returned an image without usage metadata — try a different model",
                 ),
                 provider_metadata=None,
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
 
         if img_gen_tokens_usage := img_gen_job.job_report.img_gen_tokens_usage:
             nb_tokens: NbTokensByCategoryDict = {
@@ -165,13 +168,18 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
                         detail="OpenAI returned no image data — try rephrasing the prompt or using a different model",
                     ),
                     provider_metadata=None,
-                )
+                ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
 
             image_format = response_output_format
             if image_format is None:
                 image_bytes = base64.b64decode(base64_str)
-                file_type = detect_file_type_from_bytes(image_bytes)
-                image_format = ImageFormat.from_mime_type(mime_type=file_type.mime).value
+                try:
+                    file_type = detect_file_type_from_bytes(image_bytes)
+                    image_format = ImageFormat.from_mime_type(mime_type=file_type.mime).value
+                except (FileTypeError, UnsupportedImageMimeTypeError) as exc:
+                    # The bytes are the provider's answer, not an input of the caller's.
+                    exc.with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
+                    raise
 
             generated_images.append(
                 GeneratedImageRawDetails(

@@ -20,8 +20,8 @@ from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.inference.error_classification import extract_linkup_metadata
-from pipelex.cogt.inference.error_classify import classify_inference_error
-from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
+from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.pricing_unit import PricingUnit
 from pipelex.cogt.usage.usage_cost import record_unit_priced_usage
@@ -77,7 +77,7 @@ class LinkupExtractWorker(ExtractWorkerAbstract):
             LinkupUnknownError,
         ) as sdk_exc:
             metadata = extract_linkup_metadata(sdk_exc)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.EXTRACT)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,

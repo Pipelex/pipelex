@@ -100,7 +100,7 @@ class TestOpenAIImgGenWorkerErrorHandling:
         assert exc_info.value.provider_metadata is not None
         assert exc_info.value.provider_metadata.status_code == 429
 
-    async def test_timeout_is_transient(self, mocker: MockerFixture) -> None:
+    async def test_timeout_is_an_unknown_outcome(self, mocker: MockerFixture) -> None:
         worker = _make_openai_img_gen_worker(mocker)
         request = httpx.Request("POST", "https://api.openai.com/v1/images/generations")
         sdk_exc = openai.APITimeoutError(request=request)
@@ -115,13 +115,13 @@ class TestOpenAIImgGenWorkerErrorHandling:
         with pytest.raises(ImgGenGenerationError) as exc_info:
             await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.error_category is InferenceErrorCategory.AMBIGUOUS
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
         assert exc_info.value.provider_metadata is not None
         assert exc_info.value.provider_metadata.sdk_exception_type == "APITimeoutError"
 
-    async def test_connection_error_is_transient(self, mocker: MockerFixture) -> None:
+    async def test_connection_error_is_an_unknown_outcome(self, mocker: MockerFixture) -> None:
         worker = _make_openai_img_gen_worker(mocker)
         request = httpx.Request("POST", "https://api.openai.com/v1/images/generations")
         sdk_exc = openai.APIConnectionError(message="Connection refused", request=request)
@@ -136,11 +136,11 @@ class TestOpenAIImgGenWorkerErrorHandling:
         with pytest.raises(ImgGenGenerationError) as exc_info:
             await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.error_category is InferenceErrorCategory.AMBIGUOUS
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
 
-    async def test_internal_server_error_is_transient(self, mocker: MockerFixture) -> None:
+    async def test_internal_server_error_is_an_unknown_outcome(self, mocker: MockerFixture) -> None:
         worker = _make_openai_img_gen_worker(mocker)
         sdk_exc = openai.InternalServerError(
             "server error",
@@ -158,7 +158,7 @@ class TestOpenAIImgGenWorkerErrorHandling:
         with pytest.raises(ImgGenGenerationError) as exc_info:
             await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.error_category is InferenceErrorCategory.AMBIGUOUS
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
         assert exc_info.value.provider_metadata is not None

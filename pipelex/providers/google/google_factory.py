@@ -5,6 +5,7 @@ from typing import Any, ClassVar
 
 from google.genai import types as genai_types
 from google.genai.client import Client as GoogleGenAiClient
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex import log
 from pipelex.cogt.document.prompt_document import PromptDocument
@@ -129,7 +130,7 @@ class GoogleFactory:
                     kind=UserActionKind.CHANGE_INPUT,
                     detail="Google Gemini returned no candidates — try rephrasing the prompt or using a different model",
                 ),
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
 
         candidate = response.candidates[0]
         if not candidate.content or not candidate.content.parts:
@@ -142,7 +143,7 @@ class GoogleFactory:
                     kind=UserActionKind.CHANGE_INPUT,
                     detail="Google Gemini returned a candidate with no content parts — try rephrasing the prompt or using a different model",
                 ),
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
 
         text_parts: list[str] = []
         for part in candidate.content.parts:
@@ -163,7 +164,7 @@ class GoogleFactory:
                     kind=UserActionKind.CHANGE_INPUT,
                     detail="Google Gemini returned only thinking parts and no text — shorten the prompt, raise max_tokens, or disable thinking",
                 ),
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
 
         return "\n\n".join(text_parts)
 

@@ -1,6 +1,7 @@
 import json
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import ValidationError
 
 from pipelex.base_exceptions import ErrorReport, PipelexError
@@ -133,42 +134,46 @@ class TestErrorCategoryInfrastructure:
     # --- to_error_report() ---
 
     def test_to_error_report_pipelex_error_minimal(self) -> None:
-        """PipelexError.to_error_report returns an ErrorReport with error_type and message."""
+        """PipelexError.to_error_report returns an ErrorReport with error_type and message, and the fallback code's verdict."""
         err = PipelexError("basic error")
         report = err.to_error_report()
         assert report.error_type == "PipelexError"
         assert report.message == "basic error"
+        assert report.code == CoreCode.RUNTIME_UNEXPECTED
         assert report.error_category is None
-        assert report.retryable is None
+        assert report.retryable is False
 
     def test_to_error_report_cogt_error_no_category(self) -> None:
-        """CogtError report has None for optional fields when not set."""
-        err = CogtError("plain error")
+        """A failure with no category and no cause reports its class's fallback code, and None for the optional fields."""
+        err = LLMCompletionError("plain error")
         report = err.to_error_report()
-        assert report.error_type == "CogtError"
+        assert report.error_type == "LLMCompletionError"
         assert report.message == "plain error"
+        assert report.code == CoreCode.RUNTIME_UNEXPECTED
         assert report.error_category is None
-        assert report.retryable is None
+        assert report.retryable is False
         assert report.user_action is None
         assert report.model is None
         assert report.provider is None
 
     def test_to_error_report_with_category(self) -> None:
-        """CogtError report includes category and retryable when set."""
-        err = CogtError("oops", error_category=InferenceErrorCategory.CONTENT)
+        """A report includes the category, and a content failure with no code keeps its class's fallback."""
+        err = LLMCompletionError("oops", error_category=InferenceErrorCategory.CONTENT)
         report = err.to_error_report()
         assert report.error_category == "content"
+        assert report.code == CoreCode.RUNTIME_UNEXPECTED
         assert report.retryable is False
 
     def test_to_error_report_with_all_cogt_fields(self) -> None:
-        """Report includes user_action when set."""
-        err = CogtError(
+        """Report includes user_action when set, and a transient failure with no code reports a code that invites a retry."""
+        err = LLMCompletionError(
             "oops",
             error_category=InferenceErrorCategory.TRANSIENT,
             user_action=UserAction(kind=UserActionKind.WAIT_AND_RETRY, detail="Retry in a moment"),
         )
         report = err.to_error_report()
         assert report.error_category == "transient"
+        assert report.code == CoreCode.PROVIDER_UNAVAILABLE
         assert report.retryable is True
         assert report.user_action is not None
         assert report.user_action.kind is UserActionKind.WAIT_AND_RETRY
@@ -195,18 +200,20 @@ class TestErrorCategoryInfrastructure:
 
     def test_to_error_report_to_dict_omits_none(self) -> None:
         """to_dict() omits None-valued fields."""
-        err = CogtError("plain error")
+        err = LLMCompletionError("plain error")
         report_dict = err.to_error_report().to_dict()
         assert "error_category" not in report_dict
-        assert "retryable" not in report_dict
         assert "user_action" not in report_dict
         assert "model" not in report_dict
         assert "provider" not in report_dict
         assert report_dict == {
-            "error_type": "CogtError",
+            "code": "runtime.unexpected",
+            "error_type": "LLMCompletionError",
             "message": "plain error",
-            "title": "AI inference failed",
-            "type_uri": "https://docs.pipelex.com/latest/errors/cogt-error/",
+            "title": "An unexpected error occurred",
+            "type_uri": "https://mthds.ai/errors/runtime.unexpected",
+            "error_domain": "runtime",
+            "retryable": False,
         }
 
     def test_to_error_report_to_dict_json_serializable(self) -> None:
@@ -219,12 +226,7 @@ class TestErrorCategoryInfrastructure:
 
     def test_error_report_is_frozen(self) -> None:
         """ErrorReport is immutable."""
-        report = ErrorReport(
-            error_type="CogtError",
-            message="test",
-            title="AI inference failed",
-            type_uri="https://docs.pipelex.com/latest/errors/cogt-error/",
-        )
+        report = ErrorReport.make_for_code(code=CoreCode.PROVIDER_FAILED, error_type="LLMCompletionError", message="test")
         with pytest.raises(ValidationError):
             report.message = "mutated"  # type: ignore[misc]
 
@@ -233,7 +235,7 @@ class TestErrorCategoryInfrastructure:
         original = ValueError("original error")
         msg = "wrapped"
         with pytest.raises(CogtError) as exc_info:
-            raise CogtError(msg, error_category=InferenceErrorCategory.TRANSIENT) from original
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT) from original
         assert exc_info.value.__cause__ is original
         report = exc_info.value.to_error_report()
         assert report.error_category == "transient"

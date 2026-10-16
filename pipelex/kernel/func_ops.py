@@ -28,6 +28,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.kernel.exceptions import FuncOutputTypeError
 from pipelex.kernel.func_results import FuncCallResult, FuncResult
 from pipelex.kernel.memory_ops import store_result
 
@@ -64,8 +65,8 @@ async def call_function(*, function: Callable[..., Any], memory: WorkingMemory, 
     elif isinstance(func_output_object, str):
         content = TextContent(text=func_output_object)
     else:
-        msg = f"Function '{label}' must return a StuffContent or a list, got {type(func_output_object)}"
-        raise TypeError(msg)
+        msg = f"Function '{label}' must return a StuffContent, a list or a string, got {type(func_output_object)}"
+        raise FuncOutputTypeError(msg)
 
     return FuncCallResult(
         content=content,

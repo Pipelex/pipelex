@@ -11,7 +11,8 @@ from pipelex.cogt.inference.error_classification import (
     UserActionKind,
     extract_typesafe_metadata,
 )
-from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.error_classify import InferenceErrorFamily
+from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.providers.typesafe.typesafe_error_classification import classify_typesafe_error
 from tests.unit.pipelex.providers.typesafe.test_data import TestData, rebuild_recorded_exception

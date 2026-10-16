@@ -2,14 +2,11 @@ from typing import Annotated, Any, Self, Union
 
 from pydantic import BeforeValidator, Field, WithJsonSchema, field_validator, model_validator
 
+from pipelex.cogt.exceptions import LLMSettingValueError
 from pipelex.cogt.image.prompt_image import PromptImageDetail
 from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
 from pipelex.cogt.models.model_reference import ModelReference, parse_model_reference
 from pipelex.system.configuration.config_model import ConfigModel
-
-
-class LLMSettingValueError(ValueError):
-    pass
 
 
 class LLMSetting(ConfigModel):

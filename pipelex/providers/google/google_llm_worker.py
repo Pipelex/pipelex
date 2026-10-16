@@ -5,6 +5,7 @@ import httpx
 from google.genai import errors as genai_errors
 from google.genai import types as genai_types
 from google.genai.client import Client as GoogleGenAiClient
+from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex import log
@@ -15,8 +16,8 @@ from pipelex.cogt.inference.error_classification import (
     extract_google_metadata,
     extract_underlying_sdk_exception,
 )
-from pipelex.cogt.inference.error_classify import classify_inference_error
-from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
+from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.llm.completion_stop import classify_prompt_block_reason
 from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_job import LLMJob
@@ -252,7 +253,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
             )
         except (genai_errors.ServerError, genai_errors.ClientError, httpx.TransportError) as sdk_exc:
             metadata = extract_google_metadata(sdk_exc)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,
@@ -345,7 +346,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
             underlying_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc)
             if underlying_exc is not None:
                 metadata = extract_google_metadata(underlying_exc)
-                classification = classify_inference_error(metadata)
+                classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
                 raise render_inference_error(
                     metadata=metadata,
                     classification=classification,
@@ -361,10 +362,10 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                     kind=UserActionKind.CONTACT_SUPPORT,
                     detail="Structured generation failed for an unrecognized reason — retry, and report this if it persists",
                 ),
-            ) from instructor_exc
+            ).with_error_code(CoreCode.RUNTIME_UNEXPECTED) from instructor_exc
         except (genai_errors.ServerError, genai_errors.ClientError, httpx.TransportError) as sdk_exc:
             metadata = extract_google_metadata(sdk_exc)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,

@@ -1,6 +1,7 @@
 from typing import Any, Callable
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.config_cogt import ModelDeckConfig
@@ -376,7 +377,7 @@ class TestModelDeckCheck:
         model_choice: str,
         needed_model: str,
     ) -> None:
-        """A bare handle the deck serves only as another model type is refused, and the sentence names that mismatch rather than a missing handle."""
+        """A bare handle the deck serves only as another model type is refused as a capability it lacks, and the sentence names that mismatch."""
         model_deck = self._create_test_model_deck()
         mocker.patch(GET_MODEL_DECK_TARGET, return_value=model_deck)
 
@@ -389,6 +390,7 @@ class TestModelDeckCheck:
         assert error.reference_kind == ModelReferenceKind.HANDLE
         assert str(error).startswith(f"Model handle '{name}' is served by the model deck, but not as {needed_model}")
         assert "was not found" not in str(error)
+        assert error.resolve_error_code() == CoreCode.MODEL_CAPABILITY_UNSUPPORTED
 
     @pytest.mark.parametrize(
         ("check_fn", "model_type"),

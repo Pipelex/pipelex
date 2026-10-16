@@ -10,6 +10,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel
 from pytest_mock import MockerFixture
 
@@ -206,6 +207,8 @@ class TestLeafReadScope:
         with pytest.raises(UriReadRefusedError) as exc_info:
             await call_leaf(FOREIGN_KEY, PipeRunMode.DRY, factory)
         assert exc_info.value.reason == UriReadRefusalReason.FOREIGN_STORAGE_KEY, leaf_name
+        # The run took its inputs through the same scope, so what a leaf refuses is a URL the method produced.
+        assert exc_info.value.resolve_error_code() == CoreCode.SECURITY_METHOD_URL_REFUSED, leaf_name
         assert f"of pipe '{PIPE_CODE}'" in str(exc_info.value)
         assert factory.method_calls == []
         for worker_spy in no_workers.values():

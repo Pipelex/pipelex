@@ -5,6 +5,7 @@ import uuid
 from typing import Any, Literal, get_args, get_origin
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, Field, ValidationError
 from pytest_mock import MockerFixture
 
@@ -449,15 +450,16 @@ class TestSchemaToModel:
     # ---- Layer 2: __import__ allowlist (defense-in-depth at the exec boundary) ----
 
     def test_exec_blocks_import_subprocess(self) -> None:
-        """Even bypassing Layer 1, the restricted __import__ blocks `import subprocess`."""
+        """Even bypassing Layer 1, the restricted __import__ blocks `import subprocess`, as the perimeter's refusal."""
         malicious_source = "from pydantic import BaseModel\nimport subprocess\nclass Innocent(BaseModel):\n    name: str = 'ok'\n"
-        with pytest.raises(ImportError, match="subprocess"):
+        with pytest.raises(UnsafeSchemaError, match="subprocess") as exc_info:
             SchemaToModelFactory._exec_and_extract_class(malicious_source, class_name="Innocent")  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+        assert exc_info.value.resolve_error_code() == CoreCode.SECURITY_SCHEMA_REFUSED
 
     def test_exec_blocks_direct_dunder_import_call(self) -> None:
         """A direct __import__('subprocess') call is also blocked."""
         malicious_source = "from pydantic import BaseModel\nclass Innocent(BaseModel):\n    name: str = 'ok'\n_leak = __import__('subprocess')\n"
-        with pytest.raises(ImportError, match="subprocess"):
+        with pytest.raises(UnsafeSchemaError, match="subprocess"):
             SchemaToModelFactory._exec_and_extract_class(malicious_source, class_name="Innocent")  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     @pytest.mark.parametrize(
@@ -472,7 +474,7 @@ class TestSchemaToModel:
     def test_exec_blocks_dangerous_imports(self, import_line: str, expected_module: str) -> None:
         """A range of dangerous stdlib imports is blocked by the allowlist."""
         malicious_source = f"from pydantic import BaseModel\n{import_line}\nclass Innocent(BaseModel):\n    name: str = 'ok'\n"
-        with pytest.raises(ImportError, match=expected_module):
+        with pytest.raises(UnsafeSchemaError, match=expected_module):
             SchemaToModelFactory._exec_and_extract_class(malicious_source, class_name="Innocent")  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     @pytest.mark.parametrize(

@@ -58,10 +58,11 @@ class HuggingFaceErrorHandlingTestData:
             UserActionKind.CONTACT_SUPPORT,
         ),
         (
+            # An image generation is billed and not idempotent, so a failure after it was sent is an unknown outcome.
             "server_error_503",
             503,
             "Service unavailable",
-            InferenceErrorCategory.TRANSIENT,
+            InferenceErrorCategory.AMBIGUOUS,
             UserActionKind.WAIT_AND_RETRY,
         ),
     ]
@@ -69,7 +70,7 @@ class HuggingFaceErrorHandlingTestData:
     TIMEOUT_CASES: ClassVar[list[tuple[str, InferenceErrorCategory, UserActionKind]]] = [
         (
             "inference_timeout",
-            InferenceErrorCategory.TRANSIENT,
+            InferenceErrorCategory.AMBIGUOUS,
             UserActionKind.WAIT_AND_RETRY,
         ),
     ]

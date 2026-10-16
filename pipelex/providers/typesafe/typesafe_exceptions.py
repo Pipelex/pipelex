@@ -1,8 +1,19 @@
+from typing import ClassVar
+
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex.cogt.exceptions import CogtError
+from pipelex.errors.error_code_declaration import ErrorCodeDeclaration, ErrorCodeSet
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 
 
 class TypesafeError(CogtError):
-    """Base for every error this backend raises, so callers can catch the provider as a family."""
+    """Base for every error this backend raises, so callers can catch the provider as a family.
+
+    Raised itself for a backend with no API key, which is the deployment's missing credential.
+    """
+
+    error_code: ClassVar[ErrorCodeDeclaration] = PipelexErrorCode.CONFIG_CREDENTIAL_MISSING
 
 
 class TypesafeJudgmentResponseError(TypesafeError):
@@ -15,11 +26,17 @@ class TypesafeJudgmentResponseError(TypesafeError):
     something — so this is where the wrong shape actually stops.
     """
 
+    error_code = CoreCode.PROVIDER_RESPONSE_INVALID
+
 
 class TypesafeQuestionUnsupportedError(TypesafeError):
     """The question is legal MTHDS that this backend will not serve.
 
     The vendor's own bounds, not the language's: a rating scale longer than this backend answers.
     Enforcing it here rather than in the blueprint is deliberate — a method that exceeds it stays
-    valid and a different judgment backend may well accept it.
+    valid and a different judgment backend may well accept it. The scale is written in the method, so it is
+    ``model.capability_unsupported``; a rating level with neither a label nor a description, which the blueprint
+    already refuses, is ``runtime.unexpected``, which its raise site chooses.
     """
+
+    error_code = ErrorCodeSet(default=CoreCode.MODEL_CAPABILITY_UNSUPPORTED, others=(CoreCode.RUNTIME_UNEXPECTED,))

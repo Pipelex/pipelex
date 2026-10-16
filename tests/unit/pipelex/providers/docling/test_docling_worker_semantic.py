@@ -44,7 +44,7 @@ class TestDoclingWorkerSemantic:
             (FileNotFoundError, "No such file", InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
             (ValueError, "Unsupported format", InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
             (RuntimeError, "Conversion failed", InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
-            (OSError, "Disk read error", InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
+            (OSError, "Disk read error", InferenceErrorCategory.UNKNOWN, UserActionKind.CONTACT_SUPPORT),
         ],
     )
     async def test_local_exception_carries_semantic_user_action(

@@ -29,6 +29,7 @@ substituted as a parameter, a dotted path included.
 from collections.abc import Sequence
 from typing import Any, Self, cast
 
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ConfigDict
 
 from pipelex.cogt.document.prompt_document import PromptDocument
@@ -244,10 +245,10 @@ class PromptFiles:
             )
         except ContextProviderError as exc:
             msg = f"Could not find image '{image_reference.variable_path}' in context: {exc}"
-            raise PromptContentError(msg) from exc
+            raise PromptContentError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED) from exc
         if not isinstance(image_content, ImageContent):
             msg = f"Image reference '{image_reference.variable_path}' is of type '{type(image_content).__name__}', expected ImageContent"
-            raise PromptContentError(msg)
+            raise PromptContentError(msg).with_error_code(CoreCode.METHOD_WIRING_INVALID)
         self._image_registry_indices[image_reference.variable_path] = self._image_registry.register_image(image_content)
 
     def _register_direct_list_images(self, *, image_reference: ImageReference, context_provider: ContextProviderAbstract) -> None:
@@ -259,17 +260,17 @@ class PromptFiles:
             )
         except ContextProviderError as exc:
             msg = f"Could not find image list '{image_reference.variable_path}' in context: {exc}"
-            raise PromptContentError(msg) from exc
+            raise PromptContentError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED) from exc
         if not isinstance(image_items, (list, tuple)):
             msg = (
                 f"Image list reference '{image_reference.variable_path}' is of type '{type(image_items).__name__}', "
                 "expected list or tuple of ImageContent"
             )
-            raise PromptContentError(msg)
+            raise PromptContentError(msg).with_error_code(CoreCode.METHOD_WIRING_INVALID)
         for list_position, image_item in enumerate(cast("list[Any] | tuple[Any, ...]", image_items), start=1):
             if not isinstance(image_item, ImageContent):
                 msg = f"Item of '{image_reference.variable_path}' is of type '{type(image_item).__name__}', expected ImageContent"
-                raise PromptContentError(msg)
+                raise PromptContentError(msg).with_error_code(CoreCode.METHOD_WIRING_INVALID)
             # Keyed by the 1-based list position, numbered by the registry index.
             self._image_registry_indices[f"{image_reference.variable_path}[{list_position}]"] = self._image_registry.register_image(image_item)
 
@@ -282,10 +283,10 @@ class PromptFiles:
             )
         except ContextProviderError as exc:
             msg = f"Could not find document '{document_reference.variable_path}' in context: {exc}"
-            raise PromptContentError(msg) from exc
+            raise PromptContentError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED) from exc
         if not isinstance(document_content, DocumentContent):
             msg = f"Document reference '{document_reference.variable_path}' is of type '{type(document_content).__name__}', expected DocumentContent"
-            raise PromptContentError(msg)
+            raise PromptContentError(msg).with_error_code(CoreCode.METHOD_WIRING_INVALID)
         self._documents[document_reference.variable_path] = PromptDocumentFactory.make_prompt_document(
             uri=document_content.url,
             mime_type=document_content.mime_type,
@@ -300,17 +301,17 @@ class PromptFiles:
             )
         except ContextProviderError as exc:
             msg = f"Could not find document list '{document_reference.variable_path}' in context: {exc}"
-            raise PromptContentError(msg) from exc
+            raise PromptContentError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED) from exc
         if not isinstance(document_items, (list, tuple)):
             msg = (
                 f"Document list reference '{document_reference.variable_path}' is of type '{type(document_items).__name__}', "
                 "expected list or tuple of DocumentContent"
             )
-            raise PromptContentError(msg)
+            raise PromptContentError(msg).with_error_code(CoreCode.METHOD_WIRING_INVALID)
         for list_position, document_item in enumerate(cast("list[Any] | tuple[Any, ...]", document_items), start=1):
             if not isinstance(document_item, DocumentContent):
                 msg = f"Item of '{document_reference.variable_path}' is of type '{type(document_item).__name__}', expected DocumentContent"
-                raise PromptContentError(msg)
+                raise PromptContentError(msg).with_error_code(CoreCode.METHOD_WIRING_INVALID)
             self._documents[f"{document_reference.variable_path}[{list_position}]"] = PromptDocumentFactory.make_prompt_document(
                 uri=document_item.url,
                 mime_type=document_item.mime_type,

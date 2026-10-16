@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib.util
 from typing import TYPE_CHECKING, Any
 
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.config import get_config
 from pipelex.plugins.model_handle import ModelHandle
@@ -70,9 +72,13 @@ def list_bedrock_models(
                 aws_region=aws_region,
             )
 
-    except (AwsCredentialsError, BotoCoreError, ClientError) as exc:
+    except AwsCredentialsError as exc:
         msg = f"Error listing Bedrock models: {exc}"
         raise PipelexCLIError(msg) from exc
+    except (BotoCoreError, ClientError) as exc:
+        # The SDK's own failure carries no code: Bedrock answered the listing, or could not be reached, with a failure.
+        msg = f"Error listing Bedrock models: {exc}"
+        raise PipelexCLIError(msg).with_error_code(CoreCode.PROVIDER_FAILED) from exc
 
 
 def _display_bedrock_models_flat(

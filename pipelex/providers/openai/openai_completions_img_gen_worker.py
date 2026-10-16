@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING, Any, cast
 
 import openai
+from mthds.protocol.problem.registry import CoreCode
 from openai import (
     APIConnectionError,
     APIStatusError,
@@ -13,10 +14,11 @@ from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_openai_metadata
-from pipelex.cogt.inference.error_classify import classify_inference_error
-from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
+from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.providers.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.base64_utils import extract_base64_str_from_base64_url_if_possible
@@ -90,7 +92,7 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
             )
         except (APIStatusError, APIConnectionError) as sdk_exc:
             metadata = extract_openai_metadata(sdk_exc)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.IMG_GEN)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,
@@ -120,7 +122,7 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
                                     detail="The provider returned no image data — try rephrasing the prompt or using a different model",
                                 ),
                                 provider_metadata=None,
-                            )
+                            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
                         base64_str, base64_extracted_mime_type = extracted
         elif (content := openai_message.content) and content.startswith("http"):
             # The response message is a URL, which only a service with a fixed output format answers with:
@@ -130,7 +132,7 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
                     f"The completions image response is a URL, but the worker for backend '{self.inference_model.backend_name}' "
                     f"was built with no fixed output format, so the image's format cannot be known."
                 )
-                raise ImgGenParameterError(msg)
+                raise ImgGenParameterError(msg).with_error_code(PipelexErrorCode.CONFIG_INVALID)
             actual_url = openai_message.content
         elif hasattr(openai_message, "content_blocks"):
             content_blocks = cast("list[dict[str, Any]]", openai_message.content_blocks)  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
@@ -149,7 +151,7 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
                                         detail="The provider returned no image data — try rephrasing the prompt or using a different model",
                                     ),
                                     provider_metadata=None,
-                                )
+                                ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
                             base64_str, base64_extracted_mime_type = extracted
                             break
         if not base64_str and not actual_url:
@@ -162,7 +164,7 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
                     detail="The provider returned no image — try rephrasing the prompt or using a different model",
                 ),
                 provider_metadata=None,
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
 
         if (img_gen_tokens_usage := img_gen_job.job_report.img_gen_tokens_usage) and (usage := response.usage):
             img_gen_tokens_usage.nb_tokens_by_category = self.openai_completions_factory.make_nb_tokens_by_category(usage=usage)
@@ -221,7 +223,7 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
                 )
             else:
                 msg = f"Unexpected PreparedFile type: {type(prepped_image).__name__}"
-                raise ImgGenParameterError(msg)
+                raise ImgGenParameterError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
 
         return [{"role": "user", "content": user_contents}]
 
@@ -233,6 +235,6 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
         nb_images: int,
     ) -> list[GeneratedImageRawDetails]:
         if nb_images > 1:
-            msg = f"The image genration backend '{self.inference_model.desc}' can't generate multiple images at once: {nb_images}"
-            raise NotImplementedError(msg)
+            msg = f"The image generation backend '{self.inference_model.desc}' cannot generate several images at once, and {nb_images} were requested"
+            raise ImgGenParameterError(msg)
         return [await self._gen_image(img_gen_job=img_gen_job)]

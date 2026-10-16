@@ -11,9 +11,10 @@ from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.error_classification import extract_fal_metadata
-from pipelex.cogt.inference.error_classify import classify_inference_error
-from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
+from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.providers.fal.fal_factory import FalFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
@@ -41,7 +42,7 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
     ) -> Any:
         if self.inference_model.rules is None:
             msg = f"Model '{self.inference_model.name}' does not have rules configured"
-            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
+            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION).with_error_code(PipelexErrorCode.CONFIG_INVALID)
         args_dict = await ImgGenArgsFactory.make_args_for_model(
             model_rules=self.inference_model.rules,
             img_gen_job=img_gen_job,
@@ -52,7 +53,7 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
         fal_application = args_dict.pop("model", None)
         if fal_application is None:
             msg = f"Model '{self.inference_model.name}' rules must include a 'model_choice' entry"
-            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
+            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION).with_error_code(PipelexErrorCode.CONFIG_INVALID)
         try:
             handler = await self.fal_async_client.submit(
                 application=fal_application,
@@ -61,7 +62,7 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
             return await handler.get()
         except (MissingCredentialsError, FalClientHTTPError, FalClientTimeoutError, FalClientError) as exc:
             metadata = extract_fal_metadata(exc)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.IMG_GEN)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,

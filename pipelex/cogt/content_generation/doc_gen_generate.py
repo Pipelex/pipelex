@@ -40,7 +40,7 @@ from pipelex.base_exceptions import PipelexError, PipelexUnexpectedError
 from pipelex.cogt.content_generation.assignment_models import RenderDocumentAssignment
 from pipelex.cogt.content_generation.dry_mock import dry_render_document
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
-from pipelex.cogt.content_generation.read_authorization import authorize_assignment_reads
+from pipelex.cogt.content_generation.read_authorization import authorize_assignment_reads, authorize_method_uri_read
 from pipelex.cogt.doc_gen.doc_gen_engine import get_doc_gen_inference_model, require_doc_gen_engine_installed
 from pipelex.cogt.doc_gen.doc_gen_worker_factory import DocGenWorkerFactory
 from pipelex.cogt.doc_gen.document_composition import DocumentComposition
@@ -51,10 +51,10 @@ from pipelex.cogt.doc_gen.template_check import TemplateCheckRequest
 from pipelex.cogt.inference.inference_call_summary import InferenceCallSummary, InferenceOperation
 from pipelex.core.method_trees.method_files import TreeListing, read_listed_file, read_method_file, read_tree_listing
 from pipelex.core.stuffs.document_content import DocumentContent
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.runtime_hub import get_report_delegate, get_template_file_stage
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.tools.uri.uri_bytes import load_bytes_and_mime_type_from_any_uri
-from pipelex.tools.uri.uri_read_scope import authorize_uri_read
 
 if TYPE_CHECKING:
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -109,7 +109,7 @@ class RunRenderResources(RenderResources):
                 f"template can name, and this document is {source_desc}."
             )
             raise TemplateUrlRefusedError(msg, refusal_code=None)
-        authorize_uri_read(uri=uri, read_scope=self._read_scope, position=position)
+        authorize_method_uri_read(uri=uri, read_scope=self._read_scope, position=position)
         loaded = await load_bytes_and_mime_type_from_any_uri(uri, storage_provider=self._storage_provider)
         return LoadedResource(data=loaded.data, mime_type=loaded.mime_type)
 
@@ -165,7 +165,7 @@ class RunRenderResources(RenderResources):
             # Stop the read too, which would otherwise go on running on the loop after the print has failed.
             future.cancel()
             msg = f"Reading {position} took longer than {_RESOURCE_LOAD_TIMEOUT_SECONDS} seconds."
-            raise DocGenRenderError(msg) from exc
+            raise DocGenRenderError(msg).with_error_code(PipelexErrorCode.DOCGEN_PRINT_TIMEOUT) from exc
 
 
 async def render_document_and_store(
@@ -229,7 +229,7 @@ async def read_template_file(*, render_assignment: RenderDocumentAssignment) -> 
         template_source = data.decode("utf-8")
     except UnicodeDecodeError as exc:
         msg = f"The template file '{template_file.name}' of '{composition.filename}' is not UTF-8 text."
-        raise DocGenRenderError(msg) from exc
+        raise DocGenRenderError(msg).with_error_code(PipelexErrorCode.DOCGEN_TEMPLATE_INVALID) from exc
     html = await get_template_file_stage().render_html_template_file(template_file=template_file, template_source=template_source)
     return TemplateFileForPrint(html=html, template=None)
 

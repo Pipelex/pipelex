@@ -1,20 +1,30 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
+from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
-from pipelex.base_exceptions import ErrorDomain, ErrorReport, PipelexError, iter_cause_chain
+from pipelex.base_exceptions import ErrorReport, PipelexError, iter_cause_chain
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
+from pipelex.cogt.models.model_reference import ModelReferenceKind
+from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, ErrorCodeSet, InheritsCause, declared_error_codes
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 
 if TYPE_CHECKING:
     from pipelex.cogt.model_backends.model_type import ModelType
-    from pipelex.cogt.models.model_reference import ModelReferenceKind
+    from pipelex.errors.error_codes import ErrorCode
 
 
 class InferenceErrorCategory(StrEnum):
-    """Classifies inference errors for retry decisions and error reporting."""
+    """The runtime's own classification of an inference failure, which picks its registry code.
+
+    It stays inside the runtime: a report's domain and retry verdict are its code's, and the category is
+    what the classification (``pipelex.cogt.inference.error_classify``) reads to pick that code, and what the
+    Temporal activity reads to decide whether a provider call may be repeated within the run, since a call
+    whose outcome is unknown must not be, though a new run may succeed (the census's question 6).
+    """
 
     TRANSIENT = "transient"
     CONFIGURATION = "configuration"
@@ -41,43 +51,97 @@ class InferenceErrorCategory(StrEnum):
                 return False
 
     @property
-    def error_domain(self) -> ErrorDomain | None:
-        """The :class:`~pipelex.base_exceptions.ErrorDomain` this category implies — who can fix it.
+    def is_outcome_unknown(self) -> bool:
+        """Whether the failed call may have taken effect, so it must not be repeated within the run."""
+        match self:
+            case InferenceErrorCategory.AMBIGUOUS:
+                return True
+            case (
+                InferenceErrorCategory.TRANSIENT
+                | InferenceErrorCategory.CONFIGURATION
+                | InferenceErrorCategory.CONTENT
+                | InferenceErrorCategory.CAPACITY
+                | InferenceErrorCategory.UNKNOWN
+            ):
+                return False
 
-        The category a worker assigns is already the authoritative statement of *whose fault*
-        an inference failure is, so :meth:`CogtError.to_error_report` derives the domain from it
-        rather than making every leaf class in the family declare the same fact twice.
+    @property
+    def default_error_code(self) -> ErrorCode | None:
+        """The code an error naming this category and no code reports, ``None`` where the category alone names none.
 
-        ``CONTENT`` is the one mapping that changes an HTTP answer: a content-policy refusal, a
-        malformed prompt image, a bad prompt parameter are all properties of material the caller
-        submitted, so they belong in ``INPUT`` and answer 422 rather than 500.
-
-        ``UNKNOWN`` deliberately maps to ``None``. It means classification itself failed, and
-        ``RUNTIME`` would be a claim this code cannot support; an absent domain already renders
-        500, so the honest answer costs nothing.
-
-        ``CAPACITY -> RUNTIME`` does not disturb the provider-429 passthrough:
-        :attr:`~pipelex.base_exceptions.ErrorReport.http_status` checks
-        ``provider_metadata.status_code`` before it consults the domain.
+        The classification picks a code with every category it reads. This serves an error a worker or a plugin builds
+        by hand with a category alone, whose report must agree with what the category says: a transient failure invites
+        a retry, which ``runtime.unexpected`` does not, and a configuration failure is the operator's to fix. A content
+        failure may be the caller's input or a request the runtime built, so it names no code, and neither does an
+        unknown one: such an error keeps its class's fallback.
         """
         match self:
-            case InferenceErrorCategory.CONTENT:
-                return ErrorDomain.INPUT
+            case InferenceErrorCategory.TRANSIENT:
+                return CoreCode.PROVIDER_UNAVAILABLE
             case InferenceErrorCategory.CONFIGURATION:
-                return ErrorDomain.CONFIG
-            case InferenceErrorCategory.TRANSIENT | InferenceErrorCategory.CAPACITY | InferenceErrorCategory.AMBIGUOUS:
-                return ErrorDomain.RUNTIME
-            case InferenceErrorCategory.UNKNOWN:
+                return CoreCode.RUNTIME_MISCONFIGURED
+            case InferenceErrorCategory.CAPACITY:
+                return CoreCode.PROVIDER_QUOTA_EXHAUSTED
+            case InferenceErrorCategory.AMBIGUOUS:
+                return CoreCode.PROVIDER_OUTCOME_UNKNOWN
+            case InferenceErrorCategory.CONTENT | InferenceErrorCategory.UNKNOWN:
                 return None
 
 
+# Every code the inference classification picks for a failed provider call (``pipelex.cogt.inference.error_classify``),
+# from the status ladder, the status-less type tables and the service error vocabulary a plugin contributes. Each
+# family's failure class declares them all, so that the Render step constructs it with the code the classification
+# chose, and the vocabulary refuses an entry naming a code outside them. ``model.unavailable`` is also the code of the
+# families' not-found classes.
+INFERENCE_FAILURE_CODES: tuple[ErrorCode, ...] = (
+    CoreCode.RUNTIME_UNEXPECTED,
+    CoreCode.RUNTIME_MISCONFIGURED,
+    CoreCode.PROVIDER_RATE_LIMITED,
+    CoreCode.PROVIDER_UNAVAILABLE,
+    CoreCode.PROVIDER_TIMEOUT,
+    CoreCode.PROVIDER_FAILED,
+    CoreCode.PROVIDER_RESPONSE_INVALID,
+    CoreCode.PROVIDER_CREDENTIAL_REFUSED,
+    CoreCode.PROVIDER_QUOTA_EXHAUSTED,
+    CoreCode.PROVIDER_OUTCOME_UNKNOWN,
+    CoreCode.MODEL_UNAVAILABLE,
+    CoreCode.MODEL_CAPABILITY_UNSUPPORTED,
+    CoreCode.MODEL_CONTEXT_EXCEEDED,
+    CoreCode.MODEL_CONTENT_REFUSED,
+    CoreCode.MODEL_OUTPUT_SCHEMA_MISMATCH,
+    CoreCode.MODEL_NO_RESULT,
+    CoreCode.INPUT_TOO_LARGE,
+    CoreCode.INPUT_FILE_TYPE_UNSUPPORTED,
+    CoreCode.INPUT_FILE_UNREADABLE,
+    CoreCode.INPUT_REFERENCE_NOT_FOUND,
+    CoreCode.INPUT_URL_UNREACHABLE,
+    CoreCode.SECURITY_INPUT_URL_REFUSED,
+    CoreCode.SECURITY_METHOD_URL_REFUSED,
+    PipelexErrorCode.CONFIG_INVALID,
+    PipelexErrorCode.CONFIG_CREDENTIAL_MISSING,
+    PipelexErrorCode.BILLING_CREDIT_EXHAUSTED,
+)
+
+
+def _inference_failure_declaration(*, fallback: ErrorCode) -> InheritsCause:
+    """The declaration of a family's failure class: its cause's code, else the fallback, or any classified code chosen."""
+    return InheritsCause(fallback=fallback, others=tuple(code for code in INFERENCE_FAILURE_CODES if code is not fallback))
+
+
 class CogtError(PipelexError):
+    """The base of the inference layer's errors, which carry the provider facts a classification reads.
+
+    Never raised directly: a subclass declares its code, or the set the classification picks from
+    (``pipelex.cogt.inference.error_classify``), where ``error_category`` stays the runtime's own reading of
+    the failure.
+    """
+
+    error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
     error_category: InferenceErrorCategory | None = None
     user_action: UserAction | None = None
     provider_metadata: ProviderErrorMetadata | None = None
     model_handle: str | None = None
     backend_name: str | None = None
-    _declared_title = "AI inference failed"
 
     def __init__(
         self,
@@ -96,6 +160,31 @@ class CogtError(PipelexError):
             self.provider_metadata = provider_metadata
         if backend_name is not None:
             self.backend_name = backend_name
+
+    @property
+    @override
+    def own_error_code(self) -> ErrorCode | None:
+        """The code this error carries by itself, or, failing that, the one its category names when its cause carries none.
+
+        A failure class takes its cause's code, or its fallback with no coded cause. An error built by hand with a
+        category and no code, by a worker or by a plugin, reports its category's code instead
+        (``InferenceErrorCategory.default_error_code``), when its class declares it and no Pipelex error along its
+        cause chain carries a code of its own, so that its report's retry verdict agrees with the category's.
+        """
+        own_code = super().own_error_code
+        if own_code is not None or self.error_category is None:
+            return own_code
+        category_code = self.error_category.default_error_code
+        if category_code is None or category_code not in declared_error_codes(type(self).error_code):
+            return None
+        for node in iter_cause_chain(self):
+            if node is self:
+                continue
+            if not isinstance(node, PipelexError):
+                break
+            if node.own_error_code is not None:
+                return None
+        return category_code
 
     def fill_model_and_provider(self, model_handle: str | None, *, backend_name: str | None) -> None:
         """Fill ``model_handle`` / ``backend_name`` from the worker, only when still unset.
@@ -119,31 +208,21 @@ class CogtError(PipelexError):
     @override
     def to_error_report(self) -> ErrorReport:
         # Start from the base report (which already runs cause-chain enrichment
-        # over the shared classification fields) and layer the CogtError-specific
+        # over the shared diagnostic fields) and layer the CogtError-specific
         # fields on top with the same wrapper-wins-when-set semantics: a value
         # explicitly set on this CogtError overrides whatever the cause surfaced,
         # otherwise the cause-derived value carried by ``base_report`` stays.
+        # The code, and the domain and retry verdict it decides, are already on
+        # ``base_report``: the category picked the code, it decides nothing else.
         # Footgun: ``provider_metadata`` uses whole-object OR, and a Pydantic
         # model instance is always truthy — a wrapper that attached
         # attribution-only metadata (no ``status_code`` / ``retry_after_seconds``)
         # discards the cause's actionable hints. Pinned by
         # ``tests/unit/pipelex/cogt/test_cogt_provider_metadata_wrapper_wins.py``.
         base_report = super().to_error_report()
-        own_retryable = self.error_category.is_retryable if self.error_category is not None else None
-        # ``error_domain`` is derived from this error's own category rather than declared per leaf
-        # class, so the two fields can never contradict each other on the wire. Precedence mirrors
-        # every other field here — a class-level ``error_domain`` set explicitly on the leaf wins,
-        # then the derivation, then whatever ``base_report`` already inherited from the cause chain
-        # (which for a ``CogtError`` cause is that cause's own derivation). Deriving from
-        # ``self.error_category`` and not from ``base_report.error_category`` is deliberate: the
-        # report field is typed ``str``, and the same wrapper-wins precedence on both fields makes
-        # the two agree anyway — an inherited category rides in with the domain it derived.
-        own_domain = self.error_category.error_domain if self.error_category is not None else None
         return base_report.model_copy(
             update={
                 "error_category": self.error_category or base_report.error_category,
-                "error_domain": self.error_domain or own_domain or base_report.error_domain,
-                "retryable": own_retryable if own_retryable is not None else base_report.retryable,
                 "model": self.model_handle or base_report.model,
                 "provider": self.backend_name or base_report.provider,
                 "provider_metadata": self.provider_metadata or base_report.provider_metadata,
@@ -174,22 +253,20 @@ def find_inference_error_category_in_chain(exc: BaseException) -> InferenceError
 
 
 class LLMConfigError(CogtError):
+    error_code = PipelexErrorCode.CONFIG_INVALID
     error_category = InferenceErrorCategory.CONFIGURATION
 
 
-class ImageContentError(CogtError):
-    error_category = InferenceErrorCategory.CONTENT
-
-
 class CostRegistryError(CogtError):
-    pass
+    """An accounting invariant of the cost registry that did not hold."""
 
-
-class ReportingManagerError(CogtError):
-    pass
+    error_code = CoreCode.RUNTIME_UNEXPECTED
 
 
 class SdkTypeError(CogtError):
+    """A worker handed an SDK client of the wrong type: wiring code of ours, not a file an operator edits."""
+
+    error_code = CoreCode.RUNTIME_UNEXPECTED
     error_category = InferenceErrorCategory.CONFIGURATION
 
 
@@ -201,22 +278,19 @@ class ModelChoiceNotFoundError(CogtError):
     model is an invalid validation verdict (error type ``unknown_model``), never a failure of the validator.
 
     Includes available options and migration hints in error message.
+
+    The reference is the method's, so the fault is its author's: ``model.unknown`` for a reference the deck does not
+    define, and ``model.capability_unsupported`` for a bare handle the deck serves only as another model type, which
+    the deck chooses where it raises it. A reference the deck itself names, as a default or an override, is the
+    deployment's fault instead: the deck re-raises its miss as a ``ModelDeckChoiceUnresolvedError``.
     """
 
+    error_code = ErrorCodeSet(default=CoreCode.MODEL_UNKNOWN, others=(CoreCode.MODEL_CAPABILITY_UNSUPPORTED,))
     error_category = InferenceErrorCategory.CONFIGURATION
-    # Declared explicitly, against the grain of the CONFIGURATION category's ``CONFIG`` derivation,
-    # because the two fields are answering different questions here. The *category* is right: from
-    # the provider call's point of view the setup is wrong and no retry will help. But this class
-    # exists to report a mistyped model reference in material the caller authored — its message
-    # carries "Did you mean:" suggestions and lists the available options — so the caller is who
-    # fixes it, on the hosted API (a submitted method naming an unknown model) as much as in a
-    # local ``.mthds`` file. An operator-side deck fault surfaces as
-    # ``ModelDeckPresetValidatonError`` instead, which keeps the derived ``CONFIG``.
-    error_domain = ErrorDomain.INPUT
-    # The message is caller-facing copy for the same reason: it names only the caller's own model
-    # reference and the deck's public handles (suggestions, sigil hints, available options). Without
-    # the flag, STRICT disclosure on the hosted API replaced it with the generic placeholder, so a
-    # method naming an unknown model failed its dry run with no hint of which model or what to use.
+    # The message is caller-facing copy: it names only the caller's own model reference and the
+    # deck's public handles (suggestions, sigil hints, available options). Without the flag, STRICT
+    # disclosure on the hosted API replaced it with the generic placeholder, so a method naming an
+    # unknown model failed its dry run with no hint of which model or what to use.
     _authors_caller_facing_message = True
 
     def __init__(
@@ -256,19 +330,62 @@ class ModelChoiceNotFoundError(CogtError):
         super().__init__(message=full_message)
 
 
-class LLMSettingsValidationError(CogtError):
+class ModelDeckChoiceUnresolvedError(ModelChoiceNotFoundError):
+    """A model choice the model deck names itself, a default or an override, that the deck does not resolve.
+
+    The deck is the deployment's configuration, so the fault is the host's, never the caller's input, though the
+    reference reaches the deck's lookup as a method's own does: a step that names no model runs on the deck's default
+    or override, and a miss there is raised by the same lookup, as a ``ModelChoiceNotFoundError``, which this wraps.
+    A bare handle is ``model.unavailable``, a model this deployment serves no backend for as the type the step needs,
+    whose other step lets the caller name a model the step can use; a preset, an alias or a waterfall the deck does
+    not define is ``pipelex.config.invalid``. Its message names the deck's setting and the reference, for the
+    operator, so it is not caller-facing.
+
+    It is still a model choice the deck does not resolve, so a handler that skips an unresolvable choice, such as the
+    load-time checks that leave a model to the run, skips the deck's own as it skips a method's.
+    """
+
+    error_code = ErrorCodeSet(default=PipelexErrorCode.CONFIG_INVALID, others=(CoreCode.MODEL_UNAVAILABLE,))
+    error_category = InferenceErrorCategory.CONFIGURATION
+    _authors_caller_facing_message = False
+
+    def __init__(self, *, deck_setting: str, unresolved: ModelChoiceNotFoundError):
+        self.deck_setting = deck_setting
+        message = (
+            f"The model deck's {deck_setting} names the model '{unresolved.model_choice}', which the deck does not resolve: {unresolved.message}"
+        )
+        # The lookup's message already carries its suggestions and options, so they are copied rather than appended again.
+        super().__init__(
+            message=message,
+            model_type=unresolved.model_type,
+            model_choice=unresolved.model_choice,
+            reference_kind=unresolved.reference_kind,
+        )
+        self.available_options = unresolved.available_options
+        self.suggestions = unresolved.suggestions
+        self.wrong_sigil_hints = unresolved.wrong_sigil_hints
+        self.cross_collection_suggestions = unresolved.cross_collection_suggestions
+        if unresolved.reference_kind is None:
+            return
+        match unresolved.reference_kind:
+            case ModelReferenceKind.HANDLE:
+                self.with_error_code(CoreCode.MODEL_UNAVAILABLE)
+            case ModelReferenceKind.PRESET | ModelReferenceKind.ALIAS | ModelReferenceKind.WATERFALL:
+                pass
+
+
+class ModelDeckValidationError(CogtError):
+    """The model deck as configured is invalid: its files do not validate, or a preset names a model it does not serve."""
+
+    error_code = PipelexErrorCode.CONFIG_INVALID
     error_category = InferenceErrorCategory.CONFIGURATION
 
 
-class ImgGenSettingsValidationError(CogtError):
-    error_category = InferenceErrorCategory.CONFIGURATION
+class ModelDeckPresetValidatonError(ModelDeckValidationError):
+    """A deck preset names a model this deployment does not serve, refused when the deck is validated at boot."""
 
+    error_code = PipelexErrorCode.CONFIG_INVALID
 
-class ModelDeckValidatonError(CogtError):
-    error_category = InferenceErrorCategory.CONFIGURATION
-
-
-class ModelDeckPresetValidatonError(ModelDeckValidatonError):
     def __init__(
         self,
         message: str,
@@ -285,6 +402,15 @@ class ModelDeckPresetValidatonError(ModelDeckValidatonError):
 
 
 class ModelNotFoundError(CogtError):
+    """A model reference that resolves to no model this deployment serves, when a run looks its model up.
+
+    ``model.unavailable`` for a reference the deck itself names (a preset's model, an alias's target, a waterfall)
+    on a backend that is not enabled, which is the operator's to fix; ``model.unknown`` for a reference only a
+    method's inline model setting names, which the deck chooses where it raises it. The base of the render path's
+    not-found classes too, which a provider's answer selects.
+    """
+
+    error_code: ClassVar[ErrorCodeDeclaration] = ErrorCodeSet(default=CoreCode.MODEL_UNAVAILABLE, others=(CoreCode.MODEL_UNKNOWN,))
     error_category = InferenceErrorCategory.CONFIGURATION
 
     def __init__(
@@ -305,6 +431,10 @@ class ModelNotFoundError(CogtError):
 
 
 class ModelWaterfallError(ModelNotFoundError):
+    """A waterfall none of whose models this deployment serves."""
+
+    error_code = CoreCode.MODEL_UNAVAILABLE
+
     def __init__(self, message: str, model_handle: str, fallback_list: list[str]):
         self.model_handle = model_handle
         self.fallback_list = fallback_list
@@ -312,6 +442,7 @@ class ModelWaterfallError(ModelNotFoundError):
 
 
 class LLMHandleNotFoundError(CogtError):
+    error_code = PipelexErrorCode.CONFIG_INVALID
     error_category = InferenceErrorCategory.CONFIGURATION
 
     def __init__(self, message: str, preset_id: str, model_handle: str, enabled_backends: set[str] | None = None):
@@ -322,6 +453,7 @@ class LLMHandleNotFoundError(CogtError):
 
 
 class ImgGenHandleNotFoundError(CogtError):
+    error_code = PipelexErrorCode.CONFIG_INVALID
     error_category = InferenceErrorCategory.CONFIGURATION
 
     def __init__(self, message: str, preset_id: str, model_handle: str):
@@ -331,6 +463,7 @@ class ImgGenHandleNotFoundError(CogtError):
 
 
 class ExtractHandleNotFoundError(CogtError):
+    error_code = PipelexErrorCode.CONFIG_INVALID
     error_category = InferenceErrorCategory.CONFIGURATION
 
     def __init__(self, message: str, preset_id: str, model_handle: str):
@@ -340,6 +473,7 @@ class ExtractHandleNotFoundError(CogtError):
 
 
 class SearchHandleNotFoundError(CogtError):
+    error_code = PipelexErrorCode.CONFIG_INVALID
     error_category = InferenceErrorCategory.CONFIGURATION
 
     def __init__(self, message: str, preset_id: str, model_handle: str):
@@ -349,6 +483,7 @@ class SearchHandleNotFoundError(CogtError):
 
 
 class DocGenHandleNotFoundError(CogtError):
+    error_code = PipelexErrorCode.CONFIG_INVALID
     error_category = InferenceErrorCategory.CONFIGURATION
 
     def __init__(self, message: str, preset_id: str, model_handle: str):
@@ -358,6 +493,7 @@ class DocGenHandleNotFoundError(CogtError):
 
 
 class JudgmentHandleNotFoundError(CogtError):
+    error_code = PipelexErrorCode.CONFIG_INVALID
     error_category = InferenceErrorCategory.CONFIGURATION
 
     def __init__(self, message: str, preset_id: str, model_handle: str):
@@ -366,19 +502,28 @@ class JudgmentHandleNotFoundError(CogtError):
         super().__init__(message)
 
 
-class ExtractOutputError(CogtError):
-    pass
-
-
 class GeneratedImageError(CogtError):
-    pass
+    """An image a provider returned that cannot be converted."""
+
+    error_code = CoreCode.PROVIDER_RESPONSE_INVALID
 
 
 class LLMModelNotFoundError(ModelNotFoundError):
-    pass
+    """A provider that does not know the model the deck resolved, as its answer said: the deployment's to fix."""
+
+    error_code = CoreCode.MODEL_UNAVAILABLE
 
 
 class LLMCapabilityError(CogtError):
+    """A setting or a request the model refuses: the method's choice of model, or of a setting it cannot take.
+
+    ``model.capability_unsupported``, or ``model.context_exceeded`` where the run's inputs carry more images than the
+    model takes, which the raise site chooses.
+    """
+
+    error_code: ClassVar[ErrorCodeDeclaration] = ErrorCodeSet(
+        default=CoreCode.MODEL_CAPABILITY_UNSUPPORTED, others=(CoreCode.MODEL_CONTEXT_EXCEEDED,)
+    )
     error_category = InferenceErrorCategory.CONFIGURATION
 
 
@@ -389,11 +534,19 @@ class LLMSettingRefusedError(LLMCapabilityError):
     worker's own refusal carries, so a validation verdict can show it under strict disclosure.
     """
 
+    error_code = CoreCode.MODEL_CAPABILITY_UNSUPPORTED
     _authors_caller_facing_message = True
 
 
 class LLMCompletionError(CogtError):
-    pass
+    """A text completion that failed: a provider's failure the classification read, or an answer that cannot be used.
+
+    The Render step constructs it with the code its classification picked, and a worker raising it directly chooses
+    one: ``provider.response_invalid`` for an answer with no usable text, ``runtime.unexpected`` for a structured
+    generation that failed with no cause to read. A worker wrapping a coded error in it takes that error's code.
+    """
+
+    error_code: ClassVar[ErrorCodeDeclaration] = _inference_failure_declaration(fallback=CoreCode.RUNTIME_UNEXPECTED)
 
 
 class CompletionTruncationLimit(StrEnum):
@@ -410,8 +563,9 @@ class LLMCompletionTruncatedError(LLMCompletionError):
 
     A worker raises it when its provider's stop signal says the text was cut (see
     `pipelex.cogt.llm.completion_stop`), instead of handing back the partial or empty text as a result. It
-    is a content error, in the input domain, and not retryable: the same request stops at the same limit,
-    and the remedy is the author's or the caller's. Which remedy depends on the limit hit, carried as
+    is not retryable: the same request stops at the same limit. Its code follows the limit hit:
+    ``model.output_truncated`` at the output limit, the method's token cap, and ``model.context_exceeded`` at the
+    context window, which the inputs filled. Which remedy applies depends on the limit hit, carried as
     `truncation_limit`: at the output limit, a higher `max_tokens` on the pipe or a shorter input, or, when the
     request sent no `max_tokens` and the provider's default cut the text, a `max_tokens` set on the pipe up to
     the model's limit, a lower reasoning effort or a shorter input; at the context window, which the input and
@@ -420,6 +574,7 @@ class LLMCompletionTruncatedError(LLMCompletionError):
     token counts, never the partial text or the provider's body, so it is kept verbatim for the caller.
     """
 
+    error_code = ErrorCodeSet(default=CoreCode.MODEL_OUTPUT_TRUNCATED, others=(CoreCode.MODEL_CONTEXT_EXCEEDED,))
     error_category = InferenceErrorCategory.CONTENT
     _authors_caller_facing_message = True
 
@@ -465,6 +620,11 @@ class LLMCompletionTruncatedError(LLMCompletionError):
             f"The model '{model_handle}' {what_happened} before it finished {subject} ({', '.join(details)}), so the text is incomplete. {next_step}"
         )
         super().__init__(message, user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail=next_step))
+        match truncation_limit:
+            case CompletionTruncationLimit.MAX_TOKENS:
+                self.with_error_code(CoreCode.MODEL_OUTPUT_TRUNCATED)
+            case CompletionTruncationLimit.CONTEXT_WINDOW:
+                self.with_error_code(CoreCode.MODEL_CONTEXT_EXCEEDED)
         self.model_handle = model_handle
         self.stop_reason = stop_reason
         self.truncation_limit = truncation_limit
@@ -478,12 +638,13 @@ class LLMCompletionRefusedError(LLMCompletionError):
 
     A worker raises it when its provider's stop signal says the model refused or a filter cut the text (see
     `pipelex.cogt.llm.completion_stop`), instead of handing back the partial or empty text as a result. It
-    is a content error, in the input domain, and not retryable: what a model declines or a filter blocks is
+    is ``model.content_refused``, and not retryable: what a model declines or a filter blocks is
     the prompt and the input it was given, so the remedy is to revise them. The message names only the pipe,
     the model's deck handle and the provider's stop value, never the partial text or the provider's body, so
     it is kept verbatim for the caller.
     """
 
+    error_code = CoreCode.MODEL_CONTENT_REFUSED
     error_category = InferenceErrorCategory.CONTENT
     _authors_caller_facing_message = True
 
@@ -500,113 +661,172 @@ class LLMCompletionRefusedError(LLMCompletionError):
         self.pipe_code = pipe_code
 
 
-class LLMAssignmentError(CogtError):
-    pass
-
-
-class LLMPromptSpecError(CogtError):
-    error_category = InferenceErrorCategory.CONTENT
-
-
 class LLMPromptParameterError(CogtError):
+    """A rendered prompt that holds no text, usually because an input it renders was empty."""
+
+    error_code = CoreCode.PIPE_PROMPT_EMPTY
     error_category = InferenceErrorCategory.CONTENT
+
+
+class LLMSettingValueError(PipelexError, ValueError):
+    """An LLM setting whose values contradict each other, refused by its validator.
+
+    A ``ValueError`` as well, so that pydantic wraps it into the validation error of the model being built: the
+    method's bundle, or the model deck, whose boundary then reads the fault as its own.
+    """
+
+    error_code = CoreCode.METHOD_MODEL_SETTING_INVALID
 
 
 class PromptImageFactoryError(CogtError):
+    """A prompt image with none of a URI, base64 data or bytes: an invariant of ours."""
+
+    error_code = CoreCode.RUNTIME_UNEXPECTED
     error_category = InferenceErrorCategory.CONTENT
 
 
 class PromptImageFormatError(CogtError):
+    """A prompt image of a known format the model does not read."""
+
+    error_code = CoreCode.INPUT_FILE_TYPE_UNSUPPORTED
     error_category = InferenceErrorCategory.CONTENT
 
 
 class PromptDocumentFactoryError(CogtError):
+    """A prompt document with none of a URI, base64 data or bytes: an invariant of ours."""
+
+    error_code = CoreCode.RUNTIME_UNEXPECTED
     error_category = InferenceErrorCategory.CONTENT
 
 
 class PromptDocumentFormatError(CogtError):
     """A prompt document's known format is one the LLM does not read.
 
-    A content error, and so in the input domain: the model is fixed by the method and reads the
+    The input's fault, ``input.file_type_unsupported``: the model is fixed by the method and reads the
     formats it declares, while the file changes from run to run. A model that reads no documents at
     all is the author's choice of model, which stays an `LLMCapabilityError`.
     """
 
+    error_code = CoreCode.INPUT_FILE_TYPE_UNSUPPORTED
     error_category = InferenceErrorCategory.CONTENT
 
 
 class ImgGenModelNotFoundError(ModelNotFoundError):
-    pass
+    """An image provider that does not know the model the deck resolved, as its answer said."""
+
+    error_code = CoreCode.MODEL_UNAVAILABLE
 
 
 class ImgGenPromptError(CogtError):
+    """An image generation prompt that holds no text."""
+
+    error_code = CoreCode.PIPE_PROMPT_EMPTY
     error_category = InferenceErrorCategory.CONTENT
 
 
 class ImgGenParameterError(CogtError):
+    """An image generation setting that cannot reach the model.
+
+    ``model.capability_unsupported`` for a setting the method asks of a model that does not take it (an aspect ratio,
+    a size, a background, a format); ``pipelex.config.invalid`` for a model spec with no image rules, or rules the
+    worker cannot apply; ``runtime.unexpected`` for a prepared file of a type the worker never receives. The raise
+    site chooses.
+    """
+
+    error_code = ErrorCodeSet(
+        default=CoreCode.MODEL_CAPABILITY_UNSUPPORTED,
+        others=(PipelexErrorCode.CONFIG_INVALID, CoreCode.RUNTIME_UNEXPECTED),
+    )
     error_category = InferenceErrorCategory.CONTENT
 
 
 class ImgGenGenerationError(CogtError):
-    pass
+    """An image generation that failed: a provider's failure the classification read, or an answer that cannot be used.
 
+    The Render step constructs it with the code its classification picked, and a worker raising it directly chooses
+    one: ``provider.response_invalid`` for an answer with no usable image, ``provider.outcome_unknown`` for a call
+    that failed after it was sent, which may have generated, and billed, the image. With no code chosen and no coded
+    cause, it is ``provider.outcome_unknown``, since an image generation is a call no one may blindly repeat.
+    """
 
-class ImgGenGeneratedTypeError(ImgGenGenerationError):
-    pass
+    error_code = _inference_failure_declaration(fallback=CoreCode.PROVIDER_OUTCOME_UNKNOWN)
 
 
 class ExtractCapabilityError(CogtError):
+    """An extraction the model cannot perform, such as captioning images it does not read."""
+
+    error_code = CoreCode.MODEL_CAPABILITY_UNSUPPORTED
     error_category = InferenceErrorCategory.CONFIGURATION
 
 
 class ExtractInputFormatError(CogtError):
     """The file given to an extraction has a known format that the extract model does not read.
 
-    A content error, and so in the input domain: the model is fixed by the method and reads the
+    The input's fault, ``input.file_type_unsupported``: the model is fixed by the method and reads the
     formats it declares, while the file changes from run to run, and the person who can act is the
     one supplying it.
     """
 
+    error_code = CoreCode.INPUT_FILE_TYPE_UNSUPPORTED
     error_category = InferenceErrorCategory.CONTENT
 
 
 class ExtractJobFailureError(CogtError):
-    pass
+    """An extraction that failed at its provider, raised by the Render step with the code its classification picked."""
+
+    error_code = _inference_failure_declaration(fallback=CoreCode.RUNTIME_UNEXPECTED)
 
 
 class ExtractModelNotFoundError(ModelNotFoundError):
-    pass
+    """An extract provider that does not know the model the deck resolved, as its answer said."""
+
+    error_code = CoreCode.MODEL_UNAVAILABLE
 
 
 class SearchJobFailureError(CogtError):
-    pass
+    """A search that failed at its provider, raised by the Render step with the code its classification picked."""
+
+    error_code = _inference_failure_declaration(fallback=CoreCode.RUNTIME_UNEXPECTED)
 
 
 class SearchModelNotFoundError(ModelNotFoundError):
-    pass
+    """A search provider that does not know the model the deck resolved, as its answer said."""
+
+    error_code = CoreCode.MODEL_UNAVAILABLE
 
 
 class JudgmentJobFailureError(CogtError):
-    pass
+    """A judgment that failed at its provider, raised by the Render step with the code its classification picked."""
+
+    error_code = _inference_failure_declaration(fallback=CoreCode.RUNTIME_UNEXPECTED)
 
 
 class JudgmentAnswerMismatchError(CogtError):
-    """A judgment worker answered questions nobody asked, or answered one in the wrong shape."""
+    """A judgment worker answered questions nobody asked, or answered one in the wrong shape: its output does not match its schema."""
+
+    error_code = CoreCode.MODEL_OUTPUT_SCHEMA_MISMATCH
 
 
 class JudgmentCapabilityError(CogtError):
     """A judgment job carries files its model does not read: images to a model without vision, documents to one that reads none.
 
-    The author's choice of model, and so a configuration error, as `LLMCapabilityError` is for an LLM.
-    A document of a format the model does not read is the caller's file, which stays a
-    `PromptDocumentFormatError`.
+    The author's choice of model, ``model.capability_unsupported``, as `LLMCapabilityError` is for an LLM; more
+    images than the model takes is ``model.context_exceeded``; a model spec claiming files its backend cannot take
+    is ``pipelex.config.invalid``. The raise site chooses. A document of a format the model does not read is the
+    caller's file, which stays a `PromptDocumentFormatError`.
     """
 
+    error_code = ErrorCodeSet(
+        default=CoreCode.MODEL_CAPABILITY_UNSUPPORTED,
+        others=(CoreCode.MODEL_CONTEXT_EXCEEDED, PipelexErrorCode.CONFIG_INVALID),
+    )
     error_category = InferenceErrorCategory.CONFIGURATION
 
 
 class JudgmentModelNotFoundError(ModelNotFoundError):
-    pass
+    """A judgment provider that does not know the model the deck resolved, as its answer said."""
+
+    error_code = CoreCode.MODEL_UNAVAILABLE
 
 
 class JudgmentRefusedError(CogtError):
@@ -622,6 +842,7 @@ class JudgmentRefusedError(CogtError):
     caller.
     """
 
+    error_code = CoreCode.MODEL_CONTENT_REFUSED
     error_category = InferenceErrorCategory.CONTENT
     _authors_caller_facing_message = True
 
@@ -663,7 +884,7 @@ class JudgmentModelMissingError(PipelexError):
     remedies, so it is kept verbatim for the caller.
     """
 
-    error_domain = ErrorDomain.INPUT
+    error_code = CoreCode.MODEL_UNSPECIFIED
     _authors_caller_facing_message = True
 
     def __init__(self, *, pipe_code: str | None = None):
@@ -677,27 +898,29 @@ class JudgmentModelMissingError(PipelexError):
 
 
 class RoutingProfileLibraryNotFoundError(CogtError):
-    pass
+    error_code = PipelexErrorCode.CONFIG_INVALID
 
 
 class RoutingProfileBlueprintValueError(CogtError, ValueError):
-    pass
+    """A routing profile's value its validator refuses; a ``ValueError`` as well, so that pydantic wraps it."""
+
+    error_code = PipelexErrorCode.CONFIG_INVALID
 
 
 class RoutingProfileLibraryError(CogtError):
-    pass
+    error_code = PipelexErrorCode.CONFIG_INVALID
 
 
 class InferenceModelSpecError(CogtError):
-    pass
+    error_code = PipelexErrorCode.CONFIG_INVALID
 
 
 class InferenceBackendLibraryNotFoundError(CogtError):
-    pass
+    error_code = PipelexErrorCode.CONFIG_INVALID
 
 
 class InferenceBackendLibraryValidationError(CogtError):
-    pass
+    error_code = PipelexErrorCode.CONFIG_INVALID
 
 
 class InferenceBackendCredentialsErrorType(StrEnum):
@@ -710,6 +933,18 @@ class InferenceBackendCredentialsErrorType(StrEnum):
 
 
 class InferenceBackendCredentialsError(CogtError):
+    """A credential a backend needs that this process cannot resolve, coded by why.
+
+    ``pipelex.config.credential_missing`` for a variable or secret this process does not hold, or a fallback pattern
+    none of whose candidates resolves; ``pipelex.config.invalid`` for a placeholder whose prefix no secrets provider
+    reads, a malformed file rather than a missing key; ``runtime.misconfigured`` for a process booted without
+    inference that was asked to call a backend, which is the deployment's wiring.
+    """
+
+    error_code = ErrorCodeSet(
+        default=PipelexErrorCode.CONFIG_CREDENTIAL_MISSING,
+        others=(PipelexErrorCode.CONFIG_INVALID, CoreCode.RUNTIME_MISCONFIGURED),
+    )
     error_category = InferenceErrorCategory.CONFIGURATION
     user_action = UserAction(
         kind=UserActionKind.CHECK_CREDENTIALS,
@@ -739,6 +974,13 @@ class InferenceBackendCredentialsError(CogtError):
         if user_action is not None:
             self.user_action = user_action
         super().__init__(message)
+        match credentials_error_type:
+            case InferenceBackendCredentialsErrorType.VAR_NOT_FOUND | InferenceBackendCredentialsErrorType.VAR_FALLBACK_PATTERN:
+                self.with_error_code(PipelexErrorCode.CONFIG_CREDENTIAL_MISSING)
+            case InferenceBackendCredentialsErrorType.UNKNOWN_VAR_PREFIX:
+                self.with_error_code(PipelexErrorCode.CONFIG_INVALID)
+            case InferenceBackendCredentialsErrorType.NOT_RESOLVED_ON_KEYLESS_BOOT:
+                self.with_error_code(CoreCode.RUNTIME_MISCONFIGURED)
 
 
 class InferenceBackendLibraryError(CogtError):
@@ -748,15 +990,19 @@ class InferenceBackendLibraryError(CogtError):
     the failure to that backend rather than to one whose name merely appears in the message's prose.
     """
 
+    error_code = PipelexErrorCode.CONFIG_INVALID
     error_category = InferenceErrorCategory.CONFIGURATION
 
 
 class RoutingProfileDisabledBackendError(CogtError):
+    error_code = PipelexErrorCode.CONFIG_INVALID
     error_category = InferenceErrorCategory.CONFIGURATION
 
 
 class ModelManagerError(CogtError):
-    pass
+    """A route to a backend that is not loaded, or an exact route to a backend that declares no such model."""
+
+    error_code = PipelexErrorCode.CONFIG_INVALID
 
 
 class PluginModelDeclarationError(CogtError):
@@ -768,6 +1014,7 @@ class PluginModelDeclarationError(CogtError):
     file when one is involved.
     """
 
+    error_code = PipelexErrorCode.CONFIG_INVALID
     error_category = InferenceErrorCategory.CONFIGURATION
 
     def __init__(self, message: str, *, plugin: str):
@@ -786,14 +1033,12 @@ class ModelListingUnsupportedError(CogtError):
     "unsupported" exception so core names no integration.
     """
 
+    error_code = CoreCode.RUNTIME_UNSUPPORTED
+
     def __init__(self, *, sdk: str) -> None:
         self.sdk = sdk
         super().__init__(f"The '{sdk}' SDK client does not support remote model listing.")
 
 
 class ModelDeckNotFoundError(CogtError):
-    pass
-
-
-class ModelDeckValidationError(CogtError):
-    pass
+    error_code = PipelexErrorCode.CONFIG_INVALID

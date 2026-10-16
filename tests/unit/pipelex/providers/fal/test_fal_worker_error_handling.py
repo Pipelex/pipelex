@@ -135,7 +135,7 @@ class TestFalWorkerErrorHandling:
         ("_topic", "expected_category", "expected_user_action_kind"),
         FalErrorHandlingTestData.TIMEOUT_CASES,
     )
-    async def test_timeout_error_is_transient(
+    async def test_timeout_error_is_an_unknown_outcome(
         self,
         mocker: MockerFixture,
         _topic: str,
@@ -165,7 +165,7 @@ class TestFalWorkerErrorHandling:
         ("_topic", "expected_category", "expected_user_action_kind"),
         FalErrorHandlingTestData.GENERIC_CLIENT_ERROR_CASES,
     )
-    async def test_generic_client_error_is_transient(
+    async def test_generic_client_error_is_an_unknown_outcome(
         self,
         mocker: MockerFixture,
         _topic: str,

@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING, Any
 
 import openai
+from mthds.protocol.problem.registry import CoreCode
 from openai import (
     NOT_GIVEN,
     omit,
@@ -15,8 +16,8 @@ from pipelex.cogt.inference.error_classification import (
     extract_openai_metadata,
     extract_underlying_sdk_exception,
 )
-from pipelex.cogt.inference.error_classify import classify_inference_error
-from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
+from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
@@ -155,7 +156,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
             )
         except (openai.APIStatusError, openai.APIConnectionError) as sdk_exc:
             metadata = extract_openai_metadata(sdk_exc)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,
@@ -174,7 +175,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
                     kind=UserActionKind.CHANGE_INPUT,
                     detail="OpenAI returned no completion choices — try rephrasing the prompt or using a different model",
                 ),
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := response.usage):
             llm_tokens_usage.nb_tokens_by_category = self.openai_completions_factory.make_nb_tokens_by_category(usage=usage)
@@ -195,7 +196,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
                     kind=UserActionKind.CHANGE_INPUT,
                     detail="OpenAI returned a response with no content — try rephrasing the prompt or using a different model",
                 ),
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
 
         return response_text
 
@@ -239,7 +240,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
             underlying_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc)
             if underlying_exc is not None:
                 metadata = extract_openai_metadata(underlying_exc)
-                classification = classify_inference_error(metadata)
+                classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
                 raise render_inference_error(
                     metadata=metadata,
                     classification=classification,
@@ -251,10 +252,12 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
                 f"OpenAI structured generation via 'instructor' failed with model: {self.inference_model.desc} "
                 f"trying to generate schema: {schema} with error: {instructor_exc}"
             )
-            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.UNKNOWN) from instructor_exc
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.UNKNOWN).with_error_code(
+                CoreCode.RUNTIME_UNEXPECTED
+            ) from instructor_exc
         except (openai.APIStatusError, openai.APIConnectionError) as sdk_exc:
             metadata = extract_openai_metadata(sdk_exc)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -106,8 +107,8 @@ class TestPypdfium2WorkerErrorHandling:
         assert report.retryable is False
         assert report.error_type == "ExtractJobFailureError"
 
-    async def test_error_report_for_os_error_is_retryable(self, mocker: MockerFixture) -> None:
-        """to_error_report() for OSError has TRANSIENT category and is retryable."""
+    async def test_error_report_for_os_error_is_the_runtime_s(self, mocker: MockerFixture) -> None:
+        """A local disk failure is this machine's, not the input's and not one a retry is known to clear: runtime.unexpected."""
         worker = _make_pypdfium2_worker(mocker)
         sdk_exc = OSError("Disk read error")
 
@@ -127,5 +128,6 @@ class TestPypdfium2WorkerErrorHandling:
             await worker._extract_pages(extract_job=_make_extract_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         report = exc_info.value.to_error_report()
-        assert report.error_category == "transient"
-        assert report.retryable is True
+        assert report.error_category == "unknown"
+        assert report.code == CoreCode.RUNTIME_UNEXPECTED
+        assert report.retryable is False

@@ -1,9 +1,9 @@
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex.cogt.exceptions import CogtError
 
 
 class GoogleLLMWorkerError(CogtError):
-    """Base exception for Google LLM Worker errors."""
+    """A Gemini structured answer whose parsed result is not of the schema's type."""
 
-
-class GoogleImgGenWorkerError(CogtError):
-    """Base exception for Google Image Generation Worker errors."""
+    error_code = CoreCode.MODEL_OUTPUT_SCHEMA_MISMATCH

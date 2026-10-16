@@ -8,7 +8,6 @@ worker's error family, with a human-readable message and a structured
 """
 
 import math
-from enum import StrEnum
 
 from pipelex.cogt.exceptions import (
     CogtError,
@@ -25,18 +24,7 @@ from pipelex.cogt.exceptions import (
     SearchModelNotFoundError,
 )
 from pipelex.cogt.inference.error_classification import SDKErrorEnvelope, UserAction, UserActionKind
-from pipelex.cogt.inference.error_classify import ClassificationResult
-
-
-class InferenceErrorFamily(StrEnum):
-    """The worker family raising an inference error — selects the exception class."""
-
-    LLM = "llm"
-    IMG_GEN = "img_gen"
-    EXTRACT = "extract"
-    SEARCH = "search"
-    JUDGMENT = "judgment"
-
+from pipelex.cogt.inference.error_classify import ClassificationResult, InferenceErrorFamily
 
 # Generic failure error class per family — used when the error is not a missing model.
 _FAILURE_CLASSES: dict[InferenceErrorFamily, type[CogtError]] = {
@@ -93,6 +81,9 @@ def _render_detail(metadata: SDKErrorEnvelope, *, classification: Classification
         # Same reason: ``CHANGE_MODEL`` renders "the requested model was not found", which is false
         # for a model that exists and is served, only not for this caller.
         return _render_model_not_allowed_detail(model_handle=model_handle)
+    if classification.category.is_outcome_unknown:
+        # A call that is not idempotent may have run: the kind's "run it again" would duplicate a billed result.
+        return "The provider failed after the request was sent, so it may have produced and billed a result — check for one before running it again."
     match classification.user_action_kind:
         case UserActionKind.WAIT_AND_RETRY:
             # The advice is read on a failed run's report, once every automatic retry is spent, so
@@ -137,7 +128,7 @@ def render_inference_error(
 
     Returns:
         A ``CogtError`` subclass instance carrying the category, structured
-        ``UserAction``, and ``provider_metadata``.
+        ``UserAction``, and ``provider_metadata``, with the classification's code chosen.
     """
     message = _format_message(metadata, model_desc=model_desc)
     user_action = UserAction(
@@ -153,10 +144,13 @@ def render_inference_error(
             user_action=user_action,
             provider_metadata=metadata,
         )
+    # The not-found classes report ``model.unavailable`` alone, which the classification guarantees. A failure
+    # class declares every classified code, and its code is chosen here rather than inherited, since the
+    # provider's exception it is raised from carries none.
     failure_class = _FAILURE_CLASSES[family]
     return failure_class(
         message,
         error_category=classification.category,
         user_action=user_action,
         provider_metadata=metadata,
-    )
+    ).with_error_code(classification.error_code)

@@ -1,10 +1,12 @@
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.config import get_config
 from pipelex.tools.misc.exceptions import RemoteFileFetchError
+from pipelex.tools.network.exceptions import SsrfBlockedError
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
 FAKE_IMAGE_BYTES = b"fake-image-bytes-for-hashing"
@@ -196,3 +198,22 @@ class TestGeneratedContentFactoryFetchedRemoteImage:
         storage_provider.store.assert_not_awaited()
         assert image_content.url == "https://example.com/gone"
         assert image_content.public_url == "https://example.com/gone"
+
+    @pytest.mark.usefixtures("_remote_fetch_enabled")
+    async def test_a_refused_provider_url_fails_as_the_provider_s(self, mocker: MockerFixture):
+        """A generated image's URL is one the provider's answer named, so the guard's refusal of it is the provider's, not the caller's."""
+        storage_provider = mocker.MagicMock(spec=StorageProviderAbstract)
+        mocker.patch(
+            "pipelex.cogt.content_generation.generated_content_factory.fetch_file_and_content_type_from_url_httpx",
+            new=mocker.AsyncMock(side_effect=SsrfBlockedError("Refused a request to 'internal.example': it resolves to a private address")),
+        )
+        factory = GeneratedContentFactory(storage_provider=storage_provider)
+
+        with pytest.raises(SsrfBlockedError) as exc_info:
+            await factory.make_image_content(
+                storage_scope="test/scope",
+                raw_details=GeneratedImageRawDetails(size=None, actual_url="https://internal.example/image.png"),
+            )
+
+        assert exc_info.value.resolve_error_code() == CoreCode.SECURITY_PROVIDER_URL_REFUSED
+        storage_provider.store.assert_not_awaited()
