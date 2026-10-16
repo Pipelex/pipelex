@@ -84,6 +84,7 @@ DuplicateLogSinkError | Duplicate log sink | https://docs.pipelex.com/latest/err
 DuplicateModelListerError | Duplicate model lister | https://docs.pipelex.com/latest/errors/duplicate-model-lister-error/
 DuplicateOrchestratorError | Duplicate orchestrator | https://docs.pipelex.com/latest/errors/duplicate-orchestrator-error/
 DuplicatePipeFuncExecutorError | Duplicate pipe func executor | https://docs.pipelex.com/latest/errors/duplicate-pipe-func-executor-error/
+DuplicatePipeFuncPackageOfferError | Duplicate pipe func package offer | https://docs.pipelex.com/latest/errors/duplicate-pipe-func-package-offer-error/
 DuplicateSecretsProviderError | Duplicate secrets provider | https://docs.pipelex.com/latest/errors/duplicate-secrets-provider-error/
 DuplicateServiceErrorCodeError | Duplicate service error code | https://docs.pipelex.com/latest/errors/duplicate-service-error-code-error/
 DuplicateStorageProviderError | Duplicate storage provider | https://docs.pipelex.com/latest/errors/duplicate-storage-provider-error/
@@ -115,6 +116,7 @@ GoogleImgGenWorkerError | Google img gen worker | https://docs.pipelex.com/lates
 GoogleLLMWorkerError | Google LLM worker | https://docs.pipelex.com/latest/errors/google-llm-worker-error/
 GraphSpecError | Graph spec | https://docs.pipelex.com/latest/errors/graph-spec-error/
 GraphSpecValidationError | Graph spec validation | https://docs.pipelex.com/latest/errors/graph-spec-validation-error/
+HostLibraryRequirementsError | Host library requirements | https://docs.pipelex.com/latest/errors/host-library-requirements-error/
 HostLibraryTreeError | Host library tree | https://docs.pipelex.com/latest/errors/host-library-tree-error/
 HostedBaseUrlError | Hosted base url | https://docs.pipelex.com/latest/errors/hosted-base-url-error/
 HostedLocalFileUploadUnavailableError | Hosted local file upload unavailable | https://docs.pipelex.com/latest/errors/hosted-local-file-upload-unavailable-error/
@@ -195,6 +197,9 @@ MethodPackageSymlinkError | Method package symlink | https://docs.pipelex.com/la
 MethodPackageTooLargeError | Method package too large | https://docs.pipelex.com/latest/errors/method-package-too-large-error/
 MethodRefError | Method reference error | https://docs.pipelex.com/latest/errors/method-ref-error/
 MethodRefParseError | Method ref parse | https://docs.pipelex.com/latest/errors/method-ref-parse-error/
+MethodRequirementsError | Method requirements | https://docs.pipelex.com/latest/errors/method-requirements-error/
+MethodRequirementsFileError | Method requirements file | https://docs.pipelex.com/latest/errors/method-requirements-file-error/
+MethodRequirementsNotMetError | Method requirements not met | https://docs.pipelex.com/latest/errors/method-requirements-not-met-error/
 MethodStructuresRefusedError | Method structures refused | https://docs.pipelex.com/latest/errors/method-structures-refused-error/
 MethodTreeLoadError | Method tree load | https://docs.pipelex.com/latest/errors/method-tree-load-error/
 MigrationError | Migration error | https://docs.pipelex.com/latest/errors/migration-error/
@@ -243,6 +248,7 @@ PipeExecutionError | Pipe execution | https://docs.pipelex.com/latest/errors/pip
 PipeExtractFactoryError | Pipe extract factory | https://docs.pipelex.com/latest/errors/pipe-extract-factory-error/
 PipeFactoryError | Pipe factory | https://docs.pipelex.com/latest/errors/pipe-factory-error/
 PipeFuncExecutionError | Pipe func execution | https://docs.pipelex.com/latest/errors/pipe-func-execution-error/
+PipeFuncPackageSetUnstatedError | Pipe func package set unstated | https://docs.pipelex.com/latest/errors/pipe-func-package-set-unstated-error/
 PipeFuncTransportError | Pipe func transport | https://docs.pipelex.com/latest/errors/pipe-func-transport-error/
 PipeIOContractError | Pipe IO contract | https://docs.pipelex.com/latest/errors/pipe-io-contract-error/
 PipeImgGenFactoryError | Pipe img gen factory | https://docs.pipelex.com/latest/errors/pipe-img-gen-factory-error/

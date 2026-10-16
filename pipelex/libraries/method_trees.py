@@ -46,7 +46,7 @@ from mthds.method_tree.vocabulary import ExclusionRule, TreeRefusalCode
 from pipelex import log
 from pipelex.core.method_trees.tree_bundle import TreeBundle
 from pipelex.hosted.execution import get_or_load_pipelex_config
-from pipelex.libraries.exceptions import HostLibraryTreeError, MethodTreeLoadError
+from pipelex.libraries.exceptions import HostLibraryRequirementsError, HostLibraryTreeError, MethodRequirementsError, MethodTreeLoadError
 
 LIMITS_ADVICE = (
     "Hand over the method's own folder rather than a directory above it, or raise the limits of "
@@ -121,20 +121,25 @@ def list_package_method_tree(*, root: Path, package_address: str, limits: TreeLi
 
 @contextmanager
 def reporting_host_library_tree_faults() -> Generator[None, None, None]:
-    """Report a method tree of this host's own library directories that cannot be listed as the host's fault.
+    """Report a method tree of this host's own library directories that cannot be listed, or whose requirements refuse it, as the host's fault.
 
     Around a load of library directories that are not the caller's, such as the ones a server loads beside a request's
-    bundles, a `MethodTreeLoadError` leaves as a `HostLibraryTreeError`, which is a configuration fault and whose
-    message, naming paths on the host, never reaches the caller.
+    bundles, a `MethodTreeLoadError` leaves as a `HostLibraryTreeError`, and a `MethodRequirementsError` as a
+    `HostLibraryRequirementsError`: both are configuration faults, whose messages, naming paths on the host, never reach
+    the caller.
 
     Raises:
         HostLibraryTreeError: A tree of the directories could not be listed.
+        HostLibraryRequirementsError: A method of the directories declares requirements its PipeFunc environment refuses.
     """
     try:
         yield
     except MethodTreeLoadError as exc:
         msg = f"A library directory of this host cannot be read as a method tree: {exc.message}"
         raise HostLibraryTreeError(msg) from exc
+    except MethodRequirementsError as exc:
+        msg = f"A library directory of this host holds a method whose requirements.txt refuses it: {exc.message}"
+        raise HostLibraryRequirementsError(msg) from exc
 
 
 def tree_bundles_of(*, tree: MethodTree) -> list[TreeBundle]:
@@ -389,6 +394,53 @@ def _spelled_from(*, library_dir: Path, location: Path) -> Path:
         return location
 
 
+class LibraryTree(NamedTuple):
+    """A method tree a library directory holds, with the directory as the caller gave it."""
+
+    library_dir: Path
+    tree: MethodTree
+
+
+def list_library_dir_trees(*, library_dirs: Iterable[Path], limits: TreeLimits | None = None) -> list[LibraryTree]:
+    """The method trees of the library directories, in the order the directories are given, each directory's own first.
+
+    A tree holding no bundle is listed too, such as one holding only the Python a server received beside a method's
+    bundles: a load reads its `requirements.txt` before it reads any of its Python.
+
+    Args:
+        library_dirs: The library directories.
+        limits: The limits to list each tree under, read from the configuration once when not given.
+
+    Raises:
+        MethodTreeLoadError: A tree could not be listed.
+    """
+    active_limits = limits or local_tree_limits()
+    library_trees: list[LibraryTree] = []
+    for library_dir in library_dirs:
+        for tree in list_library_trees(library_dir=library_dir, limits=active_limits):
+            library_trees.append(LibraryTree(library_dir=library_dir, tree=tree))
+    return library_trees
+
+
+def library_bundle_files_of(*, library_trees: Iterable[LibraryTree]) -> list[LibraryBundleFile]:
+    """The bundle files of listed library trees, each as a member of its method tree, each file once.
+
+    A file two of the trees hold, such as a directory and one of its subdirectories both given, is the member of the
+    first tree that holds it, spelled from that tree's library directory.
+    """
+    seen_locations: set[Path] = set()
+    bundle_files: list[LibraryBundleFile] = []
+    for library_tree in library_trees:
+        for tree_bundle in tree_bundles_of(tree=library_tree.tree):
+            location = tree_bundle.location
+            if location in seen_locations:
+                continue
+            seen_locations.add(location)
+            spelled_path = _spelled_from(library_dir=library_tree.library_dir, location=location)
+            bundle_files.append(LibraryBundleFile(tree_bundle=tree_bundle, path=spelled_path))
+    return bundle_files
+
+
 def list_library_bundle_files(*, library_dirs: Iterable[Path], limits: TreeLimits | None = None) -> list[LibraryBundleFile]:
     """The bundle files of the library directories, each as a member of its method tree, each file once.
 
@@ -402,18 +454,7 @@ def list_library_bundle_files(*, library_dirs: Iterable[Path], limits: TreeLimit
     Raises:
         MethodTreeLoadError: A tree could not be listed.
     """
-    active_limits = limits or local_tree_limits()
-    seen_locations: set[Path] = set()
-    bundle_files: list[LibraryBundleFile] = []
-    for library_dir in library_dirs:
-        for tree in list_library_trees(library_dir=library_dir, limits=active_limits):
-            for tree_bundle in tree_bundles_of(tree=tree):
-                location = tree_bundle.location
-                if location in seen_locations:
-                    continue
-                seen_locations.add(location)
-                bundle_files.append(LibraryBundleFile(tree_bundle=tree_bundle, path=_spelled_from(library_dir=library_dir, location=location)))
-    return bundle_files
+    return library_bundle_files_of(library_trees=list_library_dir_trees(library_dirs=library_dirs, limits=limits))
 
 
 def bundle_files_under(*, library_dirs: Iterable[Path]) -> list[Path]:

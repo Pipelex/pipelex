@@ -132,6 +132,7 @@ own page. Classes are grouped by subsystem.
 - [`DuplicateModelListerError`](duplicate-model-lister-error.md) — Duplicate model lister
 - [`DuplicateOrchestratorError`](duplicate-orchestrator-error.md) — Duplicate orchestrator
 - [`DuplicatePipeFuncExecutorError`](duplicate-pipe-func-executor-error.md) — Duplicate pipe func executor
+- [`DuplicatePipeFuncPackageOfferError`](duplicate-pipe-func-package-offer-error.md) — Duplicate pipe func package offer
 - [`DuplicateSecretsProviderError`](duplicate-secrets-provider-error.md) — Duplicate secrets provider
 - [`DuplicateServiceErrorCodeError`](duplicate-service-error-code-error.md) — Duplicate service error code
 - [`DuplicateStorageProviderError`](duplicate-storage-provider-error.md) — Duplicate storage provider

@@ -4,7 +4,7 @@
 interpreter half of the boot: it subclasses :class:`pipelex.runtime_boot.RuntimeBoot` — importing it
 downward, which the interpreter layer may do — and appends the constructions that only a process
 which will actually load and run a method needs: the ``InterpreterHub``, the composed plugin
-manifests, the ``PipeFuncExecutorRegistry`` and its executor, the ``LibraryManager``, the
+manifests, the ``PipeFuncExecutorRegistry`` and its executor, the ``PipeFuncPackageOfferRegistry``, the ``LibraryManager``, the
 ``PipelineManager``, the pipe-kind class registrations, the ``PipeRouter`` and the ``PipeRun``.
 
 Inheritance rather than composition is deliberate: every attribute address is preserved
@@ -41,6 +41,7 @@ from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipeline.pipeline_manager import PipelineManager
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
 from pipelex.plugins.pipe_func_executor_registry import PipeFuncExecutorRegistry
+from pipelex.plugins.pipe_func_package_offer_registry import PipeFuncPackageOfferRegistry
 from pipelex.plugins.registrar import HubSlot
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.runtime_boot import PACKAGE_VERSION, RuntimeBoot
@@ -141,6 +142,11 @@ class Pipelex(RuntimeBoot):
 
         pipe_func_executor_registry = PipeFuncExecutorRegistry(plugin_registrar.pipe_func_executors)
         self.interpreter_hub.set_pipe_func_executor_registry(pipe_func_executor_registry)
+        # The packages each out-of-process mode offers a PipeFunc, which a method's requirements.txt is checked against
+        # when it loads; `direct` needs no entry, its packages being this interpreter's own.
+        self.interpreter_hub.set_pipe_func_package_offer_registry(
+            pipe_func_package_offer_registry=PipeFuncPackageOfferRegistry(plugin_registrar.pipe_func_package_offers)
+        )
 
         # Injection precedence: explicit setup() param > plugin slot-claim thunk > config-selected
         # registry factory. The PipeFunc execution axis is orthogonal to orchestration: a Temporal

@@ -46,9 +46,11 @@ from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
 from pipelex.libraries.library_factory import LibraryFactory
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
+from pipelex.libraries.method_requirements import ensure_method_requirements_met, ensure_package_requirements_met
 from pipelex.libraries.method_trees import (
     LibraryBundleFile,
-    list_library_bundle_files,
+    library_bundle_files_of,
+    list_library_dir_trees,
     list_package_method_tree,
     local_tree_limits,
     tree_bundle_of_lone_file,
@@ -583,7 +585,8 @@ class LibraryManager(LibraryManagerAbstract):
             # in it, then the tree of each file named alone. A file the membership rule keeps out is never read.
             # This machine's limits are read once for the whole load.
             tree_limits = local_tree_limits()
-            all_bundle_files: list[LibraryBundleFile] = list_library_bundle_files(library_dirs=library_dirs, limits=tree_limits)
+            library_trees = list_library_dir_trees(library_dirs=library_dirs, limits=tree_limits)
+            all_bundle_files: list[LibraryBundleFile] = library_bundle_files_of(library_trees=library_trees)
             for library_file_path in library_file_paths or []:
                 all_bundle_files.append(
                     LibraryBundleFile(
@@ -591,6 +594,19 @@ class LibraryManager(LibraryManagerAbstract):
                         path=library_file_path,
                     )
                 )
+
+            # A method declaring Python packages in its requirements.txt is refused here when the environment its
+            # PipeFunc steps run in does not meet them: before any of its Python is imported or captured, and before
+            # any of its pipes is built. Every listed tree counts, one holding no bundle included, such as the Python a
+            # server received beside a method's bundles. A refusal may name host paths: these are the caller's own
+            # directories, or the host's, whose refusal `reporting_host_library_tree_faults` withholds as its own fault.
+            ensure_method_requirements_met(
+                trees=[
+                    *(library_tree.tree for library_tree in library_trees),
+                    *(bundle_file.tree_bundle.tree for bundle_file in all_bundle_files),
+                ],
+                names_host_paths=True,
+            )
 
             # Each file once, as the member of the first tree that holds it.
             seen_locations: set[Path] = set()
@@ -873,6 +889,12 @@ class LibraryManager(LibraryManagerAbstract):
                 for blueprint in unplaced_host_blueprints:
                     if blueprint.host_bundle_file is not None:
                         blueprint.place_in_tree(tree_bundle=tree_bundle_of_lone_file(bundle_file=blueprint.host_bundle_file, limits=tree_limits))
+            # Every bundle read from this host's disk loads under its tree's requirements.txt, on every load: a blueprint
+            # placed by an earlier load, a refused one included, is judged again rather than taken as judged.
+            ensure_method_requirements_met(
+                trees=[blueprint.tree_bundle.tree for blueprint in blueprints if blueprint.tree_bundle is not None],
+                names_host_paths=True,
+            )
 
             # Accumulate blueprints for later crate construction via get_crate()
             self._blueprints.setdefault(library_id, []).extend(blueprints)
@@ -1343,6 +1365,8 @@ class LibraryManager(LibraryManagerAbstract):
 
         Raises:
             MthdsParserError: A bundle of the dependency does not parse, its items named by the bundle's source.
+            MethodRequirementsError: The package's requirements.txt holds a line the standard refuses, or names
+                packages its PipeFunc environment does not hold, named by the package's address.
         """
         alias = resolved_dep.alias
 
@@ -1353,6 +1377,8 @@ class LibraryManager(LibraryManagerAbstract):
         tree_bundles_by_source: dict[str, TreeBundle] = {}
         # Listed under the package's address: a refusal never names the directory it was installed or fetched into.
         package_tree = list_package_method_tree(root=resolved_dep.package_root, package_address=package_address, limits=tree_limits)
+        # The package's own requirements.txt is judged before any of its bundles loads, as the consumer's tree is.
+        ensure_package_requirements_met(tree=package_tree, package_address=package_address)
         for tree_bundle in tree_bundles_of(tree=package_tree):
             # The package's address and the bundle's tree path: never the host's path to the package.
             bundle_source = f"{package_address}/{tree_bundle.tree_path}"

@@ -36,6 +36,26 @@ A file a bundle names, such as a [`PipeDocGen`](pipes/pipe-operators/PipeDocGen.
 
 A library directory, such as a `-L` directory or one of `PIPELEXPATH`, is a place methods are found rather than one method. Pipelex loads its tree, then the tree of each nested package and nested repository under it, each as a method of its own whose steps read only its own files, so every method in the directory loads. A `.mthds` file kept out by the membership rule, a hidden one, a gitignored one or one inside a virtual environment, is not loaded.
 
+## Python packages: `requirements.txt`
+
+A method whose own Python, such as the module of a [`PipeFunc`](pipes/pipe-operators/PipeFunc.md) step, imports a package declares it in a `requirements.txt` at the root of its tree. Only the root's file declares anything: a `requirements.txt` in a subfolder is an ordinary file of the tree. Each line of the file is blank, a comment whose first character other than a space or a tab is `#`, or exactly one [PEP 508](https://peps.python.org/pep-0508/) requirement, markers and extras included:
+
+```text
+# Reading and writing spreadsheets
+pandas>=2.2,<3
+openpyxl==3.1.5
+tzdata; python_version >= "3.12"
+```
+
+Pipelex refuses, naming each such line, a requirement naming a URL (`name @ https://…`), an option of any kind (a line starting with `-`, such as `-r`, `-e`, `-c` or `--index-url`), a comment after a requirement on the same line, and a line continued with a backslash. A comment after a requirement is refused as a comment whatever it says, a URL in it included. The file must be UTF-8 text.
+
+When a tree holding Python and a root `requirements.txt` loads, Pipelex checks every requirement against the Python environment its PipeFunc steps run in, before importing any of the tree's Python and before building any of its pipes, and refuses the method when one is not met, naming each requirement and why. A requirement whose marker is false in that environment is not needed there and is not checked. A tree with no Python is not checked, since nothing in it could import a package. A package your method calls by its address is checked the same way when it loads, its refusal naming the package by its address. Pipelex never installs anything.
+
+- **Locally**, a PipeFunc runs in the interpreter Pipelex runs in, so the requirements are checked against the packages installed there, extras included. The refusal names the method's folder and gives the command that installs what is missing into that interpreter, such as `uv pip install --python /path/to/python 'pandas>=2.2,<3'`. When Pipelex was installed as a uv tool, add the packages to the tool instead, which keeps them across upgrades: `uv tool install pipelex --with 'pandas>=2.2,<3'`.
+- **On a sandbox-hosted deployment**, such as the hosted API, a PipeFunc runs in the deployment's sandbox, whose packages are the whole offer: nothing is installed for a method. The requirements are checked against the package set the deployment states for its sandbox, and a method asking for a package it does not hold, or for a version it does not hold, is refused when it loads and when it is validated, naming each requirement. A requirement with extras cannot be checked there and is refused, so list the packages the extra brings directly.
+
+Python declaring a structure class is refused on a sandbox-hosted deployment whatever its requirements: see [Python classes](concepts/python-classes.md).
+
 ## Where a folder's run starts
 
 `pipelex run bundle <folder>` with no `--pipe` starts where the MTHDS protocol says a run naming no pipe starts, since the bundles of a folder have no order:

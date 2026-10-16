@@ -212,6 +212,20 @@ class DuplicatePipeFuncExecutorError(PluginError):
         super().__init__(message)
 
 
+class DuplicatePipeFuncPackageOfferError(PluginError):
+    """Two plugins stated the package offer of the same PipeFunc execution mode."""
+
+    def __init__(self, *, mode: str, first_plugin: str, second_plugin: str):
+        self.mode = mode
+        self.first_plugin = first_plugin
+        self.second_plugin = second_plugin
+        message = (
+            f"The PipeFunc package offer of execution mode '{mode}' is stated by both plugin "
+            f"'{first_plugin}' and plugin '{second_plugin}'. Each mode must have a single package offer."
+        )
+        super().__init__(message)
+
+
 class DuplicateHttpErrorMapperError(PluginError):
     """Two plugins registered an HTTP-error mapper for the same exception type."""
 

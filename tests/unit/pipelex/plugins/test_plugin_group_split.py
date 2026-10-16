@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from pipelex.plugins.contract import PipelexPlugin
     from pipelex.plugins.orchestrator_registry import OrchestratorProtocol
     from pipelex.plugins.pipe_func_executor_registry import PipeFuncExecutorFactoryFn
+    from pipelex.plugins.pipe_func_package_offer_registry import PipeFuncPackageOfferFactoryFn
     from pipelex.plugins.registrar import PluginRegistrar
     from pipelex.system.configuration.configs import PipelexConfig
 
@@ -36,6 +37,9 @@ INTERPRETER_TIER_CALLS: dict[str, Callable[[PluginRegistrar], None]] = {
     "orchestrator": lambda registrar: registrar.add_orchestrator(mode="temporal", orchestrator=cast("OrchestratorProtocol", object())),
     "bundle validator": lambda registrar: registrar.add_bundle_validator(mode="temporal", validator=cast("BundleValidatorProtocol", object())),
     "pipe_func executor": lambda registrar: registrar.add_pipe_func_executor(mode="daytona", factory=cast("PipeFuncExecutorFactoryFn", object)),
+    "pipe_func package offer": lambda registrar: registrar.add_pipe_func_package_offer(
+        mode="daytona", factory=cast("PipeFuncPackageOfferFactoryFn", object)
+    ),
     "hub slot pipe_router": lambda registrar: registrar.claim_pipe_router(object),
     "hub slot pipe_run": lambda registrar: registrar.claim_pipe_run(object),
     "hub slot pipe_func_executor": lambda registrar: registrar.claim_pipe_func_executor(object),

@@ -285,6 +285,8 @@ A library directory whose own tree is empty, one holding nothing but nested pack
 
 The structure classes and `@pipe_func()` functions of a library directory are discovered by scanning its Python files, which skips the directories listed in the `excluded_dirs` array under `[interpreter.scan]` in `pipelex.toml` (virtual environments, `.git`, caches, `node_modules`, `results` and the like); a value that is not an array, such as a single string, fails the boot. That list no longer decides which `.mthds` files load.
 
+Before any of that Python is imported, each tree of the load that holds Python and a `requirements.txt` at its root has its requirements checked against the interpreter Pipelex runs in, and a method whose requirements are not met, or whose file holds a line the MTHDS standard refuses, such as `-r base.txt` or `-e .`, refuses the load (see [Method Trees](../../building-methods/method-trees.md#python-packages-requirementstxt)). When a server loads its own library directories beside a caller's bundles, such a refusal is a `HostLibraryRequirementsError`, a fault of the server's configuration whose message, naming its paths, never reaches the caller, as a tree it cannot list is a `HostLibraryTreeError`. A project root handed over as a library directory is such a tree, so its own `requirements.txt` is read as its methods' declaration: hand over the folder holding your methods rather than the project root, or keep the root's file to plain PEP 508 requirements that the interpreter meets.
+
 ## Project Organization
 
 **Golden rule:** Put `.mthds` files where they make sense in YOUR project. Pipelex finds them automatically.
