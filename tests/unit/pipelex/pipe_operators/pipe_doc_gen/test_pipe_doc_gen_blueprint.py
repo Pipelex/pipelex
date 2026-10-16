@@ -5,13 +5,15 @@ from pydantic import ValidationError
 
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat
 from pipelex.core.bundle_resources.bundle_resource import BundleResourceReadStage, canonical_resource_path_or_none
+from pipelex.core.method_trees.file_references import BundleFileOrigin, BundleValidationContext
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen_blueprint import PipeDocGenBlueprint
 
 
-def _blueprint(**overrides: Any) -> PipeDocGenBlueprint:
+def _blueprint(*, file_origin: BundleFileOrigin | None = None, **overrides: Any) -> PipeDocGenBlueprint:
     kwargs: dict[str, Any] = {"description": "Print the invoice", "inputs": {"invoice": "Invoice"}, "output": "Document", "format": "pdf"}
     kwargs.update(overrides)
-    return PipeDocGenBlueprint.model_validate(kwargs)
+    context = BundleValidationContext(file_origin=file_origin) if file_origin is not None else None
+    return PipeDocGenBlueprint.model_validate(kwargs, context=context)
 
 
 class TestPipeDocGenBlueprint:
@@ -61,10 +63,37 @@ class TestPipeDocGenBlueprint:
         assert blueprint.template_file == template_file
         assert canonical_resource_path_or_none(path=template_file) is not None
 
+    @pytest.mark.parametrize("file_origin", [None, BundleFileOrigin.METHOD_TREE], ids=["no_context", "method_tree"])
     @pytest.mark.parametrize("template_file", ["../invoice.docx", "templates/../invoice.docx", "../shared/templates/invoice.docx"])
-    def test_a_path_climbing_through_dot_dot_is_left_to_the_method_tree(self, template_file: str) -> None:
+    def test_a_path_climbing_through_dot_dot_is_left_to_the_method_tree(self, template_file: str, file_origin: BundleFileOrigin | None) -> None:
         """A `..` may climb to a file elsewhere in the method's tree, which only the load, holding the tree, can tell."""
-        blueprint = _blueprint(format="docx", template_file=template_file)
+        blueprint = _blueprint(file_origin=file_origin, format="docx", template_file=template_file)
+        assert blueprint.template_file == template_file
+
+    @pytest.mark.parametrize(
+        ("template_file", "expected_reason"),
+        [
+            ("../invoice.docx", "it leaves the bundle through a '..' segment"),
+            ("templates/../invoice.docx", "it leaves the bundle through a '..' segment"),
+            ("templates/invoice\x00.docx", "it holds a NUL character"),
+            ("/srv/methods/invoice.docx", "it is absolute"),
+            ("C:invoice.docx", "it holds a colon"),
+        ],
+        ids=["leaves_the_bundle", "dot_dot_inside", "nul_character", "absolute", "colon"],
+    )
+    def test_a_bundle_reading_submitted_files_refuses_a_path_none_could_be_keyed_by(self, template_file: str, expected_reason: str) -> None:
+        """A bundle loaded from a string reads only the files submitted with it, so its step is held to the rule they are keyed by."""
+        with pytest.raises(ValidationError) as exc_info:
+            _blueprint(file_origin=BundleFileOrigin.SUBMITTED_FILES, format="docx", template_file=template_file)
+
+        (error,) = exc_info.value.errors()
+        assert "PipeDocGen's 'template_file' names a file submitted with its bundle" in error["msg"]
+        assert expected_reason in error["msg"]
+        assert template_file not in error["msg"]
+
+    @pytest.mark.parametrize("template_file", ["invoice.docx", "./invoice.docx", "templates/invoice.docx", "templates//invoice.docx"])
+    def test_a_bundle_reading_submitted_files_accepts_a_path_inside_it(self, template_file: str) -> None:
+        blueprint = _blueprint(file_origin=BundleFileOrigin.SUBMITTED_FILES, format="docx", template_file=template_file)
         assert blueprint.template_file == template_file
 
     @pytest.mark.parametrize("template_file", ["/srv/methods/invoice.docx", "C:/srv/methods/invoice.docx", "srv\\methods\\invoice.docx"])

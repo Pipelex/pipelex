@@ -5,18 +5,19 @@ from typing import Any
 
 import pytest
 
-from pipelex.base_exceptions import PipelexError
+from pipelex.base_exceptions import PipelexError, ValidationErrorCategory
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenSource
 from pipelex.cogt.doc_gen.template_check import TemplateFinding, TemplateFindingSeverity
 from pipelex.core.bundle_resources.bundle_resource import BundleResources, make_bundle_resources
 from pipelex.core.bundle_resources.exceptions import BundleResourceNotNamedError
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.resolve_bundle import resolve_crate_from_contents
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.storage_scope import DRY_RUN_STORAGE_SCOPE, LOCAL_STORAGE_SCOPE
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import StubEngines, WorkerLikePipeRun, write_bundle
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import METHOD_MANIFEST, StubEngines, WorkerLikePipeRun, write_bundle
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 _DOCX_TEMPLATE_STEP = 'format = "docx"\ntemplate_file = "templates/invoice.docx"'
@@ -25,6 +26,17 @@ _DOCX_BYTES = b"PK docx template bytes"
 
 def _docx_resources() -> BundleResources:
     return make_bundle_resources(files={"./templates/invoice.docx": _DOCX_BYTES})
+
+
+async def _load_from_content(*, load: str, content: str, resources: BundleResources | None) -> None:
+    """Validate the content, resolve its crate or run it, as the runner's routes do with a bundle sent as a string."""
+    match load:
+        case "validate":
+            await validate_bundle(mthds_contents=[content], bundle_resources=resources)
+        case "resolve":
+            resolve_crate_from_contents(mthds_contents=[content], bundle_resources=resources)
+        case _:
+            await PipelexMTHDSProtocol(bundle_resources=resources).execute(mthds_contents=[content], inputs=PipeDocGenTestData.INVOICE_INPUTS)
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -59,6 +71,54 @@ class TestPipeDocGenBundleResources:
 
         report = str(exc_info.value.to_error_report().model_dump())
         assert "names the template file 'templates/invoice.docx', which was not supplied with its bundle" in report
+
+    @pytest.mark.usefixtures("stub_engines")
+    @pytest.mark.parametrize("template_file", ["../invoice.docx", "templates/../invoice.docx"], ids=["leaves_the_bundle", "dot_dot_inside"])
+    @pytest.mark.parametrize("load", ["validate", "resolve", "run"])
+    @pytest.mark.parametrize("sends_a_file", [False, True], ids=["sends_nothing", "sends_a_file"])
+    async def test_a_template_file_no_submitted_file_could_be_keyed_by_is_a_blueprint_item_at_the_step(
+        self, template_file: str, load: str, sends_a_file: bool
+    ) -> None:
+        """The step's file is held to the rule the files sent with its bundle are keyed by, when its blueprint validates.
+
+        Whatever the request sends, the step is the verdict's one item, a blueprint one located at the step, which
+        names the field and never repeats the path, rather than a load refusal saying the file was not supplied.
+        """
+        content = PipeDocGenTestData.bundle(step_fields=f'format = "docx"\ntemplate_file = "{template_file}"')
+        resources = make_bundle_resources(files={"invoice.docx": _DOCX_BYTES}) if sends_a_file else None
+
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await _load_from_content(load=load, content=content, resources=resources)
+
+        items = exc_info.value.to_error_report().validation_errors
+        assert items is not None
+        (item,) = items
+        assert item.category == ValidationErrorCategory.BLUEPRINT_VALIDATION
+        assert item.pipe_code == "print_invoice"
+        assert item.domain_code == "doc_gen_tests"
+        assert item.field_path == "pipe.print_invoice"
+        assert "PipeDocGen's 'template_file'" in item.message
+        assert "it leaves the bundle through a '..' segment" in item.message
+        assert template_file not in item.message
+
+    async def test_a_bundle_its_caller_read_from_a_file_here_climbs_through_dot_dot_in_its_method_tree(
+        self, stub_engines: StubEngines, tmp_path: Path
+    ) -> None:
+        """Contents read from a file named in `bundle_uris` are that file's bundle, whose step may climb through `..` in its tree."""
+        (tmp_path / "METHODS.toml").write_text(METHOD_MANIFEST, encoding="utf-8")
+        (tmp_path / "templates").mkdir()
+        (tmp_path / "templates" / "invoice.docx").write_bytes(_DOCX_BYTES)
+        (tmp_path / "bundles").mkdir()
+        bundle_path = write_bundle(
+            directory=tmp_path / "bundles", step_fields='format = "docx"\ntemplate_file = "../templates/invoice.docx"', as_method=False
+        )
+
+        await PipelexMTHDSProtocol(bundle_uris=[str(bundle_path)], pipe_run_mode=PipeRunMode.DRY).execute(
+            mthds_contents=[bundle_path.read_text(encoding="utf-8")],
+            inputs=PipeDocGenTestData.INVOICE_INPUTS,
+        )
+
+        assert [check_request.template for check_request in stub_engines.check_requests] == [_DOCX_BYTES]
 
     @pytest.mark.usefixtures("stub_engines")
     async def test_a_file_no_step_names_is_refused_as_the_request_s_fault_not_as_a_verdict(self) -> None:

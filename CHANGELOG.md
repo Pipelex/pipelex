@@ -10,6 +10,10 @@
 
 - **A method's `requirements.txt` is checked when it loads (Breaking)**: a method tree holding Python and a `requirements.txt` at its root is refused before any of its Python is imported, naming each requirement, when the environment its PipeFunc steps run in does not meet it, or when the file holds a line the MTHDS standard refuses (a URL, an option such as `-r` or `-e`, a comment after a requirement, a continued line). A package a method calls by its address is checked the same way, named by its address. Locally the environment is the interpreter Pipelex runs in and the refusal gives the `uv pip install` command that fixes it; on a sandbox-hosted deployment it is the package set the deployment states for its sandbox, a run is refused with a `422` and a validation by `method_ref` with an `is_valid: false` verdict located on the line, naming no path on the server. A method of a server's own library directories whose requirements are not met is the server's fault, a `500` `HostLibraryRequirementsError` whose message never reaches the caller. Pipelex never installs anything. A project root loaded as a library directory is such a tree, so hand over the folder holding the methods instead when the root's `requirements.txt` is an application's.
 
+### Fixed
+
+- **A `template_file` no sent file could be keyed by is a blueprint item at its step**: a bundle loaded from content strings, as the API's routes and `validate_bundle` load one, whose `PipeDocGen` step's `template_file` holds a `..` segment or a NUL character, or names no file, is refused when it parses, whatever files the request sends, as one `blueprint_validation` item with `field_path` `pipe.<code>` whose message names the field and not the path, instead of a load refusal saying the file was not supplied. A bundle read from disk still resolves a `..` in its method tree.
+
 ## [v0.86.1] - 2026-10-16
 
 ### Added

@@ -12,6 +12,7 @@ from typing_extensions import TypedDict
 from pipelex import log
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.bundle_resources.bundle_resource import BundleResources
+from pipelex.core.method_trees.file_references import BundleFileOrigin
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.interpreter_hub import (
     clear_current_library,
@@ -229,8 +230,11 @@ async def validate_bundle(
                 log.verbose(f"No library directories to load ({source_label})")
             if mthds_contents is not None:
                 content_sources: list[str | None] = list(mthds_sources) if mthds_sources is not None else [None] * len(mthds_contents)
+                # Contents belong to no method tree: their steps read only the files submitted with them.
                 loaded_blueprints = [
-                    MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content, mthds_source=source)
+                    MthdsParser.make_pipelex_bundle_blueprint(
+                        mthds_content=content, mthds_source=source, file_origin=BundleFileOrigin.SUBMITTED_FILES
+                    )
                     for content, source in zip(mthds_contents, content_sources, strict=True)
                 ]
                 if bundle_resources:

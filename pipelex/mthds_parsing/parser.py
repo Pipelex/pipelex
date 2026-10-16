@@ -4,6 +4,7 @@ from typing import Any
 from pydantic import BaseModel, ValidationError
 
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
+from pipelex.core.method_trees.file_references import BundleFileOrigin, BundleValidationContext
 from pipelex.mthds_parsing.bundle_elaborator import BundleElaborator
 from pipelex.mthds_parsing.exceptions import BundleElaboratorError, MthdsParserError
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
@@ -23,6 +24,7 @@ class MthdsParser(BaseModel):
         *,
         mthds_content: str | None = None,
         mthds_source: str | None = None,
+        file_origin: BundleFileOrigin = BundleFileOrigin.METHOD_TREE,
     ) -> PipelexBundleBlueprint:
         """Parse one MTHDS source into a ``PipelexBundleBlueprint``.
 
@@ -36,13 +38,24 @@ class MthdsParser(BaseModel):
         categorizer reads off that dict — mirroring the real file path the disk
         path already records, and overriding any ``source`` the bundle text
         itself declared. Ignored when ``bundle_path`` is provided (the path wins).
+
+        ``file_origin`` says where the bundle's steps find the files they name, and so the rule a file
+        reference, such as a ``PipeDocGen`` step's ``template_file``, is held to when the blueprint validates.
+        A caller loading ``mthds_content`` that no loader will place in a method tree passes ``SUBMITTED_FILES``:
+        such a bundle reads only the files submitted with it, so a step naming a file none of them could be keyed
+        by, such as one through a ``..`` segment, is refused here, as a blueprint item at the step, whatever the
+        request sends. ``METHOD_TREE``, the default, checks a reference's form alone, for the load to resolve it
+        in the bundle's tree; it is the only origin of a bundle read from ``bundle_path``, so it is ignored there.
         """
         blueprint_dict: dict[str, Any]
+        validation_context: BundleValidationContext
         try:
             if bundle_path is not None:
                 blueprint_dict = load_toml_from_path(path=str(bundle_path))
                 blueprint_dict[PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD] = str(bundle_path)
+                validation_context = BundleValidationContext(file_origin=BundleFileOrigin.METHOD_TREE)
             elif mthds_content is not None:
+                validation_context = BundleValidationContext(file_origin=file_origin)
                 blueprint_dict = load_toml_from_content(content=mthds_content)
                 # Seed the logical source unconditionally (``None`` when unnamed): this
                 # overrides any ``source`` the bundle text declared and keeps the success
@@ -76,7 +89,7 @@ class MthdsParser(BaseModel):
             # ``source`` is already populated from the seeded ``blueprint_dict`` above
             # (disk path → real file path; in-memory path → ``mthds_source``), so no
             # post-validate re-assignment is needed.
-            pipelex_bundle_blueprint = PipelexBundleBlueprint.model_validate(blueprint_dict)
+            pipelex_bundle_blueprint = PipelexBundleBlueprint.model_validate(blueprint_dict, context=validation_context)
         except ValidationError as exc:
             # TODO: Move this to the validate_bundle function
             # Every error becomes an item, categorized or not, so none hides another; only a concept's

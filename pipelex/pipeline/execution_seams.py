@@ -32,6 +32,7 @@ from pipelex.core.bundle_resources.bundle_resource import BundleResources
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.method_trees.file_references import BundleFileOrigin
 from pipelex.interpreter_hub import (
     clear_current_library,
     get_concept_library,
@@ -63,6 +64,17 @@ from pipelex.tools.misc.file_utils import reject_bare_str_or_path
 if TYPE_CHECKING:
     from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
     from pipelex.system.trace_context import TraceContext
+
+
+def _resolved_bundle_uris(*, bundle_uris: Sequence[str]) -> list[Path]:
+    """Each bundle URI as a path on this host: resolved, or as written when it cannot be resolved."""
+    resolved_uris: list[Path] = []
+    for uri in bundle_uris:
+        try:
+            resolved_uris.append(Path(uri).resolve())
+        except (OSError, RuntimeError):
+            resolved_uris.append(Path(uri))
+    return resolved_uris
 
 
 def acquire_library(
@@ -112,6 +124,8 @@ def acquire_library(
     whose file exists is loaded as read from it: its steps read beside it, such as a ``PipeDocGen`` step's
     ``template_file``, and an address-based reference is searched for in a ``.mthds/methods/`` directory above it, as
     when its directory loads. They are the host's own paths, never a label a remote caller sends: a server passes none.
+    Every other content belongs to no method tree and reads only the files submitted with it, so a step naming a file
+    none of them could be keyed by, such as one through a ``..`` segment, is refused when its blueprint validates.
 
     ``bundle_resources`` are the files submitted with the ``mthds_contents`` that their steps read, such as a
     ``PipeDocGen`` step's ``template_file``, keyed by canonical bundle-relative path. The library holds them before the
@@ -158,7 +172,18 @@ def acquire_library(
                 else withholding_host_library_files(library_dirs=effective_dirs, caller_contents=mthds_contents)
             )
             with host_library_withholding, translate_to_validate_bundle_error():
-                all_blueprints = [MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
+                # The file on this host each content was read from, where the caller names one that exists: that bundle
+                # is the file's, whose steps find the files they name in its method tree. Every other content belongs to
+                # no tree, and its steps read only the files submitted with it, so its blueprint validates under that rule.
+                resolved_uris = _resolved_bundle_uris(bundle_uris=bundle_uris or [])
+                host_bundle_files: list[Path | None] = [uri if uri.is_file() else None for uri in resolved_uris] or [None] * len(mthds_contents)
+                all_blueprints = [
+                    MthdsParser.make_pipelex_bundle_blueprint(
+                        mthds_content=content,
+                        file_origin=BundleFileOrigin.SUBMITTED_FILES if host_bundle_file is None else BundleFileOrigin.METHOD_TREE,
+                    )
+                    for content, host_bundle_file in zip(mthds_contents, host_bundle_files, strict=True)
+                ]
                 if bundle_resources:
                     check_bundle_resources(blueprints=all_blueprints, bundle_resources=bundle_resources)
                     library_manager.add_bundle_resources(library_id=library_id, bundle_resources=bundle_resources)
@@ -169,16 +194,14 @@ def acquire_library(
                 if bundle_uris:
                     current_library = library_manager.get_library(library_id=library_id)
                     blueprints_to_load = []
-                    for blueprint, uri in zip(all_blueprints, bundle_uris, strict=True):
-                        try:
-                            resolved_uri = Path(uri).resolve()
-                        except (OSError, RuntimeError):
-                            resolved_uri = Path(uri)
+                    for blueprint, uri, resolved_uri, host_bundle_file in zip(
+                        all_blueprints, bundle_uris, resolved_uris, host_bundle_files, strict=True
+                    ):
                         if resolved_uri in current_library.loaded_mthds_paths:
                             log.verbose(f"Bundle '{uri}' was skipped, already loaded from library directories")
                         else:
-                            if resolved_uri.is_file():
-                                blueprint.mark_read_from_host_file(bundle_file=resolved_uri)
+                            if host_bundle_file is not None:
+                                blueprint.mark_read_from_host_file(bundle_file=host_bundle_file)
                             blueprints_to_load.append(blueprint)
 
                 if blueprints_to_load:
