@@ -41,6 +41,8 @@ RELEASES_URL = "https://github.com/Pipelex/pipelex/releases"
 
 # The page of this documentation that describes how the registry is maintained.
 CONTRIBUTE_PAGE = "contribute/error-registry.md"
+# The section of this documentation that says how far errors carry the registry's codes.
+ERROR_MODEL_SECTION = "under-the-hood/error-model.md#error-codes-and-the-pipelex-error-registry"
 
 
 def _domain_action(*, domain: RegistryDomain) -> str:
@@ -164,8 +166,8 @@ def render_index_page(*, registry: ErrorRegistryDocument) -> str:
         "# Error Codes",
         "",
         (
-            "Every problem Pipelex answers carries a code, and its `type` is the URL of the code's page. A code of the MTHDS "
-            "standard, such as `input.missing`, is a core code, documented with the standard on "
+            "An error code names a situation a runner or a client can meet, and its type URI is the URL of the code's page. "
+            "A code of the MTHDS standard, such as `input.missing`, is a core code, documented with the standard on "
             f"[mthds.ai]({MTHDS_CORE_CODES_URL}) at `https://mthds.ai/errors/<code>`. A code that starts with `pipelex.` names "
             "a situation the standard leaves to its implementations, and has its page here, at "
             f"`{registry.base_url}/<code>`. Each page says what its code means, who must act and what to do, and gives the "
@@ -179,6 +181,12 @@ def render_index_page(*, registry: ErrorRegistryDocument) -> str:
             f"`pipelex-error-registry.json` on [GitHub]({RELEASES_URL}) and inside the `pipelex` package. This is version "
             f"`{registry.version}` of the registry. [The Error Registry]({_link(page=page, target=CONTRIBUTE_PAGE)}) "
             "describes how it is maintained."
+        ),
+        "",
+        (
+            "The registry declares the Pipelex codes, but Pipelex's errors do not carry them yet: an error still reports its "
+            "`error_type` and a type URI derived from its class, and giving every error its code is the next step of this "
+            f"work, as the [Error Model]({_link(page=page, target=ERROR_MODEL_SECTION)}) describes."
         ),
         "",
     ]
