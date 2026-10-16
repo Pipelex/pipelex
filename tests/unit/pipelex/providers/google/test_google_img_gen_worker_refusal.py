@@ -14,6 +14,7 @@ from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategor
 from pipelex.cogt.img_gen.img_gen_gemini_mapping import ResolvedGeminiImageConfig
 from pipelex.cogt.img_gen.img_gen_model_rules import AspectRatioTaxonomy, ImgGenArgTopic
 from pipelex.cogt.inference.error_classification import UserActionKind
+from pipelex.cogt.llm import completion_stop
 from pipelex.providers.google.google_img_gen_worker import GoogleImgGenWorker
 
 if TYPE_CHECKING:
@@ -136,6 +137,22 @@ class TestGoogleImgGenWorkerRefusal:
                 await worker._gen_image(img_gen_job=_img_gen_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.resolve_error_code() == CoreCode.PROVIDER_RESPONSE_INVALID
+
+    # genai warns that it does not know the value, and keeps it
+    @pytest.mark.filterwarnings("ignore:IMAGE_BRAND_NEW is not a valid FinishReason")
+    async def test_an_unknown_finish_reason_is_logged_as_an_image_generations(self, mocker: MockerFixture) -> None:
+        """A value Gemini adds later is taken as normal and logged as an image generation's, never as an LLM's stop reason."""
+        warning = mocker.patch.object(completion_stop.log, "warning")
+        async with _answering(_finished_without_image("IMAGE_BRAND_NEW")) as http_client:
+            worker = _worker(mocker, http_client=http_client)
+            with pytest.raises(ImgGenGenerationError) as exc_info:
+                await worker._gen_image(img_gen_job=_img_gen_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.resolve_error_code() == CoreCode.PROVIDER_RESPONSE_INVALID
+        warning.assert_called_once_with(
+            "An image finish reason was not recognized, so it was taken as normal",
+            fields={"model_handle": _MODEL_HANDLE, "finish_reason": "IMAGE_BRAND_NEW"},
+        )
 
     async def test_a_generated_image_is_returned(self, mocker: MockerFixture) -> None:
         async with _answering(_GENERATED_IMAGE) as http_client:

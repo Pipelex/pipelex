@@ -18,7 +18,7 @@ from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_google_metadata
 from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
 from pipelex.cogt.inference.error_render import render_inference_error
-from pipelex.cogt.llm.completion_stop import classify_prompt_block_reason, classify_stop_reason
+from pipelex.cogt.llm.completion_stop import classify_image_finish_reason
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.providers.google.google_factory import GoogleFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -214,26 +214,26 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
         Gemini answers a blocked image request with a success all the same: a candidate whose finish reason names the
         filter that stopped it (`IMAGE_SAFETY`, `IMAGE_PROHIBITED_CONTENT`, `SAFETY` and their kin), and no image, or,
         for a prompt blocked before the model wrote anything, no candidate at all and a block reason in the prompt
-        feedback. Both read as the text workers read them (see `pipelex.cogt.llm.completion_stop`), so an image refused
-        on policy grounds is `model.content_refused`, the caller's input to revise, rather than an empty answer. Any
-        other finish reason leaves the answer to the checks that read what it holds.
+        feedback, which is a refusal whatever its value, as the text workers read it. The finish reason reads from
+        Gemini's vocabulary (see `pipelex.cogt.llm.completion_stop`), so an image refused on policy grounds is
+        `model.content_refused`, the caller's input to revise, rather than an empty answer. Any other finish reason
+        leaves the answer to the checks that read what it holds.
 
         Raises:
             ImgGenGenerationError: With `model.content_refused`, when a finish reason or a block reason says the request
                 was refused.
         """
         model_handle = self.inference_model.name
-        refusal_reason: str | None = None
-        if response.candidates:
-            if finish_reason := response.candidates[0].finish_reason:
-                outcome = classify_stop_reason(stop_reason=finish_reason.value, model_handle=model_handle)
-                if outcome.is_refused:
-                    refusal_reason = finish_reason.value
-        elif response.prompt_feedback and (block_reason := response.prompt_feedback.block_reason):
-            outcome = classify_prompt_block_reason(block_reason=block_reason.value, model_handle=model_handle)
-            if outcome.is_refused:
-                refusal_reason = block_reason.value
-        if refusal_reason is None:
+        stop_signal = GoogleFactory.read_stop_signal(response=response)
+        refusal_reason: str
+        if stop_signal.finish_reason is not None:
+            if not classify_image_finish_reason(finish_reason=stop_signal.finish_reason, model_handle=model_handle).is_refused:
+                return
+            refusal_reason = stop_signal.finish_reason
+        elif stop_signal.block_reason is not None:
+            # A prompt blocked before the model answered is a refusal whatever its reason, which the error names
+            refusal_reason = stop_signal.block_reason
+        else:
             return
         next_step = "Revise the image prompt or its input images."
         msg = f"The model '{model_handle}' refused to generate the image, or a safety filter blocked it (reason '{refusal_reason}'). {next_step}"

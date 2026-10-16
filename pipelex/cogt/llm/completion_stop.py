@@ -16,6 +16,10 @@ OpenAI-compatible servers send none. Two signals say on their own that the text 
 with them: a Responses API answer whose status is `incomplete` is never normal, an unknown or missing reason being
 taken as a truncation, and a Gemini answer with no candidate whose prompt feedback names a block reason is a refusal.
 
+The Google image worker reads its answer's finish reason with `classify_image_finish_reason`, from Gemini's
+vocabulary alone, the image values included, so a safety filter that refused the image is told from an empty answer,
+and the prompt's block reason as the text workers read it.
+
 The classifier only turns a stop that was silently a success into an error. Structured generation's stops are read
 by the structuring library, instructor, whose configured re-asks are left as they are: it raises its
 `IncompleteOutputException` for a structured answer cut at its output limit, carrying that answer, and
@@ -246,6 +250,30 @@ def classify_responses_stop(*, status: str | None, incomplete_reason: str | None
             fields={"model_handle": model_handle, "stop_reason": status, "incomplete_reason": incomplete_reason},
         )
         return _TRUNCATED
+    return outcome
+
+
+def classify_image_finish_reason(*, finish_reason: str, model_handle: str) -> CompletionStopOutcome:
+    """Read the finish reason of a Gemini image generation's candidate, which says whether a safety filter refused it.
+
+    The Google image worker receives Gemini's values alone, so it reads Gemini's vocabulary, the image values
+    included, rather than the union the text workers read. A value the classifier does not know is logged at warning
+    level as an image generation's, and taken as normal, so the worker looks for the image as before.
+
+    Args:
+        finish_reason: The candidate's `finish_reason`, as its value.
+        model_handle: The model's deck handle, named by the warning about an unknown value.
+
+    Returns:
+        The outcome the value stands for: normal for an unknown value.
+    """
+    outcome = GEMINI_FINISH_REASONS.get(finish_reason.upper())
+    if outcome is None:
+        log.warning(
+            "An image finish reason was not recognized, so it was taken as normal",
+            fields={"model_handle": model_handle, "finish_reason": finish_reason},
+        )
+        return _NORMAL
     return outcome
 
 
