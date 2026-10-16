@@ -3,12 +3,14 @@
 A code's type URI is the registry's base URL, a slash, then the whole code:
 ``https://docs.pipelex.com/errors/pipelex.billing.plan_limit``. The documentation itself is versioned,
 and serves the code's page at ``/<version>/errors/pipelex/billing/plan_limit/``, with ``/latest/`` the
-released version. The site is static, with no server-side redirect, so the documentation's deployment
-writes, at the root of the published site, one directory per code named after the whole code, holding a
-page that redirects to the code's ``/latest/`` page; the host answers the type URI, which has no trailing
-slash, by redirecting it to that directory. The stubs are written from the pages the released version
-holds, so a code resolves once a release that documents it is the latest, and a stub whose code the
-latest version no longer documents is removed.
+released version. The site is served by GitHub Pages from its ``gh-pages`` branch, with no server-side
+redirect of our own, so the documentation's deployment writes, at the root of the published site, one
+directory per code named after the whole code, holding an ``index.html`` that redirects to the code's
+``/latest/`` page. GitHub Pages answers a URL naming a directory without its trailing slash, as the type
+URI does, with a 301 to the same URL with the slash, whatever its last segment holds (``/0.87.0`` is
+answered so too), and serves the directory's ``index.html`` there. The stubs are written from the pages the
+released version holds, so a code resolves once a release that documents it is the latest, and a stub whose
+code the latest version no longer documents is removed.
 """
 
 from __future__ import annotations

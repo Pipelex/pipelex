@@ -1,11 +1,10 @@
 """The generator of the error code pages under ``docs/errors/``: their index, and one page per Pipelex code.
 
-A code's page is ``docs/errors/<prefix>/<family>/<name>.md``, one directory per segment but the last, which
-MkDocs serves at ``/<version>/errors/<prefix>/<family>/<name>/``. A page is never named after the whole code,
-because the site's host answers a URL whose last segment holds a dot by redirecting it to the same URL without
-its trailing slash, where the page's relative links no longer resolve. The type URI,
-``https://docs.pipelex.com/errors/<code>``, reaches the page through the redirect stub the documentation's
-deployment writes at the site's root (:mod:`pipelex.cli.dev_cli.commands.error_registry.type_redirects`).
+A code's page is ``docs/errors/<prefix>/<family>/<name>.md``, one directory per segment but the last, as the
+MTHDS standard lays out the core codes' pages, which MkDocs serves at ``/<version>/errors/<prefix>/<family>/<name>/``.
+The type URI, ``https://docs.pipelex.com/errors/<code>``, names no version, so it reaches the page through the
+redirect stub the documentation's deployment writes at the site's root
+(:mod:`pipelex.cli.dev_cli.commands.error_registry.type_redirects`).
 
 The pages follow the MTHDS standard's pages for the core codes, and link to the standard's documentation for
 what a domain, a retry verdict and a step are. They are committed, so that the documentation builds from the
