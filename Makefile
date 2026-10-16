@@ -199,7 +199,7 @@ make docs-serve-versioned     - Serve versioned docs locally with mike
 make docs-list                - List deployed documentation versions
 make docs-deploy VERSION=x.y.z - Deploy docs as version x.y.z (local, no push)
 make docs-deploy-stable       - Deploy stable docs with 'latest' alias (CI only)
-make docs-deploy-specific-version         - Deploy docs for the current version with 'pre-release' alias (CI only)
+make docs-deploy-specific-version-pre-release - Deploy docs for the current version with 'pre-release' alias (CI only)
 make docs-deploy-root          - Deploy root assets (404.html, robots.txt, index.html) to gh-pages
 make docs-delete VERSION=x.y.z - Delete a deployed documentation version
 
@@ -241,7 +241,7 @@ export HELP
 	test-durations td test-durations-serial tds test-time tt test-time-serial tts \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright merge-check-plxt-format merge-check-plxt-lint \
 	li check-unused-imports fix-unused-imports check-TODOs check-uv \
-	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-specific-version docs-delete \
+	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-specific-version-pre-release docs-delete \
 	generate-mthds-schema generate-mthds-schema-quiet gms check-mthds-schema cms \
 	generate-corpus-vocabulary generate-corpus-vocabulary-quiet \
 	check-ledger cl check-migration-schemas cmig up-migration-schemas up-migration-schemas-force umig umigf \
