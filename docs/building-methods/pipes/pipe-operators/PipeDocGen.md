@@ -130,6 +130,44 @@ A `pdf` step's `template`, or its `.html` `template_file`, is rendered with exac
 
 An inline `template` is rendered where the step runs, its text being the bundle's own. A `template_file` is read where the document is printed: the step names the file by its method tree and its path there, and the print stage reads it, renders it with the step's data and prints it, a dry run's print included, so a value the template reads that does not exist fails the dry run as it fails a live one. On a distributed orchestrator such as Temporal, the step runs in a workflow, which reads no file, and the print runs in an activity, which reads the file from the method file store of the deployment. An HTML template file is printed with the inputs the step declares, the only data it may read, so an HTML step's print carries none of the run's other data.
 
+### Images, stylesheets and fonts beside a template
+
+An HTML template names the files of its method by relative URLs, as a web page names the files beside it. A relative URL resolves against the template file's own place in the method's folder, and an inline `template`'s against its bundle file, so a brand kit travels with its method: the logo beside the template, the stylesheet that lays it out, the font in `fonts/`. Take a method whose folder holds these files:
+
+```text
+METHODS.toml
+invoice.mthds
+templates/invoice.html
+templates/logo.png
+styles/print.css
+fonts/brand.woff2
+```
+
+The template names the logo beside it and the stylesheet one folder up:
+
+```html
+<link rel="stylesheet" href="../styles/print.css">
+<img src="logo.png" alt="Acme">
+<h1>Invoice {{ invoice.number }}</h1>
+```
+
+A URL inside a stylesheet resolves against the stylesheet, as in a browser, so `styles/print.css` names the font from its own folder:
+
+```css
+@font-face { font-family: Brand; src: url("../fonts/brand.woff2"); }
+body { font-family: Brand; }
+```
+
+- **The files are read from the method, never from a disk.** The print reads each file from the method's tree, under the run's read scope, wherever it prints: in the process that loaded the method, and on a distributed orchestrator such as Temporal, where the print activity reads it from the method file store of the deployment.
+- **Only images, stylesheets and fonts are read.** A relative URL naming any other file of the method, such as its Python, a bundle, `METHODS.toml`, `requirements.txt` or a data file, is refused, by its suffix: a URL may come from a run's input, such as `<img src="{{ photo.url }}">`, and a document can carry what it reads, as a `rel="attachment"` link embeds its file in the PDF, so a caller allowed to run a method does not get to read its files that way. The images are `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.svg`, `.avif`, `.apng`, `.bmp`, `.ico`, `.tif` and `.tiff`, the stylesheets `.css`, and the fonts `.woff`, `.woff2`, `.ttf`, `.otf`, `.ttc` and `.eot`.
+- **`..` climbs anywhere inside the method, never above its root.** A URL that climbs above the folder holding `METHODS.toml`, a root-relative URL such as `/logo.png`, a folder, a missing file, and a file the method leaves out, such as a hidden or a gitignored one, are refused with a message naming the URL, the template and the reason. A file outside the method is never read, even when it exists. A bundle named alone, with no `METHODS.toml` at or above it, is a method of that one file, so a file beside it is refused with the advice to hand over the method's folder.
+- **A URL the template writes is checked when the method loads.** `pipelex validate`, a dry run and every load check each literal relative URL of the template and of the stylesheets it links, such as `<img src="logo.png">`, so a missing or misspelt file fails before any print. A URL the template builds from the run's inputs is checked when the document prints, and a refused one fails the print with a `TemplateUrlRefusedError`.
+- **A URL with a scheme is left as written.** An `https://` URL is fetched through the SSRF guard, a `data:` URL is decoded, and a `pipelex-storage://` URL is read under the run's read scope, as before, so a template's split between the method's files and the caller's is the URL's own: relative for the method, a stored URI for a caller's file or an earlier output. A URL with no path, such as `#top`, names no file.
+- **A file name holding `?`, `#` or `%` is written percent-encoded**, `100%25.png` for `100%.png`, since a URL's query and fragment are dropped before it resolves and a `%` starts an escape.
+- **A bundle loaded from a string** resolves its inline template's relative URLs from the root of the files sent with it, and with no file sent beside it, it belongs to no method tree, so a relative URL its template writes is refused when the method loads, and one built from the run's inputs fails the print. Load such a method from its folder.
+
+The engine that prints HTML joins each relative URL to a base URL Pipelex hands it and reads the file through Pipelex ([Document Engine Plugins](../../../under-the-hood/document-engine-plugins.md#relative-urls-the-files-of-the-templates-method-tree)).
+
 ### Office template files
 
 An `.xlsx`, `.docx` or `.pptx` template file is filled by its engine from the inputs as plain data, so it sees fields, not the sigils and filters of HTML templates. In plain data a native value is its value, and a verdict is its verdict: a `YesNo` is its boolean, a `Choice` its option key and a `Rating` its level, so the file reads `team` rather than `team.choice`, and a verdict's probability or confidence does not reach it. A `pdf` template reads the verdict whole, `team.choice` and `team.confidence` included, as a `PipeCompose` template does. Its contract is documented with the plugin. When the plugin's engine checks templates, `pipelex validate` and the dry run compare the file with the inputs' concepts: a misspelled name is reported before any run.
@@ -149,7 +187,7 @@ When a bundle is sent as content rather than read from a directory, as it is thr
 
 - **The key is the path the step names**, relative to the bundle and written with forward slashes: a step with `template_file = "templates/invoice.docx"` reads the file sent as `templates/invoice.docx`, and `./templates/invoice.docx` or `templates//invoice.docx`, as a key or as the path a step names, names the same file. Every bundle of the request is read as sitting in one directory. An absolute path, a `..` segment, a backslash and a colon are refused, as a key and as the path a step names: a step whose `template_file` could not be a key is refused when its bundle is parsed, whatever the request sends, so every file a string-loaded step can name can be sent with it.
 - **The value is the file's bytes** in standard base64.
-- **Every file sent must be one a step names.** A file no step reads is refused, so a misspelled key fails loudly rather than leaving its step without a template.
+- **Every file sent must be one a step names.** A file no step reads is refused, so a misspelled key fails loudly rather than leaving its step without a template. A file a template names by a relative URL, such as its logo, is named by no step, so it cannot be sent this way: such a method is loaded from its folder.
 - **The files are checked like files on disk.** An `.html` template file is checked against the inputs when the method loads, and the engine's template check runs on an office template file at validation and in the dry run.
 
 The files sent with a bundle make one method tree, with the bundles sent as strings at its root: the run names that tree by its digest, as it names the tree of a bundle loaded from a directory, and carries none of its files. The print stage reads a template file from the tree, under the run's read scope, to print it or to check it, wherever it runs: in the process that loaded the method, the tree is the one its library holds; on a remote orchestrator such as Temporal, the deployment's method file store serves it. No template file rides in the run's payloads, so none is bounded by them.

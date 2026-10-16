@@ -67,6 +67,13 @@ if TYPE_CHECKING:
 # accept, or read a field that is gone, on its first call; the bump turns that into a discovery-time mismatch naming
 # the plugin. ``claim_method_file_store``, the hub slot an activity reads method files through by their tree's digest
 # (``MethodFileStoreProtocol`` in ``pipelex.core.method_trees.method_file_store``), joined the menu with it.
+#
+# Relative URLs in an HTML document joined the document engine contract under v7 without a bump, as additions: the
+# render job's ``base_url``, under ``METHOD_FILE_URL_PREFIX`` (``render_job``, with ``is_method_file_url`` to test a URL
+# against it), which an engine joins a relative URL of the document to; the method-file arm of
+# ``RenderResources.load``, which reads an image, a stylesheet or a font joined under the prefix from the document's
+# method tree; and the error that arm raises for a URL naming no such file (``TemplateUrlRefusedError``), which an engine
+# lets pass as it came. An engine written before them ignores ``base_url`` and keeps refusing a relative URL, as it did.
 PLUGIN_API_VERSION: int = 7
 
 

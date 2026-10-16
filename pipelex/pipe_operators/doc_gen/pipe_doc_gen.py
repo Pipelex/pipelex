@@ -10,11 +10,12 @@ from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice, DocGenSettin
 from pipelex.cogt.doc_gen.document_composition import ComposedTemplateFile, DocumentComposition, TemplateRenderContext
 from pipelex.cogt.doc_gen.input_shape import InputShape, shape_of_input
 from pipelex.cogt.doc_gen.layout_builder import build_layout_document, humanize
+from pipelex.cogt.doc_gen.method_file_urls import RelativeUrlBase
 from pipelex.cogt.doc_gen.plain_data import plain_data
 from pipelex.cogt.models.model_deck_check import check_doc_gen_choice_with_deck
 from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.method_trees.tree_bundle import MethodFileRef
+from pipelex.core.method_trees.tree_bundle import MethodFileRef, TreeBundleRef
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.document_content import DocumentContent
@@ -58,6 +59,10 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
     format and source, checked when the method loads. A dry run composes for real, which checks the templates against
     mock inputs; its print reads and renders the template file and runs the engine's template checker on an office
     one, and prints and stores nothing.
+
+    A relative URL in an HTML template, such as the `src` of a logo beside it, names a file of the template's method
+    tree, resolved against the template file, or against the bundle of an inline template: the composition says where
+    the template sits in its tree, and the print stage reads each file the engine asks for from the tree.
     """
 
     type: Literal["PipeDocGen"] = "PipeDocGen"
@@ -67,6 +72,17 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
     template_file: str | None = Field(default=None, description="The template file as the method names it")
     template_file_ref: MethodFileRef | None = Field(
         default=None, description="The template file as a file of the step's method tree, which the print stage reads"
+    )
+    template_bundle_ref: TreeBundleRef | None = Field(
+        default=None,
+        description=(
+            "The bundle of the inline HTML template, as its method tree names it, which the template's relative URLs resolve "
+            "against; None when the bundle belongs to no method tree, or the step has no inline template"
+        ),
+    )
+    template_tree_is_one_file: bool = Field(
+        default=False,
+        description="Whether the inline template's bundle was named alone, so its method tree holds no file beside it",
     )
     filename: str | None = None
 
@@ -266,14 +282,27 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
                         label="template",
                         templating_style=resolve_templating_style(authored=None),
                     )
-                    return DocumentComposition(format=self.doc_gen_format, source=source, filename=filename, title=title, html=html)
+                    return DocumentComposition(
+                        format=self.doc_gen_format,
+                        source=source,
+                        filename=filename,
+                        title=title,
+                        html=html,
+                        url_base=self._inline_template_url_base(),
+                    )
+                template_file = self._composed_template_file(
+                    render_context=self._render_context(working_memory=working_memory, pipe_run_params=pipe_run_params)
+                )
                 return DocumentComposition(
                     format=self.doc_gen_format,
                     source=source,
                     filename=filename,
                     title=title,
-                    template_file=self._composed_template_file(
-                        render_context=self._render_context(working_memory=working_memory, pipe_run_params=pipe_run_params)
+                    template_file=template_file,
+                    url_base=RelativeUrlBase(
+                        tree_digest=template_file.file.tree_digest,
+                        holder=template_file.file.tree_path,
+                        template_label=f"the template file '{template_file.file.tree_path}'",
                     ),
                 )
             case DocGenSource.TEMPLATE_FILE:
@@ -285,6 +314,22 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
                     template_file=self._composed_template_file(input_shapes=self._input_shapes()),
                     data={name: plain_data(content) for name, content in named_contents},
                 )
+
+    def _inline_template_url_base(self) -> RelativeUrlBase | None:
+        """Where the inline template's relative URLs resolve: against its bundle, in the bundle's method tree, when it has one."""
+        bundle_ref = self.template_bundle_ref
+        if bundle_ref is None:
+            return None
+        if bundle_ref.tree_path is None:
+            template_label = f"the inline template of PipeDocGen '{self.code}', in bundles loaded from content strings"
+        else:
+            template_label = f"the inline template of PipeDocGen '{self.code}', in '{bundle_ref.tree_path}'"
+        return RelativeUrlBase(
+            tree_digest=bundle_ref.tree_digest,
+            holder=bundle_ref.tree_path,
+            template_label=template_label,
+            is_one_file_tree=self.template_tree_is_one_file,
+        )
 
     def _composed_template_file(
         self, *, render_context: TemplateRenderContext | None = None, input_shapes: dict[str, InputShape] | None = None

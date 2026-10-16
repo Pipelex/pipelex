@@ -68,6 +68,8 @@ EXPECTED_THIRD_PARTY_ROOTS: frozenset[str] = frozenset(
         "httpx",
         "instructor",
         "jinja2",
+        # The MTHDS standard's own library, not a vendor: a document's relative URLs resolve in its method tree by its rules.
+        "mthds",
         "opentelemetry",
         "polyfactory",
         "pydantic",
