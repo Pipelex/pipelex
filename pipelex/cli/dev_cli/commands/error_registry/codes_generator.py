@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING
 
 from pipelex.cli.dev_cli.commands.error_registry.exceptions import ErrorRegistryError
 from pipelex.errors.registry.registry_document import RegistryItemType, RegistryParam, RegistryParamType
+from pipelex.tools.misc.string_utils import snake_to_pascal_case
 
 if TYPE_CHECKING:
     from pipelex.errors.registry.registry_document import ErrorRegistryDocument, RegistryEntry
@@ -48,8 +49,7 @@ def code_member_name(*, registry: ErrorRegistryDocument, code: str) -> str:
 
 def params_class_name(*, registry: ErrorRegistryDocument, code: str) -> str:
     """The parameters model of a code: its family and name in PascalCase, then ``Params``, such as ``BillingPlanLimitParams``."""
-    words = _local_code(registry=registry, code=code).replace(".", "_").split("_")
-    return "".join(word.capitalize() for word in words) + "Params"
+    return snake_to_pascal_case(_local_code(registry=registry, code=code).replace(".", "_")) + "Params"
 
 
 class _Imports:
