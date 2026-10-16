@@ -28,7 +28,7 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.interpreter_hub import get_current_library_id_or_none, get_pipe_func_executor
 from pipelex.kernel.memory_ops import store_result
-from pipelex.pipe_operators.func.exceptions import PipeFuncFunctionError
+from pipelex.pipe_operators.func.exceptions import PipeFuncFunctionError, PipeFuncRaisedError
 from pipelex.pipe_operators.func.function_name import function_name_form_violation
 from pipelex.pipe_operators.func.pipe_func_call_context import pipe_func_call_in_flight
 from pipelex.pipe_operators.func.pipe_func_python import (
@@ -357,16 +357,20 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             # The message names the step's inputs, never their values: those are this run's content.
             inputs_desc = ", ".join(self.inputs.root) or "none"
             output_desc = self.output.to_bundle_representation()
+            # The function's own exception, which the in-process executor marks as raised by the function.
+            error_desc = exc.message if isinstance(exc, PipeFuncRaisedError) else f"{type(exc).__name__}: {exc}"
             msg = (
                 f"PipeFunc '{self.code}' failed during execution.\n"
                 f"  Expected output: {output_desc}\n"
                 f"  Inputs: {inputs_desc}\n\n"
-                f"  Error: {type(exc).__name__}: {exc}"
+                f"  Error: {error_desc}"
             )
             # Not classified as the caller's fault: the function's own exception text can carry
             # whatever the process holds (a path, a setting, a secret), so it stays redacted under
-            # STRICT disclosure. A failure the executor reports as a Pipelex error (a timeout, a sandbox
-            # that cannot run the call) keeps its own code; any other exception is the function's own.
+            # STRICT disclosure. A Pipelex error keeps its own code: the in-process executor's mark of
+            # what the function raised is `pipe.function_raised` whatever the function raised, and a
+            # failure of the seam (a timeout, a sandbox that cannot run the call) is the seam's. Any other
+            # exception comes from an out-of-process executor, reporting the function's failure that way.
             if isinstance(exc, PipelexError):
                 raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).with_error_code(

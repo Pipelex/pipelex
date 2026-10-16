@@ -18,10 +18,11 @@ from pipelex.core.method_trees.tree_files import write_call_files
 from pipelex.core.method_trees.tree_python import TREE_PYTHON_HOLD
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.interpreter_hub import get_library_manager, get_required_pipe
+from pipelex.kernel.exceptions import FuncOutputTypeError
 from pipelex.kernel.func_ops import call_function
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe_func_call_files import read_pipe_func_call_files
-from pipelex.pipe_operators.func.exceptions import PipeFuncExecutionError
+from pipelex.pipe_operators.func.exceptions import PipeFuncExecutionError, PipeFuncRaisedError
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_call_context import function_of_call_in_flight
 from pipelex.pipe_operators.func.pipe_func_execution_dtos import PipeFuncExecutionRequest, PipeFuncExecutionResponse
@@ -77,11 +78,20 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
         # The step imported and checked its function before the run (its `_validate_before_run`), and names it for its
         # call in flight; a call that names none, the transported run's, finds the step in the current library, which
         # binds it once. The call itself — async/sync dispatch, return coercion — is the kernel's, so an out-of-process
-        # executor and this one share one definition of what running a function means. Nothing is caught here: the
-        # function is arbitrary user code whose failure surface is not enumerable, and the operator wraps this call to
-        # decorate the failure with the pipe's inputs/output for a diagnostic PipeRunError.
+        # executor and this one share one definition of what running a function means. What the function raised is
+        # marked as its own, `PipeFuncRaisedError`, so the operator, which decorates the failure with the pipe's inputs
+        # and output, tells it from a failure of this seam, which keeps its own code.
         function = function_of_call_in_flight(pipe_ref=pipe_code) or resolve_pipe_func(pipe_code=pipe_code).bind_function()
-        call_result = await call_function(function=function, function_name=function_name, memory=working_memory)
+        try:
+            call_result = await call_function(function=function, function_name=function_name, memory=working_memory)
+        except FuncOutputTypeError:
+            # The kernel's coercion refused what the function returned: `pipe.output_invalid`, its own code.
+            raise
+        except Exception as exc:
+            # Case (2), unbounded code: the function is arbitrary user code whose exception surface cannot be
+            # enumerated. Whatever it raised is its failure, a coded Pipelex error a helper raised inside it included.
+            msg = f"{type(exc).__name__}: {exc}"
+            raise PipeFuncRaisedError(msg) from exc
         return PipeFuncExecutionResult(
             content=call_result.content,
             function_module=call_result.function_module,

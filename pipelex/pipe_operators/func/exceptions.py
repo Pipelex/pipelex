@@ -27,6 +27,18 @@ class PipeFuncExecutionError(PipelexError):
     error_code = InheritsCause(fallback=CoreCode.RUNTIME_UNEXPECTED, others=(CoreCode.PIPE_FUNCTION_TIMED_OUT,))
 
 
+class PipeFuncRaisedError(PipelexError):
+    """The function a PipeFunc step calls raised.
+
+    Raised by the in-process executor from whatever the function's own code raised, so that the step tells a failure
+    of its function from a failure of the seam that runs it: it is ``pipe.function_raised`` whatever the function
+    raised, a coded Pipelex error included, which rides as its cause. Its message gives the type and the text of the
+    function's exception, which can carry whatever the process holds, so it is not caller-facing.
+    """
+
+    error_code = CoreCode.PIPE_FUNCTION_RAISED
+
+
 class PipeFuncFunctionError(PipelexError):
     """A `PipeFunc`'s `function_name` names no function the step may call.
 

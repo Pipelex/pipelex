@@ -262,6 +262,7 @@ PipeFactoryError | one of method.schema_violation, method.concept_unresolved, ru
 PipeFuncExecutionError | inherits cause, else runtime.unexpected; or chosen: pipe.function_timed_out
 PipeFuncFunctionError | method.function_invalid
 PipeFuncPackageSetUnstatedError | runtime.misconfigured
+PipeFuncRaisedError | pipe.function_raised
 PipeFuncTransportError | runtime.misconfigured
 PipeIOContractError | method.concept_invalid
 PipeImgGenFactoryError | model.context_exceeded
