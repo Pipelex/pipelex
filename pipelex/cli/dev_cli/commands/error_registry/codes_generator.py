@@ -7,7 +7,8 @@ the types the registry declares and none it does not:
 - ``identifier`` and ``caller_text`` are ``str``, ``integer`` is ``int``;
 - ``seconds`` is a ``float`` and ``bytes`` an ``int``, neither ever negative;
 - ``sha256`` is a ``str`` of lowercase hexadecimal;
-- ``enum`` is the ``Literal`` of its values, and ``list`` a ``list`` of its items' type;
+- ``enum`` is the ``Literal`` of its values, and ``list`` a ``list`` of its items' type, each item
+  constrained as a parameter of that type is;
 - an optional parameter is its type or ``None``, ``None`` by default.
 
 Each model also names its code and its operator-only parameters, which an implementation leaves out of
@@ -54,6 +55,7 @@ class _Imports:
     """Which names the generated module uses, so that it imports exactly those."""
 
     def __init__(self) -> None:
+        self.uses_annotated = False
         self.uses_literal = False
         self.uses_field = False
 
@@ -78,13 +80,9 @@ def _scalar_annotation(*, scalar_type: RegistryParamType, values: list[str] | No
             raise ErrorRegistryError(msg)
 
 
-def _item_annotation(*, item_type: RegistryItemType, imports: _Imports) -> str:
-    return _scalar_annotation(scalar_type=item_type.item_type, values=item_type.values, imports=imports)
-
-
-def _constraints(*, param: RegistryParam) -> list[str]:
-    """The field constraints a parameter's type adds to its Python type."""
-    match param.param_type:
+def _scalar_constraints(*, scalar_type: RegistryParamType) -> list[str]:
+    """The field constraints a scalar type adds to its Python type: none for a list, whose items carry their own."""
+    match scalar_type:
         case RegistryParamType.SECONDS | RegistryParamType.BYTES:
             return ["ge=0"]
         case RegistryParamType.SHA256:
@@ -93,6 +91,17 @@ def _constraints(*, param: RegistryParam) -> list[str]:
             RegistryParamType.IDENTIFIER | RegistryParamType.INTEGER | RegistryParamType.ENUM | RegistryParamType.CALLER_TEXT | RegistryParamType.LIST
         ):
             return []
+
+
+def _item_annotation(*, item_type: RegistryItemType, imports: _Imports) -> str:
+    """The annotation of a list's item: its scalar's Python type, constrained as a parameter of that type is."""
+    annotation = _scalar_annotation(scalar_type=item_type.item_type, values=item_type.values, imports=imports)
+    constraints = _scalar_constraints(scalar_type=item_type.item_type)
+    if not constraints:
+        return annotation
+    imports.uses_annotated = True
+    imports.uses_field = True
+    return f"Annotated[{annotation}, Field({', '.join(constraints)})]"
 
 
 def _field_line(*, param_name: str, param: RegistryParam, imports: _Imports) -> str:
@@ -105,7 +114,7 @@ def _field_line(*, param_name: str, param: RegistryParam, imports: _Imports) -> 
         annotation = f"list[{_item_annotation(item_type=param.items, imports=imports)}]"
     else:
         annotation = _scalar_annotation(scalar_type=param.param_type, values=param.values, imports=imports)
-    constraints = _constraints(param=param)
+    constraints = _scalar_constraints(scalar_type=param.param_type)
     if param.optional:
         annotation = f"{annotation} | None"
         if constraints:
@@ -210,7 +219,11 @@ def render_pipelex_codes(*, registry: ErrorRegistryDocument) -> str:
     body.append("}")
     body.append('"""The parameters model of every Pipelex code."""')
 
-    typing_names = ["ClassVar", "Literal"] if imports.uses_literal else ["ClassVar"]
+    typing_names = ["ClassVar"]
+    if imports.uses_annotated:
+        typing_names.insert(0, "Annotated")
+    if imports.uses_literal:
+        typing_names.append("Literal")
     pydantic_names = ["BaseModel", "ConfigDict", "Field"] if imports.uses_field else ["BaseModel", "ConfigDict"]
     header = [
         '"""The Pipelex error codes and the typed parameters of each, generated from ``pipelex-error-registry.yaml``.',

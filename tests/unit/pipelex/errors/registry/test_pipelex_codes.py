@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from typing import Any
+import importlib.util
+import sys
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from pydantic import ValidationError
 
+from pipelex.cli.dev_cli.commands.error_registry.codes_generator import render_pipelex_codes
 from pipelex.errors.registry.pipelex_codes import (
     PIPELEX_ERROR_PARAMS,
     CatalogNotFoundParams,
@@ -14,7 +17,17 @@ from pipelex.errors.registry.pipelex_codes import (
     SecurityReservedKeyParams,
     WebhookDeliveryFailedParams,
 )
-from pipelex.errors.registry.registry_document import load_pipelex_error_registry
+from pipelex.errors.registry.registry_document import ErrorRegistryDocument, load_pipelex_error_registry
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+# Items of a list parameter typed as each constrained scalar, added to a code to test what the generator writes for them.
+CONSTRAINED_LIST_PARAMS: dict[str, dict[str, Any]] = {
+    "sizes": {"type": "list", "items": {"type": "bytes"}, "description": "Sizes."},
+    "durations": {"type": "list", "items": {"type": "seconds"}, "description": "Durations."},
+    "digests": {"type": "list", "items": {"type": "sha256"}, "description": "Digests."},
+}
 
 
 class TestPipelexCodes:
@@ -56,3 +69,42 @@ class TestPipelexCodes:
         assert delivery.model_dump() == {"reason": "http_status", "receiver_status": 500}
         timeout = DocgenPrintTimeoutParams(limit=30)
         assert timeout.limit == 30.0
+
+    @pytest.mark.parametrize(
+        ("topic", "values"),
+        [
+            ("a negative size", {"sizes": [-4], "durations": [], "digests": []}),
+            ("a negative duration", {"sizes": [], "durations": [-0.5], "digests": []}),
+            ("a digest that is not lowercase hexadecimal", {"sizes": [], "durations": [], "digests": ["NOT-HEX"]}),
+        ],
+    )
+    def test_a_list_item_carries_the_constraints_of_its_type(
+        self,
+        composed_document: dict[str, Any],
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        topic: str,
+        values: dict[str, Any],
+    ) -> None:
+        """An item of a list of sizes, durations or digests is refused where a single parameter of its type would be."""
+        entry = next(entry for entry in composed_document["codes"] if entry["code"] == "pipelex.storage.unavailable")
+        entry["params"].update(CONSTRAINED_LIST_PARAMS)
+        text = render_pipelex_codes(registry=ErrorRegistryDocument.model_validate(composed_document))
+        assert "    sizes: list[Annotated[int, Field(ge=0)]]" in text
+        assert "    durations: list[Annotated[float, Field(ge=0)]]" in text
+        assert '    digests: list[Annotated[str, Field(pattern="^[0-9a-f]{64}$")]]' in text
+        module_path = tmp_path / "generated_pipelex_codes.py"
+        module_path.write_text(text, encoding="utf-8")
+        spec = importlib.util.spec_from_file_location("generated_pipelex_codes", module_path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        # Pydantic resolves the module's postponed annotations through sys.modules.
+        monkeypatch.setitem(sys.modules, spec.name, module)
+        spec.loader.exec_module(module)
+        model: Any = module.StorageUnavailableParams
+        valid = model(scheme="s3", sizes=[0, 4096], durations=[0.5], digests=["a" * 64])
+        assert valid.sizes == [0, 4096]
+        with pytest.raises(ValidationError):
+            model(scheme="s3", **values)
+        assert topic
