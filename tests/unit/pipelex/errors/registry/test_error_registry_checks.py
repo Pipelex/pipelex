@@ -292,6 +292,10 @@ class TestErrorRegistryChecks:
                 "the parameter code names an attribute of the generated parameters model",
             ),
             (
+                _add_param("pipelex.storage.unavailable", "int", {"type": "integer", "optional": True, "description": "A number."}),
+                "the parameter int would shadow the builtin int the generated annotations name",
+            ),
+            (
                 _add_codes(["pipelex.run_job", "pipelex.run"], ["pipelex.run_job.failed", "pipelex.run.job_failed"]),
                 "the codes pipelex.run_job.failed, pipelex.run.job_failed generate the same PipelexErrorCode member, RUN_JOB_FAILED",
             ),

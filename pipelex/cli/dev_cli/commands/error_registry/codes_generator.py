@@ -30,6 +30,10 @@ from pipelex.tools.misc.string_utils import snake_to_pascal_case
 if TYPE_CHECKING:
     from pipelex.errors.registry.registry_document import ErrorRegistryDocument, RegistryEntry
 
+# The builtins the generated annotations name. A field named after one would shadow it in the class's namespace,
+# where pydantic resolves the annotations, so that a later field's `str` or `int` would name that field's default.
+ANNOTATION_BUILTIN_NAMES = frozenset({"str", "int", "float", "list", "frozenset"})
+
 _LINE_LENGTH = 150
 _DOCSTRING_WIDTH = 110
 _SHA256_PATTERN = "^[0-9a-f]{64}$"

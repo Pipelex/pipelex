@@ -28,7 +28,12 @@ from jsonschema import Draft202012Validator, FormatChecker, ValidationError
 from pydantic import BaseModel
 from pydantic import ValidationError as PydanticValidationError
 
-from pipelex.cli.dev_cli.commands.error_registry.codes_generator import code_member_name, generated_code_errors, params_class_name
+from pipelex.cli.dev_cli.commands.error_registry.codes_generator import (
+    ANNOTATION_BUILTIN_NAMES,
+    code_member_name,
+    generated_code_errors,
+    params_class_name,
+)
 from pipelex.errors.registry.registry_document import ErrorRegistryDocument, RegistryDomain, RegistryEntry
 
 if TYPE_CHECKING:
@@ -201,6 +206,8 @@ def param_name_errors(*, entry: RegistryEntry, here: str) -> list[str]:
             errors.append(f"{here}: the parameter {param_name} is a Python keyword, which the generated parameters model cannot hold")
         elif param_name in RESERVED_PARAM_NAMES or hasattr(BaseModel, param_name):
             errors.append(f"{here}: the parameter {param_name} names an attribute of the generated parameters model")
+        elif param_name in ANNOTATION_BUILTIN_NAMES:
+            errors.append(f"{here}: the parameter {param_name} would shadow the builtin {param_name} the generated annotations name")
     return errors
 
 

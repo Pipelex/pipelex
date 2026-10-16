@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import importlib.util
 import sys
 from typing import TYPE_CHECKING, Any
@@ -7,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from pydantic import ValidationError
 
-from pipelex.cli.dev_cli.commands.error_registry.codes_generator import render_pipelex_codes
+from pipelex.cli.dev_cli.commands.error_registry.codes_generator import ANNOTATION_BUILTIN_NAMES, render_pipelex_codes
 from pipelex.errors.registry.pipelex_codes import (
     PIPELEX_ERROR_PARAMS,
     CatalogNotFoundParams,
@@ -27,6 +28,24 @@ CONSTRAINED_LIST_PARAMS: dict[str, dict[str, Any]] = {
     "sizes": {"type": "list", "items": {"type": "bytes"}, "description": "Sizes."},
     "durations": {"type": "list", "items": {"type": "seconds"}, "description": "Durations."},
     "digests": {"type": "list", "items": {"type": "sha256"}, "description": "Digests."},
+}
+
+
+# A parameter of every type, plain, optional and as a list's items, so the generated module names every annotation it can.
+EVERY_TYPE_PARAMS: dict[str, dict[str, Any]] = {
+    **{
+        f"{prefix}_{scalar}": {"type": scalar, "description": "A value.", **({"optional": True} if prefix == "optional" else {})}
+        for scalar in ("identifier", "integer", "seconds", "bytes", "sha256", "caller_text")
+        for prefix in ("plain", "optional")
+    },
+    "plain_enum": {"type": "enum", "values": ["a", "b"], "description": "A value."},
+    "optional_enum": {"type": "enum", "values": ["a", "b"], "optional": True, "description": "A value."},
+    "operator_value": {"type": "identifier", "operator_only": True, "description": "A value."},
+    **{
+        f"list_of_{scalar}": {"type": "list", "items": {"type": scalar}, "description": "Values."}
+        for scalar in ("identifier", "integer", "seconds", "bytes", "sha256", "caller_text")
+    },
+    "list_of_enum": {"type": "list", "items": {"type": "enum", "values": ["a", "b"]}, "description": "Values."},
 }
 
 
@@ -111,3 +130,21 @@ class TestPipelexCodes:
         with pytest.raises(ValidationError):
             model(scheme="s3", **values)
         assert topic
+
+    def test_the_generated_annotations_name_only_the_builtins_a_parameter_may_not_take(self, composed_document: dict[str, Any]) -> None:
+        """Every lowercase name a generated class annotates with is one the checks refuse as a parameter name, so no field shadows it.
+
+        Only a class body's annotations are resolved in a namespace a field's name enters; the module's own are not.
+        """
+        entry = next(entry for entry in composed_document["codes"] if entry["code"] == "pipelex.storage.unavailable")
+        entry["params"].update(EVERY_TYPE_PARAMS)
+        text = render_pipelex_codes(registry=ErrorRegistryDocument.model_validate(composed_document))
+        annotated_names: set[str] = set()
+        for class_node in ast.walk(ast.parse(text)):
+            if not isinstance(class_node, ast.ClassDef):
+                continue
+            for statement in class_node.body:
+                if isinstance(statement, ast.AnnAssign):
+                    annotated_names.update(name.id for name in ast.walk(statement.annotation) if isinstance(name, ast.Name) and name.id.islower())
+        assert {"str", "int", "float", "list", "frozenset"} <= annotated_names
+        assert annotated_names <= ANNOTATION_BUILTIN_NAMES, annotated_names - ANNOTATION_BUILTIN_NAMES

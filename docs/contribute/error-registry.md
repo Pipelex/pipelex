@@ -63,7 +63,7 @@ To these, Pipelex adds the rules its own use of the registry needs:
 
 - the core registry registers the `pipelex` prefix under the base URL the pages are published at, `https://docs.pipelex.com/errors`;
 - every code a sentence names in backticks exists: a core code such as `provider.credential_refused` in the core registry, a `pipelex.` code in this one;
-- every parameter name can be a field of the generated parameters model, so it is neither a Python keyword nor an attribute of a pydantic model;
+- every parameter name can be a field of the generated parameters model, so it is neither a Python keyword, nor an attribute of a pydantic model, nor a builtin the model's annotations name, such as `int` or `str`, which the field would shadow;
 - distinct codes generate distinct names in the typed Python: the generated names drop the prefix and join the segments, so `pipelex.run_job.failed` and `pipelex.run.job_failed` would both be `RUN_JOB_FAILED` and `RunJobFailedParams`, and the check refuses such a pair rather than let one model replace the other;
 - every title and parameter description can be written into a docstring of the typed Python, so none holds a backslash or a closing quote, and every parameter's field fits on one line of the formatter's length.
 
