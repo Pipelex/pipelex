@@ -40,7 +40,7 @@ The file is always named by its path in the method's tree, `requirements.txt`, o
 
 ## A host's own library directories
 
-A server loads its own library directories (`PIPELEXPATH`, the instance defaults, installed libraries) beside a caller's bundles. A method of those directories whose requirements are not met is the deployment's fault, not the caller's: around such a load, `reporting_host_library_tree_faults` turns the refusal into a `HostLibraryRequirementsError`, a `config`-domain error answered with a `500` whose message, naming paths on the host, never reaches the caller under STRICT disclosure, as it turns a tree it cannot list into a `HostLibraryTreeError`.
+A server loads its own library directories (`PIPELEXPATH`, the instance defaults, installed libraries) beside a caller's bundles. A method of those directories whose requirements are not met is the deployment's fault, not the caller's: around such a load, `reporting_host_library_tree_faults` turns the refusal into a `HostLibraryRequirementsError`, carrying `pipelex.config.invalid` and answered with a `500` whose message, naming paths on the host, never reaches the caller under STRICT disclosure, as it turns a tree it cannot list into a `HostLibraryTreeError`. Any other refusal of such a method while it loads becomes a `HostLibraryLoadRefusalError`, carrying `pipelex.config.invalid` too (see [Library Configuration](../configuration/config-technical/library-config.md)).
 
 ## Where the check runs on a sandbox-hosted deployment
 
@@ -48,7 +48,7 @@ A server loads its own library directories (`PIPELEXPATH`, the instance defaults
 
 - **A run** (`/execute`, `/start`) with a `files` or `bundle_b64` bundle, or by `method_ref`, is refused there as a `422` naming each requirement, before the method's files load and before any dispatch.
 - **A validation by `method_ref`** (`/validate`) is dispatched whole to a validator that never reads the method's Python, a Temporal worker for instance, so `ApiRunner.validate_verdict` returns a refusal as the invalid verdict, one item per line, before the validator is reached. Inline `mthds_contents` carry no Python and are not checked.
-- **A directory of the request that cannot be listed** stays the host's fault, a `500` `HostLibraryTreeError`, as the load reports it.
+- **A directory of the request that cannot be listed** stays the host's fault, a `500` `HostLibraryTreeError` carrying `pipelex.config.invalid`, as the load reports it.
 - **The worker** loads the library crate the runner built, which carries the method's Python sources but not its `requirements.txt`, so it never checks anything, and needs to know nothing of the sandbox's packages.
 
 ## The seam: stating the sandbox's packages
@@ -79,7 +79,7 @@ class ExampleSandboxPlugin:
 
 - **`PipeFuncPackageOffer`** (`pipelex/plugins/pipe_func_package_offer_registry.py`) is closed, frozen plain data: `environment`, the place as a refusal names it to the method's author; `distributions`, each distribution's name with its exact installed version, the names compared normalized; and `marker_environment`, the PEP 508 marker values of the sandbox's interpreter. A variable left out of `marker_environment`, such as `python_full_version` when the image pins only its minor version, makes every requirement whose marker reads it refused.
 - **The factory** receives the `PipeFuncConfig` and is called each time a method declaring requirements loads, never at registration, so it may read the plugin's own configuration and should cache what it computes. It answers `None` when it cannot state the offer.
-- **It fails closed.** A mode with no registered offer, or whose factory answers `None`, meets no requirement: a method declaring one is refused with `PipeFuncPackageSetUnstatedError`, a `config`-domain fault of the deployment whose message is not caller-facing, rather than loading and failing inside the sandbox at its first import. Its message says which of the two happened: no plugin registers an offer for the mode, or the registered one could not state the packages, whose remedy is in the plugin's configuration. A method declaring none still loads.
+- **It fails closed.** A mode with no registered offer, or whose factory answers `None`, meets no requirement: a method declaring one is refused with `PipeFuncPackageSetUnstatedError`, a fault of the deployment carrying `runtime.misconfigured`, whose message is not caller-facing, rather than loading and failing inside the sandbox at its first import. Its message says which of the two happened: no plugin registers an offer for the mode, or the registered one could not state the packages, whose remedy is in the plugin's configuration. A method declaring none still loads.
 - **It is interpreter-layer**, like `add_pipe_func_executor`: a plugin published under `pipelex.plugins.kernel` that calls it is refused with `PluginLayerViolationError`. A second plugin stating the same mode is refused with `DuplicatePipeFuncPackageOfferError`, naming both.
 
 `Pipelex.setup` builds the `PipeFuncPackageOfferRegistry` from the registrar beside the `PipeFuncExecutorRegistry` and puts it on the `InterpreterHub` (`get_pipe_func_package_offer_registry`).
@@ -90,11 +90,11 @@ For the hosted API, the Daytona sandbox plugin registers the offer for its `dayt
 
 ## Errors
 
-| Error | Domain | When |
+| Error | Code | When |
 | --- | --- | --- |
-| `MethodRequirementsFileError` | `input` | The file holds a line the standard refuses, naming each, or is not UTF-8 text. |
-| `MethodRequirementsNotMetError` | `input` | The environment does not meet a requirement, naming each and why. |
-| `HostLibraryRequirementsError` | `config` | A method of a host's own library directories, loaded beside a caller's bundles, is refused for its requirements. |
-| `PipeFuncPackageSetUnstatedError` | `config` | A sandbox-hosted deployment states no package set for its execution mode. |
+| `MethodRequirementsFileError` | `method.package_invalid` | The file holds a line the standard refuses, naming each, or is not UTF-8 text. |
+| `MethodRequirementsNotMetError` | `method.dependency_missing` | The environment does not meet a requirement, naming each and why. |
+| `HostLibraryRequirementsError` | `pipelex.config.invalid` | A method of a host's own library directories, loaded beside a caller's bundles, is refused for its requirements. |
+| `PipeFuncPackageSetUnstatedError` | `runtime.misconfigured` | A sandbox-hosted deployment states no package set for its execution mode. |
 
 The first two are `LibraryLoadingError`s carrying one blueprint validation item per line, whose `source` is the file's path in the tree and whose `line` is the line's number, so a validation reports them as an invalid verdict located on the line. They are deliberately not `MethodTreeLoadError`s, which a server reports as its own fault around the library directories it loads.

@@ -224,6 +224,25 @@ Use `pipelex plugins list` to see every discovered plugin, the entry-point group
 
 ---
 
+## Declaring the error codes a plugin raises
+
+Every error a plugin raises reports a public registry code, a closed plugin's included: a caller reads the code, its page and its next step whatever plugin raised it. A plugin's error class declares its code as its `error_code`, one code, an `ErrorCodeSet` whose raise sites choose one with `.with_error_code(...)`, or an `InheritsCause` that takes its cause's code, and every code comes from the MTHDS core (`CoreCode`) or from Pipelex's registry (`PipelexErrorCode`). A plugin defines no code of its own. A failure a worker builds by hand with an `InferenceErrorCategory` and no code reports the category's own code (`InferenceErrorCategory.default_error_code`) when no cause carries one, so that a transient failure, which the run repeats, never reports a failure no retry clears.
+
+The plugin also declares, in its `register`, every code its errors can carry:
+
+```python
+from mthds.protocol.problem.registry import CoreCode
+
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
+
+
+def register(self, registrar: PluginRegistrar) -> None:
+    registrar.declare_error_codes(codes=(CoreCode.PROVIDER_FAILED, PipelexErrorCode.DOCGEN_PRINT_TIMEOUT, "pipelex.docgen.template_invalid"))
+    # ...and the plugin's backends
+```
+
+A code is given as its constant or as its string. Each one is parsed at boot, and a code neither registry defines refuses the boot with `PluginErrorCodeNotRegisteredError` (`pipelex.plugin.broken`), naming the plugin and the code, before any of the plugin's codes is bound. A release of the plugin built against codes this Pipelex does not define therefore fails where its operator sees it, never on a caller's run. Several plugins may declare the same code, since a public code means one thing whoever raises it. The registrar keeps the bound codes per plugin in `declared_error_codes`, and the seam belongs to no layer, so a `pipelex.plugins.kernel` plugin declares its codes as an interpreter plugin does.
+
 ## The Inference SPI
 
 What an out-of-tree backend plugin imports *is* the contract. The published surface is listed below, one module per row, grouped by what a plugin does with it. The plugin contract and the worker contracts are what every backend plugin needs; the rest is what a plugin reaching an OpenAI- or Anthropic-compatible service, or a gateway with error codes of its own, builds on.
@@ -316,10 +335,13 @@ A worker implements the provider half of a call, `_gen_text` or `_extract_pages`
 | `parse_retry_after_seconds`, `error_code_from_body_code_first` | `pipelex.cogt.inference.error_classification` | the parsers a distiller of a plain-HTTP failure shares |
 | `extract_gateway_metadata` | `pipelex.cogt.inference.error_classification` | the distiller of a Portkey-substrate failure |
 | `ProviderName` | `pipelex.cogt.inference.provider_name` | which provider a distilled failure reports |
-| `classify_inference_error` | `pipelex.cogt.inference.error_classify` | the shared Classify step |
-| `InferenceErrorFamily`, `render_inference_error` | `pipelex.cogt.inference.error_render` | the shared Render step |
-| `ServiceErrorCode` | `pipelex.cogt.inference.service_error_vocabulary` | one error code a plugin's service emits, contributed through `PluginRegistrar.add_service_error_codes` ([Service Error Codes](service-error-codes.md)) |
-| `URLs` | `pipelex.urls` | the public error docs base a plugin error's declared type URI points under |
+| `classify_inference_error`, `InferenceErrorFamily`, `ClassificationResult` | `pipelex.cogt.inference.error_classify` | the shared Classify step, called with the family of the failed call (`classify_inference_error(metadata, family=InferenceErrorFamily.LLM)`), which picks the category and the registry code together |
+| `render_inference_error` | `pipelex.cogt.inference.error_render` | the shared Render step, which constructs the family's error with the code the Classify step picked |
+| `ServiceErrorCode` | `pipelex.cogt.inference.service_error_vocabulary` | one error code a plugin's service emits, with the registry code it reports, contributed through `PluginRegistrar.add_service_error_codes` ([Service Error Codes](service-error-codes.md)) |
+| `INFERENCE_FAILURE_CODES` | `pipelex.cogt.exceptions` | the registry codes every family's failure class declares, which a classification and a service error code pick from |
+| `CoreCode` | `mthds.protocol.problem.registry` | the MTHDS core's public error codes |
+| `PipelexErrorCode` | `pipelex.errors.registry.pipelex_codes` | Pipelex's own public error codes |
+| `ErrorCodeSet`, `InheritsCause`, `ABSTRACT_ERROR` | `pipelex.errors.error_code_declaration` | how a plugin's error class declares its code: a set its raise sites choose from, its cause's code, or none for a base never raised |
 
 **The runtime a worker runs in**
 
@@ -345,6 +367,7 @@ The SPI is a documented, versioned **module/symbol list** gated by `PLUGIN_API_V
 | duplicate `sdk` model lister | `DuplicateModelListerError` (names both plugins) |
 | a service error code two plugins contribute | `DuplicateServiceErrorCodeError` (names both plugins) |
 | a service error code the runtime classifies itself | `ReservedServiceErrorCodeError` |
+| a declared error code neither the MTHDS core nor Pipelex's registry defines | `PluginErrorCodeNotRegisteredError` (names the plugin and the code) |
 | `name` in `runtime.plugins.disabled` but core-unconditional | `CoreUnconditionalPluginDisabledError` |
 | entry point raises while loading/registering | `BrokenPluginError` |
 | lookup for an unregistered `(family, sdk)` | `InferenceBackendNotFoundError` ("… Is its plugin installed and enabled?") |
