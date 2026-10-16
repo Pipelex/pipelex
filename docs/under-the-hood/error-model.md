@@ -52,7 +52,7 @@ Classification happens once, at **Layer 1**. Layers 2–5 are wrappers: they att
 | `error_type` | `str` | The exception class name |
 | `message` | `str` | Human-readable message |
 | `title` | `str` | Stable human-readable summary — the RFC 7807 `title` |
-| `type_uri` | `str` | Per-class documentation URI — the RFC 7807 `type` |
+| `type_uri` | `str` | Class-derived URI — the RFC 7807 `type`; the per-class pages it named are retired, see [Error codes](#error-codes-and-the-pipelex-error-registry) |
 | `error_category` | `str \| None` | `InferenceErrorCategory` value (inference errors only) |
 | `error_domain` | `str \| None` | `ErrorDomain` value — `input` / `config` / `runtime`. Declared per class, except on the `CogtError` family where it is [derived from `error_category`](#the-cogterror-family-derives-its-domain-from-its-category) |
 | `retryable` | `bool \| None` | Whether a retry could succeed. Declared per class, `retryable = False` on a deterministic refusal of what the caller sent (`BundleResourceNotNamedError`, `BundleResourcePathError`), except on the `CogtError` family where it is derived from `error_category`; left `None`, it is taken from the cause chain, or absent |
@@ -71,6 +71,14 @@ Classification happens once, at **Layer 1**. Layers 2–5 are wrappers: they att
 `error_type` has no such hatch: it is `type(self).__name__`, the Python class name with no indirection. That makes it the **machine contract** — consumers outside this repo `switch` on that string. Renaming an error class therefore breaks them *silently*: their build stays green and the branch simply stops matching, falling through to a generic error path.
 
 The guard against that is a committed snapshot of the full `(error_type, title, type_uri)` set at `tests/data/errors/error_identity.txt`, regenerated with `make generate-error-identity` (alias `make gei`) and gated by `tests/unit/pipelex/errors/test_error_identity_snapshot.py`. A rename cannot land without producing a reviewable one-line-pair diff on that file at the moment it is made — which is also the moment to plan the matching consumer updates.
+
+### Error codes and the Pipelex error registry
+
+The MTHDS standard names every error a runner or a client can meet with a code, `input.missing` or `model.unavailable`, and publishes them as its core error registry: one entry per code, declaring its title, the domain whose actor must act, its retry verdict, its steps, its typed parameters and its HTTP status. A problem's `type` is the code's page, `https://mthds.ai/errors/<code>` for a core code. What the standard leaves to implementations, billing, organizations, the hosted catalog, Pipelex's storage, its configuration and plugins and the components it ships, Pipelex names with codes of its own under the `pipelex` extension prefix, which the core registry registers to Pipelex: `pipelex.billing.credit_exhausted`, `pipelex.config.variable_missing`.
+
+The Pipelex codes are authored in one public file, `pipelex/errors/registry/pipelex-error-registry.yaml`, in the standard's registry format. Everything else is generated from it with `make generate-error-registry` (alias `make ger`): the JSON snapshot `pipelex-error-registry.json` beside it, which the package ships, every release publishes as an asset, and `load_pipelex_error_registry()` (`pipelex/errors/registry/registry_document.py`) reads; the typed Python of the codes, `pipelex/errors/registry/pipelex_codes.py`, with a `PipelexErrorCode` member and a closed parameters model per code; and one page per code under `docs/errors/`, which is where a Pipelex code's type URI, `https://docs.pipelex.com/errors/<code>`, leads. [The Error Registry](../contribute/error-registry.md) describes the format's checks and the workflow.
+
+The registry does not yet drive the reports above: `error_type` and the class-derived `type_uri` are still what a report carries, and the per-class pages that `type_uri` named are retired. Moving each raise site and the API's problem documents onto the codes is the next step of this work.
 
 ### `validation_errors` — structured bundle-validation diagnostics
 
@@ -543,6 +551,8 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 | File | Purpose |
 |------|---------|
 | `pipelex/base_exceptions.py` | `PipelexError`, `ErrorReport`, `ErrorDomain`, `ValidationErrorItem`, `error_domain_to_http_status()` |
+| `pipelex/errors/registry/pipelex-error-registry.yaml` | The Pipelex error registry, the single source of the `pipelex.` codes; its snapshot, its typed codes (`pipelex_codes.py`) and its pages are generated from it |
+| `pipelex/errors/registry/registry_document.py` | The typed model of an MTHDS error registry, and `load_pipelex_error_registry()` |
 | `pipelex/pipeline/validation_errors.py` | `build_validation_error_items()` — shared CLI/API structured bundle-validation builder |
 | `pipelex/validation_error_types.py` | The closed `error_type` registry — `VALIDATION_ERROR_TYPES`, `PipeValidationErrorType`, `PipeFactoryErrorType`, `ValidationResidualErrorType`, `HintLintErrorType` |
 | `pipelex/cogt/exceptions.py` | `CogtError`, `InferenceErrorCategory` |

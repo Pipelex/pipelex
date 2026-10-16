@@ -59,9 +59,6 @@ plugins:
       separator: '[\s\-\.]+'
   - redirects:
       redirect_maps:
-        # `PipelexInterpreterError` was renamed `MthdsParserError`; the error page filename and the
-        # `type_uri` it publishes both derive from the class name, so the retired URI needs a redirect.
-        'errors/pipelex-interpreter-error.md': 'errors/mthds-parser-error.md'
         'under-the-hood/temporal-deployment.md': 'distributed-execution/index.md'
         'distributed-execution/temporal/index.md': 'distributed-execution/index.md'
         'distributed-execution/cluster-setup.md': 'distributed-execution/index.md'
@@ -363,6 +360,7 @@ plugins:
         - under-the-hood/log-sink-plugins.md: "Log Sink Plugins"
         - under-the-hood/document-engine-plugins.md: "Document Engine Plugins"
         - under-the-hood/error-model.md: "Error Model"
+        - errors/index.md: "Error Codes"
         - under-the-hood/runtime-bridge-and-transport.md: "Runtime Bridge & Transport"
         - under-the-hood/distributed-content-generation.md: "Content Generation Across Boundaries"
         Project:
@@ -377,6 +375,7 @@ plugins:
         - contribute/registration-surface.md: "Registration Surface"
         - contribute/inference-family-surface.md: "Inference Family Surface"
         - contribute/drift-contracts.md: "Drift Contracts"
+        - contribute/error-registry.md: "The Error Registry"
         - contribute/mthds-test-corpus.md: "MTHDS Test Corpus"
         - contribute/trace-input-semantics.md: "Tracing Input Semantics"
         - contribute/generate-projection-corpus.md: "Projection Fixture Corpus"
@@ -426,24 +425,16 @@ extra_css:
 # Pages intentionally excluded from the user-facing nav.
 #
 # - `CLAUDE.md` is a docs-authoring guide for contributors, not a published page.
-# - `errors/*.md` are generated reference stubs (one per PipelexError subclass) reached
-#   via the RFC 7807 `type` URI carried on every ErrorReport. They are not part of any
-#   guided navigation flow — the only nav entries are the landing page `errors/index.md`
-#   and the macro listing pages (`errors/authoring-and-language.md`, etc., re-included
-#   below), and the individual per-class pages live as orphan pages whose existence is
-#   declared here so `mkdocs build --strict` does not flag them as accidentally unlisted.
+# - `errors/pipelex/` holds one generated page per code of the Pipelex error registry, reached
+#   through the code's type URI and from the index `errors/index.md`, which the nav lists.
+#   `pipelex-dev generate-error-registry` writes them all; see docs/contribute/error-registry.md.
 # - `agents/*.md` are AI-agent-facing playbooks (debugging workflows, environment
 #   gotchas) referenced from the root `CLAUDE.md`. They are built and searchable but
 #   intentionally kept out of the user-facing nav so they don't clutter the reading
 #   flow for human readers of the docs site.
 not_in_nav: |
   CLAUDE.md
-  errors/*.md
-  !errors/index.md
-  !errors/authoring-and-language.md
-  !errors/execution-and-runtime.md
-  !errors/inference-and-providers.md
-  !errors/platform-and-tooling.md
+  errors/pipelex/
   agents/*.md
 
 nav:
@@ -565,12 +556,7 @@ nav:
       - Observer Data Extraction: analytics/data-extraction.md
       - Telemetry: setup/telemetry.md
       - Usage Statistics: setup/usage-statistics.md
-    - Error Reference:
-      - Overview: errors/index.md
-      - Authoring & language: errors/authoring-and-language.md
-      - Execution & runtime: errors/execution-and-runtime.md
-      - Inference & providers: errors/inference-and-providers.md
-      - Platform & tooling: errors/platform-and-tooling.md
+    - Error Codes: errors/index.md
     - Configuration (TOML reference):
       - Overview: configuration/index.md
       - Pipeline Validation Configuration:
@@ -640,6 +626,7 @@ nav:
     - Registration Surface: contribute/registration-surface.md
     - Inference Family Surface: contribute/inference-family-surface.md
     - Drift Contracts: contribute/drift-contracts.md
+    - The Error Registry: contribute/error-registry.md
     - MTHDS Test Corpus: contribute/mthds-test-corpus.md
     - Tracing Input Semantics: contribute/trace-input-semantics.md
     - Projection Fixture Corpus: contribute/generate-projection-corpus.md
