@@ -13,7 +13,7 @@ The `PipeFunc` operator provides an essential escape hatch, allowing you to exec
 
 A `PipeFunc` step names a Python function of its method by the function's **import path from the root of the method's tree**: `function_name = "funcs.totals.compute_totals"` names the function `compute_totals` of the file `funcs/totals.py` in the method's folder. The [method tree](../../method-trees.md) is the set of files the method is made of, so the function travels with the method wherever the method goes.
 
-1. **Validation** locates the module in the tree and proves, from its source and without running any Python, that the function is a top-level `def` or `async def` of the module carrying the `@pipe_func()` marker.
+1. **Validation** locates the module in the tree and proves, from its source and without running any Python, that the function is a top-level `def` or `async def` of the module carrying the `@pipe_func()` marker. A function it cannot find or prove is a `pipe_func_function_refused` validation error on the step's `function_name`, saying what is missing.
 2. **The step's first run** imports the module under its real name, with the tree's root first on Python's import path, so the module imports its siblings in the tree as it would anywhere else (`from funcs.rates import VAT_RATE`). The imported function is then checked against the calling convention and the step's output.
 3. **Each run** calls the function with the current `working_memory`, and stores what it returns as the step's output.
 

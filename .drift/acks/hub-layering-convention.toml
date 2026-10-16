@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:72fac07cc613e7b8eefe3ffa16d368fcfd1c883e9ca67fa42521189cd29509f0"
+digest = "sha256:b43388e7c97d4a39aadb375cde0f3431d0e9bce1c15adab9d9d4c61e958a403a"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-16T01:21:40Z"
-rationale = "clean-pass: interpreter_hub.py gains the PipeFuncPackageOfferRegistry setter and getters and the module accessor get_pipe_func_package_offer_registry; this change already lists it in the pipe func row of the partition table and names the registry's install beside the PipeFuncExecutorRegistry in Pipelex.setup; no import crosses the boundary."
+reviewed_at = "2026-10-16T02:32:28Z"
+rationale = "real-catch: after merging dev, runtime_hub.py drops FuncRegistry, set_func_registry and get_func_registry with the retired registry, and interpreter_hub.py carries dev's PipeFuncPackageOfferRegistry accessors; docs/contribute/hub-layering.md no longer names get_func_registry among the runtime hub's getters and lists get_pipe_func_package_offer_registry in the pipe func row. No import crosses the boundary."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:fda2237457fe0b6830ff2ae8f720698735bec4c3"
 "pipelex/interpreter_hub.py" = "blob:4efc29ca60c42ca0fe0533c402d7bb246b0bb2c2"
-"pipelex/runtime_hub.py" = "blob:2af9f62d93b2005daa55a7c61e0390601e430c00"
+"pipelex/runtime_hub.py" = "blob:87f051f8ab31244ed34c9c5dfc499d5e309edcaf"

@@ -222,7 +222,7 @@ fails_at = "runtime"
 
 [error.pipe_func_function_refused]
 code = "pipe_func_function_refused"
-fails_at = "runtime"
+excluded = "It refuses a PipeFunc step whose function its method tree does not hold or cannot be proven, so only a PipeFunc step produces it, and the PipeFunc operator is excluded: a focused entry is one bundle that has to validate everywhere, and its Python module would have to travel with it to consumers that do not read Python. Exercise it in a consumer's own fixtures, beside the operator."
 
 [error.unknown_validation_error]
 code = "unknown_validation_error"

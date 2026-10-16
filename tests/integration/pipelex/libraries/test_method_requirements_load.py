@@ -8,9 +8,9 @@ from pipelex.core.method_trees.tree_python import TREE_PYTHON_HOLD
 from pipelex.interpreter_hub import get_library_manager, get_required_pipe, scoped_current_library
 from pipelex.libraries.exceptions import MethodRequirementsNotMetError, PipeFuncPackageSetUnstatedError
 from pipelex.mthds_parsing.parser import MthdsParser
+from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.plugins.pipe_func_package_offer_registry import PipeFuncPackageOffer, PipeFuncPackageOfferFactoryFn, PipeFuncPackageOfferRegistry
 from pipelex.system.configuration.pipe_func_config import PipeFuncConfig
-from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from tests.integration.pipelex.libraries.installed_packages import isolate_installed_methods, vendor_probe
 from tests.integration.pipelex.libraries.test_data import ProbePackageTestData
 

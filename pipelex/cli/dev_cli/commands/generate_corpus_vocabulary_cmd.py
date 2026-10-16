@@ -177,6 +177,12 @@ _ERROR_TYPE_EXCLUSIONS: dict[ValidationErrorType, str] = {
         "address-based reference to a package that is not installed fails as `unresolved_package_dependency` instead. "
         "Revisit if an entry can ever carry the packages it depends on."
     ),
+    PipeValidationErrorType.PIPE_FUNC_FUNCTION_REFUSED: (
+        "It refuses a PipeFunc step whose function its method tree does not hold or cannot be proven, so only a PipeFunc "
+        "step produces it, and the PipeFunc operator is excluded: a focused entry is one bundle that has to validate "
+        "everywhere, and its Python module would have to travel with it to consumers that do not read Python. "
+        "Exercise it in a consumer's own fixtures, beside the operator."
+    ),
     PipeValidationErrorType.LLM_SETTING_REFUSED_BY_MODEL: (
         "It refuses a model setting the model it resolves to refuses, such as reasoning on a model that does not "
         "think, so the bundle that produces it must name a model the deck defines with that particular capability. "
