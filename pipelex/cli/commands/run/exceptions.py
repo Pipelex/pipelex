@@ -18,5 +18,3 @@ class AmbiguousInputsFilesError(PipelexError):
         kind=UserActionKind.CHANGE_INPUT,
         detail="Pass --inputs explicitly to choose which inputs file to use",
     )
-    # The message describes a fault in the caller's own bundle directory — caller-facing copy.
-    _authors_caller_facing_message = True

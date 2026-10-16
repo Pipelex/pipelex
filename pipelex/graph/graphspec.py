@@ -11,6 +11,7 @@ from typing import Annotated, Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
+from pipelex.errors.problem import PipelexProblem
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 # Redaction limits
@@ -277,29 +278,6 @@ class NodeIOSpec(BaseModel):
     outputs: list[IOSpec] = Field(default_factory=empty_list_factory_of(IOSpec))
 
 
-class ErrorSpec(BaseModel):
-    """Error information for failed nodes.
-
-    Stack traces are automatically truncated to MAX_STACK_LENGTH.
-    """
-
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    error_type: str
-    message: str
-    stack: str | None = None
-    # Whether `message` was written for the caller, as the `caller_facing_message` of the error report of the error the
-    # pipe raised says: a reader that discloses failures to the caller under the strict disclosure shows the message
-    # only when this is true.
-    caller_facing: bool = False
-
-    @field_validator("stack", mode="after")
-    @classmethod
-    def truncate_stack(cls, value: str | None) -> str | None:
-        """Truncate stack trace to MAX_STACK_LENGTH."""
-        return _truncate_string(value, max_length=MAX_STACK_LENGTH)
-
-
 class ModelUsageSpec(BaseModel):
     """What one inference model actually did for a node.
 
@@ -455,12 +433,23 @@ class NodeSpec(BaseModel):
         validation_alias="io",
         serialization_alias="io",
     )
-    error: ErrorSpec | None = None
+    # The problem that ended a failed node, in the caller's view, located at the node's own pipe; None for every other
+    # status.
+    error: PipelexProblem | None = None
+    # The stack trace of the error that ended a failed node, when the graph's data inclusion asks for it, truncated to
+    # MAX_STACK_LENGTH.
+    error_stack: str | None = None
     tags: dict[str, str] = Field(default_factory=dict)
     metrics: dict[str, float] = Field(default_factory=dict)
     # Inference usage attributed to this node; None under NodeUsageSpec invariant 1.
     usage: NodeUsageSpec | None = None
     execution_data: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("error_stack", mode="after")
+    @classmethod
+    def truncate_error_stack(cls, value: str | None) -> str | None:
+        """Truncate the stack trace to MAX_STACK_LENGTH."""
+        return _truncate_string(value, max_length=MAX_STACK_LENGTH)
 
 
 class EdgeSpec(BaseModel):

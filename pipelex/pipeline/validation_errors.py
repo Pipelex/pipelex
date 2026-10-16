@@ -1,19 +1,25 @@
-"""Shared builder that flattens bundle-validation error data into typed wire items.
+"""Shared builder that flattens bundle-validation error data into typed wire items, and those into problem items.
 
-``build_validation_error_items`` is the single source of truth behind both
-structured-error surfaces:
+``build_validation_error_items`` is the single source of truth behind every
+structured-error surface:
 
 - the agent CLI's ``validation_errors`` JSON array (via
-  ``pipelex.cli.agent_cli.commands.agent_output.extract_validation_errors``), and
-- the API report's ``ErrorReport.validation_errors`` (via
-  ``ValidateBundleError.to_error_report``).
+  ``pipelex.cli.agent_cli.commands.agent_output.extract_validation_errors``),
+- the ``/validate`` route's invalid verdict, and
+- the problem's ``errors`` (via ``ValidateBundleError.problem_items``, which
+  turns each item into a problem item with :func:`problem_item_of`).
 
-Both reach it through ``ValidateBundleError.validation_error_items``, so the CLI
+All of them reach it through ``ValidateBundleError.validation_error_items``, so the CLI
 and API structured shapes cannot drift. It takes the error-data lists directly
 rather than a ``ValidateBundleError`` instance — that keeps the dependency one-directional
 (``pipelex.pipeline.exceptions`` imports this module, never the reverse) so there
 is no import cycle.
 """
+
+from typing import Any
+
+from mthds.protocol.problem.models import ProblemItem
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.core.exceptions import (
@@ -22,8 +28,11 @@ from pipelex.core.exceptions import (
     PipelexBundleBlueprintValidationErrorData,
     PipesAndConceptValidationErrorData,
 )
+from pipelex.core.pipes.exceptions import pipe_validation_error_code
+from pipelex.errors.error_codes import ErrorCode, error_code_spec
+from pipelex.errors.problem import make_location, make_problem_item
 from pipelex.pipeline.fixes.planner import plan_fix_for_blueprint_validation_error, plan_fix_for_pipe_validation_error
-from pipelex.validation_error_types import ValidationResidualErrorType
+from pipelex.validation_error_types import PipeFactoryErrorType, PipeValidationErrorType, ValidationResidualErrorType
 
 
 def build_validation_error_items(
@@ -62,7 +71,7 @@ def build_validation_error_items(
         factory_errors: Pipe-factory error data (e.g. a missing concept).
         pipe_validation_errors: Pipe/concept validation error data.
         dry_run_failures: One located failure per pipe whose dry run failed.
-        fallback_message: The error's caller-facing message, used as the
+        fallback_message: The error's message, used as the
             last-resort residual. Only projected as a ``blueprint_validation``
             item when no other channel produced one.
 
@@ -128,7 +137,7 @@ def build_validation_error_items(
         )
 
     # One located item per failing pipe: the sweep already reduced a failure that made enclosing
-    # controllers fail to the innermost pipe, and built each message under the disclosure rule.
+    # controllers fail to the innermost pipe, and gave each failure the sentence its code renders for a caller.
     for dry_run_failure in dry_run_failures or []:
         items.append(
             ValidationErrorItem(
@@ -157,3 +166,68 @@ def build_validation_error_items(
         )
 
     return items
+
+
+def validation_item_code(*, item: ValidationErrorItem, residual_code: ErrorCode) -> ErrorCode:
+    """The code of a validation item that is not a dry run's: its ``error_type``'s, or ``residual_code`` for an item with none.
+
+    Args:
+        item: The item.
+        residual_code: The code of the refusal the verdict was built from, which an item no stage classified takes.
+
+    Returns:
+        The item's code.
+    """
+    error_type = item.error_type
+    if error_type is None:
+        return residual_code
+    if isinstance(error_type, PipeValidationErrorType):
+        return pipe_validation_error_code(error_type=error_type)
+    if isinstance(error_type, PipeFactoryErrorType):
+        match error_type:
+            case PipeFactoryErrorType.UNKNOWN_CONCEPT:
+                return CoreCode.METHOD_CONCEPT_UNRESOLVED
+            case PipeFactoryErrorType.UNKNOWN_FACTORY_ERROR:
+                return CoreCode.METHOD_SCHEMA_VIOLATION
+    # The dry-run residual, whose items take their failure's own code, and the advisory types, which only ride warnings.
+    return residual_code
+
+
+def _item_facts(*, item: ValidationErrorItem) -> dict[str, Any]:
+    """The facts a validation item holds, by the names the registry gives the parameters that carry them."""
+    facts: dict[str, Any] = {
+        "pipe": item.pipe_code,
+        "concept": item.missing_concept_code or item.concept_code,
+        "variables": item.variable_names,
+        "model": item.model_reference,
+        "model_type": item.model_type,
+        "suggestions": item.suggestions,
+        "field_path": item.field_path,
+        "missing": item.missing_pipe_code,
+        "finding": item.message,
+    }
+    return {name: value for name, value in facts.items() if value is not None}
+
+
+def problem_item_of(*, item: ValidationErrorItem, code: ErrorCode) -> ProblemItem:
+    """The problem item of a validation item: its code, the parameters its locators give that code, and its location.
+
+    Args:
+        item: The validation item.
+        code: Its code: :func:`validation_item_code`'s, or the dry-run failure's own.
+
+    Returns:
+        The problem item, its sentence rendered from the code's template.
+    """
+    spec = error_code_spec(code)
+    params = {name: value for name, value in _item_facts(item=item).items() if name in spec.param_names}
+    line = item.line if item.line is not None and item.line >= 1 else None
+    column = item.column if item.column is not None and item.column >= 1 else None
+    location = make_location(pipe=item.pipe_code, field=item.field_name or item.field_path or None, file=item.source, line=line, column=column)
+    return make_problem_item(
+        code=code,
+        params=params,
+        location=location,
+        suggestions=item.suggestions,
+        suggested_fix=item.suggested_fix.model_dump(mode="json", exclude_none=True) if item.suggested_fix is not None else None,
+    )

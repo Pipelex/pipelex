@@ -25,7 +25,6 @@ class PipeDocGenFactoryError(PipelexError):
             CoreCode.METHOD_FIELD_PATH_UNRESOLVED,
         ),
     )
-    _authors_caller_facing_message = True
 
 
 class PipeDocGenRunError(PipelexError):
@@ -50,7 +49,6 @@ class PipeDocGenUndefinedValueError(PipelexError):
     """
 
     error_code = CoreCode.PIPE_TEMPLATE_RENDER_FAILED
-    _authors_caller_facing_message = True
 
 
 class PipeDocGenTemplateCheckError(PipelexError):
@@ -62,7 +60,6 @@ class PipeDocGenTemplateCheckError(PipelexError):
     """
 
     error_code = PipelexErrorCode.DOCGEN_TEMPLATE_INVALID
-    _authors_caller_facing_message = True
 
 
 class PipeDocGenTemplateFileUncheckedError(PipelexError):

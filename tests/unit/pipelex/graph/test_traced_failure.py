@@ -1,11 +1,11 @@
 import logging
 
 import pytest
+from pipelex.graph.traced_failure import ERROR_REPORT_FAULT_MESSAGE, TracedFailure, make_traced_failure
 from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.core.stuffs.exceptions import StuffFactoryError
-from pipelex.graph.traced_failure import ERROR_REPORT_FAULT_MESSAGE, TracedFailure, make_traced_failure
 
 
 class TestTracedFailure:

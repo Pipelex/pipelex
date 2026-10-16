@@ -57,7 +57,6 @@ class DocGenEngineMissingError(PipelexError):
     """
 
     error_code = PipelexErrorCode.DOCGEN_ENGINE_UNAVAILABLE
-    _authors_caller_facing_message = True
 
     def __init__(
         self,
@@ -111,7 +110,6 @@ class DocGenModelCapabilityError(PipelexError):
     """
 
     error_code = CoreCode.MODEL_CAPABILITY_UNSUPPORTED
-    _authors_caller_facing_message = True
 
     def __init__(self, *, doc_gen_format: DocGenFormat, source: DocGenSource, model: str, pipe_code: str | None = None):
         self.doc_gen_format = doc_gen_format
@@ -133,8 +131,8 @@ class DocGenRenderError(PipelexError):
     render contract (`render_job.py`).
 
     Its raise site chooses the code: ``pipelex.docgen.content_unprintable`` for the run's data an engine cannot lay
-    out (an element taller than a page, an image that is not one), which is also the site that says
-    ``as_caller_fault()``; ``pipelex.docgen.print_timeout`` for a print stopped at its deadline;
+    out (an element taller than a page, an image that is not one), whose raise site gives the code's ``reason`` and
+    ``element`` parameters; ``pipelex.docgen.print_timeout`` for a print stopped at its deadline;
     ``pipelex.docgen.resource_refused`` or ``security.method_url_refused`` for a file the printed document may not
     name; ``pipelex.docgen.template_invalid`` for a method's template file the print cannot read; and
     ``runtime.unexpected``, the default, for an engine failure or a job an engine was never meant to get,
@@ -165,7 +163,6 @@ class MarkdownFormattingBudgetError(PipelexError):
     """
 
     error_code = CoreCode.INPUT_TOO_LARGE
-    _authors_caller_facing_message = True
 
 
 class TemplateUrlRefusedError(PipelexError):
@@ -193,7 +190,6 @@ class TemplateUrlRefusedError(PipelexError):
     """
 
     error_code = CoreCode.SECURITY_METHOD_PATH_REFUSED
-    _authors_caller_facing_message = True
 
     def __init__(self, message: str, *, refusal_code: TreeRefusalCode | None):
         super().__init__(message)

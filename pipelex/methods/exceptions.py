@@ -10,12 +10,10 @@ from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 class MethodRefError(PipelexError):
     """Base class for errors while resolving a method reference (`<address>[@<tag>]`).
 
-    Every subclass describes the caller's own reference or the package it points at,
-    so the messages are caller-facing by design.
+    Every subclass describes the caller's own reference or the package it points at.
     """
 
     error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
-    _authors_caller_facing_message: ClassVar[bool] = True
 
 
 class MethodRefParseError(MethodRefError):

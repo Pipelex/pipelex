@@ -8,9 +8,8 @@ class PipeLLMFactoryError(PipelexError):
 
     Raised only while the pipe is built from its blueprint, about that blueprint, so it is the method's to fix
     (``method.template_invalid``) and bundle validation reports it as an item located on the pipe. Its messages
-    name only the author's own pipe, concepts and template text, so they are caller-facing copy kept under STRICT
-    disclosure.
+    name only the author's own pipe, concepts and template text; like every message, they reach the operator's
+    diagnostics alone, the caller reading the sentences the code renders.
     """
 
     error_code = CoreCode.METHOD_TEMPLATE_INVALID
-    _authors_caller_facing_message = True

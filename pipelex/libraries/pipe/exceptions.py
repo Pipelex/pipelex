@@ -38,9 +38,8 @@ class EntryPipeNotFoundError(PipeNotFoundError):
     ``request.pipe_unspecified`` where the caller named no pipe and the method declares no entry pipe. An entry pipe
     the method itself declares that names no pipe of the method chooses ``method.pipe_unresolved``.
 
-    Caller-facing copy: the message names only the caller's own `pipe_code`, so STRICT disclosure
-    keeps it verbatim. The flag spans every raise site of the class, so each one owes that invariant:
-    a message here may name what the caller typed and nothing from the loaded library.
+    The message names only the caller's own `pipe_code`, and each raise site owes that invariant: a
+    message here may name what the caller typed and nothing from the loaded library.
     """
 
     error_code = ErrorCodeSet(
@@ -58,7 +57,6 @@ class EntryPipeNotFoundError(PipeNotFoundError):
         # stop asserting a scope it cannot know.
         detail="Check the pipe code for typos and make sure the bundle in scope for this operation declares it.",
     )
-    _authors_caller_facing_message = True
 
 
 class EntryPipeAmbiguousError(PipeLibraryError):
@@ -69,9 +67,9 @@ class EntryPipeAmbiguousError(PipeLibraryError):
     — ``request.pipe_ambiguous``, same reasoning as :class:`EntryPipeNotFoundError`; several entry pipes the method
     itself declares choose ``method.pipe_unresolved``.
 
-    Caller-facing copy: the message names the caller's own `pipe_code` and the qualified `pipe_ref`s
-    of bundles they loaded themselves, so it survives STRICT disclosure intact — and it has to, since
-    the candidates are the only thing that makes the error actionable. That holds because the entry
+    The message names the caller's own `pipe_code` and the qualified `pipe_ref`s of bundles they
+    loaded themselves, the candidates being the only thing that makes the error actionable, and a raise
+    site gives them as the code's `candidates` parameter, which the caller reads. That holds because the entry
     library carries only the caller's own bundles: the runner passes no `library_dirs` and no
     deployment sets `PIPELEXPATH`, so no host-private `.mthds` is merged into it. It is a property of
     how the runner is deployed, not a rule this class enforces — a deployment that did merge a host
@@ -86,4 +84,3 @@ class EntryPipeAmbiguousError(PipeLibraryError):
         # the alias too — a bare 'domain.pipe_code' does not reach a dependency pipe at all.
         detail="Name one candidate explicitly: 'domain.pipe_code', or 'alias->domain.pipe_code' for a cross-package code.",
     )
-    _authors_caller_facing_message = True

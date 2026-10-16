@@ -23,7 +23,8 @@ from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
 def _describe_template_syntax_error(*, validation_error: ValidationError) -> str:
     """Say where a prompt fails to parse, in words that owe nothing to the prompt.
 
-    A ``PipeLLMFactoryError`` is caller-facing, and the prompt it is about may not be the caller's: a pipe
+    The description is the ``finding`` parameter of a ``PipeLLMFactoryError``'s problem, which reaches the caller, and
+    the prompt it is about may not be the caller's: a pipe
     with no system prompt of its own inherits its domain's, which a host's library may have declared.
     Every layer between Jinja2 and this factory appends the template source to its message, and Jinja2's
     own diagnosis quotes the token it stopped at (an unknown tag's name, an unexpected word), so no text

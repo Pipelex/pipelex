@@ -18,7 +18,7 @@ from pydantic import BaseModel, PydanticUserError, ValidationError
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.base_exceptions import PipelexError, SecurityError, error_domain_is_input, iter_cause_chain
+from pipelex.base_exceptions import ErrorDomain, PipelexError, SecurityError, iter_cause_chain
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.config import is_pipe_func_sandbox_hosted
 from pipelex.core.bundle_resources.bundle_resource import canonical_submitted_files
@@ -326,7 +326,7 @@ def _locating_pipe_build_refusals(
     except (SecurityError, LibraryError, PipeValidationError):
         raise
     except PipelexError as refusal:
-        if not error_domain_is_input(refusal.to_error_report().error_domain):
+        if not ErrorDomain.from_problem_domain(refusal.resolve_domain()).is_input:
             raise
         authored_pipe_code = elaboration.parent_pipe_code if elaboration is not None else pipe_code
         raise PipeLoadRefusalError.make_from_refusal(
@@ -1825,7 +1825,7 @@ class LibraryManager(LibraryManagerAbstract):
                     methods_dirs=methods_dirs,
                 )
             except (MethodFetchDisabledError, MethodDependencyFetchError) as exc:
-                # The item carries the caller-facing text; the host's log keeps the whole cause chain, git's raw output
+                # The item carries the sentence its code renders; the host's log keeps the whole cause chain, git's raw output
                 # included, since a cause on the host (git missing, an unwritable clone directory) becomes an item too.
                 causes = " <- ".join(f"{type(cause).__name__}: {cause}" for cause in iter_cause_chain(exc))
                 log.warning("A method package could not be resolved", fields={"package_address": full_address, **error_fields(exc=exc, text=causes)})

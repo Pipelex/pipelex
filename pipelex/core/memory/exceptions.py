@@ -53,15 +53,13 @@ class InputShapingError(PipelexError):
 
     Every subclass describes a fault in the *caller's own* provided inputs — the input name,
     the declared concept, what was provided, and the expected shape rendered from the pipe's
-    signature. Each subclass carries an ``input.`` code (the caller can fix it), and ``_authors_caller_facing_message``
-    (the copy names only the caller's inputs and method, so it survives STRICT disclosure).
+    signature. Each subclass carries an ``input.`` code (the caller can fix it).
 
     Each subclass sets a per-instance ``user_action`` (advice tailored to the specific failure)
     rather than a class-level one, because the actionable fix differs per failure mode.
     """
 
     error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
-    _authors_caller_facing_message = True
 
     def __init__(self, message: str, *, variable_name: str, user_action: UserAction | None = None):
         self.variable_name = variable_name

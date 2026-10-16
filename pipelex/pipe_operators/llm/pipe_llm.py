@@ -6,7 +6,6 @@ from typing_extensions import override
 
 from pipelex.base_exceptions import iter_cause_chain
 from pipelex.cogt.exceptions import LLMCompletionError, ModelChoiceNotFoundError
-from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting, LLMSettingChoices
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
 from pipelex.cogt.models.model_reference import ModelReference
@@ -437,12 +436,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         return (
             PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
             .with_error_code(CoreCode.METHOD_TEMPLATE_INVALID)
-            .as_caller_fault(
-                user_action=UserAction(
-                    kind=UserActionKind.CHANGE_INPUT,
-                    detail=f"Fix the {where} of PipeLLM '{self.code}': {fault}",
-                )
-            )
+            .with_params(template=where, finding=fault)
         )
 
     def _format_error_location(self, pipe_run_params: PipeRunParams) -> str:

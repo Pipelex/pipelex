@@ -26,7 +26,6 @@ from pipelex.cogt.exceptions import (
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting
-from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.cogt.judgment.judgment_setting import JudgmentModelChoice, JudgmentSetting
 from pipelex.cogt.llm.llm_setting import (
     LLMModelChoice,
@@ -65,7 +64,7 @@ def resolve_deck_choice(*, deck_setting: str, resolve: Callable[[], DeckSettingT
     """Resolve a model choice the deck names itself, a default or an override, so that a miss is the deck's fault.
 
     The deck's lookups refuse a reference they do not resolve as ``ModelChoiceNotFoundError``, which reads as the
-    method's: ``model.unknown`` and caller-facing. A step that names no model reaches the same lookups with the deck's
+    method's: ``model.unknown``. A step that names no model reaches the same lookups with the deck's
     own choice, and the caller can change nothing about that, so the miss is raised again as a
     ``ModelDeckChoiceUnresolvedError`` naming the deck's setting.
 
@@ -1387,12 +1386,7 @@ class ModelDeck(ConfigModel):
                 raise (
                     ModelNotFoundError(message=msg, model_handle=model_handle)
                     .with_error_code(CoreCode.MODEL_UNKNOWN)
-                    .as_caller_fault(
-                        user_action=UserAction(
-                            kind=UserActionKind.CHANGE_MODEL,
-                            detail=f"Change the model '{model_handle}' to {model_type.indefinite_description} the model deck serves.",
-                        )
-                    )
+                    .with_params(model=model_handle, model_type=model_type)
                 )
             raise ModelNotFoundError(message=msg, model_handle=model_handle)
         if self.inference_models.get(model_type=model_type, handle=model_handle) is None:

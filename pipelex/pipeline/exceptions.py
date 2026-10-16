@@ -1,11 +1,12 @@
 import re
 from collections.abc import Collection
-from typing import ClassVar, NamedTuple, Self, TypeVar
+from typing import Any, ClassVar, NamedTuple, Self, TypeVar
 
+from mthds.protocol.problem.models import ProblemItem, ProblemLocation
 from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
-from pipelex.base_exceptions import ErrorReport, PipelexError, ValidationErrorItem
+from pipelex.base_exceptions import PipelexError, ValidationErrorItem
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.core.exceptions import (
     DryRunFailureErrorData,
@@ -14,10 +15,12 @@ from pipelex.core.exceptions import (
     PipesAndConceptValidationErrorData,
 )
 from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, ErrorCodeSet, InheritsCause
+from pipelex.errors.error_codes import ErrorCode, code_is_method_domain
+from pipelex.errors.problem import PipelexProblem, ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.pipe_run.exceptions import find_failure_location
-from pipelex.pipe_run.located_failure import build_located_failure_report, locate_failure_message
-from pipelex.pipeline.validation_errors import build_validation_error_items
+from pipelex.pipe_run.located_failure import failure_location_of, locate_failure_message, located_root_fault
+from pipelex.pipeline.validation_errors import build_validation_error_items, problem_item_of, validation_item_code
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 
@@ -37,14 +40,10 @@ class PipelineExecutionError(PipelexError):
     (it happened outside any routed pipe run, or it crossed a transport boundary as a report that
     already names its pipe), ``pipe_code`` is the entry pipe and ``pipe_stack`` is empty.
 
-    Its report is not its own. It takes its cause's code, and ``to_error_report()`` takes the identity
-    (``code``, ``error_type``, ``title``, ``type_uri``, and the domain and retry verdict the code
-    decides), the message and the caller-facing flag of the root fault, the first ``PipelexError`` on
-    the cause chain that carries a code of its own, or the report such an error recovered across a
-    transport boundary; the message is prefixed with the failing pipe and its path. The diagnostics are
-    inherited from the cause chain (so a categorized ``CogtError`` keeps its ``WAIT_AND_RETRY`` /
-    ``CHECK_BILLING`` action) and, when nothing on the chain advises an action, a fallback names the
-    failing pipe. See ``pipelex.pipe_run.located_failure``.
+    Its problem is not its own. It takes its cause's code, and ``to_problem()`` is the root fault's, the first
+    ``PipelexError`` on the cause chain that carries a code of its own, or the problem such an error recovered across
+    a transport boundary, with a ``location`` naming the failing pipe and its path. See
+    ``pipelex.pipe_run.located_failure``.
     """
 
     error_code = InheritsCause(fallback=CoreCode.RUNTIME_UNEXPECTED)
@@ -95,13 +94,19 @@ class PipelineExecutionError(PipelexError):
         )
 
     @override
-    def to_error_report(self) -> ErrorReport:
-        return build_located_failure_report(
-            wrapper=self,
-            own_report=super().to_error_report(),
-            pipe_code=self.pipe_code,
-            pipe_stack=self.pipe_stack,
-        )
+    def to_problem(
+        self,
+        *,
+        view: ProblemView,
+        request_id: str | None = None,
+        pipeline_run_id: str | None = None,
+        failure_location: ProblemLocation | None = None,
+    ) -> PipelexProblem:
+        location = failure_location or failure_location_of(pipe_code=self.pipe_code, pipe_stack=self.pipe_stack)
+        root_fault = located_root_fault(wrapper=self)
+        if root_fault is None:
+            return super().to_problem(view=view, request_id=request_id, pipeline_run_id=pipeline_run_id, failure_location=location)
+        return root_fault.to_problem(view=view, request_id=request_id, pipeline_run_id=pipeline_run_id, failure_location=location)
 
 
 class PipeStackOverflowError(PipelexError):
@@ -113,6 +118,10 @@ class PipeStackOverflowError(PipelexError):
         self.limit = limit
         self.pipe_stack = list(pipe_stack)  # snapshot: the live stack unwinds after this error is raised
         super().__init__(message)
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"limit": self.limit}
 
 
 class PipelineManagerNotFoundError(PipelexError):
@@ -248,8 +257,11 @@ class ValidateBundleError(PipelexError):
 
     All errors are categorized and stored in their respective lists.
 
-    Its code is ``method.invalid``, each item keeping its own; a request that names nothing to validate, such
-    as an empty set of bundle contents, is ``request.invalid``, chosen at its raise site.
+    Its code is ``method.invalid``, each item keeping its own code on the problem's ``errors``; a request that names
+    nothing to validate, such as an empty set of bundle contents, is ``request.invalid``, chosen at its raise site.
+    The validation translation builds one only when at least one item is the method's
+    (``pipelex.pipeline.validate_bundle_translation``): a refusal whose every item is a fault of another actor answers
+    that fault, never an invalid verdict.
     """
 
     error_code = ErrorCodeSet(default=CoreCode.METHOD_INVALID, others=(CoreCode.REQUEST_INVALID,))
@@ -259,9 +271,6 @@ class ValidateBundleError(PipelexError):
         # suggested fix when one can be derived, so the top level says to follow them rather than to go read them.
         detail="Edit the bundle as each validation error says: apply its suggested fix where it has one, after confirming an unsafe one",
     )
-    # Bundle-validation messages describe faults in the caller's own bundle —
-    # caller-facing copy, kept verbatim under STRICT disclosure.
-    _authors_caller_facing_message = True
 
     def __init__(
         self,
@@ -285,11 +294,10 @@ class ValidateBundleError(PipelexError):
 
         # Disease C: the top-line ``message`` is often a leaky ``str(pydantic ValidationError)``
         # (``Value errors: '<field>': Value error, …``). Replace it at the source with a clean
-        # summary derived from the already-clean per-error item messages, so EVERY surface that
-        # shows the top-line — the agent JSON ``message`` and the API report — benefits (one
-        # engine), not just the CLI markdown. The raw ``message`` still rides ``to_error_report``'s
-        # ``fallback_message`` residual, which only fires when there is no categorized data (the
-        # summary is the raw message in that same case, so the two stay consistent).
+        # summary derived from the already-clean per-error item messages, so every surface that
+        # shows the top-line benefits (one engine), not just the CLI markdown. The raw ``message``
+        # still rides the ``fallback_message`` residual, which only fires when there is no categorized
+        # data (the summary is the raw message in that same case, so the two stay consistent).
         super().__init__(
             _summarize_bundle_validation_message(
                 blueprint_errors=self.pipelex_bundle_blueprint_validation_errors,
@@ -310,7 +318,7 @@ class ValidateBundleError(PipelexError):
         answer about the same bundle. Every channel the constructor takes is carried here: a channel added to
         it must be added here too, which ``test_validate_bundle_error_withholding`` pins. A validator of
         submitted content uses it to keep the files of the host's own library directories, paths on the host,
-        out of a verdict that STRICT disclosure hands the caller verbatim.
+        out of a verdict the caller reads.
 
         Args:
             withheld_files: Every spelling of every file the verdict must not name.
@@ -343,8 +351,8 @@ class ValidateBundleError(PipelexError):
     def validation_error_items(self) -> list[ValidationErrorItem]:
         """Project every channel this verdict carries into typed wire items, via the shared builder.
 
-        The one projection behind the API report (:meth:`to_error_report`), the agent CLI's
-        ``validation_errors`` array and ``pipelex fix``, so no surface can drop a channel another
+        The one projection behind the problem's items (:meth:`problem_items`), the ``/validate`` verdict, the agent
+        CLI's ``validation_errors`` array and ``pipelex fix``, so no surface can drop a channel another
         keeps. The pipe-validation arm uses :attr:`pipe_validation_error_data` (pipe validation
         **plus** pipe/concept instantiation errors) so the instantiation category is not silently
         dropped. Each dry-run failure becomes its own located ``dry_run`` item. Finally
@@ -363,19 +371,26 @@ class ValidateBundleError(PipelexError):
         )
 
     @override
-    def to_error_report(self) -> ErrorReport:
-        """Attach the structured ``validation_errors`` list onto the base report.
+    def problem_items(self) -> list[ProblemItem] | None:
+        """One problem item per validation item, each with its own code: a dry run's the failure's, any other its type's.
 
-        ``super().to_error_report()`` builds the report and enriches it from the
-        ``__cause__`` chain; this override then attaches the per-error structured
-        list from :meth:`validation_error_items` — the same items the agent CLI
-        emits — so the API problem document carries machine-mappable diagnostics.
-        The list is set to ``None`` when empty so it drops out of the
-        ``exclude_none`` wire projection (and the round-trip stays identical to a
-        plain report).
+        An item no stage classified takes the code of the refusal this verdict was built from when that refusal is
+        the method's, and ``method.schema_violation`` otherwise.
         """
-        report = super().to_error_report()
-        return report.model_copy(update={"validation_errors": self.validation_error_items() or None})
+        residual_code: ErrorCode = CoreCode.METHOD_SCHEMA_VIOLATION
+        cause = self.__cause__
+        if isinstance(cause, PipelexError) and code_is_method_domain(code=cause.resolve_error_code()):
+            residual_code = cause.resolve_error_code()
+        dry_run_codes = iter([failure.code for failure in self.dry_run_failures])
+        items: list[ProblemItem] = []
+        for item in self.validation_error_items():
+            item_code: ErrorCode
+            if item.category.is_dry_run:
+                item_code = next(dry_run_codes, CoreCode.RUNTIME_UNEXPECTED)
+            else:
+                item_code = validation_item_code(item=item, residual_code=residual_code)
+            items.append(problem_item_of(item=item, code=item_code))
+        return items or None
 
 
 class HostLibraryLoadRefusalError(PipelexError):
@@ -386,9 +401,9 @@ class HostLibraryLoadRefusalError(PipelexError):
     refuses in any other way the caller's own content would be refused, is the deployment's configuration failing to
     validate: `pipelex.config.invalid`, the code the registry gives the libraries among the runtime's own
     configuration, and the one `HostLibraryTreeError` and `HostLibraryRequirementsError` carry for the same
-    directories. Its message names the method's refusal for the operator and is not caller-facing, so STRICT
-    disclosure answers with the placeholder and none of the host library's text. It is deliberately no
-    `LibraryError`, which a validation would report as the caller's invalid bundle.
+    directories. Its message names the method's refusal, which only the operator reads, and the caller reads the
+    code's sentence, which quotes none of the host library's text. It is deliberately no `LibraryError`, which a
+    validation would report as the caller's invalid bundle.
     """
 
     error_code = PipelexErrorCode.CONFIG_INVALID
@@ -416,14 +431,12 @@ class PipelineInputContentError(PipelexError):
     caller supplied the value — INPUT domain, so API servers answer 422, never
     a sanitized 500 (a blank url used to surface as IsADirectoryError('.') → 500).
 
-    Deliberately NOT caller-facing: the message names the resolved path and the
-    ``OSError`` subclass that rejected it, or the storage provider's reason for
-    refusing a key, which are server-side storage facts. Surviving STRICT disclosure would turn the report into an
-    existence/permission oracle over the runner's filesystem for any
-    authenticated caller — ``PermissionError`` on a path that exists reads
-    differently from ``FileNotFoundError`` on one that does not. The
-    caller-facing half of this family is ``PipelineInputUrlMissingError``,
-    whose message carries nothing but the accepted schemes.
+    The message names the resolved path and the ``OSError`` subclass that
+    rejected it, or the storage provider's reason for refusing a key, which are
+    server-side storage facts: it rides only the operator's diagnostics, since a
+    caller reading it could probe the runner's filesystem — ``PermissionError``
+    on a path that exists reads differently from ``FileNotFoundError`` on one
+    that does not. The caller reads the code's sentence.
 
     It takes its cause's code, so a storage key refused as a traversal reports the storage error's own code,
     and a key refused for another reason the fallback, a malformed storage address. A raise site that knows
@@ -446,14 +459,13 @@ class PipelineInputContentError(PipelexError):
 class PipelineInputUrlInvalidError(PipelineInputContentError):
     """An Image/Document input carries an http(s) url that does not parse as one.
 
-    Caller-facing on purpose: the message repeats the url the caller supplied and
-    what is wrong with its shape, both of which are the caller's own facts. Whether
+    The message repeats the url the caller supplied and what is wrong with its
+    shape, both of which are the caller's own facts. Whether
     the resource behind a well-formed url exists is not decided here — the operator
     that consumes the input fetches it and reports a real failure.
     """
 
     error_code = CoreCode.INPUT_INVALID
-    _authors_caller_facing_message = True
     user_action = UserAction(
         kind=UserActionKind.CHANGE_INPUT,
         detail="Provide a well-formed http(s) URL: a scheme, a host, and no whitespace.",
@@ -464,14 +476,12 @@ class PipelineInputFormatError(PipelineInputContentError):
     """A file input's format is one its input slot, or the pipe that consumes it, cannot take.
 
     Raised at run setup, after the setup established each file input's format from its bytes, so the
-    run is refused before any pipe spends anything on it. Caller-facing on purpose, and the flag spans
-    every child and every raise site: a message in this family carries only facts the caller supplied
-    (the input's path in the inputs, the file's identified type) or the method declares (a pipe, a
-    model, the formats that model reads), never a url, a storage key or a server-side reason.
+    run is refused before any pipe spends anything on it. A message in this family carries only facts the
+    caller supplied (the input's path in the inputs, the file's identified type) or the method declares (a
+    pipe, a model, the formats that model reads), never a url, a storage key or a server-side reason.
     """
 
     error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
-    _authors_caller_facing_message = True
     user_action = UserAction(
         kind=UserActionKind.CHANGE_INPUT,
         detail="Give the input a file in a format the method can read.",
@@ -513,17 +523,9 @@ class PipelineInputFormatUnsupportedError(PipelineInputFormatError):
 
 
 class PipelineInputUrlMissingError(PipelineInputContentError):
-    """An Image/Document input carries a blank url.
-
-    The message states only the accepted schemes — no path, no server-side fact
-    — so it is caller-facing copy and survives STRICT disclosure intact, where
-    the placeholder would leave the caller with nothing to act on.
-    (``caller_facing_message`` is the *report* field; the class-level flag that
-    sets it is ``_authors_caller_facing_message``.)
-    """
+    """An Image/Document input carries a blank url."""
 
     error_code = CoreCode.INPUT_INVALID
-    _authors_caller_facing_message = True
 
 
 class MethodEntryError(PipelexError):
@@ -555,4 +557,3 @@ class MethodEntryError(PipelexError):
         kind=UserActionKind.CHANGE_INPUT,
         detail="Name the pipe to run, or declare the method's one main_pipe: in its METHODS.toml, or in one of its bundles",
     )
-    _authors_caller_facing_message = True

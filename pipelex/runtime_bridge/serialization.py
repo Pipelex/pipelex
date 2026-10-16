@@ -26,9 +26,9 @@ if TYPE_CHECKING:
 
 # Pipe-execution failures an orchestrator converts into PipelexBridgeDispatchError so a host can catch a
 # single error type regardless of execution mode. Distributed orchestrators additionally catch their
-# own workflow-level execution errors; wrapping with ``from exc`` loses no signal — the structured
-# ErrorReport stays reachable via ``__cause__`` and is surfaced by
-# PipelexBridgeDispatchError.to_error_report()'s cause-chain enrichment.
+# own workflow-level execution errors; wrapping with ``from exc`` loses no signal — the root fault
+# stays reachable via ``__cause__``, and PipelexBridgeDispatchError, which takes its cause's code,
+# reports its problem.
 PIPE_DISPATCH_ERRORS: tuple[type[PipelexError], ...] = (
     PipeRunError,
     PipeJobError,

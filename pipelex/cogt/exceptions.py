@@ -6,10 +6,11 @@ from typing import TYPE_CHECKING, ClassVar
 from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
-from pipelex.base_exceptions import ErrorReport, PipelexError, iter_cause_chain
+from pipelex.base_exceptions import PipelexError, ProblemFacts, iter_cause_chain
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.cogt.models.model_reference import ModelReferenceKind
 from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, ErrorCodeSet, InheritsCause, declared_error_codes
+from pipelex.errors.problem import ProviderDiagnostics, cap_problem_text
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 
 if TYPE_CHECKING:
@@ -186,7 +187,7 @@ class CogtError(PipelexError):
         (``LLMCompletionError``, ``ImgGenGenerationError``, ...) carry no model
         or provider of their own. Each worker family calls this at its
         public-method chokepoint — where model and provider are unambiguously
-        known — so the eventual ``ErrorReport`` can attribute the failure.
+        known — so the eventual problem can attribute the failure.
 
         Never overwrites a value an inner error already set (e.g.
         ``LLMModelNotFoundError`` setting its own ``model_handle``), and skips
@@ -199,27 +200,30 @@ class CogtError(PipelexError):
             self.backend_name = backend_name
 
     @override
-    def to_error_report(self) -> ErrorReport:
-        # Start from the base report (which already runs cause-chain enrichment
-        # over the shared diagnostic fields) and layer the CogtError-specific
-        # fields on top with the same wrapper-wins-when-set semantics: a value
-        # explicitly set on this CogtError overrides whatever the cause surfaced,
-        # otherwise the cause-derived value carried by ``base_report`` stays.
-        # The code, and the domain and retry verdict it decides, are already on
-        # ``base_report``: the category picked the code, it decides nothing else.
-        # Footgun: ``provider_metadata`` uses whole-object OR, and a Pydantic
-        # model instance is always truthy — a wrapper that attached
-        # attribution-only metadata (no ``status_code`` / ``retry_after_seconds``)
-        # discards the cause's actionable hints. Pinned by
-        # ``tests/unit/pipelex/cogt/test_cogt_provider_metadata_wrapper_wins.py``.
-        base_report = super().to_error_report()
-        return base_report.model_copy(
-            update={
-                "error_category": self.error_category or base_report.error_category,
-                "model": self.model_handle or base_report.model,
-                "provider": self.backend_name or base_report.provider,
-                "provider_metadata": self.provider_metadata or base_report.provider_metadata,
-            }
+    def problem_facts(self) -> ProblemFacts:
+        """The model and the provider this failure names, what the provider answered, and how long it asked to wait.
+
+        Each fact is the nearest one set along the cause chain (``PipelexError._chain_facts``), so a wrapper that
+        set a fact overrides its cause's, and one that did not leaves the cause's in place. The provider's answer
+        rides only the operator's diagnostics, its message capped, since it is the provider's text and may quote
+        anything the request held.
+        """
+        provider: ProviderDiagnostics | None = None
+        metadata = self.provider_metadata
+        if metadata is not None:
+            provider = ProviderDiagnostics(
+                name=self.backend_name or metadata.provider,
+                status=metadata.status_code,
+                code=metadata.provider_error_code,
+                request_id=metadata.request_id,
+                message=cap_problem_text(text=metadata.message) if metadata.message else None,
+            )
+        elif self.backend_name is not None:
+            provider = ProviderDiagnostics(name=self.backend_name)
+        return ProblemFacts(
+            model=self.model_handle,
+            provider=provider,
+            retry_after=metadata.retry_after_seconds if metadata is not None else None,
         )
 
 
@@ -280,11 +284,6 @@ class ModelChoiceNotFoundError(CogtError):
 
     error_code = ErrorCodeSet(default=CoreCode.MODEL_UNKNOWN, others=(CoreCode.MODEL_CAPABILITY_UNSUPPORTED,))
     error_category = InferenceErrorCategory.CONFIGURATION
-    # The message is caller-facing copy: it names only the caller's own model reference and the
-    # deck's public handles (suggestions, sigil hints, available options). Without the flag, STRICT
-    # disclosure on the hosted API replaced it with the generic placeholder, so a method naming an
-    # unknown model failed its dry run with no hint of which model or what to use.
-    _authors_caller_facing_message = True
 
     def __init__(
         self,
@@ -340,7 +339,6 @@ class ModelDeckChoiceUnresolvedError(ModelChoiceNotFoundError):
 
     error_code = ErrorCodeSet(default=PipelexErrorCode.CONFIG_INVALID, others=(CoreCode.MODEL_UNAVAILABLE,))
     error_category = InferenceErrorCategory.CONFIGURATION
-    _authors_caller_facing_message = False
 
     def __init__(self, *, deck_setting: str, unresolved: ModelChoiceNotFoundError):
         self.deck_setting = deck_setting
@@ -524,11 +522,10 @@ class LLMSettingRefusedError(LLMCapabilityError):
     """A worker's refusal of an LLM setting, worded for the caller who wrote the setting.
 
     Its message names the model by its deck handle, never by the SDK, backend or provider model id a
-    worker's own refusal carries, so a validation verdict can show it under strict disclosure.
+    worker's own refusal carries, so a validation verdict can show it to whoever wrote the setting.
     """
 
     error_code = CoreCode.MODEL_CAPABILITY_UNSUPPORTED
-    _authors_caller_facing_message = True
 
 
 class LLMCompletionError(CogtError):
@@ -569,7 +566,6 @@ class LLMCompletionTruncatedError(LLMCompletionError):
 
     error_code = ErrorCodeSet(default=CoreCode.MODEL_OUTPUT_TRUNCATED, others=(CoreCode.MODEL_CONTEXT_EXCEEDED,))
     error_category = InferenceErrorCategory.CONTENT
-    _authors_caller_facing_message = True
 
     def __init__(
         self,
@@ -639,7 +635,6 @@ class LLMCompletionRefusedError(LLMCompletionError):
 
     error_code = CoreCode.MODEL_CONTENT_REFUSED
     error_category = InferenceErrorCategory.CONTENT
-    _authors_caller_facing_message = True
 
     def __init__(self, *, model_handle: str, stop_reason: str, pipe_code: str | None = None):
         subject = f"the text of pipe '{pipe_code}'" if pipe_code else "its text"
@@ -837,7 +832,6 @@ class JudgmentRefusedError(CogtError):
 
     error_code = CoreCode.MODEL_CONTENT_REFUSED
     error_category = InferenceErrorCategory.CONTENT
-    _authors_caller_facing_message = True
 
     def __init__(self, *, pipe_code: str | None, model_handle: str, question_name: str | None = None):
         step = f"PipeJudge '{pipe_code}'" if pipe_code else "This judgment"
@@ -878,7 +872,6 @@ class JudgmentModelMissingError(PipelexError):
     """
 
     error_code = CoreCode.MODEL_UNSPECIFIED
-    _authors_caller_facing_message = True
 
     def __init__(self, *, pipe_code: str | None = None):
         self.pipe_code = pipe_code

@@ -34,9 +34,6 @@ class MissingOrchestratorError(PipelexRuntimeBridgeError):
         others=(CoreCode.RUNTIME_UNSUPPORTED, PipelexErrorCode.CONFIG_DEPENDENCY_MISSING, CoreCode.RUNTIME_UNEXPECTED),
     )
 
-    # The message is caller-actionable ("is its plugin installed?"); keep it under STRICT disclosure.
-    _authors_caller_facing_message = True
-
     def __init__(self, *, mode: OrchestrationMode):
         self.mode = mode
         super().__init__(_build_missing_message(noun="orchestrator", mode=mode))
@@ -57,9 +54,6 @@ class MissingBundleValidatorError(PipelexRuntimeBridgeError):
         default=PipelexErrorCode.PLUGIN_NOT_FOUND,
         others=(CoreCode.RUNTIME_UNSUPPORTED, PipelexErrorCode.CONFIG_DEPENDENCY_MISSING, CoreCode.RUNTIME_UNEXPECTED),
     )
-
-    # The message is caller-actionable ("is its plugin installed?"); keep it under STRICT disclosure.
-    _authors_caller_facing_message = True
 
     def __init__(self, *, mode: OrchestrationMode):
         self.mode = mode

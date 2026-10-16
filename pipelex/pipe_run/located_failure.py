@@ -3,34 +3,28 @@
 When a pipe fails during a run, the error that reaches a surface sits under several wrappers: the
 pipe router's `PipeRouterError`, which knows the failing pipe and its stack, maybe a runtime bridge's
 `PipelexBridgeDispatchError`, and the runner's `PipelineExecutionError`. None of them is what went
-wrong, and each takes its cause's code. The report of such a failure is therefore built from its
+wrong, and each takes its cause's code. The problem of such a failure is therefore built from its
 **root fault**, the error whose code the failure resolves to, and only located by the wrappers:
 
 - the root fault is the first `PipelexError` down the cause chain that carries a code of its own, the
   same walk `PipelexError.resolve_error_code` makes, so a wrapper that adds the fact deciding the code
   is the root fault over a coded cause; when none carries one, it is the innermost `PipelexError`. The
   walk stops at a foreign exception, whose stand-in is the fault (see `find_root_fault`);
-- the identity (`code`, `error_type`, `title`, `type_uri`, and the domain and retry verdict the code
-  decides) is the root fault's, and so are its caller-facing flag, its `validation_errors` and its
-  `migration`;
-- the message names the failing pipe and its path from the entry pipe, then gives the root fault's
-  own message unaltered. Pipe codes are the caller's own names, so the message is caller-facing
-  exactly when the root fault's is;
-- the diagnostics are the cause-chain enrichment's, and when nothing on the chain carries a user
-  action, the fallback names the failing pipe.
+- the problem is the root fault's, its code, parameters and diagnostics included;
+- its `location` names the failing pipe and its path from the entry pipe, as members rather than a prefix of
+  any sentence, and a code that declares a `pipe` parameter is given the failing pipe.
 
-`ErrorReport` has no location field, so the location rides the message until the error contract
-gives it one. A root fault whose report was recovered across a transport boundary (a report
-carried by a `PipelexError`, the way a distributed worker's submitter carries it) is taken as it is:
-at the runner, with no location on the chain, it is reported unchanged, and a host router packs
-the root fault's own report with its location rather than a located report (see
-`PipeRouterProtocol._as_pipelex_failure`), so nothing is located twice.
+A root fault whose problem was recovered across a transport boundary (a problem carried by a `PipelexError`,
+the way a distributed worker's submitter carries it) is taken as it is: at the runner, with no location on the
+chain, it is reported unchanged, and a host router packs the root fault's own problem with its location rather
+than a located problem (see `PipeRouterProtocol._as_pipelex_failure`), so nothing is located twice.
 """
 
+from mthds.protocol.problem.models import ProblemLocation
 from pydantic import ValidationError
 
-from pipelex.base_exceptions import ErrorReport, PipelexError, PipelexUnexpectedError, iter_cause_chain
-from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
+from pipelex.base_exceptions import PipelexError, PipelexUnexpectedError, iter_cause_chain
+from pipelex.errors.problem import make_location
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 # Joins the pipe codes of a failure's path from the entry pipe down to the pipe that failed.
@@ -96,18 +90,28 @@ def compose_located_message(*, pipe_code: str, pipe_stack: list[str], message: s
 
 
 def locate_failure_message(*, failure: PipelexError, pipe_code: str, pipe_stack: list[str]) -> str:
-    """The message a located wrapper of `failure` carries: its root fault's own message, located."""
+    """The message a located wrapper of `failure` carries, for its logs and its operator: its root fault's own message, located."""
     root_fault = find_root_fault(error=failure) or failure
-    return compose_located_message(pipe_code=pipe_code, pipe_stack=pipe_stack, message=root_fault.to_error_report().message)
+    return compose_located_message(pipe_code=pipe_code, pipe_stack=pipe_stack, message=root_fault.message)
+
+
+def failure_location_of(*, pipe_code: str, pipe_stack: list[str]) -> ProblemLocation | None:
+    """The location of a failure at `pipe_code`, whose path from the entry pipe is `pipe_stack`.
+
+    `None` when the stack is empty, since the location is then unknown.
+    """
+    if not pipe_stack:
+        return None
+    return make_location(pipe=pipe_code, path=pipe_stack)
 
 
 def make_unexpected_failure(*, error: Exception) -> PipelexUnexpectedError:
     """Stand a `PipelexUnexpectedError` in for an exception that is not a `PipelexError`.
 
     Its message names the original class, and it is chained to the original so its traceback
-    survives. It is never caller-facing: a foreign exception's text can carry anything, a server
-    path or a secret included. A pydantic `ValidationError` keeps the readable rendering the runner
-    gives one.
+    survives. Its message only ever reaches an operator, since a foreign exception's text can carry
+    anything, a server path or a secret included. A pydantic `ValidationError` keeps the readable
+    rendering the runner gives one.
     """
     detail = format_pydantic_validation_error(error) if isinstance(error, ValidationError) else (str(error) or repr(error))
     unexpected_error = PipelexUnexpectedError(f"{type(error).__name__}: {detail}")
@@ -116,58 +120,24 @@ def make_unexpected_failure(*, error: Exception) -> PipelexUnexpectedError:
     return unexpected_error
 
 
-def _fallback_user_action(*, pipe_code: str, pipe_stack: list[str]) -> UserAction:
-    if pipe_stack:
-        detail = f"The run failed in pipe '{pipe_code}': the message gives the cause."
-    else:
-        detail = f"The run of '{pipe_code}' failed: the message gives the cause."
-    return UserAction(kind=UserActionKind.UNKNOWN, detail=detail)
-
-
 def _find_root_fault_below(*, wrapper: PipelexError) -> PipelexError | None:
     """The root fault under `wrapper`, or `None` when it wraps no `PipelexError` or its chain loops back to it."""
     cause = wrapper.__cause__
     if cause is None:
         return None
-    # A cyclic chain that reaches the wrapper again would make the root fault's report recurse
-    # into the wrapper's: report the wrapper as itself instead, as the base enrichment does.
+    # A cyclic chain that reaches the wrapper again would make the root fault's problem recurse
+    # into the wrapper's: report the wrapper as itself instead.
     if any(node is wrapper for node in iter_cause_chain(cause)):
         return None
     return find_root_fault(error=cause)
 
 
-def build_located_failure_report(
-    *,
-    wrapper: PipelexError,
-    own_report: ErrorReport,
-    pipe_code: str,
-    pipe_stack: list[str],
-) -> ErrorReport:
-    """Build the report of a located run failure from its root fault.
+def located_root_fault(*, wrapper: PipelexError) -> PipelexError | None:
+    """The root fault a located wrapper reports.
 
-    Args:
-        wrapper: The located wrapper whose report this is (a `PipeRouterError` or a
-            `PipelineExecutionError`).
-        own_report: The wrapper's own report, as `PipelexError.to_error_report` builds it: its own
-            identity, and the diagnostics enriched from its cause chain.
-        pipe_code: The pipe that failed.
-        pipe_stack: That pipe's path from the entry pipe, ending with it. Empty when the location is
-            unknown, in which case the message is the root fault's, unlocated.
-
-    Returns:
-        The root fault's report, carrying its code and what the code decides, with the located message and
-        the chain's diagnostics.
+    `None` when the wrapper is its own root fault: it chose its code, wraps no `PipelexError`, or loops back to itself.
     """
     # A wrapper whose raise site chose its code is the root fault itself, as `resolve_error_code` reads it.
-    root_fault = None if wrapper.own_error_code is not None else _find_root_fault_below(wrapper=wrapper)
-    identity_report = root_fault.to_error_report() if root_fault is not None else own_report
-    return identity_report.model_copy(
-        update={
-            "message": compose_located_message(pipe_code=pipe_code, pipe_stack=pipe_stack, message=identity_report.message),
-            "error_category": own_report.error_category,
-            "user_action": own_report.user_action or _fallback_user_action(pipe_code=pipe_code, pipe_stack=pipe_stack),
-            "model": own_report.model,
-            "provider": own_report.provider,
-            "provider_metadata": own_report.provider_metadata,
-        }
-    )
+    if wrapper.own_error_code is not None:
+        return None
+    return _find_root_fault_below(wrapper=wrapper)

@@ -17,7 +17,7 @@ from typing import NamedTuple, cast
 
 from pydantic import ValidationError
 
-from pipelex.base_exceptions import PipelexError, SecurityError, error_domain_is_input
+from pipelex.base_exceptions import ErrorDomain, PipelexError, SecurityError
 from pipelex.config import get_config
 from pipelex.core.bundle_resources.exceptions import BundleResourceNotNamedError, BundleResourcePathError
 from pipelex.core.exceptions import DryRunFailureErrorData, PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
@@ -27,9 +27,10 @@ from pipelex.core.pipes.exceptions import (
     PipeOperatorModelChoiceError,
     PipeRunError,
     PipeValidationError,
-    caller_facing_refusal_text,
+    refusal_detail,
 )
 from pipelex.core.validation import report_validation_error
+from pipelex.errors.error_codes import code_is_method_domain
 from pipelex.interpreter_hub import get_library_manager
 from pipelex.libraries.exceptions import LibraryError, LibraryLoadingError, MethodTreeLoadError
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
@@ -90,12 +91,15 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
     factory error, etc. Sharing one source of truth means a new handler only
     needs to be added once.
 
-    **Every refusal of the bundle is a verdict.** After the class-specific arms, a final arm turns any
-    other ``PipelexError`` whose report is ``input``-domained (the caller's fault) into a verdict with one
-    item, so a refusal nobody wrote an arm for still reaches the author as an invalid bundle rather than
-    as a crash or a no-verdict fault. Only a failure of the tool or its environment — a ``config`` or
-    ``runtime`` fault, an unclassified one, anything that is not a ``PipelexError`` — propagates as
-    no verdict, along with the refusals that must keep their own class: ``PipeNotFoundError`` (its
+    **Every refusal of the method is a verdict, and only a refusal of the method.** After the class-specific
+    arms, a final arm turns any other ``PipelexError`` whose code is the method's (its registry domain is
+    ``method``) into a verdict with one item, so a refusal nobody wrote an arm for still reaches the author
+    as an invalid bundle rather than as a crash or a no-verdict fault. A dry run's failures, and a library's
+    refusal, become a verdict only when at least one of them is the method's: a failure whose every fault
+    belongs to another actor, the runtime's own included, answers its own code, never that the method is
+    invalid. A failure of the tool or its environment, a refusal of another actor than the method's author,
+    anything that is not a ``PipelexError``, propagates as no verdict, along with the refusals that must
+    keep their own class: ``PipeNotFoundError`` (its
     dedicated not-found handler), a ``SecurityError`` (never absorbed by a domain handler), a
     ``ValidateBundleError`` already produced (never re-wrapped), and a ``BundleResourceNotNamedError`` or a
     ``BundleResourcePathError``, which refuse the files submitted with the bundle rather than the bundle.
@@ -150,10 +154,10 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
         # violations, factory failures). Surface them as a clean ValidateBundleError instead of a
         # raw traceback. LibraryLoadingError carries blueprint- and pipe/concept-validation errors;
         # forward them so the CLI renders the same structured detail it does for the other arms.
-        # A library error that is not the caller's input, such as an invariant of the library manager
-        # (`runtime.unexpected`) or library directories configured wrongly (`pipelex.config.invalid`), is a fault of
-        # the runtime, never a verdict about the bundle, and propagates as it is.
-        if not error_domain_is_input(library_error.to_error_report().error_domain):
+        # A library error that is not the method's, such as an invariant of the library manager
+        # (`runtime.unexpected`) or library directories configured wrongly (`pipelex.config.invalid`), is no
+        # verdict about the bundle, and propagates as it is.
+        if not code_is_method_domain(code=library_error.resolve_error_code()):
             raise
         if isinstance(library_error, LibraryLoadingError):
             blueprint_validation_errors = library_error.blueprint_validation_errors
@@ -167,13 +171,18 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
             pipe_validation_errors=pipe_concept_validation_errors,
         ) from library_error
     except PipeRunError as pipe_run_error:
-        # A pipe run failing outside the sweep's per-pipe classification: one dry-run item on its pipe,
-        # whose text follows the disclosure rule, since the verdict carries it past STRICT disclosure.
-        failure_text = caller_facing_refusal_text(refusal=pipe_run_error)
+        # A pipe run failing outside the sweep's per-pipe classification: one dry-run item on its pipe when
+        # its fault is the method's, whose text is the sentence its code renders for the caller who reads the
+        # verdict, and otherwise the fault itself, which no verdict carries.
+        failure_code = pipe_run_error.resolve_error_code()
+        if not code_is_method_domain(code=failure_code):
+            raise
+        failure_text = refusal_detail(refusal=pipe_run_error)
         raise ValidateBundleError(
-            message=failure_text,
+            message=pipe_run_error.message,
             dry_run_failures=[
                 DryRunFailureErrorData(
+                    code=failure_code,
                     pipe_code=pipe_run_error.pipe_code,
                     message=f"Pipe '{pipe_run_error.pipe_code}' failed its dry run: {failure_text}",
                 )
@@ -184,10 +193,17 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
         raise
     except DryRunError as dry_run_error:
         # The sweep's failures, one per failing pipe, located at the innermost pipe that failed. A
-        # DryRunError raised elsewhere carries none, and becomes one item under the disclosure rule.
+        # DryRunError raised elsewhere carries none, and stands for one failure, its own. They are a verdict
+        # only when one of them is the method's; otherwise the dry run's fault answers its own code, every
+        # failure riding its items, and never reads as an invalid method.
+        dry_run_failures = dry_run_error.failures or [
+            DryRunFailureErrorData(code=dry_run_error.resolve_error_code(), message=refusal_detail(refusal=dry_run_error))
+        ]
+        if not any(code_is_method_domain(code=failure.code) for failure in dry_run_failures):
+            raise
         raise ValidateBundleError(
             message=dry_run_error.message,
-            dry_run_failures=dry_run_error.failures or [DryRunFailureErrorData(message=caller_facing_refusal_text(refusal=dry_run_error))],
+            dry_run_failures=dry_run_failures,
         ) from dry_run_error
     except PipeOperatorModelChoiceError as model_choice_error:
         # A pipe names a model its deck does not define: the operator located it on the pipe and the
@@ -237,7 +253,7 @@ def reporting_host_library_faults() -> Generator[None, None, None]:
         msg = f"A method in a library directory of this host does not validate: {report_validation_error(validation_error=validation_error).message}"
         raise HostLibraryLoadRefusalError(msg) from validation_error
     except PipelexError as refusal:
-        if not error_domain_is_input(refusal.to_error_report().error_domain):
+        if not ErrorDomain.from_problem_domain(refusal.resolve_domain()).is_input:
             raise
         msg = f"A method in a library directory of this host refuses to load ({type(refusal).__name__}): {refusal.message}"
         raise HostLibraryLoadRefusalError(msg) from refusal
@@ -246,20 +262,19 @@ def reporting_host_library_faults() -> Generator[None, None, None]:
 def _make_refusal_verdict(*, refusal: PipelexError) -> ValidateBundleError | None:
     """The one-item verdict for a refusal of the caller's input that has no arm of its own, else ``None``.
 
-    ``None`` — no verdict — unless the refusal's report is ``input``-domained: a ``config`` or ``runtime``
-    fault, or an unclassified one, is a failure of the tool or its environment, which the validator must
-    not report as the bundle's fault. The item is ``pipe_validation`` when the library load located the
+    ``None`` — no verdict — unless the refusal's code is the method's: a refusal another actor must act on,
+    the caller's input, the account, the operator or the runtime, is never the bundle's fault, and keeps
+    its own code. The item is ``pipe_validation`` when the library load located the
     refusal on the pipe it was building (``PipeLoadRefusalError``, with the pipe's code, domain and file),
     and ``blueprint_validation`` otherwise. It carries no ``error_type``: a refusal with a closed code
     has its own arm above, and naming one here would claim a diagnosis the refusal does not make.
 
-    The item's text is the refusal's message only when that message was authored as caller-facing copy,
-    and otherwise its title: the verdict is caller-facing as a whole and is kept verbatim under STRICT
-    disclosure, so internal text must not ride it past the redaction it would otherwise get.
+    The item's text is the sentence the refusal's code renders for a caller, never the refusal's own message:
+    the verdict is read by the caller, and the message is the operator's diagnostics.
     """
-    if not error_domain_is_input(refusal.to_error_report().error_domain):
+    if not code_is_method_domain(code=refusal.resolve_error_code()):
         return None
-    message = caller_facing_refusal_text(refusal=refusal)
+    message = refusal_detail(refusal=refusal)
     if isinstance(refusal, PipeLoadRefusalError):
         return ValidateBundleError(
             message=message,
@@ -285,8 +300,8 @@ def withholding_host_library_files(
 ) -> Generator[None, None, None]:
     """Keep the files of a host's own library directories out of the verdict the block raises.
 
-    A verdict is caller-facing as a whole, and STRICT disclosure hands its message and its items to the caller
-    verbatim, so it must not name a path on the host. When submitted content is validated or run, the library
+    A verdict is read by the caller, its items' messages and locators included, so it must not name a path on the
+    host. When submitted content is validated or run, the library
     directories loaded beside it are the host's (installed libraries, the defaults, ``PIPELEXPATH``), and an item
     located in one of their files would name that file, as would a message about it, such as a duplicate
     declaration, a load that failed, or two ``@pipe_func`` functions of the same name, which the registry names by

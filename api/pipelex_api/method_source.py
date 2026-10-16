@@ -33,7 +33,8 @@ The routes use it two ways:
 The security gate (packaging invariant 7 — execution locus decides) is the request tree's
 (`pipelex_api.method_tree_request.ensure_python_allowed`): on a deployment that is not sandbox-hosted, a package
 carrying any `.py` is refused with a 403 `CustomCodeRequiresSandbox`; on a sandbox-hosted one, PipeFunc `.py` is
-acceptable but a package declaring `StructuredContent` subclasses is refused (`MethodStructuresRefusedError` → 403).
+acceptable but a package declaring `StructuredContent` subclasses is refused (`MethodStructuresRefusedError`, a 422
+`pipelex.deployment.python_structures_refused`).
 
 Everything a run needs is read OUT of the cached clone before this module returns — the tree's bytes into memory —
 while the clone is pinned against eviction (`MethodCloneCache.pinned_package`), so cache eviction never races a read or

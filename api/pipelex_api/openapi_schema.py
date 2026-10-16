@@ -17,7 +17,7 @@ YAML alike: both go through `openapi()`.
 Deliberately import-side-effect-free, mirroring `pipelex_api.exception_handlers`: no env var reads, no app
 construction, no router wiring. That is what lets a test build a production-faithful app —
 one that renders the error media type the way the real server does — without dragging in
-`pipelex_api.main`'s startup chain (`Pipelex.make`, `get_auth_dependency`, the `ERROR_DISCLOSURE`
+`pipelex_api.main`'s startup chain (`Pipelex.make`, `get_auth_dependency`, the `AUTH_MODE`
 fail-fast), so a misconfigured env var cannot crash collection of every module that needs the
 app class.
 """

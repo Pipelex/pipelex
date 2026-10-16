@@ -96,7 +96,7 @@ def resolve_crate_from_contents(
         crate = library_manager.get_crate(library_id)
         if crate is None:
             # Unreachable with non-empty contents (load_from_blueprints accumulated them), so a
-            # None crate is an internal invariant break, not a caller-facing verdict.
+            # None crate is an internal invariant break, not a verdict on the caller's method.
             msg = "library crate unavailable after a successful bundle load"
             raise PipelexUnexpectedError(msg)
         normalized = normalize_crate(crate, mthds_version=MTHDS_STANDARD_VERSION)

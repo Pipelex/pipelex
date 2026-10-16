@@ -1,12 +1,15 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
+from mthds.protocol.problem.models import ProblemLocation
 from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.errors.error_code_declaration import ErrorCodeDeclaration, ErrorCodeSet, InheritsCause
 from pipelex.errors.error_codes import ErrorCode
+from pipelex.errors.problem import ProblemView, make_location
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.validation_error_types import PipeFactoryErrorType, PipeValidationErrorType
 
@@ -99,6 +102,14 @@ class PipeRunError(PipelexError):
         self.pipe_code = pipe_code
         super().__init__(message)
 
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"pipe": self.pipe_code}
+
+    @override
+    def problem_location(self) -> ProblemLocation | None:
+        return make_location(pipe=self.pipe_code)
+
 
 class PipeOperatorModelChoiceError(PipelexError):
     """Raised by a pipe operator (``PipeLLM``, ``PipeStructure``, ``PipeImgGen``, ``PipeExtract``, ``PipeSearch``, ``PipeJudge``)
@@ -112,9 +123,9 @@ class PipeOperatorModelChoiceError(PipelexError):
     ``PipeLLM``), and the library load adds the file the pipe is declared in. Every pipe type that names
     a model raises this same error, so every one of them gives the same verdict item.
 
-    The message names the pipe and the field, then keeps the deck check's sentence and its suggestions,
-    so it is caller-facing copy: it names only the caller's own model reference and the deck's public
-    handles, and it must reach a hosted caller under STRICT disclosure.
+    The message names the pipe and the field, then keeps the deck check's sentence and its suggestions; the
+    problem gives the reference as written, the model type and the suggestions as parameters, and the pipe and
+    the field as its location.
 
     It takes the code of the deck check's refusal it locates: ``model.unknown`` for a reference the deck
     does not define, ``model.capability_unsupported`` for a bare handle the deck serves only as another
@@ -122,7 +133,6 @@ class PipeOperatorModelChoiceError(PipelexError):
     """
 
     error_code = InheritsCause(fallback=CoreCode.MODEL_UNKNOWN)
-    _authors_caller_facing_message = True
 
     def __init__(
         self,
@@ -150,6 +160,14 @@ class PipeOperatorModelChoiceError(PipelexError):
         # library load fills it from the crate's source map before the error leaves the load loop.
         self.source = source
         super().__init__(message)
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"model": self.model_choice, "model_type": self.model_type, "suggestions": self.suggestions, "pipe": self.pipe_code}
+
+    @override
+    def problem_location(self) -> ProblemLocation | None:
+        return make_location(pipe=self.pipe_code, field=self.field_name, file=self.source)
 
     @classmethod
     def make_from_model_choice_not_found(
@@ -185,13 +203,11 @@ class PipeLoadRefusalError(PipelexError):
     ``error_type``, since the refusal has no closed code. Only an ``input``-domained refusal is wrapped: a
     fault of the configuration or of the runtime keeps its own identity and stays a no-verdict fault.
 
-    Its message is built only from caller-facing material, the caller's own pipe code and either the
-    refusal's message, when that message is caller-facing, or the refusal's title, so it is kept under
-    STRICT disclosure. It takes the code of the refusal it wraps.
+    Its message names the pipe and gives the refusal's own message, for the operator; the caller reads the
+    sentence the refusal's code renders. It takes the code of the refusal it wraps.
     """
 
     error_code = InheritsCause(fallback=CoreCode.METHOD_SCHEMA_VIOLATION)
-    _authors_caller_facing_message = True
 
     def __init__(self, message: str, *, pipe_code: str, domain_code: str, source: str | None):
         self.pipe_code = pipe_code
@@ -199,24 +215,25 @@ class PipeLoadRefusalError(PipelexError):
         self.source = source
         super().__init__(message)
 
+    @override
+    def problem_location(self) -> ProblemLocation | None:
+        return make_location(pipe=self.pipe_code, file=self.source)
+
     @classmethod
     def make_from_refusal(cls, *, refusal: PipelexError, pipe_code: str, domain_code: str, source: str | None) -> "PipeLoadRefusalError":
-        """Locate a refusal on the pipe being built, keeping its message only when it is caller-facing."""
-        message = f"Pipe '{pipe_code}' could not be loaded: {caller_facing_refusal_text(refusal=refusal)}"
+        """Locate a refusal on the pipe being built."""
+        message = f"Pipe '{pipe_code}' could not be loaded: {refusal.message}"
         return cls(message, pipe_code=pipe_code, domain_code=domain_code, source=source)
 
 
-def caller_facing_refusal_text(*, refusal: PipelexError) -> str:
-    """The refusal's message when it was authored as caller-facing copy, otherwise its title.
+def refusal_detail(*, refusal: PipelexError) -> str:
+    """The sentence a refusal's code renders for a caller, the text an item of a verdict built from a raised refusal carries.
 
-    A validation verdict is caller-facing as a whole — ``ValidateBundleError`` keeps its message under
-    STRICT disclosure — so text taken from a refusal onto a verdict item must be caller-facing too: a
-    refusal whose message is internal is named by its title, which is always public.
+    A verdict is read by the caller, so an item taken from a refusal never carries the refusal's own message,
+    which is the operator's diagnostics: it carries the code's ``detail``, rendered from the parameters a caller
+    may read.
     """
-    report = refusal.to_error_report()
-    if report.caller_facing_message:
-        return report.message
-    return report.title
+    return refusal.to_problem(view=ProblemView.CALLER).detail
 
 
 def pipe_validation_error_code(*, error_type: PipeValidationErrorType | None) -> ErrorCode:

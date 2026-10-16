@@ -342,10 +342,6 @@ class RetiredPluginEntryPointGroupError(PluginError):
 
     error_code = PipelexErrorCode.PLUGIN_BROKEN
 
-    # The message names the caller's own installed distributions and the exact fix; it is fully
-    # actionable, so keep it verbatim under STRICT disclosure.
-    _authors_caller_facing_message = True
-
     def __init__(self, *, plugin_names: list[str], retired_group: str, groups: list[str]):
         self.plugin_names = plugin_names
         self.retired_group = retired_group
@@ -378,9 +374,6 @@ class PluginDeclaredInMultipleGroupsError(PluginError):
     """
 
     error_code = PipelexErrorCode.PLUGIN_BROKEN
-
-    # The message names the caller's own installed distribution and the exact fix.
-    _authors_caller_facing_message = True
 
     def __init__(self, *, plugin_name: str, groups: list[str]):
         self.plugin_name = plugin_name
@@ -423,10 +416,6 @@ class UnknownBootOrchestratorError(PluginError):
 
     error_code = PipelexErrorCode.PLUGIN_NOT_FOUND
 
-    # The message describes the caller's own input (the requested orchestrator name) and is fully
-    # actionable; keep it verbatim under STRICT disclosure.
-    _authors_caller_facing_message = True
-
     def __init__(self, *, requested: str):
         self.requested = requested
         message = (
@@ -448,10 +437,6 @@ class UnknownStorageMethodError(PluginError):
     """
 
     error_code = PipelexErrorCode.PLUGIN_NOT_FOUND
-
-    # The message describes the caller's own input (the configured storage method) and lists the
-    # registered methods; it is fully actionable, so keep it verbatim under STRICT disclosure.
-    _authors_caller_facing_message = True
 
     def __init__(self, *, method: str, registered_methods: list[str]):
         self.method = method
@@ -477,10 +462,6 @@ class UnknownPipeFuncExecutionModeError(PluginError):
 
     error_code = PipelexErrorCode.PLUGIN_NOT_FOUND
 
-    # The message describes the caller's own input (the configured execution mode) and lists the
-    # registered modes; it is fully actionable, so keep it verbatim under STRICT disclosure.
-    _authors_caller_facing_message = True
-
     def __init__(self, *, mode: str, registered_modes: list[str]):
         self.mode = mode
         self.registered_modes = registered_modes
@@ -504,10 +485,6 @@ class UnknownSecretsMethodError(PluginError):
 
     error_code = PipelexErrorCode.PLUGIN_NOT_FOUND
 
-    # The message describes the caller's own input (the configured secrets method) and lists the
-    # registered methods; it is fully actionable, so keep it verbatim under STRICT disclosure.
-    _authors_caller_facing_message = True
-
     def __init__(self, *, method: str, registered_methods: list[str]):
         self.method = method
         self.registered_methods = registered_methods
@@ -530,10 +507,6 @@ class UnknownLogSinkError(PluginError):
     """
 
     error_code = PipelexErrorCode.PLUGIN_NOT_FOUND
-
-    # The message describes the caller's own input (the configured sink) and lists the registered
-    # ones; it is fully actionable, so keep it verbatim under STRICT disclosure.
-    _authors_caller_facing_message = True
 
     def __init__(self, *, method: str, registered_methods: list[str]):
         self.method = method

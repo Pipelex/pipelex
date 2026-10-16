@@ -19,10 +19,6 @@ class CsvError(ToolError):
     error_code: ClassVar[ErrorCodeDeclaration] = ErrorCodeSet(
         default=CoreCode.INPUT_INVALID, others=(CoreCode.REQUEST_INVALID, CoreCode.RUNTIME_UNEXPECTED)
     )
-    # The whole family describes faults in the caller's OWN CSV input (a missing file, a header that
-    # does not match the concept, a cell that will not coerce), so the message is safe and useful to
-    # expose. Opt in so STRICT disclosure keeps it instead of redacting it to a generic placeholder.
-    _authors_caller_facing_message = True
 
 
 class CsvReadError(CsvError):

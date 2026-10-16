@@ -33,15 +33,13 @@ class UriReadRefusedError(SecurityError):
     A :class:`SecurityError`, so that a domain-level ``except`` around a read cannot swallow it.
     The default is ``security.input_url_refused``, answered as a 422: an input asked for the read
     and the caller fixes it by passing the file as an input or an upload. A raise or catch site that
-    knows the method named the URL chooses ``security.method_url_refused``. The message is
-    caller-facing and keeps its text under STRICT disclosure: it names where the URL sat (an
-    image of a pipe's prompt, an input) and why it was refused, and quotes neither the URL nor the
-    read scope. The refusal happens before any IO, so it says nothing about whether the file
+    knows the method named the URL chooses ``security.method_url_refused``. The message names
+    where the URL sat (an image of a pipe's prompt, an input) and why it was refused, and quotes
+    neither the URL nor the read scope. The refusal happens before any IO, so it says nothing about whether the file
     exists.
     """
 
     error_code = ErrorCodeSet(default=CoreCode.SECURITY_INPUT_URL_REFUSED, others=(CoreCode.SECURITY_METHOD_URL_REFUSED,))
-    _authors_caller_facing_message = True
 
     def __init__(self, message: str, *, reason: UriReadRefusalReason):
         super().__init__(message)

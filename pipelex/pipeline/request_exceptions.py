@@ -26,8 +26,6 @@ class PipelexRequestError(PipelineRequestError, PipelexError):
     """
 
     error_code = ErrorCodeSet(default=CoreCode.REQUEST_INVALID, others=(CoreCode.REQUEST_UNSUPPORTED,))
-    # The message describes a field of the caller's own request and nothing of the server's.
-    _authors_caller_facing_message = True
 
     def __init__(self, message: str, *, field: str, unsupported_reason: str | None = None) -> None:
         """Build the refusal of one request field.

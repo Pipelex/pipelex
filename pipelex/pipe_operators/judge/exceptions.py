@@ -22,7 +22,6 @@ class PipeJudgeInputCapabilityError(PipeJudgeError):
     """
 
     error_code = CoreCode.MODEL_CAPABILITY_UNSUPPORTED
-    _authors_caller_facing_message = True
 
     def __init__(self, *, pipe_code: str, variable_path: str, file_kind: str, model_name: str, model_inputs: list[str]):
         self.pipe_code = pipe_code

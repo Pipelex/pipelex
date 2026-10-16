@@ -47,12 +47,14 @@ async def render_doc_gen_template(
             raise
         # The template is the method author's own: the message names the step, the template and what Jinja2 refused.
         msg = f"PipeDocGen '{pipe_code}' could not render its {label}: {exc.fault}"
-        raise PipeDocGenRunError(msg).with_error_code(CoreCode.METHOD_TEMPLATE_INVALID).as_caller_fault() from exc
+        raise (
+            PipeDocGenRunError(msg).with_error_code(CoreCode.METHOD_TEMPLATE_INVALID).with_params(pipe=pipe_code, template=label, finding=exc.fault)
+        ) from exc
     except Jinja2TemplateRenderError as exc:
         undefined_error = exc.__cause__
         if isinstance(undefined_error, UndefinedError):
             # Raised from Jinja's own error rather than from the tools-layer wrapper, whose message quotes the
-            # template and is not caller-facing, so that this is the root fault a verdict or a run report names.
+            # template, so that this is the root fault a verdict or a run's problem names.
             msg = (
                 f"PipeDocGen '{pipe_code}' could not render its {label}: {undefined_error.message}. "
                 "Every value a document's template reads must exist: check the name against the input's concept, "

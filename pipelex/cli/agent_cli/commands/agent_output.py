@@ -29,7 +29,10 @@ import typer
 from pipelex_sdk.errors import ApiResponseError
 from pydantic import ValidationError
 
-from pipelex.base_exceptions import PipelexError, ValidationErrorItem, iter_cause_chain
+from pipelex.base_exceptions import ErrorDomain, PipelexError, ValidationErrorItem, iter_cause_chain
+from pipelex.cogt.exceptions import find_inference_error_category_in_chain
+from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.problem import ProblemView
 from pipelex.hosted.error_rendering import hosted_refusal_message, hosted_refusal_next_step, sent_verdict
 from pipelex.pipe_run.located_failure import find_root_fault
 from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
@@ -66,16 +69,16 @@ def get_agent_cli_error_format() -> CliOutputFormat:
 
 # Fallback error-classification lookups, keyed by error_type name.
 #
-# agent_error() reads error_domain / retryable / user_action from a PipelexError
-# cause's to_error_report() first, and every PipelexError carries a registry code,
-# which decides its domain and its retry verdict: the report always holds both. So
+# agent_error() reads error_domain / retryable from a PipelexError cause's registry
+# code first, and every PipelexError carries one, which decides its domain and its
+# retry verdict, and its hint from the advice along the cause's chain. So
 # AGENT_ERROR_DOMAINS is the fallback for the error types that carry no code alone:
 # builtin and third-party exceptions, and synthetic error_type labels passed straight
 # to agent_error(). A PipelexError subclass must NOT appear in it, since its entry
 # could never be read; when the domain the code projects is not the one this CLI
 # wants, the class needs another code, never an entry here. AGENT_ERROR_HINTS may
-# still name a PipelexError subclass: a hint is read only when the report gives no
-# next step. Both are enforced by tests/unit/pipelex/cli/test_agent_output_drift.py.
+# still name a PipelexError subclass: a hint is read only when the cause's chain
+# advises no action. Both are enforced by tests/unit/pipelex/cli/test_agent_output_drift.py.
 # An unknown model is the author's input fault, whether it is raised bare by the deck check or located
 # on its pipe: the next step is to correct the reference, not to diagnose the installation.
 _UNKNOWN_MODEL_HINT = (
@@ -200,17 +203,17 @@ def _assemble_error_payload(message: str, *, error_type: str, cause: BaseExcepti
     """Build the structured error payload shared by the JSON and markdown renderers.
 
     Sources ``hint`` / ``retryable`` / ``error_domain`` / ``error_code`` / ``error_category`` /
-    ``model`` / ``provider`` from a ``PipelexError`` cause's ``to_error_report()``
-    first, falling back to the lookup dicts for error types that cannot
+    ``model`` / ``provider`` from a ``PipelexError`` cause first: its code, its chain's advice and
+    its problem in the operator's view, falling back to the lookup dicts for error types that cannot
     self-describe. ``extra`` is merged last and overrides everything.
 
-    ``migration`` comes from the report too, and it is the one field here that an agent is meant
-    to *act* on rather than classify by: its presence says the configuration is stale rather than
-    wrong, and the loop it opens is ``pipelex-agent migrate --dry-run --format json`` followed by
-    ``--yes``. Emitted only when the report carries one, so branching on its presence is the
+    ``migration`` comes from the problem's diagnostics too, and it is the one field here that an agent
+    is meant to *act* on rather than classify by: its presence says the configuration is stale rather
+    than wrong, and the loop it opens is ``pipelex-agent migrate --dry-run --format json`` followed by
+    ``--yes``. Emitted only when the error carries one, so branching on its presence is the
     whole test.
 
-    ``validation_errors`` comes from the report as well, whenever it carries any: a command that
+    ``validation_errors`` comes from the cause's chain as well, whenever a verdict on it carries any: a command that
     refuses an invalid bundle (a run refused before any pipe ran, for one) hands the agent the same
     located items ``validate`` gives, each with its pipe, its field and its fix, rather than only the
     summary sentence. They are the items :func:`extract_validation_errors` projects, dumped the same way.
@@ -221,7 +224,7 @@ def _assemble_error_payload(message: str, *, error_type: str, cause: BaseExcepti
         "message": message,
     }
 
-    # Extract structured data from PipelexError.to_error_report() when available
+    # Extract structured data from a PipelexError cause when available: its code decides the domain and the verdict
     report_hint: str | None = None
     report_retryable: bool | None = None
     report_category: str | None = None
@@ -230,20 +233,24 @@ def _assemble_error_payload(message: str, *, error_type: str, cause: BaseExcepti
     report_extras: dict[str, Any] = {}
 
     if isinstance(cause, PipelexError):
-        report = cause.to_error_report()
-        report_hint = report.user_action_detail()
-        report_retryable = report.retryable
-        report_category = report.error_category
-        report_domain = report.error_domain
-        report_code = report.code
-        if report.model:
-            report_extras["model"] = report.model
-        if report.provider:
-            report_extras["provider"] = report.provider
-        if report.migration is not None:
-            report_extras["migration"] = report.migration.model_dump(mode="json")
-        if report.validation_errors:
-            report_extras["validation_errors"] = [item.model_dump(mode="json", exclude_none=True) for item in report.validation_errors]
+        problem = cause.to_problem(view=ProblemView.OPERATOR)
+        code_spec = error_code_spec(cause.resolve_error_code())
+        advised_action = cause.advised_action()
+        report_hint = advised_action.detail if advised_action is not None and advised_action.detail else None
+        report_retryable = code_spec.invites_retry
+        report_category = find_inference_error_category_in_chain(cause)
+        report_domain = ErrorDomain.from_problem_domain(code_spec.domain)
+        report_code = code_spec.code
+        diagnostics = problem.diagnostics
+        if diagnostics is not None and diagnostics.model:
+            report_extras["model"] = diagnostics.model
+        if diagnostics is not None and diagnostics.provider is not None and diagnostics.provider.name:
+            report_extras["provider"] = diagnostics.provider.name
+        if diagnostics is not None and diagnostics.migration is not None:
+            report_extras["migration"] = diagnostics.migration.model_dump(mode="json")
+        chain_validation_errors = _chain_validation_error_items(error=cause)
+        if chain_validation_errors:
+            report_extras["validation_errors"] = [item.model_dump(mode="json", exclude_none=True) for item in chain_validation_errors]
 
     # hint: report-first, fallback to lookup dict
     hint = report_hint or AGENT_ERROR_HINTS.get(error_type)
@@ -450,10 +457,17 @@ def run_failure_fields(*, error: PipelineExecutionError) -> dict[str, Any]:
         fields["cause_type"] = type(cause).__name__
         fields["cause_message"] = str(cause)
     else:
-        root_report = root_fault.to_error_report()
-        fields["cause_type"] = root_report.error_type
-        fields["cause_message"] = root_report.message
+        fields["cause_type"] = type(root_fault).__name__
+        fields["cause_message"] = root_fault.message
     return fields
+
+
+def _chain_validation_error_items(*, error: BaseException) -> list[ValidationErrorItem]:
+    """The items of the first invalid verdict along ``error``'s cause chain, ``error`` itself included; empty when none."""
+    for node in iter_cause_chain(error):
+        if isinstance(node, ValidateBundleError):
+            return node.validation_error_items()
+    return []
 
 
 def _non_empty_string(*, value: Any) -> str | None:
@@ -558,7 +572,7 @@ def extract_validation_errors(exc: ValidateBundleError) -> list[dict[str, Any]]:
     """Project a ``ValidateBundleError`` into the CLI ``validation_errors`` JSON array.
 
     Thin adapter over ``ValidateBundleError.validation_error_items`` — the shared builder,
-    same one feeding the API 422's ``ErrorReport.validation_errors`` — so the CLI
+    same one feeding the ``/validate`` verdict and the problem's items — so the CLI
     and API structured shapes can never drift. Each typed item is dumped to a
     plain dict with unset fields dropped (``exclude_none``), matching the
     machine-first agent-CLI envelope; the entries carry ``category``,
@@ -645,7 +659,7 @@ def agent_error_validate_bundle(
                 exit_code=1,
             )
         case CliOutputFormat.MARKDOWN:
-            items = list(exc.to_error_report().validation_errors or [])
+            items = exc.validation_error_items()
             markdown = _render_validate_bundle_markdown(items, bundle_path=bundle_path, library_dirs=library_dirs, allow_signatures=allow_signatures)
             print(markdown, file=sys.stderr)
             raise typer.Exit(1) from exc

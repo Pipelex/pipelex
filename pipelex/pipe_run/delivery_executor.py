@@ -9,7 +9,6 @@ from kajson.exceptions import KajsonException
 from pydantic import ValidationError
 
 from pipelex import log
-from pipelex.base_exceptions import DisclosureMode, ErrorReport
 from pipelex.config import get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError, ConceptRefAmbiguousError
@@ -23,6 +22,7 @@ from pipelex.core.qualified_ref_exceptions import QualifiedRefError
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
+from pipelex.errors.problem import PipelexProblem, caller_view_of
 from pipelex.graph.graph_factory import generate_graph_outputs
 from pipelex.interpreter_hub import get_concept_library, get_current_library_id_or_none
 from pipelex.libraries.exceptions import LibraryError
@@ -59,10 +59,12 @@ class DeliveryExecutor:
         pipeline_run_id: str,
         delivery_assignment: DeliveryAssignment,
         status: DeliveryStatus,
-        error_report: ErrorReport | None = None,
+        problem: PipelexProblem | None = None,
         request_id: str | None = None,
     ) -> None:
         """Execute a full delivery: generate result files, store them, then notify webhooks.
+
+        ``problem`` is a failed run's problem in the operator's view, which each webhook receives in its own view.
 
         ``request_id`` is the originating API request id (when set). The delivery binds it
         with ``pipeline_run_id`` onto the log context, so every record the delivery emits,
@@ -88,7 +90,7 @@ class DeliveryExecutor:
                     status=status,
                     result_url=result_url,
                     webhook=webhook,
-                    error_report=error_report,
+                    problem=problem,
                 )
 
     # ---- Result file generation ----
@@ -458,12 +460,13 @@ class DeliveryExecutor:
         status: DeliveryStatus,
         result_url: str | None,
         webhook: WebhookTarget,
-        error_report: ErrorReport | None = None,
+        problem: PipelexProblem | None = None,
     ) -> None:
-        """POST status, optional result_url, and optional VERBOSE error report to a webhook URL.
+        """POST status, optional result_url, and a failed run's problem to a webhook URL.
 
-        VERBOSE on the wire is deliberate: the receiver decides what to re-expose
-        downstream (it can render STRICT via :meth:`ErrorReport.to_problem_document`).
+        The problem rides in the webhook's own view (``WebhookTarget.problem_view``): an
+        operator's webhook, such as a hosted plane's completion callback, receives the
+        diagnostics, and a caller's receives the problem without them.
 
         The HTTP client uses :class:`SsrfGuardedTransport`, which re-resolves the
         callback host at connect time and refuses private/loopback/metadata
@@ -485,8 +488,8 @@ class DeliveryExecutor:
             payload["status"] = status
             if result_url is not None:
                 payload["result_url"] = result_url
-            if error_report is not None:
-                payload["error"] = error_report.to_dict(disclosure_mode=DisclosureMode.VERBOSE)
+            if problem is not None:
+                payload["error"] = (problem if webhook.problem_view.shows_diagnostics else caller_view_of(problem=problem)).to_wire()
 
             async with httpx.AsyncClient(transport=SsrfGuardedTransport()) as client:
                 response = await client.post(

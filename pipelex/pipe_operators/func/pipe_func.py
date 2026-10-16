@@ -361,9 +361,9 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             msg = (
                 f"PipeFunc '{self.code}' failed during execution.\n  Expected output: {output_desc}\n  Inputs: {inputs_desc}\n\n  Error: {error_desc}"
             )
-            # Not classified as the caller's fault: the function's own exception text can carry
-            # whatever the process holds (a path, a setting, a secret), so it stays redacted under
-            # STRICT disclosure. The wrapper takes its cause's code. What the function raised reads
+            # No parameter carries the function's own exception text, which can carry whatever the
+            # process holds (a path, a setting, a secret): it rides the operator's diagnostics alone.
+            # The wrapper takes its cause's code. What the function raised reads
             # `pipe.function_raised` only because an executor marked it so: the in-process executor
             # raises it as `PipeFuncRaisedError`, and an out-of-process one must report a coded Pipelex
             # error the same way. A failure of the seam (a timeout, a sandbox that cannot run the call)
