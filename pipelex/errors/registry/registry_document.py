@@ -233,10 +233,15 @@ class RegistrySteps(_RegistryModel):
 
 
 class RegistryReference(_RegistryModel):
-    """A documentation page that defines the situation a code names, and the text to link it with."""
+    """A documentation page that defines the situation a code names, and the text to link it with.
+
+    The href is a path from the documentation's root. The format's schema lets a segment after the first hold
+    dots, which also lets one be `.` or `..` and climb out of the documentation (`x/../../README.md`); this model
+    refuses a segment made of dots alone, so a reference always names a page under the documentation's root.
+    """
 
     title: str = Field(min_length=1, pattern=r"\S")
-    href: str = Field(pattern=r"^[a-z0-9_\-]+(/[a-z0-9_\-.]+)*\.md(#[a-z0-9_\-]+)?$")
+    href: str = Field(pattern=r"^[a-z0-9_\-]+(/[a-z0-9_\-.]*[a-z0-9_\-][a-z0-9_\-.]*)*\.md(#[a-z0-9_\-]+)?$")
 
 
 class RegistryFamily(_RegistryModel):

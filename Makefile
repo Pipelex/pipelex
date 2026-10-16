@@ -1216,7 +1216,8 @@ docs-deploy-specific-version-pre-release: env generate-error-registry-quiet
 # rewrites any semver path segment (including pre-release suffixes like -rc1) to /latest/.
 # `pipelex-dev write-error-type-redirects` writes errors/<code>/index.html at the root for every
 # error code latest/ documents, so that a problem's type URI, https://$(SITE_DOMAIN)/errors/<code>,
-# reaches the code's page under /latest/ (docs/contribute/error-registry.md).
+# reaches the code's page under /latest/ (docs/contribute/error-registry.md). While latest/ documents
+# no code it writes no stub at all, so errors/ is staged only when the checkout holds it.
 # WARNING: Do NOT insert comments inside the shell continuation chain below.
 # Lines starting with # after a \ continuation become shell comments that silently
 # truncate the command.
@@ -1239,7 +1240,7 @@ endif
 	cd "$$TMPDIR" && \
 	git add 404.html robots.txt index.html sitemap.xml && \
 	(git add -A llms.txt llms-full.txt 2>/dev/null || true) && \
-	git add -A errors && \
+	if [ -d errors ]; then git add -A errors; fi && \
 	(git diff --cached --quiet || git commit -m "Update root assets (404.html, robots.txt, index.html, sitemap.xml, llms.txt, error type redirects)") && \
 	git push origin gh-pages
 

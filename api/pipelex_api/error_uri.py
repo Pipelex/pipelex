@@ -27,8 +27,12 @@ def error_type_uri(error_type: str) -> str:
     """Return the RFC 7807 `type` URI for an error type name.
 
     `EnvVarNotFoundError` -> `https://docs.pipelex.com/latest/errors/env-var-not-found-error/`.
-    The trailing slash matches the canonical docs URL form, exactly as
-    `PipelexError.type_uri()` produces it upstream.
+    The URI is derived from the class name, trailing slash included, exactly as
+    `PipelexError.type_uri()` derives it upstream, so the two share one shape on
+    the wire. No page lives at it: the per-class error pages are retired, and the
+    docs site's 404 page sends such a URI to the Error Codes index. The type URI
+    stays class-derived until every raise carries its code from the error
+    registry, whose type URI names the code's page.
     """
     return f"{URLs.error_docs_base}/{pascal_case_to_kebab(error_type)}/"
 

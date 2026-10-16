@@ -10,7 +10,9 @@ A registry document is checked in three passes, each run only on a document the 
 3. the rules a schema cannot state, which the standard's repository applies to the core registry and
    which apply to an extension registry alike: a family or a code given twice, a code whose family is
    undeclared, a family no code uses, a code or a family outside the prefix, a template naming a
-   parameter its reader may not see, and a reference to a documentation page that does not exist.
+   parameter its reader may not see, and a reference to a documentation page that does not exist:
+   one outside the documentation, one under ``docs/errors/`` that this registry does not generate,
+   or one elsewhere that the documentation does not hold.
    To these, Pipelex adds the rules its own use of the registry needs: the prefix is registered in the
    core registry under the same base URL, every code a sentence names in backticks exists, every
    parameter name can be a field of the typed Python generated from the registry, distinct codes
@@ -34,6 +36,8 @@ from pipelex.cli.dev_cli.commands.error_registry.codes_generator import (
     generated_code_errors,
     params_class_name,
 )
+from pipelex.cli.dev_cli.commands.error_registry.pages_generator import generated_page_paths
+from pipelex.cli.dev_cli.commands.error_registry.registry_source import PAGES_ROOT
 from pipelex.errors.registry.registry_document import ErrorRegistryDocument, RegistryDomain, RegistryEntry
 
 if TYPE_CHECKING:
@@ -211,6 +215,29 @@ def param_name_errors(*, entry: RegistryEntry, here: str) -> list[str]:
     return errors
 
 
+def reference_errors(*, entry: RegistryEntry, here: str, docs_dir: Path, generated_pages: frozenset[str]) -> list[str]:
+    """Every page a code's `see` names is a page of the documentation, its anchor aside.
+
+    The generator owns ``docs/errors/`` whole, and writes its pages from this same registry, so a page there is
+    one the registry generates, whether or not it is on disk yet: a new code may name another new code's page,
+    while a page on disk that the registry no longer generates is one the generator removes. A page anywhere
+    else is one the documentation holds. A page that lies outside the documentation once resolved, through a
+    `..` segment, which the typed model already refuses, or a symbolic link, is refused.
+    """
+    errors: list[str] = []
+    docs_root = docs_dir.resolve()
+    for reference in entry.see or []:
+        page = reference.href.split("#", 1)[0]
+        if not (docs_dir / page).resolve().is_relative_to(docs_root):
+            errors.append(f"{here}: see names {page}, which lies outside the documentation")
+        elif page.startswith(f"{PAGES_ROOT}/"):
+            if page not in generated_pages:
+                errors.append(f"{here}: see names {page}, which this registry does not generate")
+        elif not (docs_dir / page).is_file():
+            errors.append(f"{here}: see names {page}, which the documentation does not hold")
+    return errors
+
+
 def generated_name_errors(*, registry: ErrorRegistryDocument, where: str) -> list[str]:
     """Distinct codes generate distinct ``PipelexErrorCode`` members and distinct parameters models.
 
@@ -246,6 +273,7 @@ def semantic_errors(*, registry: ErrorRegistryDocument, core: ErrorRegistryDocum
     prefix = registry.prefix
     families = [family.family for family in registry.families]
     used_families: set[str] = set()
+    generated_pages = generated_page_paths(registry=registry)
 
     for family in sorted({name for name in families if families.count(name) > 1}):
         errors.append(f"{where}: the family {family} is declared twice")
@@ -280,10 +308,7 @@ def semantic_errors(*, registry: ErrorRegistryDocument, core: ErrorRegistryDocum
         errors.extend(param_name_errors(entry=entry, here=here))
         for member, text in _entry_texts(entry=entry):
             errors.extend(code_reference_errors(text=text, here=f"{here}: {member}", registry=registry, core=core))
-        for reference in entry.see or []:
-            page = reference.href.split("#", 1)[0]
-            if not (docs_dir / page).is_file():
-                errors.append(f"{here}: see names {page}, which the documentation does not hold")
+        errors.extend(reference_errors(entry=entry, here=here, docs_dir=docs_dir, generated_pages=generated_pages))
 
     for family in families:
         if family not in used_families:

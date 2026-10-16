@@ -10,7 +10,9 @@ directory per code named after the whole code, holding an ``index.html`` that re
 URI does, with a 301 to the same URL with the slash, whatever its last segment holds (``/0.87.0`` is
 answered so too), and serves the directory's ``index.html`` there. The stubs are written from the pages the
 released version holds, so a code resolves once a release that documents it is the latest, and a stub whose
-code the latest version no longer documents is removed.
+code the latest version no longer documents is removed. The base URL itself gets a root stub, redirecting to
+the codes' index under ``/latest/``, only while the latest version documents at least one code; otherwise a
+root stub written earlier is removed, and only a file carrying the stubs' marker is ever removed.
 """
 
 from __future__ import annotations
@@ -31,6 +33,8 @@ if TYPE_CHECKING:
 LATEST_DIR_NAME = "latest"
 # The comment every stub carries, so that only a stub this module wrote is ever removed.
 STUB_MARKER = "<!-- pipelex-dev write-error-type-redirects: the type URI of an error code -->"
+# How a report names the root stub, the base URL's own, which serves no code.
+ROOT_STUB_NAME = "(index)"
 
 _SEGMENT = r"[a-z][a-z0-9_]*"
 _CODE_DIR_REGEX = re.compile(rf"^{_SEGMENT}(\.{_SEGMENT})+$")
@@ -105,23 +109,37 @@ def write_type_redirects(*, site_root: Path, base_url: str) -> TypeRedirectsRepo
     unchanged: list[str] = []
     removed: list[str] = []
     targets = {code: f"/{LATEST_DIR_NAME}/{stubs_path}/{code.replace('.', '/')}/" for code in codes}
-    targets[""] = f"/{LATEST_DIR_NAME}/{stubs_path}/"
+    # The root stub sends the base URL to the codes' index under /latest/, which only a version that documents
+    # the codes holds: before such a release is the latest, /latest/errors/ is not that index, and may be no
+    # page at all, so no root stub is written, and the site's 404 page sends the base URL to /latest/ as it
+    # sends any path without a version.
+    if codes:
+        targets[""] = f"/{LATEST_DIR_NAME}/{stubs_path}/"
     for code, target_path in targets.items():
         stub_file = stubs_dir / code / "index.html" if code else stubs_dir / "index.html"
         content = render_stub(target_path=target_path, site_origin=site_origin)
         if stub_file.is_file() and stub_file.read_text(encoding="utf-8") == content:
-            unchanged.append(code or "(index)")
+            unchanged.append(code or ROOT_STUB_NAME)
             continue
         stub_file.parent.mkdir(parents=True, exist_ok=True)
         stub_file.write_text(content, encoding="utf-8", newline="\n")
-        written.append(code or "(index)")
+        written.append(code or ROOT_STUB_NAME)
 
     if stubs_dir.is_dir():
         for stub_dir in sorted(stubs_dir.iterdir()):
             if not stub_dir.is_dir() or stub_dir.name in targets or not _CODE_DIR_REGEX.match(stub_dir.name):
                 continue
             stub_file = stub_dir / "index.html"
-            if stub_file.is_file() and STUB_MARKER in stub_file.read_text(encoding="utf-8"):
+            if _is_stub(stub_file=stub_file):
                 shutil.rmtree(stub_dir)
                 removed.append(stub_dir.name)
+        root_stub_file = stubs_dir / "index.html"
+        if "" not in targets and _is_stub(stub_file=root_stub_file):
+            root_stub_file.unlink()
+            removed.append(ROOT_STUB_NAME)
     return TypeRedirectsReport(written=written, unchanged=unchanged, removed=removed)
+
+
+def _is_stub(*, stub_file: Path) -> bool:
+    """Whether a file is a stub this module wrote, which alone it may remove: a file carrying the stub's marker."""
+    return stub_file.is_file() and STUB_MARKER in stub_file.read_text(encoding="utf-8")

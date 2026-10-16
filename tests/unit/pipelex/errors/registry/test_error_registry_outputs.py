@@ -15,6 +15,7 @@ from pipelex.cli.dev_cli.commands.error_registry.error_registry_cmd import (
     generate_error_registry_cmd,
     write_error_type_redirects_cmd,
 )
+from pipelex.cli.dev_cli.commands.error_registry.pages_generator import generated_page_paths, render_pages
 from pipelex.cli.dev_cli.commands.error_registry.registry_outputs import check_error_registry, orphan_pages, source_errors
 from pipelex.cli.dev_cli.commands.error_registry.registry_source import (
     DOCS_DIR,
@@ -77,6 +78,11 @@ class TestErrorRegistryOutputs:
             assert entry.page_path == "errors/" + entry.code.replace(".", "/") + ".md"
             assert (DOCS_DIR / entry.page_path).is_file()
 
+    def test_the_generated_page_paths_are_the_pages_the_generator_renders(self) -> None:
+        """The paths a `see` reference may name before the pages are written are exactly the pages the generator writes."""
+        registry = load_pipelex_error_registry()
+        assert generated_page_paths(registry=registry) == frozenset(render_pages(registry=registry))
+
     def test_the_vendored_standard_files_are_the_recorded_ones(self) -> None:
         """The standard's schema and core snapshot are copied verbatim, at the digests and the commit vendored.toml records."""
         record = load_vendored_record()
@@ -134,6 +140,7 @@ class TestErrorRegistryFaultsArePrinted:
         [
             (_source_from("codes: [\n"), "registry.yaml: while parsing"),
             (_source_from("prefix: pipelex\nprefix: acme\n"), "duplicate key 'prefix'"),
+            (_source_from("? [a, b]\n: value\n"), "found a key that is a sequence or a mapping"),
             (_source_from("- a list\n"), "the registry is a mapping of its members"),
             (_source_from("version: 1.0.0\nprefix: pipelex\n"), "writes a version"),
             (_missing_source, "absent.yaml cannot be read"),

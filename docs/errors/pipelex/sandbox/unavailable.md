@@ -37,7 +37,7 @@ A problem carries the [step](https://mthds.ai/latest/spec/protocol/#next-steps) 
 
 The problem's `detail` is written from this template, filled with the occurrence's parameters:
 
-> The sandbox that runs the method's code could not be started (backend: `{backend}`), so the code never ran.
+> The Daytona sandbox that runs the method's code could not be started (backend: `{backend}`), so the code never ran.
 
 ## Parameters
 

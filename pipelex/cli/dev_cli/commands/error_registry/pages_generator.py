@@ -315,6 +315,11 @@ def render_code_page(*, registry: ErrorRegistryDocument, entry: RegistryEntry) -
     return "\n".join(lines)
 
 
+def generated_page_paths(*, registry: ErrorRegistryDocument) -> frozenset[str]:
+    """The path of every page :func:`render_pages` writes, from the documentation's root, without rendering them."""
+    return frozenset({INDEX_PAGE, *(entry.page_path for entry in registry.codes)})
+
+
 def render_pages(*, registry: ErrorRegistryDocument) -> dict[str, str]:
     """Every generated page, by its path from the documentation's root."""
     pages = {INDEX_PAGE: render_index_page(registry=registry)}

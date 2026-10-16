@@ -1718,7 +1718,7 @@
       "retry": "yes",
       "raised_as": "problem",
       "status": 503,
-      "detail": "The sandbox that runs the method's code could not be started (backend: {backend}), so the code never ran.",
+      "detail": "The Daytona sandbox that runs the method's code could not be started (backend: {backend}), so the code never ran.",
       "steps": {
         "actor": {
           "kind": "retry",

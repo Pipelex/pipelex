@@ -10,12 +10,13 @@ from pydantic import ValidationError as PydanticValidationError
 from pipelex.cli.dev_cli.commands.error_registry.exceptions import ErrorRegistryError
 from pipelex.cli.dev_cli.commands.error_registry.registry_checks import (
     model_errors,
+    reference_errors,
     registry_errors,
     schema_errors,
     semantic_errors,
 )
 from pipelex.cli.dev_cli.commands.error_registry.registry_source import DOCS_DIR, compose_registry_document, load_registry_source
-from pipelex.errors.registry.registry_document import ErrorRegistryDocument
+from pipelex.errors.registry.registry_document import ErrorRegistryDocument, RegistryReference
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -373,6 +374,87 @@ class TestErrorRegistryChecks:
         source_path.write_text("prefix: pipelex\nprefix: acme\n", encoding="utf-8")
         with pytest.raises(ErrorRegistryError, match="duplicate key 'prefix'"):
             load_registry_source(path=source_path)
+
+    @pytest.mark.parametrize(
+        ("topic", "text"),
+        [
+            ("a sequence key at the top", "? [a, b]\n: value\n"),
+            ("a mapping key in a nested mapping", "codes:\n  ? {a: 1}\n  : value\n"),
+        ],
+    )
+    def test_a_complex_yaml_key_is_refused_as_a_load_fault(self, tmp_path: Path, topic: str, text: str) -> None:
+        """A sequence or a mapping written as a key is unhashable, so the loader refuses it as a fault rather than raise a TypeError."""
+        source_path = tmp_path / "registry.yaml"
+        source_path.write_text(text, encoding="utf-8")
+        with pytest.raises(ErrorRegistryError, match="found a key that is a sequence or a mapping") as exc_info:
+            load_registry_source(path=source_path)
+        assert "registry.yaml" in str(exc_info.value), topic
+
+    @pytest.mark.parametrize(
+        "href",
+        [
+            "building-methods/../../changelog.md",
+            "under-the-hood/./error-model.md",
+            "under-the-hood/../under-the-hood/error-model.md#anchor",
+        ],
+    )
+    def test_a_see_reference_with_a_dot_segment_is_refused_by_the_typed_model(
+        self, composed_document: dict[str, Any], standard_schema: dict[str, Any], href: str
+    ) -> None:
+        """The format's schema lets a segment be `.` or `..`, which climbs out of the documentation; the typed model refuses it."""
+        _entry(composed_document, "pipelex.storage.unavailable")["see"] = [{"title": "Elsewhere", "href": href}]
+        assert schema_errors(document=composed_document, schema=standard_schema, where=WHERE) == []
+        registry, found_by_model = model_errors(document=composed_document, where=WHERE)
+        assert registry is None
+        assert any("codes/" in error and "see/0/href" in error for error in found_by_model), found_by_model
+
+    @pytest.mark.parametrize(
+        ("topic", "href", "expected"),
+        [
+            ("a page the documentation holds", "guide/page.md", None),
+            ("a page the documentation holds, with an anchor", "guide/page.md#a-section", None),
+            ("the index the registry generates", "errors/index.md", None),
+            ("a code page the registry generates, not on disk yet", "errors/pipelex/fresh/code.md", None),
+            ("a page on disk under errors/ the registry no longer generates", "errors/pipelex/old/gone.md", "which this registry does not generate"),
+            ("a page the documentation does not hold", "guide/missing.md", "which the documentation does not hold"),
+            ("a page that climbs out of the documentation", "guide/../../outside.md", "which lies outside the documentation"),
+            ("a symbolic link out of the documentation", "escape.md", "which lies outside the documentation"),
+        ],
+    )
+    def test_a_see_reference_names_a_page_of_the_documentation(
+        self, composed_document: dict[str, Any], tmp_path: Path, topic: str, href: str, expected: str | None
+    ) -> None:
+        """A reference names a page the documentation holds or one this registry generates, and never one outside the documentation."""
+        docs_dir = tmp_path / "docs"
+        for page in ("guide/page.md", "errors/pipelex/old/gone.md"):
+            (docs_dir / page).parent.mkdir(parents=True, exist_ok=True)
+            (docs_dir / page).write_text("page", encoding="utf-8")
+        (tmp_path / "outside.md").write_text("outside", encoding="utf-8")
+        (docs_dir / "escape.md").symlink_to(tmp_path / "outside.md")
+        registry = ErrorRegistryDocument.model_validate(composed_document)
+        entry = registry.entry(code="pipelex.storage.unavailable")
+        assert entry is not None
+        # Built without validation, as the typed model would refuse the `..` segment before this check ever runs.
+        referencing = entry.model_copy(update={"see": [RegistryReference.model_construct(title="A page", href=href)]})
+        generated_pages = frozenset({"errors/index.md", "errors/pipelex/fresh/code.md"})
+        errors = reference_errors(entry=referencing, here=WHERE, docs_dir=docs_dir, generated_pages=generated_pages)
+        if expected is None:
+            assert errors == [], topic
+        else:
+            assert errors == [f"{WHERE}: see names {href.split('#', 1)[0]}, {expected}"], topic
+
+    def test_a_see_reference_may_name_the_page_of_a_code_not_yet_generated(
+        self, composed_document: dict[str, Any], standard_schema: dict[str, Any], core_registry: ErrorRegistryDocument
+    ) -> None:
+        """A new code may name another new code's page, which the generator writes from this same registry."""
+        _add_codes(["pipelex.fresh"], ["pipelex.fresh.first", "pipelex.fresh.second"])(composed_document)
+        assert not (DOCS_DIR / "errors" / "pipelex" / "fresh" / "second.md").exists()
+        _entry(composed_document, "pipelex.fresh.first")["see"] = [{"title": "Second", "href": "errors/pipelex/fresh/second.md"}]
+        errors = registry_errors(document=composed_document, schema=standard_schema, core=core_registry, docs_dir=DOCS_DIR, where=WHERE)
+        assert errors == []
+        _entry(composed_document, "pipelex.fresh.first")["see"] = [{"title": "Third", "href": "errors/pipelex/fresh/third.md"}]
+        errors = registry_errors(document=composed_document, schema=standard_schema, core=core_registry, docs_dir=DOCS_DIR, where=WHERE)
+        assert errors == [f"{WHERE}: pipelex.fresh.first: see names errors/pipelex/fresh/third.md, which this registry does not generate"]
 
     def test_a_source_that_writes_its_own_version_is_refused(self) -> None:
         """The version is Pipelex's, from pyproject.toml, and written nowhere else."""

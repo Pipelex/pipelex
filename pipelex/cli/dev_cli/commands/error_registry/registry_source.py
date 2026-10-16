@@ -53,13 +53,20 @@ def relative_to_repo(*, path: Path) -> str:
 
 
 class _UniqueKeyLoader(yaml.SafeLoader):
-    """A safe loader that refuses a mapping holding the same key twice, which a YAML loader would otherwise keep silently."""
+    """A safe loader that refuses a mapping holding the same key twice, which a YAML loader would otherwise keep silently.
+
+    It also refuses a complex key, a sequence or a mapping written after `?`, which the registry format never
+    uses and which no Python mapping can hold, as a load fault rather than an unhashable key's `TypeError`.
+    """
 
 
 def _construct_unique_mapping(loader: _UniqueKeyLoader, node: yaml.MappingNode) -> dict[Any, Any]:  # kw-only: ignore
     # A PyYAML constructor, which the loader calls positionally with itself and the node.
     seen: set[Any] = set()
     for key_node, _value_node in node.value:
+        if not isinstance(key_node, yaml.ScalarNode):
+            msg = "found a key that is a sequence or a mapping, where the registry's keys are plain names"
+            raise yaml.constructor.ConstructorError(None, None, msg, key_node.start_mark)
         key: Any = loader.construct_object(key_node, deep=True)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         if key in seen:
             msg = f"duplicate key {key!r}"
@@ -75,7 +82,8 @@ def load_registry_source(*, path: Path = REGISTRY_SOURCE_PATH) -> dict[str, Any]
     """The registry's YAML source, as a mapping.
 
     Raises:
-        ErrorRegistryError: When the file cannot be read, does not parse, holds a key twice or is not a mapping.
+        ErrorRegistryError: When the file cannot be read, does not parse, holds a key twice or a key that is a
+            sequence or a mapping, or is not a mapping.
     """
     try:
         with path.open(encoding="utf-8") as stream:

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipelex.cli.dev_cli.commands.error_registry.exceptions import ErrorRegistryError
-from pipelex.cli.dev_cli.commands.error_registry.type_redirects import STUB_MARKER, write_type_redirects
+from pipelex.cli.dev_cli.commands.error_registry.type_redirects import ROOT_STUB_NAME, STUB_MARKER, write_type_redirects
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -28,7 +28,7 @@ class TestTypeRedirects:
 
         report = write_type_redirects(site_root=tmp_path, base_url=BASE_URL)
 
-        assert report.written == ["pipelex.billing.credit_exhausted", "pipelex.config.syntax", "(index)"]
+        assert report.written == ["pipelex.billing.credit_exhausted", "pipelex.config.syntax", ROOT_STUB_NAME]
         stub = (tmp_path / "errors" / "pipelex.billing.credit_exhausted" / "index.html").read_text(encoding="utf-8")
         assert STUB_MARKER in stub
         assert '<meta http-equiv="refresh" content="0; url=/latest/errors/pipelex/billing/credit_exhausted/">' in stub
@@ -49,13 +49,51 @@ class TestTypeRedirects:
         report = write_type_redirects(site_root=tmp_path, base_url=BASE_URL)
         assert report.written == []
         assert report.removed == []
-        assert sorted(report.unchanged) == ["(index)", "pipelex.billing.credit_exhausted", "pipelex.billing.plan_limit"]
+        assert sorted(report.unchanged) == [ROOT_STUB_NAME, "pipelex.billing.credit_exhausted", "pipelex.billing.plan_limit"]
 
         (tmp_path / "latest" / "errors" / "pipelex" / "billing" / "plan_limit" / "index.html").unlink()
         report = write_type_redirects(site_root=tmp_path, base_url=BASE_URL)
         assert report.removed == ["pipelex.billing.plan_limit"]
         assert not (tmp_path / "errors" / "pipelex.billing.plan_limit").exists()
         assert (foreign_dir / "index.html").is_file()
+
+    def test_no_root_stub_is_written_while_latest_documents_no_code(self, tmp_path: Path) -> None:
+        """Before a release that documents the codes is latest, a root stub would redirect into a 404, so no stub is written."""
+        _publish_page(tmp_path, version="latest", page_dir="env-var-not-found-error")
+        (tmp_path / "latest" / "errors" / "index.html").write_text("<html>the retired class pages' index</html>", encoding="utf-8")
+        _publish_page(tmp_path, version="0.88.0", page_dir="pipelex/billing/credit_exhausted")
+
+        report = write_type_redirects(site_root=tmp_path, base_url=BASE_URL)
+
+        assert report.written == []
+        assert report.unchanged == []
+        assert report.removed == []
+        assert not (tmp_path / "errors").exists()
+
+    def test_a_root_stub_written_earlier_is_removed_once_latest_documents_no_code(self, tmp_path: Path) -> None:
+        """The root stub this command wrote goes with the codes' stubs when latest no longer documents any code."""
+        _publish_page(tmp_path, version="latest", page_dir="pipelex/billing/credit_exhausted")
+        assert write_type_redirects(site_root=tmp_path, base_url=BASE_URL).written == ["pipelex.billing.credit_exhausted", ROOT_STUB_NAME]
+        (tmp_path / "latest" / "errors" / "pipelex" / "billing" / "credit_exhausted" / "index.html").unlink()
+
+        report = write_type_redirects(site_root=tmp_path, base_url=BASE_URL)
+
+        assert report.written == []
+        assert report.removed == ["pipelex.billing.credit_exhausted", ROOT_STUB_NAME]
+        assert not (tmp_path / "errors" / "index.html").exists()
+        assert not (tmp_path / "errors" / "pipelex.billing.credit_exhausted").exists()
+
+    def test_a_root_index_this_command_did_not_write_is_never_removed(self, tmp_path: Path) -> None:
+        """A file at the root stub's place without the stubs' marker is not a stub, so it stays when there is no root stub to write."""
+        (tmp_path / "latest").mkdir()
+        foreign_index = tmp_path / "errors" / "index.html"
+        foreign_index.parent.mkdir()
+        foreign_index.write_text("<html>mine</html>", encoding="utf-8")
+
+        report = write_type_redirects(site_root=tmp_path, base_url=BASE_URL)
+
+        assert report.removed == []
+        assert foreign_index.read_text(encoding="utf-8") == "<html>mine</html>"
 
     def test_a_site_without_a_latest_version_is_refused(self, tmp_path: Path) -> None:
         """With no released version there is no page for a type URI to reach."""
