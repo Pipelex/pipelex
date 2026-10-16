@@ -1,6 +1,7 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
@@ -118,6 +119,10 @@ class OptionalValueAbsentError(PipeRunError):
             variable_name=variable_name,
             absence_record=absence_record,
         )
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {**super().problem_params(), "variable": self.variable_name}
 
 
 class NoInputsRequiredError(PipelexError):

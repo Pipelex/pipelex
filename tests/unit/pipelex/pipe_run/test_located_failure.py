@@ -1,32 +1,51 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, StepKind
 from typing_extensions import override
 
-from pipelex.base_exceptions import INTERNAL_ERROR_PLACEHOLDER, DisclosureMode, ErrorDomain, ErrorReport, PipelexError
+from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory, LLMCompletionError
-from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.pipes.inputs.exceptions import OptionalValueAbsentError
 from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of, merge_locations
 from pipelex.pipe_run.exceptions import PipeRouterError, find_failure_location
 from pipelex.pipe_run.located_failure import compose_located_message, find_foreign_fault, find_root_fault, make_unexpected_failure
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.runtime_bridge.exceptions import PipelexBridgeDispatchError
 from pipelex.system.pipe_run_mode import PipeRunMode
 
+if TYPE_CHECKING:
+    from mthds.protocol.problem.models import ProblemLocation
 
-class _RecoveredReportError(PipelexError):
-    """Carries a report recovered across a transport boundary, and reports it as it is."""
 
-    def __init__(self, message: str, *, error_report: ErrorReport):
+class _RecoveredProblemError(PipelexError):
+    """Carries a problem recovered across a transport boundary, and reports it as it is, located where it is told."""
+
+    def __init__(self, message: str, *, problem: PipelexProblem):
         super().__init__(message)
-        self.error_report = error_report
+        self.recovered_problem = problem
 
     @override
-    def to_error_report(self) -> ErrorReport:
-        return self.error_report
+    def to_problem(
+        self,
+        *,
+        view: ProblemView,
+        request_id: str | None = None,
+        pipeline_run_id: str | None = None,
+        failure_location: ProblemLocation | None = None,
+    ) -> PipelexProblem:
+        problem = self.recovered_problem
+        if failure_location is not None:
+            problem = problem.model_copy(update={"location": merge_locations(base=problem.location, override=failure_location)})
+        match view:
+            case ProblemView.OPERATOR:
+                return problem
+            case ProblemView.CALLER:
+                return caller_view_of(problem=problem)
 
 
 def _locate(failure: PipelexError, *, pipe_stack: list[str]) -> PipeRouterError:
@@ -62,7 +81,7 @@ def _make_absence_error() -> OptionalValueAbsentError:
     )
 
 
-class TestLocatedFailureReport:
+class TestLocatedFailureProblem:
     @pytest.mark.parametrize(
         ("pipe_stack", "expected_message"),
         [
@@ -94,7 +113,11 @@ class TestLocatedFailureReport:
 
         assert find_root_fault(error=located) is unexpected_failure
         assert find_foreign_fault(error=located) is foreign_fault
-        assert located.to_error_report().error_type == "PipelexUnexpectedError"
+        problem = located.to_problem(view=ProblemView.OPERATOR)
+        assert problem.code == CoreCode.RUNTIME_UNEXPECTED
+        assert problem.diagnostics is not None
+        assert problem.diagnostics.error_class == "PipelexUnexpectedError"
+        assert "boom" not in str(located.to_problem(view=ProblemView.CALLER).to_wire())
 
     def test_a_same_class_rethrow_keeps_its_added_context(self) -> None:
         """An error raised from one of its own class restates the fault with context: the outer one is reported."""
@@ -104,10 +127,13 @@ class TestLocatedFailureReport:
         located = _locate(with_remedy, pipe_stack=["flow", "draw"])
 
         assert find_root_fault(error=located) is with_remedy
-        assert located.to_error_report().message == "Pipe 'draw' failed (flow → draw): Size tier '4k' is not satisfiable: use '1k' or '2k'"
+        assert located.message == "Pipe 'draw' failed (flow → draw): Size tier '4k' is not satisfiable: use '1k' or '2k'"
+        problem = located.to_problem(view=ProblemView.OPERATOR)
+        assert problem.diagnostics is not None
+        assert problem.diagnostics.message == "Size tier '4k' is not satisfiable: use '1k' or '2k'"
 
-    def test_identity_and_message_are_the_root_faults(self) -> None:
-        """Through the router, a bridge and the runner, the report is the root fault's, located once."""
+    def test_the_problem_is_the_root_faults_located_at_the_failing_pipe(self) -> None:
+        """Through the router, a bridge and the runner, the problem is the root fault's, located once at the innermost pipe."""
         root_fault = LLMCompletionError(message="rate limited", error_category=InferenceErrorCategory.TRANSIENT).with_error_code(
             CoreCode.PROVIDER_RATE_LIMITED
         )
@@ -120,88 +146,95 @@ class TestLocatedFailureReport:
         assert find_failure_location(error=run_failure) is located
         assert run_failure.pipe_code == "gen_ideas"
         assert run_failure.pipe_stack == ["flow", "analyze", "gen_ideas"]
+        assert run_failure.message == "Pipe 'gen_ideas' failed (flow → analyze → gen_ideas): rate limited"
 
-        report = run_failure.to_error_report()
-        assert report.error_type == "LLMCompletionError"
-        root_spec = error_code_spec(CoreCode.PROVIDER_RATE_LIMITED)
-        assert report.code == root_spec.code
-        assert report.title == root_spec.title
-        assert report.type_uri == root_spec.type_uri
-        assert report.message == "Pipe 'gen_ideas' failed (flow → analyze → gen_ideas): rate limited"
-        assert run_failure.message == report.message
-        # Classification inherited from the chain, and the retry verdict the root fault's code decides.
-        assert report.error_category == InferenceErrorCategory.TRANSIENT
-        assert report.retryable is True
-        assert report == located.to_error_report()
+        for view in ProblemView:
+            problem = run_failure.to_problem(view=view, pipeline_run_id="run-1")
+            root_spec = error_code_spec(CoreCode.PROVIDER_RATE_LIMITED)
+            assert problem.code == root_spec.code
+            assert problem.title == root_spec.title
+            assert problem.type == root_spec.type_uri
+            assert problem.is_retryable is True
+            assert problem.location is not None
+            assert problem.location.pipe == "gen_ideas"
+            assert problem.location.path == ["flow", "analyze", "gen_ideas"]
+            assert problem.pipeline_run_id == "run-1"
+            assert problem.to_wire() == located.to_problem(view=view, pipeline_run_id="run-1").to_wire()
+        operator = run_failure.to_problem(view=ProblemView.OPERATOR)
+        assert operator.diagnostics is not None
+        assert operator.diagnostics.error_class == "LLMCompletionError"
+        assert operator.diagnostics.message == "rate limited"
 
-    def test_caller_facing_flag_is_the_root_faults(self) -> None:
-        """A caller-facing root keeps its located message under STRICT; the wrapper grants nothing of its own."""
-        report = _wrap_in_runner(
-            _locate(_make_absence_error(), pipe_stack=["force_flow", "force_echo"]), entry_pipe_code="force_flow"
-        ).to_error_report()
+    def test_the_location_names_the_pipe_and_its_path_in_the_caller_view(self) -> None:
+        """The caller reads where its run failed as members, never only inside the detail: they are its own pipe codes."""
+        run_failure = _wrap_in_runner(_locate(_make_absence_error(), pipe_stack=["force_flow", "force_echo"]), entry_pipe_code="force_flow")
 
-        assert report.caller_facing_message is True
-        strict_payload = report.to_dict(disclosure_mode=DisclosureMode.STRICT)
-        assert strict_payload["message"] == report.message
-        assert strict_payload["message"].startswith("Pipe 'force_echo' failed (force_flow → force_echo): ")
-        assert strict_payload["user_action"]["kind"] == UserActionKind.CHANGE_INPUT
+        caller = run_failure.to_problem(view=ProblemView.CALLER)
 
-    def test_a_bridge_sentence_is_never_caller_facing(self) -> None:
-        """A bridge error with no PipelexError under it reports as itself, and stays redacted under STRICT."""
+        assert caller.code == CoreCode.PIPE_FORCED_INPUT_ABSENT
+        assert caller.location is not None
+        assert caller.location.as_wire() == {"pipe": "force_echo", "path": ["force_flow", "force_echo"]}
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"pipe": "force_echo", "variable": "clause"}
+        assert caller.detail == "Pipe 'force_echo' forces 'clause' with '!', and it was absent in this run."
+        assert caller.next_step.kind == StepKind.CHANGE_METHOD
+        assert caller.diagnostics is None
+
+    def test_an_entry_pipe_failure_has_no_location(self) -> None:
+        """A failure no router located has no path, so its problem holds no location rather than an empty one."""
+        run_failure = _wrap_in_runner(PipelexError("combine failed"), entry_pipe_code="flow")
+
+        problem = run_failure.to_problem(view=ProblemView.CALLER)
+
+        assert problem.location is None
+        assert "location" not in problem.to_wire()
+
+    def test_a_bridge_sentence_never_reaches_the_caller(self) -> None:
+        """A bridge error with no PipelexError under it reports as itself, its sentence the operator's alone."""
         bridge_error = PipelexBridgeDispatchError("Pipe execution failed in DIRECT mode for pipe 'flow': internal detail")
-        report = _wrap_in_runner(bridge_error, entry_pipe_code="flow").to_error_report()
+        run_failure = _wrap_in_runner(bridge_error, entry_pipe_code="flow")
 
-        assert report.error_type == "PipelexBridgeDispatchError"
-        assert report.caller_facing_message is False
-        assert report.to_dict(disclosure_mode=DisclosureMode.STRICT)["message"] == INTERNAL_ERROR_PLACEHOLDER
+        caller = run_failure.to_problem(view=ProblemView.CALLER)
+        operator = run_failure.to_problem(view=ProblemView.OPERATOR)
 
-    def test_floor_and_fallback_apply_only_when_the_chain_is_silent(self) -> None:
-        """No domain and no action on the chain: RUNTIME, and a fallback naming the failing pipe."""
-        report = _locate(PipelexError("combine failed"), pipe_stack=["flow", "analyze"]).to_error_report()
+        assert "internal detail" not in str(caller.to_wire())
+        assert operator.diagnostics is not None
+        assert operator.diagnostics.error_class == "PipelexBridgeDispatchError"
 
-        assert report.error_domain == ErrorDomain.RUNTIME
-        assert report.user_action == UserAction(kind=UserActionKind.UNKNOWN, detail="The run failed in pipe 'analyze': the message gives the cause.")
-
-    def test_a_categorized_action_is_kept(self) -> None:
-        root_fault = CogtError(
-            message="quota exceeded",
-            error_category=InferenceErrorCategory.CAPACITY,
-            user_action=UserAction(kind=UserActionKind.CHECK_BILLING, detail="Check your billing"),
-        )
-        report = _locate(root_fault, pipe_stack=["flow"]).to_error_report()
-
-        assert report.user_action == UserAction(kind=UserActionKind.CHECK_BILLING, detail="Check your billing")
-
-    def test_a_recovered_report_is_taken_as_it_is(self) -> None:
-        """A report recovered across a boundary already names its pipe: the runner does not locate it again."""
-        recovered_report = _locate(PipelexError("combine failed"), pipe_stack=["flow", "analyze"]).to_error_report()
-        recovered = _RecoveredReportError(recovered_report.message, error_report=recovered_report)
+    def test_a_recovered_problem_is_taken_as_it_is(self) -> None:
+        """A problem recovered across a boundary already names its pipe: the runner does not locate it again."""
+        recovered_problem = _locate(PipelexError("combine failed"), pipe_stack=["flow", "analyze"]).to_problem(view=ProblemView.OPERATOR)
+        recovered = _RecoveredProblemError("combine failed", problem=recovered_problem)
         bridge_error = PipelexBridgeDispatchError(f"Pipe execution failed in temporal blocking delivery for pipe 'flow': {recovered}")
         bridge_error.__cause__ = recovered
         run_failure = _wrap_in_runner(bridge_error, entry_pipe_code="flow")
 
         assert run_failure.pipe_code == "flow"
         assert run_failure.pipe_stack == []
-        assert run_failure.message == recovered_report.message
-        assert run_failure.to_error_report() == recovered_report
+        assert run_failure.to_problem(view=ProblemView.OPERATOR).to_wire() == recovered_problem.to_wire()
+        assert run_failure.to_problem(view=ProblemView.CALLER).to_wire() == caller_view_of(problem=recovered_problem).to_wire()
 
-    def test_a_recovered_leaf_report_is_located_by_the_router(self) -> None:
-        """A PipelexError carrying a leaf's recovered report is located with the leaf's identity."""
-        leaf_report = CogtError(message="model refused", error_category=InferenceErrorCategory.CONFIGURATION).to_error_report()
-        report = _locate(_RecoveredReportError(leaf_report.message, error_report=leaf_report), pipe_stack=["flow", "summarize"]).to_error_report()
+    def test_a_recovered_leaf_problem_is_located_by_the_router(self) -> None:
+        """A PipelexError carrying a leaf's recovered problem is located with the leaf's identity."""
+        leaf_problem = CogtError(message="model refused", error_category=InferenceErrorCategory.CONFIGURATION).to_problem(view=ProblemView.OPERATOR)
+        located = _locate(_RecoveredProblemError("model refused", problem=leaf_problem), pipe_stack=["flow", "summarize"])
 
-        assert report.error_type == "CogtError"
-        assert report.message == "Pipe 'summarize' failed (flow → summarize): model refused"
-        assert report.code == leaf_report.code
-        assert report.error_domain == leaf_report.error_domain
+        problem = located.to_problem(view=ProblemView.OPERATOR)
+
+        assert problem.code == leaf_problem.code
+        assert problem.domain == leaf_problem.domain
+        assert problem.diagnostics == leaf_problem.diagnostics
+        assert problem.location is not None
+        assert problem.location.as_wire() == {"pipe": "summarize", "path": ["flow", "summarize"]}
 
     def test_a_cyclic_chain_reports_the_wrapper_as_itself(self) -> None:
-        """A chain that loops back to the wrapper cannot make the report recurse."""
+        """A chain that loops back to the wrapper cannot make the problem recurse."""
         root_fault = PipelexError("combine failed")
         located = _locate(root_fault, pipe_stack=["flow"])
         root_fault.__cause__ = located
 
-        report = located.to_error_report()
+        problem = located.to_problem(view=ProblemView.OPERATOR)
 
-        assert report.error_type == "PipeRouterError"
-        assert report.message.endswith("combine failed")
+        assert problem.diagnostics is not None
+        assert problem.diagnostics.error_class == "PipeRouterError"
+        assert problem.diagnostics.message.endswith("combine failed")

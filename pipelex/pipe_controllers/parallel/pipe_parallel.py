@@ -572,10 +572,13 @@ class PipeParallel(PipeController):
             if not next_steps:
                 # The combine's own message can quote a structure class's validator, which a deployment may have
                 # written: it stays the operator's, and the caller reads the code's sentence over the refused fields.
-                exc.with_error_code(CoreCode.PIPE_OUTPUT_INVALID).with_params(output_concept=output_concept_ref)
+                # A refusal of the whole structure, such as a model validator's, names no field: the caller reads the
+                # fields the branches fed, which the refusal is about together.
                 refused_field_names = _refused_field_names(exc=exc)
-                if refused_field_names is not None:
-                    exc.with_params(fields=sorted(refused_field_names))
+                exc.with_error_code(CoreCode.PIPE_OUTPUT_INVALID).with_params(
+                    output_concept=output_concept_ref,
+                    fields=sorted(refused_field_names if refused_field_names is not None else output_stuff_contents),
+                )
                 raise
             lead = f"PipeParallel '{self.code}' cannot combine its branch results into its output '{output_concept_ref}'."
             message_parts = [lead, *next_steps.values()]
