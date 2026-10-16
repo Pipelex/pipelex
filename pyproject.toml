@@ -580,4 +580,4 @@ good-names = ["_"]
 
 [tool.uv.sources]
 mthds = { git = "https://github.com/mthds-ai/mthds-python.git", rev = "26b8e80cf2ba1cc39ba009ed633e9cc5d311cb62" }
-pipelex-sdk = { git = "https://github.com/Pipelex/pipelex-sdk.git", rev = "e9cece139351bade7a3b4802ff21ba2be7ecdc28", subdirectory = "python" }
+pipelex-sdk = { git = "https://github.com/Pipelex/pipelex-sdk.git", rev = "9b990513432882fbc9e697aa06ab79e53b90c376", subdirectory = "python" }

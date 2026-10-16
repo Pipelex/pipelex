@@ -3742,7 +3742,7 @@ requires-dist = [
     { name = "opentelemetry-semantic-conventions", specifier = ">=0.59b0" },
     { name = "packaging", specifier = ">=24.0" },
     { name = "pillow", specifier = ">=12.1.1" },
-    { name = "pipelex-sdk", git = "https://github.com/Pipelex/pipelex-sdk.git?subdirectory=python&rev=e9cece139351bade7a3b4802ff21ba2be7ecdc28" },
+    { name = "pipelex-sdk", git = "https://github.com/Pipelex/pipelex-sdk.git?subdirectory=python&rev=9b990513432882fbc9e697aa06ab79e53b90c376" },
     { name = "pipelex-tools", marker = "extra == 'dev'", specifier = ">=0.7.2" },
     { name = "pipelex-tools-py", specifier = ">=0.1.3" },
     { name = "polyfactory", specifier = ">=2.21.0" },
@@ -3855,7 +3855,7 @@ provides-extras = ["dev"]
 [[package]]
 name = "pipelex-sdk"
 version = "0.45.0"
-source = { git = "https://github.com/Pipelex/pipelex-sdk.git?subdirectory=python&rev=e9cece139351bade7a3b4802ff21ba2be7ecdc28#e9cece139351bade7a3b4802ff21ba2be7ecdc28" }
+source = { git = "https://github.com/Pipelex/pipelex-sdk.git?subdirectory=python&rev=9b990513432882fbc9e697aa06ab79e53b90c376#9b990513432882fbc9e697aa06ab79e53b90c376" }
 dependencies = [
     { name = "httpx" },
     { name = "mthds" },
