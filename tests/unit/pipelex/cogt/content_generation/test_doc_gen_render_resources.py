@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 from urllib.parse import urljoin
 
 import pytest
@@ -120,6 +121,75 @@ class TestRunRenderResources:
         assert "the template file 'templates/letter.html'" in exc_info.value.message
         loader.assert_not_awaited()
         blob_spy.assert_not_called()
+
+    @pytest.mark.parametrize(
+        ("written", "tree_path"),
+        [
+            pytest.param("../main.mthds", "main.mthds", id="bundle"),
+            pytest.param("letter.html", "templates/letter.html", id="template"),
+        ],
+    )
+    async def test_a_file_of_the_tree_that_is_no_asset_is_refused_unread(
+        self, mocker: MockerFixture, method_store: LocalMethodFileStore, written: str, tree_path: str
+    ) -> None:
+        """A URL a run's input supplies may name any file of the method: only an image, a stylesheet or a font is read."""
+        tree = method_store.hold_files(holder="library", files={path: HeldFile.of_bytes(data=data) for path, data in _METHOD_FILES.items()})
+        url_base = _template_url_base(tree_digest=tree.digest)
+        blob_spy = mocker.spy(method_store, "read_blob")
+        resources = RunRenderResources(
+            storage_provider=mocker.MagicMock(spec=StorageProviderAbstract),
+            read_scope=None,
+            loop=asyncio.get_running_loop(),
+            document=_html_document(url_base=url_base),
+        )
+
+        for uri in (urljoin(url_base.base_url, written), written):
+            with pytest.raises(TemplateUrlRefusedError) as exc_info:
+                await asyncio.to_thread(resources.load, uri=uri, position="attachment 1 of the document")
+            assert exc_info.value.refusal_code is None
+            assert f"'{tree_path}', which is not an image, a stylesheet or a font" in exc_info.value.message
+        blob_spy.assert_not_called()
+
+    async def test_a_root_absolute_local_path_in_an_html_print_is_read_as_a_local_path(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """An absolute path is no relative URL: an unscoped run reads it from its disk, as before, and a scoped run refuses it."""
+        photo_path = tmp_path / "photo.png"
+        photo_path.write_bytes(b"\x89PNG local")
+        storage_provider = mocker.MagicMock(spec=StorageProviderAbstract)
+        unscoped = RunRenderResources(
+            storage_provider=storage_provider, read_scope=None, loop=asyncio.get_running_loop(), document=_html_document(url_base=None)
+        )
+        scoped = RunRenderResources(
+            storage_provider=storage_provider, read_scope="org/acme", loop=asyncio.get_running_loop(), document=_html_document(url_base=None)
+        )
+
+        loaded = await asyncio.to_thread(unscoped.load, uri=str(photo_path), position="image 1 of the document")
+
+        assert loaded.data == b"\x89PNG local"
+        with pytest.raises(UriReadRefusedError):
+            await asyncio.to_thread(scoped.load, uri=str(photo_path), position="image 1 of the document")
+
+    async def test_a_method_file_url_in_a_document_with_no_html_is_refused_for_its_source(self, mocker: MockerFixture) -> None:
+        loader = mocker.patch.object(doc_gen_generate, "load_bytes_and_mime_type_from_any_uri", new_callable=mocker.AsyncMock)
+        layout_document = DocumentComposition(
+            format=DocGenFormat.PDF,
+            source=DocGenSource.LAYOUT,
+            filename="letter.pdf",
+            title="Letter",
+            layout=LayoutDocument(title="Letter", blocks=[]),
+        )
+        resources = RunRenderResources(
+            storage_provider=mocker.MagicMock(spec=StorageProviderAbstract),
+            read_scope=None,
+            loop=asyncio.get_running_loop(),
+            document=layout_document,
+        )
+
+        with pytest.raises(TemplateUrlRefusedError) as exc_info:
+            await asyncio.to_thread(resources.load, uri=f"{METHOD_FILE_URL_PREFIX}{'ab' * 32}/logo.png", position="image 1 of the document")
+
+        assert "this document is printed from the auto-layout of its inputs" in exc_info.value.message
+        assert "inline template" not in exc_info.value.message
+        loader.assert_not_awaited()
 
     async def test_a_relative_url_of_html_with_no_method_tree_is_refused_and_never_read_from_disk(self, mocker: MockerFixture) -> None:
         """A template that belongs to no method tree names no file by a relative URL, so no local path is ever opened."""

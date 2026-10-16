@@ -1,3 +1,4 @@
+import copy
 import re
 from html.parser import HTMLParser
 from pathlib import Path
@@ -9,7 +10,9 @@ from typing_extensions import override
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.doc_gen.exceptions import TemplateUrlRefusedError
 from pipelex.cogt.doc_gen.render_job import METHOD_FILE_URL_PREFIX, RenderedDocument, RenderJob, RenderResources
+from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.pipeline.validate_bundle import validate_bundle
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import (
     METHOD_MANIFEST,
     RecordingMethodFileStore,
@@ -37,7 +40,7 @@ _ASSETS = {
 
 
 class _ReferencesInHtml(HTMLParser):
-    """The URLs an HTML document names that a printer reads: images, stylesheets, and the `url()` of its inline styles."""
+    """The URLs an HTML document names that a printer reads: images, stylesheets, attachments, and the `url()` of its inline styles."""
 
     def __init__(self) -> None:
         super().__init__()
@@ -51,8 +54,8 @@ class _ReferencesInHtml(HTMLParser):
             case "img":
                 if attributes.get("src"):
                     self.references.append(attributes["src"] or "")
-            case "link":
-                if attributes.get("rel") == "stylesheet" and attributes.get("href"):
+            case "link" | "a":
+                if attributes.get("rel") in {"stylesheet", "attachment"} and attributes.get("href"):
                     self.references.append(attributes["href"] or "")
             case "style":
                 self._in_style = True
@@ -99,6 +102,17 @@ class _AssetReadingEngine(StubEngine):
         if reference.endswith(".css"):
             for css_reference in _CSS_URL.findall(loaded.data.decode()):
                 self._read(reference=css_reference, base_url=url, resources=resources)
+
+
+def _write_files_no_template_may_read(*, method_dir: Path, outside_dir: Path) -> None:
+    """Files on disk a template must never read: one outside the method, a hidden and a gitignored one, and the method's Python."""
+    (outside_dir / "outside.png").write_bytes(b"outside")
+    (method_dir / ".private").mkdir()
+    (method_dir / ".private" / "logo.png").write_bytes(b"hidden")
+    (method_dir / "ignored.png").write_bytes(b"ignored")
+    (method_dir / ".gitignore").write_text("ignored.png\n", encoding="utf-8")
+    (method_dir / "funcs").mkdir()
+    (method_dir / "funcs" / "private_logic.py").write_text("SECRET = 42\n", encoding="utf-8")
 
 
 def _write_method(*, method_dir: Path, template: str = _TEMPLATE) -> Path:
@@ -174,44 +188,101 @@ class TestPipeDocGenTemplateAssets:
     @pytest.mark.parametrize(
         ("reference", "expected"),
         [
-            pytest.param("../../outside.png", "climbs above the root of the method tree", id="outside_the_tree"),
-            pytest.param("../../../../../../outside.png", "climbs above the root of the method tree", id="far_outside_the_tree"),
-            pytest.param("/outside.png", "or starts with '/'", id="root_relative"),
-            pytest.param("missing.png", "'templates/missing.png', which is not a file", id="absent"),
-            pytest.param("../.private/logo.png", "'.private/logo.png', which is not a file", id="hidden"),
-            pytest.param("../ignored.png", "'ignored.png', which is not a file", id="gitignored"),
+            pytest.param("../../outside.png", "climbs above the root of its method tree", id="outside_the_tree"),
+            pytest.param("../../../../../../outside.png", "climbs above the root of its method tree", id="far_outside_the_tree"),
+            pytest.param("/outside.png", "starts with '/'", id="root_relative"),
+            pytest.param("missing.png", "'templates/missing.png', which is not a file of the tree", id="absent"),
+            pytest.param("../.private/logo.png", "kept out by a path segment starting with a dot", id="hidden"),
+            pytest.param("../ignored.png", "kept out by a .gitignore pattern", id="gitignored"),
+            pytest.param("../funcs/private_logic.py", "which is not an image, a stylesheet or a font", id="not_an_asset"),
         ],
     )
-    async def test_a_relative_url_naming_no_file_of_the_tree_fails_the_print_and_reads_nothing_from_disk(
+    async def test_a_literal_url_naming_no_asset_of_the_tree_is_refused_when_the_method_loads(
         self, engine: _AssetReadingEngine, tmp_path: Path, reference: str, expected: str
     ) -> None:
-        """A file outside the tree, or one its membership rule keeps out, exists on disk and is never read."""
+        """A URL the template writes as it is is the method's own, so a missing or forbidden file fails the load, not a print."""
         method_dir = tmp_path / "method"
         bundle_path = _write_method(method_dir=method_dir, template=f'<img src="{reference}"><h1>{{{{ invoice.number }}}}</h1>')
-        (tmp_path / "outside.png").write_bytes(b"outside")
-        (method_dir / ".private").mkdir()
-        (method_dir / ".private" / "logo.png").write_bytes(b"hidden")
-        (method_dir / "ignored.png").write_bytes(b"ignored")
-        (method_dir / ".gitignore").write_text("ignored.png\n", encoding="utf-8")
+        _write_files_no_template_may_read(method_dir=method_dir, outside_dir=tmp_path)
+
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_file_path=bundle_path)
+
+        # The report names the caller's own bundle file as its source; the message names files by their tree paths alone.
+        message = exc_info.value.message
+        assert f"names '{reference}' in the template file 'templates/invoice.html'" in message
+        assert expected in message
+        assert str(tmp_path) not in message
+        assert engine.jobs == []
+
+    @pytest.mark.parametrize(
+        ("element", "reference", "expected"),
+        [
+            pytest.param("img", "../../outside.png", "climbs above the root of the method tree", id="outside_the_tree"),
+            pytest.param("img", "missing.png", "'templates/missing.png', which is not a file", id="absent"),
+            pytest.param("img", "../.private/logo.png", "'.private/logo.png', which is not a file", id="hidden"),
+            pytest.param("img", "../METHODS.toml", "'METHODS.toml', which is not an image, a stylesheet or a font", id="manifest"),
+            pytest.param(
+                "attachment", "../funcs/private_logic.py", "'funcs/private_logic.py', which is not an image, a stylesheet or a font", id="attachment"
+            ),
+        ],
+    )
+    async def test_a_url_a_run_s_input_supplies_reads_only_an_asset_of_the_tree(
+        self, engine: _AssetReadingEngine, tmp_path: Path, element: str, reference: str, expected: str
+    ) -> None:
+        """A URL interpolated from the run's inputs is checked at print: it never reads outside the tree, nor a file that is no asset.
+
+        A printer embeds a `rel="attachment"` link's file in the PDF, so a caller who may run a method but not read it would
+        otherwise take its Python home in the document.
+        """
+        method_dir = tmp_path / "method"
+        tag = '<img src="{{ invoice.customer }}">' if element == "img" else '<a rel="attachment" href="{{ invoice.customer }}">terms</a>'
+        bundle_path = _write_method(method_dir=method_dir, template=f"{tag}<h1>{{{{ invoice.number }}}}</h1>")
+        _write_files_no_template_may_read(method_dir=method_dir, outside_dir=tmp_path)
+        inputs = copy.deepcopy(PipeDocGenTestData.INVOICE_INPUTS)
+        inputs["invoice"]["content"]["customer"] = reference
 
         with pytest.raises(PipelexError) as exc_info:
-            await _run_from_its_folder(bundle_path=bundle_path)
+            await PipelexMTHDSProtocol(bundle_uris=[str(bundle_path)]).execute(
+                mthds_contents=[bundle_path.read_text(encoding="utf-8")], inputs=inputs
+            )
 
         report = str(exc_info.value.to_error_report().model_dump())
         assert TemplateUrlRefusedError.__name__ in report
         assert expected in report
-        assert "the template file 'templates/invoice.html'" in report
         assert str(tmp_path) not in report
         assert engine.read == {}
 
+    async def test_a_bundle_named_alone_is_told_to_hand_over_its_folder(self, engine: _AssetReadingEngine, tmp_path: Path) -> None:
+        """With no METHODS.toml at or above it, the bundle's tree is that one file, so the logo beside it is out of reach."""
+        (tmp_path / "logo.png").write_bytes(b"\x89PNG logo")
+        step_fields = "format = \"pdf\"\ntemplate = '''<img src=\"logo.png\"><h1>{{ invoice.number }}</h1>'''"
+        bundle_path = write_bundle(directory=tmp_path, step_fields=step_fields, as_method=False)
+
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_file_path=bundle_path)
+
+        report = str(exc_info.value.to_error_report().model_dump())
+        assert "Hand over the method's directory instead" in report
+        assert engine.jobs == []
+
     async def test_an_inline_template_of_a_bundle_with_no_method_tree_names_no_file(self, engine: _AssetReadingEngine) -> None:
-        """Bundles loaded from content strings with no file submitted beside them have no tree, so a relative URL reads nothing."""
+        """Bundles loaded from content strings with no file submitted beside them have no tree: a literal URL fails the load."""
         step_fields = "format = \"pdf\"\ntemplate = '''<img src=\"logo.png\"><h1>{{ invoice.number }}</h1>'''"
 
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_contents=[PipeDocGenTestData.bundle(step_fields=step_fields)])
+
+        assert "belongs to no method tree" in str(exc_info.value.to_error_report().model_dump())
+        assert engine.jobs == []
+
+    async def test_a_url_a_run_s_input_supplies_names_no_file_when_the_template_has_no_method_tree(self, engine: _AssetReadingEngine) -> None:
+        step_fields = "format = \"pdf\"\ntemplate = '''<img src=\"{{ invoice.customer }}\"><h1>{{ invoice.number }}</h1>'''"
+        inputs = copy.deepcopy(PipeDocGenTestData.INVOICE_INPUTS)
+        inputs["invoice"]["content"]["customer"] = "logo.png"
+
         with pytest.raises(PipelexError) as exc_info:
-            await PipelexMTHDSProtocol().execute(
-                mthds_contents=[PipeDocGenTestData.bundle(step_fields=step_fields)], inputs=PipeDocGenTestData.INVOICE_INPUTS
-            )
+            await PipelexMTHDSProtocol().execute(mthds_contents=[PipeDocGenTestData.bundle(step_fields=step_fields)], inputs=inputs)
 
         report = str(exc_info.value.to_error_report().model_dump())
         assert TemplateUrlRefusedError.__name__ in report

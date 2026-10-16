@@ -5,8 +5,8 @@ import pytest
 from mthds.method_tree.exceptions import MethodTreeRefusedError
 from mthds.method_tree.vocabulary import TreeRefusalCode
 
-from pipelex.cogt.doc_gen.method_file_urls import RelativeUrlBase, is_method_file_url, is_relative_url
-from pipelex.cogt.doc_gen.render_job import METHOD_FILE_URL_PREFIX
+from pipelex.cogt.doc_gen.method_file_urls import RelativeUrlBase, is_relative_url, template_asset_refusal
+from pipelex.cogt.doc_gen.render_job import METHOD_FILE_URL_PREFIX, is_method_file_url
 
 _HEX = "ab" * 32
 _DIGEST = f"sha256:{_HEX}"
@@ -98,11 +98,43 @@ class TestMethodFileUrls:
 
         assert exc_info.value.refusal.code == TreeRefusalCode.REFERENCE_LEAVES_TREE
 
-    def test_the_prefix_s_scheme_and_host_are_read_without_regard_to_case(self) -> None:
-        shouted = f"{METHOD_FILE_URL_PREFIX.upper()}{_HEX}/templates/logo.png"
+    def test_the_prefix_and_the_digest_are_read_without_regard_to_case(self) -> None:
+        shouted = f"{METHOD_FILE_URL_PREFIX.upper()}{_HEX.upper()}/templates/logo.png"
 
         assert is_method_file_url(url=shouted)
         assert _TEMPLATE_BASE.tree_path_of(url=shouted, tree_paths=_TREE_PATHS) == "templates/logo.png"
+
+    def test_a_joined_url_beside_a_bundle_named_alone_is_told_to_hand_over_its_folder(self) -> None:
+        url_base = RelativeUrlBase(tree_digest=_DIGEST, holder="letters.mthds", template_label="the inline template", is_one_file_tree=True)
+
+        with pytest.raises(MethodTreeRefusedError) as exc_info:
+            url_base.tree_path_of(url=urljoin(url_base.base_url, "logo.png"), tree_paths=frozenset({"letters.mthds"}))
+
+        assert exc_info.value.refusal.code == TreeRefusalCode.REFERENCE_IN_ONE_FILE_TREE
+        assert "Hand over the method's directory instead" in exc_info.value.message
+
+    @pytest.mark.parametrize(
+        ("tree_path", "is_asset"),
+        [
+            pytest.param("templates/logo.PNG", True, id="image_any_case"),
+            pytest.param("images/seal.svg", True, id="svg"),
+            pytest.param("styles/print.css", True, id="stylesheet"),
+            pytest.param("fonts/brand.woff2", True, id="font"),
+            pytest.param("funcs/private_logic.py", False, id="python"),
+            pytest.param("letters.mthds", False, id="bundle"),
+            pytest.param("METHODS.toml", False, id="manifest"),
+            pytest.param("requirements.txt", False, id="requirements"),
+            pytest.param("data/customers.csv", False, id="data"),
+            pytest.param("templates/other.html", False, id="html"),
+            pytest.param("README", False, id="no_suffix"),
+        ],
+    )
+    def test_a_document_reads_only_images_stylesheets_and_fonts_from_its_method(self, tree_path: str, is_asset: bool) -> None:
+        refusal = template_asset_refusal(tree_path=tree_path)
+
+        assert (refusal is None) is is_asset
+        if refusal is not None:
+            assert f"'{tree_path}', which is not an image, a stylesheet or a font" in refusal
 
     def test_a_relative_url_handed_as_written_resolves_against_the_holder(self) -> None:
         assert _TEMPLATE_BASE.tree_path_of(url="../fonts/brand.woff2", tree_paths=_TREE_PATHS) == "fonts/brand.woff2"
@@ -124,7 +156,7 @@ class TestMethodFileUrls:
         [
             pytest.param("logo.png", True, id="relative"),
             pytest.param("../fonts/brand.woff2", True, id="dot_dot"),
-            pytest.param("/logo.png", True, id="root_relative_is_refused_later"),
+            pytest.param("/srv/photos/photo.png", False, id="root_absolute_path"),
             pytest.param("https://cdn.example.com/logo.png", False, id="https"),
             pytest.param("data:image/png;base64,iVBORw0KGgo=", False, id="data"),
             pytest.param("pipelex-storage://scope/logo.png", False, id="storage"),

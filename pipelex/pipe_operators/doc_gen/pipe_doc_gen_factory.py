@@ -1,6 +1,8 @@
 from typing import Any
 
 from mthds.method_tree.exceptions import MethodTreeRefusedError
+from mthds.method_tree.references import is_file_reference
+from mthds.method_tree.vocabulary import ReferenceContext
 from typing_extensions import override
 
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -15,6 +17,7 @@ from pipelex.pipe_machinery.pipe_factory import PipeFactoryProtocol
 from pipelex.pipe_operators.doc_gen.exceptions import PipeDocGenFactoryError
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen_blueprint import PipeDocGenBlueprint, template_required_roots
+from pipelex.pipe_operators.doc_gen.template_asset_check import find_template_asset_refusal, literal_template_urls
 from pipelex.tools.jinja2.template_category import TemplateCategory
 
 
@@ -43,9 +46,10 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
 
         template_file_ref: MethodFileRef | None = None
         template_bundle_ref: TreeBundleRef | None = None
+        template_tree_is_one_file = False
         template_file_text: str | None = None
         if blueprint.template is not None:
-            template_bundle_ref = cls._inline_template_bundle_ref()
+            template_bundle_ref, template_tree_is_one_file = cls._inline_template_tree(pipe_code=pipe_code, template=blueprint.template)
         if blueprint.template_file is not None:
             template_file = blueprint.template_file
             match get_building_tree_bundle():
@@ -64,6 +68,13 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
                             data=cls._read_tree_file(tree_bundle=tree_bundle, tree_path=resolved_tree_path),
                         )
                         cls._check_html_template_file(pipe_code=pipe_code, template=template_file_text, inputs=inputs, template_file=template_file)
+                        cls._check_template_assets(
+                            pipe_code=pipe_code,
+                            template=template_file_text,
+                            template_label=f"the template file '{resolved_tree_path}'",
+                            holder=resolved_tree_path,
+                            tree_bundle=tree_bundle,
+                        )
                 case TreeBundleRef() as tree_bundle_ref:
                     # A step built from a crate reads nothing: the crate names its tree by digest, and the host that
                     # assembled it resolved the reference in the tree and checked the file. The print stage reads it.
@@ -90,6 +101,7 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
             template_file=blueprint.template_file,
             template_file_ref=template_file_ref,
             template_bundle_ref=template_bundle_ref,
+            template_tree_is_one_file=template_tree_is_one_file,
             filename=blueprint.filename,
         )
         if template_file_text is not None:
@@ -97,20 +109,58 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
         return pipe_doc_gen
 
     @classmethod
-    def _inline_template_bundle_ref(cls) -> TreeBundleRef | None:
-        """The bundle of an inline template, as its method tree names it: what the template's relative URLs resolve against.
+    def _inline_template_tree(cls, *, pipe_code: str, template: str) -> tuple[TreeBundleRef | None, bool]:
+        """The bundle of an inline template, as its method tree names it, which its relative URLs resolve against.
 
-        Nothing is resolved here: a relative URL is the rendered HTML's, which only the print stage's engine reads, so each
-        is resolved in the tree when the engine asks for its file. None for bundles parsed from content strings with no
-        file submitted beside them, which belong to no tree, so their template's relative URLs name no file.
+        Returns the bundle's reference, None for bundles parsed from content strings with no file submitted beside them,
+        and whether its tree is the one-file tree of a bundle named alone. The URLs the template writes as they are are
+        checked now in a tree this process holds, and refused in none, where a relative URL names no file; the rest are
+        the rendered HTML's, resolved in the tree when the print's engine asks for each.
+
+        Raises:
+            PipeDocGenFactoryError: A literal relative URL of the template names no image, stylesheet or font of its tree.
         """
         match get_building_tree_bundle():
             case TreeBundle() as tree_bundle:
-                return tree_bundle.make_ref()
+                cls._check_template_assets(
+                    pipe_code=pipe_code,
+                    template=template,
+                    template_label=f"the inline template of PipeDocGen '{pipe_code}'",
+                    holder=tree_bundle.tree_path,
+                    tree_bundle=tree_bundle,
+                )
+                return tree_bundle.make_ref(), tree_bundle.tree.is_one_file
             case TreeBundleRef() as tree_bundle_ref:
-                return tree_bundle_ref
+                return tree_bundle_ref, False
             case None:
-                return None
+                for url in literal_template_urls(template=template):
+                    if is_file_reference(url, context=ReferenceContext.URL):
+                        msg = (
+                            f"PipeDocGen '{pipe_code}' names '{url}' by a relative URL in its inline template, but its bundle was "
+                            "loaded from a string with no file sent beside it, so it belongs to no method tree and a relative URL "
+                            "names no file. Load the method from its folder, or name the file by an https:// or a data: URL."
+                        )
+                        raise PipeDocGenFactoryError(msg)
+                return None, False
+
+    @classmethod
+    def _check_template_assets(cls, *, pipe_code: str, template: str, template_label: str, holder: str | None, tree_bundle: TreeBundle) -> None:
+        """Check that each literal relative URL of an HTML template names an image, a stylesheet or a font of its tree.
+
+        Raises:
+            PipeDocGenFactoryError: One names no such file; the message names the URL, where it is written and why.
+        """
+        refusal = find_template_asset_refusal(
+            template=template,
+            template_label=template_label,
+            holder=holder,
+            tree=tree_bundle.tree,
+            read_file=lambda tree_path: cls._read_tree_file(tree_bundle=tree_bundle, tree_path=tree_path),
+        )
+        if refusal is None:
+            return
+        msg = f"PipeDocGen '{pipe_code}' names '{refusal.reference}' in {refusal.holder_label}, which its method cannot give it. {refusal.reason}"
+        raise PipeDocGenFactoryError(msg)
 
     @classmethod
     def _resolve_template_file(cls, *, pipe_code: str, template_file: str, tree_bundle: TreeBundle) -> str:

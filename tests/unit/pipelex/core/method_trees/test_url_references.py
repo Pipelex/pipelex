@@ -130,3 +130,24 @@ class TestUrlReferences:
             resolve_url_path(url_path="templates/a:b.png", reference="templates/a:b.png", holder=None, tree_paths=_TREE_PATHS)
 
         assert exc_info.value.refusal.code == TreeRefusalCode.REFERENCE_NOT_A_TREE_PATH
+
+    @pytest.mark.parametrize("written", ["logo.png", "./logo.png", "../logo.png", ".", "letters.mthds", "https://cdn.example.com/x.png"])
+    def test_in_the_one_file_tree_of_a_bundle_named_alone_every_answer_is_mthds_python_s(self, written: str) -> None:
+        """A file beside a bundle named alone is refused as out of its one-file tree, with the advice to hand over its folder."""
+        tree = tree_of_held_files(files={"letters.mthds": HeldFile.of_bytes(data=b"x")}).model_copy(update={"is_one_file": True})
+        expected: str | TreeRefusalCode | None
+        try:
+            expected = resolve_reference(written, holder="letters.mthds", context=ReferenceContext.URL, tree=tree)
+        except MethodTreeRefusedError as exc:
+            expected = exc.refusal.code
+        actual: str | TreeRefusalCode | None
+        message = ""
+        try:
+            actual = resolve_url_reference(reference=written, holder="letters.mthds", tree_paths=tree.members, is_one_file_tree=True)
+        except MethodTreeRefusedError as exc:
+            actual = exc.refusal.code
+            message = exc.message
+
+        assert actual == expected
+        if actual == TreeRefusalCode.REFERENCE_IN_ONE_FILE_TREE:
+            assert "Hand over the method's directory instead" in message

@@ -17,25 +17,24 @@ file entries, whose holder is a file of the tree. The print of a document knows 
   them without being a file of it, and the path below the root of a URL an engine joined to the print's base URL is a
   path from the root (`pipelex.cogt.doc_gen.method_file_urls`): both resolve from the root.
 
-So the steps are run here, over a set of tree paths, with `mthds-python`'s own pieces for each of them but the URL
-path's percent-decoding, which it keeps private and which is written again below to the same rules. A test holds this
-module to `resolve_reference`'s answers for every reference a holder of the tree writes.
+So the steps are run here, over a set of tree paths, with `mthds-python`'s own pieces for each of them, its pattern of a
+malformed escape included, but the URL path's split-then-decode, which it keeps private and which is written again below
+to the same rules. A test holds this module to `resolve_reference`'s answers for every reference a holder of the tree
+writes, in a tree of several files and in the one-file tree of a bundle named alone. A listing records no membership
+rule, so a file the rule keeps out is refused here as a file the tree does not hold, without the rule that kept it out.
 
 Resolving a reference is a lookup in the tree's set of paths, never a file system access: nothing here opens a path.
 """
 
-import re
 import unicodedata
 from collections.abc import Set as AbstractSet
 from urllib.parse import unquote
 
 from mthds.method_tree.exceptions import MethodTreeRefusedError, TreeRefusal
-from mthds.method_tree.references import ROOT_RESOLVED, is_file_reference, lexical_join
+from mthds.method_tree.references import MALFORMED_PERCENT_ESCAPE, ROOT_RESOLVED, is_file_reference, lexical_join
 from mthds.method_tree.tree_path import CONTROL_CATEGORY, nfc, tree_path_violation
 from mthds.method_tree.vocabulary import ReferenceContext, TreeRefusalCode
 
-#: A `%` not followed by two hexadecimal digits, which makes a URL's path malformed.
-_MALFORMED_PERCENT_ESCAPE = re.compile(r"%(?![0-9A-Fa-f]{2})")
 #: The holder a path is joined to when it resolves from the root: any lone segment, since a join keeps the holder's
 #: directories and drops its name.
 _ROOT_HOLDER = "."
@@ -50,7 +49,9 @@ def url_path_of(*, reference: str) -> str:
     return reference.split("#", 1)[0].split("?", 1)[0]
 
 
-def resolve_url_reference(*, reference: str, holder: str | None, tree_paths: AbstractSet[str], holder_label: str | None = None) -> str | None:
+def resolve_url_reference(
+    *, reference: str, holder: str | None, tree_paths: AbstractSet[str], holder_label: str | None = None, is_one_file_tree: bool = False
+) -> str | None:
     """The tree path of the file a relative URL written in `holder` names, by the standard's steps in URL context.
 
     Args:
@@ -59,6 +60,8 @@ def resolve_url_reference(*, reference: str, holder: str | None, tree_paths: Abs
         tree_paths: The tree paths of the tree's files.
         holder_label: How a refusal names the holder, such as "the template file 'templates/letter.html'"; its tree
             path when None.
+        is_one_file_tree: Whether the tree is the one-file tree of a bundle named alone, with no `METHODS.toml` at or
+            above it, whose file a reference to any other file cannot reach.
 
     Returns:
         The tree path the URL names, or None for a URL that is no file reference, such as `https://…`, `data:…`,
@@ -71,11 +74,24 @@ def resolve_url_reference(*, reference: str, holder: str | None, tree_paths: Abs
     if not is_file_reference(reference, context=ReferenceContext.URL):
         return None
     return resolve_url_path(
-        url_path=url_path_of(reference=reference), reference=reference, holder=holder, tree_paths=tree_paths, holder_label=holder_label
+        url_path=url_path_of(reference=reference),
+        reference=reference,
+        holder=holder,
+        tree_paths=tree_paths,
+        holder_label=holder_label,
+        is_one_file_tree=is_one_file_tree,
     )
 
 
-def resolve_url_path(*, url_path: str, reference: str, holder: str | None, tree_paths: AbstractSet[str], holder_label: str | None = None) -> str:
+def resolve_url_path(
+    *,
+    url_path: str,
+    reference: str,
+    holder: str | None,
+    tree_paths: AbstractSet[str],
+    holder_label: str | None = None,
+    is_one_file_tree: bool = False,
+) -> str:
     """The tree path a URL's path names from `holder`, its query and fragment already dropped: steps 2 to 7.
 
     A URL's path is always a file reference, whatever it looks like, so it is resolved without first asking whether it
@@ -88,6 +104,7 @@ def resolve_url_path(*, url_path: str, reference: str, holder: str | None, tree_
         holder: The tree path of the file holding the URL, or None for a path that resolves from the root.
         tree_paths: The tree paths of the tree's files.
         holder_label: How a refusal names the holder; its tree path when None.
+        is_one_file_tree: Whether the tree is the one-file tree of a bundle named alone.
 
     Raises:
         MethodTreeRefusedError: The path is refused, `refusal.code` saying at which step.
@@ -122,6 +139,12 @@ def resolve_url_path(*, url_path: str, reference: str, holder: str | None, tree_
             )
     if resolved in tree_paths:
         return resolved
+    if is_one_file_tree:
+        explanation = (
+            "names a file beside the bundle, but the bundle was named alone with no METHODS.toml at or above it, "
+            "so its tree holds that one file. Hand over the method's directory instead."
+        )
+        raise _refusal(reference=reference, holder_label=holder_label, code=TreeRefusalCode.REFERENCE_IN_ONE_FILE_TREE, explanation=explanation)
     what = "the root of the tree, not a file" if is_root else f"'{resolved}', which is not a file of the tree"
     explanation = f"resolves to {what}."
     raise _refusal(
@@ -138,7 +161,7 @@ def _percent_decoded(*, url_path: str, reference: str, holder_label: str) -> str
     """
     decoded_segments: list[str] = []
     for segment in url_path.split("/"):
-        if _MALFORMED_PERCENT_ESCAPE.search(segment):
+        if MALFORMED_PERCENT_ESCAPE.search(segment):
             explanation = "holds a '%' not followed by two hexadecimal digits; write a literal '%' as '%25'."
             raise _refusal(reference=reference, holder_label=holder_label, code=TreeRefusalCode.REFERENCE_INVALID, explanation=explanation)
         try:

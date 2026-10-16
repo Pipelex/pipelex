@@ -40,6 +40,11 @@ class TestRenderJob:
 
         assert job.base_url == base_url
         assert RenderJob.model_validate_json(job.model_dump_json()) == job
+        shouted = base_url.replace(METHOD_FILE_URL_PREFIX, METHOD_FILE_URL_PREFIX.upper())
+        assert (
+            RenderJob(format=DocGenFormat.PDF, source=DocGenSource.HTML, filename="n.pdf", title="N", html="<p/>", base_url=shouted).base_url
+            == shouted
+        )
 
     @pytest.mark.parametrize(
         ("source", "payload", "base_url", "message"),

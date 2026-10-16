@@ -33,6 +33,15 @@ from pipelex.cogt.doc_gen.layout_tree import LayoutDocument
 METHOD_FILE_URL_PREFIX = "https://method-files.pipelex.invalid/"
 
 
+def is_method_file_url(*, url: str) -> bool:
+    """Whether `url` lies under `METHOD_FILE_URL_PREFIX`, where it names a file of a document's method tree.
+
+    A URL's scheme and host are compared without regard to letter case, as URLs compare them. Every check of the prefix
+    goes through here, so an engine, the job's validation and the reads agree on which URLs it covers.
+    """
+    return url[: len(METHOD_FILE_URL_PREFIX)].lower() == METHOD_FILE_URL_PREFIX
+
+
 class RenderJob(BaseModel):
     """Everything an engine needs to print one document, as plain data.
 
@@ -89,7 +98,7 @@ class RenderJob(BaseModel):
             if not self.source.is_html:
                 msg = f"A render job {self.source.desc} has no HTML, so it carries no base URL for its relative URLs."
                 raise ValueError(msg)
-            if not self.base_url.startswith(METHOD_FILE_URL_PREFIX):
+            if not is_method_file_url(url=self.base_url):
                 msg = f"A render job's base URL names a file of its method tree, under '{METHOD_FILE_URL_PREFIX}'."
                 raise ValueError(msg)
         return self
@@ -138,8 +147,9 @@ class RenderResources(Protocol):
     run's read scope does not allow, a local path included. A URL under `METHOD_FILE_URL_PREFIX`, which an
     engine joined to the job's `base_url` or to the URL of a stylesheet read that way, is a file of the
     document's method tree: it is resolved in the tree by the MTHDS standard's rules for a relative URL and
-    read through the method file store, under the run's read scope. So is a relative URL of an HTML document
-    an engine hands as written, against the job's `base_url`. Neither ever reaches a disk. It is synchronous,
+    read through the method file store, under the run's read scope, when it is an image, a stylesheet or a
+    font. So is a relative reference of an HTML document an engine hands as written, against the job's
+    `base_url`. Neither ever reaches a disk; a root-absolute local path is read as one, under the read scope. It is synchronous,
     since engines are, and it may be called from the thread the engine prints in.
     """
 
@@ -152,7 +162,8 @@ class RenderResources(Protocol):
 
         Raises:
             UriReadRefusedError: the run's read scope does not allow the URI.
-            TemplateUrlRefusedError: the URI names no file of the document's method tree: it climbs above the tree's
-                root, names a file the tree does not hold, or the document has no method tree to resolve it in.
+            TemplateUrlRefusedError: the URI names no image, stylesheet or font of the document's method tree: it
+                climbs above the tree's root, names a file the tree does not hold or one of another kind, or the
+                document has no method tree to resolve it in.
         """
         ...

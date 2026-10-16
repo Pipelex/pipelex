@@ -17,8 +17,8 @@ template file is handed to its engine, and at a dry print to its engine's templa
 A relative URL of an HTML document, such as an image beside its template, names a file of the template's method tree
 (`pipelex.cogt.doc_gen.method_file_urls`): the engine joins it to the job's base URL and reads it through the
 `RenderResources` of the print, which resolves it in the tree's listing and reads the file through the method file
-store, under the run's read scope, and never from a disk. The listing is read the first time the engine asks for such a
-file, so a document that names none reads nothing more than it did.
+store, under the run's read scope, and never from a disk, when it is an image, a stylesheet or a font. The listing is
+read the first time the engine asks for such a file, so a document that names none reads nothing more than it did.
 
 Engines run on a thread pool of their own rather than the event loop's default executor, because an engine's
 thread waits while the loop reads a file for it, and that read may itself need a default-executor thread (a
@@ -45,8 +45,8 @@ from pipelex.cogt.doc_gen.doc_gen_engine import get_doc_gen_inference_model, req
 from pipelex.cogt.doc_gen.doc_gen_worker_factory import DocGenWorkerFactory
 from pipelex.cogt.doc_gen.document_composition import DocumentComposition
 from pipelex.cogt.doc_gen.exceptions import DocGenRenderError, TemplateUrlRefusedError
-from pipelex.cogt.doc_gen.method_file_urls import RelativeUrlBase, is_method_file_url, is_relative_url
-from pipelex.cogt.doc_gen.render_job import LoadedResource, RenderedDocument, RenderJob, RenderResources
+from pipelex.cogt.doc_gen.method_file_urls import RelativeUrlBase, is_relative_url, template_asset_refusal
+from pipelex.cogt.doc_gen.render_job import LoadedResource, RenderedDocument, RenderJob, RenderResources, is_method_file_url
 from pipelex.cogt.doc_gen.template_check import TemplateCheckRequest
 from pipelex.cogt.inference.inference_call_summary import InferenceCallSummary, InferenceOperation
 from pipelex.core.method_trees.method_files import TreeListing, read_listed_file, read_method_file, read_tree_listing
@@ -72,10 +72,12 @@ class RunRenderResources(RenderResources):
     An engine runs in a worker thread and reads synchronously, while storage and fetching are async, so each
     read is handed back to the event loop the print was started from, and the engine's thread waits for it.
 
-    A file of the document's method tree is read through the method file store: a URL the engine joined under the
-    job's base URL, and, in an HTML document, a relative URL the engine hands as written. Both resolve in the tree of
-    the document's template (`document.url_base`), and are refused when it has none, so a relative URL of an HTML
-    document never reaches this host's disk. Any other URL is read as it names, the read scope checked first.
+    In an HTML document, a file of the method tree is read through the method file store: a URL the engine joined
+    under the job's base URL, and a relative reference the engine hands as written. Both resolve in the tree of the
+    document's template (`document.url_base`), are refused when it has none, and are read only when they name an image,
+    a stylesheet or a font, so a relative URL of an HTML document never reaches this host's disk, nor a method file a
+    run's input could otherwise make the document carry. Any other URL is read as it names, the read scope checked
+    first, a root-absolute local path included. A document with no HTML names no file of a method tree.
     """
 
     def __init__(
@@ -90,6 +92,7 @@ class RunRenderResources(RenderResources):
         self._read_scope = read_scope
         self._loop = loop
         self._loop_thread_id = threading.get_ident()
+        self._source = document.source if document is not None else None
         self._prints_html = document is not None and document.source.is_html
         self._url_base = document.url_base if document is not None else None
         # The listing of the template's method tree, read the first time the engine asks for one of its files.
@@ -97,23 +100,25 @@ class RunRenderResources(RenderResources):
         self._tree_listing_lock = asyncio.Lock()
 
     async def _load(self, *, uri: str, position: str) -> LoadedResource:
-        if self._names_method_file(uri=uri):
+        if self._prints_html and (is_method_file_url(url=uri) or is_relative_url(url=uri)):
             return await self._load_method_file(uri=uri, position=position)
+        if is_method_file_url(url=uri):
+            source_desc = f"printed {self._source.desc}" if self._source is not None else "with no HTML"
+            msg = (
+                f"Refused to read {position}. Its URL names a file of a method, which only the relative URLs of an HTML "
+                f"template can name, and this document is {source_desc}."
+            )
+            raise TemplateUrlRefusedError(msg, refusal_code=None)
         authorize_uri_read(uri=uri, read_scope=self._read_scope, position=position)
         loaded = await load_bytes_and_mime_type_from_any_uri(uri, storage_provider=self._storage_provider)
         return LoadedResource(data=loaded.data, mime_type=loaded.mime_type)
-
-    def _names_method_file(self, *, uri: str) -> bool:
-        """Whether `uri` names a file of the document's method tree: a URL under the method file prefix, or a relative URL of HTML."""
-        if is_method_file_url(url=uri):
-            return True
-        return self._prints_html and is_relative_url(url=uri)
 
     async def _load_method_file(self, *, uri: str, position: str) -> LoadedResource:
         """Read the file of the document's method tree `uri` names, through the method file store under the run's read scope.
 
         Raises:
-            TemplateUrlRefusedError: the document's template belongs to no method tree, or `uri` names no file of it.
+            TemplateUrlRefusedError: the document's template belongs to no method tree, `uri` names no file of it, or
+                the file is not an image, a stylesheet or a font.
             MethodFileUnavailableError: the method file store does not hold the tree or the file for this run.
         """
         url_base = self._url_base
@@ -133,6 +138,10 @@ class RunRenderResources(RenderResources):
         if tree_path is None:
             msg = f"The URL of {position} was taken for a relative URL of the document, and it resolves as none."
             raise PipelexUnexpectedError(msg)
+        asset_refusal = template_asset_refusal(tree_path=tree_path)
+        if asset_refusal is not None:
+            msg = f"Refused to read {position}. {asset_refusal}"
+            raise TemplateUrlRefusedError(msg, refusal_code=None)
         data = await read_listed_file(listing=listing, tree_path=tree_path, read_scope=self._read_scope)
         # A method tree records no media type, so the engine types the file itself, as it does a local file's.
         return LoadedResource(data=data, mime_type=None)
@@ -172,7 +181,10 @@ async def render_document_and_store(
 
     Raises:
         UriReadRefusedError: an image the document names is outside the run's read scope.
-        MethodFileUnavailableError: the template file cannot be read through the method file store for this run.
+        TemplateUrlRefusedError: a relative URL of an HTML document names no image, stylesheet or font of its template's
+            method tree, or the template belongs to no method tree.
+        MethodFileUnavailableError: the template file, or a file a relative URL names, cannot be read through the method
+            file store for this run.
         ModelNotFoundError: the assignment's engine is not a model served here.
         DocGenEngineMissingError: the engine is the built-in one or one of the plugin's and is no longer declared here, or
             no installed plugin registers it.
@@ -274,7 +286,10 @@ async def _print_document(*, render_assignment: RenderDocumentAssignment, storag
 
     Raises:
         UriReadRefusedError: an image the document names is outside the run's read scope.
-        MethodFileUnavailableError: the template file cannot be read through the method file store for this run.
+        TemplateUrlRefusedError: a relative URL of an HTML document names no image, stylesheet or font of its template's
+            method tree, or the template belongs to no method tree.
+        MethodFileUnavailableError: the template file, or a file a relative URL names, cannot be read through the method
+            file store for this run.
         ModelNotFoundError: the assignment's engine is not a model served here.
         DocGenEngineMissingError: the engine is the built-in one or one of the plugin's and is no longer declared here, or
             no installed plugin registers it.

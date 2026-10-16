@@ -80,6 +80,10 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
             "against; None when the bundle belongs to no method tree, or the step has no inline template"
         ),
     )
+    template_tree_is_one_file: bool = Field(
+        default=False,
+        description="Whether the inline template's bundle was named alone, so its method tree holds no file beside it",
+    )
     filename: str | None = None
 
     # The text of an HTML template file, read when the step was built in a method tree this process holds, for the checks
@@ -320,7 +324,12 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
             template_label = f"the inline template of PipeDocGen '{self.code}', in bundles loaded from content strings"
         else:
             template_label = f"the inline template of PipeDocGen '{self.code}', in '{bundle_ref.tree_path}'"
-        return RelativeUrlBase(tree_digest=bundle_ref.tree_digest, holder=bundle_ref.tree_path, template_label=template_label)
+        return RelativeUrlBase(
+            tree_digest=bundle_ref.tree_digest,
+            holder=bundle_ref.tree_path,
+            template_label=template_label,
+            is_one_file_tree=self.template_tree_is_one_file,
+        )
 
     def _composed_template_file(
         self, *, render_context: TemplateRenderContext | None = None, input_shapes: dict[str, InputShape] | None = None

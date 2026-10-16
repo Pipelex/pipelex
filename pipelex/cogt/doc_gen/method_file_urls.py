@@ -23,9 +23,19 @@ standard refuses it, and turns a trailing `/.` into `/`, so `logo.png/.` is refu
 of these reaches a file outside the tree, since whatever the engine joined, the print reads only a file the tree's listing
 names. A URL that climbs out of the tree and back in through the digest's segment resolves inside the tree as well, and
 the template's author cannot write one: the digest is that of a tree holding the template itself.
+
+Only the kinds of file a printed document is made of are read: images, stylesheets and fonts, told by their suffix
+(`TEMPLATE_ASSET_SUFFIXES`). A relative URL may come from a run's input, interpolated into the template, and a document
+can carry what it reads, an attachment for one, so a URL naming any other file of the method, its Python, its bundles or
+its data, is refused: a caller allowed to run a method is not thereby allowed to read its files.
+
+Only a relative reference names a file of the tree. A root-absolute path, such as `/tmp/photo.png`, is no relative
+reference: an engine joining it to the base URL lands outside the tree's segment, and an engine handing it as written has
+it read as the local path it is, under the run's read scope, as any other URI.
 """
 
 from collections.abc import Set as AbstractSet
+from pathlib import PurePosixPath
 from urllib.parse import quote
 
 from mthds.method_tree.digest import DIGEST_PREFIX
@@ -34,25 +44,57 @@ from mthds.method_tree.references import ROOT_RESOLVED, is_file_reference
 from mthds.method_tree.vocabulary import ReferenceContext, TreeRefusalCode
 from pydantic import BaseModel, ConfigDict, Field
 
-from pipelex.cogt.doc_gen.render_job import METHOD_FILE_URL_PREFIX
+from pipelex.cogt.doc_gen.render_job import METHOD_FILE_URL_PREFIX, is_method_file_url
 from pipelex.core.method_trees.url_references import resolve_url_path, resolve_url_reference, url_path_of
 
-
-def is_method_file_url(*, url: str) -> bool:
-    """Whether `url` lies under `METHOD_FILE_URL_PREFIX`, where it names a file of a document's method tree.
-
-    A URL's scheme and host are compared without regard to letter case, as URLs compare them.
-    """
-    return url[: len(METHOD_FILE_URL_PREFIX)].lower() == METHOD_FILE_URL_PREFIX
+#: The suffixes of the files a document reads from its method tree, compared without regard to case: images, stylesheets
+#: and fonts, the kinds a printed page is made of.
+TEMPLATE_ASSET_SUFFIXES: frozenset[str] = frozenset(
+    {
+        # Images
+        ".apng",
+        ".avif",
+        ".bmp",
+        ".gif",
+        ".ico",
+        ".jpeg",
+        ".jpg",
+        ".png",
+        ".svg",
+        ".tif",
+        ".tiff",
+        ".webp",
+        # Stylesheets
+        ".css",
+        # Fonts
+        ".eot",
+        ".otf",
+        ".ttc",
+        ".ttf",
+        ".woff",
+        ".woff2",
+    }
+)
 
 
 def is_relative_url(*, url: str) -> bool:
-    """Whether `url` is a relative URL with a path, which in an HTML document names a file of its method tree.
+    """Whether `url` is a relative reference with a path, which in an HTML document names a file of its method tree.
 
-    A URL naming a scheme (`https:`, `data:`, `pipelex-storage:`), one holding an authority (`//host/x`) and one with no
-    path (`#top`, `?v=2`, the empty URL) are not: each is read as what it names, or left as written.
+    A URL naming a scheme (`https:`, `data:`, `pipelex-storage:`), one holding an authority (`//host/x`), one with no
+    path (`#top`, `?v=2`, the empty URL) and a root-absolute path (`/tmp/photo.png`) are not: each is read as what it
+    names, under the run's read scope, or left as written.
     """
-    return is_file_reference(url, context=ReferenceContext.URL)
+    return is_file_reference(url, context=ReferenceContext.URL) and not url.startswith("/")
+
+
+def template_asset_refusal(*, tree_path: str) -> str | None:
+    """Why a document may not read the file of its method tree at `tree_path`, or None for an image, a stylesheet or a font."""
+    if PurePosixPath(tree_path).suffix.lower() in TEMPLATE_ASSET_SUFFIXES:
+        return None
+    return (
+        f"It names '{tree_path}', which is not an image, a stylesheet or a font: a document reads only those from its method, "
+        "so that a URL a run's input supplies cannot read the method's other files."
+    )
 
 
 class RelativeUrlBase(BaseModel):
@@ -74,6 +116,9 @@ class RelativeUrlBase(BaseModel):
         )
     )
     template_label: str = Field(description="How a refusal names the template: \"the template file 'templates/letter.html'\"")
+    is_one_file_tree: bool = Field(
+        default=False, description="Whether the tree is the one-file tree of a bundle named alone, which holds no file beside the bundle"
+    )
 
     @property
     def base_url(self) -> str:
@@ -105,18 +150,22 @@ class RelativeUrlBase(BaseModel):
         """
         if is_method_file_url(url=url):
             return self._tree_path_of_joined(url=url, tree_paths=tree_paths)
-        return resolve_url_reference(reference=url, holder=self.holder, tree_paths=tree_paths, holder_label=self.template_label)
+        return resolve_url_reference(
+            reference=url, holder=self.holder, tree_paths=tree_paths, holder_label=self.template_label, is_one_file_tree=self.is_one_file_tree
+        )
 
     def _tree_path_of_joined(self, *, url: str, tree_paths: AbstractSet[str]) -> str:
         """The tree path a URL an engine joined under the prefix names, resolved from the root below the tree's segment."""
         tree_segment, _separator, below_root = url_path_of(reference=url[len(METHOD_FILE_URL_PREFIX) :]).partition("/")
-        if tree_segment != self._tree_segment:
+        if tree_segment.lower() != self._tree_segment:
             # A join removes each `..` it can, so a URL that climbed above the root, or one written from it, lands
             # outside the tree's own segment.
             msg = f"Its relative URL climbs above the root of the method tree of {self.template_label}, or starts with '/'."
             raise MethodTreeRefusedError(msg, refusal=TreeRefusal(code=TreeRefusalCode.REFERENCE_LEAVES_TREE, names=[below_root]))
         try:
-            return resolve_url_path(url_path=below_root, reference=below_root, holder=None, tree_paths=tree_paths)
+            return resolve_url_path(
+                url_path=below_root, reference=below_root, holder=None, tree_paths=tree_paths, is_one_file_tree=self.is_one_file_tree
+            )
         except MethodTreeRefusedError as exc:
             msg = self._joined_refusal_message(refusal=exc.refusal)
             raise MethodTreeRefusedError(msg, refusal=exc.refusal) from exc
@@ -138,9 +187,13 @@ class RelativeUrlBase(BaseModel):
                 if refusal.resolved == ROOT_RESOLVED:
                     return f"Its relative URL resolves to the root of {tree_label}, which is not a file."
                 return f"Its relative URL resolves to '{refusal.resolved}', which is not a file of {tree_label}."
+            case TreeRefusalCode.REFERENCE_IN_ONE_FILE_TREE:
+                return (
+                    f"Its relative URL names a file beside the bundle of {self.template_label}, but the bundle was named alone with "
+                    "no METHODS.toml at or above it, so its tree holds that one file. Hand over the method's directory instead."
+                )
             case (
-                TreeRefusalCode.REFERENCE_IN_ONE_FILE_TREE
-                | TreeRefusalCode.SYMBOLIC_LINK
+                TreeRefusalCode.SYMBOLIC_LINK
                 | TreeRefusalCode.SPECIAL_FILE
                 | TreeRefusalCode.INVALID_TREE_PATH
                 | TreeRefusalCode.NORMALIZATION_COLLISION
