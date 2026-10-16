@@ -5,16 +5,80 @@ joined to the bundle's own tree path, a `..` may climb as long as it stays insid
 file of the tree, which is a lookup in the set of tree paths the listing produced. So a file the membership rule keeps
 out of the tree, a dotfile, a `.gitignore`d file or a file of a nested package, is invisible to the step, and nothing
 outside the tree is ever opened.
+
+A bundle loaded from a content string belongs to no tree and reads only the files submitted with it, so the parser,
+told so by its caller, validates its blueprint under that origin (`BundleValidationContext`), and a reference none of
+those files could be keyed by is refused there, as a blueprint item at the step that names it.
 """
+
+from enum import StrEnum
 
 from mthds.method_tree.exceptions import MethodTreeRefusedError
 from mthds.method_tree.references import resolve_reference
 from mthds.method_tree.vocabulary import ReferenceContext, TreeRefusalCode
+from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.base_exceptions import PipelexUnexpectedError
+from pipelex.core.bundle_resources.bundle_resource import resource_path_refusal
 from pipelex.core.method_trees.tree_bundle import TreeBundle
 
 ONE_FILE_TREE_ADVICE = "Run the method's folder instead, or add a METHODS.toml to it."
+
+
+class BundleFileOrigin(StrEnum):
+    """Where a bundle's steps find the files they name, which decides the rule a file reference is held to.
+
+    A bundle read from this host's disk finds them in its method tree, where a `..` may climb to another folder of the
+    tree. A bundle loaded from a content string belongs to no tree: it reads only the files submitted with it, each
+    keyed by a path inside the bundle (`resource_path_refusal`), so a reference no such key could be, one holding a
+    `..` segment included, can never be supplied.
+    """
+
+    METHOD_TREE = "method_tree"
+    SUBMITTED_FILES = "submitted_files"
+
+
+class BundleValidationContext(BaseModel):
+    """The pydantic validation context the parser validates a bundle's blueprint with.
+
+    The validators that check a file reference, such as a `PipeDocGen` step's `template_file`, read it to know which
+    rule the reference is held to.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    file_origin: BundleFileOrigin = Field(strict=False)
+
+
+def bundle_file_origin(*, validation_context: object) -> BundleFileOrigin:
+    """Where the bundle under validation finds the files its steps name, as its validation context says.
+
+    A blueprint validated with no such context, such as one a loader parsed from its path, a crate's blueprint loaded
+    again or one built in code, is held to the method tree's rule, which checks a reference's form alone: its load then
+    resolves the reference in the bundle's tree, or, for a bundle in none, refuses a file not submitted with it.
+    """
+    if isinstance(validation_context, BundleValidationContext):
+        return validation_context.file_origin
+    return BundleFileOrigin.METHOD_TREE
+
+
+def file_reference_refusal(*, reference: str, file_origin: BundleFileOrigin) -> str | None:
+    """Why a path written in a bundle field cannot name a file where the bundle finds its files, or None when it can.
+
+    The form check comes first, whatever the origin. A bundle reading its files from its method tree is held to it
+    alone, its load deciding in the tree whether the path names a file. A bundle reading only the files submitted with
+    it is also held to the rule those files are keyed by, so a step naming a file that could never be submitted, such
+    as one through a `..` segment, is refused when its blueprint validates, before any file is looked up. The reason
+    never repeats the path.
+    """
+    form_refusal = file_reference_form_refusal(reference=reference)
+    if form_refusal is not None:
+        return form_refusal
+    match file_origin:
+        case BundleFileOrigin.METHOD_TREE:
+            return None
+        case BundleFileOrigin.SUBMITTED_FILES:
+            return resource_path_refusal(path=reference)
 
 
 def file_reference_form_refusal(*, reference: str) -> str | None:

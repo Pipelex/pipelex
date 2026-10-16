@@ -18,6 +18,7 @@ from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
 
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.bundle_resources.bundle_resource import BundleResources
+from pipelex.core.method_trees.file_references import BundleFileOrigin
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.libraries.bundle_resources import check_bundle_resources
@@ -78,8 +79,9 @@ def resolve_crate_from_contents(
         set_current_library(library_id=library_id)
         content_sources: list[str | None] = list(mthds_sources) if mthds_sources is not None else [None] * len(mthds_contents)
         with translate_to_validate_bundle_error():
+            # Contents belong to no method tree: their steps read only the files submitted with them.
             blueprints = [
-                MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content, mthds_source=source)
+                MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content, mthds_source=source, file_origin=BundleFileOrigin.SUBMITTED_FILES)
                 for content, source in zip(mthds_contents, content_sources, strict=True)
             ]
             _reject_address_based_dependencies(blueprints=blueprints)
