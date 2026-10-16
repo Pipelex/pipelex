@@ -3742,7 +3742,7 @@ requires-dist = [
     { name = "opentelemetry-semantic-conventions", specifier = ">=0.59b0" },
     { name = "packaging", specifier = ">=24.0" },
     { name = "pillow", specifier = ">=12.1.1" },
-    { name = "pipelex-sdk", specifier = "==0.45.0" },
+    { name = "pipelex-sdk", git = "https://github.com/Pipelex/pipelex-sdk.git?subdirectory=python&rev=e9cece139351bade7a3b4802ff21ba2be7ecdc28" },
     { name = "pipelex-tools", marker = "extra == 'dev'", specifier = ">=0.7.2" },
     { name = "pipelex-tools-py", specifier = ">=0.1.3" },
     { name = "polyfactory", specifier = ">=2.21.0" },
@@ -3855,16 +3855,12 @@ provides-extras = ["dev"]
 [[package]]
 name = "pipelex-sdk"
 version = "0.45.0"
-source = { registry = "https://pypi.org/simple" }
+source = { git = "https://github.com/Pipelex/pipelex-sdk.git?subdirectory=python&rev=e9cece139351bade7a3b4802ff21ba2be7ecdc28#e9cece139351bade7a3b4802ff21ba2be7ecdc28" }
 dependencies = [
     { name = "httpx" },
     { name = "mthds" },
     { name = "pydantic" },
     { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/f8/31/50cb829da5577dbfdaca032b0c4dc2285daa5ceb8c05b299341190ce82a1/pipelex_sdk-0.45.0.tar.gz", hash = "sha256:8e9de14ff0c4fa8787a03ef3f93130dcafd32b97b157cd519460ec5edaba19e3", size = 622581, upload-time = "2026-10-15T22:28:11.191Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b9/7c/9ec2d03af8aabe69ac272153f36543809f58b4d5de4243b41ad1767b0545/pipelex_sdk-0.45.0-py3-none-any.whl", hash = "sha256:b037e34aec048b85b60e70dac6098f8753a0e1472ed71b9274dfef805a8280c2", size = 241187, upload-time = "2026-10-15T22:28:09.638Z" },
 ]
 
 [[package]]
