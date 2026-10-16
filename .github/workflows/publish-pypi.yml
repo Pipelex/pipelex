@@ -106,6 +106,21 @@ jobs:
             echo "head_sha=$HEAD_SHA"
           } >> "$GITHUB_OUTPUT"
           echo "Shipping $NAME $VERSION from $HEAD_SHA"
+      # The Pipelex error registry is published with every release under the release's
+      # version (docs/contribute/error-registry.md). Its snapshot carries the version it
+      # was generated with, so a release whose snapshot was not regenerated after the
+      # version bump stops here, before anything is published under the wrong number.
+      - name: Verify the error registry carries the release's version
+        env:
+          VERSION: ${{ steps.project.outputs.version }}
+        run: |
+          set -euo pipefail
+          ERROR_REGISTRY=pipelex/errors/registry/pipelex-error-registry.json
+          REGISTRY_VERSION=$(jq -r '.version' "$ERROR_REGISTRY")
+          if [ "$REGISTRY_VERSION" != "$VERSION" ]; then
+            echo "::error::$ERROR_REGISTRY carries the version $REGISTRY_VERSION, not $VERSION. Run make generate-error-registry after the version bump."
+            exit 1
+          fi
       # A recovery re-run — the one the signing fallback in `github-release`
       # prescribes — must attach and sign the exact bytes this version published,
       # because PyPI's copies of them are immutable. Rebuilding cannot promise
@@ -711,6 +726,16 @@ jobs:
         run: >-
           gh release upload
           "v$VERSION" dist/*.whl dist/*.tar.gz
+          --repo "$GITHUB_REPOSITORY"
+          --clobber
+      # The Pipelex error registry's snapshot, from the release commit, which the
+      # build job checked carries this version.
+      - name: Upload the error registry to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          gh release upload
+          "v$VERSION" pipelex/errors/registry/pipelex-error-registry.json
           --repo "$GITHUB_REPOSITORY"
           --clobber
       - name: Sign the dists with Sigstore
