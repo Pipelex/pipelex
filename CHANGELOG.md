@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.86.1] - 2026-10-16
+
+### Changed
+
+- **A scoped event log captures usage events**: a usage event emitted while `runtime_hub.scoped_event_log` is set now goes into the scoped event log and nowhere else, ahead of an event log registered with `ReportingManager.set_event_log` and of the per-process runner fallback, including inside an isolated sub-execution such as a Temporal activity, where it always went to the fallback. Code running a leaf inside an activity can therefore scope a fresh `InMemoryEventLog` around it and return the leaf's usage events with its result, which is how a backend with no shared tracing store, such as Mistral Workflows, collects a run's usage; with no scoped event log set, usage events are routed as before.
+
 ## [v0.86.0] - 2026-10-13
 
 ### Highlights

@@ -129,8 +129,9 @@ class PipelexKernel:
         the cogt leaf emits a usage event only when the metadata it is handed carries one. Passing it
         adopts its ``graph_id`` as this run's ``pipeline_run_id`` rather than minting a fresh id —
         the two are one identity, and letting them diverge would scatter a single run's usage events
-        across two ids (the registered-context emit path stamps the event log's id, the runner
-        fallback stamps the metadata's), so the read-back would silently miss half of them.
+        across two ids (the registered-context emit path stamps the event log's id, the scoped
+        event log and the runner fallback stamp the metadata's), so the read-back would silently
+        miss half of them.
 
         ``pipeline_run_id`` names the run when no trace context does. The run id is a trace
         context's ``graph_id`` when one is given, else this value, else a fresh ``uuid4``. A trace
