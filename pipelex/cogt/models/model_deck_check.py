@@ -46,9 +46,13 @@ def _raise_model_choice_not_found(
         wrong_sigil_hints=wrong_sigil_hints,
         cross_collection_suggestions=cross_suggestions,
     )
-    if reference_kind == ModelReferenceKind.HANDLE and model_deck.is_served_only_as_other_types(name=name, model_type=model_type):
-        raise not_found.with_error_code(CoreCode.MODEL_CAPABILITY_UNSUPPORTED)
-    raise not_found
+    match reference_kind:
+        case ModelReferenceKind.HANDLE:
+            if model_deck.is_served_only_as_other_types(name=name, model_type=model_type):
+                raise not_found.with_error_code(CoreCode.MODEL_CAPABILITY_UNSUPPORTED)
+            raise not_found
+        case ModelReferenceKind.PRESET | ModelReferenceKind.ALIAS | ModelReferenceKind.WATERFALL:
+            raise not_found
 
 
 def check_llm_choice_with_deck(llm_choice: LLMModelChoice) -> None:
