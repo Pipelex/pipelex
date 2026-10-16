@@ -7,21 +7,21 @@ type          = "PipeFunc"
 description   = "Analyzes the clause (plain input: lifts when clause is absent)"
 inputs        = { clause = "Text" }
 output        = "Text"
-function_name = "oshow_analyze_clause"
+function_name = "optionals_showcase_funcs.oshow_analyze_clause"
 
 [pipe.oshow_summarize_analysis]
 type          = "PipeFunc"
 description   = "Summarizes the analysis (plain input: chained lift)"
 inputs        = { analysis = "Text" }
 output        = "Text"
-function_name = "oshow_summarize_analysis"
+function_name = "optionals_showcase_funcs.oshow_summarize_analysis"
 
 [pipe.oshow_flag_risk]
 type          = "PipeFunc"
 description   = "Produces the risk note for a flagged contract"
 inputs        = { contract = "Text" }
 output        = "Text"
-function_name = "oshow_flag_risk"
+function_name = "optionals_showcase_funcs.oshow_flag_risk"
 
 [pipe.oshow_assess_risk]
 type                = "PipeCondition"
@@ -64,7 +64,7 @@ type          = "PipeFunc"
 description   = "Asserts presence of the clause with a force marker"
 inputs        = { clause = "Text!" }
 output        = "Text"
-function_name = "oshow_force_extract"
+function_name = "optionals_showcase_funcs.oshow_force_extract"
 
 [pipe.oshow_force_flow]
 type        = "PipeSequence"

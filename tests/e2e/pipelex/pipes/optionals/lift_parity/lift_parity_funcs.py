@@ -1,5 +1,5 @@
-"""PipeFunc implementations for the lift-parity bundle, auto-registered at library load via the
-@pipe_func decorator (FuncRegistryUtils.register_funcs_in_folder).
+"""PipeFunc implementations for the lift-parity bundle, which names each by its import path from this folder,
+such as `lift_parity_funcs.<function>`.
 """
 
 from pipelex.core.memory.working_memory import WorkingMemory

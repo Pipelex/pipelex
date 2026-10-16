@@ -28,7 +28,7 @@ class TestBundleElaborator:
                     type="PipeFunc",
                     description="Plain",
                     output="Foo",
-                    function_name="my_func",
+                    function_name="funcs.my_func",
                 ),
             },
         )

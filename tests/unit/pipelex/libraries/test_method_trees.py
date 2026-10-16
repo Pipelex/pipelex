@@ -10,9 +10,12 @@ from pipelex.libraries.method_trees import (
     LIMITS_ADVICE,
     bundle_files_under,
     list_library_bundle_files,
+    list_library_dir_trees,
     list_package_method_tree,
     reporting_host_library_tree_faults,
+    submitted_python_files,
     tree_bundle_of_lone_file,
+    tree_python_sources,
 )
 
 _MANIFEST = '[package]\naddress = "github.com/pipelex-tests/nested"\nversion = "1.0.0"\ndescription = "A nested package"\n'
@@ -205,3 +208,32 @@ class TestMethodTrees:
         found = bundle_files_under(library_dirs=[tmp_path / "lib", tmp_path / "missing"])
 
         assert set(found) == {tmp_path / "lib" / "a.mthds", tmp_path / "lib" / ".hidden" / "b.mthds", tmp_path / "lib" / "link.mthds"}
+
+    def test_only_a_directory_whose_own_tree_holds_no_bundle_submits_its_files(self, tmp_path: Path) -> None:
+        """Its files are the Python submitted beside bundles parsed from strings; a tree holding a bundle carries its own."""
+        _touch(directory=tmp_path, tree_path="submitted/funcs/totals.py", content="X = 1\n")
+        _touch(directory=tmp_path, tree_path="submitted/notes.txt", content="note\n")
+        _touch(directory=tmp_path, tree_path="method/method.mthds")
+        _touch(directory=tmp_path, tree_path="method/funcs.py", content="X = 2\n")
+        _touch(directory=tmp_path, tree_path="rooted/METHODS.toml", content=_MANIFEST)
+        _touch(directory=tmp_path, tree_path="rooted/python/helpers.py", content="X = 3\n")
+
+        submitted = {
+            library_tree.library_dir.name: submitted_python_files(library_tree=library_tree)
+            for library_tree in list_library_dir_trees(library_dirs=[tmp_path / "submitted", tmp_path / "method", tmp_path / "rooted" / "python"])
+        }
+
+        assert submitted == {"submitted": {"funcs/totals.py": b"X = 1\n", "notes.txt": b"note\n"}, "method": {}, "python": {"helpers.py": b"X = 3\n"}}
+
+    def test_the_python_of_a_nested_tree_is_named_from_its_library_directory(self, tmp_path: Path) -> None:
+        _touch(directory=tmp_path, tree_path="top.mthds")
+        _touch(directory=tmp_path, tree_path="top_funcs.py", content="X = 1\n")
+        _touch(directory=tmp_path, tree_path="checkouts/reports/report.mthds")
+        _touch(directory=tmp_path, tree_path="checkouts/reports/models/report.py", content="X = 2\n")
+        (tmp_path / "checkouts" / "reports" / ".git").mkdir()
+
+        sources: dict[str, str] = {}
+        for library_tree in list_library_dir_trees(library_dirs=[tmp_path]):
+            sources.update(tree_python_sources(tree=library_tree.tree, library_dir=library_tree.library_dir))
+
+        assert sources == {"top_funcs.py": "X = 1\n", "checkouts/reports/models/report.py": "X = 2\n"}

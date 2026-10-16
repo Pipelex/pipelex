@@ -1,8 +1,8 @@
 """Tests for PipeFunc validation error reporting.
 
 This module tests that when a @pipe_func decorated function has issues
-(like missing return type), the validation provides clear error messages
-instead of just "function not found".
+(like a missing return type), validating its method provides a clear error message
+naming the function and the issue, the module being imported by the step's import path.
 """
 
 import tempfile
@@ -11,10 +11,10 @@ from typing import ClassVar
 
 import pytest
 
+from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager
 from pipelex.libraries.exceptions import LibraryError
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.validate_bundle import validate_bundle
-from pipelex.system.registries.func_registry import func_registry
+from pipelex.pipeline.validate_bundle import ValidateBundleResult, validate_bundle
 
 
 class TestData:
@@ -30,7 +30,7 @@ description = "Test bundle for pipe_func validation error reporting"
 [pipe.test_pipe_func]
 type = "PipeFunc"
 description = "Test pipe that uses a function"
-function_name = "{function_name}"
+function_name = "my_funcs.{function_name}"
 output = "Text"
 """
 
@@ -41,7 +41,7 @@ description = "Test bundle for pipe_func validation error reporting"
 [pipe.test_pipe_func]
 type = "PipeFunc"
 description = "Test pipe that uses a function without return type"
-function_name = "my_func_no_return_type"
+function_name = "my_funcs.my_func_no_return_type"
 output = "Text"
 """
 
@@ -165,22 +165,24 @@ from pipelex.system.registries.func_registry import pipe_func
 async def func_missing_param_type(working_memory) -> TextContent:
     return TextContent(text="test")
 """,
-            "type annotation",
+            "must annotate its parameter 'working_memory'",
         ),
     ]
+
+
+async def _validate_and_release(*, mthds_file_path: Path, library_dirs: list[Path]) -> ValidateBundleResult:
+    """Validate, then tear down the library a successful validation leaves open and current, which holds its tree's Python."""
+    result = await validate_bundle(mthds_file_path=mthds_file_path, library_dirs=library_dirs)
+    library_id = get_current_library_id_or_none()
+    if library_id is not None:
+        get_library_manager().teardown(library_id=library_id)
+        clear_current_library()
+    return result
 
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeFuncValidationErrors:
     """Tests for PipeFunc validation error reporting when @pipe_func decorated functions have issues."""
-
-    def setup_method(self):
-        """Clear the func_registry before each test."""
-        func_registry.teardown()
-
-    def teardown_method(self):
-        """Clean up the func_registry after each test."""
-        func_registry.teardown()
 
     async def test_pipe_func_missing_return_type_reports_clear_error(self):
         """Test that a @pipe_func decorated function without return type gives a clear error.
@@ -252,7 +254,7 @@ class TestPipeFuncValidationErrors:
             py_file.write_text(TestData.FUNC_WITH_DECORATOR_VALID)
 
             # Validate the bundle - should succeed
-            result = await validate_bundle(
+            result = await _validate_and_release(
                 mthds_file_path=mthds_file,
                 library_dirs=[temp_path],
             )
@@ -350,9 +352,6 @@ class TestPipeFuncValidationErrors:
             # The error should mention the function name
             assert function_name in error_message, f"Error message should mention the function name '{function_name}'. Got: {error_message}"
 
-            # The error should mention that the function is not eligible (has decorator but failed)
-            assert "not eligible" in error_message.lower(), f"Error should mention that the function is 'not eligible'. Got: {error_message}"
-
             # The error should contain the expected error substring explaining the specific issue
             assert expected_error_substring.lower() in error_message.lower(), (
                 f"Error should mention '{expected_error_substring}' to explain the specific issue. Got: {error_message}"
@@ -389,7 +388,7 @@ description = "Test bundle for pipe_func return type validation"
 [pipe.test_pipe_func]
 type = "PipeFunc"
 description = "Test pipe expecting Text output but function returns StructuredContent"
-function_name = "func_wrong_structure_class"
+function_name = "my_funcs.func_wrong_structure_class"
 output = "Text"
 """
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -447,7 +446,7 @@ description = "Test bundle for ListContent validation"
 [pipe.test_list_content_pipe]
 type = "PipeFunc"
 description = "Test pipe with array output"
-function_name = "func_returns_list_content"
+function_name = "my_funcs.func_returns_list_content"
 output = "Text[]"
 """
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -462,7 +461,7 @@ output = "Text[]"
             py_file.write_text(func_code)
 
             # Validate the bundle - should succeed
-            result = await validate_bundle(
+            result = await _validate_and_release(
                 mthds_file_path=mthds_file,
                 library_dirs=[temp_path],
             )
@@ -499,7 +498,7 @@ description = "Test bundle for ListContent validation error"
 [pipe.test_wrong_list_content_pipe]
 type = "PipeFunc"
 description = "Test pipe with mismatched list item type"
-function_name = "func_returns_wrong_list_content"
+function_name = "my_funcs.func_returns_wrong_list_content"
 output = "Text[]"
 """
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -557,7 +556,7 @@ description = "Test bundle for ListContent requirement"
 [pipe.test_array_requires_list_content]
 type = "PipeFunc"
 description = "Test pipe with array output expecting ListContent"
-function_name = "func_returns_single_instead_of_list"
+function_name = "my_funcs.func_returns_single_instead_of_list"
 output = "Text[]"
 """
         with tempfile.TemporaryDirectory() as temp_dir:

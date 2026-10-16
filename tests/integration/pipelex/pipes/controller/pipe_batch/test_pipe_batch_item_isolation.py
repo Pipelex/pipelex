@@ -4,7 +4,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.registries.func_registry import func_registry
+from pipelex.system.registries.func_registry import pipe_func
 
 _BUNDLE = """
 domain = "batch_item_isolation"
@@ -25,10 +25,11 @@ type = "PipeFunc"
 description = "Shouts one note, rewriting the item it was handed in place"
 inputs = { note = "Text" }
 output = "Text"
-function_name = "batch_item_isolation_shout_note"
+function_name = "tests.integration.pipelex.pipes.controller.pipe_batch.test_pipe_batch_item_isolation.batch_item_isolation_shout_note"
 """
 
 
+@pipe_func()
 def batch_item_isolation_shout_note(working_memory: WorkingMemory) -> TextContent:
     note = working_memory.get_stuff_as_text(name="note")
     note.text = note.text.upper()
@@ -37,15 +38,6 @@ def batch_item_isolation_shout_note(working_memory: WorkingMemory) -> TextConten
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeBatchItemIsolation:
-    @classmethod
-    def setup_class(cls):
-        func_registry.register_function(batch_item_isolation_shout_note)
-
-    @classmethod
-    def teardown_class(cls):
-        if func_registry.has_function(batch_item_isolation_shout_note.__name__):
-            func_registry.unregister_function_by_name(batch_item_isolation_shout_note.__name__)
-
     async def test_a_branch_rewriting_its_item_leaves_the_batched_list_unchanged(self) -> None:
         """Each branch gets its own copy of its item, as it gets its own copy of the rest of working memory."""
         result = await PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.LIVE).execute(

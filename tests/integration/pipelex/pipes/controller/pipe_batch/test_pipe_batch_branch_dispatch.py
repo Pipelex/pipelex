@@ -31,11 +31,12 @@ from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.registries.func_registry import func_registry
+from pipelex.system.registries.func_registry import pipe_func
 
 _DOMAIN_CODE = "test_batch_branch_dispatch"
 
 
+@pipe_func()
 def batch_branch_dispatch_shout_item(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text=working_memory.get_stuff_as_str(name="item").upper())
 
@@ -68,7 +69,7 @@ def _build_batch() -> PipeBatch:
             description="Uppercase the batch item",
             inputs={"item": "Text"},
             output="Text",
-            function_name="batch_branch_dispatch_shout_item",
+            function_name=f"{__name__}.batch_branch_dispatch_shout_item",
         ),
     )
     pipe_library = get_pipe_library()
@@ -103,15 +104,6 @@ def _make_items_memory(batch: PipeBatch, texts: list[str]):
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeBatchBranchDispatch:
-    @classmethod
-    def setup_class(cls):
-        func_registry.register_function(batch_branch_dispatch_shout_item)
-
-    @classmethod
-    def teardown_class(cls):
-        if func_registry.has_function(batch_branch_dispatch_shout_item.__name__):
-            func_registry.unregister_function_by_name(batch_branch_dispatch_shout_item.__name__)
-
     async def test_branches_dispatch_through_the_hook(self, job_metadata: JobMetadata, load_empty_library: Callable[[], str]):
         """One `run_batch_branch` call per item, and the batch itself never enters through the hook."""
         load_empty_library()

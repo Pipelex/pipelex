@@ -11,10 +11,10 @@ from tests.unit.pipelex.pipe_operators.pipe_func.data import PipeFuncInputTestCa
 
 
 class TestPipeFuncValidation:
-    """Test PipeFunc with valid, registered, and functioning functions.
+    """Test PipeFunc with valid functions named by import path.
 
-    Error cases (function not found, invalid return types, etc.) are tested
-    at the registry level in test_func_registry_utils.py.
+    Error cases (function not found, invalid return types, etc.) are tested where the function is located and
+    checked, in the tests of pipe_func_python and of the definition check.
     """
 
     @pytest.mark.parametrize(
@@ -28,7 +28,7 @@ class TestPipeFuncValidation:
         load_test_library: Callable[[list[Path]], None],
     ):
         load_test_library([Path(Path(__file__).parent)])
-        """Test that PipeFunc works correctly with valid, registered functions."""
+        """Test that PipeFunc works correctly with valid functions named by import path."""
         log.verbose(f"Testing valid case: {test_id}")
 
         pipe_func = PipeFactory[PipeFunc].make_from_blueprint(

@@ -8,10 +8,9 @@ class PipeFuncConfig(ConfigModel):
     # plugins populate (the config-selected-singleton seam, sibling of runtime.storage.method). An open
     # string token: "direct" (core, in-process — imports and runs the customer function here) is the
     # default; "daytona" (our Daytona sandbox plugin) runs it out-of-process. Any non-"direct" mode is a remote/sandbox
-    # backend: library loading captures the customer .py source as text (onto the crate) instead of
-    # registering it in the func_registry, and the PipeFunc validators skip the func_registry lookup +
-    # return-type checks — the real function is registered and validated inside the sandbox, not here.
-    # "direct" is byte-identical to the pre-existing behavior. This is a hosted-deploy concern, not a
+    # backend: library loading captures the method's files as they are (onto the crate) instead of
+    # importing any of them, a PipeFunc's validation proves its function's form from the captured source,
+    # and the function is imported, checked and run inside the sandbox, never here. This is a hosted-deploy concern, not a
     # client preference, so it is intentionally absent from the .pipelex/ override file.
     #
     # Lives in its own module (not configs.py) so the PipeFuncExecutorRegistry can type its factory

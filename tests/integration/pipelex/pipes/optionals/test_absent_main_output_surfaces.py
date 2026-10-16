@@ -15,7 +15,7 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.graph.graphspec import NodeStatus
 from pipelex.pipeline.pipeline_response import RunState
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
-from pipelex.system.registries.func_registry import func_registry
+from pipelex.system.registries.func_registry import pipe_func
 
 _BUNDLE = """
 domain = "opt_surfaces"
@@ -27,14 +27,14 @@ type = "PipeFunc"
 description = "Analyzes the source (plain input: lifts when source is absent)"
 inputs = { source = "Text" }
 output = "Text"
-function_name = "opt_surfaces_make_analysis"
+function_name = "tests.integration.pipelex.pipes.optionals.test_absent_main_output_surfaces.opt_surfaces_make_analysis"
 
 [pipe.opt_surfaces_summarize]
 type = "PipeFunc"
 description = "Summarizes the analysis (plain input: lifts in chain)"
 inputs = { analysis = "Text" }
 output = "Text"
-function_name = "opt_surfaces_summarize"
+function_name = "tests.integration.pipelex.pipes.optionals.test_absent_main_output_surfaces.opt_surfaces_summarize"
 
 [pipe.opt_flow]
 type = "PipeSequence"
@@ -48,30 +48,18 @@ steps = [
 """
 
 
+@pipe_func()
 def opt_surfaces_make_analysis(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text=f"analysis of {working_memory.get_stuff_as_str(name='source')}")
 
 
+@pipe_func()
 def opt_surfaces_summarize(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text=f"summary: {working_memory.get_stuff_as_str(name='analysis')}")
 
 
-_TEST_FUNCS = [opt_surfaces_make_analysis, opt_surfaces_summarize]
-
-
 @pytest.mark.asyncio(loop_scope="class")
 class TestAbsentMainOutputSurfaces:
-    @classmethod
-    def setup_class(cls):
-        for func in _TEST_FUNCS:
-            func_registry.register_function(func)
-
-    @classmethod
-    def teardown_class(cls):
-        for func in _TEST_FUNCS:
-            if func_registry.has_function(func.__name__):
-                func_registry.unregister_function_by_name(func.__name__)
-
     async def test_execute_with_absent_main_output_succeeds_across_surfaces(self):
         """Omitting the optional input lifts the whole chain: the execute response is a success
         naming the declared slot, the ledger chains provenance, and the graph marks skips.

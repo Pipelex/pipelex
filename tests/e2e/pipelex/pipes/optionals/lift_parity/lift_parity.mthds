@@ -7,14 +7,14 @@ type          = "PipeFunc"
 description   = "Analyzes the source (plain input: lifts when source is absent)"
 inputs        = { source = "Text" }
 output        = "Text"
-function_name = "opar_make_analysis"
+function_name = "lift_parity_funcs.opar_make_analysis"
 
 [pipe.opar_summarize]
 type          = "PipeFunc"
 description   = "Summarizes the analysis (plain input: chained lift)"
 inputs        = { analysis = "Text" }
 output        = "Text"
-function_name = "opar_summarize"
+function_name = "lift_parity_funcs.opar_summarize"
 
 [pipe.opar_flow]
 type = "PipeSequence"

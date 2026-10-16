@@ -70,7 +70,7 @@ code = "Composite"
 
 [operator.func]
 code = "PipeFunc"
-excluded = "A PipeFunc names a Python function that is resolved against the runtime's function registry at validation time, so an entry declaring one fails with \"Function '<name>' not found in registry\" in every consumer that has not registered that exact function. A corpus entry has to validate everywhere, and the cross-language consumers cannot register a Python function at all, so no portable focused entry exists. Exercise PipeFunc in a consumer's own fixtures."
+excluded = "A PipeFunc names a Python function by its import path in the method tree, and validation locates that module among the tree's files and reads it, so an entry declaring one is refused wherever its Python module does not travel with it. A corpus entry is a bundle that has to validate everywhere, and the cross-language consumers do not read Python at all, so no portable focused entry exists. Exercise PipeFunc in a consumer's own fixtures."
 
 [operator.img_gen]
 code = "PipeImgGen"
@@ -219,6 +219,10 @@ excluded = "It refuses a reference to a pipe an installed dependency package loa
 [error.unknown_model]
 code = "unknown_model"
 fails_at = "runtime"
+
+[error.pipe_func_function_refused]
+code = "pipe_func_function_refused"
+excluded = "It refuses a PipeFunc step whose function its method tree does not hold or cannot be proven, so only a PipeFunc step produces it, and the PipeFunc operator is excluded: a focused entry is one bundle that has to validate everywhere, and its Python module would have to travel with it to consumers that do not read Python. Exercise it in a consumer's own fixtures, beside the operator."
 
 [error.unknown_validation_error]
 code = "unknown_validation_error"

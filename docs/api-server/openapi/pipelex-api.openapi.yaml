@@ -4945,8 +4945,11 @@ components:
           title: Output
         function_name:
           type: string
+          pattern: ^[^.]+(\.[^.]+)+$
           title: Function Name
-          description: The name of the function to call.
+          description: 'The import path of the function to call, from the root of the method tree: the module''s dotted path,
+            then the function''s name, such as ''funcs.totals.compute_totals'' for the function compute_totals of funcs/totals.py.
+            The function must be a top-level def or async def of that module, decorated with @pipe_func().'
       additionalProperties: false
       type: object
       required:
@@ -5968,6 +5971,7 @@ components:
       - unresolved_package_dependency
       - unexported_pipe_dependency
       - unknown_model
+      - pipe_func_function_refused
       - unknown_validation_error
       title: PipeValidationErrorType
       description: 'Types of pipe validation errors.

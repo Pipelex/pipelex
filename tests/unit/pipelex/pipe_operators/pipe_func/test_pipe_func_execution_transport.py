@@ -7,8 +7,10 @@ must forbid extras (it is a wire contract).
 """
 
 import pytest
+from mthds.method_tree.file_entry import Base64FileEntry
 from pydantic import ValidationError
 
+from pipelex.core.method_trees.tree_files import tree_file_bytes
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_operators.func.pipe_func_execution_transport import (
     DEFAULT_PIPE_FUNC_TIMEOUT_SECONDS,
@@ -38,6 +40,22 @@ class TestPipeFuncExecutionTransport:
         assert "working_memory_raw" in PipeFuncExecutionRequest.model_fields
         assert PipeFuncExecutionRequest.model_fields["timeout_seconds"].default == DEFAULT_PIPE_FUNC_TIMEOUT_SECONDS
 
+    def test_request_carries_the_call_files_as_file_entries(self) -> None:
+        """The call's files travel at their tree paths, text as text and other bytes in Base64, and survive a JSON round-trip."""
+        binary = bytes([0, 159, 146, 150])
+        request = PipeFuncExecutionRequest(
+            crate=LibraryCrate(),
+            files={"funcs/totals.py": "TOTAL = 3\n", "assets/logo.bin": Base64FileEntry.make_from_bytes(binary)},
+            working_memory_raw={},
+            pipe_code="my_domain.my_pipe",
+            function_name="funcs.totals.compute_totals",
+            job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="user", pipeline_run_id="run")),
+            pipe_run_params=PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=10, batch_max_concurrency=None),
+        )
+        again = PipeFuncExecutionRequest.model_validate_json(request.model_dump_json())
+        assert tree_file_bytes(entry=again.files["funcs/totals.py"]) == b"TOTAL = 3\n"
+        assert tree_file_bytes(entry=again.files["assets/logo.bin"]) == binary
+
     def test_request_rejects_non_finite_timeout(self) -> None:
         """A non-finite timeout would disable the runaway-code guard, so the wire contract rejects it."""
         with pytest.raises(ValidationError, match="timeout_seconds"):
@@ -45,7 +63,7 @@ class TestPipeFuncExecutionTransport:
                 crate=LibraryCrate(),
                 working_memory_raw={},
                 pipe_code="my_pipe",
-                function_name="my_func",
+                function_name="my_funcs.my_func",
                 job_metadata=JobMetadata(
                     run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="user", pipeline_run_id="run")
                 ),

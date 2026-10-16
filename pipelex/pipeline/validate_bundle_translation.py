@@ -44,7 +44,6 @@ from pipelex.mthds_parsing.handle_pipe_errors import (
 )
 from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.system.registries.exceptions import FuncRegistryError
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.typing.module_inspector import convert_file_path_to_module_path
 
@@ -162,13 +161,6 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
             pipelex_bundle_blueprint_validation_errors=blueprint_validation_errors,
             pipe_validation_errors=pipe_concept_validation_errors,
         ) from library_error
-    except FuncRegistryError as func_registry_error:
-        # A duplicate @pipe_func name across the scanned library dirs. Raised while loading the
-        # library, so it lands here rather than on the PipeFunc field validator's ValueError path.
-        # It is caller-fixable input (rename one with @pipe_func(name=...)), so it must produce a
-        # verdict — `is_valid: false` — not the "no verdict could be produced" exit 2 / 5xx an
-        # untranslated error would give.
-        raise ValidateBundleError(message=func_registry_error.message) from func_registry_error
     except PipeRunError as pipe_run_error:
         # A pipe run failing outside the sweep's per-pipe classification: one dry-run item on its pipe,
         # whose text follows the disclosure rule, since the verdict carries it past STRICT disclosure.

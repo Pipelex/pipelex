@@ -37,6 +37,19 @@ class MigrationSnapshotRefusedError(MigrationError):
     _declared_title = "Migration snapshot refused"
 
 
+class FunctionNamesMigrationError(PipelexError):
+    """The function names of a method could not be migrated to import paths.
+
+    Raised by `pipelex fix function-names` when the path it is handed is not a method's folder, its method tree cannot
+    be listed, or a file cannot be read or written. The flat names it cannot resolve are not an error: the migration
+    reports them for the author to decide.
+    """
+
+    error_domain = ErrorDomain.INPUT
+    retryable = False
+    _declared_title = "Function names migration error"
+
+
 class FormerReleaseConfigError(PipelexSetupError):
     """The inference configuration still carries what a former release wrote for the Pipelex Gateway.
 

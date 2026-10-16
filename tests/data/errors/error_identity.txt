@@ -109,7 +109,7 @@ FileTypeError | File type | https://docs.pipelex.com/latest/errors/file-type-err
 FixTransactionError | Fix transaction | https://docs.pipelex.com/latest/errors/fix-transaction-error/
 FixWriteConflictError | Fix write conflict | https://docs.pipelex.com/latest/errors/fix-write-conflict-error/
 FormerReleaseConfigError | Configuration left by a former release | https://docs.pipelex.com/latest/errors/former-release-config-error/
-FuncRegistryError | Func registry | https://docs.pipelex.com/latest/errors/func-registry-error/
+FunctionNamesMigrationError | Function names migration error | https://docs.pipelex.com/latest/errors/function-names-migration-error/
 GcpLogSinkCredentialsError | Log sink credentials missing or refused | https://docs.pipelex.com/latest/errors/gcp-log-sink-credentials-error/
 GeneratedImageError | Generated image | https://docs.pipelex.com/latest/errors/generated-image-error/
 GoogleImgGenWorkerError | Google img gen worker | https://docs.pipelex.com/latest/errors/google-img-gen-worker-error/
@@ -248,6 +248,7 @@ PipeExecutionError | Pipe execution | https://docs.pipelex.com/latest/errors/pip
 PipeExtractFactoryError | Pipe extract factory | https://docs.pipelex.com/latest/errors/pipe-extract-factory-error/
 PipeFactoryError | Pipe factory | https://docs.pipelex.com/latest/errors/pipe-factory-error/
 PipeFuncExecutionError | Pipe func execution | https://docs.pipelex.com/latest/errors/pipe-func-execution-error/
+PipeFuncFunctionError | Pipe func function | https://docs.pipelex.com/latest/errors/pipe-func-function-error/
 PipeFuncPackageSetUnstatedError | Pipe func package set unstated | https://docs.pipelex.com/latest/errors/pipe-func-package-set-unstated-error/
 PipeFuncTransportError | Pipe func transport | https://docs.pipelex.com/latest/errors/pipe-func-transport-error/
 PipeIOContractError | Pipe IO contract | https://docs.pipelex.com/latest/errors/pipe-io-contract-error/
@@ -351,6 +352,9 @@ TomlError | TOML parse error | https://docs.pipelex.com/latest/errors/toml-error
 ToolError | Tool error | https://docs.pipelex.com/latest/errors/tool-error/
 TraceEventModeError | Trace event mode | https://docs.pipelex.com/latest/errors/trace-event-mode-error/
 TracebackMessageError | Traceback message | https://docs.pipelex.com/latest/errors/traceback-message-error/
+TreeModuleShadowingError | Tree module shadowing | https://docs.pipelex.com/latest/errors/tree-module-shadowing-error/
+TreePythonError | Tree python | https://docs.pipelex.com/latest/errors/tree-python-error/
+TreePythonHeldError | Tree python held | https://docs.pipelex.com/latest/errors/tree-python-held-error/
 TypesafeError | Typesafe | https://docs.pipelex.com/latest/errors/typesafe-error/
 TypesafeJudgmentResponseError | Typesafe judgment response | https://docs.pipelex.com/latest/errors/typesafe-judgment-response-error/
 TypesafeQuestionUnsupportedError | Typesafe question unsupported | https://docs.pipelex.com/latest/errors/typesafe-question-unsupported-error/

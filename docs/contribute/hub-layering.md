@@ -38,7 +38,7 @@ There is deliberately **no** `pipelex.hub`. It was deleted rather than kept as a
 | config | `get_required_config`, `get_optional_config` |
 | console | `get_console` |
 | secrets | `get_secrets_provider`, `get_secret` |
-| system registries | `get_class_registry`, `get_func_registry` |
+| system registries | `get_class_registry` |
 | storage | `get_storage_provider` |
 | telemetry | `get_telemetry_manager`, `get_otel_tracer` |
 | models | `get_models_manager`, `get_model_deck`, `get_sdk_client_manager` |

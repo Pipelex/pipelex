@@ -18,21 +18,20 @@ from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipeline.controller_taint import collect_controller_taint_analyses
 from pipelex.pipeline.optionality_warnings import build_optionality_warnings
-from pipelex.system.registries.func_registry import func_registry
+from pipelex.system.registries.func_registry import pipe_func
 from pipelex.validation_error_types import PipeValidationErrorType
 
 _DOMAIN_CODE = "test_redundant_force"
 
 
+@pipe_func()
 def redundant_force_make_a(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text=f"a:{working_memory.get_stuff_as_str(name='topic')}")
 
 
+@pipe_func()
 def redundant_force_consume_a(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text=f"b:{working_memory.get_stuff_as_str(name='a_out')}")
-
-
-_TEST_FUNCS = [redundant_force_make_a, redundant_force_consume_a]
 
 
 def _build_force_pipes() -> tuple[PipeSequence, PipeSequence]:
@@ -50,7 +49,7 @@ def _build_force_pipes() -> tuple[PipeSequence, PipeSequence]:
             description="Always produces a_out",
             inputs={"topic": "Text"},
             output="Text",
-            function_name="redundant_force_make_a",
+            function_name=f"{__name__}.redundant_force_make_a",
         ),
     )
     step_force = PipeFactory[PipeFunc].make_from_blueprint(
@@ -60,7 +59,7 @@ def _build_force_pipes() -> tuple[PipeSequence, PipeSequence]:
             description="Consumes a_out with a force marker",
             inputs={"a_out": "Text!"},
             output="Text",
-            function_name="redundant_force_consume_a",
+            function_name=f"{__name__}.redundant_force_consume_a",
         ),
     )
     pipe_library = get_pipe_library()
@@ -98,17 +97,6 @@ def _build_force_pipes() -> tuple[PipeSequence, PipeSequence]:
 
 
 class TestRedundantForceWarning:
-    @classmethod
-    def setup_class(cls):
-        for func in _TEST_FUNCS:
-            func_registry.register_function(func)
-
-    @classmethod
-    def teardown_class(cls):
-        for func in _TEST_FUNCS:
-            if func_registry.has_function(func.__name__):
-                func_registry.unregister_function_by_name(func.__name__)
-
     def test_force_on_guaranteed_slot_warns(self, load_empty_library: Callable[[], str]):
         """A `!` consumption whose slot is guaranteed in its only analyzed flow yields one warning."""
         load_empty_library()

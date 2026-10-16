@@ -11,7 +11,7 @@ class InputNameRefusalTestData:
 description = "Totals an invoice"
 inputs = { invoice = "Invoice" }
 output = "Number"
-function_name = "total_invoice"
+function_name = "invoice_funcs.total_invoice"
 """,
         PipeType.PIPE_IMG_GEN: """type = "PipeImgGen"
 description = "Draws the letterhead of an invoice"

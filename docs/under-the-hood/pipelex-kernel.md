@@ -78,7 +78,7 @@ Both façade calls take the concept and the output class the caller wants, defau
 | `pipelex.kernel.search_ops` | `resolve_search_setting`, `run_search` |
 | `pipelex.kernel.judgment_ops` | `judgment_setting_of_choice`, `served_judgment_model`, `resolve_judgment_setting`, `make_verdict_content`, `run_judgment`, `AskedQuestion`, `run_multi_judgment` |
 | `pipelex.kernel.compose_ops` | `build_compose_context`, `build_composed_content`, `run_compose_template` |
-| `pipelex.kernel.func_ops` | `call_registered_function`, `run_func` |
+| `pipelex.kernel.func_ops` | `call_function`, `run_func` |
 | `pipelex.kernel.memory_ops` | `shape_inputs`, `store_result`, `extract_main_content` / `extract_named_content`, `extract_main_content_as_list` / `extract_named_content_as_list` |
 | `pipelex.kernel.prompt_assembly` | `UserPromptContent`, `AssembledUserPrompt`, `assemble_user_prompt`, `PromptFiles` |
 | `pipelex.kernel.llm_prompt_content` | `LlmPromptContent`, `assemble_llm_prompt` |
@@ -205,6 +205,6 @@ with kernel.log_context():
 Two arms of the interpreter stayed interpreter-side, both because moving them would cost more than the caller gains:
 
 - **`PipeCompose`'s construct mode.** Its semantics are `StructuredContentComposer` over a `ConstructBlueprint`, and a blueprint is an MTHDS language artifact with a language-side consumer. A programmatic caller holds real Python and builds its structured object directly rather than describing the construction declaratively. The template path *is* fully extracted, and the one thing both paths share — the three-layer context ordering — is single-sourced in `build_compose_context`.
-- **`PipeFunc`'s pluggable executor seam.** The protocol and its DTOs are typed on interpreter models (`PipeRunParams`, `LibraryCrate`), so the kernel cannot name them. What running a function *means* — registry lookup, async-vs-sync dispatch, content coercion — is single-sourced in `call_registered_function`, which both the in-process executor and the kernel's `run_func` ride. What stays outside is *where* the function runs, which is configured deployment machinery rather than operator semantics. So a kernel `run_func` always runs in this process.
+- **`PipeFunc`'s pluggable executor seam.** The protocol and its DTOs are typed on interpreter models (`PipeRunParams`, `LibraryCrate`), so the kernel cannot name them. What running a function *means* — async-vs-sync dispatch and content coercion — is single-sourced in `call_function`, which both the in-process executor and the kernel's `run_func` ride. Finding the function is not the kernel's: a `PipeFunc` step imports it by its import path from its method tree, which is a library's business, so `run_func` takes the function itself, as every other op takes resolved values. What stays outside is *where* the function runs, which is configured deployment machinery rather than operator semantics. So a kernel `run_func` always runs in this process.
 
 Beyond those: controllers are out of scope entirely (`pipelex/pipe_controllers/` is the interpreter's), the kernel is not separately installable from PyPI, and "activity-shaped" is a design constraint on the call signatures rather than a distributed-execution deliverable.

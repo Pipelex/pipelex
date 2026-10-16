@@ -11,102 +11,107 @@ The `PipeFunc` operator provides an essential escape hatch, allowing you to exec
 
 ## How it works
 
-`PipeFunc` operates by calling a Python function that has been registered with Pipelex's central function registry.
+A `PipeFunc` step names a Python function of its method by the function's **import path from the root of the method's tree**: `function_name = "funcs.totals.compute_totals"` names the function `compute_totals` of the file `funcs/totals.py` in the method's folder. The [method tree](../../method-trees.md) is the set of files the method is made of, so the function travels with the method wherever the method goes.
 
-1.  **Decorator Required**: Functions must be decorated with `@pipe_func()` to be discovered and registered (since v0.12.0).
-2.  **Automatic Discovery**: Functions with the `@pipe_func()` decorator are automatically discovered from anywhere in your project when Pipelex starts up.
-3.  **Function Signature**: Eligible functions are registered using their function name (or a custom name) as the registry key.
-4.  **Execution**: When the `PipeFunc` pipe is executed, it looks up your function by name and calls it, passing in the current `working_memory`.
-5.  **Returning Data**: The function returns data, which `PipeFunc` places back into the working memory, associated with the pipe's `output` concept.
+1. **Validation** locates the module in the tree and proves, from its source and without running any Python, that the function is a top-level `def` or `async def` of the module carrying the `@pipe_func()` marker. A function it cannot find or prove is a `pipe_func_function_refused` validation error on the step's `function_name`, saying what is missing.
+2. **The step's first run** imports the module under its real name, with the tree's root first on Python's import path, so the module imports its siblings in the tree as it would anywhere else (`from funcs.rates import VAT_RATE`). The imported function is then checked against the calling convention and the step's output.
+3. **Each run** calls the function with the current `working_memory`, and stores what it returns as the step's output.
 
-## Function Eligibility Requirements
+Nothing is discovered or imported when Pipelex starts: a module's top-level code runs when a step that names one of its functions first runs.
 
-For a function to be automatically registered and available to `PipeFunc`, it **must** meet all of the following criteria:
+## Writing a function
 
-!!! warning "Function Eligibility Requirements"
+A function a `PipeFunc` step can call:
 
-- **Must be decorated with** `@pipe_func()` (required since v0.12.0)
-- **Can be async or sync**: `async def` functions are awaited directly; plain `def` functions run in a worker thread (via `asyncio.to_thread`) so they don't block the pipeline
-- **Must have exactly 1 parameter** named `working_memory`
-- **Parameter type must be** `WorkingMemory`
-- **Return type must be** a subclass of `StuffContent` (or a generic type like `ListContent[SomeType]`)
-- **Must be discoverable** (not in excluded directories like `.venv`, `__pycache__`, etc.)
+- **carries the `@pipe_func()` marker**, which takes no argument;
+- **is a top-level function of its module**, a `def` or an `async def` the module defines itself: a function the module imports from elsewhere, or assigns to the name, is refused;
+- **takes exactly one parameter**, named `working_memory` and typed `WorkingMemory`;
+- **returns a `StuffContent` subclass**, such as `TextContent`, a `StructuredContent` model or `ListContent[SomeType]`, matching the step's `output`: a list type for an output such as `Text[]`, the concept's own structure class otherwise.
 
-### Return values
+An `async def` function is awaited; a plain `def` function runs in a worker thread (via `asyncio.to_thread`), so it does not block the pipeline.
 
-Your Python function can return:
+Here is a method holding its Python beside its bundle:
 
--   A `StuffContent` object (e.g., `TextContent`, `ImageContent`, or a custom `StructuredContent` model).
--   A `ListContent` containing `StuffContent` objects.
-
-## How to Create a Function
-
-To make a Python function available to `PipeFunc`:
-
-1. Add the `@pipe_func()` decorator to your function
-2. Place the function anywhere in your project (it will be auto-discovered)
-3. Ensure it meets all eligibility requirements
-
-!!! warning "Module Execution During Auto-Discovery"
-    When Pipelex discovers functions with `@pipe_func()`, it imports the module containing them. **Any code at the module level (outside functions/classes) will be executed during import.** This can have unintended side effects.
-    
-    **Best practice:** Keep your `@pipe_func()` functions in dedicated modules with minimal module-level code, or ensure module-level code is safe to execute during discovery.
-
-Here is an example of an eligible function:
+```text
+invoicing/
+├── METHODS.toml
+├── invoicing.mthds
+└── funcs/
+    ├── rates.py
+    └── totals.py
+```
 
 ```python
-# in any Python file in your project (e.g., my_project/custom_functions.py)
+# invoicing/funcs/totals.py
 
-from pipelex.system.registries.func_registry import pipe_func
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.system.registries.func_registry import pipe_func
+
+from funcs.rates import VAT_RATE
 
 
-@pipe_func()  # Required decorator for auto-discovery
+@pipe_func()
 async def concatenate_texts(working_memory: WorkingMemory) -> TextContent:
-    """
-    Retrieves two text stuffs, concatenates them, and returns a new text stuff.
-    """
-    # Get data from working memory using the names from previous steps
+    """Retrieve two texts, concatenate them, and return a new text."""
     text1 = working_memory.get_stuff_as_str("text_a")
     text2 = working_memory.get_stuff_as_str("text_b")
-
-    concatenated = f"{text1} -- {text2}"
-
-    return TextContent(text=concatenated)
+    return TextContent(text=f"{text1} -- {text2} (VAT {VAT_RATE})")
 ```
 
-The function will be automatically registered with the name `concatenate_texts` (the function name) when Pipelex starts up.
+```toml
+# invoicing/invoicing.mthds
 
-### Custom Registration Name
-
-You can optionally specify a custom name for registration:
-
-```python
-@pipe_func(name="custom_concat")
-async def concatenate_texts(working_memory: WorkingMemory) -> TextContent:
-    # Implementation...
-    pass
+[pipe.combine_them]
+type          = "PipeFunc"
+description   = "Combine two text inputs using a custom Python function"
+inputs        = { text_a = "Text", text_b = "Text" }
+output        = "Text"
+function_name = "funcs.totals.concatenate_texts"
 ```
 
-Then use `function_name = "custom_concat"` in your `.mthds` file.
+A folder of modules, such as `funcs/` here, is a package with or without an `__init__.py`.
 
-### Function names share one flat name space
+## The function name
 
-Registration names are unqualified — there is no module or package prefix — and every library directory Pipelex scans registers into the same process-wide registry. Two functions registered under the same name is therefore an error: Pipelex raises a `FuncRegistryError` naming both origins instead of letting scan order decide which one your `.mthds` files actually call.
+`function_name` is a dotted import path: the module's path from the tree's root, its folders and its file name without `.py` joined by dots, then the function's name. A `function_name` holding no dot names no module, and is refused as the bundle is read, the message naming the migration command below.
 
-Registering the *same* function again — a directory scanned twice, a module reached by two paths — is a no-op, so overlapping scan roots are fine.
+Where the path starts depends on how the bundle reaches Pipelex:
 
-If you hit a collision, give one of the two functions a distinct registration name:
+- **A bundle of a method tree**, a method folder, a `.mthds` file in it, a library directory or a dependency package, imports from the root of its tree: the folder holding the method's `METHODS.toml`, or the folder handed over when there is none (see [Where a tree is rooted](../../method-trees.md#where-a-tree-is-rooted)).
+- **A bundle passed as content**, with no file of its own, imports locally from Python's own import path, such as a module of your project or an installed package. On a sandbox-hosted deployment, it imports from the root of the Python submitted with it: the files of each library directory loaded beside it whose own tree holds no bundle, such as the directory a server writes a request's Python into. A library directory holding a bundle submits nothing, since its steps import from their own tree, and two directories submitting different files at one path refuse the load, since the sandbox writes them all under one root.
 
-```python
-@pipe_func(name="invoices_summarize")
-async def summarize(working_memory: WorkingMemory) -> TextContent:
-    # Implementation...
-    pass
+## One method's Python in a process
+
+A local run imports a method's modules under their real names, with the tree's root first on the import path, so Pipelex keeps the methods of one process from stepping on each other:
+
+- **No shadowing.** A top-level module of the tree named like a standard-library module, such as `json.py`, or like a module importable outside the tree, such as an installed package, is refused as the method is validated, the message naming the module, the file and what it would shadow. On a sandbox-hosted deployment, where a function runs in a sandbox holding its own packages, only a standard-library name is refused. The one exception is a `structures` module, which the runtime generates from a method's concepts (`pipelex build structures`), so the method's own copy of it is the intended one.
+- **One tree's Python at a time.** A run holds the Python of the tree it imports from until its library is torn down, and every run of that same tree shares the hold. A step of another tree that would load its Python while it is held is refused, the message naming both trees by a bundle each holds and the start of its digest, never by a path on the machine: two trees could define modules of the same name, and one process has one module of each name. So a run whose own steps and a dependency package's steps both call Python is refused locally.
+- **Eviction before the next tree.** Once no run holds a tree, its root leaves the import path, and the next tree to load its Python first removes every module imported from a file of the earlier tree, however it was imported, a helper your structure module imported while the method loaded included, so a process running several methods one after the other never runs one method's module for another's step. A module of a file the tree keeps out, such as one of a virtual environment inside the folder, is not the tree's and stays.
+
+## The local import guard
+
+While a run holds a tree, Pipelex serves the imports of every module under the tree's root:
+
+- **A file the tree keeps out cannot be imported**, such as a `.gitignore`d module or a module of a virtual environment inside the folder: the import is refused with the membership rule that excluded it. What runs locally is what a sandbox would receive.
+- **No bytecode is written into the tree**: no `__pycache__` folder appears beside your modules, so a method's files, and its tree digest, stay as they were written.
+
+The guard covers imports only. A file your function reads with `open()` is not checked locally: read the files your method ships by their path in the tree, and keep in mind that a sandbox receives only the tree's files.
+
+## Sandbox-hosted execution
+
+On a sandbox-hosted deployment, the runner never imports a method's Python. Validation proves each function's form from the method's files, and each call of a `PipeFunc` step runs in a sandbox that receives every file of the step's tree except its `.mthds` files, written at their paths in the tree, the tree's root first on the import path. The runner reads those files once, as the method loads, and only for a tree holding a `PipeFunc` step, so a run goes on after the folder it read them from is gone. A structure class is refused wherever the load finds one, in the library directory's own tree or in a package or repository nested in it. The sandbox generates the `structures` module from the method's concepts, so a function can `from structures import <domain>__<Concept>` without the method shipping a copy.
+
+## Migrating flat function names
+
+A `PipeFunc` step used to name its function by a flat name, the key under which a process-wide function registry held every `@pipe_func` function of every scanned directory, and `@pipe_func(name="...")` gave a function another key. The registry is retired: a flat name is refused, and `@pipe_func()` takes no argument. One command rewrites a method:
+
+```bash
+pipelex fix function-names invoicing/
+pipelex fix function-names invoicing/ --dry-run
 ```
 
-Prefixing names with the domain they serve is the simplest way to keep them distinct as a project grows.
+For each `PipeFunc` step whose `function_name` holds no dot, it finds the marked function of the tree that the flat name registered and writes its import path, then drops the argument of every `@pipe_func(name=...)` marker. It imports nothing and keeps every comment and alignment of your files. A flat name that no module of the tree registers, or that two register, is left as it is and reported with the markers registering it, a marker whose name is not a string literal is reported too, and the command exits `1`. See [Fix Commands](../../../tools/cli/fix.md#fix-function-names).
 
 ## Declaring the packages your functions need
 
@@ -114,30 +119,17 @@ When your functions import a package beyond Pipelex and the standard library, su
 
 ## Configuration
 
-Once the function is registered, you can use it in your `.mthds` file.
-
 ### MTHDS Parameters
 
-| Parameter       | Type   | Description                                                                 | Required |
-| --------------- | ------ | --------------------------------------------------------------------------- | -------- |
-| `type`          | string | The type of the pipe: `PipeFunc`                                                                          | Yes      |
-| `description`   | string | A description of the function operation.                                                                   | Yes      |
-| `function_name` | string | The unique name used to register the Python function (e.g., "combine_two_texts"). | Yes      |
-| `output`        | string | The concept to associate with the function's return value.                  | Yes      |
-
-### Example
-
-This MTHDS snippet shows how to use the `concatenate_texts` function defined above. It assumes two previous pipes have produced outputs named `text_a` and `text_b`.
-
-```toml
-[pipe.combine_them]
-type = "PipeFunc"
-description = "Combine two text inputs using a custom Python function"
-function_name = "concatenate_texts"
-output = "ConcatenatedText"
-```
+| Parameter       | Type   | Description                                                                                                      | Required |
+| --------------- | ------ | ---------------------------------------------------------------------------------------------------------------- | -------- |
+| `type`          | string | The type of the pipe: `PipeFunc`                                                                                 | Yes      |
+| `description`   | string | A description of the function operation.                                                                         | Yes      |
+| `function_name` | string | The function's import path from the root of the method tree, such as `"funcs.totals.compute_totals"`.          | Yes      |
+| `output`        | string | The concept to associate with the function's return value.                                                       | Yes      |
 
 ## Related Documentation
 
+- [Method Trees](../../method-trees.md) - The files a method is made of, and where its tree is rooted
 - [Advanced Customizations](../../../advanced/index.md) - Extend Pipelex with custom logic
 - [Working Memory](../working-memory.md) - How pipes access and share data

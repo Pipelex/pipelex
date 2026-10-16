@@ -36,7 +36,7 @@ type = "PipeFunc"
 description = "Crunch numbers in caller code"
 inputs = { data = "Text" }
 output = "Text"
-function_name = "crunch"
+function_name = "crunch_funcs.pipe_func.crunch"
 """
 
 _PIPE_FUNC_PY = """\
@@ -45,7 +45,7 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.system.registries.func_registry import pipe_func
 
 
-@pipe_func(name="crunch")
+@pipe_func()
 async def crunch(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text="crunched")
 """
@@ -137,7 +137,7 @@ class TestBundleStructuresRefusal:
         orchestrator = _RecordingOrchestrator()
         client = _build_client(mocker, orchestrator=orchestrator)
 
-        files = {"main.mthds": _PIPE_FUNC_MTHDS, "funcs/pipe_func.py": _PIPE_FUNC_PY}
+        files = {"main.mthds": _PIPE_FUNC_MTHDS, "crunch_funcs/pipe_func.py": _PIPE_FUNC_PY}
         response = client.post("/v1/start", json={"files": files, "inputs": {"data": "1,2,3"}})
 
         assert response.status_code in {200, 202}, response.text

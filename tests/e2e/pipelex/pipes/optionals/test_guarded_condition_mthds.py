@@ -12,7 +12,6 @@ from pipelex.core.memory.absence import AbsenceKind
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.pipeline_response import RunState
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
-from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
 from pipelex.validation_error_types import PipeValidationErrorType
 
 _FIXTURE_DIR = Path(__file__).parent / "guarded_condition"
@@ -57,12 +56,6 @@ class TestGuardedConditionExpression:
             """expression_template = "{{ flag.text }}\"""",
         )
         assert unguarded_text != guarded_text
-
-        # Register the bundle's @pipe_func impls so PipeFunc construction succeeds and the load-time
-        # guard lint — not a missing-function error — is what rejects the unguarded variant. Without
-        # this, the raw-content load path never walks a folder to register funcs, so construction
-        # fails first and the failure "passes" for the wrong reason (and only on some xdist workers).
-        FuncRegistryUtils.register_funcs_in_folder(folder_path=_FIXTURE_DIR)
 
         runner = PipelexMTHDSProtocol()
         with pytest.raises(ValidateBundleError) as exc_info:
