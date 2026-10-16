@@ -2,7 +2,8 @@
 
 An HTML template names the files beside it in its method tree by relative URLs: an image's `src`, a stylesheet's `href`,
 and the fonts and images a stylesheet names with `url()`. Each is a file reference in URL context, resolved against the
-tree path of the file that holds it (`pipelex.core.method_trees.url_references`). An engine resolves a relative URL as
+tree path of the file that holds it, by `mthds-python`'s `resolve_reference_in_paths` over the tree's listing, which
+resolves one written in no file of the tree from the root. An engine resolves a relative URL as
 HTML and CSS do, by joining it to the URL of the file that holds it, which is how a stylesheet's own URLs resolve against
 the stylesheet rather than the template. So the print hands the engine a base URL standing for the template's place in
 its tree, `RenderJob.base_url`, under `METHOD_FILE_URL_PREFIX`, whose host no network serves. The engine reads a URL it
@@ -15,7 +16,12 @@ removes each `..` it can, so a URL that climbed out lands beside that segment, o
 tree, and so is a root-relative URL such as `/logo.png`, which lands there too. Below the digest's segment, the URL's path
 is a path from the root, resolved by the standard's steps from the root: each segment percent-decoded, the result in NFC,
 a `..` the join left, such as a percent-encoded one, resolved lexically, the result checked to be a tree path and looked
-up. A relative URL an engine hands as written, without joining it, is resolved against the holder by the same steps.
+up. The steps first ask whether a URL is a file reference at all, and a path below the root that is empty names the root,
+while one that reads as a scheme (`a:b.png`) or an authority (`//x`) is refused here as malformed, as the standard's form
+check refuses a path naming a scheme or starting with `/`: what an engine joined is a path whatever it reads as, never a
+URL to leave as written. A relative URL an engine hands as written, without joining it, is resolved against the holder by
+the same steps. Either way, a refusal is worded here from its code, naming the template, rather than in `mthds-python`'s
+words, which name the holder by its tree path alone.
 
 An engine's join applies RFC 3986's removal of dot segments, which parts from the standard's lexical resolution in a few
 corner spellings: Python's `urljoin`, which WeasyPrint uses, drops an empty segment, so `a//b` names `a/b` where the
@@ -40,12 +46,13 @@ from urllib.parse import quote
 
 from mthds.method_tree.digest import DIGEST_PREFIX
 from mthds.method_tree.exceptions import MethodTreeRefusedError, TreeRefusal
-from mthds.method_tree.references import ROOT_RESOLVED, is_file_reference
+from mthds.method_tree.references import ROOT_RESOLVED, is_file_reference, resolve_reference_in_paths, url_path_of
+from mthds.method_tree.tree_path import tree_path_violation
 from mthds.method_tree.vocabulary import ReferenceContext, TreeRefusalCode
 from pydantic import BaseModel, ConfigDict, Field
 
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.cogt.doc_gen.render_job import METHOD_FILE_URL_PREFIX, is_method_file_url
-from pipelex.core.method_trees.url_references import resolve_url_path, resolve_url_reference, url_path_of
 
 #: The suffixes of the files a document reads from its method tree, compared without regard to case: images, stylesheets
 #: and fonts, the kinds a printed page is made of.
@@ -147,49 +154,79 @@ class RelativeUrlBase(BaseModel):
         Raises:
             MethodTreeRefusedError: The URL names no file of the tree; `refusal.code` is the standard's code for why,
                 and the message says so naming the template.
+            PipelexUnexpectedError: The listing does not hold the holder, so it is not the listing of the template's tree.
         """
         if is_method_file_url(url=url):
             return self._tree_path_of_joined(url=url, tree_paths=tree_paths)
-        return resolve_url_reference(
-            reference=url, holder=self.holder, tree_paths=tree_paths, holder_label=self.template_label, is_one_file_tree=self.is_one_file_tree
-        )
+        if self.holder is not None and self.holder not in tree_paths:
+            msg = f"The listing a relative URL of {self.template_label} was resolved in does not hold '{self.holder}', the template's own file."
+            raise PipelexUnexpectedError(msg)
+        try:
+            return resolve_reference_in_paths(
+                url, holder=self.holder, context=ReferenceContext.URL, tree_paths=tree_paths, is_one_file_tree=self.is_one_file_tree
+            )
+        except MethodTreeRefusedError as exc:
+            msg = self._refusal_message(refusal=exc.refusal, subject=f"The relative URL '{url}'")
+            raise MethodTreeRefusedError(msg, refusal=exc.refusal) from exc
 
     def _tree_path_of_joined(self, *, url: str, tree_paths: AbstractSet[str]) -> str:
         """The tree path a URL an engine joined under the prefix names, resolved from the root below the tree's segment."""
-        tree_segment, _separator, below_root = url_path_of(reference=url[len(METHOD_FILE_URL_PREFIX) :]).partition("/")
+        tree_segment, _separator, below_root = url_path_of(url[len(METHOD_FILE_URL_PREFIX) :]).partition("/")
         if tree_segment.lower() != self._tree_segment:
             # A join removes each `..` it can, so a URL that climbed above the root, or one written from it, lands
             # outside the tree's own segment.
             msg = f"Its relative URL climbs above the root of the method tree of {self.template_label}, or starts with '/'."
             raise MethodTreeRefusedError(msg, refusal=TreeRefusal(code=TreeRefusalCode.REFERENCE_LEAVES_TREE, names=[below_root]))
         try:
-            return resolve_url_path(
-                url_path=below_root, reference=below_root, holder=None, tree_paths=tree_paths, is_one_file_tree=self.is_one_file_tree
+            tree_path = resolve_reference_in_paths(
+                below_root, holder=None, context=ReferenceContext.URL, tree_paths=tree_paths, is_one_file_tree=self.is_one_file_tree
             )
         except MethodTreeRefusedError as exc:
-            msg = self._joined_refusal_message(refusal=exc.refusal)
+            msg = self._refusal_message(refusal=exc.refusal, subject="Its relative URL")
             raise MethodTreeRefusedError(msg, refusal=exc.refusal) from exc
+        if tree_path is not None:
+            return tree_path
+        # The steps leave as written a URL that is no file reference, but what an engine joined below the tree's segment
+        # is a path from the root whatever it reads as, so it is refused here: an empty one names the root, and one that
+        # reads as a scheme or an authority is malformed, as the form check refuses a path naming a scheme or starting with '/'.
+        refusal: TreeRefusal
+        if below_root:
+            refusal = TreeRefusal(code=TreeRefusalCode.REFERENCE_INVALID, names=[below_root])
+        else:
+            refusal = TreeRefusal(code=TreeRefusalCode.REFERENCE_NOT_IN_TREE, names=[below_root], resolved=ROOT_RESOLVED)
+        raise MethodTreeRefusedError(self._refusal_message(refusal=refusal, subject="Its relative URL"), refusal=refusal)
 
-    def _joined_refusal_message(self, *, refusal: TreeRefusal) -> str:
-        """Why a URL an engine joined names no file of the tree, naming what it resolved to, since the URL as written is the engine's."""
+    def _refusal_message(self, *, refusal: TreeRefusal, subject: str) -> str:
+        """Why a relative URL of the document names no file of the tree, worded from the refusal's code, naming the template.
+
+        `mthds-python`'s own message names the holder by its tree path alone, and a URL an engine joined by the engine's
+        spelling, so the message is written here, naming what the URL resolved to where the code records it.
+
+        Args:
+            refusal: The refusal, as the standard's steps recorded it.
+            subject: How the message names the URL: as written, or as "Its relative URL" for one an engine joined.
+        """
         tree_label = f"the method tree of {self.template_label}"
         match refusal.code:
             case TreeRefusalCode.REFERENCE_INVALID:
                 return (
-                    f"Its relative URL is malformed in {tree_label}: its path holds a backslash, a '%' not followed by two "
-                    "hexadecimal digits, or a percent-escape that decodes to a '/', a backslash, a control character or bytes that are not UTF-8."
+                    f"{subject} is malformed in {tree_label}: its path names a scheme or starts with '/', or it holds a backslash, "
+                    "a '%' not followed by two hexadecimal digits, or a percent-escape that decodes to a '/', a backslash, "
+                    "a control character or bytes that are not UTF-8."
                 )
             case TreeRefusalCode.REFERENCE_LEAVES_TREE:
-                return f"Its relative URL climbs above the root of {tree_label}."
+                return f"{subject} climbs above the root of {tree_label}."
             case TreeRefusalCode.REFERENCE_NOT_A_TREE_PATH:
-                return f"Its relative URL resolves to '{refusal.resolved}', which cannot name a file of {tree_label}."
+                violation = tree_path_violation(refusal.resolved) if refusal.resolved is not None else None
+                reason = f": {violation}" if violation is not None else ""
+                return f"{subject} resolves to '{refusal.resolved}', which cannot name a file of {tree_label}{reason}."
             case TreeRefusalCode.REFERENCE_NOT_IN_TREE:
                 if refusal.resolved == ROOT_RESOLVED:
-                    return f"Its relative URL resolves to the root of {tree_label}, which is not a file."
-                return f"Its relative URL resolves to '{refusal.resolved}', which is not a file of {tree_label}."
+                    return f"{subject} resolves to the root of {tree_label}, which is not a file."
+                return f"{subject} resolves to '{refusal.resolved}', which is not a file of {tree_label}."
             case TreeRefusalCode.REFERENCE_IN_ONE_FILE_TREE:
                 return (
-                    f"Its relative URL names a file beside the bundle of {self.template_label}, but the bundle was named alone with "
+                    f"{subject} names a file beside the bundle of {self.template_label}, but the bundle was named alone with "
                     "no METHODS.toml at or above it, so its tree holds that one file. Hand over the method's directory instead."
                 )
             case (
@@ -210,5 +247,5 @@ class RelativeUrlBase(BaseModel):
                 | TreeRefusalCode.MODULE_NOT_IN_TREE
                 | TreeRefusalCode.MODULE_AMBIGUOUS
             ):
-                # Resolving a URL's path refuses it only by the reference codes above.
-                return f"Its relative URL names no file of {tree_label}."
+                # Resolving a reference refuses it only by the reference codes above.
+                return f"{subject} names no file of {tree_label}."

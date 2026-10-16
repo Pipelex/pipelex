@@ -6641,6 +6641,10 @@ components:
           - type: string
           - type: 'null'
           title: Runner Version
+        blob_store:
+          type: boolean
+          title: Blob Store
+          default: false
         implementation:
           type: string
           title: Implementation
@@ -6652,10 +6656,6 @@ components:
           - type: string
           - type: 'null'
           title: Runtime Version
-        blob_store:
-          type: boolean
-          title: Blob Store
-          default: false
       additionalProperties: true
       type: object
       required:

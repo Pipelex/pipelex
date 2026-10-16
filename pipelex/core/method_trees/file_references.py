@@ -9,9 +9,10 @@ outside the tree is ever opened.
 A bundle loaded from a content string reads only the files submitted with it, so the parser, told so by its caller,
 validates its blueprint under that origin (`BundleValidationContext`), and a reference none of those files could be keyed
 by is refused there, as a blueprint item at the step that names it. Such bundles sit at the root of the tree of the files
-submitted with them, so their references resolve from the root, and the result must be one of those files. Such a
-reference is first spelled the one way the submitted files are keyed, its `.` segments and repeated slashes collapsed,
-so `templates//invoice.docx` names the file submitted as `templates/invoice.docx`.
+submitted with them without being a file of it, so their references resolve from the root, by `mthds-python`'s
+`resolve_reference_in_paths` over those files' paths, and the result must be one of those files. Such a reference is
+first spelled the one way the submitted files are keyed, its `.` segments and repeated slashes collapsed, so
+`templates//invoice.docx` names the file submitted as `templates/invoice.docx`.
 
 A pipe built from a library crate, which names its bundle's tree by digest and carries no listing, resolves a reference
 lexically and reads nothing: the host that assembled the crate resolved it in the tree and checked the file was there.
@@ -20,7 +21,7 @@ lexically and reads nothing: the host that assembled the crate resolved it in th
 from enum import StrEnum
 
 from mthds.method_tree.exceptions import MethodTreeRefusedError, TreeRefusal
-from mthds.method_tree.references import ROOT_RESOLVED, lexical_join, resolve_reference
+from mthds.method_tree.references import ROOT_RESOLVED, lexical_join, resolve_reference, resolve_reference_in_paths
 from mthds.method_tree.tree_path import nfc, tree_path_violation
 from mthds.method_tree.vocabulary import ReferenceContext, TreeRefusalCode
 from pydantic import BaseModel, ConfigDict, Field
@@ -30,10 +31,6 @@ from pipelex.core.bundle_resources.bundle_resource import canonical_resource_pat
 from pipelex.core.method_trees.tree_bundle import TreeBundle, TreeBundleRef
 
 ONE_FILE_TREE_ADVICE = "Run the method's folder instead, or add a METHODS.toml to it."
-
-#: The holder a reference is joined to when it is written in bundles at the root of their tree, which they are no file of:
-#: any lone segment, since a join keeps the holder's directories and drops its name.
-_ROOT_HOLDER = "."
 
 
 class BundleFileOrigin(StrEnum):
@@ -117,22 +114,24 @@ def file_reference_form_refusal(*, reference: str) -> str | None:
 def resolve_bundle_file_reference(*, reference: str, tree_bundle: TreeBundle) -> str:
     """The tree path of the file a bundle field names, resolved against the bundle's tree path in its method tree.
 
-    Bundles at the root of the tree of the files submitted with them resolve a reference from the root, and the result
-    must be one of those files.
+    Bundles at the root of the tree of the files submitted with them resolve a reference from the root, in the set of
+    those files' paths, the reference first spelled the one way they are keyed.
 
     Raises:
         MethodTreeRefusedError: When the reference is refused; `refusal.code` says at which step of the resolution,
             and `reference_refusal_reason` words it for the bundle's author.
     """
+    resolved: str | None
     if tree_bundle.tree_path is None:
-        resolved_from_root = _join_lexically(reference=reference, holder=None)
-        if resolved_from_root not in tree_bundle.tree.members:
-            msg = f"The file reference '{reference}' resolves to '{resolved_from_root}', which is not one of the files submitted with the bundle."
-            raise MethodTreeRefusedError(
-                msg, refusal=TreeRefusal(code=TreeRefusalCode.REFERENCE_NOT_IN_TREE, names=[reference], resolved=resolved_from_root)
-            )
-        return resolved_from_root
-    resolved = resolve_reference(reference, holder=tree_bundle.tree_path, context=ReferenceContext.PATH, tree=tree_bundle.tree)
+        resolved = resolve_reference_in_paths(
+            _keyed_spelling(reference=reference),
+            holder=None,
+            context=ReferenceContext.PATH,
+            tree_paths=tree_bundle.tree.members,
+            is_one_file_tree=tree_bundle.tree.is_one_file,
+        )
+    else:
+        resolved = resolve_reference(reference, holder=tree_bundle.tree_path, context=ReferenceContext.PATH, tree=tree_bundle.tree)
     if resolved is None:
         msg = f"A reference in path context is always a file reference, yet '{reference}' was resolved as none."
         raise PipelexUnexpectedError(msg)
@@ -151,12 +150,20 @@ def resolve_crate_file_reference(*, reference: str, tree_bundle_ref: TreeBundleR
     return _join_lexically(reference=reference, holder=tree_bundle_ref.tree_path)
 
 
+def _keyed_spelling(*, reference: str) -> str:
+    """A reference written in bundles at the root of the files submitted with them, spelled as those files are keyed.
+
+    Blueprint validation accepts a repeated slash or a `.` segment there (`canonical_resource_path_or_none`), which the
+    standard's join would otherwise keep as an empty segment; a reference with no such spelling is left as written.
+    """
+    return canonical_resource_path_or_none(path=reference) or reference
+
+
 def _join_lexically(*, reference: str, holder: str | None) -> str:
     """The tree path `reference` names from `holder`, or from the root when None, by the standard's join alone.
 
     From the root, the reference names a file submitted beside bundles loaded from content strings, so it is first spelled
-    as those files are keyed (`canonical_resource_path_or_none`): blueprint validation accepts a repeated slash or a `.`
-    segment there, which the standard's join would otherwise keep as an empty segment.
+    as those files are keyed (`_keyed_spelling`).
 
     Raises:
         MethodTreeRefusedError: The reference's form names no file, it climbs above the root, or it names the root.
@@ -165,11 +172,8 @@ def _join_lexically(*, reference: str, holder: str | None) -> str:
     if form_refusal is not None:
         msg = f"The file reference '{reference}' cannot name a file of a method tree: {form_refusal}."
         raise MethodTreeRefusedError(msg, refusal=TreeRefusal(code=TreeRefusalCode.REFERENCE_INVALID, names=[reference]))
-    if holder is None:
-        joined = canonical_resource_path_or_none(path=reference) or reference
-        segments = lexical_join(holder=_ROOT_HOLDER, path=nfc(joined))
-    else:
-        segments = lexical_join(holder=holder, path=nfc(reference))
+    spelled = _keyed_spelling(reference=reference) if holder is None else reference
+    segments = lexical_join(holder=holder, path=nfc(spelled))
     if segments is None:
         msg = f"The file reference '{reference}' climbs above the root of its method tree."
         raise MethodTreeRefusedError(msg, refusal=TreeRefusal(code=TreeRefusalCode.REFERENCE_LEAVES_TREE, names=[reference]))

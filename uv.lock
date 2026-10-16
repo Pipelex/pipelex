@@ -25,6 +25,7 @@ members = [
     "pipelex",
     "pipelex-api",
 ]
+overrides = [{ name = "mthds", specifier = "==0.23.0" }]
 
 [[package]]
 name = "accelerate"
@@ -2754,7 +2755,7 @@ wheels = [
 
 [[package]]
 name = "mthds"
-version = "0.22.0"
+version = "0.23.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -2763,9 +2764,9 @@ dependencies = [
     { name = "tomlkit" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d7/e7/d765bd459f47d7c1773c1af847eefc6e1e1cc5e7e7b9266eb99d54945375/mthds-0.22.0.tar.gz", hash = "sha256:0ece0af23f2e412d3fdfa08c2b07881a837292b69c2df721137bf1b319916d1b", size = 365343, upload-time = "2026-10-15T22:04:58.59Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/51/c2/2d70bc3f90c8f3dac25a416992a6e68f8efd7c2af05871c9ab091661ab22/mthds-0.23.0.tar.gz", hash = "sha256:a683c9cee742b2e2164c9abac0c934886adf72e48fff4953fb65e5c34ccdfeb2", size = 394385, upload-time = "2026-10-16T22:50:29.605Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ac/f3/2ce468930b48bac1f750a97426f141cded85702c83b02ba3801b11fdefcd/mthds-0.22.0-py3-none-any.whl", hash = "sha256:bed9d09dac9c76c07cdb26675bbcf4eca79c4b926bfff8c0c02bdaa7b643e2e7", size = 149743, upload-time = "2026-10-15T22:04:56.956Z" },
+    { url = "https://files.pythonhosted.org/packages/e9/33/d2eb995332b68e256298a3278c20b4460e2e1f2289fa487bd3839a958311/mthds-0.23.0-py3-none-any.whl", hash = "sha256:1f0212d3d673829341b30ca16b0038b67f65aa41b979f30539f8d664c9673ec4", size = 159544, upload-time = "2026-10-16T22:50:27.857Z" },
 ]
 
 [[package]]

@@ -530,6 +530,11 @@ banned-module-level-imports = ["rich"]
 
 [tool.uv]
 required-version = ">=0.7.2"
+# A branch-only stopgap, never to merge: it resolves mthds 0.23.0 over both the `mthds==0.22.0` pin above and the one
+# pipelex-sdk 0.45.0 carries, so this branch can adopt EmptyMethodTreeError and resolve_reference_in_paths before any
+# pipelex-sdk release pins mthds 0.23.0. It reaches no published wheel. Once such a pipelex-sdk release is out, delete
+# this override and move the `mthds` and `pipelex-sdk` pins together, as the bump-mthds skill does.
+override-dependencies = ["mthds==0.23.0"]
 
 # The Pipelex API server lives in `api/` as a second workspace member, the `pipelex-api` distribution.
 # It depends on this package through the workspace, so it always runs the library of the same commit,

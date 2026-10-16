@@ -19,12 +19,11 @@ from typing import NamedTuple
 
 from mthds.method_tree.exceptions import MethodTreeRefusedError
 from mthds.method_tree.models import MethodTree
-from mthds.method_tree.references import is_file_reference, resolve_reference
+from mthds.method_tree.references import resolve_reference, resolve_reference_in_paths
 from mthds.method_tree.vocabulary import ReferenceContext
 from typing_extensions import override
 
 from pipelex.cogt.doc_gen.method_file_urls import template_asset_refusal
-from pipelex.core.method_trees.url_references import resolve_url_reference
 
 #: A Jinja comment, which renders as nothing.
 _JINJA_COMMENT = re.compile(r"\{#.*?#\}", re.DOTALL)
@@ -149,15 +148,17 @@ def find_template_asset_refusal(
 
 
 def _resolve(*, reference: str, holder: str | None, tree: MethodTree) -> str | None:
-    """The tree path a URL names from its holder, by `mthds-python` when the holder is a file of the tree.
+    """The tree path a URL names from its holder, or from the root when None, by `mthds-python`; None for no file reference.
 
-    Its refusals then name the membership rule that keeps a file out, and the one-file tree of a bundle named alone.
+    From a holder, a file of the tree, a refusal names the membership rule that keeps a file out, and the one-file tree of
+    a bundle named alone. Bundles parsed from content strings sit at the root of the tree of the files submitted with
+    them without being a file of it, so their URLs resolve from the root, in the tree's paths.
     """
-    if not is_file_reference(reference, context=ReferenceContext.URL):
-        return None
     if holder is not None:
         return resolve_reference(reference, holder=holder, context=ReferenceContext.URL, tree=tree)
-    return resolve_url_reference(reference=reference, holder=None, tree_paths=tree.members, is_one_file_tree=tree.is_one_file)
+    return resolve_reference_in_paths(
+        reference, holder=None, context=ReferenceContext.URL, tree_paths=tree.members, is_one_file_tree=tree.is_one_file
+    )
 
 
 def _stylesheet_text(*, data: bytes | None) -> str | None:

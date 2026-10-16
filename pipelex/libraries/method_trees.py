@@ -13,7 +13,9 @@ tree of its own, so every method under it loads as it did before trees, and each
 
 A package or repository nested in a library directory that holds no `.mthds` file is skipped before it is listed, so
 a nested checkout with nothing to load, a submodule say, never fails the load for a file it holds. A library directory
-whose own tree is empty, one holding nothing but nested methods, still has its nested methods found and loaded.
+whose own tree is empty, one holding nothing but nested methods, still has its nested methods found and loaded: the
+lister's `EmptyMethodTreeError` carries what its listing kept out, and the nested trees are read from it exactly as
+they are from a tree that holds a file, so this module never walks a directory itself.
 
 Each tree is listed under `[interpreter.method_tree_limits]`, this machine's own limits, read once per load: the lister
 stops before hashing any file once a tree passes one, so a directory handed over by mistake is refused in moments.
@@ -22,29 +24,17 @@ A directory a host wrote a tree out as, and holds in `WRITTEN_METHOD_TREES`, is 
 the tree as written, so the membership rule is not applied twice (`pipelex.libraries.written_trees`).
 """
 
-from collections.abc import Generator, Iterable
+from collections.abc import Generator, Iterable, Mapping
 from contextlib import contextmanager
 from pathlib import Path
 from typing import NamedTuple
 
-from mthds.method_tree.discovery import (
-    BUNDLE_SUFFIX,
-    DEFAULT_DIRECTORY_NAMES,
-    GITIGNORE_NAME,
-    DirectoryEntry,
-    find_manifest_directory,
-    holds_git_entry,
-    holds_manifest,
-    holds_venv_marker,
-    kind_of_exact_name,
-    read_directory,
-)
-from mthds.method_tree.exceptions import MethodTreeRefusedError, TreeLimitError, TreeSourceError
-from mthds.method_tree.gitignore import PatternList
+from mthds.method_tree.discovery import BUNDLE_SUFFIX, DEFAULT_DIRECTORY_NAMES, find_manifest_directory, holds_venv_marker, read_directory
+from mthds.method_tree.exceptions import EmptyMethodTreeError, MethodTreeRefusedError, TreeLimitError, TreeSourceError
 from mthds.method_tree.lister import list_method_tree, list_method_tree_at_root
-from mthds.method_tree.models import MethodTree, TreeLimits
+from mthds.method_tree.models import MethodTree, TreeExclusion, TreeLimits
 from mthds.method_tree.tree_path import nfc
-from mthds.method_tree.vocabulary import ExclusionRule, TreeRefusalCode
+from mthds.method_tree.vocabulary import ExclusionRule
 
 from pipelex import log
 from pipelex.core.method_trees.method_file_store import HeldFile
@@ -174,35 +164,6 @@ def tree_bundle_of_lone_file(*, bundle_file: Path, limits: TreeLimits | None = N
     return TreeBundle(tree=tree, tree_path=tree.entry)
 
 
-def _is_empty_tree(*, refusal_error: MethodTreeRefusedError) -> bool:
-    match refusal_error.refusal.code:
-        case TreeRefusalCode.EMPTY_TREE:
-            return True
-        case (
-            TreeRefusalCode.SYMBOLIC_LINK
-            | TreeRefusalCode.SPECIAL_FILE
-            | TreeRefusalCode.INVALID_TREE_PATH
-            | TreeRefusalCode.NORMALIZATION_COLLISION
-            | TreeRefusalCode.PATH_COLLISION
-            | TreeRefusalCode.LONE_FILE_EXCLUDED
-            | TreeRefusalCode.GITIGNORE_NOT_UTF8
-            | TreeRefusalCode.DUPLICATE_KEY
-            | TreeRefusalCode.EXCLUDED_NAME
-            | TreeRefusalCode.MALFORMED_ENTRY
-            | TreeRefusalCode.MISSING_BLOB
-            | TreeRefusalCode.REFERENCE_INVALID
-            | TreeRefusalCode.REFERENCE_LEAVES_TREE
-            | TreeRefusalCode.REFERENCE_NOT_A_TREE_PATH
-            | TreeRefusalCode.REFERENCE_NOT_IN_TREE
-            | TreeRefusalCode.REFERENCE_IN_ONE_FILE_TREE
-            | TreeRefusalCode.FUNCTION_NAME_WITHOUT_MODULE
-            | TreeRefusalCode.FUNCTION_NAME_INVALID_SEGMENT
-            | TreeRefusalCode.MODULE_NOT_IN_TREE
-            | TreeRefusalCode.MODULE_AMBIGUOUS
-        ):
-            return False
-
-
 def _holds_a_tree_of_its_own(*, rule: ExclusionRule) -> bool:
     """Whether a directory a library directory's listing kept out by `rule` is a tree of its own, loaded beside it."""
     match rule:
@@ -245,78 +206,6 @@ def _holds_a_bundle_name(*, directory: Path) -> bool:
     return False
 
 
-def _with_gitignore(
-    *, location: Path, tree_path: str, entries: list[DirectoryEntry], pattern_lists: tuple[PatternList, ...]
-) -> tuple[PatternList, ...]:
-    """The pattern lists that apply to a directory's entries: its parents', and its own `.gitignore` file's when it holds one."""
-    kind = kind_of_exact_name(entries, GITIGNORE_NAME)
-    if kind is None or not kind.is_regular_file:
-        return pattern_lists
-    try:
-        pattern_list = PatternList.make_from_bytes((location / GITIGNORE_NAME).read_bytes(), base=tree_path)
-    except (OSError, UnicodeDecodeError):
-        # The listing that found this tree empty read the file; one that changed since keeps nothing out.
-        return pattern_lists
-    return (*pattern_lists, pattern_list)
-
-
-def _kept_out_by_patterns(*, tree_path: str, pattern_lists: tuple[PatternList, ...]) -> bool:
-    """Whether the `.gitignore` patterns keep a directory out, as git decides: the deepest file with a matching pattern."""
-    for pattern_list in reversed(pattern_lists):
-        matched = pattern_list.last_match(tree_path, is_dir=True)
-        if matched is not None:
-            return not matched.negative
-    return False
-
-
-def _nested_tree_roots(*, directory: Path) -> list[Path]:
-    """The roots of the packages and repositories nested in a directory whose own tree the membership rule leaves empty.
-
-    The lister refuses an empty tree without saying what it kept out, so this walks the directory as the lister does,
-    judging each directory by its name, then by its own entries, then by the `.gitignore` patterns, and descends into
-    every directory it keeps: a nested package or repository is a root, and what the rule keeps out is never entered.
-    The tree is rooted at the directory itself, since a tree rooted at a `METHODS.toml` holds that file and is never empty.
-    """
-    roots: list[Path] = []
-    pending: list[tuple[Path, str, tuple[PatternList, ...]]] = [(directory, "", ())]
-    while pending:
-        location, tree_path, parent_pattern_lists = pending.pop()
-        try:
-            entries = read_directory(location)
-        except OSError:
-            continue
-        pattern_lists = _with_gitignore(location=location, tree_path=tree_path, entries=entries, pattern_lists=parent_pattern_lists)
-        children: list[tuple[Path, str, tuple[PatternList, ...]]] = []
-        for entry in sorted(entries, key=lambda directory_entry: directory_entry.raw_name):
-            name = nfc(entry.raw_name)
-            if not entry.kind.is_directory or name.startswith(".") or name in DEFAULT_DIRECTORY_NAMES:
-                continue
-            child_location = location / entry.raw_name
-            child_tree_path = f"{tree_path}/{name}" if tree_path else name
-            try:
-                child_entries = read_directory(child_location)
-            except OSError:
-                continue
-            if holds_venv_marker(child_entries):
-                continue
-            if holds_git_entry(child_entries) or holds_manifest(child_entries):
-                roots.append(child_location)
-                continue
-            if _kept_out_by_patterns(tree_path=child_tree_path, pattern_lists=pattern_lists):
-                continue
-            children.append((child_location, child_tree_path, pattern_lists))
-        pending.extend(reversed(children))
-    return roots
-
-
-def _trees_nested_in_empty_directory(*, directory: Path, limits: TreeLimits) -> list[MethodTree]:
-    """The trees of the packages and repositories nested in a directory whose own tree is empty, and theirs."""
-    trees: list[MethodTree] = []
-    for nested_root in _nested_tree_roots(directory=directory):
-        trees.extend(_nested_library_trees(root=nested_root, limits=limits))
-    return trees
-
-
 def _nested_library_trees(*, root: Path, limits: TreeLimits) -> list[MethodTree]:
     """The tree of a package or repository nested in a library directory, then the trees nested in it, depth first.
 
@@ -331,9 +220,9 @@ def _nested_library_trees(*, root: Path, limits: TreeLimits) -> list[MethodTree]
         return []
     try:
         tree = list_method_tree_at_root(root, limits=limits)
+    except EmptyMethodTreeError as exc:
+        return _trees_nested_in_empty_tree(empty_tree_error=exc, limits=limits)
     except MethodTreeRefusedError as exc:
-        if _is_empty_tree(refusal_error=exc):
-            return _trees_nested_in_empty_directory(directory=root, limits=limits)
         raise MethodTreeLoadError(exc.message) from exc
     except TreeLimitError as exc:
         msg = f"{exc.message} {LIMITS_ADVICE}"
@@ -343,17 +232,52 @@ def _nested_library_trees(*, root: Path, limits: TreeLimits) -> list[MethodTree]
     return _library_trees(tree=tree, limits=limits)
 
 
-def _library_trees(*, tree: MethodTree, limits: TreeLimits) -> list[MethodTree]:
-    """`tree`, then the tree of each nested package and nested repository it kept out, and theirs, depth first."""
-    trees = [tree]
-    if tree.directory is None:
-        return trees
-    for tree_path, exclusion in tree.excluded_directories.items():
+def _trees_kept_out(
+    *, root: Path, excluded_directories: Mapping[str, TreeExclusion], raw_paths: Mapping[str, str], limits: TreeLimits
+) -> list[MethodTree]:
+    """The tree of each nested package and nested repository a listing rooted at `root` kept out, and theirs, depth first.
+
+    Args:
+        root: The root of the listing.
+        excluded_directories: The directories the listing pruned, by tree path, with the rule that pruned each.
+        raw_paths: The path as the file system spells it, by tree path, for an entry whose names it holds in another form than NFC.
+        limits: The limits to list each tree under.
+
+    Raises:
+        MethodTreeLoadError: A tree could not be listed.
+    """
+    trees: list[MethodTree] = []
+    for tree_path, exclusion in excluded_directories.items():
         if not _holds_a_tree_of_its_own(rule=exclusion.rule):
             continue
-        on_disk = tree.raw_paths.get(tree_path, tree_path)
-        trees.extend(_nested_library_trees(root=tree.directory.joinpath(*on_disk.split("/")), limits=limits))
+        on_disk = raw_paths.get(tree_path, tree_path)
+        trees.extend(_nested_library_trees(root=root.joinpath(*on_disk.split("/")), limits=limits))
     return trees
+
+
+def _trees_nested_in_empty_tree(*, empty_tree_error: EmptyMethodTreeError, limits: TreeLimits) -> list[MethodTree]:
+    """The trees nested in a directory whose own tree the membership rule leaves empty, read from what its listing kept out.
+
+    Raises:
+        MethodTreeLoadError: A tree could not be listed.
+    """
+    return _trees_kept_out(
+        root=empty_tree_error.root,
+        excluded_directories=empty_tree_error.excluded_directories,
+        raw_paths=empty_tree_error.raw_paths,
+        limits=limits,
+    )
+
+
+def _library_trees(*, tree: MethodTree, limits: TreeLimits) -> list[MethodTree]:
+    """`tree`, then the tree of each nested package and nested repository it kept out, and theirs, depth first.
+
+    Raises:
+        MethodTreeLoadError: A tree could not be listed.
+    """
+    if tree.directory is None:
+        return [tree]
+    return [tree, *_trees_kept_out(root=tree.directory, excluded_directories=tree.excluded_directories, raw_paths=tree.raw_paths, limits=limits)]
 
 
 def list_library_trees(*, library_dir: Path, limits: TreeLimits | None = None) -> list[MethodTree]:
@@ -378,9 +302,9 @@ def list_library_trees(*, library_dir: Path, limits: TreeLimits | None = None) -
     active_limits = limits or local_tree_limits()
     try:
         tree = list_method_tree(library_dir, limits=active_limits)
+    except EmptyMethodTreeError as exc:
+        return _trees_nested_in_empty_tree(empty_tree_error=exc, limits=active_limits)
     except MethodTreeRefusedError as exc:
-        if _is_empty_tree(refusal_error=exc):
-            return _trees_nested_in_empty_directory(directory=library_dir.resolve(), limits=active_limits)
         raise MethodTreeLoadError(exc.message) from exc
     except TreeLimitError as exc:
         msg = f"{exc.message} {LIMITS_ADVICE}"

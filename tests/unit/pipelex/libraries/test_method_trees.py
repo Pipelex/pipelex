@@ -1,3 +1,4 @@
+import unicodedata
 from pathlib import Path
 
 import pytest
@@ -142,6 +143,21 @@ class TestMethodTrees:
         }
         suite_tree = by_location[tmp_path / "checkouts" / "suite" / "pkg" / "suite.mthds"].tree
         assert suite_tree.directory == (tmp_path / "checkouts" / "suite" / "pkg").resolve()
+
+    @pytest.mark.parametrize("own_tree", ["empty", "holding_a_file"])
+    def test_a_nested_package_is_found_under_the_name_the_file_system_spells(self, tmp_path: Path, own_tree: str) -> None:
+        """A nested package's folder named in NFD is reached under that spelling, whether or not the library directory's own tree is empty."""
+        folder_name = unicodedata.normalize("NFD", "facturé")
+        if own_tree == "holding_a_file":
+            _touch(directory=tmp_path, tree_path="top.mthds")
+        _touch(directory=tmp_path, tree_path=f"{folder_name}/METHODS.toml", content=_MANIFEST)
+        _touch(directory=tmp_path, tree_path=f"{folder_name}/invoice.mthds")
+
+        bundle_files = list_library_bundle_files(library_dirs=[tmp_path])
+
+        nested = [bundle_file for bundle_file in bundle_files if bundle_file.tree_bundle.tree_path == "invoice.mthds"]
+        assert [bundle_file.path for bundle_file in nested] == [tmp_path / folder_name / "invoice.mthds"]
+        assert nested[0].tree_bundle.tree.directory == (tmp_path / folder_name).resolve()
 
     def test_a_nested_checkout_holding_no_bundle_is_skipped_before_it_is_listed(self, tmp_path: Path) -> None:
         """A nested repository with nothing to load never refuses the load, whatever it holds; one holding a bundle follows every rule."""

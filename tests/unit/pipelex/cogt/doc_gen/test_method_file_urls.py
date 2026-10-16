@@ -5,6 +5,7 @@ import pytest
 from mthds.method_tree.exceptions import MethodTreeRefusedError
 from mthds.method_tree.vocabulary import TreeRefusalCode
 
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.cogt.doc_gen.method_file_urls import RelativeUrlBase, is_relative_url, template_asset_refusal
 from pipelex.cogt.doc_gen.render_job import METHOD_FILE_URL_PREFIX, is_method_file_url
 
@@ -89,6 +90,61 @@ class TestMethodFileUrls:
         assert exc_info.value.refusal.code == code
         assert named in exc_info.value.message
         assert "the template file 'templates/letter.html'" in exc_info.value.message
+
+    @pytest.mark.parametrize(
+        ("below_root", "code", "named"),
+        [
+            pytest.param("a:b.png", TreeRefusalCode.REFERENCE_INVALID, "names a scheme", id="reads_as_a_scheme"),
+            pytest.param("a:b/../templates/logo.png", TreeRefusalCode.REFERENCE_INVALID, "names a scheme", id="reads_as_a_scheme_then_climbs"),
+            pytest.param("//templates/logo.png", TreeRefusalCode.REFERENCE_INVALID, "starts with '/'", id="reads_as_an_authority"),
+            pytest.param("/templates/logo.png", TreeRefusalCode.REFERENCE_INVALID, "starts with '/'", id="starts_with_a_slash"),
+            pytest.param("", TreeRefusalCode.REFERENCE_NOT_IN_TREE, "the root of the method tree", id="empty"),
+            pytest.param("?v=2", TreeRefusalCode.REFERENCE_NOT_IN_TREE, "the root of the method tree", id="query_alone"),
+        ],
+    )
+    def test_a_joined_path_the_steps_take_for_no_file_reference_is_refused_never_left_as_written(
+        self, below_root: str, code: TreeRefusalCode, named: str
+    ) -> None:
+        """Below the tree's segment, an engine's join leaves a path from the root whatever it reads as, so a None from the steps is refused."""
+        joined = f"{METHOD_FILE_URL_PREFIX}{_HEX}/{below_root}"
+
+        with pytest.raises(MethodTreeRefusedError) as exc_info:
+            _TEMPLATE_BASE.tree_path_of(url=joined, tree_paths=_TREE_PATHS)
+
+        assert exc_info.value.refusal.code == code
+        assert named in exc_info.value.message
+        assert "the template file 'templates/letter.html'" in exc_info.value.message
+
+    @pytest.mark.parametrize(
+        ("written", "code", "named"),
+        [
+            pytest.param("../../logo.png", TreeRefusalCode.REFERENCE_LEAVES_TREE, "climbs above the root", id="climbs_above_the_root"),
+            pytest.param("/logo.png", TreeRefusalCode.REFERENCE_INVALID, "is malformed", id="root_relative"),
+            pytest.param("..%2Flogo.png", TreeRefusalCode.REFERENCE_INVALID, "is malformed", id="encoded_slash"),
+            pytest.param("missing.png", TreeRefusalCode.REFERENCE_NOT_IN_TREE, "'templates/missing.png', which is not a file", id="absent"),
+            pytest.param("..", TreeRefusalCode.REFERENCE_NOT_IN_TREE, "the root of the method tree", id="the_root"),
+            pytest.param(
+                "../fonts/brand\t.woff2",
+                TreeRefusalCode.REFERENCE_NOT_A_TREE_PATH,
+                "'fonts/brand\t.woff2', which cannot name a file of the method tree of the template file 'templates/letter.html': ",
+                id="control_character",
+            ),
+        ],
+    )
+    def test_a_url_as_written_naming_no_file_is_refused_in_pipelex_s_words(self, written: str, code: TreeRefusalCode, named: str) -> None:
+        """The refusal is worded from its code, naming the URL as written and the template, never only the holder's tree path."""
+        with pytest.raises(MethodTreeRefusedError) as exc_info:
+            _TEMPLATE_BASE.tree_path_of(url=written, tree_paths=_TREE_PATHS)
+
+        assert exc_info.value.refusal.code == code
+        assert exc_info.value.message.startswith(f"The relative URL '{written}' ")
+        assert named in exc_info.value.message
+        assert "the template file 'templates/letter.html'" in exc_info.value.message
+
+    def test_a_listing_that_does_not_hold_the_holder_is_a_fault_of_pipelex(self) -> None:
+        """The listing is the template's tree's, which holds its holder, so one without it is no caller's fault."""
+        with pytest.raises(PipelexUnexpectedError, match=re.escape("'templates/letter.html'")):
+            _TEMPLATE_BASE.tree_path_of(url="logo.png", tree_paths=frozenset({"main.mthds", "templates/logo.png"}))
 
     def test_a_url_under_another_tree_s_segment_is_refused_as_leaving_the_tree(self) -> None:
         other_tree_url = f"{METHOD_FILE_URL_PREFIX}{'cd' * 32}/templates/logo.png"
