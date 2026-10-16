@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:558d2a12672e159edf2827791bcb5370781df2b576b958e0ea48989833087f8b"
+digest = "sha256:8ad6535ebd13f9a08da05c84f082e11f9dec80718a9666d9bcaba5c3c4a55747"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-13T02:26:31Z"
-rationale = "real-catch: runtime_hub.py gains the module-level resolve_effective_run_mode, moved from the pipe tier so the kernel layer can reach it; the run-mode row of the partition table now names it and the resolve_run_mode_for_boot paragraph says why it sits beside it. No import crosses the boundary: runtime_hub imports cogt_run_params, which is kernel-layer, and KERNEL_LAYER_PACKAGES is unchanged."
+reviewed_at = "2026-10-15T23:18:44Z"
+rationale = "clean-pass: runtime_hub.py changes only the scoped_event_log docstring, which now says usage events honour the override too; no symbol moves between the hubs, no import crosses the boundary, and the tracing row of the partition table already names scoped_event_log and get_event_log_override."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:fda2237457fe0b6830ff2ae8f720698735bec4c3"
 "pipelex/interpreter_hub.py" = "blob:023f8452daf76dde409afc7c0966b149b11edabb"
-"pipelex/runtime_hub.py" = "blob:8269c5d9d549dd06eb8329e3763efed403f95fed"
+"pipelex/runtime_hub.py" = "blob:2af9f62d93b2005daa55a7c61e0390601e430c00"
