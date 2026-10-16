@@ -2,14 +2,24 @@ from collections.abc import Iterator
 from enum import StrEnum
 from typing import Any, ClassVar, Self
 
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import override
 
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction
+from pipelex.errors.error_code_declaration import (
+    ABSTRACT_ERROR,
+    AbstractError,
+    ErrorCodeDeclaration,
+    ErrorCodeSet,
+    InheritsCause,
+    declared_error_codes,
+    describe_error_code_declaration,
+)
+from pipelex.errors.error_codes import ErrorCode, error_code_spec
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.migration.plan import MigrationPlan
 from pipelex.suggested_fix import SuggestedFix
-from pipelex.tools.misc.string_utils import pascal_case_to_kebab, pascal_case_to_sentence
-from pipelex.urls import URLs
 from pipelex.validation_error_types import ValidationErrorType
 
 
@@ -80,7 +90,7 @@ INTERNAL_ERROR_PLACEHOLDER = "An internal error occurred."
 # deployment's settings — never anything the caller submitted. It is diagnostics
 # for whoever runs the process, which on a hosted surface is not the caller.
 _STRICT_KEPT_FIELDS: frozenset[str] = frozenset(
-    {"error_type", "title", "type_uri", "error_domain", "error_category", "retryable", "validation_errors"}
+    {"code", "error_type", "title", "type_uri", "error_domain", "error_category", "retryable", "validation_errors"}
 )
 
 # The curated subset of ``ProviderErrorMetadata`` that survives STRICT
@@ -187,11 +197,31 @@ class ErrorDomain(StrEnum):
     - INPUT: the caller can fix it (bad .mthds, wrong args, malformed JSON).
     - CONFIG: an environment or configuration change is needed.
     - RUNTIME: a failure that occurred during execution.
+
+    A report's domain is no longer declared by an error class: it is read from the domain the registry
+    gives the error's code, through :meth:`from_problem_domain`, until the problem document carries that
+    domain itself.
     """
 
     INPUT = "input"
     CONFIG = "config"
     RUNTIME = "runtime"
+
+    @classmethod
+    def from_problem_domain(cls, problem_domain: ProblemDomain) -> "ErrorDomain":
+        """The report domain of a code's registry domain.
+
+        The caller's input and the method the caller sent are both the caller's to change, so both read
+        ``INPUT``; the account's owner and whoever runs the runtime act outside the request, so both read
+        ``CONFIG``; and ``runtime`` stays ``RUNTIME``.
+        """
+        match problem_domain:
+            case ProblemDomain.INPUT | ProblemDomain.METHOD:
+                return cls.INPUT
+            case ProblemDomain.ACCOUNT | ProblemDomain.OPERATOR:
+                return cls.CONFIG
+            case ProblemDomain.RUNTIME:
+                return cls.RUNTIME
 
     @property
     def is_input(self) -> bool:
@@ -415,10 +445,11 @@ class ErrorReport(BaseModel):
 
     Used by CLI JSON output, agent output, and Temporal error details.
 
-    ``title`` and ``type_uri`` are the stable identity pair surfaced to consumers
-    (CLI, API, docs). Every ``PipelexError`` populates them automatically via
-    :meth:`PipelexError.title` / :meth:`PipelexError.type_uri`; consumers never
-    humanize or kebab-case a class name themselves.
+    ``code`` is the registry code the error resolved to (:meth:`PipelexError.resolve_error_code`): a core code
+    of the MTHDS standard or a Pipelex code. ``title`` and ``type_uri`` are the code's title and the code's
+    documentation page, and ``error_domain`` and ``retryable`` are read from the domain and the retry verdict
+    the registry gives the code, so that no raise site sets them independently: two cases that need different
+    verdicts are two codes. Consumers never humanize or kebab-case a class name themselves.
 
     Frozen: wrappers must rebuild via :meth:`model_copy` rather than mutate, so
     a cause-enrichment pass cannot accidentally overwrite an outer wrapper's
@@ -427,6 +458,7 @@ class ErrorReport(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid", arbitrary_types_allowed=True)
 
+    code: str
     error_type: str
     message: str
     title: str
@@ -576,6 +608,47 @@ class ErrorReport(BaseModel):
         """
         return cls.model_validate(data)
 
+    @classmethod
+    def make_for_code(
+        cls,
+        *,
+        code: ErrorCode,
+        error_type: str,
+        message: str,
+        user_action: UserAction | None = None,
+        caller_facing_message: bool = False,
+        validation_errors: list[ValidationErrorItem] | None = None,
+    ) -> "ErrorReport":
+        """Build the report of an error that carries ``code``, reading from the registry what the code decides.
+
+        The title, the documentation page, the domain and the retry verdict are the code's, so a report built here
+        can never disagree with its code. ``PipelexError.to_error_report`` builds every error's report this way.
+
+        Args:
+            code: The registry code the error resolved to.
+            error_type: The error's class name.
+            message: The error's message.
+            user_action: The next step its raise site named, when it named one.
+            caller_facing_message: Whether the message is caller-facing copy, which STRICT disclosure keeps.
+            validation_errors: The structured items of a bundle-validation refusal.
+
+        Returns:
+            The report.
+        """
+        spec = error_code_spec(code)
+        return cls(
+            code=code,
+            error_type=error_type,
+            message=message,
+            title=spec.title,
+            type_uri=spec.type_uri,
+            error_domain=ErrorDomain.from_problem_domain(spec.domain),
+            retryable=spec.invites_retry,
+            user_action=user_action,
+            caller_facing_message=caller_facing_message,
+            validation_errors=validation_errors,
+        )
+
     def user_action_detail(self) -> str | None:
         """Return the free-form advice text on ``user_action``, or ``None`` when absent."""
         return self.user_action.detail if self.user_action is not None else None
@@ -596,109 +669,123 @@ class ErrorReport(BaseModel):
         return error_domain_to_http_status(self.error_domain)
 
 
-def _humanize_class_name(class_name: str) -> str:
-    """Derive a human-readable title from a ``PipelexError`` subclass name.
-
-    Strips a trailing ``Error`` (if present) and runs the remainder through
-    :func:`pipelex.tools.misc.string_utils.pascal_case_to_sentence`. Single-token
-    leaves (``CogtError`` -> ``Cogt``) read awkwardly and warrant a curated
-    :attr:`PipelexError._declared_title` override.
-    """
-    stem = class_name.removesuffix("Error") if class_name.endswith("Error") and class_name != "Error" else class_name
-    return pascal_case_to_sentence(stem)
+_FALLBACK_ERROR_CODE: ErrorCode = CoreCode.RUNTIME_UNEXPECTED
+"""The code of an error whose cause chain names none: the catch-all, ``runtime.unexpected``, step ``report``."""
 
 
 class PipelexError(Exception):
-    error_domain: ErrorDomain | None = None
-    user_action: UserAction | None = None
-    # Whether running the same request again could succeed, declared by a class whose every instance answers the
-    # same: ``False`` on a deterministic refusal of what the caller sent. ``None`` says nothing, and the report then
-    # takes the answer from the ``__cause__`` chain, or carries none. The ``CogtError`` family derives it from its
-    # ``error_category`` instead.
-    retryable: bool | None = None
+    """The root of every error Pipelex raises, each carrying a registry code.
 
-    # When declared *directly in a subclass body*, ``title()`` returns this
-    # verbatim instead of auto-deriving from the class name. Use to fix awkward
-    # auto-derives (e.g. ``CogtError`` -> ``Cogt``) or to publish a curated
-    # user-facing label. ``title()`` consults ``cls.__dict__`` so inheritance
-    # is bypassed — each class either declares its own title or auto-derives
-    # from its own name. That is why the curated ``"Pipelex error"`` value is
-    # set on ``PipelexError`` *itself* without leaking to bare subclasses.
-    _declared_title: ClassVar[str | None] = "Pipelex error"
-    # When declared *directly in a subclass body*, ``type_uri()`` returns this
-    # verbatim instead of appending the kebab-cased class name to the
-    # ``URLs.error_docs_base`` constant. Same inheritance-bypass semantics
-    # as ``_declared_title``.
-    _declared_type_uri: ClassVar[str | None] = None
+    Every subclass declares ``error_code`` in its own class body, as :mod:`pipelex.errors.error_code_declaration`
+    describes: the code it raises, the set its raise sites choose from, that it takes its cause's code, or that it
+    is an abstract base. The code decides the report's title, documentation page, domain and retry verdict, so a
+    class declares none of them; ``tests/unit/pipelex/errors/test_error_code_gate.py`` fails the build on a
+    subclass that declares no code, and ``docs/under-the-hood/error-model.md`` explains the model.
+    """
+
+    error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
+    user_action: UserAction | None = None
+
     # When True, ``ErrorReport``s built from this class keep their ``message``
     # verbatim under STRICT disclosure (see :class:`DisclosureMode`). Set it on
     # classes whose ``message`` is genuinely caller-facing copy — text describing
     # the *caller's own* input (a ``.mthds`` syntax error, a failed bundle
     # validation). It is consulted by plain attribute access, so it inherits
     # normally — a subclass of a caller-facing error stays caller-facing.
-    # (Contrast ``_declared_title`` / ``_declared_type_uri``, which ``title()`` /
-    # ``type_uri()`` deliberately read via ``cls.__dict__`` to bypass inheritance.)
     _authors_caller_facing_message: ClassVar[bool] = False
     # The per-instance counterpart of ``_authors_caller_facing_message``, set only by
     # :meth:`as_caller_fault`, for a class whose instances are not all the caller's fault.
     _raised_as_caller_fault: bool = False
+    # The code the raise site chose with :meth:`with_error_code`, from the codes the class declares.
+    _chosen_error_code: ErrorCode | None = None
 
-    @classmethod
-    def title(cls) -> str:
-        """Return the human-readable title for this error class.
-
-        Used as the RFC 7807 ``title`` field on every ``ErrorReport``. Auto-derived
-        from the class name unless a subclass sets :attr:`_declared_title` directly
-        in its own body. Inheritance is bypassed so a parent's curated title does
-        not silently capture every subclass — each class either declares its own
-        title or auto-derives.
-        """
-        declared = cls.__dict__.get("_declared_title")
-        if isinstance(declared, str):
-            return declared
-        return _humanize_class_name(cls.__name__)
-
-    @classmethod
-    def type_uri(cls) -> str:
-        """Return the class-derived URI for this error class.
-
-        Used as the RFC 7807 ``type`` field on every ``ErrorReport``. Auto-derived
-        as ``<URLs.error_docs_base>/<kebab-class-name>/`` unless a subclass sets
-        :attr:`_declared_type_uri` directly in its own body. The per-class pages
-        this URI named are retired: an error's documentation is now the page of
-        its code in the MTHDS core registry or the Pipelex error registry
-        (``pipelex/errors/registry/``), and the docs site's ``404.html`` sends a
-        retired class URI to the error codes' index.
-
-        Pure function: the base URI is the :data:`pipelex.urls.URLs.error_docs_base`
-        constant, so this is safe to call before Pipelex bootstrap and inside
-        Temporal workflow code without any determinism hazard.
-
-        Footgun: ``pascal_case_to_kebab`` is case-folding — acronym-casing
-        variants of an existing class name collide (``LLMError`` and ``LlmError``
-        both kebab to ``llm-error``). ``test_pipelex_error_type_uri_uniqueness``
-        catches this at CI time. Pick one casing per acronym in the codebase.
-        """
-        declared = cls.__dict__.get("_declared_type_uri")
-        if isinstance(declared, str):
-            return declared
-        return f"{URLs.error_docs_base}/{pascal_case_to_kebab(cls.__name__)}/"
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        declaration = cls.__dict__.get("error_code")
+        if declaration is not None and not isinstance(declaration, (CoreCode, PipelexErrorCode, ErrorCodeSet, InheritsCause, AbstractError)):
+            msg = (
+                f"{cls.__qualname__}.error_code must be a CoreCode, a PipelexErrorCode, an ErrorCodeSet, an InheritsCause "
+                f"or ABSTRACT_ERROR, not {declaration!r}."
+            )
+            raise TypeError(msg)
 
     def __init__(self, message: str):
         super().__init__(message)
         self.message = message
 
-    def as_caller_fault(self, *, user_action: UserAction | None = None) -> Self:
-        """Classify this error, where it is raised, as a fault in the caller's own method or inputs.
+    def with_error_code(self, error_code: ErrorCode) -> Self:
+        """Choose, where this error is raised, which of its class's codes it carries.
 
-        Its report then carries the ``INPUT`` domain, so an HTTP surface answers 422, and a
-        caller-facing ``message``, which STRICT disclosure keeps (see :class:`DisclosureMode`): the
-        two facts a class declares with ``error_domain = ErrorDomain.INPUT`` and
-        ``_authors_caller_facing_message = True``. It serves a class raised both for the caller's
-        faults and for faults that are not the caller's, which therefore cannot declare them: the
-        raise site that knows says so there, for this one error. A plain wrapper raised from this
-        error inherits the ``INPUT`` domain through the cause chain, but never the caller-facing
-        flag, since its own message is not this one.
+        A class whose raise sites need different codes declares them as an :class:`ErrorCodeSet`, or as the
+        codes an :class:`InheritsCause` class's raise site may choose, and the raise site that knows which
+        applies chooses it here: ``raise SomeError(msg).with_error_code(CoreCode.MODEL_UNAVAILABLE)``. A chosen
+        code stops the cause walk at this error, as a declared code does.
+
+        Args:
+            error_code: One of the codes the class declares.
+
+        Returns:
+            This error, so that the raise site reads ``raise SomeError(msg).with_error_code(code)``.
+
+        Raises:
+            ValueError: When the class does not declare the code, which is a fault of the raise site; the gate
+                test checks every raise site that chooses a code on the class it constructs.
+        """
+        declared_codes = declared_error_codes(type(self).error_code)
+        if error_code not in declared_codes:
+            declared = describe_error_code_declaration(type(self).error_code)
+            msg = f"{type(self).__name__} does not declare the code '{error_code}': its declaration is {declared}."
+            raise ValueError(msg)
+        self._chosen_error_code = error_code
+        return self
+
+    @property
+    def own_error_code(self) -> ErrorCode | None:
+        """The code this error carries by itself, ``None`` when it takes its cause's.
+
+        The code its raise site chose; else its class's code, or the default of its class's set; else ``None``
+        for a class that takes its cause's code or an abstract base.
+        """
+        if self._chosen_error_code is not None:
+            return self._chosen_error_code
+        declaration = type(self).error_code
+        if isinstance(declaration, ErrorCodeSet):
+            return declaration.default
+        if isinstance(declaration, (InheritsCause, AbstractError)):
+            return None
+        return declaration
+
+    def resolve_error_code(self) -> ErrorCode:
+        """The registry code this error reports, resolved along its ``__cause__`` chain.
+
+        The walk starts at this error and stops at the first error that carries a code by itself
+        (:attr:`own_error_code`). It descends through every error that takes its cause's code, and through an
+        abstract base raised by mistake, and stops at a cause that is not a Pipelex error. When no error along
+        the way carries a code, the error reports the fallback of the deepest error that takes its cause's code,
+        and ``runtime.unexpected`` when none names one.
+        """
+        fallback: ErrorCode | None = None
+        for node in iter_cause_chain(self):
+            if not isinstance(node, PipelexError):
+                break
+            own_code = node.own_error_code
+            if own_code is not None:
+                return own_code
+            declaration = type(node).error_code
+            if isinstance(declaration, InheritsCause):
+                fallback = declaration.fallback
+        return fallback or _FALLBACK_ERROR_CODE
+
+    def as_caller_fault(self, *, user_action: UserAction | None = None) -> Self:
+        """Say, where this error is raised, that its message describes only the caller's own method or inputs.
+
+        Its report then carries a caller-facing ``message``, which STRICT disclosure keeps (see
+        :class:`DisclosureMode`): the fact a class declares with ``_authors_caller_facing_message = True``. It
+        serves a class raised both for the caller's faults and for faults that are not the caller's, which
+        therefore cannot declare it: the raise site that knows says so there, for this one error. Who must act
+        is the code's domain, which the raise site chooses with :meth:`with_error_code` when the class declares
+        a set. A plain wrapper raised from this error never inherits the caller-facing flag, since its own
+        message is not this one.
 
         The raise site vouches for the message: it names only the caller's own method and data
         (pipe codes, concept codes, variable names, the values the caller sent), never a server
@@ -710,7 +797,6 @@ class PipelexError(Exception):
         Returns:
             This error, so that the raise site reads ``raise SomeError(msg).as_caller_fault()``.
         """
-        self.error_domain = ErrorDomain.INPUT
         self._raised_as_caller_fault = True
         if user_action is not None:
             self.user_action = user_action
@@ -719,45 +805,35 @@ class PipelexError(Exception):
     def to_error_report(self) -> ErrorReport:
         """Return a structured error report, enriched from the ``__cause__`` chain.
 
-        Wrapper exceptions (``PipeRunError`` -> ``PipeRouterError`` ->
-        ``PipelineExecutionError``) carry no ``error_category`` / ``retryable`` /
-        ``model`` / ``provider`` of their own. This surfaces those classification
-        fields from the underlying exception (typically a ``CogtError``) so they
-        survive every wrapping layer up to the CLI / HTTP boundary.
-
-        ``title`` / ``type_uri`` are *wrapper-wins*: enrichment never overwrites
-        them with the cause's identity — the outermost wrapper's class is what
-        the consumer sees.
+        The report's ``code`` is :meth:`resolve_error_code`, and its title, documentation page, domain and
+        retry verdict are the code's. Wrapper exceptions (``PipeRunError`` -> ``PipeRouterError`` ->
+        ``PipelineExecutionError``) carry no ``error_category`` / ``model`` / ``provider`` of their own: this
+        surfaces those fields from the underlying exception (typically a ``CogtError``) so they survive every
+        wrapping layer up to the CLI / HTTP boundary.
 
         Subclasses override to include additional fields (error_category, model,
         etc.); an override must end with ``self._enrich_error_report_from_cause(report)``
         so the cause-chain enrichment stays uniform across the hierarchy.
         """
-        report = ErrorReport(
+        report = ErrorReport.make_for_code(
+            code=self.resolve_error_code(),
             error_type=type(self).__name__,
             message=self.message,
-            title=type(self).title(),
-            type_uri=type(self).type_uri(),
-            error_domain=self.error_domain,
-            retryable=self.retryable,
             user_action=self.user_action,
             caller_facing_message=self._authors_caller_facing_message or self._raised_as_caller_fault,
         )
         return self._enrich_error_report_from_cause(report)
 
     def _enrich_error_report_from_cause(self, report: ErrorReport) -> ErrorReport:
-        """Fill the ``None`` classification fields of ``report`` from the ``__cause__`` chain.
+        """Fill the ``None`` diagnostic fields of ``report`` from the ``__cause__`` chain.
 
-        A wrapper keeps its own ``error_type``, ``message``, ``title``,
-        ``type_uri`` and ``caller_facing_message`` but inherits every
-        classification field it does not set itself — ``error_category``,
-        ``error_domain``, ``retryable``, ``user_action``, ``model``, ``provider``,
-        ``provider_metadata`` — from the underlying ``PipelexError`` that knows
-        them. ``caller_facing_message`` is pointedly NOT inherited: it records
-        the provenance of ``report.message``, which is always the wrapper's own
-        message, so a domain-less wrapper raised ``from`` an ``INPUT`` cause does
-        not pick up caller-facing status. ``to_error_report()`` overrides call
-        this so enrichment stays uniform.
+        A wrapper keeps its own ``code`` and everything the code decides, ``error_type``, ``message`` and
+        ``caller_facing_message``, but inherits every field it does not set itself — ``error_category``,
+        ``user_action``, ``model``, ``provider``, ``provider_metadata`` — from the underlying ``PipelexError``
+        that knows them. The code needs no inheriting here: :meth:`resolve_error_code` already walked the chain.
+        ``caller_facing_message`` is pointedly NOT inherited: it records the provenance of ``report.message``,
+        which is always the wrapper's own message. ``to_error_report()`` overrides call this so enrichment stays
+        uniform.
         """
         cause = self.__cause__
         if not isinstance(cause, PipelexError):
@@ -768,10 +844,10 @@ class PipelexError(Exception):
         if any(node is self for node in iter_cause_chain(cause)):
             return report
         cause_report = cause.to_error_report()
-        # Only the cause-merged classification fields are updated; the wrapper-wins
-        # fields (error_type, message, title, type_uri, caller_facing_message)
-        # stay untouched, so a future wrapper-wins field added to ErrorReport
-        # does not need to be re-listed here.
+        # Only the cause-merged diagnostic fields are updated; the wrapper-wins
+        # fields (code, error_type, message, title, type_uri, error_domain, retryable,
+        # caller_facing_message) stay untouched, so a future wrapper-wins field added
+        # to ErrorReport does not need to be re-listed here.
         # Footgun: ``provider_metadata`` uses whole-object OR, and a Pydantic
         # model instance is always truthy — a wrapper that attached
         # attribution-only metadata (no ``status_code`` / ``retry_after_seconds``)
@@ -780,8 +856,6 @@ class PipelexError(Exception):
         return report.model_copy(
             update={
                 "error_category": report.error_category or cause_report.error_category,
-                "error_domain": report.error_domain or cause_report.error_domain,
-                "retryable": report.retryable if report.retryable is not None else cause_report.retryable,
                 "user_action": report.user_action or cause_report.user_action,
                 "model": report.model or cause_report.model,
                 "provider": report.provider or cause_report.provider,
@@ -791,18 +865,18 @@ class PipelexError(Exception):
 
 
 class PipelexUnexpectedError(PipelexError):
-    _declared_title = "Unexpected internal error"
+    """A fault of ours: an invariant that did not hold, or a host wired wrongly."""
+
+    error_code: ClassVar[ErrorCodeDeclaration] = CoreCode.RUNTIME_UNEXPECTED
 
 
 class PipelexConfigError(PipelexError):
-    """A configuration this process cannot use, optionally with the migration that explains it.
+    """A configuration this process cannot use, optionally with the migration that explains it."""
 
-    ``error_domain`` stays :attr:`ErrorDomain.CONFIG` whether or not a migration is attached —
-    that value is a closed cross-repo enum and the agent-hook spec routes anything else to BLOCK,
-    so staleness is reported *inside* the CONFIG domain rather than as a domain of its own.
-    """
-
-    error_domain = ErrorDomain.CONFIG
+    error_code: ClassVar[ErrorCodeDeclaration] = ErrorCodeSet(
+        default=PipelexErrorCode.CONFIG_INVALID,
+        others=(PipelexErrorCode.CONFIG_SYNTAX, PipelexErrorCode.CONFIG_FILE_MISSING),
+    )
 
     def __init__(self, message: str, *, migration: MigrationErrorBlock | None = None):
         super().__init__(message)
@@ -817,7 +891,18 @@ class PipelexConfigError(PipelexError):
 
 
 class PipelexSetupError(PipelexError):
-    error_domain = ErrorDomain.CONFIG
+    """A boot that cannot complete: an embedding host calling it wrongly, or a configuration it wraps."""
+
+    error_code: ClassVar[ErrorCodeDeclaration] = InheritsCause(
+        fallback=CoreCode.RUNTIME_MISCONFIGURED,
+        others=(
+            CoreCode.RUNTIME_UNEXPECTED,
+            PipelexErrorCode.CONFIG_FILE_MISSING,
+            PipelexErrorCode.CONFIG_INVALID,
+            PipelexErrorCode.CONFIG_SYNTAX,
+            PipelexErrorCode.CONFIG_VARIABLE_MISSING,
+        ),
+    )
 
 
 class SecurityError(PipelexError):
@@ -827,4 +912,4 @@ class SecurityError(PipelexError):
     swallowed by domain-level `except` handlers (e.g. `except PipelexError`).
     """
 
-    _declared_title = "Security policy violation"
+    error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR

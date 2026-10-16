@@ -1,21 +1,22 @@
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import ErrorDomain, PipelexConfigError, PipelexError, PipelexSetupError
 from pipelex.cogt.exceptions import (
     CogtError,
-    ImageContentError,
     ImgGenParameterError,
     ImgGenPromptError,
     InferenceBackendLibraryError,
     InferenceErrorCategory,
     LLMPromptParameterError,
-    LLMPromptSpecError,
     PromptDocumentFactoryError,
     PromptImageFactoryError,
     PromptImageFormatError,
     SdkTypeError,
 )
 from pipelex.core.stuffs.exceptions import DateContentError
+from pipelex.errors.error_codes import ErrorCode
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.libraries.pipe.exceptions import EntryPipeAmbiguousError, EntryPipeNotFoundError, PipeLibraryError, PipeNotFoundError
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.pipeline.exceptions import (
@@ -40,28 +41,30 @@ _PIPELINE_EXEC_ERROR = PipelineExecutionError(
 
 
 class TestClassLevelMetadata:
-    """Key exceptions self-describe error_domain / user_action / error_category at the class level."""
+    """Key exceptions self-describe their code, user_action and error_category at the class level."""
 
     @pytest.mark.parametrize(
-        ("_topic", "exc", "expected_domain"),
+        ("_topic", "exc", "expected_code", "expected_domain"),
         [
-            ("pipeline_execution", _PIPELINE_EXEC_ERROR, ErrorDomain.RUNTIME),
-            ("pipe_execution", PipeExecutionError("boom"), ErrorDomain.RUNTIME),
-            ("validate_bundle", ValidateBundleError("boom"), ErrorDomain.INPUT),
-            ("pipeline_input_content", PipelineInputContentError("boom"), ErrorDomain.INPUT),
+            # The run's wrapper takes its cause's code, and with no cause its fallback.
+            ("pipeline_execution", _PIPELINE_EXEC_ERROR, CoreCode.RUNTIME_UNEXPECTED, ErrorDomain.RUNTIME),
+            ("pipe_execution", PipeExecutionError("boom"), CoreCode.RUNTIME_UNEXPECTED, ErrorDomain.RUNTIME),
+            ("validate_bundle", ValidateBundleError("boom"), CoreCode.METHOD_INVALID, ErrorDomain.INPUT),
+            ("pipeline_input_content", PipelineInputContentError("boom"), PipelexErrorCode.STORAGE_URI_INVALID, ErrorDomain.INPUT),
             # The entry-shaped lookups report a pipe_code the caller supplied, so a typo is theirs
-            # to fix — 422, never the 500 an undomained error renders as.
-            ("entry_pipe_not_found", EntryPipeNotFoundError("boom"), ErrorDomain.INPUT),
-            ("entry_pipe_ambiguous", EntryPipeAmbiguousError("boom"), ErrorDomain.INPUT),
-            ("interpreter", MthdsParserError("boom"), ErrorDomain.INPUT),
-            ("setup", PipelexSetupError("boom"), ErrorDomain.CONFIG),
-            ("config", PipelexConfigError("boom"), ErrorDomain.CONFIG),
-            ("env_var_not_found", EnvVarNotFoundError("boom"), ErrorDomain.CONFIG),
+            # to fix — 422, never the 500 a runtime fault renders as.
+            ("entry_pipe_not_found", EntryPipeNotFoundError("boom"), CoreCode.REQUEST_PIPE_NOT_FOUND, ErrorDomain.INPUT),
+            ("entry_pipe_ambiguous", EntryPipeAmbiguousError("boom"), CoreCode.REQUEST_PIPE_AMBIGUOUS, ErrorDomain.INPUT),
+            ("interpreter", MthdsParserError("boom"), CoreCode.METHOD_INVALID, ErrorDomain.INPUT),
+            ("setup", PipelexSetupError("boom"), CoreCode.RUNTIME_MISCONFIGURED, ErrorDomain.CONFIG),
+            ("config", PipelexConfigError("boom"), PipelexErrorCode.CONFIG_INVALID, ErrorDomain.CONFIG),
+            ("env_var_not_found", EnvVarNotFoundError("boom"), PipelexErrorCode.CONFIG_VARIABLE_MISSING, ErrorDomain.CONFIG),
         ],
     )
-    def test_error_domain(self, _topic: str, exc: PipelexError, expected_domain: ErrorDomain) -> None:
-        """The targeted exceptions carry their expected error_domain in to_error_report()."""
+    def test_error_code(self, _topic: str, exc: PipelexError, expected_code: ErrorCode, expected_domain: ErrorDomain) -> None:
+        """The targeted exceptions report their class's code, and the domain it decides, in to_error_report()."""
         report = exc.to_error_report()
+        assert report.code == expected_code
         assert report.error_domain == expected_domain
 
     @pytest.mark.parametrize(
@@ -94,14 +97,12 @@ class TestClassLevelMetadata:
     @pytest.mark.parametrize(
         ("_topic", "exc", "expected_category"),
         [
-            ("prompt_spec", LLMPromptSpecError("x"), InferenceErrorCategory.CONTENT),
             ("prompt_parameter", LLMPromptParameterError("x"), InferenceErrorCategory.CONTENT),
             ("prompt_image_factory", PromptImageFactoryError("x"), InferenceErrorCategory.CONTENT),
             ("prompt_image_format", PromptImageFormatError("x"), InferenceErrorCategory.CONTENT),
             ("prompt_document_factory", PromptDocumentFactoryError("x"), InferenceErrorCategory.CONTENT),
             ("imggen_prompt", ImgGenPromptError("x"), InferenceErrorCategory.CONTENT),
             ("imggen_parameter", ImgGenParameterError("x"), InferenceErrorCategory.CONTENT),
-            ("image_content", ImageContentError("x"), InferenceErrorCategory.CONTENT),
             ("sdk_type", SdkTypeError("x"), InferenceErrorCategory.CONFIGURATION),
             ("backend_library", InferenceBackendLibraryError("x"), InferenceErrorCategory.CONFIGURATION),
         ],
@@ -158,8 +159,8 @@ class TestClassLevelMetadata:
 
         Pins the deliberate inheritance contract on ``_authors_caller_facing_message``
         (plain attribute access — see ``base_exceptions.py``): a future refactor
-        swapping the flag to ``cls.__dict__`` lookup (the path used by
-        ``_declared_title`` / ``_declared_type_uri``) would silently downgrade
+        swapping the flag to ``cls.__dict__`` lookup (the path the error-code gate
+        uses for ``error_code``) would silently downgrade
         STRICT disclosure for every subclass and let internal messages leak under
         STRICT — or, more likely, silently redact authored caller-facing copy.
         """

@@ -24,7 +24,7 @@ canonical ``PipelexValidationReport`` (a ``ValidationReport`` subtype); the API 
 that precise type at its edge.
 """
 
-from typing import TYPE_CHECKING, Protocol, TypeAlias, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, TypeAlias, runtime_checkable
 
 from mthds.protocol.models import ValidationReport
 
@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 # ErrorReport. Bound at runtime (not just under TYPE_CHECKING) so an external validator
 # plugin can import it to annotate its own validate_bundles. Both arms are leaf types w.r.t.
 # the hub, so this hub-reachable seam stays import-acyclic even with the runtime imports.
-BundleValidationVerdict: TypeAlias = ValidationReport | ErrorReport
+BundleValidationVerdict: TypeAlias = ValidationReport[Any] | ErrorReport
 
 
 @runtime_checkable

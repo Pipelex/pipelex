@@ -9,6 +9,7 @@ from pipelex.base_exceptions import ErrorReport
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource, doc_gen_choice_key
 from pipelex.cogt.inference.error_classification import RUNTIME_CLASSIFIED_ERROR_CODES
 from pipelex.cogt.model_backends.model_type import DEFAULT_MODEL_TYPE
+from pipelex.errors.error_codes import ErrorCode, parse_error_code
 from pipelex.plugins.bundle_validator_registry import BundleValidatorProtocol
 from pipelex.plugins.exceptions import (
     DuplicateBundleValidatorError,
@@ -25,6 +26,7 @@ from pipelex.plugins.exceptions import (
     DuplicateServiceErrorCodeError,
     DuplicateStorageProviderError,
     HubSlotAlreadyClaimedError,
+    PluginErrorCodeNotRegisteredError,
     PluginLayerViolationError,
     ReservedServiceErrorCodeError,
 )
@@ -184,6 +186,8 @@ class PluginRegistrar:
         self.internal_models: dict[tuple[str, str], dict[str, Any]] = {}
         self.doc_gen_defaults: dict[tuple[DocGenFormat, DocGenSource], str] = {}
         self.service_error_codes: dict[str, ServiceErrorCode] = {}
+        # The public codes each plugin declared it raises, bound to the registry and kept in the order declared.
+        self.declared_error_codes: dict[str, tuple[ErrorCode, ...]] = {}
         # Ordered list (not a type-keyed dict) because the exception types are
         # resolved lazily — only ``get_http_error_mappers`` invokes the providers,
         # so duplicate-by-type detection is deferred to resolution time too.
@@ -427,6 +431,32 @@ class PluginRegistrar:
             contributed.append(code)
         if contributed:
             self._active.contributions.append(f"service error codes {', '.join(contributed)}")
+
+    def declare_error_codes(self, *, codes: "Iterable[str]") -> None:
+        """Declare the public error codes this plugin raises, binding each to the registry that defines it.
+
+        A plugin, a closed one included, raises errors whose codes are public: a caller reads the code, its page and its
+        next step whatever plugin raised it, so each must be a code of the MTHDS core or of Pipelex's registry. Each
+        declared code is parsed here (``parse_error_code``), at boot, and an unregistered one refuses the boot with
+        ``PluginErrorCodeNotRegisteredError`` (``pipelex.plugin.broken``), naming the plugin and the code, before any of
+        the plugin's codes is bound: a release of the plugin that targets a code this Pipelex does not define fails
+        where its operator sees it, not on a caller's run. A code may be given as its string or as its constant, and
+        declared by several plugins, since a public code means one thing whoever raises it. The bound codes are kept
+        per plugin in ``declared_error_codes``, each once, in the order first declared.
+        """
+        bound: list[ErrorCode] = []
+        for code in codes:
+            error_code = parse_error_code(code)
+            if error_code is None:
+                raise PluginErrorCodeNotRegisteredError(plugin_name=self._active.name, code=code)
+            bound.append(error_code)
+        if not bound:
+            return
+        already_declared = self.declared_error_codes.get(self._active.name, ())
+        newly_declared = tuple(dict.fromkeys(error_code for error_code in bound if error_code not in already_declared))
+        self.declared_error_codes[self._active.name] = already_declared + newly_declared
+        if newly_declared:
+            self._active.contributions.append(f"error codes {', '.join(newly_declared)}")
 
     def add_pipe_func_executor(self, *, mode: str, factory: PipeFuncExecutorFactoryFn) -> None:
         """Contribute a factory for one PipeFunc execution mode, keyed by an open ``mode`` token.

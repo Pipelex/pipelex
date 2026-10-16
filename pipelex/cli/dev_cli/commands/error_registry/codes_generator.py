@@ -208,6 +208,58 @@ def _params_class(*, registry: ErrorRegistryDocument, entry: RegistryEntry, impo
     return lines
 
 
+def _entries_lines(*, registry: ErrorRegistryDocument) -> list[str]:
+    """The lines declaring ``PipelexErrorEntry`` and ``PIPELEX_ERROR_ENTRIES``, every code's title and verdict.
+
+    The runtime reads a code's title, domain, retry verdict, status and step kinds from this table rather
+    than from the snapshot, so that classifying an error never reads a file: an error is built anywhere,
+    inside a Temporal workflow's sandbox included.
+    """
+    lines = [
+        "",
+        "",
+        "class PipelexErrorEntry(NamedTuple):",
+        '    """What the registry declares about a Pipelex code that classifying an error needs.',
+        "",
+        "    Attributes:",
+        "        title: The code's short title, the same for every occurrence.",
+        "        domain: Who must act, from the MTHDS protocol's closed list of domains.",
+        "        retry: Whether repeating the operation can succeed: ``no``, ``yes`` or ``outcome_unknown``.",
+        "        status: The HTTP status of an answer the code is the body of, ``None`` for a code raised otherwise.",
+        "        actor_step: The kind of the step aimed at the domain's actor.",
+        "        other_step: The kind of the step aimed at any other reader.",
+        '    """',
+        "",
+        "    title: str",
+        "    domain: str",
+        "    retry: str",
+        "    status: int | None",
+        "    actor_step: str",
+        "    other_step: str",
+        "",
+        "",
+        "PIPELEX_ERROR_ENTRIES: dict[PipelexErrorCode, PipelexErrorEntry] = {",
+    ]
+    for entry in registry.codes:
+        member_name = code_member_name(registry=registry, code=entry.code)
+        title = _docstring_text(text=entry.title, where=f"{entry.code}: title")
+        lines.extend(
+            [
+                f"    PipelexErrorCode.{member_name}: PipelexErrorEntry(",
+                f"        title={json.dumps(title)},",
+                f"        domain={json.dumps(str(entry.domain))},",
+                f"        retry={json.dumps(str(entry.retry))},",
+                f"        status={entry.status},",
+                f"        actor_step={json.dumps(str(entry.steps.actor.kind))},",
+                f"        other_step={json.dumps(str(entry.steps.other.kind))},",
+                "    ),",
+            ]
+        )
+    lines.append("}")
+    lines.append('"""The title and verdict of every Pipelex code."""')
+    return lines
+
+
 def render_pipelex_codes(*, registry: ErrorRegistryDocument) -> str:
     """The text of ``pipelex_codes.py`` for a registry."""
     imports = _Imports()
@@ -256,12 +308,14 @@ def render_pipelex_codes(*, registry: ErrorRegistryDocument) -> str:
         body.append(f"    PipelexErrorCode.{member_name}: {params_class_name(registry=registry, code=entry.code)},")
     body.append("}")
     body.append('"""The parameters model of every Pipelex code."""')
+    body.extend(_entries_lines(registry=registry))
 
-    typing_names = ["ClassVar"]
+    typing_names = ["ClassVar", "NamedTuple"]
     if imports.uses_annotated:
-        typing_names.insert(0, "Annotated")
+        typing_names.append("Annotated")
     if imports.uses_literal:
         typing_names.append("Literal")
+    typing_names.sort()
     pydantic_names = ["BaseModel", "ConfigDict", "Field"] if imports.uses_field else ["BaseModel", "ConfigDict"]
     header = [
         '"""The Pipelex error codes and the typed parameters of each, generated from ``pipelex-error-registry.yaml``.',

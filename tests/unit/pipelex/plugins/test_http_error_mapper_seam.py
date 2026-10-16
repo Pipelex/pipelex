@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import ErrorReport
 from pipelex.plugins.contract import PLUGIN_API_VERSION
@@ -25,13 +26,7 @@ def _make_registrar() -> PluginRegistrar:
 
 
 def _to_report(exc: Exception) -> ErrorReport:
-    return ErrorReport(
-        error_type="FakeTransportError",
-        message=str(exc),
-        title="Fake transport error",
-        type_uri="https://errors.pipelex.com/fake-transport-error",
-        retryable=True,
-    )
+    return ErrorReport.make_for_code(code=CoreCode.PROVIDER_UNAVAILABLE, error_type="FakeTransportError", message=str(exc))
 
 
 class TestHttpErrorMapperSeam:
@@ -47,9 +42,9 @@ class TestHttpErrorMapperSeam:
         mappers = registrar.get_http_error_mappers()
         assert set(mappers) == {_FakeTransportError}
         report = mappers[_FakeTransportError](_FakeTransportError("server unreachable"))
+        assert report.code == CoreCode.PROVIDER_UNAVAILABLE
         assert report.retryable is True
         assert report.message == "server unreachable"
-        assert report.type_uri == "https://errors.pipelex.com/fake-transport-error"
 
     def test_provider_resolved_lazily_not_at_registration(self) -> None:
         """The exc-type provider runs only on get_http_error_mappers (read time), never at register — the import-light invariant."""
